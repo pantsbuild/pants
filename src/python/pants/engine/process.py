@@ -11,7 +11,7 @@ from pants.base.exception_sink import ExceptionSink
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.rules import Get, RootRule, collect_rules, rule, side_effecting
+from pants.engine.rules import Get, collect_rules, rule, side_effecting
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -379,10 +379,4 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
 
 
 def rules():
-    return [
-        *collect_rules(),
-        RootRule(BinaryPathRequest),
-        RootRule(Process),
-        RootRule(InteractiveRunner),
-        RootRule(MultiPlatformProcess),
-    ]
+    return collect_rules()

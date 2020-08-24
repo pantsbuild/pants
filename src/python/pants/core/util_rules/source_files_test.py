@@ -9,7 +9,9 @@ from pants.core.target_types import FilesSources
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
+from pants.engine.rules import QueryRule
 from pants.engine.target import Sources as SourcesField
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -32,7 +34,11 @@ SOURCES3 = TargetSources("src/java", ["j1.java", "j2.java"])
 class SourceFilesTest(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *source_files_rules())
+        return (
+            *super().rules(),
+            *source_files_rules(),
+            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper)),
+        )
 
     def mock_sources_field(
         self,

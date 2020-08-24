@@ -40,7 +40,7 @@ from pants.engine.fs import (
 )
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.process import MultiPlatformProcess, Process, ProcessResult
-from pants.engine.rules import Get, RootRule, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
@@ -524,10 +524,4 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
 
 
 def rules():
-    return [
-        *collect_rules(),
-        *pex_cli.rules(),
-        RootRule(PexProcess),
-        RootRule(PexRequest),
-        RootRule(TwoStepPexRequest),
-    ]
+    return [*collect_rules(), *pex_cli.rules()]

@@ -17,6 +17,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
     Type,
     Union,
@@ -437,17 +438,19 @@ class TaskRule(Rule):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class RootRule(Rule):
-    """Represents a root input to an execution of a rule graph.
+class QueryRule(Rule):
+    """A QueryRule declares that a given set of Params will be used to request an output type.
 
-    Roots act roughly like parameters, in that in some cases the only source of a particular type
-    might be when a value is provided as a root subject at the beginning of an execution.
+    Every callsite to `Scheduler.product_request` should have a corresponding QueryRule to ensure
+    that the relevant portions of the RuleGraph are generated.
     """
 
     _output_type: Type
+    input_types: Tuple[Type, ...]
 
-    def __init__(self, output_type: Type) -> None:
+    def __init__(self, output_type: Type, input_types: Sequence[Type]) -> None:
         self._output_type = output_type
+        self.input_types = tuple(input_types)
 
     @property
     def output_type(self):
@@ -459,19 +462,19 @@ class RuleIndex:
     """Holds a normalized index of Rules used to instantiate Nodes."""
 
     rules: Dict[Type, OrderedSet[Rule]]
-    roots: FrozenOrderedSet[RootRule]
+    queries: FrozenOrderedSet[QueryRule]
     union_rules: FrozenOrderedSet[UnionRule]
 
     @classmethod
     def create(cls, rule_entries) -> "RuleIndex":
         """Creates a RuleIndex with tasks indexed by their output type."""
         serializable_rules: Dict[Type, OrderedSet[Rule]] = {}
-        serializable_roots: OrderedSet[RootRule] = OrderedSet()
+        queries: OrderedSet[QueryRule] = OrderedSet()
         union_rules: OrderedSet[UnionRule] = OrderedSet()
 
         def add_rule(rule: Rule) -> None:
-            if isinstance(rule, RootRule):
-                serializable_roots.add(rule)
+            if isinstance(rule, QueryRule):
+                queries.add(rule)
             else:
                 output_type = rule.output_type
                 if output_type not in serializable_rules:
@@ -496,7 +499,7 @@ class RuleIndex:
 
         return RuleIndex(
             rules=serializable_rules,
-            roots=FrozenOrderedSet(serializable_roots),
+            queries=FrozenOrderedSet(queries),
             union_rules=FrozenOrderedSet(union_rules),
         )
 
@@ -504,7 +507,7 @@ class RuleIndex:
         rules = FrozenOrderedSet(
             (
                 *itertools.chain.from_iterable(ruleset for ruleset in self.rules.values()),
-                *self.roots,
+                *self.queries,
             )
         )
         return rules, self.union_rules

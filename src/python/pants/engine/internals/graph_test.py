@@ -11,7 +11,6 @@ import pytest
 
 from pants.base.specs import (
     AddressLiteralSpec,
-    AddressSpecs,
     FilesystemGlobSpec,
     FilesystemLiteralSpec,
     FilesystemSpec,
@@ -46,7 +45,7 @@ from pants.engine.internals.graph import (
     parse_dependencies_field,
 )
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, MultiGet, RootRule, rule
+from pants.engine.rules import Get, MultiGet, QueryRule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -91,7 +90,12 @@ class MockTarget(Target):
 class GraphTest(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), RootRule(Addresses), RootRule(WrappedTarget))
+        return (
+            *super().rules(),
+            QueryRule(Targets, (DependenciesRequest, OptionsBootstrapper)),
+            QueryRule(TransitiveTargets, (Addresses, OptionsBootstrapper)),
+            QueryRule(SourcesSnapshot, (Specs, OptionsBootstrapper)),
+        )
 
     @classmethod
     def target_types(cls):
@@ -321,6 +325,10 @@ class TestOwners(TestBase):
     def target_types(cls):
         return (MockTarget,)
 
+    @classmethod
+    def rules(cls):
+        return (*super().rules(), QueryRule(Owners, (OwnersRequest, OptionsBootstrapper)))
+
     def assert_owners(self, requested: Iterable[str], *, expected: Set[Address]) -> None:
         result = self.request_product(
             Owners, Params(OwnersRequest(tuple(requested)), create_options_bootstrapper())
@@ -406,15 +414,20 @@ class TestSpecsToAddresses(TestBase):
     def target_types(cls):
         return (MockTarget,)
 
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            QueryRule(AddressesWithOrigins, (FilesystemSpecs, OptionsBootstrapper)),
+            QueryRule(AddressesWithOrigins, (Specs, OptionsBootstrapper)),
+        )
+
     def resolve_filesystem_specs(
         self, specs: Iterable[FilesystemSpec], *, bootstrapper: Optional[OptionsBootstrapper] = None
     ) -> Set[AddressWithOrigin]:
         result = self.request_product(
             AddressesWithOrigins,
-            Params(
-                Specs(AddressSpecs([]), FilesystemSpecs(specs)),
-                bootstrapper or create_options_bootstrapper(),
-            ),
+            Params(FilesystemSpecs(specs), bootstrapper or create_options_bootstrapper(),),
         )
         return set(result)
 
@@ -568,7 +581,9 @@ class TestFindValidFieldSets(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            RootRule(TargetsWithOrigins),
+            QueryRule(
+                TargetsToValidFieldSets, (TargetsToValidFieldSetsRequest, TargetsWithOrigins)
+            ),
             UnionRule(cls.FieldSetSuperclass, cls.FieldSetSubclass1),
             UnionRule(cls.FieldSetSuperclass, cls.FieldSetSubclass2),
             UnionRule(cls.FieldSetSuperclassWithOrigin, cls.FieldSetSubclassWithOrigin),
@@ -656,7 +671,10 @@ class TestFindValidFieldSets(TestBase):
 class TestSources(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), RootRule(HydrateSourcesRequest))
+        return (
+            *super().rules(),
+            QueryRule(HydratedSources, (HydrateSourcesRequest, OptionsBootstrapper)),
+        )
 
     def test_normal_hydration(self) -> None:
         addr = Address("src/fortran", target_name=":lib")
@@ -841,8 +859,9 @@ class TestCodegen(TestBase):
         return (
             *super().rules(),
             generate_smalltalk_from_avro,
-            RootRule(GenerateSmalltalkFromAvroRequest),
-            RootRule(HydrateSourcesRequest),
+            QueryRule(UnionMembership, ()),
+            QueryRule(HydratedSources, (HydrateSourcesRequest, OptionsBootstrapper)),
+            QueryRule(GeneratedSources, (GenerateSmalltalkFromAvroRequest, OptionsBootstrapper)),
             UnionRule(GenerateSourcesRequest, GenerateSmalltalkFromAvroRequest),
         )
 
@@ -1080,10 +1099,10 @@ class TestDependencies(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            RootRule(DependenciesRequest),
             inject_smalltalk_deps,
             inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
+            QueryRule(Addresses, (DependenciesRequest, OptionsBootstrapper)),
             UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),

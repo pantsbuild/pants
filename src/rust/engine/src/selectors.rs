@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::core::TypeId;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialOrd, Hash, PartialEq)]
 pub struct Get {
   pub product: TypeId,
   pub subject: TypeId,
@@ -17,7 +17,7 @@ impl fmt::Display for Get {
   }
 }
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Ord, PartialOrd, Hash, PartialEq)]
 pub struct Select {
   pub product: TypeId,
 }
@@ -37,7 +37,7 @@ impl fmt::Debug for Select {
 ///
 /// A key for the dependencies used from a rule.
 ///
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum DependencyKey {
   // A Get for a particular product/subject pair.
   JustGet(Get),

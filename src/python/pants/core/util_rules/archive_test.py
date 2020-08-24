@@ -7,8 +7,8 @@ from io import BytesIO
 
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.core.util_rules.archive import rules as archive_rules
-from pants.engine.fs import DigestContents, FileContent, Snapshot
-from pants.engine.rules import RootRule
+from pants.engine.fs import DigestContents, FileContent
+from pants.engine.rules import QueryRule
 from pants.testutil.engine_util import Params
 from pants.testutil.test_base import TestBase
 
@@ -23,7 +23,7 @@ class ArchiveTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *archive_rules(), RootRule(Snapshot))
+        return (*super().rules(), *archive_rules(), QueryRule(ExtractedDigest, (MaybeExtractable,)))
 
     # TODO: Figure out a way to run these tests without a TestBase subclass, and use
     #  pytest.mark.parametrize.

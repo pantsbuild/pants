@@ -8,7 +8,7 @@ from typing import Iterable, Tuple
 
 from pants.engine.platform import Platform
 from pants.engine.process import BinaryPathRequest, BinaryPaths, InteractiveProcess
-from pants.engine.rules import Get, RootRule, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
@@ -64,4 +64,4 @@ async def find_open_program(request: OpenFilesRequest, plat: Platform) -> OpenFi
 
 
 def rules():
-    return (*collect_rules(), RootRule(OpenFilesRequest))
+    return collect_rules()

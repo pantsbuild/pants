@@ -6,7 +6,7 @@ from typing import Iterable, Set, Tuple, Type
 
 from pants.core.target_types import FilesSources
 from pants.engine.fs import MergeDigests, Snapshot
-from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
 from pants.util.meta import frozen_after_init
@@ -78,4 +78,4 @@ async def determine_source_files(request: SourceFilesRequest) -> SourceFiles:
 
 
 def rules():
-    return [*collect_rules(), RootRule(SourceFilesRequest)]
+    return collect_rules()

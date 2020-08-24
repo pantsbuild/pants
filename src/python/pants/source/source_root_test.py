@@ -9,7 +9,8 @@ import pytest
 
 from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.internals.selectors import Params
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import (
     OptionalSourceRoot,
     SourceRoot,
@@ -270,7 +271,11 @@ class AllRootsTest(TestBase):
 class SourceRootsRequestTest(TestBase):
     @classmethod
     def rules(cls):
-        return [*super().rules(), *source_root_rules(), RootRule(SourceRootsRequest)]
+        return [
+            *super().rules(),
+            *source_root_rules(),
+            QueryRule(SourceRootsResult, (SourceRootsRequest, OptionsBootstrapper)),
+        ]
 
     def test_source_roots_request(self) -> None:
         req = SourceRootsRequest(

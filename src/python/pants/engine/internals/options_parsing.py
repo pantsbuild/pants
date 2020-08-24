@@ -3,8 +3,9 @@
 
 from dataclasses import dataclass
 
-from pants.engine.rules import RootRule, collect_rules, rule
-from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.rules import collect_rules, rule
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import GlobalOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -20,11 +21,12 @@ class _Options:
 
 
 @rule
-def parse_options(options_bootstrapper: OptionsBootstrapper) -> _Options:
+def parse_options(
+    options_bootstrapper: OptionsBootstrapper, build_config: BuildConfiguration
+) -> _Options:
     # TODO: Because _OptionsBootstapper is currently provided as a Param, this @rule relies on options
     # remaining relatively stable in order to be efficient. See #6845 for a discussion of how to make
     # minimize the size of that value.
-    build_config = BuildConfigInitializer.get(options_bootstrapper)
     return _Options(
         OptionsInitializer.create(options_bootstrapper, build_config, init_subsystems=False)
     )
@@ -42,8 +44,4 @@ def log_level(global_options: GlobalOptions) -> LogLevel:
 
 
 def rules():
-    return [
-        *collect_rules(),
-        RootRule(Scope),
-        RootRule(OptionsBootstrapper),
-    ]
+    return collect_rules()

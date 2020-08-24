@@ -6,12 +6,13 @@ from typing import List, Optional
 
 import pytest
 
-from pants.core.util_rules import source_files, stripped_source_files
+from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -22,9 +23,8 @@ class StrippedSourceFilesTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *source_files.rules(),
             *stripped_source_files.rules(),
-            RootRule(SourceFiles),
+            QueryRule(StrippedSourceFiles, (SourceFiles, OptionsBootstrapper)),
         )
 
     def get_stripped_files(

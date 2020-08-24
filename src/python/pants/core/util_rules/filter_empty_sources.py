@@ -6,7 +6,7 @@ from typing import TypeVar
 from typing_extensions import Protocol
 
 from pants.engine.collection import Collection
-from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
 from pants.engine.target import Target
@@ -65,8 +65,4 @@ async def determine_targets_with_sources(request: TargetsWithSourcesRequest) -> 
 
 
 def rules():
-    return [
-        *collect_rules(),
-        RootRule(FieldSetsWithSourcesRequest),
-        RootRule(TargetsWithSourcesRequest),
-    ]
+    return collect_rules()

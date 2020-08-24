@@ -12,7 +12,7 @@ from pants.core.util_rules import source_files, stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import MergeDigests, Snapshot
-from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Sources, Target
 from pants.engine.unions import UnionMembership
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -124,5 +124,4 @@ def rules():
         *ancestor_files.rules(),
         *source_files.rules(),
         *stripped_source_files.rules(),
-        RootRule(PythonSourceFilesRequest),
     ]

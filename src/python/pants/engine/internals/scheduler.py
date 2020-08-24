@@ -99,7 +99,7 @@ class Scheduler:
         execution_options: ExecutionOptions,
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
-        validate: bool = True,
+        validate_reachability: bool = True,
     ) -> None:
         """
         :param native: An instance of engine.native.Native.
@@ -114,15 +114,15 @@ class Scheduler:
         :param union_membership: All the registered and normalized union rules.
         :param execution_options: Execution options for (remote) processes.
         :param include_trace_on_error: Include the trace through the graph upon encountering errors.
-        :type include_trace_on_error: bool
-        :param validate: True to assert that the ruleset is valid.
+        :param validate_reachability: True to assert that all rules in an otherwise successfully
+          constructed rule graph are reachable: if a graph cannot be successfully constructed, it
+          is always a fatal error.
         """
         self._native = native
         self.include_trace_on_error = include_trace_on_error
         self._visualize_to_dir = visualize_to_dir
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
-        self._root_subject_types = [r.output_type for r in rule_index.roots]
 
         # Create the native Scheduler and Session.
         tasks = self._register_rules(rule_index, union_membership)
@@ -156,7 +156,6 @@ class Scheduler:
 
         self._scheduler = native.new_scheduler(
             tasks=tasks,
-            root_subject_types=self._root_subject_types,
             build_root=build_root,
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
@@ -172,8 +171,8 @@ class Scheduler:
             rule_graph_name = "rule_graph.dot"
             self.visualize_rule_graph_to_file(os.path.join(self._visualize_to_dir, rule_graph_name))
 
-        if validate:
-            self._assert_ruleset_valid()
+        if validate_reachability:
+            self._native.lib.validate_reachability(self._scheduler)
 
     def graph_trace(self, session, execution_request):
         with temporary_file_path() as path:
@@ -181,9 +180,6 @@ class Scheduler:
             with open(path, "r") as fd:
                 for line in fd.readlines():
                     yield line.rstrip()
-
-    def _assert_ruleset_valid(self):
-        self._native.lib.validator_run(self._scheduler)
 
     def _to_params_list(self, subject_or_params):
         if isinstance(subject_or_params, Params):
@@ -201,6 +197,10 @@ class Scheduler:
                     self._register_task(tasks, output_type, rule, union_membership)
                 else:
                     raise ValueError(f"Unexpected Rule type: {rule}")
+        for query in rule_index.queries:
+            self._native.lib.tasks_query_add(
+                tasks, query.output_type, query.input_types,
+            )
         return tasks
 
     def _register_task(

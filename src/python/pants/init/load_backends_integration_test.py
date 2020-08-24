@@ -12,6 +12,8 @@ def discover_backends() -> List[str]:
     backends = {
         str(register_py.parent).replace("src/python/", "").replace("/", ".")
         for register_py in register_pys
+        # TODO: See https://github.com/pantsbuild/pants/issues/10683.
+        if register_py != Path("src/python/pants/backend/codegen/protobuf/python/register.py")
     }
     always_activated = {"pants.core", "pants.backend.project_info", "pants.backend.pants_info"}
     return sorted(backends - always_activated)
