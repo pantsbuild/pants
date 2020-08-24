@@ -4,7 +4,6 @@
 from typing import Tuple
 
 from pants.backend.python.rules.pex import Pex, PexRequest, PexRequirements
-from pants.backend.python.rules.pex_environment import PexEnvironment
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
 from pants.backend.python.subsystems.ipython import IPython
@@ -21,7 +20,7 @@ class PythonRepl(ReplImplementation):
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) -> ReplRequest:
+async def create_python_repl_request(repl: PythonRepl) -> ReplRequest:
     requirements_request = Get(
         Pex,
         PexFromTargetsRequest,
@@ -36,11 +35,12 @@ async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) 
     merged_digest = await Get(
         Digest, MergeDigests((requirements_pex.digest, sources.source_files.snapshot.digest))
     )
-
     chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
-    env = {**pex_env.environment_dict, "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)}
-
-    return ReplRequest(digest=merged_digest, args=(repl.in_chroot(requirements_pex.name),), env=env)
+    return ReplRequest(
+        digest=merged_digest,
+        args=(repl.in_chroot(requirements_pex.name),),
+        env={"PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)},
+    )
 
 
 class IPythonRepl(ReplImplementation):
@@ -48,9 +48,7 @@ class IPythonRepl(ReplImplementation):
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_ipython_repl_request(
-    repl: IPythonRepl, ipython: IPython, pex_env: PexEnvironment
-) -> ReplRequest:
+async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> ReplRequest:
     # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
     # so that we can get the interpreter constraints for use in ipython_request.
     requirements_pex_request = await Get(
@@ -87,19 +85,18 @@ async def create_ipython_repl_request(
             (requirements_pex.digest, sources.source_files.snapshot.digest, ipython_pex.digest)
         ),
     )
-
+    chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
     args: Tuple[str, ...] = (repl.in_chroot(ipython_pex.name),)
     if ipython.options.ignore_cwd:
         args = args + ("--ignore-cwd",)
-
-    chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
-    env = {
-        **pex_env.environment_dict,
-        "PEX_PATH": repl.in_chroot(requirements_pex_request.output_filename),
-        "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
-    }
-
-    return ReplRequest(digest=merged_digest, args=args, env=env)
+    return ReplRequest(
+        digest=merged_digest,
+        args=args,
+        env={
+            "PEX_PATH": repl.in_chroot(requirements_pex_request.output_filename),
+            "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
+        },
+    )
 
 
 def rules():
