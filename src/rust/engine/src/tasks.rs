@@ -1,14 +1,14 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::core::{Function, TypeId};
 use crate::intrinsics::Intrinsics;
 use crate::selectors::{DependencyKey, Get, Select};
 
-use rule_graph::{DisplayForGraph, DisplayForGraphArgs};
+use rule_graph::{DisplayForGraph, DisplayForGraphArgs, Query};
 
 use log::Level;
 
@@ -166,9 +166,11 @@ pub struct Intrinsic {
 #[derive(Clone, Debug)]
 pub struct Tasks {
   // output product type -> list of rules providing it
-  rules: HashMap<TypeId, Vec<Rule>>,
+  rules: BTreeMap<TypeId, Vec<Rule>>,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
+  // queries
+  queries: Vec<Query<Rule>>,
 }
 
 ///
@@ -184,13 +186,18 @@ pub struct Tasks {
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
-      rules: HashMap::default(),
+      rules: BTreeMap::default(),
       preparing: None,
+      queries: Vec::default(),
     }
   }
 
-  pub fn as_map(&self) -> &HashMap<TypeId, Vec<Rule>> {
+  pub fn as_map(&self) -> &BTreeMap<TypeId, Vec<Rule>> {
     &self.rules
+  }
+
+  pub fn queries(&self) -> &Vec<Query<Rule>> {
+    &self.queries
   }
 
   pub fn intrinsics_set(&mut self, intrinsics: &Intrinsics) {
@@ -265,5 +272,9 @@ impl Tasks {
       rules,
     );
     rules.push(rule);
+  }
+
+  pub fn query_add(&mut self, product: TypeId, params: Vec<TypeId>) {
+    self.queries.push(Query::new(product, params));
   }
 }

@@ -5,18 +5,14 @@ from uuid import UUID
 
 from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.internals.uuid import rules as uuid_rules
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.testutil.test_base import TestBase
 
 
 class UUIDTest(TestBase):
     @classmethod
     def rules(cls):
-        return (
-            *super().rules(),
-            *uuid_rules(),
-            RootRule(UUIDRequest),
-        )
+        return (*super().rules(), *uuid_rules(), QueryRule(UUID, (UUIDRequest,)))
 
     def test_distinct_uuids(self):
         uuid1 = self.request_product(UUID, [UUIDRequest()])

@@ -10,9 +10,9 @@ from pants.backend.python.rules.ancestor_files import (
     identify_missing_ancestor_files,
 )
 from pants.core.util_rules import stripped_source_files
-from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import DigestContents
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -24,8 +24,7 @@ class InjectAncestorFilesTest(TestBase):
             *super().rules(),
             find_missing_ancestor_files,
             *stripped_source_files.rules(),
-            RootRule(AncestorFilesRequest),
-            RootRule(SourceFiles),
+            QueryRule(AncestorFiles, (AncestorFilesRequest, OptionsBootstrapper)),
         )
 
     def assert_injected(

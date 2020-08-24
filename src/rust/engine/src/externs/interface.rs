@@ -225,8 +225,8 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "validator_run",
-    py_fn!(py, validator_run(a: PyScheduler)),
+    "validate_reachability",
+    py_fn!(py, validate_reachability(a: PyScheduler)),
   )?;
   m.add(
     py,
@@ -321,6 +321,11 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(py, tasks_add_select(a: PyTasks, b: PyType)),
   )?;
   m.add(py, "tasks_task_end", py_fn!(py, tasks_task_end(a: PyTasks)))?;
+  m.add(
+    py,
+    "tasks_query_add",
+    py_fn!(py, tasks_query_add(a: PyTasks, b: PyType, c: Vec<PyType>)),
+  )?;
 
   m.add(
     py,
@@ -350,7 +355,6 @@ py_module_initializer!(native_engine, |py, m| {
         named_caches_dir_buf: String,
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
-        root_type_ids: Vec<PyType>,
         remoting_options: PyRemotingOptions,
         exec_strategy_opts: PyExecutionStrategyOptions
       )
@@ -756,7 +760,6 @@ fn scheduler_create(
   named_caches_dir_buf: String,
   ignore_patterns: Vec<String>,
   use_gitignore: bool,
-  root_type_ids: Vec<PyType>,
   remoting_options: PyRemotingOptions,
   exec_strategy_opts: PyExecutionStrategyOptions,
 ) -> CPyResult<PyScheduler> {
@@ -776,7 +779,6 @@ fn scheduler_create(
 
     Core::new(
       executor.clone(),
-      root_type_ids.into_iter().map(externs::type_for).collect(),
       tasks,
       types,
       intrinsics,
@@ -1091,6 +1093,21 @@ fn tasks_task_end(py: Python, tasks_ptr: PyTasks) -> PyUnitResult {
   })
 }
 
+fn tasks_query_add(
+  py: Python,
+  tasks_ptr: PyTasks,
+  output_type: PyType,
+  input_types: Vec<PyType>,
+) -> PyUnitResult {
+  with_tasks(py, tasks_ptr, |tasks| {
+    tasks.query_add(
+      externs::type_for(output_type),
+      input_types.into_iter().map(externs::type_for).collect(),
+    );
+    Ok(None)
+  })
+}
+
 fn graph_invalidate(py: Python, scheduler_ptr: PyScheduler, paths: Vec<String>) -> CPyResult<u64> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     let paths = paths.into_iter().map(PathBuf::from).collect();
@@ -1165,12 +1182,12 @@ fn session_new_run_id(py: Python, session_ptr: PySession) -> PyUnitResult {
   })
 }
 
-fn validator_run(py: Python, scheduler_ptr: PyScheduler) -> PyUnitResult {
+fn validate_reachability(py: Python, scheduler_ptr: PyScheduler) -> PyUnitResult {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     scheduler
       .core
       .rule_graph
-      .validate()
+      .validate_reachability()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
       .map(|()| None)
   })

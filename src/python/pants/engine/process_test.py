@@ -16,7 +16,7 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResult,
 )
-from pants.engine.rules import Get, RootRule, rule
+from pants.engine.rules import Get, QueryRule, rule
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 
@@ -85,11 +85,8 @@ async def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -
     return Concatted(cat_process_result.stdout.decode())
 
 
-def create_cat_stdout_rules():
-    return [
-        cat_files_process_result_concatted,
-        RootRule(CatExecutionRequest),
-    ]
+def cat_stdout_rules():
+    return [cat_files_process_result_concatted, QueryRule(Concatted, (CatExecutionRequest,))]
 
 
 @dataclass(frozen=True)
@@ -190,11 +187,23 @@ async def javac_compile_process_result(
     )
 
 
-def create_javac_compile_rules():
-    return [javac_compile_process_result, RootRule(JavacCompileRequest)]
+def javac_compile_rules():
+    return [
+        javac_compile_process_result,
+        QueryRule(JavacVersionOutput, (JavacVersionExecutionRequest,)),
+        QueryRule(JavacCompileResult, (JavacCompileRequest,)),
+    ]
 
 
 class TestInputFileCreation(TestBase):
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            QueryRule(ProcessResult, (Process,)),
+            QueryRule(FallibleProcessResult, (Process,)),
+        )
+
     def test_input_file_creation(self):
         file_name = "some.filename"
         file_contents = b"some file contents"
@@ -288,10 +297,12 @@ class ProcessTest(TestBase):
     @classmethod
     def rules(cls):
         return (
-            super().rules()
-            + [RootRule(JavacVersionExecutionRequest), get_javac_version_output]
-            + create_cat_stdout_rules()
-            + create_javac_compile_rules()
+            *super().rules(),
+            get_javac_version_output,
+            *cat_stdout_rules(),
+            *javac_compile_rules(),
+            QueryRule(ProcessResult, (Process,)),
+            QueryRule(FallibleProcessResult, (Process,)),
         )
 
     def test_env(self):

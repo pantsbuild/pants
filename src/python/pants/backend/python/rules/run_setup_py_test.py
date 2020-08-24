@@ -42,9 +42,9 @@ from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets, WrappedTarget
-from pants.source.source_root import SourceRootConfig
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -76,15 +76,16 @@ class TestSetupPyBase(TestBase):
 class TestGenerateChroot(TestSetupPyBase):
     @classmethod
     def rules(cls):
-        return super().rules() + [
+        return (
+            *super().rules(),
             generate_chroot,
             get_sources,
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
-            RootRule(SetupPyChrootRequest),
             *python_sources.rules(),
-        ]
+            QueryRule(SetupPyChroot, (SetupPyChrootRequest, OptionsBootstrapper)),
+        )
 
     def assert_chroot(self, expected_files, expected_setup_kwargs, addr):
         chroot = self.request_product(
@@ -230,14 +231,14 @@ class TestGenerateChroot(TestSetupPyBase):
 class TestGetSources(TestSetupPyBase):
     @classmethod
     def rules(cls):
-        return super().rules() + [
+        return (
+            *super().rules(),
             get_sources,
-            RootRule(SetupPySourcesRequest),
-            RootRule(SourceRootConfig),
             *source_files.rules(),
             *stripped_source_files.rules(),
             *python_sources.rules(),
-        ]
+            QueryRule(SetupPySources, (SetupPySourcesRequest, OptionsBootstrapper)),
+        )
 
     def assert_sources(
         self,
@@ -345,12 +346,13 @@ class TestGetSources(TestSetupPyBase):
 class TestGetRequirements(TestSetupPyBase):
     @classmethod
     def rules(cls):
-        return super().rules() + [
+        return (
+            *super().rules(),
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
-            RootRule(DependencyOwner),
-        ]
+            QueryRule(ExportedTargetRequirements, (DependencyOwner, OptionsBootstrapper)),
+        )
 
     def assert_requirements(self, expected_req_strs, addr):
         reqs = self.request_product(
@@ -430,11 +432,12 @@ class TestGetRequirements(TestSetupPyBase):
 class TestGetOwnedDependencies(TestSetupPyBase):
     @classmethod
     def rules(cls):
-        return super().rules() + [
+        return (
+            *super().rules(),
             get_owned_dependencies,
             get_exporting_owner,
-            RootRule(DependencyOwner),
-        ]
+            QueryRule(OwnedDependencies, (DependencyOwner, OptionsBootstrapper)),
+        )
 
     def assert_owned(self, owned: Iterable[str], exported: str):
         assert sorted(owned) == sorted(
@@ -524,10 +527,11 @@ class TestGetOwnedDependencies(TestSetupPyBase):
 class TestGetExportingOwner(TestSetupPyBase):
     @classmethod
     def rules(cls):
-        return super().rules() + [
+        return (
+            *super().rules(),
             get_exporting_owner,
-            RootRule(OwnedDependency),
-        ]
+            QueryRule(ExportedTarget, (OwnedDependency, OptionsBootstrapper)),
+        )
 
     def assert_is_owner(self, owner: str, owned: str):
         assert (

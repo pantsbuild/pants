@@ -11,8 +11,9 @@ from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import Target
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
@@ -35,7 +36,13 @@ class IsortIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *isort_rules(), RootRule(IsortRequest))
+        return (
+            *super().rules(),
+            *isort_rules(),
+            QueryRule(LintResults, (IsortRequest, OptionsBootstrapper)),
+            QueryRule(FmtResult, (IsortRequest, OptionsBootstrapper)),
+            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper)),
+        )
 
     def make_target_with_origin(self, source_files: List[FileContent]) -> Target:
         for source_file in source_files:

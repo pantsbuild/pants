@@ -17,7 +17,8 @@ from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
@@ -118,9 +119,9 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *pex_from_targets.rules(),
             *source_files.rules(),
             *stripped_source_files.rules(),
-            RootRule(PythonTestFieldSet),
-            # For conftest detection.
-            *dependency_inference_rules.rules(),
+            *dependency_inference_rules.rules(),  # For conftest detection.
+            QueryRule(TestResult, (PythonTestFieldSet, OptionsBootstrapper)),
+            QueryRule(TestDebugRequest, (PythonTestFieldSet, OptionsBootstrapper)),
         )
 
     def run_pytest(

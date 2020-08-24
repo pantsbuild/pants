@@ -13,18 +13,20 @@ from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, Protobu
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import (
     GeneratedSources,
     HydratedSources,
     HydrateSourcesRequest,
     WrappedTarget,
 )
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import NoSourceRootError
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
 
+@pytest.mark.skip(reason="TODO(#10683)")
 class ProtobufPythonIntegrationTest(ExternalToolTestBase):
     @classmethod
     def target_types(cls):
@@ -38,7 +40,8 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
             *additional_fields.rules(),
             *source_files.rules(),
             *stripped_source_files.rules(),
-            RootRule(GeneratePythonFromProtobufRequest),
+            QueryRule(HydratedSources, (HydrateSourcesRequest, OptionsBootstrapper)),
+            QueryRule(GeneratedSources, (GeneratePythonFromProtobufRequest, OptionsBootstrapper)),
         )
 
     def assert_files_generated(

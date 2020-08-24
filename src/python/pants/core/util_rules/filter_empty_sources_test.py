@@ -11,7 +11,9 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.core.util_rules.filter_empty_sources import rules as filter_empty_sources_rules
 from pants.engine.addresses import Address
+from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet, Sources, Tags, Target
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -19,7 +21,12 @@ from pants.testutil.test_base import TestBase
 class FilterEmptySourcesTest(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *filter_empty_sources_rules())
+        return (
+            *super().rules(),
+            *filter_empty_sources_rules(),
+            QueryRule(FieldSetsWithSources, (FieldSetsWithSourcesRequest, OptionsBootstrapper)),
+            QueryRule(TargetsWithSources, (TargetsWithSourcesRequest, OptionsBootstrapper)),
+        )
 
     def test_filter_field_sets(self) -> None:
         @dataclass(frozen=True)

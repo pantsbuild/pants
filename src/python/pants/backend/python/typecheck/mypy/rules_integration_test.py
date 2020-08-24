@@ -12,8 +12,9 @@ from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import Target, WrappedTarget
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
@@ -66,9 +67,8 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         return (
             *super().rules(),
             *mypy_rules(),
-            RootRule(MyPyRequest),
-            # mypy needs __init__.py files in many cases: we pull in inference to avoid boilerplate.
-            *dependency_inference_rules.rules(),
+            *dependency_inference_rules.rules(),  # Used for `__init__.py` inference.
+            QueryRule(TypecheckResults, (MyPyRequest, OptionsBootstrapper)),
         )
 
     @classmethod

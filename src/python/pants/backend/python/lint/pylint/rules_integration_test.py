@@ -12,8 +12,9 @@ from pants.backend.python.target_types import PythonLibrary, PythonRequirementLi
 from pants.core.goals.lint import LintResult, LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import Target, WrappedTarget
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
@@ -39,7 +40,11 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *pylint_rules(), RootRule(PylintRequest))
+        return (
+            *super().rules(),
+            *pylint_rules(),
+            QueryRule(LintResults, (PylintRequest, OptionsBootstrapper)),
+        )
 
     def make_target(
         self,

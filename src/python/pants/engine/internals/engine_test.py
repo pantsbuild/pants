@@ -13,7 +13,7 @@ from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, RootRule, rule
+from pants.engine.rules import Get, MultiGet, QueryRule, rule
 from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
@@ -164,41 +164,24 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     def test_recursive_multi_get(self):
         # Tests that a rule that "uses itself" multiple times per invoke works.
-        rules = [
-            fib,
-            RootRule(int),
-        ]
-
+        rules = [fib, QueryRule(Fib, (int,))]
         (fib_10,) = self.mk_scheduler(rules=rules).product_request(Fib, subjects=[10])
-
         self.assertEqual(55, fib_10.val)
 
     def test_no_include_trace_error_raises_boring_error(self):
-        rules = [
-            RootRule(B),
-            nested_raise,
-        ]
-
+        rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=False)
-
         with self.assertRaises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
-
         self.assert_equal_with_printing(
             "1 Exception encountered:\n\n  Exception: An exception for B\n", str(cm.exception)
         )
 
     def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
-        rules = [
-            RootRule(B),
-            nested_raise,
-        ]
-
+        rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=False)
-
         with self.assertRaises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[B(), B()]))
-
         self.assert_equal_with_printing(
             dedent(
                 """
@@ -212,15 +195,10 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         )
 
     def test_include_trace_error_raises_error_with_trace(self):
-        rules = [
-            RootRule(B),
-            nested_raise,
-        ]
-
+        rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=True)
         with self.assertRaises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
-
         self.assert_equal_with_printing(
             dedent(
                 """
@@ -240,90 +218,26 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             remove_locations_from_traceback(str(cm.exception)),
         )
 
-    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6829")
-    def test_trace_multi(self):
-        # Tests that when multiple distinct failures occur, they are each rendered.
-
-        @rule
-        def d_from_b_nested_raise(b: B) -> D:  # type: ignore[return]
-            fn_raises(b)
-
-        @rule
-        def c_from_b_nested_raise(b: B) -> C:  # type: ignore[return]
-            fn_raises(b)
-
-        @rule
-        def a_from_c_and_d(c: C, d: D) -> A:
-            return A()
-
-        rules = [
-            RootRule(B),
-            d_from_b_nested_raise,
-            c_from_b_nested_raise,
-            a_from_c_and_d,
-        ]
-
-        scheduler = self.scheduler(rules, include_trace_on_error=True)
-        with self.assertRaises(ExecutionError) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
-
-        self.assert_equal_with_printing(
-            dedent(
-                f"""
-                1 Exception encountered:
-                Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
-                  Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
-                    Computing Task(d_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =D, true)
-                      Throw(An exception for B)
-                        Traceback (most recent call last):
-                          File LOCATION-INFO, in call
-                            val = func(*args)
-                          File LOCATION-INFO, in d_from_b_nested_raise
-                            fn_raises(b)
-                          File LOCATION-INFO, in fn_raises
-                            raise Exception('An exception for {{}}'.format(type(x).__name__))
-                        Exception: An exception for B
-
-
-                Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
-                  Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
-                    Computing Task(c_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =C, true)
-                      Throw(An exception for B)
-                        Traceback (most recent call last):
-                          File LOCATION-INFO, in call
-                            val = func(*args)
-                          File LOCATION-INFO, in c_from_b_nested_raise
-                            fn_raises(b)
-                          File LOCATION-INFO, in fn_raises
-                            raise Exception('An exception for {{}}'.format(type(x).__name__))
-                        Exception: An exception for B
-                """
-            ).lstrip()
-            + "\n",
-            remove_locations_from_traceback(str(cm.exception)),
-        )
-
-    def test_illegal_root_selection(self):
-        rules = [RootRule(B)]
-
-        scheduler = self.scheduler(rules, include_trace_on_error=False)
-
+    def test_nonexistent_root(self) -> None:
+        rules = [QueryRule(A, [B])]
         # No rules are available to compute A.
+        with self.assertRaises(ValueError) as cm:
+            self.scheduler(rules, include_trace_on_error=False)
+        assert (
+            "No installed rules return the type A: Is the rule that you're expecting to run "
+            "registered?"
+        ) in str(cm.exception)
+
+    def test_missing_query_rule(self) -> None:
+        # Even if we register the rule to go from MyInt -> MyFloat, we must register a QueryRule
+        # for the graph to work when making a synchronous call via `Scheduler.product_request`.
+        scheduler = self.mk_scheduler(rules=[upcast], include_trace_on_error=False)
         with self.assertRaises(Exception) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
-
-        self.assert_equal_with_printing(
-            "No installed @rules return the type A. Is the @rule that you're expecting to run registered?",
-            str(cm.exception),
-        )
-
-    def test_nonexistent_root_fails_differently(self):
-        rules = [upcast]
-
-        with self.assertRaises(Exception) as cm:
-            list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
-
-        assert "consider declaring RootRule(MyInt)" in str(cm.exception)
+            scheduler.product_request(MyFloat, subjects=[MyInt(0)])
+        assert (
+            "No installed QueryRules return the type MyFloat. Try registering QueryRule(MyFloat "
+            "for MyInt)."
+        ) in str(cm.exception)
 
 
 @dataclass
@@ -350,7 +264,7 @@ class WorkunitTracker:
 
 class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
     def test_streaming_workunits_reporting(self):
-        rules = [fib, RootRule(int)]
+        rules = [fib, QueryRule(Fib, (int,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -380,7 +294,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert tracker.finished
 
     def test_streaming_workunits_parent_id_and_rule_metadata(self):
-        rules = [RootRule(Input), rule_one_function, rule_two, rule_three, rule_four]
+        rules = [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -445,7 +359,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r4["level"] == "INFO"
 
     def test_streaming_workunit_log_levels(self) -> None:
-        rules = [RootRule(Input), rule_one_function, rule_two, rule_three, rule_four]
+        rules = [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -483,7 +397,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r1["parent_id"] == select["span_id"]
 
     def test_streaming_workunit_log_level_parent_rewrite(self) -> None:
-        rules = [RootRule(Input), rule_A, rule_B, rule_C]
+        rules = [rule_A, rule_B, rule_C, QueryRule(Alpha, (Input,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -555,7 +469,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level=LogLevel.ERROR)
 
-        rules = [a_rule, RootRule(int)]
+        rules = [a_rule, QueryRule(ModifiedOutput, (int,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -591,7 +505,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level=None)
 
-        rules = [a_rule, RootRule(int)]
+        rules = [a_rule, QueryRule(ModifiedOutput, (int,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -624,7 +538,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> Output:
             return Output(val=n)
 
-        rules = [a_rule, RootRule(int)]
+        rules = [a_rule, QueryRule(Output, (int,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -650,6 +564,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 class StreamingWorkunitProcessTests(TestBase):
 
     additional_options = ["--no-process-execution-use-local-cache"]
+
+    @classmethod
+    def rules(cls):
+        return [*super().rules(), QueryRule(ProcessResult, (Process,))]
 
     def test_process_digests_on_workunits(self):
         scheduler = self.scheduler

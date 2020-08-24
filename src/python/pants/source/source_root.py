@@ -11,7 +11,7 @@ from typing import Dict, Iterable, Optional, Set, Tuple, Union
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import PathGlobs, Snapshot
-from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -357,8 +357,4 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
 
 def rules():
-    return [
-        *collect_rules(),
-        RootRule(SourceRootRequest),
-        RootRule(SourceRootsRequest),
-    ]
+    return collect_rules()

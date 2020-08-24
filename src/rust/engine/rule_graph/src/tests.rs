@@ -1,34 +1,141 @@
-use crate::{Palette, RuleGraph};
+use crate::builder::combinations_of_one;
+use crate::{Palette, Query, RuleGraph};
 use std::fmt;
 
 #[test]
-fn valid() {
-  let rules = vec![("a", vec![Rule("a_from_b", vec![DependencyKey("b", None)])])]
-    .into_iter()
-    .collect();
-  let roots = vec!["b"];
-  let graph = RuleGraph::new(&rules, roots);
+fn combinations_of_one_test() {
+  let combo = |input: Vec<Vec<usize>>| -> Vec<Vec<usize>> {
+    combinations_of_one(&input)
+      .map(|output| output.into_iter().cloned().collect())
+      .collect()
+  };
+  let empty: Vec<Vec<usize>> = vec![];
 
-  graph.validate().unwrap();
+  // Any empty set means the whole result is empty.
+  assert_eq!(empty, combo(vec![]));
+  assert_eq!(empty, combo(vec![vec![1, 2], vec![]]));
+  assert_eq!(empty, combo(vec![vec![], vec![1, 2]]));
+
+  assert_eq!(vec![vec![1]], combo(vec![vec![1]]));
+  assert_eq!(
+    vec![vec![1, 3], vec![2, 3]],
+    combo(vec![vec![1, 2], vec![3]])
+  );
+  assert_eq!(
+    vec![vec![1, 2, 4], vec![1, 3, 4]],
+    combo(vec![vec![1], vec![2, 3], vec![4]])
+  );
 }
 
 #[test]
-fn no_root() {
+fn basic() {
   let rules = vec![("a", vec![Rule("a_from_b", vec![DependencyKey("b", None)])])]
     .into_iter()
     .collect();
-  let roots = vec![];
-  let graph = RuleGraph::new(&rules, roots);
+  let queries = vec![Query::new("a", vec!["b"])];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  assert!(graph
-    .validate()
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec!["b"], "a").unwrap();
+}
+
+#[test]
+fn singleton() {
+  let rules = vec![("a", vec![Rule("a_singleton", vec![])])]
+    .into_iter()
+    .collect();
+  let queries = vec![Query::new("a", vec![])];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
+
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec![""], "a").unwrap();
+}
+
+#[test]
+fn insufficient_query() {
+  let rules = vec![("a", vec![Rule("a_from_b", vec![DependencyKey("b", None)])])]
+    .into_iter()
+    .collect();
+  let queries = vec![Query::new("a", vec![])];
+
+  assert!(RuleGraph::new(&rules, queries)
     .err()
     .unwrap()
-    .contains("No rule was able to compute DependencyKey(\"b\", None)."));
+    .contains("No installed rules return the type b"));
 }
 
 #[test]
-fn self_cycle() {
+fn ambiguity() {
+  let rules = vec![(
+    "a",
+    vec![
+      Rule("a_from_b", vec![DependencyKey("b", None)]),
+      Rule("a_from_c", vec![DependencyKey("c", None)]),
+    ],
+  )]
+  .into_iter()
+  .collect();
+  let queries = vec![Query::new("a", vec!["b", "c"])];
+
+  assert!(RuleGraph::new(&rules, queries)
+    .err()
+    .unwrap()
+    .contains("Encountered 1 rule graph error:\n  Too many"));
+}
+
+#[test]
+fn nested_basic() {
+  let rules = vec![
+    (
+      "a",
+      vec![Rule("a_from_b", vec![DependencyKey("b", Some("c"))])],
+    ),
+    (
+      "b",
+      vec![Rule(
+        "b_from_c",
+        vec![DependencyKey("c", None), DependencyKey("d", None)],
+      )],
+    ),
+  ]
+  .into_iter()
+  .collect();
+  let queries = vec![Query::new("a", vec!["d"])];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
+
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec!["d"], "a").unwrap();
+}
+
+#[test]
+fn nested_multiple() {
+  let rules = vec![
+    (
+      "a",
+      vec![Rule("a_from_b", vec![DependencyKey("b", Some("c"))])],
+    ),
+    (
+      "b",
+      vec![
+        Rule(
+          "b_from_c",
+          vec![DependencyKey("c", None), DependencyKey("d", None)],
+        ),
+        Rule("b_from_other_unreachable", vec![DependencyKey("d", None)]),
+      ],
+    ),
+  ]
+  .into_iter()
+  .collect();
+  let queries = vec![Query::new("a", vec!["d"])];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
+
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec!["d"], "a").unwrap();
+}
+
+#[test]
+fn self_cycle_simple() {
   let rules = vec![(
     "Fib",
     vec![Rule(
@@ -41,10 +148,13 @@ fn self_cycle() {
   )]
   .into_iter()
   .collect();
-  let roots = vec!["Fib", "int", "nonsense"];
-  let graph = RuleGraph::new(&rules, roots);
+  let queries = vec![
+    Query::new("Fib", vec!["int"]),
+    Query::new("Fib", vec!["Fib"]),
+  ];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  graph.validate().unwrap();
+  graph.validate_reachability().unwrap();
   graph.find_root_edges(vec!["int"], "Fib").unwrap();
   graph.find_root_edges(vec!["Fib"], "Fib").unwrap();
 }
@@ -75,11 +185,77 @@ fn self_cycle_with_external_dep() {
   ]
   .into_iter()
   .collect();
-  let roots = vec!["int"];
-  let graph = RuleGraph::new(&rules, roots);
+  let queries = vec![Query::new("Thing", vec!["int"])];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  graph.validate().unwrap();
+  graph.validate_reachability().unwrap();
   graph.find_root_edges(vec!["int"], "Thing").unwrap();
+}
+
+#[test]
+fn mutual_recursion() {
+  let rules = vec![
+    (
+      "IsEven",
+      vec![Rule(
+        "is_even",
+        vec![
+          DependencyKey("int", None),
+          DependencyKey("IsOdd", Some("int")),
+        ],
+      )],
+    ),
+    (
+      "IsOdd",
+      vec![Rule(
+        "is_odd",
+        vec![
+          DependencyKey("int", None),
+          DependencyKey("IsEven", Some("int")),
+        ],
+      )],
+    ),
+  ]
+  .into_iter()
+  .collect();
+  let queries = vec![
+    Query::new("IsEven", vec!["int"]),
+    Query::new("IsOdd", vec!["int"]),
+  ];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
+
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec!["int"], "IsEven").unwrap();
+  graph.find_root_edges(vec!["int"], "IsOdd").unwrap();
+}
+
+#[test]
+fn wide() {
+  let rules = vec![(
+    "Output",
+    vec![
+      Rule("one", vec![DependencyKey("Output", Some("A"))]),
+      Rule(
+        "two",
+        vec![DependencyKey("A", None), DependencyKey("Output", Some("B"))],
+      ),
+      Rule(
+        "three",
+        vec![DependencyKey("B", None), DependencyKey("Output", Some("C"))],
+      ),
+      Rule(
+        "four",
+        vec![DependencyKey("C", None), DependencyKey("D", None)],
+      ),
+    ],
+  )]
+  .into_iter()
+  .collect();
+  let queries = vec![Query::new("Output", vec!["D"])];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
+
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec!["D"], "Output").unwrap();
 }
 
 impl super::TypeId for &'static str {
@@ -104,7 +280,7 @@ impl super::Rule for Rule {
   }
 
   fn require_reachable(&self) -> bool {
-    true
+    !self.0.ends_with("_unreachable")
   }
 
   fn color(&self) -> Option<Palette> {
@@ -125,7 +301,7 @@ impl fmt::Display for Rule {
 }
 
 // A product and a param. Abbreviated for simpler construction and matching.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, Hash, PartialEq)]
 struct DependencyKey(&'static str, Option<&'static str>);
 
 impl super::DependencyKey for DependencyKey {

@@ -36,7 +36,7 @@ from pants.engine.fs import (
     SourcesSnapshot,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -61,7 +61,6 @@ from pants.engine.target import (
     TargetWithOrigin,
     TransitiveTargets,
     UnexpandedTargets,
-    UnexpandedTargetsWithOrigins,
     UnrecognizedTargetTypeException,
     WrappedTarget,
     _AbstractFieldSet,
@@ -220,17 +219,6 @@ async def resolve_targets_with_origins(
     return TargetsWithOrigins(expanded_targets_with_origins)
 
 
-@rule
-async def resolve_unexpanded_targets_with_origins(
-    addresses_with_origins: AddressesWithOrigins,
-) -> UnexpandedTargetsWithOrigins:
-    targets_with_origins = await MultiGet(
-        Get(TargetWithOrigin, AddressWithOrigin, address_with_origin)
-        for address_with_origin in addresses_with_origins
-    )
-    return UnexpandedTargetsWithOrigins(targets_with_origins)
-
-
 # -----------------------------------------------------------------------------------------------
 # TransitiveTargets
 # -----------------------------------------------------------------------------------------------
@@ -321,20 +309,9 @@ async def transitive_targets(targets: Targets) -> TransitiveTargets:
         )
         visited.update(queued)
 
+    transitive_targets = TransitiveTargets(tuple(targets), FrozenOrderedSet(visited))
     _detect_cycles(tuple(t.address for t in targets), dependency_mapping)
-
-    transitive_wrapped_excludes = await MultiGet(
-        Get(WrappedTarget, AddressInput, address_input)
-        for t in (*targets, *visited)
-        for address_input in t.get(Dependencies).unevaluated_transitive_excludes
-    )
-    transitive_excludes = FrozenOrderedSet(
-        wrapped_t.target for wrapped_t in transitive_wrapped_excludes
-    )
-
-    return TransitiveTargets(
-        tuple(targets), FrozenOrderedSet(visited.difference(transitive_excludes))
-    )
+    return transitive_targets
 
 
 # -----------------------------------------------------------------------------------------------
@@ -940,13 +917,4 @@ def find_valid_field_sets(
 
 
 def rules():
-    return [
-        *collect_rules(),
-        RootRule(DependenciesRequest),
-        RootRule(HydrateSourcesRequest),
-        RootRule(InferDependenciesRequest),
-        RootRule(InjectDependenciesRequest),
-        RootRule(OwnersRequest),
-        RootRule(Specs),
-        RootRule(TargetsToValidFieldSetsRequest),
-    ]
+    return collect_rules()

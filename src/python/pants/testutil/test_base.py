@@ -36,8 +36,8 @@ from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.process import InteractiveRunner
-from pants.engine.rules import RootRule
-from pants.engine.target import Target
+from pants.engine.rules import QueryRule
+from pants.engine.target import Target, WrappedTarget
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.global_options import ExecutionOptions, GlobalOptions
@@ -227,7 +227,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def rules(cls):
-        return [*source_root.rules(), RootRule(Address)]
+        return [*source_root.rules(), QueryRule(WrappedTarget, (Address, OptionsBootstrapper))]
 
     @classmethod
     def target_types(cls) -> Sequence[Type[Target]]:

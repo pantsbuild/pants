@@ -14,6 +14,7 @@ from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexPlatforms,
+    PexProcess,
     PexRequest,
     PexRequirements,
 )
@@ -22,8 +23,9 @@ from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.python.python_setup import PythonSetup
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
@@ -184,7 +186,9 @@ class PexTest(ExternalToolTestBase):
         return (
             *super().rules(),
             *pex_rules(),
-            RootRule(PexRequest),
+            QueryRule(Pex, (PexRequest, OptionsBootstrapper)),
+            QueryRule(Process, (PexProcess, OptionsBootstrapper)),
+            QueryRule(ProcessResult, (Process,)),
         )
 
     def create_pex_and_get_all_data(

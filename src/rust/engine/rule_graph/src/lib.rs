@@ -30,14 +30,13 @@
 mod builder;
 mod rules;
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io;
 
 pub use crate::builder::Builder;
-pub use crate::rules::{DependencyKey, DisplayForGraph, DisplayForGraphArgs, Rule, TypeId};
-
-// TODO: Consider switching to HashSet and dropping the Ord bound from TypeId.
-type ParamTypes<T> = BTreeSet<T>;
+pub use crate::rules::{
+  DependencyKey, DisplayForGraph, DisplayForGraphArgs, ParamTypes, Query, Rule, TypeId,
+};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 struct UnreachableError<R: Rule> {
@@ -46,6 +45,7 @@ struct UnreachableError<R: Rule> {
 }
 
 impl<R: Rule> UnreachableError<R> {
+  #[allow(dead_code)]
   fn new(rule: R) -> UnreachableError<R> {
     UnreachableError {
       rule,
@@ -75,46 +75,8 @@ impl<R: Rule> EntryWithDeps<R> {
   pub fn params(&self) -> &ParamTypes<R::TypeId> {
     match self {
       EntryWithDeps::Inner(ref ie) => &ie.params,
-      EntryWithDeps::Root(ref re) => &re.params,
+      EntryWithDeps::Root(ref re) => &re.0.params,
     }
-  }
-
-  ///
-  /// Returns the set of DependencyKeys representing the dependencies of this EntryWithDeps.
-  ///
-  fn dependency_keys(&self) -> Vec<R::DependencyKey> {
-    match self {
-      EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => rule.dependency_keys(),
-      EntryWithDeps::Root(RootEntry {
-        ref dependency_key, ..
-      }) => vec![*dependency_key],
-    }
-  }
-
-  ///
-  /// Given a set of used parameters (which must be a subset of the parameters available here),
-  /// return a clone of this entry with its parameter set reduced to the used parameters.
-  ///
-  fn simplified(&self, used_params: ParamTypes<R::TypeId>) -> EntryWithDeps<R> {
-    let mut simplified = self.clone();
-    {
-      let simplified_params = match &mut simplified {
-        EntryWithDeps::Inner(ref mut ie) => &mut ie.params,
-        EntryWithDeps::Root(ref mut re) => &mut re.params,
-      };
-
-      let unavailable_params: ParamTypes<_> =
-        used_params.difference(simplified_params).cloned().collect();
-      assert!(
-        unavailable_params.is_empty(),
-        "Entry {} used parameters that were not available: {}",
-        entry_with_deps_str(self),
-        params_str(&unavailable_params),
-      );
-
-      *simplified_params = used_params;
-    }
-    simplified
   }
 }
 
@@ -124,20 +86,8 @@ pub enum Entry<R: Rule> {
   WithDeps(EntryWithDeps<R>),
 }
 
-impl<R: Rule> Entry<R> {
-  fn params(&self) -> Vec<R::TypeId> {
-    match self {
-      Entry::WithDeps(ref e) => e.params().iter().cloned().collect(),
-      Entry::Param(ref type_id) => vec![*type_id],
-    }
-  }
-}
-
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub struct RootEntry<R: Rule> {
-  params: ParamTypes<R::TypeId>,
-  dependency_key: R::DependencyKey,
-}
+pub struct RootEntry<R: Rule>(Query<R>);
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct InnerEntry<R: Rule> {
@@ -152,7 +102,6 @@ impl<R: Rule> InnerEntry<R> {
 }
 
 type RuleDependencyEdges<R> = HashMap<EntryWithDeps<R>, RuleEdges<R>>;
-type UnfulfillableRuleMap<R> = HashMap<EntryWithDeps<R>, Vec<Diagnostic<R>>>;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 struct Diagnostic<R: Rule> {
@@ -162,25 +111,12 @@ struct Diagnostic<R: Rule> {
 }
 
 ///
-/// A graph containing rules mapping rules to their dependencies taking into account subject types.
+/// A graph mapping rules to their dependencies.
 ///
-/// This is a graph of rules. It models dependencies between rules, along with the subject types for
-/// those rules. This allows the resulting graph to include cases where a selector is fulfilled by
-/// the subject of the graph.
-///
-///
-/// `root_param_types` the root parameter types that this graph was generated with.
-/// `root_dependencies` A map from root rules, ie rules representing the expected selector / subject
-///   types for requests, to the rules that can fulfill them.
-/// `rule_dependency_edges` A map from rule entries to the rule entries they depend on.
-///   The collections of dependencies are contained by RuleEdges objects.
-/// `unfulfillable_rules` A map of rule entries to collections of Diagnostics
-///   containing the reasons why they were eliminated from the graph.
 #[derive(Debug)]
 pub struct RuleGraph<R: Rule> {
-  root_param_types: ParamTypes<R::TypeId>,
+  queries: Vec<Query<R>>,
   rule_dependency_edges: RuleDependencyEdges<R>,
-  unfulfillable_rules: UnfulfillableRuleMap<R>,
   unreachable_rules: Vec<UnreachableError<R>>,
 }
 
@@ -189,9 +125,8 @@ pub struct RuleGraph<R: Rule> {
 impl<R: Rule> Default for RuleGraph<R> {
   fn default() -> Self {
     RuleGraph {
-      root_param_types: ParamTypes::default(),
+      queries: Vec::default(),
       rule_dependency_edges: RuleDependencyEdges::default(),
-      unfulfillable_rules: UnfulfillableRuleMap::default(),
       unreachable_rules: Vec::default(),
     }
   }
@@ -263,12 +198,10 @@ impl<R: Rule> DisplayForGraph for EntryWithDeps<R> {
         params_str(params)
       ),
       &EntryWithDeps::Root(ref root) => format!(
-        // TODO: Consider dropping this (final) public use of the keyword "Select", while ensuring
-        // that error messages remain sufficiently grokkable.
-        "Select({}){}for {}",
-        root.dependency_key,
+        "Query({}){}for {}",
+        root.0.product,
         display_args.line_separator(),
-        params_str(&root.params)
+        params_str(&root.0.params)
       ),
     }
   }
@@ -310,8 +243,11 @@ fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
 }
 
 impl<R: Rule> RuleGraph<R> {
-  pub fn new(tasks: &HashMap<R::TypeId, Vec<R>>, root_param_types: Vec<R::TypeId>) -> RuleGraph<R> {
-    Builder::new(tasks, root_param_types).graph()
+  pub fn new(
+    rules: &BTreeMap<R::TypeId, Vec<R>>,
+    queries: Vec<Query<R>>,
+  ) -> Result<RuleGraph<R>, String> {
+    Builder::new(rules, queries).graph()
   }
 
   pub fn find_root_edges<I: IntoIterator<Item = R::TypeId>>(
@@ -355,9 +291,8 @@ impl<R: Rule> RuleGraph<R> {
     }
 
     Ok(RuleGraph {
-      root_param_types: self.root_param_types.clone(),
+      queries: self.queries.clone(),
       rule_dependency_edges: reachable,
-      unfulfillable_rules: UnfulfillableRuleMap::default(),
       unreachable_rules: Vec::default(),
     })
   }
@@ -388,13 +323,12 @@ impl<R: Rule> RuleGraph<R> {
     product: R::TypeId,
   ) -> Result<(EntryWithDeps<R>, RuleEdges<R>), String> {
     let params: ParamTypes<_> = param_inputs.into_iter().collect();
-    let dependency_key = R::DependencyKey::new_root(product);
 
     // Attempt to find an exact match.
-    let maybe_root = EntryWithDeps::Root(RootEntry {
+    let maybe_root = EntryWithDeps::Root(RootEntry(Query {
+      product,
       params: params.clone(),
-      dependency_key,
-    });
+    }));
     if let Some(edges) = self.rule_dependency_edges.get(&maybe_root) {
       return Ok((maybe_root, edges.clone()));
     }
@@ -406,8 +340,7 @@ impl<R: Rule> RuleGraph<R> {
       .iter()
       .filter_map(|(entry, edges)| match entry {
         EntryWithDeps::Root(ref root_entry)
-          if root_entry.dependency_key == dependency_key
-            && root_entry.params.is_subset(&params) =>
+          if root_entry.0.product == product && root_entry.0.params.is_subset(&params) =>
         {
           Some((entry, edges))
         }
@@ -420,45 +353,35 @@ impl<R: Rule> RuleGraph<R> {
         let (root_entry, edges) = subset_matches[0];
         Ok((root_entry.clone(), edges.clone()))
       }
-      0 if params.is_subset(&self.root_param_types) => {
+      0 => {
         // The Params were all registered as RootRules, but the combination wasn't legal.
         let mut suggestions: Vec<_> = self
           .rule_dependency_edges
           .keys()
           .filter_map(|entry| match entry {
-            EntryWithDeps::Root(ref root_entry) if root_entry.dependency_key == dependency_key => {
-              Some(format!("Params({})", params_str(&root_entry.params)))
+            EntryWithDeps::Root(ref root_entry) if root_entry.0.product == product => {
+              Some(format!("Params({})", params_str(&root_entry.0.params)))
             }
             _ => None,
           })
           .collect();
         let suggestions_str = if suggestions.is_empty() {
           format!(
-            "return the type {}. Is the @rule that you're expecting to run registered?",
+            "return the type {}. Try registering QueryRule({} for {}).",
             product,
+            product,
+            params_str(&params),
           )
         } else {
           suggestions.sort();
           format!(
-            "can compute {} given input Params({}), but there were @rules that could compute it using:\n  {}",
+            "can compute {} given input Params({}), but it can be produced using:\n  {}",
             product,
             params_str(&params),
             suggestions.join("\n  ")
           )
         };
-        Err(format!("No installed @rules {}", suggestions_str,))
-      }
-      0 => {
-        // Some Param(s) were not registered.
-        let mut unregistered_params: Vec<_> = params
-          .difference(&self.root_param_types)
-          .map(|p| p.to_string())
-          .collect();
-        unregistered_params.sort();
-        Err(format!(
-          "Types that will be passed as Params at the root of a graph need to be registered via RootRule:\n  {}",
-          unregistered_params.join("\n  "),
-        ))
+        Err(format!("No installed QueryRules {}", suggestions_str,))
       }
       _ => {
         let match_strs = subset_matches
@@ -487,173 +410,25 @@ impl<R: Rule> RuleGraph<R> {
     }
   }
 
-  pub fn validate(&self) -> Result<(), String> {
-    let used_rules: HashSet<_> = self
-      .rule_dependency_edges
-      .keys()
-      .filter_map(|entry| match entry {
-        EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => Some(rule),
-        _ => None,
-      })
-      .collect();
-
-    // Collect diagnostics by type.
-    let (unfulfillable_entries, unfulfillable_roots, unfulfillable_rules) = {
-      let mut unfulfillable_entries = HashMap::new();
-      let mut unfulfillable_roots = Vec::new();
-      let mut unfulfillable_rules = HashSet::new();
-      for (e, diagnostics) in &self.unfulfillable_rules {
-        match e {
-          EntryWithDeps::Inner(InnerEntry { ref rule, .. })
-            if rule.require_reachable()
-              && !diagnostics.is_empty()
-              && !used_rules.contains(&rule) =>
-          {
-            unfulfillable_entries.insert(e, diagnostics.clone());
-            unfulfillable_rules.insert(rule);
-          }
-          EntryWithDeps::Root(re) if !diagnostics.is_empty() => {
-            unfulfillable_entries.insert(e, diagnostics.clone());
-            unfulfillable_roots.push(re);
-          }
-          _ => {}
-        }
-      }
-      (
-        unfulfillable_entries,
-        unfulfillable_roots,
-        unfulfillable_rules,
-      )
-    };
-
-    // Collect unreachable errors for which we would not already report an
-    // unfulfillable error.
-    let unreachable_errors: HashMap<_, _> = self
-      .unreachable_rules
-      .iter()
-      .filter_map(|u| {
-        if unfulfillable_rules.contains(&u.rule) {
-          None
-        } else {
-          Some((&u.rule, vec![u.diagnostic.clone()]))
-        }
-      })
-      .collect();
-
-    if unfulfillable_rules.is_empty() && unreachable_errors.is_empty() {
+  pub fn validate_reachability(&self) -> Result<(), String> {
+    if self.unreachable_rules.is_empty() {
       return Ok(());
     }
 
-    // There are errors. Walk the graph of errored entries to find leaves to render.
-    let unfulfillable_errors: HashMap<_, _> = {
-      let mut entry_stack: Vec<_> = unfulfillable_roots
-        .into_iter()
-        .map(|re| EntryWithDeps::Root(re.clone()))
-        .collect();
-      let mut visited = HashSet::new();
-      let mut errored_leaves = HashSet::new();
-      while let Some(entry) = entry_stack.pop() {
-        if visited.contains(&entry) {
-          continue;
-        }
-        visited.insert(entry.clone());
-        let diagnostics = unfulfillable_entries
-          .get(&entry)
-          .ok_or_else(|| format!("Unknown entry in RuleGraph: {:?}", entry))?;
-
-        // If none of the detail entries of this entry are errored, this is a leaf. Otherwise,
-        // continue recursing into the errored children.
-        let mut causes = diagnostics
-          .iter()
-          .flat_map(|d| d.details.iter())
-          .filter_map(|(detail_entry, _)| match detail_entry {
-            Entry::WithDeps(ref e) if unfulfillable_entries.contains_key(e) => Some(e.clone()),
-            _ => None,
-          })
-          .peekable();
-        if causes.peek().is_some() {
-          // There was at least one errored potential source of a dependency: recurse into them
-          // as potential leaves.
-          entry_stack.extend(causes);
-        } else {
-          // This node had no known cause entries: it's a leaf.
-          errored_leaves.insert(entry);
-        }
-      }
-
-      // Collate the leaves by rule (which is necessary because monomorphization will cause various
-      // permutations of parameters for each rule).
-      let mut collated_unfulfillable_rules = HashMap::new();
-      for (e, diagnostics) in unfulfillable_entries.into_iter() {
-        match e {
-          EntryWithDeps::Inner(InnerEntry { rule, .. }) if errored_leaves.contains(e) => {
-            collated_unfulfillable_rules
-              .entry(rule)
-              .or_insert_with(Vec::new)
-              .extend(diagnostics);
-          }
-          _ => (),
-        }
-      }
-      collated_unfulfillable_rules
-    };
-
-    let mut msgs: Vec<String> = unfulfillable_errors
-      .into_iter()
-      .chain(unreachable_errors.into_iter())
-      .map(|(rule, mut diagnostics)| {
-        diagnostics.sort_by(|l, r| l.reason.cmp(&r.reason));
-        diagnostics.dedup_by(|l, r| l.reason == r.reason);
-        let errors = diagnostics
-          .into_iter()
-          .map(|d| {
-            if d.details.is_empty() {
-              d.reason
-            } else {
-              let mut details: Vec<_> = d
-                .details
-                .iter()
-                .map(|(entry, msg)| {
-                  if let Some(msg) = msg {
-                    format!("{}: {}", entry_str(entry), msg)
-                  } else {
-                    entry_str(entry)
-                  }
-                })
-                .collect();
-              details.sort();
-              details.dedup();
-              format!("{}:\n      {}", d.reason, details.join("\n      "))
-            }
-          })
-          .collect::<Vec<_>>()
-          .join("\n    ");
-        format!("{}:\n    {}", rule, errors)
-      })
-      .collect();
-    msgs.sort();
-
-    Err(format!(
-      "Rules with errors: {}\n\n  {}",
-      msgs.len(),
-      msgs.join("\n\n  ")
-    ))
+    // TODO: This method is currently a noop: see https://github.com/pantsbuild/pants/issues/10649.
+    Ok(())
   }
 
   pub fn visualize(&self, f: &mut dyn io::Write) -> io::Result<()> {
     let display_args = DisplayForGraphArgs { multiline: true };
-    let mut root_subject_type_strs = self
-      .root_param_types
+    let mut queries_strs = self
+      .queries
       .iter()
-      .map(|&t| format!("{}", t))
+      .map(|q| q.to_string())
       .collect::<Vec<String>>();
-    root_subject_type_strs.sort();
+    queries_strs.sort();
     writeln!(f, "digraph {{")?;
-    writeln!(
-      f,
-      "  // root subject types: {}",
-      root_subject_type_strs.join(", ")
-    )?;
+    writeln!(f, "  // queries: {}", queries_strs.join(", "))?;
     writeln!(f, "  // root entries")?;
     let mut root_rule_strs = self
       .rule_dependency_edges
@@ -735,6 +510,8 @@ impl<R: Rule> RuleGraph<R> {
 ///
 /// Records the dependency rules for a rule.
 ///
+/// TODO: No longer needs a Vec<Entry>.
+///
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct RuleEdges<R: Rule> {
   dependencies: HashMap<R::DependencyKey, Vec<Entry<R>>>,
@@ -750,14 +527,6 @@ impl<R: Rule> RuleEdges<R> {
 
   pub fn all_dependencies(&self) -> impl Iterator<Item = &Entry<R>> {
     self.dependencies.values().flatten()
-  }
-
-  fn add_edge(&mut self, dependency_key: R::DependencyKey, new_dependency: Entry<R>) {
-    self
-      .dependencies
-      .entry(dependency_key)
-      .or_insert_with(Vec::new)
-      .push(new_dependency);
   }
 }
 
