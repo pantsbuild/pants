@@ -309,20 +309,9 @@ async def transitive_targets(targets: Targets) -> TransitiveTargets:
         )
         visited.update(queued)
 
+    transitive_targets = TransitiveTargets(tuple(targets), FrozenOrderedSet(visited))
     _detect_cycles(tuple(t.address for t in targets), dependency_mapping)
-
-    transitive_wrapped_excludes = await MultiGet(
-        Get(WrappedTarget, AddressInput, address_input)
-        for t in (*targets, *visited)
-        for address_input in t.get(Dependencies).unevaluated_transitive_excludes
-    )
-    transitive_excludes = FrozenOrderedSet(
-        wrapped_t.target for wrapped_t in transitive_wrapped_excludes
-    )
-
-    return TransitiveTargets(
-        tuple(targets), FrozenOrderedSet(visited.difference(transitive_excludes))
-    )
+    return transitive_targets
 
 
 # -----------------------------------------------------------------------------------------------
