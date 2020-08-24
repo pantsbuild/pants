@@ -47,7 +47,7 @@ class NativeHandler(StreamHandler):
 
         if stream:
             try:
-                self.native.setup_stderr_logger(log_level.level)
+                self.native.setup_stderr_logger()
             except Exception as e:
                 print(f"Error setting up pantsd logger: {e!r}", file=sys.stderr)
                 raise e
@@ -171,7 +171,7 @@ def setup_logging_to_file(
     safe_mkdir(log_dir)
     log_path = os.path.join(log_dir, log_filename)
 
-    fd = native.setup_pantsd_logger(log_path, level.level)
+    fd = native.setup_pantsd_logger(log_path)
     ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
     handler = NativeHandler(level, native_filename=log_path)
 

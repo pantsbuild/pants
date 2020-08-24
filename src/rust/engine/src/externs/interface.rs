@@ -92,13 +92,9 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "setup_pantsd_logger",
-    py_fn!(py, setup_pantsd_logger(a: String, b: u64)),
+    py_fn!(py, setup_pantsd_logger(a: String)),
   )?;
-  m.add(
-    py,
-    "setup_stderr_logger",
-    py_fn!(py, setup_stderr_logger(a: u64)),
-  )?;
+  m.add(py, "setup_stderr_logger", py_fn!(py, setup_stderr_logger()))?;
   m.add(py, "flush_log", py_fn!(py, flush_log()))?;
   m.add(
     py,
@@ -1673,20 +1669,20 @@ fn init_logging(
   Ok(None)
 }
 
-fn setup_pantsd_logger(py: Python, log_file: String, level: u64) -> CPyResult<i64> {
+fn setup_pantsd_logger(py: Python, log_file: String) -> CPyResult<i64> {
   logging::set_thread_destination(Destination::Pantsd);
 
   let path = PathBuf::from(log_file);
   PANTS_LOGGER
-    .set_pantsd_logger(path, level)
+    .set_pantsd_logger(path)
     .map(i64::from)
     .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
 }
 
-fn setup_stderr_logger(_: Python, level: u64) -> PyUnitResult {
+fn setup_stderr_logger(_: Python) -> PyUnitResult {
   logging::set_thread_destination(Destination::Stderr);
   PANTS_LOGGER
-    .set_stderr_logger(level)
+    .set_stderr_logger()
     .expect("Error setting up STDERR logger");
   Ok(None)
 }
