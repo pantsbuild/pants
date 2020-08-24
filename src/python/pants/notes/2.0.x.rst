@@ -47,6 +47,9 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Revert "Fix `run`, `repl`, and `test --debug` to have hermetic environments (#10668)" (#10688)
+  `PR #10688 <https://github.com/pantsbuild/pants/pull/10688>`_
+
 * Implement RuleGraph construction using data flow analysis (#10645)
   `PR #10645 <https://github.com/pantsbuild/pants/pull/10645>`_
 
