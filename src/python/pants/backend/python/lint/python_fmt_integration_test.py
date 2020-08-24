@@ -13,7 +13,6 @@ from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
@@ -42,12 +41,12 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
             *(extra_args or []),
         ]
         results = self.request_product(
-            LanguageFmtResults, Params(targets, create_options_bootstrapper(args=args)),
+            LanguageFmtResults, [targets, create_options_bootstrapper(args=args)],
         )
         return results
 
     def get_digest(self, source_files: List[FileContent]) -> Digest:
-        return self.request_product(Digest, CreateDigest(source_files))
+        return self.request_product(Digest, [CreateDigest(source_files)])
 
     def test_multiple_formatters_changing_the_same_file(self) -> None:
         original_source = FileContent(

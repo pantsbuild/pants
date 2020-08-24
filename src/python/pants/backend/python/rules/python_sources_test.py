@@ -19,7 +19,6 @@ from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import Sources, Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
@@ -66,7 +65,7 @@ class PythonSourceFilesTest(ExternalToolTestBase):
     ) -> StrippedPythonSourceFiles:
         return self.request_product(
             StrippedPythonSourceFiles,
-            Params(
+            [
                 PythonSourceFilesRequest(
                     targets, include_resources=include_resources, include_files=include_files
                 ),
@@ -77,7 +76,7 @@ class PythonSourceFilesTest(ExternalToolTestBase):
                         *(extra_args or []),
                     ]
                 ),
-            ),
+            ],
         )
 
     def get_unstripped_sources(
@@ -91,7 +90,7 @@ class PythonSourceFilesTest(ExternalToolTestBase):
     ) -> PythonSourceFiles:
         return self.request_product(
             PythonSourceFiles,
-            Params(
+            [
                 PythonSourceFilesRequest(
                     targets, include_resources=include_resources, include_files=include_files
                 ),
@@ -102,7 +101,7 @@ class PythonSourceFilesTest(ExternalToolTestBase):
                         *(extra_args or []),
                     ]
                 ),
-            ),
+            ],
         )
 
     def test_filters_out_irrelevant_targets(self) -> None:

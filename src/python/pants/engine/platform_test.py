@@ -17,6 +17,6 @@ class PlatformTest(TestBase):
         process = Process(
             argv=("/bin/echo", "test"), description="Run some program that will exit cleanly."
         )
-        result = self.request_product(FallibleProcessResultWithPlatform, process)
+        result = self.request_product(FallibleProcessResultWithPlatform, [process])
         assert result.exit_code == 0
         assert result.platform == this_platform

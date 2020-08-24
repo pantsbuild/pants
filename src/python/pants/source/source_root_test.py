@@ -8,7 +8,6 @@ from typing import Iterable, Optional, cast
 import pytest
 
 from pants.engine.fs import Digest, PathGlobs, Snapshot
-from pants.engine.internals.selectors import Params
 from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import (
@@ -284,12 +283,12 @@ class SourceRootsRequestTest(TestBase):
         )
         res = self.request_product(
             SourceRootsResult,
-            Params(
+            [
                 req,
                 create_options_bootstrapper(
                     args=["--source-root-patterns=['src/python','tests/python']"]
                 ),
-            ),
+            ],
         )
         assert {
             PurePath("src/python/foo/bar.py"): SourceRoot("src/python"),

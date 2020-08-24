@@ -21,7 +21,6 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import (
     PY_36,
@@ -52,14 +51,14 @@ class PluginResolverTest(TestBase):
     def _create_pex(self) -> Pex:
         return self.request_product(
             Pex,
-            Params(
+            [
                 PexRequest(
                     output_filename="setup-py-runner.pex",
                     internal_only=True,
                     requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"]),
                 ),
                 create_options_bootstrapper(args=["--backend-packages=pants.backend.python"]),
-            ),
+            ],
         )
 
     def _run_setup_py(
@@ -68,22 +67,26 @@ class PluginResolverTest(TestBase):
         pex_obj = self._create_pex()
         source_digest = self.request_product(
             Digest,
-            CreateDigest(
-                [
-                    FileContent(
-                        "setup.py",
-                        dedent(
-                            f"""
+            [
+                CreateDigest(
+                    [
+                        FileContent(
+                            "setup.py",
+                            dedent(
+                                f"""
                     from setuptools import setup
 
                     setup(name="{plugin}", version="{version or DEFAULT_VERSION}")
                 """
-                        ).encode(),
-                    )
-                ]
-            ),
+                            ).encode(),
+                        )
+                    ]
+                )
+            ],
         )
-        merged_digest = self.request_product(Digest, MergeDigests([pex_obj.digest, source_digest]))
+        merged_digest = self.request_product(
+            Digest, [MergeDigests([pex_obj.digest, source_digest])]
+        )
 
         process = Process(
             argv=("python", "setup-py-runner.pex", "setup.py") + tuple(setup_py_args),
@@ -94,8 +97,8 @@ class PluginResolverTest(TestBase):
             description="Run setup.py",
             output_directories=("dist/",),
         )
-        result = self.request_product(ProcessResult, process)
-        result_snapshot = self.request_product(Snapshot, result.output_digest)
+        result = self.request_product(ProcessResult, [process])
+        result_snapshot = self.request_product(Snapshot, [result.output_digest])
         self.scheduler.write_digest(result.output_digest, path_prefix="output")
         safe_mkdir(install_dir)
         for path in result_snapshot.files:

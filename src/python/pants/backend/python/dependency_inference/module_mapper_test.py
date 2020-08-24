@@ -21,7 +21,6 @@ from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.frozendict import FrozenDict
@@ -108,7 +107,7 @@ class ModuleMapperTest(TestBase):
         # not generate subtargets.
         self.create_file("tests/python/project_test/demo_test/__init__.py")
         self.add_to_build_file("tests/python/project_test/demo_test", "python_library()")
-        result = self.request_product(FirstPartyModuleToAddressMapping, options_bootstrapper)
+        result = self.request_product(FirstPartyModuleToAddressMapping, [options_bootstrapper])
         assert result.mapping == FrozenDict(
             {
                 "project.util.dirutil": Address(
@@ -149,7 +148,7 @@ class ModuleMapperTest(TestBase):
             ),
         )
         result = self.request_product(
-            ThirdPartyModuleToAddressMapping, Params(create_options_bootstrapper())
+            ThirdPartyModuleToAddressMapping, [create_options_bootstrapper()]
         )
         assert result.mapping == FrozenDict(
             {
@@ -166,7 +165,7 @@ class ModuleMapperTest(TestBase):
 
         def get_owner(module: str) -> Optional[Address]:
             return self.request_product(
-                PythonModuleOwner, Params(PythonModule(module), options_bootstrapper)
+                PythonModuleOwner, [PythonModule(module), options_bootstrapper]
             ).address
 
         # First check that we can map 3rd-party modules.

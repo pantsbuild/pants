@@ -38,7 +38,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Dependencies, Sources, Tags, Target
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import MockGet, Params, run_rule
+from pants.testutil.engine_util import MockGet, run_rule
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.testutil.test_base import TestBase
 from pants.util.frozendict import FrozenDict
@@ -140,7 +140,7 @@ class BuildFileIntegrationTest(TestBase):
 
     def test_resolve_address(self) -> None:
         def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
-            assert self.request_product(Address, address_input) == expected
+            assert self.request_product(Address, [address_input]) == expected
 
         self.create_file("a/b/c.txt")
         assert_is_expected(
@@ -167,7 +167,7 @@ class BuildFileIntegrationTest(TestBase):
         assert_is_expected(AddressInput("", target_component="t"), Address("", target_name="t"))
 
         with pytest.raises(ExecutionError) as exc:
-            self.request_product(Address, AddressInput("a/b/fake"))
+            self.request_product(Address, [AddressInput("a/b/fake")])
         assert "'a/b/fake' does not exist on disk" in str(exc.value)
 
     def test_target_adaptor_parsed_correctly(self) -> None:
@@ -190,9 +190,7 @@ class BuildFileIntegrationTest(TestBase):
             ),
         )
         addr = Address("helloworld")
-        target_adaptor = self.request_product(
-            TargetAdaptor, Params(addr, create_options_bootstrapper())
-        )
+        target_adaptor = self.request_product(TargetAdaptor, [addr, create_options_bootstrapper()])
         assert target_adaptor.name == "helloworld"
         assert target_adaptor.type_alias == "mock_tgt"
         assert target_adaptor.kwargs["dependencies"] == [
@@ -208,7 +206,7 @@ class BuildFileIntegrationTest(TestBase):
     def test_target_adaptor_not_found(self) -> None:
         bootstrapper = create_options_bootstrapper()
         with pytest.raises(ExecutionError) as exc:
-            self.request_product(TargetAdaptor, Params(Address("helloworld"), bootstrapper))
+            self.request_product(TargetAdaptor, [Address("helloworld"), bootstrapper])
         assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
 
         self.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
@@ -216,7 +214,7 @@ class BuildFileIntegrationTest(TestBase):
             "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
         )
         with pytest.raises(ExecutionError, match=expected_rx_str):
-            self.request_product(TargetAdaptor, Params(Address("helloworld"), bootstrapper))
+            self.request_product(TargetAdaptor, [Address("helloworld"), bootstrapper])
 
     def test_build_file_address(self) -> None:
         self.create_file("helloworld/BUILD.ext", "mock_tgt()")
@@ -224,7 +222,7 @@ class BuildFileIntegrationTest(TestBase):
 
         def assert_bfa_resolved(address: Address) -> None:
             expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=address)
-            bfa = self.request_product(BuildFileAddress, Params(address, bootstrapper))
+            bfa = self.request_product(BuildFileAddress, [address, bootstrapper])
             assert bfa == expected_bfa
 
         assert_bfa_resolved(Address("helloworld"))
@@ -236,10 +234,10 @@ class BuildFileIntegrationTest(TestBase):
     ) -> Set[AddressWithOrigin]:
         result = self.request_product(
             AddressesWithOrigins,
-            Params(
+            [
                 AddressSpecs(specs, filter_by_global_options=True),
                 bootstrapper or create_options_bootstrapper(),
-            ),
+            ],
         )
         return set(result)
 

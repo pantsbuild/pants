@@ -12,7 +12,6 @@ from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import Sources as SourcesField
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -62,7 +61,7 @@ class SourceFilesTest(TestBase):
         expected_unrooted: Iterable[str] = (),
     ) -> None:
         result = self.request_product(
-            SourceFiles, Params(SourceFilesRequest(sources_fields), create_options_bootstrapper()),
+            SourceFiles, [SourceFilesRequest(sources_fields), create_options_bootstrapper()],
         )
         assert list(result.snapshot.files) == sorted(
             set(itertools.chain.from_iterable(sources.full_paths for sources in expected))

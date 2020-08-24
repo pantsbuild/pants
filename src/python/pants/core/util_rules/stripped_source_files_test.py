@@ -13,7 +13,6 @@ from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -40,7 +39,7 @@ class StrippedSourceFilesTest(TestBase):
             source_root_patterns = ["src/python", "src/java", "tests/python"]
             args.append(f"--source-root-patterns={json.dumps(source_root_patterns)}")
         result = self.request_product(
-            StrippedSourceFiles, Params(request, create_options_bootstrapper(args=args)),
+            StrippedSourceFiles, [request, create_options_bootstrapper(args=args)],
         )
         return list(result.snapshot.files)
 

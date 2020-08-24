@@ -16,7 +16,6 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -52,10 +51,10 @@ class PantsRequirementTest(TestBase):
         self.create_file(requirements_txt_relpath, requirements_txt)
         targets = self.request_product(
             Targets,
-            Params(
+            [
                 Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([])),
                 create_options_bootstrapper(),
-            ),
+            ],
         )
         assert {expected_file_dep, *expected_targets} == set(targets)
 

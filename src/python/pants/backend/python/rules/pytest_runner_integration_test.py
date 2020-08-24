@@ -19,7 +19,6 @@ from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
@@ -151,12 +150,12 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             args.append(f"--pytest-execution-slot-var={execution_slot_var}")
         if not address:
             address = Address(self.package, target_name="target")
-        params = Params(
+        subjects = [
             PythonTestFieldSet.create(PythonTests({}, address=address)),
             create_options_bootstrapper(args=args),
-        )
-        test_result = self.request_product(TestResult, params)
-        debug_request = self.request_product(TestDebugRequest, params)
+        ]
+        test_result = self.request_product(TestResult, subjects)
+        debug_request = self.request_product(TestDebugRequest, subjects)
         if debug_request.process is not None:
             debug_result = InteractiveRunner(self.scheduler).run(debug_request.process)
             assert test_result.exit_code == debug_result.exit_code
@@ -342,8 +341,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert result.exit_code == 0
         assert f"{self.package}/test_good.py ." in result.stdout
         assert result.xml_results is not None
-        digest_contents = self.request_product(DigestContents, result.xml_results)
-        assert len(digest_contents) == 1
+        digest_contents = self.request_product(DigestContents, [result.xml_results])
         file = digest_contents[0]
         assert file.path.startswith("dist/test-results")
         assert b"pants_test.test_good" in file.content

@@ -5,7 +5,6 @@ from pants.engine.rules import QueryRule, SubsystemRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
 from pants.python.python_setup import PythonSetup
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
@@ -25,10 +24,10 @@ class TestEngineOptionsParsing(TestBase):
             args=["-ldebug"], env=dict(PANTS_PANTSD="True", PANTS_BUILD_IGNORE='["ignoreme/"]')
         )
         global_options = self.request_product(
-            ScopedOptions, Params(Scope(GLOBAL_SCOPE), options_bootstrapper)
+            ScopedOptions, [Scope(GLOBAL_SCOPE), options_bootstrapper]
         )
         python_setup_options = self.request_product(
-            ScopedOptions, Params(Scope("python-setup"), options_bootstrapper)
+            ScopedOptions, [Scope("python-setup"), options_bootstrapper]
         )
 
         self.assertEqual(global_options.options.level, LogLevel.DEBUG)
@@ -41,8 +40,7 @@ class TestEngineOptionsParsing(TestBase):
         # Confirm that re-executing with a new-but-identical Options object results in memoization.
 
         def parse(ob):
-            params = Params(Scope(str(GLOBAL_SCOPE)), ob)
-            return self.request_product(ScopedOptions, params)
+            return self.request_product(ScopedOptions, [Scope(GLOBAL_SCOPE), ob])
 
         # If two OptionsBootstrapper instances are not equal, memoization will definitely not kick in.
         one_opts = create_options_bootstrapper()

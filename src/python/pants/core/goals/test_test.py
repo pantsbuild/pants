@@ -92,7 +92,7 @@ class ConditionallySucceedsFieldSet(MockTestFieldSet):
 class TestTest(TestBase):
     def make_interactive_process(self) -> InteractiveProcess:
         digest = self.request_product(
-            Digest, CreateDigest((FileContent(path="program.py", content=b"def test(): pass"),))
+            Digest, [CreateDigest((FileContent(path="program.py", content=b"def test(): pass"),))]
         )
         return InteractiveProcess(["/usr/bin/python", "program.py"], input_digest=digest)
 

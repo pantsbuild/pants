@@ -15,7 +15,6 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import WrappedTarget
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.frozendict import FrozenDict
@@ -43,10 +42,10 @@ class PantsRequirementTest(TestBase):
         self.add_to_build_file("3rdparty/python", f"{build_file_entry}\n")
         target = self.request_product(
             WrappedTarget,
-            Params(
+            [
                 Address("3rdparty/python", target_name=expected_target_name),
                 create_options_bootstrapper(),
-            ),
+            ],
         ).target
         assert isinstance(target, PythonRequirementLibrary)
         assert target[PythonRequirementsField].value == (

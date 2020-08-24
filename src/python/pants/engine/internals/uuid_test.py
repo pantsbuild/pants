@@ -15,11 +15,11 @@ class UUIDTest(TestBase):
         return (*super().rules(), *uuid_rules(), QueryRule(UUID, (UUIDRequest,)))
 
     def test_distinct_uuids(self):
-        uuid1 = self.request_product(UUID, UUIDRequest())
-        uuid2 = self.request_product(UUID, UUIDRequest())
+        uuid1 = self.request_product(UUID, [UUIDRequest()])
+        uuid2 = self.request_product(UUID, [UUIDRequest()])
         assert uuid1 != uuid2
 
     def test_identical_uuids(self):
-        uuid1 = self.request_product(UUID, UUIDRequest(randomizer=0.0))
-        uuid2 = self.request_product(UUID, UUIDRequest(randomizer=0.0))
+        uuid1 = self.request_product(UUID, [UUIDRequest(randomizer=0.0)])
+        uuid2 = self.request_product(UUID, [UUIDRequest(randomizer=0.0)])
         assert uuid1 == uuid2

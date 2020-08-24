@@ -45,7 +45,6 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets, WrappedTarget
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -70,7 +69,7 @@ class TestSetupPyBase(TestBase):
 
     def tgt(self, addr: str) -> Target:
         return self.request_product(
-            WrappedTarget, Params(Address.parse(addr), create_options_bootstrapper())
+            WrappedTarget, [Address.parse(addr), create_options_bootstrapper()]
         ).target
 
 
@@ -91,12 +90,12 @@ class TestGenerateChroot(TestSetupPyBase):
     def assert_chroot(self, expected_files, expected_setup_kwargs, addr):
         chroot = self.request_product(
             SetupPyChroot,
-            Params(
+            [
                 SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
                 create_options_bootstrapper(),
-            ),
+            ],
         )
-        snapshot = self.request_product(Snapshot, Params(chroot.digest))
+        snapshot = self.request_product(Snapshot, [chroot.digest])
         assert sorted(expected_files) == sorted(snapshot.files)
         kwargs = json.loads(chroot.setup_keywords_json)
         assert expected_setup_kwargs == kwargs
@@ -105,10 +104,10 @@ class TestGenerateChroot(TestSetupPyBase):
         with pytest.raises(ExecutionError) as excinfo:
             self.request_product(
                 SetupPyChroot,
-                Params(
+                [
                     SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
                     create_options_bootstrapper(),
-                ),
+                ],
             )
         ex = excinfo.value
         assert len(ex.wrapped_exceptions) == 1
@@ -251,12 +250,12 @@ class TestGetSources(TestSetupPyBase):
     ):
         srcs = self.request_product(
             SetupPySources,
-            Params(
+            [
                 SetupPySourcesRequest(Targets([self.tgt(addr) for addr in addrs]), py2=False),
                 create_options_bootstrapper(),
-            ),
+            ],
         )
-        chroot_snapshot = self.request_product(Snapshot, Params(srcs.digest))
+        chroot_snapshot = self.request_product(Snapshot, [srcs.digest])
 
         assert sorted(expected_files) == sorted(chroot_snapshot.files)
         assert sorted(expected_packages) == sorted(srcs.packages)
@@ -358,7 +357,7 @@ class TestGetRequirements(TestSetupPyBase):
     def assert_requirements(self, expected_req_strs, addr):
         reqs = self.request_product(
             ExportedTargetRequirements,
-            Params(DependencyOwner(ExportedTarget(self.tgt(addr))), create_options_bootstrapper()),
+            [DependencyOwner(ExportedTarget(self.tgt(addr))), create_options_bootstrapper()],
         )
         assert sorted(expected_req_strs) == list(reqs)
 
@@ -445,10 +444,10 @@ class TestGetOwnedDependencies(TestSetupPyBase):
             od.target.address.spec
             for od in self.request_product(
                 OwnedDependencies,
-                Params(
+                [
                     DependencyOwner(ExportedTarget(self.tgt(exported))),
                     create_options_bootstrapper(),
-                ),
+                ],
             )
         )
 
@@ -538,16 +537,14 @@ class TestGetExportingOwner(TestSetupPyBase):
         assert (
             owner
             == self.request_product(
-                ExportedTarget,
-                Params(OwnedDependency(self.tgt(owned)), create_options_bootstrapper()),
+                ExportedTarget, [OwnedDependency(self.tgt(owned)), create_options_bootstrapper()],
             ).target.address.spec
         )
 
     def assert_error(self, owned: str, exc_cls: Type[Exception]):
         with pytest.raises(ExecutionError) as excinfo:
             self.request_product(
-                ExportedTarget,
-                Params(OwnedDependency(self.tgt(owned)), create_options_bootstrapper()),
+                ExportedTarget, [OwnedDependency(self.tgt(owned)), create_options_bootstrapper()],
             )
         ex = excinfo.value
         assert len(ex.wrapped_exceptions) == 1

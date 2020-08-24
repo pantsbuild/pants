@@ -21,7 +21,6 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import InferredDependencies, WrappedTarget
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import all_roots
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -96,12 +95,10 @@ class PythonDependencyInferenceTest(TestBase):
             if enable_string_imports:
                 args.append("--python-infer-string-imports")
             options_bootstrapper = create_options_bootstrapper(args=args)
-            target = self.request_product(
-                WrappedTarget, Params(address, options_bootstrapper)
-            ).target
+            target = self.request_product(WrappedTarget, [address, options_bootstrapper]).target
             return self.request_product(
                 InferredDependencies,
-                Params(InferPythonDependencies(target[PythonSources]), options_bootstrapper),
+                [InferPythonDependencies(target[PythonSources]), options_bootstrapper],
             )
 
         normal_address = Address("src/python")
@@ -146,12 +143,10 @@ class PythonDependencyInferenceTest(TestBase):
         self.add_to_build_file("src/python/root/mid/leaf", "python_library()")
 
         def run_dep_inference(address: Address) -> InferredDependencies:
-            target = self.request_product(
-                WrappedTarget, Params(address, options_bootstrapper)
-            ).target
+            target = self.request_product(WrappedTarget, [address, options_bootstrapper]).target
             return self.request_product(
                 InferredDependencies,
-                Params(InferInitDependencies(target[PythonSources]), options_bootstrapper),
+                [InferInitDependencies(target[PythonSources]), options_bootstrapper],
             )
 
         assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
@@ -178,12 +173,10 @@ class PythonDependencyInferenceTest(TestBase):
         self.add_to_build_file("src/python/root/mid/leaf", "python_tests()")
 
         def run_dep_inference(address: Address) -> InferredDependencies:
-            target = self.request_product(
-                WrappedTarget, Params(address, options_bootstrapper)
-            ).target
+            target = self.request_product(WrappedTarget, [address, options_bootstrapper]).target
             return self.request_product(
                 InferredDependencies,
-                Params(InferConftestDependencies(target[PythonSources]), options_bootstrapper),
+                [InferConftestDependencies(target[PythonSources]), options_bootstrapper],
             )
 
         assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(

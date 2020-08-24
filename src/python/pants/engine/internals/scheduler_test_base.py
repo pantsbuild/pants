@@ -7,7 +7,6 @@ from dataclasses import asdict
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.internals.native import Native
-from pants.engine.internals.nodes import Throw
 from pants.engine.internals.scheduler import Scheduler
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
@@ -83,10 +82,7 @@ class SchedulerTestBase:
         """Runs an ExecutionRequest for the given product and subjects, and returns the result
         value."""
         request = scheduler.execution_request([product], subjects)
-        return self.execute_literal(scheduler, request)
-
-    def execute_literal(self, scheduler, execution_request):
-        returns, throws = scheduler.execute(execution_request)
+        returns, throws = scheduler.execute(request)
         if throws:
             with temporary_file_path(cleanup=False, suffix=".dot") as dot_file:
                 scheduler.visualize_graph_to_file(dot_file)
@@ -105,9 +101,3 @@ class SchedulerTestBase:
 
         _, state = returns[0]
         return state
-
-    def execute_raising_throw(self, scheduler, product, subject):
-        resulting_value = self.execute_expecting_one_result(scheduler, product, subject)
-        self.assertTrue(type(resulting_value) is Throw)
-
-        raise resulting_value.exc
