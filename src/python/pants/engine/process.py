@@ -283,12 +283,6 @@ class InteractiveProcess:
                 "files when it runs in the workspace"
             )
 
-    @classmethod
-    def from_process(cls, process: Process) -> "InteractiveProcess":
-        return InteractiveProcess(
-            argv=process.argv, env=process.env, input_digest=process.input_digest
-        )
-
 
 @side_effecting
 @dataclass(frozen=True)

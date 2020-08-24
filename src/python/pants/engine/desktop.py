@@ -1,67 +1,83 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
+from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Tuple
+from typing import ClassVar, Iterable, Iterator
 
-from pants.engine.platform import Platform
-from pants.engine.process import BinaryPathRequest, BinaryPaths, InteractiveProcess
-from pants.engine.rules import Get, collect_rules, rule
-from pants.util.meta import frozen_after_init
-
-logger = logging.getLogger(__name__)
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class OpenFilesRequest:
-    files: Tuple[PurePath, ...]
-    error_if_open_not_found: bool
-
-    def __init__(self, files: Iterable[PurePath], *, error_if_open_not_found: bool = True) -> None:
-        self.files = tuple(files)
-        self.error_if_open_not_found = error_if_open_not_found
+from pants.engine.console import Console
+from pants.engine.process import InteractiveProcess, InteractiveRunner
+from pants.util.osutil import get_os_name
+from pants.util.strutil import safe_shlex_join
 
 
 @dataclass(frozen=True)
-class OpenFiles:
-    processes: Tuple[InteractiveProcess, ...]
+class _Opener(ABC):
+    console: Console
+    runner: InteractiveRunner
+
+    program: ClassVar[str]
+
+    def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcess]:
+        # N.B.: We cannot mark this method @abc.abstractmethod due to:
+        #   https://github.com/python/mypy/issues/5374
+        raise NotImplementedError()
+
+    def open(self, files: Iterable[PurePath]) -> None:
+        for request in self._iter_openers(files):
+            open_command = safe_shlex_join(request.argv)
+            try:
+                result = self.runner.run(request)
+                if result.exit_code != 0:
+                    self.console.print_stderr(
+                        f"Failed to open files for viewing using `{open_command}` - received exit "
+                        f"code {result.exit_code}."
+                    )
+            except Exception as e:
+                self.console.print_stderr(
+                    f"Failed to open files for viewing using " f"`{open_command}`: {e}"
+                )
+                self.console.print_stderr(
+                    f"Ensure {self.program} is installed on your `PATH` and " f"re-run this goal."
+                )
 
 
-@rule
-async def find_open_program(request: OpenFilesRequest, plat: Platform) -> OpenFiles:
-    open_program_name = "open" if plat == Platform.darwin else "xdg-open"
-    open_program_paths = await Get(
-        BinaryPaths,
-        BinaryPathRequest(binary_name=open_program_name, search_path=("/bin", "/usr/bin")),
-    )
-    if not open_program_paths.first_path:
-        error = (
-            f"Could not find the program '{open_program_name}' on `/bin` or `/usr/bin`, so cannot "
-            f"open the files {sorted(request.files)}."
+class _DarwinOpener(_Opener):
+    program = "open"
+
+    def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcess]:
+        yield InteractiveProcess(
+            argv=(self.program, *(str(f) for f in files)), run_in_workspace=True
         )
-        if request.error_if_open_not_found:
-            raise OSError(error)
-        logger.error(error)
-        return OpenFiles(())
-
-    if plat == Platform.darwin:
-        processes = [
-            InteractiveProcess(
-                argv=(open_program_paths.first_path, *(str(f) for f in request.files)),
-                run_in_workspace=True,
-            )
-        ]
-    else:
-        processes = [
-            InteractiveProcess(argv=(open_program_paths.first_path, str(f)), run_in_workspace=True)
-            for f in request.files
-        ]
-
-    return OpenFiles(tuple(processes))
 
 
-def rules():
-    return collect_rules()
+class _LinuxOpener(_Opener):
+    program = "xdg-open"
+
+    def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcess]:
+        for f in files:
+            yield InteractiveProcess(argv=(self.program, str(f)), run_in_workspace=True)
+
+
+_OPENERS_BY_OSNAME = {"darwin": _DarwinOpener, "linux": _LinuxOpener}
+
+
+def ui_open(console: Console, runner: InteractiveRunner, files: Iterable[PurePath]) -> None:
+    """Opens the given files with the appropriate application for the current operating system.
+
+    Any failures to either locate an appropriate application to open the files with or else execute
+    that program are reported to the console stderr.
+    """
+    osname = get_os_name()
+    opener_type = _OPENERS_BY_OSNAME.get(osname)
+    if opener_type is None:
+        console.print_stderr(f"Could not open {' '.join(map(str, files))} for viewing.")
+        console.print_stderr(
+            f"Opening files for viewing is currently not supported for the "
+            f"{osname} operating system."
+        )
+        return
+
+    opener = opener_type(console, runner)
+    opener.open(files)

@@ -1580,9 +1580,10 @@ fn run_local_interactive_process(
             command.current_dir(tempdir.path());
           }
 
-          // We use a hermetic environment to mirror normal Processes.
-          command.env_clear();
-          command.envs(externs::project_frozendict(&value, "env"));
+          let env = externs::project_frozendict(&value, "env");
+          for (key, value) in env.iter() {
+            command.env(key, value);
+          }
 
           let mut subprocess = command.spawn().map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
           let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
