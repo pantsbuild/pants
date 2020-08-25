@@ -5,6 +5,156 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0a0 (8/24/2020)
+-------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Temporarily disable protobuf support. (#10685)
+  `PR #10685 <https://github.com/pantsbuild/pants/pull/10685>`_
+
+* Simplify `python_requirement_library` by deprecating the `python_requirement` object (#10669)
+  `PR #10669 <https://github.com/pantsbuild/pants/pull/10669>`_
+
+* Updated default version of pytest to 6.0.1 (#10328)
+  `PR #10328 <https://github.com/pantsbuild/pants/pull/10328>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Adds a `pipenv_requirements` macro (#10654)
+  `PR #10654 <https://github.com/pantsbuild/pants/pull/10654>`_
+
+* Add transitive excludes for `dependencies` with `!!` (#10663)
+  `PR #10663 <https://github.com/pantsbuild/pants/pull/10663>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix Coverage loading a custom config file (#10670)
+  `PR #10670 <https://github.com/pantsbuild/pants/pull/10670>`_
+
+* Fix Rust 3rdparty logs showing up with `--dynamic-ui` (#10640)
+  `PR #10640 <https://github.com/pantsbuild/pants/pull/10640>`_
+
+* Fix logging deadlock when trace logging is used (#10635)
+  `PR #10635 <https://github.com/pantsbuild/pants/pull/10635>`_
+
+* Fix project name canonicalization. (#10628)
+  `PR #10628 <https://github.com/pantsbuild/pants/pull/10628>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Revert "Fix `run`, `repl`, and `test --debug` to have hermetic environments (#10668)" (#10688)
+  `PR #10688 <https://github.com/pantsbuild/pants/pull/10688>`_
+
+* Implement RuleGraph construction using data flow analysis (#10645)
+  `PR #10645 <https://github.com/pantsbuild/pants/pull/10645>`_
+
+* Fix `run`, `repl`, and `test --debug` to have hermetic environments (#10668)
+  `PR #10668 <https://github.com/pantsbuild/pants/pull/10668>`_
+
+* Handle workunits corresponding to canceled Nodes. (#10659)
+  `PR #10659 <https://github.com/pantsbuild/pants/pull/10659>`_
+
+* Add support for JSON coverage reports (#10625)
+  `PR #10625 <https://github.com/pantsbuild/pants/pull/10625>`_
+
+* Add an FFI function for reading a `FrozenDict` (#10666)
+  `PR #10666 <https://github.com/pantsbuild/pants/pull/10666>`_
+
+* Stream output of `typecheck`, rather than dumping at the end (#10656)
+  `PR #10656 <https://github.com/pantsbuild/pants/pull/10656>`_
+
+* Allow `binary` to be implemented without implementing `run` (#10660)
+  `PR #10660 <https://github.com/pantsbuild/pants/pull/10660>`_
+
+* Reduce noisy log messages from `@rule` params (#10658)
+  `PR #10658 <https://github.com/pantsbuild/pants/pull/10658>`_
+
+* Add type hints to `TestBase` (#10647)
+  `PR #10647 <https://github.com/pantsbuild/pants/pull/10647>`_
+
+* Refactoring in graph (#10637)
+  `PR #10637 <https://github.com/pantsbuild/pants/pull/10637>`_
+
+* Stream output of `test`, rather than dumping at the end (#10634)
+  `PR #10634 <https://github.com/pantsbuild/pants/pull/10634>`_
+
+* Preserve Pytest's exit code with `./pants test` (#10632)
+  `PR #10632 <https://github.com/pantsbuild/pants/pull/10632>`_
+
+* Rename `--per-target-caching` to `--per-file-caching` for `lint` and `fmt` (#10630)
+  `PR #10630 <https://github.com/pantsbuild/pants/pull/10630>`_
+
+* Upgrade setuptools from 49.2.0 to 49.60 (#10626)
+  `PR #10626 <https://github.com/pantsbuild/pants/pull/10626>`_
+
+* Allow `test --debug` to run on multiple targets sequentially (#10629)
+  `PR #10629 <https://github.com/pantsbuild/pants/pull/10629>`_
+
+* Stream output of `fmt`, rather than dumping at the end (#10627)
+  `PR #10627 <https://github.com/pantsbuild/pants/pull/10627>`_
+
+* Stream output of `lint`, rather than dumping at the end (#10538)
+  `PR #10538 <https://github.com/pantsbuild/pants/pull/10538>`_
+
+* Add coverage reports as artifacts on the test goal workunit (#10623)
+  `PR #10623 <https://github.com/pantsbuild/pants/pull/10623>`_
+
+Testing
+~~~~~~~
+
+* Change `TestBase.request_product()` to take an iterable of subjects (#10682)
+  `PR #10682 <https://github.com/pantsbuild/pants/pull/10682>`_
+
+* Only use `TestBase` for tests that run rules (#10680)
+  `PR #10680 <https://github.com/pantsbuild/pants/pull/10680>`_
+
+* Change `pants_integration_test.py` to use Pytest-style functions (#10675)
+  `PR #10675 <https://github.com/pantsbuild/pants/pull/10675>`_
+
+* Consolidate `GoalRuleTestBase` into `TestBase` (#10679)
+  `PR #10679 <https://github.com/pantsbuild/pants/pull/10679>`_
+
+* Rename `TestBase.request_single_product` to `TestBase.request_product` (#10678)
+  `PR #10678 <https://github.com/pantsbuild/pants/pull/10678>`_
+
+* Reorganize `testutil/` (#10674)
+  `PR #10674 <https://github.com/pantsbuild/pants/pull/10674>`_
+
+* Add `PantsIntegrationTest.setup_tmpdir()` (#10673)
+  `PR #10673 <https://github.com/pantsbuild/pants/pull/10673>`_
+
+* Change `PantsIntegrationTest` to be hermetic by default (#10672)
+  `PR #10672 <https://github.com/pantsbuild/pants/pull/10672>`_
+
+* Remove unused `pytest-timeout` plugin from default `--pytest-plugins` (#10631)
+  `PR #10631 <https://github.com/pantsbuild/pants/pull/10631>`_
+
+* Rename `PantsRunIntegrationTest` to `PantsIntegrationTest` (#10664)
+  `PR #10664 <https://github.com/pantsbuild/pants/pull/10664>`_
+
+* Add tests for HTML and XML coverage reports. (#10211)
+  `PR #10211 <https://github.com/pantsbuild/pants/pull/10211>`_
+
+Documentation/Logging
+~~~~~~~~~~~~~~~~~~~~~
+
+* Provide better debugging information for rule parameters (#10665)
+  `PR #10665 <https://github.com/pantsbuild/pants/pull/10665>`_
+
+* Stop including the origin module in Debug logs (#10642)
+  `PR #10642 <https://github.com/pantsbuild/pants/pull/10642>`_
+
+* Change log level for rules and filesystem intrinsics to trace (#10639)
+  `PR #10639 <https://github.com/pantsbuild/pants/pull/10639>`_
+
+* Change some remote execution log messages to debug level (#10643)
+  `PR #10643 <https://github.com/pantsbuild/pants/pull/10643>`_
+
 2.0.0.dev9 (8/15/2020)
 ----------------------
 
