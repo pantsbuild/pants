@@ -309,3 +309,39 @@ impl TestDirectory {
     hashing::Digest::of_bytes(&self.bytes())
   }
 }
+
+pub struct TestTree {
+  pub tree: bazel_protos::remote_execution::Tree,
+}
+
+impl TestTree {
+  pub fn roland_at_root() -> TestTree {
+    TestDirectory::containing_roland().into()
+  }
+
+  pub fn robin_at_root() -> TestTree {
+    TestDirectory::containing_robin().into()
+  }
+}
+
+impl TestTree {
+  pub fn bytes(&self) -> bytes::Bytes {
+    bytes::Bytes::from(self.tree.write_to_bytes().expect("Error serializing proto"))
+  }
+
+  pub fn fingerprint(&self) -> hashing::Fingerprint {
+    self.digest().0
+  }
+
+  pub fn digest(&self) -> hashing::Digest {
+    hashing::Digest::of_bytes(&self.bytes())
+  }
+}
+
+impl From<TestDirectory> for TestTree {
+  fn from(dir: TestDirectory) -> Self {
+    let mut tree = bazel_protos::remote_execution::Tree::new();
+    tree.set_root(dir.directory);
+    TestTree { tree }
+  }
+}

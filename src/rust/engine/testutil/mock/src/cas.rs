@@ -7,7 +7,7 @@ use futures01::{Future, IntoFuture, Stream};
 use grpcio::RpcContext;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use testutil::data::{TestData, TestDirectory};
+use testutil::data::{TestData, TestDirectory, TestTree};
 
 ///
 /// Implements the ContentAddressableStorage gRPC API, answering read requests with either known
@@ -68,6 +68,11 @@ impl StubCASBuilder {
     self
       .content
       .insert(directory.fingerprint(), directory.bytes());
+    self
+  }
+
+  pub fn tree(mut self, tree: &TestTree) -> Self {
+    self.content.insert(tree.fingerprint(), tree.bytes());
     self
   }
 
