@@ -427,7 +427,7 @@ impl Store {
   /// two functions f_local and f_remote. These functions are any validation or transformations you
   /// want to perform on the bytes received from the local and remote cas (if remote is configured).
   ///
-  async fn load_bytes_with<
+  pub async fn load_bytes_with<
     T: Send + 'static,
     FLocal: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
     FRemote: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
@@ -678,6 +678,7 @@ impl Store {
                   .await?;
                 Ok(Either::Right(reachable))
               }
+              Ok(Some(EntryType::Tree)) => unimplemented!(),
               Ok(None) => {
                 if allow_missing {
                   Ok(Either::Right(HashMap::new()))
@@ -1052,6 +1053,7 @@ impl StoreWrapper for Store {
 pub enum EntryType {
   Directory,
   File,
+  Tree, // multiple Directories encoded together
 }
 
 #[cfg(test)]

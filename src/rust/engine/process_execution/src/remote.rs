@@ -26,7 +26,7 @@ use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use protobuf::{self, Message, ProtobufEnum};
 use rand::{thread_rng, Rng};
-use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
+use store::{EntryType, Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use workunit_store::{with_workunit, SpanId, WorkunitMetadata, WorkunitStore};
 
 use crate::{
@@ -1162,8 +1162,53 @@ pub fn extract_output_files(
     let store = store.clone();
     directory_digests.push(
       (async move {
-        let digest_result: Result<Digest, String> = dir.get_tree_digest().try_into();
-        let mut digest = digest_result?;
+        // The `OutputDirectory` contains the digest of a `Tree` proto which contains
+        // the `Directory` proto of the root directory of this `OutputDirectory` plus all
+        // of the `Directory` protos for child directories of that root.
+
+        // Retrieve the Tree proto and hash its root `Directory` proto to obtain the digest
+        // of the output directory needed to construct the series of `Directory` protos needed
+        // for the final merge of the output directories.
+        let tree_digest: Digest = dir.get_tree_digest().try_into()?;
+        let tree_opt = store
+          .load_bytes_with(
+            EntryType::Tree,
+            tree_digest,
+            |b| {
+              let mut tree = bazel_protos::remote_execution::Tree::new();
+              tree
+                .merge_from_bytes(b)
+                .map_err(|e| format!("protobuf decode error: {:?}", e))?;
+              Ok(tree)
+            },
+            |b| {
+              let mut tree = bazel_protos::remote_execution::Tree::new();
+              tree
+                .merge_from_bytes(&b)
+                .map_err(|e| format!("protobuf decode error: {:?}", e))?;
+              Ok(tree)
+            },
+          )
+          .await?;
+
+        let tree = match tree_opt {
+          Some((t, _)) => t,
+          _ => {
+            return Err(format!(
+              "Tree with digest {:?} was not in remote",
+              tree_digest
+            ))
+          }
+        };
+
+        if !tree.has_root() {
+          return Err(format!(
+            "Tree with digest {:?} does not have root Directory",
+            tree_digest
+          ));
+        }
+        let mut digest = digest(tree.get_root())?;
+
         if !dir.get_path().is_empty() {
           for component in dir.get_path().rsplit('/') {
             let component = component.to_owned();
