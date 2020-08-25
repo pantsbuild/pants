@@ -101,7 +101,7 @@ Refactoring, Improvements, and Tooling
 * Stream output of `lint`, rather than dumping at the end (#10538)
   `PR #10538 <https://github.com/pantsbuild/pants/pull/10538>`_
 
-*  Add coverage reports as artifacts on the test goal workunit (#10623)
+* Add coverage reports as artifacts on the test goal workunit (#10623)
   `PR #10623 <https://github.com/pantsbuild/pants/pull/10623>`_
 
 Testing
