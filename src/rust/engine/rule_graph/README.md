@@ -6,7 +6,7 @@ Build logic in [Pants](https://www.pantsbuild.org/) is declared using collection
 
 In order to maximize the amount of work that can be reused at runtime, Pants statically computes the memoization keys for the nodes of the runtime graph from the user specified `@rules` during startup: this process is known as "rule graph construction". See the `Goals` section for more information on the strategy and reasoning for this.
 
-Concepts used in compilers, including live variable analysis and monomorphization, can also be useful in rule graph construction. Such concepts concepts can be used to minimize rule identities and pre-decide which versions of their dependencies they will use. See the "Open Issues" section for a call for assistance with improving the implementation of rule graph construction!
+Concepts used in compilers, including live variable analysis and monomorphization, can also be useful in rule graph construction to minimize rule identities and pre-decide which versions of their dependencies they will use. See the "Open Issues" section for a call for assistance with improving the implementation of rule graph construction!
 
 ## Concepts
 
