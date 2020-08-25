@@ -154,7 +154,11 @@ impl Log for PantsLogger {
     );
 
     let level = record.level();
-    let use_color = self.use_color.load(Ordering::SeqCst);
+    let destination_is_file = match destination {
+      Destination::Pantsd => true,
+      Destination::Stderr => false,
+    };
+    let use_color = self.use_color.load(Ordering::SeqCst) && (!destination_is_file);
 
     let level_marker = match level {
       _ if !use_color => format!("[{}]", level).normal().clear(),
