@@ -5,8 +5,8 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
-2.0.0alpha0 (8/24/2020)
------------------------
+2.0.0a0 (8/24/2020)
+-------------------
 
 API Changes
 ~~~~~~~~~~~
