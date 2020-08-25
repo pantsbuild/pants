@@ -383,6 +383,37 @@ impl<'t, R: Rule> Builder<'t, R> {
       to_visit.into_iter().rev().collect::<IndexSet<_>>()
     };
 
+    // Both the in_set and out_set shrink as this phase continues and nodes are monomorphized.
+    // Because the sets only shrink, we are able to eliminate direct dependencies based on their
+    // absence from the sets.
+    //
+    // If a node has been monomorphized and all of its dependencies have minimal in_sets, then we
+    // can assume that its in_set is minimal too: it has _stopped_ shrinking. That means that we can
+    // additionally prune dependencies transitively in cases where in_sets contain things that are
+    // not in a node's out_set (since the out_set will not grow, and the minimal in_set represents
+    // the node's true requirements).
+    let mut minimal_in_set = HashSet::new();
+
+    // Should be called after a Node has been successfully reduced (regardless of whether it became
+    // monomorphic) to maybe mark it minimal.
+    let maybe_mark_minimal_in_set = |minimal_in_set: &mut HashSet<NodeIndex<u32>>,
+                                     graph: &MonomorphizedGraph<R>,
+                                     node_id: NodeIndex<u32>| {
+      let dependencies_are_minimal = graph
+        .edges_directed(node_id, Direction::Outgoing)
+        .filter_map(|edge_ref| {
+          if graph[edge_ref.target()].is_deleted() || edge_ref.weight().is_deleted() {
+            None
+          } else {
+            Some(edge_ref.target())
+          }
+        })
+        .all(|dependency_id| node_id == dependency_id || minimal_in_set.contains(&dependency_id));
+      if dependencies_are_minimal {
+        minimal_in_set.insert(node_id);
+      }
+    };
+
     // TODO: Unfortunately, monomorphize is not completely monotonic (for reasons I can't nail
     // down), and so it is possible for nodes to split fruitlessly in loops, where each iteration
     // of the loop results in identical splits of each intermediate node. We could hypothetically
@@ -416,8 +447,19 @@ impl<'t, R: Rule> Builder<'t, R> {
       } else {
         continue;
       };
-      if !matches!(node.node, Node::Rule(_)) {
-        continue;
+      match node.node {
+        Node::Rule(_) => {
+          // Fall through to visit the rule.
+        }
+        Node::Param(_) => {
+          // Ensure that the Param is marked minimal, but don't bother to visit.
+          minimal_in_set.insert(node_id);
+          continue;
+        }
+        Node::Query(_) => {
+          // Don't bother to visit.
+          continue;
+        }
       }
 
       iteration += 1;
@@ -425,17 +467,23 @@ impl<'t, R: Rule> Builder<'t, R> {
         looping = true;
       }
       if iteration % 1000 == 0 {
-        let eliminated = graph
+        let live_count = graph
           .node_references()
-          .filter(|node_ref| node_ref.weight().is_deleted())
+          .filter(|node_ref| !node_ref.weight().is_deleted())
+          .count();
+        let minimal_count = graph
+          .node_references()
+          .filter(|node_ref| {
+            !node_ref.weight().is_deleted() && minimal_in_set.contains(&node_ref.id())
+          })
           .count();
         log::debug!(
-          "rule_graph monomorphize: iteration {}: live_node_count: {}, to_visit: {} (node_count: {}, eliminated: {})",
+          "rule_graph monomorphize: iteration {}: live: {}, minimal: {}, to_visit: {}, total: {}",
           iteration,
-          graph.node_count() - eliminated,
+          live_count,
+          minimal_count,
           to_visit.len(),
           graph.node_count(),
-          eliminated,
         );
       }
 
@@ -453,6 +501,8 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       // A node with no declared dependencies is always already minimal.
       if dependencies_by_key.is_empty() {
+        minimal_in_set.insert(node_id);
+
         // But we ensure that its out_set is accurate before continuing.
         if node.out_set != node.in_set {
           rules.remove(&node);
@@ -514,9 +564,13 @@ impl<'t, R: Rule> Builder<'t, R> {
       // create, and the dependees and dependencies to give it (respectively).
       let mut monomorphizations = HashMap::new();
       for (out_set, dependees) in dependees_by_out_set {
-        for (in_set, dependencies) in
-          Self::monomorphizations(&graph, node_id, out_set.clone(), &dependencies_by_key)
-        {
+        for (in_set, dependencies) in Self::monomorphizations(
+          &graph,
+          node_id,
+          out_set.clone(),
+          &minimal_in_set,
+          &dependencies_by_key,
+        ) {
           // Add this set of dependees and dependencies to the relevant output node.
           let key = ParamsLabeled {
             node: node.node.clone(),
@@ -529,14 +583,6 @@ impl<'t, R: Rule> Builder<'t, R> {
           let entry = monomorphizations
             .entry(key.clone())
             .or_insert_with(|| (HashSet::new(), HashSet::new()));
-          if looping {
-            log::debug!(
-              "giving combination {}:\n  {} dependees and\n  {} dependencies",
-              key,
-              dependees.len(),
-              dependencies.len()
-            );
-          }
           entry.0.extend(dependees.iter().cloned());
           entry.1.extend(dependencies);
         }
@@ -565,7 +611,9 @@ impl<'t, R: Rule> Builder<'t, R> {
             .collect::<HashSet<_>>()
         };
         if monomorphizations.len() == 1 && dependencies == &original_dependencies() {
-          // This node can not be reduced (at this time at least).
+          // This node cannot be reduced. If its dependencies had minimal in_sets, then it now also
+          // has a minimal in_set.
+          maybe_mark_minimal_in_set(&mut minimal_in_set, &graph, node_id);
           if looping {
             log::debug!(
               "not able to reduce {:?}: {} (had {} monomorphizations)",
@@ -645,8 +693,11 @@ impl<'t, R: Rule> Builder<'t, R> {
       for (new_node, (dependees, dependencies)) in monomorphizations {
         if looping {
           log::debug!(
-            "   generating {:#?}, which consumes: {:#?}",
+            "   generating {:#?}, with {} dependees and {} dependencies ({} minimal) which consumes: {:#?}",
             new_node,
+            dependees.len(),
+            dependencies.len(),
+            dependencies.iter().filter(|(_, dependency_id)| minimal_in_set.contains(dependency_id)).count(),
             dependencies
               .iter()
               .map(|(dk, di)| (dk.to_string(), graph[*di].to_string(),))
@@ -658,15 +709,19 @@ impl<'t, R: Rule> Builder<'t, R> {
           hash_map::Entry::Occupied(oe) => {
             // We're adding edges to an existing node. Ensure that we visit it later to square
             // that.
+            // NB: Because these edges do not affect the size of the in_set of this node, if it
+            // already had a minimal_in_set, it still does, despite not being monomorphic any
+            // longer.
             let existing_id = *oe.get();
             to_visit.insert(existing_id);
             (existing_id, false)
           }
-          hash_map::Entry::Vacant(ve) => (
-            *ve.insert(graph.add_node(MaybeDeleted::new(new_node))),
-            true,
-          ),
+          hash_map::Entry::Vacant(ve) => {
+            let new_node_id = graph.add_node(MaybeDeleted::new(new_node));
+            (*ve.insert(new_node_id), true)
+          }
         };
+
         if looping {
           let keyword = if is_new_node { "creating" } else { "using" };
           log::debug!("node: {}: {:?}", keyword, replacement_id);
@@ -740,6 +795,11 @@ impl<'t, R: Rule> Builder<'t, R> {
             );
           }
         }
+
+        // Now that all edges have been created, maybe mark it minimal.
+        if is_new_node {
+          maybe_mark_minimal_in_set(&mut minimal_in_set, &graph, replacement_id);
+        }
       }
     }
 
@@ -770,7 +830,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         Node::Rule(_) => {
           // Rules have in_sets computed from their dependencies, and out_sets computed from their
           // dependees and any provided params.
-          let in_set = Self::params_in_set(
+          let in_set = Self::dependencies_in_set(
             node_id,
             graph
               .edges_directed(node_id, Direction::Outgoing)
@@ -782,7 +842,7 @@ impl<'t, R: Rule> Builder<'t, R> {
                 )
               }),
           );
-          let out_set = Self::params_out_set(
+          let out_set = Self::dependees_out_set(
             &graph,
             node_id,
             graph
@@ -799,7 +859,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         }
         Node::Query(q) => {
           // Queries are always roots which declare some parameters.
-          let in_set = Self::params_in_set(
+          let in_set = Self::dependencies_in_set(
             node_id,
             graph
               .edges_directed(node_id, Direction::Outgoing)
@@ -1164,10 +1224,44 @@ impl<'t, R: Rule> Builder<'t, R> {
   }
 
   ///
+  /// Calculates the in_set required to satisfy the given dependency via the given DependencyKey.
+  ///
+  fn dependency_in_set<'a>(
+    node_id: NodeIndex<u32>,
+    dependency_key: &R::DependencyKey,
+    dependency_id: NodeIndex<u32>,
+    dependency_in_set: &'a ParamTypes<R::TypeId>,
+  ) -> Box<dyn Iterator<Item = R::TypeId> + 'a> {
+    // The in_sets of the dependency, less any Params "provided" (ie "declared variables"
+    // in the context of live variable analysis) by the relevant DependencyKey.
+    if dependency_id == node_id {
+      // A self-edge to this node does not contribute Params to its own liveness set, for two
+      // reasons:
+      //   1. it should always be a noop.
+      //   2. any time it is _not_ a noop, it is probably because we're busying updating the
+      //      liveness set, and the node contributing to its own set ends up using a stale
+      //      result.
+      return Box::new(std::iter::empty());
+    }
+
+    if let Some(provided_param) = dependency_key.provided_param() {
+      // If the DependencyKey "provides" the Param, it does not count toward our in-set.
+      Box::new(
+        dependency_in_set
+          .iter()
+          .filter(move |p| *p != &provided_param)
+          .cloned(),
+      )
+    } else {
+      Box::new(dependency_in_set.iter().cloned())
+    }
+  }
+
+  ///
   /// Calculates the in_set required to satisfy the given set of dependency edges with their
   /// in_sets.
   ///
-  fn params_in_set<'a>(
+  fn dependencies_in_set<'a>(
     node_id: NodeIndex<u32>,
     dependency_edges: impl Iterator<
       Item = (R::DependencyKey, NodeIndex<u32>, &'a ParamTypes<R::TypeId>),
@@ -1177,27 +1271,12 @@ impl<'t, R: Rule> Builder<'t, R> {
     // in the context of live variable analysis) by the relevant DependencyKeys.
     let mut in_set = ParamTypes::new();
     for (dependency_key, dependency_id, dependency_in_set) in dependency_edges {
-      if dependency_id == node_id {
-        // A self-edge to this node does not contribute Params to its own liveness set, for two
-        // reasons:
-        //   1. it should always be a noop.
-        //   2. any time it is _not_ a noop, it is probably because we're busying updating the
-        //      liveness set, and the node contributing to its own set ends up using a stale
-        //      result.
-        continue;
-      }
-
-      if let Some(provided_param) = dependency_key.provided_param() {
-        // If the DependencyKey "provides" the Param, it does not count toward our in-set.
-        in_set.extend(
-          dependency_in_set
-            .iter()
-            .filter(move |p| *p != &provided_param)
-            .cloned(),
-        );
-      } else {
-        in_set.extend(dependency_in_set.iter().cloned());
-      }
+      in_set.extend(Self::dependency_in_set(
+        node_id,
+        &dependency_key,
+        dependency_id,
+        dependency_in_set,
+      ));
     }
     in_set
   }
@@ -1205,7 +1284,7 @@ impl<'t, R: Rule> Builder<'t, R> {
   ///
   /// Calculates the out_set required to satisfy the given set of dependee edges.
   ///
-  fn params_out_set(
+  fn dependees_out_set(
     graph: &ParamsLabeledGraph<R>,
     node_id: NodeIndex<u32>,
     dependee_edges: impl Iterator<Item = (R::DependencyKey, NodeIndex<u32>)>,
@@ -1216,7 +1295,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     for (dependency_key, dependee_id) in dependee_edges {
       if dependee_id == node_id {
         // A self-edge to this node does not contribute Params to its out_set: see the reasoning
-        // in `Self::params_in_set`.
+        // in `Self::dependencies_in_set`.
         continue;
       }
 
@@ -1249,39 +1328,74 @@ impl<'t, R: Rule> Builder<'t, R> {
     graph: &MonomorphizedGraph<R>,
     node_id: NodeIndex<u32>,
     out_set: ParamTypes<R::TypeId>,
+    minimal_in_set: &HashSet<NodeIndex<u32>>,
     deps: &[Vec<(R::DependencyKey, NodeIndex<u32>)>],
   ) -> HashMap<ParamTypes<R::TypeId>, HashSet<(R::DependencyKey, NodeIndex<u32>)>> {
     let mut combinations = HashMap::new();
 
-    for combination in combinations_of_one(deps) {
-      let in_set = Self::params_in_set(
-        node_id,
-        combination
+    // We start by computing per-dependency in_sets, and filtering out dependencies that will be
+    // illegal in any possible combination.
+    let filtered_deps: Vec<Vec<(R::DependencyKey, NodeIndex<u32>, ParamTypes<R::TypeId>)>> = deps
+      .iter()
+      .map(|choices| {
+        choices
           .iter()
-          .map(|(dk, di)| (*dk, *di, &graph[*di].0.in_set)),
-      );
+          .filter_map(|(dependency_key, dependency_id)| {
+            // NB: We cannot filter provided params here, because we don't know yet what the computed
+            // in_set will be if this edge represents a self-edge.
+
+            let dependency_in_set = Self::dependency_in_set(
+              node_id,
+              &dependency_key,
+              *dependency_id,
+              &graph[*dependency_id].0.in_set,
+            )
+            .collect::<ParamTypes<_>>();
+
+            // If the dependency's in_set is minimal, we can eliminate the dependency if the
+            // out_set we're generating is missing any of the Params from the in_set. If it's
+            // not minimal, then it might shrink further in the future, and so we cannot eliminate
+            // it quite yet.
+            if minimal_in_set.contains(&dependency_id)
+              && dependency_in_set.difference(&out_set).next().is_some()
+            {
+              // The in_set contained a requirement not present in the out_set.
+              None
+            } else {
+              Some((*dependency_key, *dependency_id, dependency_in_set))
+            }
+          })
+          .collect()
+      })
+      .collect();
+
+    // Then generate the combinations of possibly valid deps.
+    for combination in combinations_of_one(&filtered_deps) {
+      // Union the pre-filtered per-dependency in_sets.
+      let in_set = combination
+        .iter()
+        .fold(ParamTypes::new(), |mut in_set, (_, _, dep_in_set)| {
+          in_set.extend(dep_in_set.iter().cloned());
+          in_set
+        });
 
       // Confirm that this combination of deps is satisfiable.
-      let satisfiable = combination.iter().all(|(dependency_key, dependency_id)| {
-        let dependency_in_set = if *dependency_id == node_id {
-          // Is a self edge: use the in_set that we're considering creating.
-          &in_set
-        } else {
-          &graph[*dependency_id].0.in_set
-        };
+      let satisfiable = combination
+        .iter()
+        .all(|(dependency_key, dependency_id, _)| {
+          let dependency_in_set = if *dependency_id == node_id {
+            // Is a self edge: use the in_set that we're considering creating.
+            &in_set
+          } else {
+            &graph[*dependency_id].0.in_set
+          };
 
-        // Any param provided by this key must be consumed.
-        let consumes_provided_param = dependency_key
-          .provided_param()
-          .map(|p| dependency_in_set.contains(&p))
-          .unwrap_or(true);
-        // And if the dependency is a Param, that Param must be present in the out_set.
-        let uses_only_present_param = match &graph[*dependency_id].0.node {
-          Node::Param(p) => out_set.contains(&p),
-          _ => true,
-        };
-        consumes_provided_param && uses_only_present_param
-      });
+          // Any param provided by this key must be consumed.
+          dependency_key
+            .provided_param()
+            .map(|p| dependency_in_set.contains(&p))
+            .unwrap_or(true)
+        });
       if !satisfiable {
         continue;
       }
@@ -1290,7 +1404,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       combinations
         .entry(in_set)
         .or_insert_with(HashSet::new)
-        .extend(combination.into_iter().cloned());
+        .extend(combination.into_iter().map(|(dk, di, _)| (*dk, *di)));
     }
 
     combinations
