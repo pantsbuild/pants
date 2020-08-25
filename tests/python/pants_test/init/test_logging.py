@@ -22,9 +22,7 @@ class LoggingTest(TestBase):
         # `init_rust_logging` must never be called more than once. The Rust logger is global and static,
         # and initializing it twice in the same test class results in a SIGABRT.
         Native().init_rust_logging(
-            # We set the level to the least verbose possible, as individual tests will increase the
-            # verbosity as necessary.
-            level=LogLevel.ERROR.level,
+            level=LogLevel.INFO.level,  # Tests assume a log level of INFO
             log_show_rust_3rdparty=False,
             use_color=False,
         )

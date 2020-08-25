@@ -4,10 +4,9 @@
 import http.client
 import logging
 import os
-import sys
 import warnings
 from logging import Formatter, Handler, LogRecord, StreamHandler
-from typing import List, Optional, TextIO, Tuple
+from typing import List, Optional, Tuple
 
 import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
@@ -31,26 +30,15 @@ class NativeHandler(StreamHandler):
     method) and proxies logs to the Rust logging infrastructure."""
 
     def __init__(
-        self,
-        log_level: LogLevel,
-        stream: Optional[TextIO] = None,
-        native_filename: Optional[str] = None,
+        self, log_level: LogLevel, native_filename: Optional[str] = None,
     ):
-
-        if stream is not None and native_filename is not None:
-            raise RuntimeError("NativeHandler must output to either a stream or a file, not both")
-
-        super().__init__(stream)
+        super().__init__(None)
         self.native = Native()
         self.native_filename = native_filename
         self.setLevel(log_level.level)
 
-        if stream:
-            try:
-                self.native.setup_stderr_logger(log_level.level)
-            except Exception as e:
-                print(f"Error setting up pantsd logger: {e!r}", file=sys.stderr)
-                raise e
+        if not self.native_filename:
+            self.native.setup_stderr_logger()
 
     def emit(self, record: LogRecord) -> None:
         self.native.write_log(
@@ -61,10 +49,7 @@ class NativeHandler(StreamHandler):
         self.native.flush_log()
 
     def __repr__(self) -> str:
-        return (
-            f"NativeHandler(id={id(self)}, level={self.level}, filename={self.native_filename}, "
-            f"stream={self.stream})"
-        )
+        return f"NativeHandler(id={id(self)}, level={self.level}, filename={self.native_filename}"
 
 
 class ExceptionFormatter(Formatter):
@@ -150,7 +135,7 @@ def setup_logging_to_stderr(
     _common_logging_setup(level, warnings_filter_regexes)
 
     python_logger = logging.getLogger(None)
-    handler = NativeHandler(level, stream=sys.stderr)
+    handler = NativeHandler(level)
     handler.setFormatter(ExceptionFormatter())
     python_logger.addHandler(handler)
     LogLevel.TRACE.set_level_for(python_logger)
@@ -171,7 +156,7 @@ def setup_logging_to_file(
     safe_mkdir(log_dir)
     log_path = os.path.join(log_dir, log_filename)
 
-    fd = native.setup_pantsd_logger(log_path, level.level)
+    fd = native.setup_pantsd_logger(log_path)
     ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
     handler = NativeHandler(level, native_filename=log_path)
 

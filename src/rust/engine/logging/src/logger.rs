@@ -1,6 +1,5 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 use crate::PythonLogLevel;
 
 use colored::*;
@@ -10,14 +9,13 @@ use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::future::Future;
-use std::io::{stderr, Stderr, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use lazy_static::lazy_static;
-use log::{debug, log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
+use log::{debug, log, max_level, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
-use simplelog::{ConfigBuilder, LevelPadding, WriteLogger};
 use tokio::task_local;
 use uuid::Uuid;
 
@@ -30,8 +28,7 @@ lazy_static! {
 }
 
 pub struct PantsLogger {
-  pantsd_log: Mutex<MaybeWriteLogger<File>>,
-  stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
+  log_file: Mutex<Option<File>>,
   use_color: AtomicBool,
   show_rust_3rdparty_logs: AtomicBool,
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
@@ -40,8 +37,7 @@ pub struct PantsLogger {
 impl PantsLogger {
   pub fn new() -> PantsLogger {
     PantsLogger {
-      pantsd_log: Mutex::new(MaybeWriteLogger::empty()),
-      stderr_log: Mutex::new(MaybeWriteLogger::empty()),
+      log_file: Mutex::new(None),
       show_rust_3rdparty_logs: AtomicBool::new(true),
       use_color: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
@@ -52,7 +48,7 @@ impl PantsLogger {
     let max_python_level: Result<PythonLogLevel, _> = max_level.try_into();
     match max_python_level {
       Ok(python_level) => {
-        let level: log::LevelFilter = python_level.into();
+        let level: LevelFilter = python_level.into();
         set_max_level(level);
         PANTS_LOGGER.use_color.store(use_color, Ordering::SeqCst);
         PANTS_LOGGER
@@ -66,22 +62,6 @@ impl PantsLogger {
     };
   }
 
-  fn maybe_increase_global_verbosity(&self, new_level: log::LevelFilter) {
-    if log::max_level() < new_level {
-      set_max_level(new_level);
-    }
-  }
-
-  pub fn set_stderr_logger(&self, python_level: u64) -> Result<(), String> {
-    python_level
-      .try_into()
-      .map_err(|err| format!("{}", err))
-      .map(|level: PythonLogLevel| {
-        self.maybe_increase_global_verbosity(level.into());
-        *self.stderr_log.lock() = MaybeWriteLogger::new(stderr(), level.into())
-      })
-  }
-
   ///
   /// Set up a file logger which logs at python_level to log_file_path.
   /// Returns the file descriptor of the log file.
@@ -90,29 +70,24 @@ impl PantsLogger {
   pub fn set_pantsd_logger(
     &self,
     log_file_path: PathBuf,
-    python_level: u64,
   ) -> Result<std::os::unix::io::RawFd, String> {
     use std::os::unix::io::AsRawFd;
-    python_level
-      .try_into()
-      .map_err(|err| format!("{}", err))
-      .and_then(|level: PythonLogLevel| {
-        {
-          // Maybe close open file by dropping the existing logger
-          *self.pantsd_log.lock() = MaybeWriteLogger::empty();
-        }
-        OpenOptions::new()
-          .create(true)
-          .append(true)
-          .open(log_file_path)
-          .map(|file| {
-            let fd = file.as_raw_fd();
-            self.maybe_increase_global_verbosity(level.into());
-            *self.pantsd_log.lock() = MaybeWriteLogger::new(file, level.into());
-            fd
-          })
-          .map_err(|err| format!("Error opening pantsd logfile: {}", err))
+
+    {
+      // Maybe close open file by dropping the existing file handle
+      *self.log_file.lock() = None;
+    }
+
+    OpenOptions::new()
+      .create(true)
+      .append(true)
+      .open(log_file_path)
+      .map(|file| {
+        let raw_fd = file.as_raw_fd();
+        *self.log_file.lock() = Some(file);
+        raw_fd
       })
+      .map_err(|err| format!("Error opening pantsd logfile: {}", err))
   }
 
   /// log_from_python is only used in the Python FFI, which in turn is only called within the
@@ -142,11 +117,11 @@ impl PantsLogger {
 }
 
 impl Log for PantsLogger {
-  fn enabled(&self, _metadata: &Metadata) -> bool {
+  fn enabled(&self, metadata: &Metadata) -> bool {
     // Individual log levels are handled by each sub-logger,
     // And a global filter is applied to set_max_level.
     // No need to filter here.
-    true
+    metadata.level() <= max_level()
   }
 
   fn log(&self, record: &Record) {
@@ -171,107 +146,62 @@ impl Log for PantsLogger {
     }
 
     let destination = get_destination();
+    let cur_date = chrono::Local::now();
+    let time_str = format!(
+      "{}.{:02}",
+      cur_date.format(TIME_FORMAT_STR),
+      cur_date.time().nanosecond() / 10_000_000 // two decimal places of precision
+    );
+
+    let level = record.level();
+    let destination_is_file = match destination {
+      Destination::Pantsd => true,
+      Destination::Stderr => false,
+    };
+    let use_color = self.use_color.load(Ordering::SeqCst) && (!destination_is_file);
+
+    let level_marker = match level {
+      _ if !use_color => format!("[{}]", level).normal().clear(),
+      Level::Info => format!("[{}]", level).normal(),
+      Level::Error => format!("[{}]", level).red(),
+      Level::Warn => format!("[{}]", level).red(),
+      Level::Debug => format!("[{}]", level).green(),
+      Level::Trace => format!("[{}]", level).magenta(),
+    };
+
+    let log_string = format!("{} {} {}", time_str, level_marker, record.args());
+
     match destination {
       Destination::Stderr => {
-        let cur_date = chrono::Local::now();
-        let time_str = format!(
-          "{}.{:02}",
-          cur_date.format(TIME_FORMAT_STR),
-          cur_date.time().nanosecond() / 10_000_000 // two decimal places of precision
-        );
-
-        let level = record.level();
-        let use_color = self.use_color.load(Ordering::SeqCst);
-
-        let level_marker = match level {
-          _ if !use_color => format!("[{}]", level).normal().clear(),
-          Level::Info => format!("[{}]", level).normal(),
-          Level::Error => format!("[{}]", level).red(),
-          Level::Warn => format!("[{}]", level).red(),
-          Level::Debug => format!("[{}]", level).green(),
-          Level::Trace => format!("[{}]", level).magenta(),
-        };
-
-        let log_string = format!("{} {} {}", time_str, level_marker, record.args());
-
-        {
-          // We first try to output to all registered handlers. If there are none, or any of them
-          // fail, then we fallback to sending directly to stderr.
-          let handlers_map = self.stderr_handlers.lock();
-          let mut any_handler_failed = false;
-          for callback in handlers_map.values() {
-            let handler_res = callback(&log_string);
-            if handler_res.is_err() {
-              any_handler_failed = true;
-            }
+        // We first try to output to all registered handlers. If there are none, or any of them
+        // fail, then we fallback to sending directly to stderr.
+        let handlers_map = self.stderr_handlers.lock();
+        let mut any_handler_failed = false;
+        for callback in handlers_map.values() {
+          let handler_res = callback(&log_string);
+          if handler_res.is_err() {
+            any_handler_failed = true;
           }
-          if handlers_map.len() == 0 || any_handler_failed {
-            self.stderr_log.lock().log(record);
+        }
+        if handlers_map.len() == 0 || any_handler_failed {
+          eprintln!("{}", log_string);
+        }
+      }
+      Destination::Pantsd => {
+        let mut maybe_file = self.log_file.lock();
+        if let Some(ref mut file) = *maybe_file {
+          match writeln!(file, "{}", log_string) {
+            Ok(()) => (),
+            Err(e) => {
+              eprintln!("Error writing to log file: {}", e);
+            }
           }
         }
       }
-      Destination::Pantsd => self.pantsd_log.lock().log(record),
     }
   }
 
-  fn flush(&self) {
-    self.stderr_log.lock().flush();
-    self.pantsd_log.lock().flush();
-  }
-}
-
-struct MaybeWriteLogger<W: Write + Send + 'static> {
-  level: LevelFilter,
-  inner: Option<Box<WriteLogger<W>>>,
-}
-
-impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
-  pub fn empty() -> MaybeWriteLogger<W> {
-    MaybeWriteLogger {
-      level: LevelFilter::Off,
-      inner: None,
-    }
-  }
-
-  pub fn new(writable: W, level: LevelFilter) -> MaybeWriteLogger<W> {
-    // We initialize the inner WriteLogger with no filters so that we don't
-    // have to create a new one every time we change the level of the outer
-    // MaybeWriteLogger.
-
-    let config = ConfigBuilder::new()
-      .set_time_format_str(TIME_FORMAT_STR)
-      .set_time_to_local(true)
-      .set_thread_level(LevelFilter::Off)
-      .set_level_padding(LevelPadding::Off)
-      .set_target_level(LevelFilter::Off)
-      .build();
-
-    MaybeWriteLogger {
-      level,
-      inner: Some(WriteLogger::new(LevelFilter::max(), config, writable)),
-    }
-  }
-}
-
-impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
-  fn enabled(&self, metadata: &Metadata) -> bool {
-    metadata.level() <= self.level
-  }
-
-  fn log(&self, record: &Record) {
-    if !self.enabled(record.metadata()) {
-      return;
-    }
-    if let Some(ref logger) = self.inner {
-      logger.log(record);
-    }
-  }
-
-  fn flush(&self) {
-    if let Some(ref logger) = self.inner {
-      logger.flush();
-    }
-  }
+  fn flush(&self) {}
 }
 
 ///
