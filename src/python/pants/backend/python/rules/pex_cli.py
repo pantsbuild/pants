@@ -26,9 +26,9 @@ class PexBinary(ExternalTool):
 
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.14"
+    default_version = "v2.1.15"
     default_known_versions = [
-        f"v2.1.14|{plat}|12937da9ad5ad2c60564aa35cb4b3992ba3cc5ef7efedd44159332873da6fe46|2637138"
+        f"v2.1.15|{plat}|f566d1a6d66c7427df3ce7c1c44f2242130133177b885bcd4024b777420d69a6|2637459"
         for plat in ["darwin", "linux "]
     ]
 
