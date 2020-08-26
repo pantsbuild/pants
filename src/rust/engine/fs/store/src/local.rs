@@ -24,7 +24,6 @@ struct InnerStore {
   //  2. It's nice to know whether we should be able to parse something as a proto.
   file_dbs: Result<Arc<ShardedLmdb>, String>,
   directory_dbs: Result<Arc<ShardedLmdb>, String>,
-  tree_dbs: Result<Arc<ShardedLmdb>, String>,
   executor: task_executor::Executor,
 }
 
@@ -44,7 +43,6 @@ impl ByteStore {
     let root = path.as_ref();
     let files_root = root.join("files");
     let directories_root = root.join("directories");
-    let trees_root = root.join("trees");
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
         // We want these stores to be allowed to grow very large, in case we are on a system with
@@ -65,8 +63,6 @@ impl ByteStore {
           lease_time,
         )
         .map(Arc::new),
-        tree_dbs: ShardedLmdb::new(trees_root, 2 * GIGABYTES, executor.clone(), lease_time)
-          .map(Arc::new),
         executor,
       }),
     })
@@ -107,7 +103,6 @@ impl ByteStore {
       let dbs = match entry_type {
         EntryType::File => self.inner.file_dbs.clone(),
         EntryType::Directory => self.inner.directory_dbs.clone(),
-        EntryType::Tree => self.inner.tree_dbs.clone(),
       };
       dbs?
         .lease(digest.0)
@@ -154,7 +149,6 @@ impl ByteStore {
       let lmdbs = match aged_fingerprint.entry_type {
         EntryType::File => self.inner.file_dbs.clone(),
         EntryType::Directory => self.inner.directory_dbs.clone(),
-        EntryType::Tree => self.inner.tree_dbs.clone(),
       };
       let (env, database, lease_database) = lmdbs.clone()?.get(&aged_fingerprint.fingerprint);
       {
@@ -196,7 +190,6 @@ impl ByteStore {
     let database = match entry_type {
       EntryType::File => self.inner.file_dbs.clone(),
       EntryType::Directory => self.inner.directory_dbs.clone(),
-      EntryType::Tree => self.inner.tree_dbs.clone(),
     };
 
     for &(ref env, ref database, ref lease_database) in &database?.all_lmdbs() {
@@ -255,7 +248,6 @@ impl ByteStore {
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
-      EntryType::Tree => self.inner.tree_dbs.clone(),
     };
     let bytes2 = bytes.clone();
     let digest = self
@@ -292,7 +284,6 @@ impl ByteStore {
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
-      EntryType::Tree => self.inner.tree_dbs.clone(),
     };
 
     dbs?.load_bytes_with(digest.0, move |bytes| {
@@ -308,7 +299,6 @@ impl ByteStore {
     let database = match entry_type {
       EntryType::File => self.inner.file_dbs.clone(),
       EntryType::Directory => self.inner.directory_dbs.clone(),
-      EntryType::Tree => self.inner.tree_dbs.clone(),
     };
     let mut digests = vec![];
     for &(ref env, ref database, ref _lease_database) in &database?.all_lmdbs() {

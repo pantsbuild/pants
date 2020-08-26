@@ -60,6 +60,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
+use bazel_protos::remote_execution::Tree;
 use parking_lot::Mutex;
 
 const MEGABYTES: usize = 1024 * 1024;
@@ -427,7 +428,7 @@ impl Store {
   /// two functions f_local and f_remote. These functions are any validation or transformations you
   /// want to perform on the bytes received from the local and remote cas (if remote is configured).
   ///
-  pub async fn load_bytes_with<
+  async fn load_bytes_with<
     T: Send + 'static,
     FLocal: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
     FRemote: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
@@ -450,9 +451,7 @@ impl Store {
       (Some(value_result), _) => value_result.map(|res| Some((res, LoadMetadata::Local))),
       (None, None) => Ok(None),
       (None, Some(remote)) => {
-        let maybe_bytes = remote
-          .load_bytes_with(entry_type, digest, move |bytes: Bytes| bytes)
-          .await?;
+        let maybe_bytes = remote.load_bytes_with(entry_type, digest, Ok).await?;
 
         match maybe_bytes {
           Some(bytes) => {
@@ -598,6 +597,48 @@ impl Store {
       .to_boxed()
   }
 
+  /// Load a REv2 Tree from a remote CAS and cache the embedded Directory protos in the
+  /// local store. Tree is used by the REv2 protocol as an optimization for encoding the
+  /// the Directory protos that compromose the output directories from a remote
+  /// execution reported by an ActionResult.
+  ///
+  /// Returns an Option<Digest> representing the `root` Directory within the Tree (if it
+  /// in fact exists in the remote CAS).
+  ///
+  /// This method requires that this Store be configured with a remote CAS (and will return
+  /// an error if this is not the case).
+  pub async fn load_tree_from_remote(&self, tree_digest: Digest) -> Result<Option<Digest>, String> {
+    let remote = if let Some(ref remote) = self.remote {
+      remote
+    } else {
+      return Err("Cannot load Trees from a remote without a remote".to_owned());
+    };
+
+    let tree_opt = remote
+      .load_bytes_with(EntryType::Directory, tree_digest, |b| {
+        let mut tree = Tree::new();
+        tree
+          .merge_from_bytes(&b)
+          .map_err(|e| format!("protobuf decode error: {:?}", e))?;
+        Ok(tree)
+      })
+      .await?;
+
+    let tree = match tree_opt {
+      Some(t) => t,
+      None => return Ok(None),
+    };
+
+    // Cache the returned `Directory` proto and the children `Directory` protos in
+    // the local store.
+    let root_digest = self.record_directory(tree.get_root(), true).await?;
+    for child_directory in tree.get_children() {
+      self.record_directory(child_directory, true).await?;
+    }
+
+    Ok(Some(root_digest))
+  }
+
   pub async fn lease_all_recursively<'a, Ds: Iterator<Item = &'a Digest>>(
     &self,
     digests: Ds,
@@ -678,7 +719,6 @@ impl Store {
                   .await?;
                 Ok(Either::Right(reachable))
               }
-              Ok(Some(EntryType::Tree)) => unimplemented!(),
               Ok(None) => {
                 if allow_missing {
                   Ok(Either::Right(HashMap::new()))
@@ -1053,7 +1093,6 @@ impl StoreWrapper for Store {
 pub enum EntryType {
   Directory,
   File,
-  Tree, // multiple Directories encoded together
 }
 
 #[cfg(test)]

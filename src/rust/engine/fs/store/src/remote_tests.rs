@@ -376,5 +376,5 @@ async fn load_bytes(
   entry_type: EntryType,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  store.load_bytes_with(entry_type, digest, |b| b).await
+  store.load_bytes_with(entry_type, digest, |b| Ok(b)).await
 }

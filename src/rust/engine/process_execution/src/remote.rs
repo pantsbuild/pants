@@ -26,7 +26,7 @@ use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use protobuf::{self, Message, ProtobufEnum};
 use rand::{thread_rng, Rng};
-use store::{EntryType, Snapshot, SnapshotOps, Store, StoreFileByDigest};
+use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use workunit_store::{with_workunit, SpanId, WorkunitMetadata, WorkunitStore};
 
 use crate::{
@@ -1170,44 +1170,11 @@ pub fn extract_output_files(
         // of the output directory needed to construct the series of `Directory` protos needed
         // for the final merge of the output directories.
         let tree_digest: Digest = dir.get_tree_digest().try_into()?;
-        let tree_opt = store
-          .load_bytes_with(
-            EntryType::Tree,
-            tree_digest,
-            |b| {
-              let mut tree = bazel_protos::remote_execution::Tree::new();
-              tree
-                .merge_from_bytes(b)
-                .map_err(|e| format!("protobuf decode error: {:?}", e))?;
-              Ok(tree)
-            },
-            |b| {
-              let mut tree = bazel_protos::remote_execution::Tree::new();
-              tree
-                .merge_from_bytes(&b)
-                .map_err(|e| format!("protobuf decode error: {:?}", e))?;
-              Ok(tree)
-            },
-          )
-          .await?;
+        let root_digest_opt = store.load_tree_from_remote(tree_digest).await?;
+        let root_digest = root_digest_opt
+          .ok_or_else(|| format!("Tree with digest {:?} was not in remote", tree_digest))?;
 
-        let tree = match tree_opt {
-          Some((t, _)) => t,
-          _ => {
-            return Err(format!(
-              "Tree with digest {:?} was not in remote",
-              tree_digest
-            ))
-          }
-        };
-
-        if !tree.has_root() {
-          return Err(format!(
-            "Tree with digest {:?} does not have root Directory",
-            tree_digest
-          ));
-        }
-        let mut digest = digest(tree.get_root())?;
+        let mut digest = root_digest;
 
         if !dir.get_path().is_empty() {
           for component in dir.get_path().rsplit('/') {
