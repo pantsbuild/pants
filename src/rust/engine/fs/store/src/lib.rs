@@ -631,11 +631,16 @@ impl Store {
 
     // Cache the returned `Directory` proto and the children `Directory` protos in
     // the local store.
-    let root_digest = self.record_directory(tree.get_root(), true).await?;
-    for child_directory in tree.get_children() {
-      self.record_directory(child_directory, true).await?;
-    }
-
+    let root_digest_fut = self.record_directory(tree.get_root(), true);
+    let children_futures = tree
+      .get_children()
+      .iter()
+      .map(|directory| self.record_directory(directory, true));
+    let (root_digest, _) = futures::future::try_join(
+      root_digest_fut,
+      futures::future::try_join_all(children_futures),
+    )
+    .await?;
     Ok(Some(root_digest))
   }
 
