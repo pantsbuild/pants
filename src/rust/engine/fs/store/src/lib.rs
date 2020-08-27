@@ -451,7 +451,7 @@ impl Store {
       (Some(value_result), _) => value_result.map(|res| Some((res, LoadMetadata::Local))),
       (None, None) => Ok(None),
       (None, Some(remote)) => {
-        let maybe_bytes = remote.load_bytes_with(entry_type, digest, Ok).await?;
+        let maybe_bytes = remote.load_bytes_with(digest, Ok).await?;
 
         match maybe_bytes {
           Some(bytes) => {
@@ -615,7 +615,7 @@ impl Store {
     };
 
     let tree_opt = remote
-      .load_bytes_with(EntryType::Directory, tree_digest, |b| {
+      .load_bytes_with(tree_digest, |b| {
         let mut tree = Tree::new();
         tree
           .merge_from_bytes(&b)

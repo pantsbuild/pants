@@ -16,7 +16,7 @@ use log::Level;
 use serverset::{retry, Serverset};
 use workunit_store::with_workunit;
 
-use super::{BackoffConfig, EntryType};
+use super::BackoffConfig;
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -233,7 +233,6 @@ impl ByteStore {
     F: Fn(Bytes) -> Result<T, String> + Send + Sync + Clone + 'static,
   >(
     &self,
-    _entry_type: EntryType,
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, String> {

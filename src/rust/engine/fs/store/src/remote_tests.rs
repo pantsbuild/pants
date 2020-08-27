@@ -1,5 +1,5 @@
 use crate::remote::ByteStore;
-use crate::{EntryType, MEGABYTES};
+use crate::MEGABYTES;
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use hashing::Digest;
@@ -361,20 +361,16 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
 }
 
 pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, EntryType::File, digest).await
+  load_bytes(&store, digest).await
 }
 
 pub async fn load_directory_proto_bytes(
   store: &ByteStore,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, EntryType::Directory, digest).await
+  load_bytes(&store, digest).await
 }
 
-async fn load_bytes(
-  store: &ByteStore,
-  entry_type: EntryType,
-  digest: Digest,
-) -> Result<Option<Bytes>, String> {
-  store.load_bytes_with(entry_type, digest, |b| Ok(b)).await
+async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
+  store.load_bytes_with(digest, |b| Ok(b)).await
 }
