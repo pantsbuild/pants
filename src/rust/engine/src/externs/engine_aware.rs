@@ -49,7 +49,13 @@ impl EngineAwareInformation for Artifacts {
   type MaybeOutput = Vec<(String, Digest)>;
 
   fn retrieve(value: &Value) -> Option<Self::MaybeOutput> {
-    let artifacts_val: Value = externs::call_method(&value, "artifacts", &[]).ok()?;
+    let artifacts_val: Value = match externs::call_method(&value, "artifacts", &[]) {
+      Ok(value) => value,
+      Err(e) => {
+        log::error!("Error calling `artifacts` method: {}", e);
+        return None;
+      }
+    };
     let artifacts_val: Value = externs::check_for_python_none(artifacts_val)?;
     let gil = Python::acquire_gil();
     let py = gil.python();
