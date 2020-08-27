@@ -120,6 +120,7 @@ impl CommandRunner {
         execute_response.get_result(),
         vec![],
         platform,
+        true,
       )
       .map(Some)
       .compat()

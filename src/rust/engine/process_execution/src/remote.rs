@@ -247,6 +247,7 @@ impl CommandRunner {
           &action_result,
           vec![],
           self.platform,
+          false,
         )
         .compat()
         .await?;
@@ -526,6 +527,7 @@ impl CommandRunner {
               execute_response.get_result(),
               vec![],
               self.platform,
+              false,
             )
             .compat()
             .await
@@ -1074,16 +1076,28 @@ pub async fn populate_fallible_execution_result_for_timeout(
   })
 }
 
+/// Convert an ActionResult into a FallibleProcessResultWithPlatform.
+///
+/// HACK: The caching CommandRunner stores the digest of the Directory that merges all output
+/// files and output directories in the `tree_digest` field of the `output_directories` field
+/// of the ActionResult/ExecuteResponse stored in the local cache. When
+/// `treat_tree_digest_as_final_directory_hack` is true, then that final merged directory
+/// will be extracted from the tree_digest of the single output directory.
 pub fn populate_fallible_execution_result(
   store: Store,
   action_result: &bazel_protos::remote_execution::ActionResult,
   execution_attempts: Vec<ExecutionStats>,
   platform: Platform,
+  treat_tree_digest_as_final_directory_hack: bool,
 ) -> impl Future01<Item = FallibleProcessResultWithPlatform, Error = String> {
   let exit_code = action_result.get_exit_code();
   extract_stdout(&store, action_result)
     .join(extract_stderr(&store, action_result))
-    .join(extract_output_files(store, action_result))
+    .join(extract_output_files(
+      store,
+      action_result,
+      treat_tree_digest_as_final_directory_hack,
+    ))
     .and_then(move |((stdout_digest, stderr_digest), output_directory)| {
       Ok(FallibleProcessResultWithPlatform {
         stdout_digest,
@@ -1152,7 +1166,29 @@ fn extract_stderr(
 pub fn extract_output_files(
   store: Store,
   action_result: &bazel_protos::remote_execution::ActionResult,
+  treat_tree_digest_as_final_directory_hack: bool,
 ) -> BoxFuture<Digest, String> {
+  // HACK: The caching CommandRunner stores the digest of the Directory that merges all output
+  // files and output directories in the `tree_digest` field of the `output_directories` field
+  // of the ActionResult/ExecuteResponse stored in the local cache. When
+  // `treat_tree_digest_as_final_directory_hack` is true, then this code will extract that
+  // directory from the tree_digest and skip the merging performed by the remainder of this
+  // method.
+  if treat_tree_digest_as_final_directory_hack {
+    match action_result.get_output_directories() {
+      &[ref directory] => {
+        let directory_digest = directory.get_tree_digest().try_into();
+        return BoxFuture::from(Box::new(futures::future::ready(directory_digest).compat()));
+      }
+      _ => {
+        let err_fut = futures::future::err(
+          "illegal state: treat_tree_digest_as_final_directory_hack expected single output directory".to_owned()
+        );
+        return BoxFuture::from(Box::new(err_fut.compat()));
+      }
+    }
+  }
+
   // Get Digests of output Directories.
   // Then we'll make a Directory for the output files, and merge them.
   let mut directory_digests = Vec::with_capacity(action_result.get_output_directories().len() + 1);

@@ -2450,7 +2450,7 @@ async fn extract_output_files_from_response(
   let executor = task_executor::Executor::new(Handle::current());
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), &cas, executor.clone());
-  crate::remote::extract_output_files(store, execute_response.get_result())
+  crate::remote::extract_output_files(store, execute_response.get_result(), false)
     .compat()
     .await
 }
