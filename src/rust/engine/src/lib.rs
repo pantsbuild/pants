@@ -30,7 +30,7 @@
 // just the one minor call as unsafe, than to mark the whole function as unsafe which may hide
 // other unsafeness.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
-#![type_length_limit = "42187898"]
+#![type_length_limit="43757804"]
 
 mod context;
 mod core;

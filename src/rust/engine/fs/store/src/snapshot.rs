@@ -42,6 +42,7 @@ impl Snapshot {
     file_digester: S,
     mut path_stats: Vec<PathStat>,
   ) -> Result<Snapshot, String> {
+    #[allow(clippy::unnecessary_sort_by)]
     path_stats.sort_by(|a, b| a.path().cmp(b.path()));
 
     // The helper assumes that if a Path has multiple children, it must be a directory.
@@ -87,6 +88,7 @@ impl Snapshot {
     let mut path_stats =
       Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter))
         .collect::<Vec<_>>();
+    #[allow(clippy::unnecessary_sort_by)]
     path_stats.sort_by(|l, r| l.path().cmp(&r.path()));
     Ok(Snapshot { digest, path_stats })
   }
@@ -100,6 +102,7 @@ impl Snapshot {
     path_stats: &[PathStat],
   ) -> Result<Digest, String> {
     let mut sorted_path_stats = path_stats.to_owned();
+    #[allow(clippy::unnecessary_sort_by)]
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
     Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
       .await

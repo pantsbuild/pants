@@ -536,6 +536,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
       .into_inner()
       .into_iter()
       .collect::<Vec<_>>();
+    #[allow(clippy::unnecessary_sort_by)]
     path_stats.sort_by(|a, b| a.path().cmp(b.path()));
     path_stats.dedup_by(|a, b| a.path() == b.path());
     Ok(path_stats)
