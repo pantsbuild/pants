@@ -9,7 +9,7 @@ from textwrap import dedent
 from typing import List, Optional
 
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, DigestContents, FileContent
 from pants.engine.internals.engine_testutil import (
     assert_equal_with_printing,
     remove_locations_from_traceback,
@@ -562,6 +562,58 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
         artifacts = workunit["artifacts"]
         assert artifacts["some_arbitrary_key"] == EMPTY_DIGEST
+
+
+@dataclass(frozen=True)
+class Output(EngineAwareReturnType):
+    val: Digest
+
+    def artifacts(self):
+        return {"some_arbitrary_key": self.val}
+
+
+@rule(desc="a_rule")
+def a_rule(digest: Digest) -> Output:
+    return Output(val=digest)
+
+
+class MoreComplicatedEngineAware(TestBase, SchedulerTestBase):
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            a_rule,
+            QueryRule(Output, (Digest,)),
+        )
+
+    def test_more_complicated_engine_aware(self) -> None:
+        tracker = WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            self.scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.TRACE,
+        )
+        with handler.session():
+            content = b"alpha"
+            subset_input = CreateDigest((FileContent(path="a.txt", content=content),))
+            subset_digest = self.request_product(Digest, [subset_input])
+            self.request_product(Output, [subset_digest])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunit = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+        )
+
+        streaming_workunit_context = handler._context
+
+        artifacts = workunit["artifacts"]
+        output_digest = artifacts["some_arbitrary_key"]
+
+        print(f"Output digest: {output_digest}")
+        output_bytes = streaming_workunit_context.digests_to_bytes([output_digest])
+        print(f"Ouput bytes: {output_bytes}")
+        assert 1 == 2
 
 
 class StreamingWorkunitProcessTests(TestBase):
