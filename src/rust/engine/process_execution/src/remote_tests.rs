@@ -19,7 +19,7 @@ use spectral::prelude::*;
 use spectral::{assert_that, string::StrAssertions};
 use store::Store;
 use tempfile::TempDir;
-use testutil::data::{TestData, TestDirectory};
+use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::owned_string_vec;
 use tokio::runtime::Handle;
 use workunit_store::{Level, SpanId, Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
@@ -1955,6 +1955,7 @@ async fn extract_output_files_from_response_one_file() {
   output_file.set_path("roland".into());
   output_file.set_digest((&TestData::roland().digest()).into());
   output_file.set_is_executable(false);
+
   let mut output_files = protobuf::RepeatedField::new();
   output_files.push(output_file);
 
@@ -1983,6 +1984,7 @@ async fn extract_output_files_from_response_two_files_not_nested() {
   output_file_2.set_path("treats".into());
   output_file_2.set_digest((&TestData::catnip().digest()).into());
   output_file_2.set_is_executable(false);
+
   let mut output_files = protobuf::RepeatedField::new();
   output_files.push(output_file_1);
   output_files.push(output_file_2);
@@ -2012,6 +2014,7 @@ async fn extract_output_files_from_response_two_files_nested() {
   output_file_2.set_path("treats".into());
   output_file_2.set_digest((&TestData::catnip().digest()).into());
   output_file_2.set_is_executable(false);
+
   let mut output_files = protobuf::RepeatedField::new();
   output_files.push(output_file_1);
   output_files.push(output_file_2);
@@ -2034,7 +2037,9 @@ async fn extract_output_files_from_response_two_files_nested() {
 async fn extract_output_files_from_response_just_directory() {
   let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
   output_directory.set_path("cats".into());
-  output_directory.set_tree_digest((&TestDirectory::containing_roland().digest()).into());
+  let tree: TestTree = TestDirectory::containing_roland().into();
+  output_directory.set_tree_digest(tree.digest().into());
+
   let mut output_directories = protobuf::RepeatedField::new();
   output_directories.push(output_directory);
 
@@ -2059,16 +2064,18 @@ async fn extract_output_files_from_response_directories_and_files() {
   // /pets/dogs/robin
 
   let mut output_directories = protobuf::RepeatedField::new();
+
   output_directories.push({
     let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
     output_directory.set_path("pets/cats".into());
-    output_directory.set_tree_digest((&TestDirectory::containing_roland().digest()).into());
+    output_directory.set_tree_digest((&TestTree::roland_at_root().digest()).into());
     output_directory
   });
+
   output_directories.push({
     let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
     output_directory.set_path("pets/dogs".into());
-    output_directory.set_tree_digest((&TestDirectory::containing_robin().digest()).into());
+    output_directory.set_tree_digest((&TestTree::robin_at_root().digest()).into());
     output_directory
   });
 
@@ -2106,7 +2113,7 @@ async fn extract_output_files_from_response_directories_and_files() {
 async fn extract_output_files_from_response_no_prefix() {
   let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
   output_directory.set_path(String::new());
-  output_directory.set_tree_digest((&TestDirectory::containing_roland().digest()).into());
+  output_directory.set_tree_digest((&TestTree::roland_at_root().digest()).into());
 
   let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
   execute_response.set_result({
@@ -2352,6 +2359,7 @@ async fn run_command_remote(
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
+    .tree(&TestTree::roland_at_root())
     .build();
   let (command_runner, store) = create_command_runner(address, &cas, Platform::Linux);
   let original = command_runner.run(request, Context::default()).await?;
@@ -2436,11 +2444,13 @@ async fn extract_output_files_from_response(
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
+    .tree(&TestTree::roland_at_root())
+    .tree(&TestTree::robin_at_root())
     .build();
   let executor = task_executor::Executor::new(Handle::current());
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), &cas, executor.clone());
-  crate::remote::extract_output_files(store, execute_response.get_result())
+  crate::remote::extract_output_files(store, execute_response.get_result(), false)
     .compat()
     .await
 }
