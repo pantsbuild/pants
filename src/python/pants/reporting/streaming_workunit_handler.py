@@ -20,6 +20,11 @@ class StreamingWorkunitContext:
         Digests in sequence."""
         return self._scheduler.digests_to_bytes(digests)
 
+    def snapshot_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes]:
+        """Given a list of Digest objects representing the digest from a Snapshot, return a list of
+        the bytes corresponding to each of those Digests in sequence."""
+        return self._scheduler.snapshot_digests_to_bytes(digests)
+
     def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
         """Invoke the internal ensure_remote_has_recursive function, which ensures that a remote
         ByteStore, if it exists, has a copy of the files fingerprinted by each Digest."""

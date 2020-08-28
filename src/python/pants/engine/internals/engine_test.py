@@ -610,10 +610,8 @@ class MoreComplicatedEngineAware(TestBase, SchedulerTestBase):
         artifacts = workunit["artifacts"]
         output_digest = artifacts["some_arbitrary_key"]
 
-        print(f"Output digest: {output_digest}")
-        output_bytes = streaming_workunit_context.digests_to_bytes([output_digest])
-        print(f"Ouput bytes: {output_bytes}")
-        assert 1 == 2
+        output_bytes = streaming_workunit_context.snapshot_digests_to_bytes([output_digest])
+        assert output_bytes == (b"alpha",)
 
 
 class StreamingWorkunitProcessTests(TestBase):

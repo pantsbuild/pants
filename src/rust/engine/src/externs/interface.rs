@@ -365,6 +365,12 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
+    "snapshot_digests_to_bytes",
+    py_fn!(py, snapshot_digests_to_bytes(a: PyScheduler, b: PyList)),
+  )?;
+
+  m.add(
+    py,
     "ensure_remote_has_recursive",
     py_fn!(py, ensure_remote_has_recursive(a: PyScheduler, b: PyList)),
   )?;
@@ -1467,6 +1473,7 @@ fn ensure_remote_has_recursive(
   })
 }
 
+//Assumes a digest that comes from a snapshot - i.e. it is a directory with a single file in it
 fn digests_to_bytes(
   py: Python,
   scheduler_ptr: PyScheduler,
@@ -1491,6 +1498,54 @@ fn digests_to_bytes(
             maybe_bytes
               .map(|bytes_tuple| bytes_tuple.0)
               .ok_or_else(|| format!("Error loading bytes from digest: {:?}", digest))
+          })
+      }
+    });
+
+    let bytes_values: Vec<PyObject> = py
+      .allow_threads(|| {
+        core.executor.block_on(
+          future03::try_join_all(digest_futures)
+            .map_ok(|values: Vec<Value>| values.into_iter().map(|val| val.into()).collect()),
+        )
+      })
+      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+
+    let output_list = PyList::new(py, &bytes_values);
+    Ok(output_list)
+  })
+}
+
+fn snapshot_digests_to_bytes(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  py_digests: PyList,
+) -> CPyResult<PyList> {
+  use bytes::Bytes;
+  use fs::FileContent;
+  with_scheduler(py, scheduler_ptr, |scheduler| {
+    let core = scheduler.core.clone();
+    let digests: Vec<Digest> = py_digests
+      .iter(py)
+      .map(|item| crate::nodes::lift_digest(&item.into()))
+      .collect::<Result<Vec<Digest>, _>>()
+      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+
+    /* dgest_futures should be some type containing Value */
+    let digest_futures = digests.into_iter().map(|digest| {
+      let store = core.store();
+      async move {
+        store
+          .contents_for_directory(digest)
+          .compat()
+          .await
+          .and_then(|contents: Vec<FileContent>| {
+            if contents.len() == 1 {
+              let bytes: &Bytes = &contents[0].content;
+              Ok(externs::store_bytes(&bytes))
+            } else {
+              Err(format!("Non-len 1 contents in this Digest"))
+            }
           })
       }
     });
