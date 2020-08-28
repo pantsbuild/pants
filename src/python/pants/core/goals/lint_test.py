@@ -14,8 +14,8 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine_util import MockConsole, MockGet, run_rule
 from pants.testutil.option_util import create_goal_subsystem
+from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 
@@ -116,7 +116,7 @@ class LintTest(TestBase):
         console = MockConsole(use_colors=False)
         workspace = Workspace(self.scheduler)
         union_membership = UnionMembership({LintRequest: lint_request_types})
-        result: Lint = run_rule(
+        result: Lint = run_rule_with_mocks(
             lint,
             rule_args=[
                 console,

@@ -16,8 +16,8 @@ from pants.engine.target import (
     Targets,
     UnrecognizedTargetTypeException,
 )
-from pants.testutil.engine_util import MockConsole, run_rule
 from pants.testutil.option_util import create_goal_subsystem
+from pants.testutil.rule_runner import MockConsole, run_rule_with_mocks
 
 
 class MockTarget(Target):
@@ -33,7 +33,7 @@ def run_goal(
     tag_regex: Optional[List[str]] = None,
 ) -> str:
     console = MockConsole(use_colors=False)
-    run_rule(
+    run_rule_with_mocks(
         filter_targets,
         rule_args=[
             Targets(targets),

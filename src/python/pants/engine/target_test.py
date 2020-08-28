@@ -39,7 +39,7 @@ from pants.engine.target import (
     generate_subtarget_address,
 )
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine_util import MockGet, run_rule
+from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
@@ -232,7 +232,7 @@ def test_async_field() -> None:
         sources_field = FortranTarget(
             {FortranSources.alias: raw_source_files}, address=Address.parse(":lib")
         )[FortranSources]
-        result: FortranSourcesResult = run_rule(
+        result: FortranSourcesResult = run_rule_with_mocks(
             hydrate_fortran_sources,
             rule_args=[FortranSourcesRequest(sources_field)],
             mock_gets=[

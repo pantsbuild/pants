@@ -17,8 +17,8 @@ from pants.engine.target import (
     TargetWithOrigin,
 )
 from pants.option.global_options import GlobalOptions
-from pants.testutil.engine_util import MockConsole, MockGet, run_rule
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
+from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
 from pants.testutil.test_base import TestBase
 
 
@@ -58,7 +58,7 @@ class RunTest(TestBase):
         )
         field_set = TestRunFieldSet.create(target)
 
-        res = run_rule(
+        res = run_rule_with_mocks(
             run,
             rule_args=[
                 create_goal_subsystem(RunSubsystem, args=[]),

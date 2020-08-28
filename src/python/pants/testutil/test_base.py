@@ -34,6 +34,7 @@ from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.selectors import Params
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, WrappedTarget
@@ -43,7 +44,6 @@ from pants.option.global_options import ExecutionOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
 from pants.source import source_root
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import GoalRuleResult as GoalRuleResult
 from pants.util.collections import assert_single_element

@@ -14,6 +14,7 @@ import pytest
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.engine_testutil import assert_equal_with_printing
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import Scheduler
 from pants.engine.internals.selectors import GetConstraints, GetParseError
@@ -30,7 +31,7 @@ from pants.engine.rules import (
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
-from pants.testutil.engine_util import MockGet, assert_equal_with_printing, run_rule
+from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.testutil.test_base import TestBase
 from pants.util.enums import match
 from pants.util.logging import LogLevel
@@ -392,7 +393,7 @@ async def a_goal_rule_generator(console: Console) -> Example:
 
 class RuleTest(TestBase):
     def test_run_rule_goal_rule_generator(self):
-        res = run_rule(
+        res = run_rule_with_mocks(
             a_goal_rule_generator,
             rule_args=[Console()],
             mock_gets=[MockGet(product_type=A, subject_type=str, mock=lambda _: A())],

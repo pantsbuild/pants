@@ -19,7 +19,7 @@ from pants.core.util_rules.filter_empty_sources import (
 from pants.engine.addresses import Address
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine_util import MockConsole, MockGet, run_rule
+from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 
@@ -126,7 +126,7 @@ class TypecheckTest(TestBase):
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
         union_membership = UnionMembership({TypecheckRequest: request_types})
-        result: Typecheck = run_rule(
+        result: Typecheck = run_rule_with_mocks(
             typecheck,
             rule_args=[console, Targets(targets), union_membership],
             mock_gets=[

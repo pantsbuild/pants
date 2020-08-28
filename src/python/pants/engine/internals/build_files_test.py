@@ -38,15 +38,14 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Dependencies, Sources, Tags, Target
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine_util import MockGet, run_rule
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
 
 def test_parse_address_family_empty() -> None:
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
-    af = run_rule(
+    af = run_rule_with_mocks(
         parse_address_family,
         rule_args=[
             Parser(target_type_aliases=[], object_aliases=BuildFileAliases()),
@@ -66,7 +65,7 @@ def test_parse_address_family_empty() -> None:
 
 
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
-    symbols = run_rule(
+    symbols = run_rule_with_mocks(
         evaluate_preludes,
         rule_args=[create_subsystem(GlobalOptions, build_file_prelude_globs=["prelude"])],
         mock_gets=[
@@ -111,7 +110,7 @@ def test_prelude_parsing_illegal_import() -> None:
 
 def test_strip_address_origin() -> None:
     addr = Address.parse("//:demo")
-    result = run_rule(
+    result = run_rule_with_mocks(
         strip_address_origins,
         rule_args=[AddressesWithOrigins([AddressWithOrigin(addr, AddressLiteralSpec("", "demo"))])],
     )

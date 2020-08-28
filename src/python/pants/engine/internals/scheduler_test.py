@@ -7,10 +7,13 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any, FrozenSet
 
+from pants.engine.internals.engine_testutil import (
+    assert_equal_with_printing,
+    remove_locations_from_traceback,
+)
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, QueryRule, rule
 from pants.engine.unions import UnionRule, union
-from pants.testutil.engine_util import assert_equal_with_printing, remove_locations_from_traceback
 from pants.testutil.test_base import TestBase
 
 
