@@ -20,6 +20,7 @@ python_distribution(
 python_library(
   sources=[
     "*.py",
+    "!rule_runner.py",
     "!test_base.py",
     "!pants_integration_test.py",
     "!pants_run_integration_test.py",
@@ -28,8 +29,8 @@ python_library(
 )
 
 python_library(
-  name="test_base",
-  sources=["test_base.py"],
+  name="rule_runner",
+  sources=["rule_runner.py", "test_base.py"],
   dependencies=["//:build_root"],
 )
 

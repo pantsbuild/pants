@@ -8,7 +8,7 @@ import pytest
 from pants.core.util_rules.distdir import DistDir, InvalidDistDir, validate_distdir
 
 
-def test_distdir():
+def test_distdir() -> None:
     buildroot = Path("/buildroot")
     assert DistDir(relpath=Path("dist")) == validate_distdir(Path("dist"), buildroot)
     assert DistDir(relpath=Path("dist")) == validate_distdir(Path("/buildroot/dist"), buildroot)

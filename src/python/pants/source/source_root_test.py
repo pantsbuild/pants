@@ -23,7 +23,7 @@ from pants.source.source_root import (
 from pants.source.source_root import rules as source_root_rules
 from pants.testutil.engine_util import MockGet, run_rule
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
-from pants.testutil.test_base import TestBase
+from pants.testutil.rule_runner import RuleRunner
 
 
 def _find_root(
@@ -194,122 +194,118 @@ def test_marker_file_and_patterns() -> None:
     assert "project2/src/python" == find_root("project2/src/python/baz/qux.py")
 
 
-class AllRootsTest(TestBase):
-    def test_all_roots(self) -> None:
+def test_all_roots() -> None:
+    dirs = (
+        "contrib/go/examples/src/go/src",
+        "src/java",
+        "src/python",
+        "src/python/subdir/src/python",  # We allow source roots under source roots.
+        "src/kotlin",
+        "my/project/src/java",
+        "src/example/java",
+        "src/example/python",
+        "fixed/root/jvm",
+    )
 
-        dirs = (
+    source_root_config = create_subsystem(
+        SourceRootConfig,
+        root_patterns=[
+            "src/*",
+            "src/example/*",
             "contrib/go/examples/src/go/src",
-            "src/java",
-            "src/python",
-            "src/python/subdir/src/python",  # We allow source roots under source roots.
-            "src/kotlin",
-            "my/project/src/java",
-            "src/example/java",
-            "src/example/python",
+            # Dir does not exist, should not be listed as a root.
+            "java",
             "fixed/root/jvm",
-        )
+        ],
+        marker_filenames=[],
+    )
 
-        source_root_config = create_subsystem(
-            SourceRootConfig,
-            root_patterns=[
-                "src/*",
-                "src/example/*",
-                "contrib/go/examples/src/go/src",
-                # Dir does not exist, should not be listed as a root.
-                "java",
-                "fixed/root/jvm",
-            ],
-            marker_filenames=[],
-        )
+    # This function mocks out reading real directories off the file system.
+    def provider_rule(_: PathGlobs) -> Snapshot:
+        return Snapshot(Digest("abcdef", 10), (), dirs)
 
-        # This function mocks out reading real directories off the file system.
-        def provider_rule(_: PathGlobs) -> Snapshot:
-            return Snapshot(Digest("abcdef", 10), (), dirs)
+    def source_root_mock_rule(req: SourceRootRequest) -> OptionalSourceRoot:
+        for d in dirs:
+            if str(req.path).startswith(d):
+                return OptionalSourceRoot(SourceRoot(str(req.path)))
+        return OptionalSourceRoot(None)
 
-        def source_root_mock_rule(req: SourceRootRequest) -> OptionalSourceRoot:
-            for d in dirs:
-                if str(req.path).startswith(d):
-                    return OptionalSourceRoot(SourceRoot(str(req.path)))
-            return OptionalSourceRoot(None)
+    output = run_rule(
+        all_roots,
+        rule_args=[source_root_config],
+        mock_gets=[
+            MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
+            MockGet(
+                product_type=OptionalSourceRoot,
+                subject_type=SourceRootRequest,
+                mock=source_root_mock_rule,
+            ),
+        ],
+    )
 
-        output = run_rule(
-            all_roots,
-            rule_args=[source_root_config],
-            mock_gets=[
-                MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
-                MockGet(
-                    product_type=OptionalSourceRoot,
-                    subject_type=SourceRootRequest,
-                    mock=source_root_mock_rule,
-                ),
-            ],
-        )
-
-        assert {
-            SourceRoot("contrib/go/examples/src/go/src"),
-            SourceRoot("src/java"),
-            SourceRoot("src/python"),
-            SourceRoot("src/python/subdir/src/python"),
-            SourceRoot("src/kotlin"),
-            SourceRoot("src/example/java"),
-            SourceRoot("src/example/python"),
-            SourceRoot("my/project/src/java"),
-            SourceRoot("fixed/root/jvm"),
-        } == set(output)
-
-    def test_all_roots_with_root_at_buildroot(self) -> None:
-        source_root_config = create_subsystem(
-            SourceRootConfig,
-            root_patterns=["/"],
-            marker_filenames=[],
-        )
-
-        # This function mocks out reading real directories off the file system
-        def provider_rule(_: PathGlobs) -> Snapshot:
-            dirs = ("foo",)  # A python package at the buildroot.
-            return Snapshot(Digest("abcdef", 10), (), dirs)
-
-        output = run_rule(
-            all_roots,
-            rule_args=[source_root_config],
-            mock_gets=[
-                MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
-                MockGet(
-                    product_type=OptionalSourceRoot,
-                    subject_type=SourceRootRequest,
-                    mock=lambda req: OptionalSourceRoot(SourceRoot(".")),
-                ),
-            ],
-        )
-        assert {SourceRoot(".")} == set(output)
+    assert {
+        SourceRoot("contrib/go/examples/src/go/src"),
+        SourceRoot("src/java"),
+        SourceRoot("src/python"),
+        SourceRoot("src/python/subdir/src/python"),
+        SourceRoot("src/kotlin"),
+        SourceRoot("src/example/java"),
+        SourceRoot("src/example/python"),
+        SourceRoot("my/project/src/java"),
+        SourceRoot("fixed/root/jvm"),
+    } == set(output)
 
 
-class SourceRootsRequestTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return [
-            *super().rules(),
+def test_all_roots_with_root_at_buildroot() -> None:
+    source_root_config = create_subsystem(
+        SourceRootConfig,
+        root_patterns=["/"],
+        marker_filenames=[],
+    )
+
+    # This function mocks out reading real directories off the file system
+    def provider_rule(_: PathGlobs) -> Snapshot:
+        dirs = ("foo",)  # A python package at the buildroot.
+        return Snapshot(Digest("abcdef", 10), (), dirs)
+
+    output = run_rule(
+        all_roots,
+        rule_args=[source_root_config],
+        mock_gets=[
+            MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
+            MockGet(
+                product_type=OptionalSourceRoot,
+                subject_type=SourceRootRequest,
+                mock=lambda req: OptionalSourceRoot(SourceRoot(".")),
+            ),
+        ],
+    )
+    assert {SourceRoot(".")} == set(output)
+
+
+def test_source_roots_request() -> None:
+    rule_runner = RuleRunner(
+        rules=[
             *source_root_rules(),
             QueryRule(SourceRootsResult, (SourceRootsRequest, OptionsBootstrapper)),
         ]
-
-    def test_source_roots_request(self) -> None:
-        req = SourceRootsRequest(
-            files=(PurePath("src/python/foo/bar.py"), PurePath("tests/python/foo/bar_test.py")),
-            dirs=(PurePath("src/python/foo"), PurePath("src/python/baz/qux")),
-        )
-        res = self.request_product(
-            SourceRootsResult,
-            [
-                req,
-                create_options_bootstrapper(
-                    args=["--source-root-patterns=['src/python','tests/python']"]
-                ),
-            ],
-        )
-        assert {
-            PurePath("src/python/foo/bar.py"): SourceRoot("src/python"),
-            PurePath("tests/python/foo/bar_test.py"): SourceRoot("tests/python"),
-            PurePath("src/python/foo"): SourceRoot("src/python"),
-            PurePath("src/python/baz/qux"): SourceRoot("src/python"),
-        } == dict(res.path_to_root)
+    )
+    req = SourceRootsRequest(
+        files=(PurePath("src/python/foo/bar.py"), PurePath("tests/python/foo/bar_test.py")),
+        dirs=(PurePath("src/python/foo"), PurePath("src/python/baz/qux")),
+    )
+    res = rule_runner.request_product(
+        SourceRootsResult,
+        [
+            req,
+            create_options_bootstrapper(
+                args=["--source-root-patterns=['src/python','tests/python']"]
+            ),
+        ],
+    )
+    assert {
+        PurePath("src/python/foo/bar.py"): SourceRoot("src/python"),
+        PurePath("tests/python/foo/bar_test.py"): SourceRoot("tests/python"),
+        PurePath("src/python/foo"): SourceRoot("src/python"),
+        PurePath("src/python/baz/qux"): SourceRoot("src/python"),
+    } == dict(res.path_to_root)

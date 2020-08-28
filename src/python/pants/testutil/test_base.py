@@ -6,7 +6,6 @@ import os
 import unittest
 from abc import ABC, ABCMeta, abstractmethod
 from contextlib import contextmanager
-from dataclasses import dataclass
 from io import StringIO
 from pathlib import PurePath
 from tempfile import mkdtemp
@@ -25,6 +24,7 @@ from typing import (
 )
 
 from pants.base.build_root import BuildRoot
+from pants.base.deprecated import warn_or_error
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -45,6 +45,7 @@ from pants.option.subsystem import Subsystem
 from pants.source import source_root
 from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.rule_runner import GoalRuleResult as GoalRuleResult
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (
@@ -87,17 +88,6 @@ class AbstractTestGenerator(ABC):
         ), f"a test with name `{method_name}` already exists on `{cls.__name__}`!"
         assert method_name.startswith("test_"), f"{method_name} is not a valid test name!"
         setattr(cls, method_name, method)
-
-
-@dataclass(frozen=True)
-class GoalRuleResult:
-    exit_code: int
-    stdout: str
-    stderr: str
-
-    @staticmethod
-    def noop() -> "GoalRuleResult":
-        return GoalRuleResult(0, stdout="", stderr="")
 
 
 class TestBase(unittest.TestCase, metaclass=ABCMeta):
@@ -256,6 +246,18 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
         BuildRoot().path = self.build_root
         self.addCleanup(BuildRoot().reset)
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        warn_or_error(
+            removal_version="2.1.0.dev0",
+            deprecated_entity_description="pants.testutil.test_base.TestBase",
+            hint=(
+                "Use `pants.testutil.rule_runner.RuleRunner` instead, which uses a Pytest fixture "
+                "style. See https://www.pantsbuild.org/v2.0/docs/rules-api-testing."
+            ),
+        )
 
     def _reset_engine(self):
         if self._scheduler is not None:

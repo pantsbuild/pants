@@ -5,83 +5,66 @@ import tarfile
 import zipfile
 from io import BytesIO
 
+import pytest
+
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.rules import QueryRule
-from pants.testutil.test_base import TestBase
+from pants.testutil.rule_runner import RuleRunner
 
 
-class ArchiveTest(TestBase):
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(rules=[*archive_rules(), QueryRule(ExtractedDigest, (MaybeExtractable,))])
 
-    files = {"foo": b"bar", "hello/world": b"Hello, World!"}
 
-    expected_digest_contents = DigestContents(
-        [FileContent(name, content) for name, content in files.items()]
+FILES = {"foo": b"bar", "hello/world": b"Hello, World!"}
+EXPECTED_DIGEST_CONTENTS = DigestContents(
+    [FileContent(name, content) for name, content in FILES.items()]
+)
+
+
+@pytest.mark.parametrize("compression", [zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED])
+def test_extract_zip(rule_runner: RuleRunner, compression: int) -> None:
+    io = BytesIO()
+    with zipfile.ZipFile(io, "w", compression=compression) as zf:
+        for name, content in FILES.items():
+            zf.writestr(name, content)
+    io.flush()
+    input_snapshot = rule_runner.make_snapshot({"test.zip": io.getvalue()})
+    extracted_digest = rule_runner.request_product(
+        ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
     )
 
-    @classmethod
-    def rules(cls):
-        return (*super().rules(), *archive_rules(), QueryRule(ExtractedDigest, (MaybeExtractable,)))
+    digest_contents = rule_runner.request_product(DigestContents, [extracted_digest.digest])
+    assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
-    # TODO: Figure out a way to run these tests without a TestBase subclass, and use
-    #  pytest.mark.parametrize.
-    def _do_test_extract_zip(self, compression) -> None:
-        io = BytesIO()
-        with zipfile.ZipFile(io, "w", compression=compression) as zf:
-            for name, content in self.files.items():
-                zf.writestr(name, content)
-        io.flush()
-        input_snapshot = self.make_snapshot({"test.zip": io.getvalue()})
-        extracted_digest = self.request_product(
-            ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
-        )
 
-        digest_contents = self.request_product(DigestContents, [extracted_digest.digest])
-        assert self.expected_digest_contents == digest_contents
+@pytest.mark.parametrize("compression", ["", "gz", "bz2", "xz"])
+def test_extract_tar(rule_runner: RuleRunner, compression: str) -> None:
+    io = BytesIO()
+    mode = f"w:{compression}" if compression else "w"
+    with tarfile.open(mode=mode, fileobj=io) as tf:
+        for name, content in FILES.items():
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.size = len(content)
+            tf.addfile(tarinfo, BytesIO(content))
+    ext = f"tar.{compression}" if compression else "tar"
+    input_snapshot = rule_runner.make_snapshot({f"test.{ext}": io.getvalue()})
+    extracted_digest = rule_runner.request_product(
+        ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
+    )
 
-    def test_extract_zip_stored(self) -> None:
-        self._do_test_extract_zip(zipfile.ZIP_STORED)
+    digest_contents = rule_runner.request_product(DigestContents, [extracted_digest.digest])
+    assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
-    def test_extract_zip_deflated(self) -> None:
-        self._do_test_extract_zip(zipfile.ZIP_DEFLATED)
 
-    # TODO: Figure out a way to run these tests without a TestBase subclass, and use
-    #  pytest.mark.parametrize.
-    def _do_test_extract_tar(self, compression) -> None:
-        io = BytesIO()
-        mode = f"w:{compression}" if compression else "w"
-        with tarfile.open(mode=mode, fileobj=io) as tf:
-            for name, content in self.files.items():
-                tarinfo = tarfile.TarInfo(name)
-                tarinfo.size = len(content)
-                tf.addfile(tarinfo, BytesIO(content))
-        ext = f"tar.{compression}" if compression else "tar"
-        input_snapshot = self.make_snapshot({f"test.{ext}": io.getvalue()})
-        extracted_digest = self.request_product(
-            ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
-        )
+def test_non_archive(rule_runner: RuleRunner) -> None:
+    input_snapshot = rule_runner.make_snapshot({"test.sh": b"# A shell script"})
+    extracted_digest = rule_runner.request_product(
+        ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
+    )
 
-        digest_contents = self.request_product(DigestContents, [extracted_digest.digest])
-        assert self.expected_digest_contents == digest_contents
-
-    def test_extract_tar(self) -> None:
-        self._do_test_extract_tar("")
-
-    def test_extract_tar_gz(self) -> None:
-        self._do_test_extract_tar("gz")
-
-    def test_extract_tar_bz2(self) -> None:
-        self._do_test_extract_tar("bz2")
-
-    def test_extract_tar_xz(self) -> None:
-        self._do_test_extract_tar("xz")
-
-    def test_non_archive(self) -> None:
-        input_snapshot = self.make_snapshot({"test.sh": b"# A shell script"})
-        extracted_digest = self.request_product(
-            ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
-        )
-
-        digest_contents = self.request_product(DigestContents, [extracted_digest.digest])
-        assert DigestContents([FileContent("test.sh", b"# A shell script")]) == digest_contents
+    digest_contents = rule_runner.request_product(DigestContents, [extracted_digest.digest])
+    assert DigestContents([FileContent("test.sh", b"# A shell script")]) == digest_contents
