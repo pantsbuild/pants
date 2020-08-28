@@ -1671,7 +1671,6 @@ fn init_logging(
 
 fn setup_pantsd_logger(py: Python, log_file: String) -> CPyResult<i64> {
   logging::set_thread_destination(Destination::Pantsd);
-
   let path = PathBuf::from(log_file);
   PANTS_LOGGER
     .set_pantsd_logger(path)

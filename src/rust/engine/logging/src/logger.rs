@@ -62,10 +62,7 @@ impl PantsLogger {
     };
   }
 
-  ///
-  /// Set up a file logger which logs at python_level to log_file_path.
-  /// Returns the file descriptor of the log file.
-  ///
+  /// Set up a file logger to log_file_path. Returns the file descriptor of the log file.
   #[cfg(unix)]
   pub fn set_pantsd_logger(
     &self,
@@ -95,12 +92,9 @@ impl PantsLogger {
   /// function, which translates the log message into the Rust log paradigm provided by
   /// the `log` crate.
   pub fn log_from_python(message: &str, python_level: u64, target: &str) -> Result<(), String> {
-    python_level
-      .try_into()
-      .map_err(|err| format!("{}", err))
-      .map(|level: PythonLogLevel| {
-        log!(target: target, level.into(), "{}", message);
-      })
+    let level: PythonLogLevel = python_level.try_into().map_err(|err| format!("{}", err))?;
+    log!(target: target, level.into(), "{}", message);
+    Ok(())
   }
 
   pub fn register_stderr_handler(&self, callback: StdioHandler) -> Uuid {
@@ -118,9 +112,6 @@ impl PantsLogger {
 
 impl Log for PantsLogger {
   fn enabled(&self, metadata: &Metadata) -> bool {
-    // Individual log levels are handled by each sub-logger,
-    // And a global filter is applied to set_max_level.
-    // No need to filter here.
     metadata.level() <= max_level()
   }
 
@@ -150,7 +141,7 @@ impl Log for PantsLogger {
     let time_str = format!(
       "{}.{:02}",
       cur_date.format(TIME_FORMAT_STR),
-      cur_date.time().nanosecond() / 10_000_000 // two decimal places of precision
+      cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
     );
 
     let level = record.level();

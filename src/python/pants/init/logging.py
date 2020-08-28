@@ -26,19 +26,14 @@ def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool, use_colo
 
 
 class NativeHandler(StreamHandler):
-    """This class is installed as a Python logging module handler (using  the logging.addHandler
+    """This class is installed as a Python logging module handler (using the logging.addHandler
     method) and proxies logs to the Rust logging infrastructure."""
 
-    def __init__(
-        self,
-        log_level: LogLevel,
-        native_filename: Optional[str] = None,
-    ):
+    def __init__(self, log_level: LogLevel, native_filename: Optional[str] = None) -> None:
         super().__init__(None)
         self.native = Native()
         self.native_filename = native_filename
         self.setLevel(log_level.level)
-
         if not self.native_filename:
             self.native.setup_stderr_logger()
 
@@ -104,7 +99,7 @@ def _common_logging_setup(level: LogLevel, warnings_filter_regexes: Optional[Lis
 
 
 def setup_logging(global_bootstrap_options):
-    """Sets up logging for a pants run.
+    """Sets up logging for a Pants run.
 
     This is called in two contexts: 1) PantsRunner, 2) DaemonPantsRunner. In the latter case, the
     loggers are saved and restored around this call, so in both cases it runs with no handlers
