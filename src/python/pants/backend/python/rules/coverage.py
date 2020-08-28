@@ -35,6 +35,7 @@ from pants.engine.fs import (
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
+    Snapshot,
 )
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -263,13 +264,14 @@ async def generate_coverage_reports(
 
     pex_processes = []
     report_types = []
+    result_snapshot = await Get(Snapshot, Digest, merged_coverage_data.coverage_data)
     coverage_reports: List[CoverageReport] = []
     for report_type in coverage_subsystem.reports:
         if report_type == CoverageReportType.RAW:
             coverage_reports.append(
                 FilesystemCoverageReport(
                     report_type=CoverageReportType.RAW,
-                    result_digest=merged_coverage_data.coverage_data,
+                    result_snapshot=result_snapshot,
                     directory_to_materialize_to=coverage_subsystem.output_dir,
                     report_file=coverage_subsystem.output_dir / ".coverage",
                 )
@@ -295,8 +297,12 @@ async def generate_coverage_reports(
             )
         )
     results = await MultiGet(Get(ProcessResult, PexProcess, process) for process in pex_processes)
+    result_snapshots = await MultiGet(Get(Snapshot, Digest, r.output_digest) for r in results)
+    result_stdouts = tuple(r.stdout for r in results)
     coverage_reports.extend(
-        _get_coverage_reports(coverage_subsystem.output_dir, report_types, results)
+        _get_coverage_reports(
+            coverage_subsystem.output_dir, report_types, result_stdouts, result_snapshots
+        )
     )
     return CoverageReports(tuple(coverage_reports))
 
@@ -304,12 +310,15 @@ async def generate_coverage_reports(
 def _get_coverage_reports(
     output_dir: PurePath,
     report_types: Sequence[CoverageReportType],
-    results: Tuple[ProcessResult, ...],
+    result_stdouts: Tuple[bytes, ...],
+    result_snapshots: Tuple[Snapshot, ...],
 ) -> List[CoverageReport]:
     coverage_reports: List[CoverageReport] = []
-    for result, report_type in zip(results, report_types):
+    for result_snapshot, result_stdout, report_type in zip(
+        result_snapshots, result_stdouts, report_types
+    ):
         if report_type == CoverageReportType.CONSOLE:
-            coverage_reports.append(ConsoleCoverageReport(result.stdout.decode()))
+            coverage_reports.append(ConsoleCoverageReport(result_stdout.decode()))
             continue
 
         report_file: Optional[PurePath] = None
@@ -324,7 +333,7 @@ def _get_coverage_reports(
         coverage_reports.append(
             FilesystemCoverageReport(
                 report_type=report_type,
-                result_digest=result.output_digest,
+                result_snapshot=result_snapshot,
                 directory_to_materialize_to=output_dir,
                 report_file=report_file,
             )

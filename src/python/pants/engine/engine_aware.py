@@ -4,7 +4,7 @@
 from abc import ABC
 from typing import Dict, Optional
 
-from pants.engine.fs import Digest, Snapshot
+from pants.engine.fs import Snapshot
 from pants.util.logging import LogLevel
 
 

@@ -259,15 +259,15 @@ async def run_python_test(
         else:
             logger.warning(f"Failed to generate coverage data for {field_set.address}.")
 
-    xml_results_digest = None
+    xml_results_snapshot = None
     if setup.results_file_name:
         xml_results_snapshot = await Get(
             Snapshot, DigestSubset(result.output_digest, PathGlobs([setup.results_file_name]))
         )
         if xml_results_snapshot.files == (setup.results_file_name,):
-            xml_results_digest = await Get(
-                Digest,
-                AddPrefix(xml_results_snapshot.digest, pytest.options.junit_xml_dir),
+            xml_results_snapshot = await Get(
+                Snapshot,
+                AddPrefix(xml_results_snapshot.digest, setup.xml_dir),  # type: ignore[arg-type]
             )
         else:
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
@@ -276,7 +276,8 @@ async def run_python_test(
         result,
         address=field_set.address,
         coverage_data=coverage_data,
-        xml_results=xml_results_digest,
+        xml_results=xml_results_snapshot,
+        address=field_set.address,
     )
 
 
