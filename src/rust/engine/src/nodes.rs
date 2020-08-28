@@ -573,9 +573,12 @@ impl Snapshot {
     }
   }
 
-  fn store_file_content(context: &Context, item: &FileContent) -> Result<Value, String> {
+  pub fn store_file_content(
+    types: &crate::types::Types,
+    item: &FileContent,
+  ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
-      context.core.types.file_content,
+      types.file_content,
       &[
         Self::store_path(&item.path)?,
         externs::store_bytes(&item.content),
@@ -587,7 +590,7 @@ impl Snapshot {
   pub fn store_digest_contents(context: &Context, item: &[FileContent]) -> Result<Value, String> {
     let entries = item
       .iter()
-      .map(|e| Self::store_file_content(context, e))
+      .map(|e| Self::store_file_content(&context.core.types, e))
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
       context.core.types.digest_contents,

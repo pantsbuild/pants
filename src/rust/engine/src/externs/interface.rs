@@ -1521,7 +1521,6 @@ fn snapshot_digests_to_bytes(
   scheduler_ptr: PyScheduler,
   py_digests: PyList,
 ) -> CPyResult<PyList> {
-  use bytes::Bytes;
   use fs::FileContent;
   with_scheduler(py, scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
@@ -1531,36 +1530,54 @@ fn snapshot_digests_to_bytes(
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
-    /* dgest_futures should be some type containing Value */
-    let digest_futures = digests.into_iter().map(|digest| {
-      let store = core.store();
-      async move {
-        store
-          .contents_for_directory(digest)
-          .compat()
-          .await
-          .and_then(|contents: Vec<FileContent>| {
-            if contents.len() == 1 {
-              let bytes: &Bytes = &contents[0].content;
-              Ok(externs::store_bytes(&bytes))
-            } else {
-              Err(format!("Non-len 1 contents in this Digest"))
-            }
-          })
-      }
-    });
+    let file_content_futures: Vec<_> = digests
+      .into_iter()
+      .map(|digest| {
+        let types = &core.types;
+        let store = core.store();
+        async move {
+          store
+            .contents_for_directory(digest)
+            .compat()
+            .await
+            .and_then(|contents: Vec<FileContent>| {
+              contents
+                .into_iter()
+                .map(|file_content: FileContent| {
+                  crate::nodes::Snapshot::store_file_content(&types, &file_content)
+                })
+                .collect::<Result<_, _>>()
+            })
+        }
+      })
+      .collect();
 
-    let bytes_values: Vec<PyObject> = py
+    let file_content_collection_values: Vec<Vec<PyObject>> = py
       .allow_threads(|| {
-        core.executor.block_on(
-          future03::try_join_all(digest_futures)
-            .map_ok(|values: Vec<Value>| values.into_iter().map(|val| val.into()).collect()),
-        )
+        core
+          .executor
+          .block_on(future03::try_join_all(file_content_futures).map_ok(
+            |values: Vec<Vec<Value>>| {
+              values
+                .into_iter()
+                .map(|file_value_list: Vec<Value>| {
+                  file_value_list.into_iter().map(|val| val.into()).collect()
+                })
+                .collect::<Vec<_>>()
+            },
+          ))
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
-    let output_list = PyList::new(py, &bytes_values);
-    Ok(output_list)
+    let output_list_of_lists = PyList::new(
+      py,
+      &file_content_collection_values
+        .into_iter()
+        .map(|py_objs: Vec<PyObject>| PyList::new(py, &py_objs).into_object())
+        .collect::<Vec<PyObject>>()
+        .as_slice(),
+    );
+    Ok(output_list_of_lists)
   })
 }
 
