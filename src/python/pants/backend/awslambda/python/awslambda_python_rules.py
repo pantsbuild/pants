@@ -118,7 +118,7 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
             entry_point=lambdex.entry_point,
         ),
     )
-    return LambdexSetup(requirements_pex=requirements_pex,)
+    return LambdexSetup(requirements_pex=requirements_pex)
 
 
 def rules():

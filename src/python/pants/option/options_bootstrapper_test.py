@@ -68,7 +68,8 @@ class OptionsBootstrapperTest(unittest.TestCase):
 
         # Check getting values from config, env and args.
         assert_seed_values(
-            config={"pants_workdir": "/from_config/.pants.d"}, workdir="/from_config/.pants.d",
+            config={"pants_workdir": "/from_config/.pants.d"},
+            workdir="/from_config/.pants.d",
         )
         assert_seed_values(
             env={"PANTS_SUPPORTDIR": "/from_env/build-support"},
@@ -139,7 +140,11 @@ class OptionsBootstrapperTest(unittest.TestCase):
                 env={"PANTS_SUPPORTDIR": "/pear"}, args=args, allow_pantsrc=False
             )
             opts = bootstrapper.get_full_options(
-                known_scope_infos=[ScopeInfo(""), ScopeInfo("foo"), ScopeInfo("fruit"),]
+                known_scope_infos=[
+                    ScopeInfo(""),
+                    ScopeInfo("foo"),
+                    ScopeInfo("fruit"),
+                ]
             )
             # So we don't choke on these on the cmd line.
             opts.register("", "--pants-workdir")
@@ -171,10 +176,16 @@ class OptionsBootstrapperTest(unittest.TestCase):
             )
 
         def assert_config_read_correctly(
-            options_bootstrapper: OptionsBootstrapper, *, expected_worker_count: int,
+            options_bootstrapper: OptionsBootstrapper,
+            *,
+            expected_worker_count: int,
         ) -> None:
             options = options_bootstrapper.get_full_options(
-                known_scope_infos=[ScopeInfo(""), ScopeInfo("compile.apt"), ScopeInfo("fruit"),],
+                known_scope_infos=[
+                    ScopeInfo(""),
+                    ScopeInfo("compile.apt"),
+                    ScopeInfo("fruit"),
+                ],
             )
             # So we don't choke on these on the cmd line.
             options.register("", "--pants-config-files", type=list)
@@ -211,19 +222,24 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp2.close()
 
             assert_config_read_correctly(
-                create_options_bootstrapper(fp1.name), expected_worker_count=1,
+                create_options_bootstrapper(fp1.name),
+                expected_worker_count=1,
             )
             assert_config_read_correctly(
-                create_options_bootstrapper(fp1.name, fp2.name), expected_worker_count=2,
+                create_options_bootstrapper(fp1.name, fp2.name),
+                expected_worker_count=2,
             )
             assert_config_read_correctly(
-                create_options_bootstrapper(fp2.name, fp1.name), expected_worker_count=1,
+                create_options_bootstrapper(fp2.name, fp1.name),
+                expected_worker_count=1,
             )
 
     def test_options_pantsrc_files(self) -> None:
         def create_options_bootstrapper(*config_paths: str) -> OptionsBootstrapper:
             return OptionsBootstrapper.create(
-                env={}, args=[f"--pantsrc-files={cp}" for cp in config_paths], allow_pantsrc=True,
+                env={},
+                args=[f"--pantsrc-files={cp}" for cp in config_paths],
+                allow_pantsrc=True,
             )
 
         with temporary_file(binary_mode=False) as fp:
@@ -238,7 +254,10 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp.close()
             bootstrapped_options = create_options_bootstrapper(fp.name)
             opts_single_config = bootstrapped_options.get_full_options(
-                known_scope_infos=[ScopeInfo(""), ScopeInfo("resolver"),]
+                known_scope_infos=[
+                    ScopeInfo(""),
+                    ScopeInfo("resolver"),
+                ]
             )
             opts_single_config.register("", "--pantsrc-files", type=list)
             opts_single_config.register("resolver", "--resolver")
@@ -250,15 +269,25 @@ class OptionsBootstrapperTest(unittest.TestCase):
             bootstrapper = OptionsBootstrapper.create(env={}, args=args, allow_pantsrc=False)
 
             opts1 = bootstrapper.get_full_options(
-                known_scope_infos=[ScopeInfo(""), ScopeInfo("foo"),]
+                known_scope_infos=[
+                    ScopeInfo(""),
+                    ScopeInfo("foo"),
+                ]
             )
             opts2 = bootstrapper.get_full_options(
-                known_scope_infos=[ScopeInfo("foo"), ScopeInfo(""),]
+                known_scope_infos=[
+                    ScopeInfo("foo"),
+                    ScopeInfo(""),
+                ]
             )
             assert opts1 is opts2
 
             opts3 = bootstrapper.get_full_options(
-                known_scope_infos=[ScopeInfo(""), ScopeInfo("foo"), ScopeInfo(""),]
+                known_scope_infos=[
+                    ScopeInfo(""),
+                    ScopeInfo("foo"),
+                    ScopeInfo(""),
+                ]
             )
             assert opts1 is opts3
 

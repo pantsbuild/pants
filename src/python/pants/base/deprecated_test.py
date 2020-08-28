@@ -277,7 +277,10 @@ def test_resolve_conflicting_options() -> None:
     new_configured_rv = RankedValue(Rank.FLAG, new_val)
 
     def assert_option_resolved(
-        *, old_configured: bool = False, new_configured: bool = False, expected: str,
+        *,
+        old_configured: bool = False,
+        new_configured: bool = False,
+        expected: str,
     ) -> None:
         old_container, new_container = OptionValueContainer(), OptionValueContainer()
         old_container.my_opt = old_configured_rv if old_configured else old_default_rv

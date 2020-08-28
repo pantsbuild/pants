@@ -38,7 +38,8 @@ class InjectAncestorFilesTest(TestBase):
         for f in original_undeclared_files:
             self.create_file(f, "# undeclared")
         request = AncestorFilesRequest(
-            "__init__.py", self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
+            "__init__.py",
+            self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
         )
         bootstrapper = create_options_bootstrapper(args=[f"--source-root-patterns={source_roots}"])
         result = self.request_product(AncestorFiles, [request, bootstrapper]).snapshot
@@ -78,7 +79,9 @@ class InjectAncestorFilesTest(TestBase):
                 "project/subdir/lib.py",
                 "no_init/lib.py",
             ],
-            original_undeclared_files=["project/__init__.py",],
+            original_undeclared_files=[
+                "project/__init__.py",
+            ],
             expected_discovered=["project/__init__.py"],
         )
 

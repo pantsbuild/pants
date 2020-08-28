@@ -222,7 +222,8 @@ def test_scoping_complex() -> None:
 def test_uninitialized_global() -> None:
     Subsystem.reset()
     with pytest.raises(
-        Subsystem.UninitializedSubsystemError, match=r"UninitializedSubsystem.*uninitialized-scope",
+        Subsystem.UninitializedSubsystemError,
+        match=r"UninitializedSubsystem.*uninitialized-scope",
     ):
         UninitializedSubsystem.global_instance()
 
@@ -235,7 +236,8 @@ def test_uninitialized_scoped_instance() -> None:
 
     optional = UninitializedOptional()
     with pytest.raises(
-        Subsystem.UninitializedSubsystemError, match=r"UninitializedSubsystem.*uninitialized-scope",
+        Subsystem.UninitializedSubsystemError,
+        match=r"UninitializedSubsystem.*uninitialized-scope",
     ):
         UninitializedSubsystem.scoped_instance(optional)
 

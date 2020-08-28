@@ -27,7 +27,10 @@ class StrippedSourceFilesTest(TestBase):
         )
 
     def get_stripped_files(
-        self, request: SourceFiles, *, args: Optional[List[str]] = None,
+        self,
+        request: SourceFiles,
+        *,
+        args: Optional[List[str]] = None,
     ) -> List[str]:
         args = args or []
         has_source_root_patterns = False
@@ -39,13 +42,16 @@ class StrippedSourceFilesTest(TestBase):
             source_root_patterns = ["src/python", "src/java", "tests/python"]
             args.append(f"--source-root-patterns={json.dumps(source_root_patterns)}")
         result = self.request_product(
-            StrippedSourceFiles, [request, create_options_bootstrapper(args=args)],
+            StrippedSourceFiles,
+            [request, create_options_bootstrapper(args=args)],
         )
         return list(result.snapshot.files)
 
     def test_strip_snapshot(self) -> None:
         def get_stripped_files_for_snapshot(
-            paths: List[str], *, args: Optional[List[str]] = None,
+            paths: List[str],
+            *,
+            args: Optional[List[str]] = None,
         ) -> List[str]:
             input_snapshot = self.make_snapshot_of_empty_files(paths)
             request = SourceFiles(input_snapshot, ())
@@ -55,9 +61,12 @@ class StrippedSourceFilesTest(TestBase):
         assert get_stripped_files_for_snapshot(["src/python/project/example.py"]) == [
             "project/example.py"
         ]
-        assert get_stripped_files_for_snapshot(["src/python/project/example.py"],) == [
-            "project/example.py"
-        ]
+        assert (
+            get_stripped_files_for_snapshot(
+                ["src/python/project/example.py"],
+            )
+            == ["project/example.py"]
+        )
 
         assert get_stripped_files_for_snapshot(["src/java/com/project/example.java"]) == [
             "com/project/example.java"
@@ -85,13 +94,21 @@ class StrippedSourceFilesTest(TestBase):
         # because there is nothing to strip.
         source_root_config = [f"--source-root-patterns={json.dumps(['/'])}"]
 
-        assert get_stripped_files_for_snapshot(
-            ["project/f1.py", "project/f2.py"], args=source_root_config,
-        ) == ["project/f1.py", "project/f2.py"]
+        assert (
+            get_stripped_files_for_snapshot(
+                ["project/f1.py", "project/f2.py"],
+                args=source_root_config,
+            )
+            == ["project/f1.py", "project/f2.py"]
+        )
 
-        assert get_stripped_files_for_snapshot(
-            ["dir1/f.py", "dir2/f.py"], args=source_root_config,
-        ) == ["dir1/f.py", "dir2/f.py"]
+        assert (
+            get_stripped_files_for_snapshot(
+                ["dir1/f.py", "dir2/f.py"],
+                args=source_root_config,
+            )
+            == ["dir1/f.py", "dir2/f.py"]
+        )
 
         # Gracefully handle an empty snapshot
         assert self.get_stripped_files(SourceFiles(EMPTY_SNAPSHOT, ())) == []

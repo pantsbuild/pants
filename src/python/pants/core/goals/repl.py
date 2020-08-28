@@ -69,7 +69,11 @@ class ReplRequest:
     env: FrozenDict[str, str]
 
     def __init__(
-        self, *, digest: Digest, args: Tuple[str, ...], env: Optional[Mapping[str, str]] = None,
+        self,
+        *,
+        digest: Digest,
+        args: Tuple[str, ...],
+        env: Optional[Mapping[str, str]] = None,
     ) -> None:
         self.digest = digest
         self.args = args

@@ -41,7 +41,8 @@ class ScopeInfo:
     @property
     def deprecated_scope_removal_version(self) -> Optional[str]:
         return cast(
-            Optional[str], self._optionable_cls_attr("deprecated_options_scope_removal_version"),
+            Optional[str],
+            self._optionable_cls_attr("deprecated_options_scope_removal_version"),
         )
 
     def _optionable_cls_attr(self, name: str, default=None):

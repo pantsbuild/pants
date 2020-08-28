@@ -11,10 +11,14 @@ from pants.option.subsystem import Subsystem
 
 
 def create_options_bootstrapper(
-    *, args: Optional[Iterable[str]] = None, env: Optional[Mapping[str, str]] = None,
+    *,
+    args: Optional[Iterable[str]] = None,
+    env: Optional[Mapping[str, str]] = None,
 ) -> OptionsBootstrapper:
     return OptionsBootstrapper.create(
-        args=("--pants-config-files=[]", *(args or [])), env=env or {}, allow_pantsrc=False,
+        args=("--pants-config-files=[]", *(args or [])),
+        env=env or {},
+        allow_pantsrc=False,
     )
 
 
@@ -63,5 +67,6 @@ def create_subsystem(
     """
     options_scope = cast(str, subsystem_type.options_scope)
     return subsystem_type(
-        scope=options_scope, scoped_options=_create_scoped_options(default_rank, **options),
+        scope=options_scope,
+        scoped_options=_create_scoped_options(default_rank, **options),
     )

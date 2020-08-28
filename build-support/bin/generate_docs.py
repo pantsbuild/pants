@@ -89,7 +89,7 @@ class ReferenceGenerator:
         options_scope_tpl = get_tpl("options_scope_reference.md.mustache")
         single_option_tpl = get_tpl("single_option_reference.md.mustache")
         self._renderer = pystache.Renderer(
-            partials={"scoped_options": options_scope_tpl, "single_option": single_option_tpl,}
+            partials={"scoped_options": options_scope_tpl, "single_option": single_option_tpl}
         )
         self._category_id = None  # Fetched lazily.
 

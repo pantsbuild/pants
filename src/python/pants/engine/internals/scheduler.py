@@ -199,7 +199,9 @@ class Scheduler:
                     raise ValueError(f"Unexpected Rule type: {rule}")
         for query in rule_index.queries:
             self._native.lib.tasks_query_add(
-                tasks, query.output_type, query.input_types,
+                tasks,
+                query.output_type,
+                query.input_types,
             )
         return tasks
 
@@ -342,13 +344,19 @@ class Scheduler:
         self._native.lib.garbage_collect_store(self._scheduler)
 
     def new_session(
-        self, build_id, dynamic_ui: bool = False, should_report_workunits: bool = False,
+        self,
+        build_id,
+        dynamic_ui: bool = False,
+        should_report_workunits: bool = False,
     ) -> "SchedulerSession":
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
             self,
             self._native.new_session(
-                self._scheduler, dynamic_ui, build_id, should_report_workunits,
+                self._scheduler,
+                dynamic_ui,
+                build_id,
+                should_report_workunits,
             ),
         )
 
@@ -622,8 +630,10 @@ class SchedulerSession:
     ) -> "InteractiveProcessResult":
         sched_pointer = self._scheduler._scheduler
         session_pointer = self._session
-        result: "InteractiveProcessResult" = self._scheduler._native.lib.run_local_interactive_process(
-            sched_pointer, session_pointer, request
+        result: "InteractiveProcessResult" = (
+            self._scheduler._native.lib.run_local_interactive_process(
+                sched_pointer, session_pointer, request
+            )
         )
         return result
 

@@ -89,11 +89,13 @@ async def prepare_python_sources(
     )
 
     missing_init_files = await Get(
-        AncestorFiles, AncestorFilesRequest("__init__.py", sources.snapshot),
+        AncestorFiles,
+        AncestorFilesRequest("__init__.py", sources.snapshot),
     )
 
     init_injected = await Get(
-        Snapshot, MergeDigests((sources.snapshot.digest, missing_init_files.snapshot.digest)),
+        Snapshot,
+        MergeDigests((sources.snapshot.digest, missing_init_files.snapshot.digest)),
     )
 
     source_root_objs = await MultiGet(

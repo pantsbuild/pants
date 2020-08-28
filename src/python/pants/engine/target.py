@@ -969,7 +969,10 @@ class ScalarField(Generic[T], PrimitiveField, metaclass=ABCMeta):
         value_or_default = super().compute_value(raw_value, address=address)
         if value_or_default is not None and not isinstance(value_or_default, cls.expected_type):
             raise InvalidFieldTypeException(
-                address, cls.alias, raw_value, expected_type=cls.expected_type_description,
+                address,
+                cls.alias,
+                raw_value,
+                expected_type=cls.expected_type_description,
             )
         return value_or_default
 
@@ -993,7 +996,10 @@ class BoolField(PrimitiveField, metaclass=ABCMeta):
         value_or_default = super().compute_value(raw_value, address=address)
         if value_or_default is not None and not isinstance(value_or_default, bool):
             raise InvalidFieldTypeException(
-                address, cls.alias, raw_value, expected_type="a boolean",
+                address,
+                cls.alias,
+                raw_value,
+                expected_type="a boolean",
             )
         return value_or_default
 
@@ -1078,7 +1084,10 @@ class SequenceField(Generic[T], PrimitiveField, metaclass=ABCMeta):
             ensure_list(value_or_default, expected_type=cls.expected_element_type)
         except ValueError:
             raise InvalidFieldTypeException(
-                address, cls.alias, raw_value, expected_type=cls.expected_type_description,
+                address,
+                cls.alias,
+                raw_value,
+                expected_type=cls.expected_type_description,
             )
         return tuple(value_or_default)
 

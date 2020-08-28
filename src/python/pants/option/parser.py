@@ -626,7 +626,9 @@ class Parser:
         """Validate option registration arguments."""
 
         def error(
-            exception_type: Type[RegistrationError], arg_name: Optional[str] = None, **msg_kwargs,
+            exception_type: Type[RegistrationError],
+            arg_name: Optional[str] = None,
+            **msg_kwargs,
         ) -> None:
             if arg_name is None:
                 arg_name = args[0] if args else "<unknown>"

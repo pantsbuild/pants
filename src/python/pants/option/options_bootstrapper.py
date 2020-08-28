@@ -82,7 +82,10 @@ class OptionsBootstrapper:
         env: Mapping[str, str], args: Sequence[str], config: Config
     ) -> Options:
         bootstrap_options = Options.create(
-            env=env, config=config, known_scope_infos=[GlobalOptions.get_scope_info()], args=args,
+            env=env,
+            config=config,
+            known_scope_infos=[GlobalOptions.get_scope_info()],
+            args=args,
         )
 
         def register_global(*args, **kwargs):
@@ -118,7 +121,10 @@ class OptionsBootstrapper:
             content: bytes
 
         def filecontent_for(path: str) -> FileContent:
-            return FileContent(ensure_text(path), read_file(path, binary_mode=True),)
+            return FileContent(
+                ensure_text(path),
+                read_file(path, binary_mode=True),
+            )
 
         def capture_the_flags(*args: str, **kwargs) -> None:
             for arg in args:
@@ -165,7 +171,8 @@ class OptionsBootstrapper:
 
         full_config_files_products = [filecontent_for(p) for p in full_config_paths]
         post_bootstrap_config = Config.load_file_contents(
-            full_config_files_products, seed_values=bootstrap_option_values.as_dict(),
+            full_config_files_products,
+            seed_values=bootstrap_option_values.as_dict(),
         )
 
         env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))

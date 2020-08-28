@@ -195,7 +195,9 @@ class Get(GetConstraints, Generic[_ProductType, _SubjectType]):
             raise TypeError(f"The subject argument cannot be a type, given {subject}.")
         return cast(_SubjectType, subject)
 
-    def __await__(self,) -> ("Generator[Get[_ProductType, _SubjectType], None, _ProductType]"):
+    def __await__(
+        self,
+    ) -> ("Generator[Get[_ProductType, _SubjectType], None, _ProductType]"):
         """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
         The `yield`ed value `self` is interpreted by the engine within `extern_generator_send()` in
@@ -355,7 +357,10 @@ async def MultiGet(  # noqa: F811
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_P0, _S0], __get1: Get[_P1, _S1], __get2: Get[_P2, _S2], __get3: Get[_P3, _S3],
+    __get0: Get[_P0, _S0],
+    __get1: Get[_P1, _S1],
+    __get2: Get[_P2, _S2],
+    __get3: Get[_P3, _S3],
 ) -> Tuple[_P0, _P1, _P2, _P3]:
     ...
 

@@ -389,12 +389,14 @@ class FSTest(TestBase, SchedulerTestBase):
             assert empty_snapshot.digest == empty_merged
 
             roland_merged = self.request_product(
-                Digest, [MergeDigests((roland_snapshot.digest, empty_snapshot.digest))],
+                Digest,
+                [MergeDigests((roland_snapshot.digest, empty_snapshot.digest))],
             )
             assert roland_snapshot.digest == roland_merged
 
             both_merged = self.request_product(
-                Digest, [MergeDigests((roland_snapshot.digest, susannah_snapshot.digest))],
+                Digest,
+                [MergeDigests((roland_snapshot.digest, susannah_snapshot.digest))],
             )
             assert both_snapshot.digest == both_merged
 
@@ -466,7 +468,9 @@ class FSTest(TestBase, SchedulerTestBase):
             safe_file_dump(os.path.join(tower_dir, "susannah"), "Not sure actually", makedirs=True)
 
             safe_file_dump(
-                os.path.join(temp_dir, "books", "dark_tower", "gunslinger"), "1982", makedirs=True,
+                os.path.join(temp_dir, "books", "dark_tower", "gunslinger"),
+                "1982",
+                makedirs=True,
             )
 
             snapshot, snapshot_with_extra_files = self.scheduler.capture_snapshots(
@@ -481,13 +485,15 @@ class FSTest(TestBase, SchedulerTestBase):
 
             # Strip empty prefix:
             zero_prefix_stripped_digest = self.request_product(
-                Digest, [RemovePrefix(snapshot.digest, "")],
+                Digest,
+                [RemovePrefix(snapshot.digest, "")],
             )
             assert snapshot.digest == zero_prefix_stripped_digest
 
             # Strip a non-empty prefix shared by all files:
             stripped_digest = self.request_product(
-                Digest, [RemovePrefix(snapshot.digest, "characters/dark_tower")],
+                Digest,
+                [RemovePrefix(snapshot.digest, "characters/dark_tower")],
             )
             assert stripped_digest == Digest(
                 fingerprint="71e788fc25783c424db555477071f5e476d942fc958a5d06ffc1ed223f779a8c",
@@ -721,7 +727,8 @@ class FSTest(TestBase, SchedulerTestBase):
             Snapshot,
             [
                 DigestSubset(
-                    self.generate_original_digest(), PathGlobs(("a.txt", "c.txt", "subdir2/**")),
+                    self.generate_original_digest(),
+                    PathGlobs(("a.txt", "c.txt", "subdir2/**")),
                 )
             ],
         )
@@ -782,7 +789,8 @@ class FSTest(TestBase, SchedulerTestBase):
 
         with self.mk_project_tree() as project_tree:
             scheduler = self.mk_scheduler(
-                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))], project_tree=project_tree,
+                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))],
+                project_tree=project_tree,
             )
             fname = "4.txt"
             new_data = "rouf"
@@ -810,7 +818,8 @@ class FSTest(TestBase, SchedulerTestBase):
 
         with self.mk_project_tree() as project_tree:
             scheduler = self.mk_scheduler(
-                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))], project_tree=project_tree,
+                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))],
+                project_tree=project_tree,
             )
             fname = "a/b/1.txt"
             # read the original file so we have nodes to invalidate.
@@ -835,7 +844,8 @@ class FSTest(TestBase, SchedulerTestBase):
     ) -> None:
         with self.mk_project_tree() as project_tree:
             scheduler = self.mk_scheduler(
-                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))], project_tree=project_tree,
+                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))],
+                project_tree=project_tree,
             )
             dir_path = "a/"
             dir_glob = f"{dir_path}/*"

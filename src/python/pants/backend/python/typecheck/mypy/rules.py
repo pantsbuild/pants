@@ -67,7 +67,8 @@ async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
     )
 
     prepared_sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure),
+        PythonSourceFiles,
+        PythonSourceFilesRequest(transitive_targets.closure),
     )
     pex_request = Get(
         Pex,
@@ -100,11 +101,13 @@ async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
     file_list_path = "__files.txt"
     python_files = "\n".join(f for f in srcs_snapshot.files if f.endswith(".py"))
     file_list_digest = await Get(
-        Digest, CreateDigest([FileContent(file_list_path, python_files.encode())]),
+        Digest,
+        CreateDigest([FileContent(file_list_path, python_files.encode())]),
     )
 
     merged_input_files = await Get(
-        Digest, MergeDigests([file_list_digest, srcs_snapshot.digest, pex.digest, config_digest]),
+        Digest,
+        MergeDigests([file_list_digest, srcs_snapshot.digest, pex.digest, config_digest]),
     )
 
     result = await Get(

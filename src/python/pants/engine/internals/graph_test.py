@@ -245,10 +245,14 @@ class GraphTest(TestBase):
             ),
         )
         self.assert_failed_cycle(
-            root_target_name="t1", subject_target_name="t1", path_target_names=("t1", "t2", "t1"),
+            root_target_name="t1",
+            subject_target_name="t1",
+            path_target_names=("t1", "t2", "t1"),
         )
         self.assert_failed_cycle(
-            root_target_name="t2", subject_target_name="t2", path_target_names=("t2", "t1", "t2"),
+            root_target_name="t2",
+            subject_target_name="t2",
+            path_target_names=("t2", "t1", "t2"),
         )
 
     def test_cycle_indirect(self) -> None:
@@ -268,7 +272,9 @@ class GraphTest(TestBase):
             path_target_names=("t1", "t2", "t3", "t2"),
         )
         self.assert_failed_cycle(
-            root_target_name="t2", subject_target_name="t2", path_target_names=("t2", "t3", "t2"),
+            root_target_name="t2",
+            subject_target_name="t2",
+            path_target_names=("t2", "t3", "t2"),
         )
 
     def test_nocycle_indirect(self) -> None:
@@ -513,7 +519,8 @@ class TestSpecsToAddresses(TestBase):
                 origin=FilesystemLiteralSpec("fs_spec/f.txt"),
             ),
             AddressWithOrigin(
-                Address("address_spec"), origin=AddressLiteralSpec("address_spec", "address_spec"),
+                Address("address_spec"),
+                origin=AddressLiteralSpec("address_spec", "address_spec"),
             ),
             AddressWithOrigin(
                 Address("multiple_files"),
@@ -607,7 +614,8 @@ class TestFindValidFieldSets(TestBase):
                 expect_single_field_set=expect_single_config,
             )
             return self.request_product(
-                TargetsToValidFieldSets, [request, TargetsWithOrigins(targets_with_origins)],
+                TargetsToValidFieldSets,
+                [request, TargetsWithOrigins(targets_with_origins)],
             )
 
         valid = find_valid_field_sets(
@@ -1108,12 +1116,16 @@ class TestDependencies(TestBase):
         return [SmalltalkLibrary]
 
     def assert_dependencies_resolved(
-        self, *, requested_address: Address, expected: Iterable[Address],
+        self,
+        *,
+        requested_address: Address,
+        expected: Iterable[Address],
     ) -> None:
         bootstrapper = create_options_bootstrapper()
         target = self.request_product(WrappedTarget, [requested_address, bootstrapper]).target
         result = self.request_product(
-            Addresses, [DependenciesRequest(target[Dependencies]), bootstrapper],
+            Addresses,
+            [DependenciesRequest(target[Dependencies]), bootstrapper],
         )
         assert sorted(result) == sorted(expected)
 

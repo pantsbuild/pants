@@ -57,9 +57,7 @@ class DependenciesIntegrationTest(TestBase):
     def test_no_dependencies(self) -> None:
         self.create_python_library(path="some/target")
         self.assert_dependencies(specs=["some/target"], expected=[])
-        self.assert_dependencies(
-            specs=["some/target"], expected=[], transitive=True,
-        )
+        self.assert_dependencies(specs=["some/target"], expected=[], transitive=True)
 
     def test_python_dependencies(self) -> None:
         self.create_python_requirement_library(name="req1")

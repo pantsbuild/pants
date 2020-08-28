@@ -164,7 +164,11 @@ class GlobalOptions(Subsystem):
         default_rel_distdir = f"/{default_distdir_name}/"
 
         register(
-            "-l", "--level", type=LogLevel, default=LogLevel.INFO, help="Set the logging level.",
+            "-l",
+            "--level",
+            type=LogLevel,
+            default=LogLevel.INFO,
+            help="Set the logging level.",
         )
 
         register(
@@ -946,7 +950,9 @@ class GlobalOptions(Subsystem):
 
         loop_flag = "--loop"
         register(
-            loop_flag, type=bool, help="Run goals continuously as file changes are detected.",
+            loop_flag,
+            type=bool,
+            help="Run goals continuously as file changes are detected.",
         )
         register(
             "--loop-max",

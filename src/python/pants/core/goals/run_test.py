@@ -35,7 +35,11 @@ class RunTest(TestBase):
         return RunRequest(digest=digest, args=(os.path.join("{chroot}", "program.py"),))
 
     def single_target_run(
-        self, *, console: MockConsole, program_text: bytes, address_spec: str,
+        self,
+        *,
+        console: MockConsole,
+        program_text: bytes,
+        address_spec: str,
     ) -> Run:
         workspace = Workspace(self.scheduler)
         interactive_runner = InteractiveRunner(self.scheduler)
@@ -83,7 +87,9 @@ class RunTest(TestBase):
         console = MockConsole(use_colors=False)
         program_text = b'#!/usr/bin/python\nprint("hello")'
         res = self.single_target_run(
-            console=console, program_text=program_text, address_spec="some/addr",
+            console=console,
+            program_text=program_text,
+            address_spec="some/addr",
         )
         assert res.exit_code == 0
 
@@ -92,7 +98,9 @@ class RunTest(TestBase):
         binary = self.create_mock_run_request(program_text)
         interactive_runner = InteractiveRunner(self.scheduler)
         process = InteractiveProcess(
-            argv=("./program.py",), run_in_workspace=False, input_digest=binary.digest,
+            argv=("./program.py",),
+            run_in_workspace=False,
+            input_digest=binary.digest,
         )
         result = interactive_runner.run(process)
         assert result.exit_code == 0

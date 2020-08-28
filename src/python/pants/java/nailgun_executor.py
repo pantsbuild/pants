@@ -247,7 +247,9 @@ Stderr:
             if remaining_time > 0:
                 stderr = read_file(self._ng_stderr, binary_mode=True)
                 raise self.InitialNailgunConnectTimedOut(
-                    timeout=timeout, stdout=accumulated_stdout, stderr=stderr,
+                    timeout=timeout,
+                    stdout=accumulated_stdout,
+                    stderr=stderr,
                 )
 
         # NB: We use PollSelector, rather than the more efficient DefaultSelector, because

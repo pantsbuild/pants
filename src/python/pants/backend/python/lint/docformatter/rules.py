@@ -52,7 +52,7 @@ class Setup:
 
 
 def generate_args(
-    *, source_files: SourceFiles, docformatter: Docformatter, check_only: bool,
+    *, source_files: SourceFiles, docformatter: Docformatter, check_only: bool
 ) -> Tuple[str, ...]:
     return ("--check" if check_only else "--in-place", *docformatter.args, *source_files.files)
 

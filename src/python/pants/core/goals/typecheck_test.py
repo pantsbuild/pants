@@ -46,7 +46,13 @@ class MockTypecheckRequest(TypecheckRequest, metaclass=ABCMeta):
     def typecheck_results(self) -> TypecheckResults:
         addresses = [config.address for config in self.field_sets]
         return TypecheckResults(
-            [TypecheckResult(self.exit_code(addresses), "", "",)],
+            [
+                TypecheckResult(
+                    self.exit_code(addresses),
+                    "",
+                    "",
+                )
+            ],
             typechecker_name=self.typechecker_name,
         )
 
@@ -144,7 +150,9 @@ class TypecheckTest(TestBase):
 
     def test_empty_target_noops(self) -> None:
         exit_code, stderr = self.run_typecheck_rule(
-            request_types=[FailingRequest], targets=[self.make_target()], include_sources=False,
+            request_types=[FailingRequest],
+            targets=[self.make_target()],
+            include_sources=False,
         )
         assert exit_code == 0
         assert stderr == ""
@@ -166,7 +174,10 @@ class TypecheckTest(TestBase):
                 SkippedRequest,
                 SuccessfulRequest,
             ],
-            targets=[self.make_target(good_address), self.make_target(bad_address),],
+            targets=[
+                self.make_target(good_address),
+                self.make_target(bad_address),
+            ],
         )
         assert exit_code == FailingRequest.exit_code([bad_address])
         assert stderr == dedent(

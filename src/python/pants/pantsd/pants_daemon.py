@@ -104,7 +104,8 @@ class PantsDaemon(PantsDaemonProcessManager):
         core = PantsDaemonCore(cls._setup_services)
 
         server = native.new_nailgun_server(
-            bootstrap_options_values.pantsd_pailgun_port, DaemonPantsRunner(core),
+            bootstrap_options_values.pantsd_pailgun_port,
+            DaemonPantsRunner(core),
         )
 
         return PantsDaemon(
@@ -119,7 +120,8 @@ class PantsDaemon(PantsDaemonProcessManager):
 
     @staticmethod
     def _setup_services(
-        bootstrap_options: OptionValueContainer, graph_scheduler: GraphScheduler,
+        bootstrap_options: OptionValueContainer,
+        graph_scheduler: GraphScheduler,
     ):
         """Initialize pantsd services.
 
@@ -128,7 +130,8 @@ class PantsDaemon(PantsDaemonProcessManager):
         build_root = get_buildroot()
 
         invalidation_globs = OptionsInitializer.compute_pantsd_invalidation_globs(
-            build_root, bootstrap_options,
+            build_root,
+            bootstrap_options,
         )
 
         scheduler_service = SchedulerService(
@@ -268,7 +271,8 @@ class PantsDaemon(PantsDaemonProcessManager):
             # We can get tracebacks of the pantsd process by tailing the pantsd log and sending it
             # SIGUSR2.
             ExceptionSink.reset_interactive_output_stream(
-                log_stream, override_faulthandler_destination=False,
+                log_stream,
+                override_faulthandler_destination=False,
             )
 
             # Reset the log location and the backtrace preference from the global bootstrap options.

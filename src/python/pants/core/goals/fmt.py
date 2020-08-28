@@ -203,7 +203,10 @@ async def fmt(
         for language_target_collection_type in language_target_collection_types
     )
     targets_with_sources: Iterable[TargetsWithSources] = await MultiGet(
-        Get(TargetsWithSources, TargetsWithSourcesRequest(language_target_collection.targets),)
+        Get(
+            TargetsWithSources,
+            TargetsWithSourcesRequest(language_target_collection.targets),
+        )
         for language_target_collection in language_target_collections
     )
     # NB: We must convert back the generic TargetsWithSources objects back into their

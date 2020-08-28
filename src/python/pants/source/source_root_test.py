@@ -124,7 +124,13 @@ def test_source_root_default_patterns() -> None:
 def test_marker_file() -> None:
     def find_root(path):
         return _find_root(
-            path, tuple(), ("SOURCE_ROOT",), ("project1/SOURCE_ROOT", "project2/src/SOURCE_ROOT",)
+            path,
+            tuple(),
+            ("SOURCE_ROOT",),
+            (
+                "project1/SOURCE_ROOT",
+                "project2/src/SOURCE_ROOT",
+            ),
         )
 
     assert "project1" == find_root("project1/foo/bar.py")
@@ -145,7 +151,13 @@ def test_marker_file() -> None:
 def test_marker_file_nested_source_roots() -> None:
     def find_root(path):
         return _find_root(
-            path, tuple(), ("SOURCE_ROOT",), ("SOURCE_ROOT", "project1/src/SOURCE_ROOT",)
+            path,
+            tuple(),
+            ("SOURCE_ROOT",),
+            (
+                "SOURCE_ROOT",
+                "project1/src/SOURCE_ROOT",
+            ),
         )
 
     assert "project1/src" == find_root("project1/src/foo/bar.py")
@@ -164,7 +176,10 @@ def test_multiple_marker_filenames() -> None:
             path,
             tuple(),
             ("SOURCE_ROOT", "setup.py"),
-            ("project1/javasrc/SOURCE_ROOT", "project2/setup.py",),
+            (
+                "project1/javasrc/SOURCE_ROOT",
+                "project2/setup.py",
+            ),
         )
 
     assert "project1/javasrc" == find_root("project1/javasrc/foo/bar.java")
@@ -244,7 +259,9 @@ class AllRootsTest(TestBase):
 
     def test_all_roots_with_root_at_buildroot(self) -> None:
         source_root_config = create_subsystem(
-            SourceRootConfig, root_patterns=["/"], marker_filenames=[],
+            SourceRootConfig,
+            root_patterns=["/"],
+            marker_filenames=[],
         )
 
         # This function mocks out reading real directories off the file system

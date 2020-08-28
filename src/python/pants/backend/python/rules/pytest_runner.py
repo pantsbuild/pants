@@ -294,7 +294,7 @@ def debug_python_test(field_set: PythonTestFieldSet, setup: TestTargetSetup) -> 
     if field_set.is_conftest():
         return TestDebugRequest(None)
     process = InteractiveProcess(
-        argv=(setup.test_runner_pex.name, *setup.args), input_digest=setup.input_digest,
+        argv=(setup.test_runner_pex.name, *setup.args), input_digest=setup.input_digest
     )
     return TestDebugRequest(process)
 

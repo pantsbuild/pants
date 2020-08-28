@@ -59,7 +59,8 @@ def calculate_specs(
             "The `--changed-*` options are not available without a recognized SCM (usually " "Git)."
         )
     changed_request = ChangedRequest(
-        sources=tuple(changed_options.changed_files(scm=scm)), dependees=changed_options.dependees,
+        sources=tuple(changed_options.changed_files(scm=scm)),
+        dependees=changed_options.dependees,
     )
     (changed_addresses,) = session.product_request(
         ChangedAddresses, [Params(changed_request, options_bootstrapper)]

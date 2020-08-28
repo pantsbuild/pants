@@ -163,13 +163,13 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     )
 
     prepare_plugin_sources_request = Get(
-        StrippedPythonSourceFiles, PythonSourceFilesRequest(partition.plugin_targets),
+        StrippedPythonSourceFiles, PythonSourceFilesRequest(partition.plugin_targets)
     )
     prepare_python_sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(partition.targets_with_dependencies),
+        PythonSourceFiles, PythonSourceFilesRequest(partition.targets_with_dependencies)
     )
     field_set_sources_request = Get(
-        SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets),
+        SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
 
     (
@@ -274,13 +274,16 @@ async def pylint_lint(
         request.field_sets, linted_targets, per_target_dependencies
     ):
         target_setup = PylintTargetSetup(field_set, Targets([tgt, *dependencies]))
-        interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-            (
-                *(tgt.get(PythonInterpreterCompatibility) for tgt in [tgt, *dependencies]),
-                *plugin_targets_compatibility_fields,
-            ),
-            python_setup,
-        ) or PexInterpreterConstraints(pylint.interpreter_constraints)
+        interpreter_constraints = (
+            PexInterpreterConstraints.create_from_compatibility_fields(
+                (
+                    *(tgt.get(PythonInterpreterCompatibility) for tgt in [tgt, *dependencies]),
+                    *plugin_targets_compatibility_fields,
+                ),
+                python_setup,
+            )
+            or PexInterpreterConstraints(pylint.interpreter_constraints)
+        )
         interpreter_constraints_to_target_setup[interpreter_constraints].add(target_setup)
 
     partitions = (

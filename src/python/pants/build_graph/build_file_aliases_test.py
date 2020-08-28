@@ -9,7 +9,8 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 class BuildFileAliasesTest(unittest.TestCase):
     def test_create(self):
         self.assertEqual(
-            BuildFileAliases(objects={}, context_aware_object_factories={}), BuildFileAliases(),
+            BuildFileAliases(objects={}, context_aware_object_factories={}),
+            BuildFileAliases(),
         )
         objects = {"jane": 42}
         self.assertEqual(
@@ -41,7 +42,8 @@ class BuildFileAliasesTest(unittest.TestCase):
         first = BuildFileAliases(objects={"d": 2}, context_aware_object_factories={"e": e_factory})
 
         second = BuildFileAliases(
-            objects={"c": 1, "d": 42}, context_aware_object_factories={"f": f_factory},
+            objects={"c": 1, "d": 42},
+            context_aware_object_factories={"f": f_factory},
         )
 
         expected = BuildFileAliases(

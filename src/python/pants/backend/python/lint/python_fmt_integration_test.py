@@ -41,7 +41,7 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
             *(extra_args or []),
         ]
         results = self.request_product(
-            LanguageFmtResults, [targets, create_options_bootstrapper(args=args)],
+            LanguageFmtResults, [targets, create_options_bootstrapper(args=args)]
         )
         return results
 
@@ -50,10 +50,12 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
 
     def test_multiple_formatters_changing_the_same_file(self) -> None:
         original_source = FileContent(
-            "test/target.py", content=b"from animals import dog, cat\n\nprint('hello')\n",
+            "test/target.py",
+            content=b"from animals import dog, cat\n\nprint('hello')\n",
         )
         fixed_source = FileContent(
-            "test/target.py", content=b'from animals import cat, dog\n\nprint("hello")\n',
+            "test/target.py",
+            content=b'from animals import cat, dog\n\nprint("hello")\n',
         )
         results = self.run_black_and_isort([original_source], name="same_file")
         assert results.output == self.get_digest([fixed_source])
@@ -75,10 +77,12 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
     def test_skipped_formatter(self) -> None:
         """Ensure that a skipped formatter does not interfere with other formatters."""
         original_source = FileContent(
-            "test/skipped.py", content=b"from animals import dog, cat\n\nprint('hello')\n",
+            "test/skipped.py",
+            content=b"from animals import dog, cat\n\nprint('hello')\n",
         )
         fixed_source = FileContent(
-            "test/skipped.py", content=b"from animals import cat, dog\n\nprint('hello')\n",
+            "test/skipped.py",
+            content=b"from animals import cat, dog\n\nprint('hello')\n",
         )
         results = self.run_black_and_isort(
             [original_source], name="skipped", extra_args=["--black-skip"]
@@ -88,7 +92,8 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
 
     def test_no_changes(self) -> None:
         source = FileContent(
-            "test/target.py", content=b'from animals import cat, dog\n\nprint("hello")\n',
+            "test/target.py",
+            content=b'from animals import cat, dog\n\nprint("hello")\n',
         )
         results = self.run_black_and_isort([source], name="different_file")
         assert results.output == self.get_digest([source])

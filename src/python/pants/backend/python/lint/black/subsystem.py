@@ -11,7 +11,7 @@ class Black(PythonToolBase):
     """The Black Python code formatter (https://black.readthedocs.io/)."""
 
     options_scope = "black"
-    default_version = "black==19.10b0"
+    default_version = "black==20.8b1"
     default_extra_requirements = ["setuptools"]
     default_entry_point = "black:patched_main"
     default_interpreter_constraints = ["CPython>=3.6"]

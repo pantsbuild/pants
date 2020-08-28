@@ -537,14 +537,16 @@ class TestGetExportingOwner(TestSetupPyBase):
         assert (
             owner
             == self.request_product(
-                ExportedTarget, [OwnedDependency(self.tgt(owned)), create_options_bootstrapper()],
+                ExportedTarget,
+                [OwnedDependency(self.tgt(owned)), create_options_bootstrapper()],
             ).target.address.spec
         )
 
     def assert_error(self, owned: str, exc_cls: Type[Exception]):
         with pytest.raises(ExecutionError) as excinfo:
             self.request_product(
-                ExportedTarget, [OwnedDependency(self.tgt(owned)), create_options_bootstrapper()],
+                ExportedTarget,
+                [OwnedDependency(self.tgt(owned)), create_options_bootstrapper()],
             )
         ex = excinfo.value
         assert len(ex.wrapped_exceptions) == 1

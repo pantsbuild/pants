@@ -36,7 +36,9 @@ class PantsDaemonClient(PantsDaemonProcessManager):
             else:
                 # We're already launched.
                 return PantsDaemonClient.Handle(
-                    self.await_pid(10), self.await_socket(10), self._metadata_base_dir,
+                    self.await_pid(10),
+                    self.await_socket(10),
+                    self._metadata_base_dir,
                 )
 
     def restart(self) -> "PantsDaemonClient.Handle":

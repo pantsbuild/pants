@@ -134,9 +134,7 @@ def test_multiget_invalid_types() -> None:
         expected_exception=TypeError,
         match=re.escape("Unexpected MultiGet argument types: Get(AClass, BClass, ...), 'bob'"),
     ):
-        next(
-            MultiGet(Get(AClass, BClass()), "bob").__await__()  # type: ignore[call-overload]
-        )
+        next(MultiGet(Get(AClass, BClass()), "bob").__await__())  # type: ignore[call-overload]
 
 
 def test_multiget_invalid_Nones() -> None:

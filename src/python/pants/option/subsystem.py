@@ -179,11 +179,11 @@ class Subsystem(Optionable):
     def __init__(self, scope: str, scoped_options: OptionValueContainer) -> None:
         """Note: A subsystem has no access to options in scopes other than its own.
 
-    Code should call scoped_instance() or global_instance() to get a subsystem instance.
-    It should not invoke this constructor directly.
+        Code should call scoped_instance() or global_instance() to get a subsystem instance.
+        It should not invoke this constructor directly.
 
-    :API: public
-    """
+        :API: public
+        """
         super().__init__()
         self._scope = scope
         self._scoped_options = scoped_options
@@ -358,7 +358,10 @@ class Subsystem(Optionable):
                 else optionable_cls.subscope(scoped_to)
             )
             scope_info = ScopeInfo(
-                scope, optionable_cls, removal_version=removal_version, removal_hint=removal_hint,
+                scope,
+                optionable_cls,
+                removal_version=removal_version,
+                removal_hint=removal_hint,
             )
 
             if scope_info not in known_scope_infos:

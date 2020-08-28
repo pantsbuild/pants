@@ -61,7 +61,8 @@ class SourceFilesTest(TestBase):
         expected_unrooted: Iterable[str] = (),
     ) -> None:
         result = self.request_product(
-            SourceFiles, [SourceFilesRequest(sources_fields), create_options_bootstrapper()],
+            SourceFiles,
+            [SourceFilesRequest(sources_fields), create_options_bootstrapper()],
         )
         assert list(result.snapshot.files) == sorted(
             set(itertools.chain.from_iterable(sources.full_paths for sources in expected))

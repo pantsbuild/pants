@@ -374,9 +374,7 @@ def check_release_prereqs() -> None:
 def list_owners() -> None:
     for package in PACKAGES:
         if not package.exists_on_pypi():
-            print(
-                f"The {package.name} package is new!  There are no owners yet.", file=sys.stderr,
-            )
+            print(f"The {package.name} package is new!  There are no owners yet.", file=sys.stderr)
             continue
         formatted_owners = "\n".join(sorted(package.owners()))
         print(f"Owners of {package.name}:\n{formatted_owners}\n")

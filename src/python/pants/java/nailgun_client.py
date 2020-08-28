@@ -101,7 +101,9 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
         """
         try:
             for chunk_type, payload in self.iter_chunks(
-                MaybeShutdownSocket(self._sock), return_bytes=True, timeout_object=self,
+                MaybeShutdownSocket(self._sock),
+                return_bytes=True,
+                timeout_object=self,
             ):
                 # TODO(#6579): assert that we have at this point received all the chunk types in
                 # ChunkType.REQUEST_TYPES, and then allow any of ChunkType.EXECUTION_TYPES.
@@ -159,7 +161,9 @@ class NailgunClient:
             self.wrapped_exc = wrapped_exc
 
             msg = self._MSG_FMT.format(
-                description=self.DESCRIPTION, address=self.address, wrapped_exc=self.wrapped_exc,
+                description=self.DESCRIPTION,
+                address=self.address,
+                wrapped_exc=self.wrapped_exc,
             )
             super(NailgunClient.NailgunError, self).__init__(msg, self.wrapped_exc)
 
@@ -235,7 +239,8 @@ class NailgunClient:
             )
             sock.close()
             raise self.NailgunConnectionError(
-                address=self._address_string, wrapped_exc=e,
+                address=self._address_string,
+                wrapped_exc=e,
             )
         else:
             return sock
@@ -289,7 +294,8 @@ class NailgunClient:
             return cast(ExitCode, exit_code)
         except (socket.error, NailgunProtocol.ProtocolError) as e:
             raise self.NailgunError(
-                address=self._address_string, wrapped_exc=e,
+                address=self._address_string,
+                wrapped_exc=e,
             )
         finally:
             sock.close()

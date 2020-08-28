@@ -123,7 +123,8 @@ def _setup_config() -> Config:
         config2.write(FILE_2.content)
         config2.close()
         parsed_config = Config.load(
-            config_paths=[config1.name, config2.name], seed_values={"buildroot": "fake_buildroot"},
+            config_paths=[config1.name, config2.name],
+            seed_values={"buildroot": "fake_buildroot"},
         )
         assert [config1.name, config2.name] == parsed_config.sources()
     return parsed_config

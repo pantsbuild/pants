@@ -97,9 +97,7 @@ class DependeesTest(TestBase):
         )
 
     def test_transitive(self) -> None:
-        self.assert_dependees(
-            targets=["base"], transitive=True, expected=["intermediate", "leaf"],
-        )
+        self.assert_dependees(targets=["base"], transitive=True, expected=["intermediate", "leaf"])
         self.assert_dependees(
             targets=["base"],
             transitive=True,

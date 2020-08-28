@@ -37,7 +37,7 @@ def create_parser() -> argparse.ArgumentParser:
         description="Convert deprecated `source` fields to `sources`.",
     )
     parser.add_argument(
-        "folders", type=Path, nargs="+", help="Folders to recursively search for `BUILD` files",
+        "folders", type=Path, nargs="+", help="Folders to recursively search for `BUILD` files"
     )
     parser.add_argument(
         "-p",

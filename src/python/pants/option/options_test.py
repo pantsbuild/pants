@@ -627,7 +627,10 @@ class OptionsTest(unittest.TestCase):
 
         # Appending and filtering across env, config and flags (in the right order).
         check(
-            flags="--listy=-[1,5,6]", env_val="+[6,7]", config_val="+[4,5]", expected=[2, 3, 4, 7],
+            flags="--listy=-[1,5,6]",
+            env_val="+[6,7]",
+            config_val="+[4,5]",
+            expected=[2, 3, 4, 7],
         )
         check(
             flags="--listy=+[8,9]",
@@ -638,7 +641,10 @@ class OptionsTest(unittest.TestCase):
 
         # Overwriting from env, then appending and filtering.
         check(
-            flags="--listy=+[8,9],-[6]", env_val="[6,7]", config_val="+[4,5]", expected=[7, 8, 9],
+            flags="--listy=+[8,9],-[6]",
+            env_val="[6,7]",
+            config_val="+[4,5]",
+            expected=[7, 8, 9],
         )
 
         # Overwriting from config, then appending.
@@ -651,7 +657,10 @@ class OptionsTest(unittest.TestCase):
 
         # Overwriting from flags.
         check(
-            flags="--listy=[8,9]", env_val="+[6,7]", config_val="+[4,5],-[8]", expected=[8, 9],
+            flags="--listy=[8,9]",
+            env_val="+[6,7]",
+            config_val="+[4,5],-[8]",
+            expected=[8, 9],
         )
 
         # Filtering all instances of repeated values.
@@ -663,12 +672,17 @@ class OptionsTest(unittest.TestCase):
 
         # Filtering a value even though it was appended again at a higher rank.
         check(
-            flags="--listy=+[4]", env_val="-[4]", config_val="+[4,5]", expected=[*default, 5],
+            flags="--listy=+[4]",
+            env_val="-[4]",
+            config_val="+[4,5]",
+            expected=[*default, 5],
         )
 
         # Filtering a value even though it was appended again at the same rank.
         check(
-            env_val="-[4],+[4]", config_val="+[4,5]", expected=[*default, 5],
+            env_val="-[4],+[4]",
+            config_val="+[4,5]",
+            expected=[*default, 5],
         )
 
         # Overwriting cancels filters.
@@ -700,7 +714,8 @@ class OptionsTest(unittest.TestCase):
             expected=two_elements_appended,
         )
         check(
-            flags='--dict-listy=\'+[{"d": 4, "e": 5}, {"f": 6}]\'', expected=two_elements_appended,
+            flags='--dict-listy=\'+[{"d": 4, "e": 5}, {"f": 6}]\'',
+            expected=two_elements_appended,
         )
         check(flags='--dict-listy=\'[{"d": 4, "e": 5}, {"f": 6}]\'', expected=replaced)
 
@@ -778,7 +793,10 @@ class OptionsTest(unittest.TestCase):
 
     def test_dict_option(self) -> None:
         def check(
-            *, expected: Dict[str, str], flags: str = "", config_val: Optional[str] = None,
+            *,
+            expected: Dict[str, str],
+            flags: str = "",
+            config_val: Optional[str] = None,
         ) -> None:
             config = {"GLOBAL": {"dicty": config_val}} if config_val else None
             global_options = self._parse(flags=flags, config=config).for_global_scope()
@@ -961,7 +979,9 @@ class OptionsTest(unittest.TestCase):
         env = {"PANTS_COMPILE_C": "66"}
 
         options = self._parse(
-            flags="--a=1 compile --b=2 compile.java --a=3 --c=4", env=env, config=config,
+            flags="--a=1 compile --b=2 compile.java --a=3 --c=4",
+            env=env,
+            config=config,
         )
 
         self.assertEqual(1, options.for_global_scope().a)
@@ -1131,13 +1151,19 @@ class OptionsTest(unittest.TestCase):
             assert option in str(record[0].message)
 
         assert_deprecation_triggered(
-            flags="--global-crufty=crufty1", option="global_crufty", expected="crufty1",
+            flags="--global-crufty=crufty1",
+            option="global_crufty",
+            expected="crufty1",
         )
         assert_deprecation_triggered(
-            flags="--global-crufty-boolean", option="global_crufty_boolean", expected=True,
+            flags="--global-crufty-boolean",
+            option="global_crufty_boolean",
+            expected=True,
         )
         assert_deprecation_triggered(
-            flags="--no-global-crufty-boolean", option="global_crufty_boolean", expected=False,
+            flags="--no-global-crufty-boolean",
+            option="global_crufty_boolean",
+            expected=False,
         )
         assert_deprecation_triggered(
             flags="stale --crufty=stale_and_crufty",
@@ -1155,7 +1181,9 @@ class OptionsTest(unittest.TestCase):
         assert_scoped_boolean_deprecation(flags="--no-stale-crufty-boolean", expected=False)
 
         assert_deprecation_triggered(
-            env={"PANTS_GLOBAL_CRUFTY": "crufty1"}, option="global_crufty", expected="crufty1",
+            env={"PANTS_GLOBAL_CRUFTY": "crufty1"},
+            option="global_crufty",
+            expected="crufty1",
         )
         assert_deprecation_triggered(
             env={"PANTS_STALE_CRUFTY": "stale_and_crufty"},
@@ -1235,23 +1263,33 @@ class OptionsTest(unittest.TestCase):
         assert_mutually_exclusive_raised(flags="--mutex-foo=foo", env={"PANTS_MUTEX_BAR": "bar"})
         assert_mutually_exclusive_raised(flags="--new-name=foo", env={"PANTS_OLD_NAME": "bar"})
         assert_mutually_exclusive_raised(
-            flags="stale --mutex-a=foo", env={"PANTS_STALE_MUTEX_B": "bar"}, scope="stale",
+            flags="stale --mutex-a=foo",
+            env={"PANTS_STALE_MUTEX_B": "bar"},
+            scope="stale",
         )
         assert_mutually_exclusive_raised(
-            flags="stale --crufty-new=foo", env={"PANTS_STALE_CRUFTY_OLD": "bar"}, scope="stale",
+            flags="stale --crufty-new=foo",
+            env={"PANTS_STALE_CRUFTY_OLD": "bar"},
+            scope="stale",
         )
 
         assert_mutually_exclusive_raised(
-            flags="--mutex-foo=foo", config={"GLOBAL": {"mutex_bar": "bar"}},
+            flags="--mutex-foo=foo",
+            config={"GLOBAL": {"mutex_bar": "bar"}},
         )
         assert_mutually_exclusive_raised(
-            flags="--new-name=foo", config={"GLOBAL": {"old_name": "bar"}},
+            flags="--new-name=foo",
+            config={"GLOBAL": {"old_name": "bar"}},
         )
         assert_mutually_exclusive_raised(
-            flags="stale --mutex-a=foo", config={"stale": {"mutex_b": "bar"}}, scope="stale",
+            flags="stale --mutex-a=foo",
+            config={"stale": {"mutex_b": "bar"}},
+            scope="stale",
         )
         assert_mutually_exclusive_raised(
-            flags="stale --crufty-old=foo", config={"stale": {"crufty_new": "bar"}}, scope="stale",
+            flags="stale --crufty-old=foo",
+            config={"stale": {"crufty_new": "bar"}},
+            scope="stale",
         )
 
         def assert_other_option_also_set(
@@ -1269,18 +1307,26 @@ class OptionsTest(unittest.TestCase):
         assert_other_option_also_set(flags="--mutex-foo=orz", other_option="mutex")
         assert_other_option_also_set(flags="--old-name=orz", other_option="new_name")
         assert_other_option_also_set(
-            flags="stale --mutex-a=orz", other_option="crufty_mutex", scope="stale",
+            flags="stale --mutex-a=orz",
+            other_option="crufty_mutex",
+            scope="stale",
         )
         assert_other_option_also_set(
-            flags="stale --crufty-old=orz", other_option="crufty_new", scope="stale",
+            flags="stale --crufty-old=orz",
+            other_option="crufty_new",
+            scope="stale",
         )
         assert_other_option_also_set(env={"PANTS_GLOBAL_MUTEX_BAZ": "orz"}, other_option="mutex")
         assert_other_option_also_set(env={"PANTS_OLD_NAME": "orz"}, other_option="new_name")
         assert_other_option_also_set(
-            env={"PANTS_STALE_MUTEX_B": "orz"}, other_option="crufty_mutex", scope="stale",
+            env={"PANTS_STALE_MUTEX_B": "orz"},
+            other_option="crufty_mutex",
+            scope="stale",
         )
         assert_other_option_also_set(
-            config={"stale": {"crufty_old": "orz"}}, other_option="crufty_new", scope="stale",
+            config={"stale": {"crufty_old": "orz"}},
+            other_option="crufty_new",
+            scope="stale",
         )
 
     def test_middle_scoped_options(self) -> None:
@@ -1539,7 +1585,9 @@ class OptionsTest(unittest.TestCase):
         env = {"PANTS_COMPILE_C": "66"}
 
         options = self._parse(
-            flags="--a=1 compile --b=2 compile.java --a=3 --c=4", env=env, config=config,
+            flags="--a=1 compile --b=2 compile.java --a=3 --c=4",
+            env=env,
+            config=config,
         )
 
         self.assertEqual(1, options.for_global_scope().a)

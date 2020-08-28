@@ -162,9 +162,7 @@ class LoaderTest(unittest.TestCase):
             registered_aliases = build_configuration.registered_aliases
             self.assertEqual(DummyObject1, registered_aliases.objects["obj1"])
             self.assertEqual(DummyObject2, registered_aliases.objects["obj2"])
-            self.assertEqual(
-                build_configuration.optionables, FrozenOrderedSet([DummySubsystem]),
-            )
+            self.assertEqual(build_configuration.optionables, FrozenOrderedSet([DummySubsystem]))
 
     def test_load_invalid_entrypoint(self):
         def build_file_aliases(bad_arg):
@@ -294,9 +292,7 @@ class LoaderTest(unittest.TestCase):
 
         with self.create_register(rules=backend_rules) as backend_package:
             load_backend(self.bc_builder, backend_package)
-            self.assertEqual(
-                self.bc_builder.create().rules, FrozenOrderedSet([example_rule.rule]),
-            )
+            self.assertEqual(self.bc_builder.create().rules, FrozenOrderedSet([example_rule.rule]))
 
         def plugin_rules():
             return [example_plugin_rule]
@@ -343,7 +339,7 @@ class LoaderTest(unittest.TestCase):
         with self.create_register(build_file_aliases=lambda: aliases) as backend_module:
             backends = [backend_module]
             build_configuration = load_backends_and_plugins(
-                plugins, self.working_set, backends, bc_builder=self.bc_builder,
+                plugins, self.working_set, backends, bc_builder=self.bc_builder
             )
         # The backend should load first, then the plugins, therefore the alias registered in
         # the plugin will override the alias registered by the backend

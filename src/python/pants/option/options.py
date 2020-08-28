@@ -401,7 +401,10 @@ class Options:
             scope = parser.scope
             known_args = parser.known_args
             for arg in known_args:
-                scoped_flag = ScopedFlagNameForFuzzyMatching(scope=scope, arg=arg,)
+                scoped_flag = ScopedFlagNameForFuzzyMatching(
+                    scope=scope,
+                    arg=arg,
+                )
                 all_scoped_flag_names.append(scoped_flag)
 
         self.walk_parsers(register_all_scoped_names)
@@ -420,7 +423,9 @@ class Options:
     # TODO: Eagerly precompute backing data for this?
     @memoized_method
     def for_scope(
-        self, scope: str, inherit_from_enclosing_scope: bool = True,
+        self,
+        scope: str,
+        inherit_from_enclosing_scope: bool = True,
     ) -> OptionValueContainer:
         """Return the option values for the given scope.
 
@@ -448,7 +453,10 @@ class Options:
         return values
 
     def get_fingerprintable_for_scope(
-        self, bottom_scope: str, fingerprint_key: str = "fingerprint", invert: bool = False,
+        self,
+        bottom_scope: str,
+        fingerprint_key: str = "fingerprint",
+        invert: bool = False,
     ):
         """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 

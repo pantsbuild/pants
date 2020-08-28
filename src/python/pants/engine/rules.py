@@ -216,7 +216,10 @@ class MissingParameterTypeAnnotation(InvalidTypeAnnotation):
 
 
 def _ensure_type_annotation(
-    *, type_annotation: Optional[Type], name: str, raise_type: Type[InvalidTypeAnnotation],
+    *,
+    type_annotation: Optional[Type],
+    name: str,
+    raise_type: Type[InvalidTypeAnnotation],
 ) -> Type:
     if type_annotation is None:
         raise raise_type(f"{name} is missing a type annotation.")

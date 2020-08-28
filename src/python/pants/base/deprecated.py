@@ -175,12 +175,20 @@ def warn_or_error(
     if removal_semver > PANTS_SEMVER:
         if ensure_stderr:
             # No warning filters can stop us from printing this message directly to stderr.
-            warning_msg = warnings.formatwarning(msg, DeprecationWarning, filename, line_number,)
+            warning_msg = warnings.formatwarning(
+                msg,
+                DeprecationWarning,
+                filename,
+                line_number,
+            )
             print(warning_msg, file=sys.stderr)
         elif print_warning:
             # This output is filtered by warning filters.
             warnings.warn_explicit(
-                message=msg, category=DeprecationWarning, filename=filename, lineno=line_number,
+                message=msg,
+                category=DeprecationWarning,
+                filename=filename,
+                lineno=line_number,
             )
         return
     else:

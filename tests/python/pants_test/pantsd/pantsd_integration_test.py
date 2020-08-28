@@ -600,7 +600,7 @@ Interrupted by user over pailgun client!
             checker.assert_running()
 
     def test_pantsd_unicode_environment(self):
-        with self.pantsd_successful_run_context(extra_env={"XXX": "¡"},) as ctx:
+        with self.pantsd_successful_run_context(extra_env={"XXX": "¡"}) as ctx:
             result = ctx.runner(["help"])
             ctx.checker.assert_started()
             result.assert_success()

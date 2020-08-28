@@ -33,7 +33,8 @@ class FiledepsTest(TestBase):
         if sources:
             self.create_files(path, sources)
         self.add_to_build_file(
-            path, f"tgt(sources={sources or []}, dependencies={dependencies or []})",
+            path,
+            f"tgt(sources={sources or []}, dependencies={dependencies or []})",
         )
 
     def assert_filedeps(
@@ -86,13 +87,15 @@ class FiledepsTest(TestBase):
         self.setup_target("dep/target", sources=["file.py"])
         self.setup_target("some/target", sources=["file.py"], dependencies=["dep/target"])
         direct_files = {"some/target/BUILD", "some/target/file.py"}
-        self.assert_filedeps(
-            targets=["some/target"], expected=direct_files,
-        )
+        self.assert_filedeps(targets=["some/target"], expected=direct_files)
         self.assert_filedeps(
             targets=["some/target"],
             transitive=True,
-            expected={*direct_files, "dep/target/BUILD", "dep/target/file.py",},
+            expected={
+                *direct_files,
+                "dep/target/BUILD",
+                "dep/target/file.py",
+            },
         )
 
     def test_multiple_targets_one_source(self) -> None:
@@ -120,7 +123,8 @@ class FiledepsTest(TestBase):
             "other/target/file.py",
         }
         self.assert_filedeps(
-            targets=["some/target", "other/target"], expected=direct_files,
+            targets=["some/target", "other/target"],
+            expected=direct_files,
         )
         self.assert_filedeps(
             targets=["some/target", "other/target"],

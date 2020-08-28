@@ -53,7 +53,10 @@ class ParserHierarchy:
     """
 
     def __init__(
-        self, env: Mapping[str, str], config: Config, scope_infos: Iterable[ScopeInfo],
+        self,
+        env: Mapping[str, str],
+        config: Config,
+        scope_infos: Iterable[ScopeInfo],
     ) -> None:
         # Sorting ensures that ancestors precede descendants.
         scope_infos = sorted(set(list(scope_infos)), key=lambda si: si.scope)

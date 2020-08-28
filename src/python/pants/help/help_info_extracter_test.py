@@ -34,7 +34,10 @@ def test_global_scope():
     do_test(["-f"], {"type": bool}, ["-f"], ["-f"])
     do_test(["--foo"], {"type": bool}, ["--[no-]foo"], ["--foo", "--no-foo"])
     do_test(
-        ["--foo"], {"type": bool, "implicit_value": False}, ["--[no-]foo"], ["--foo", "--no-foo"],
+        ["--foo"],
+        {"type": bool, "implicit_value": False},
+        ["--[no-]foo"],
+        ["--foo", "--no-foo"],
     )
     do_test(["-f", "--foo"], {"type": bool}, ["-f", "--[no-]foo"], ["-f", "--foo", "--no-foo"])
 
@@ -42,10 +45,16 @@ def test_global_scope():
     do_test(["--foo"], {"metavar": "xx"}, ["--foo=xx"], ["--foo"])
     do_test(["--foo"], {"type": int}, ["--foo=<int>"], ["--foo"])
     do_test(
-        ["--foo"], {"type": list}, ["--foo=\"['<str>', '<str>', ...]\""], ["--foo"],
+        ["--foo"],
+        {"type": list},
+        ["--foo=\"['<str>', '<str>', ...]\""],
+        ["--foo"],
     )
     do_test(
-        ["--foo"], {"type": list, "member_type": int}, ['--foo="[<int>, <int>, ...]"'], ["--foo"],
+        ["--foo"],
+        {"type": list, "member_type": int},
+        ['--foo="[<int>, <int>, ...]"'],
+        ["--foo"],
     )
     do_test(
         ["--foo"],
