@@ -3,80 +3,81 @@
 
 from typing import Tuple
 
+import pytest
+
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.source.filespec import matches_filespec
-from pants.testutil.test_base import TestBase
+from pants.testutil.rule_runner import RuleRunner
 
 
-class FilespecTest(TestBase):
-    def assert_rule_match(
-        self, glob: str, paths: Tuple[str, ...], *, should_match: bool = True
-    ) -> None:
-        # Confirm in-memory behavior.
-        matched_filespec = matches_filespec({"includes": [glob]}, paths=paths)
-        if should_match:
-            assert matched_filespec == paths
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner()
+
+
+def assert_rule_match(
+    rule_runner: RuleRunner, glob: str, paths: Tuple[str, ...], *, should_match: bool
+) -> None:
+    # Confirm in-memory behavior.
+    matched_filespec = matches_filespec({"includes": [glob]}, paths=paths)
+    if should_match:
+        assert matched_filespec == paths
+    else:
+        assert not matched_filespec
+
+    # Confirm on-disk behavior.
+    for expected_match in paths:
+        if expected_match.endswith("/"):
+            rule_runner.create_dir(expected_match)
         else:
-            assert not matched_filespec
+            rule_runner.create_file(expected_match)
+    snapshot = rule_runner.request_product(Snapshot, [PathGlobs([glob])])
+    if should_match:
+        assert sorted(paths) == sorted(snapshot.files)
+    else:
+        assert not snapshot.files
 
-        # Confirm on-disk behavior.
-        for expected_match in paths:
-            if expected_match.endswith("/"):
-                self.create_dir(expected_match)
-            else:
-                self.create_file(expected_match)
-        snapshot = self.request_product(Snapshot, [PathGlobs([glob])])
-        if should_match:
-            assert sorted(paths) == sorted(snapshot.files)
-        else:
-            assert not snapshot.files
 
-    def test_matches_single_star_0(self) -> None:
-        self.assert_rule_match("a/b/*/f.py", ("a/b/c/f.py", "a/b/q/f.py"))
+@pytest.mark.parametrize(
+    "glob,paths",
+    [
+        # Single stars.
+        ("a/b/*/f.py", ("a/b/c/f.py", "a/b/q/f.py")),
+        ("foo/bar/*", ("foo/bar/baz", "foo/bar/bar")),
+        ("*/bar/b*", ("foo/bar/baz", "foo/bar/bar")),
+        ("*/[be]*/b*", ("foo/bar/baz", "foo/bar/bar")),
+        ("foo*/bar", ("foofighters/bar", "foofighters.venv/bar")),
+        # Double stars.
+        ("**", ("a/b/c", "b")),
+        ("a/**/f", ("a/f", "a/b/c/d/e/f")),
+        ("a/b/**", ("a/b/d", "a/b/c/d/e/f")),
+        # Dots.
+        (".*", (".dots", ".dips")),
+        ("./*.py", ("f.py", "g.py")),
+        # Dirs.
+        ("dist/", ("dist",)),
+        ("build-support/*.venv/", ("build-support/blah.venv", "build-support/rbt.venv")),
+        # Literals.
+        ("a", ("a",)),
+        ("a/b/c", ("a/b/c",)),
+        ("a/b/c.py", ("a/b/c.py",)),
+    ],
+)
+def test_valid_matches(rule_runner: RuleRunner, glob: str, paths: Tuple[str, ...]) -> None:
+    assert_rule_match(rule_runner, glob, paths, should_match=True)
 
-    def test_matches_single_star_0_neg(self) -> None:
-        self.assert_rule_match("a/b/*/f.py", ("a/b/c/d/f.py", "a/b/f.py"), should_match=False)
 
-    def test_matches_single_star_1(self) -> None:
-        self.assert_rule_match("foo/bar/*", ("foo/bar/baz", "foo/bar/bar"))
-
-    def test_matches_single_star_2(self) -> None:
-        self.assert_rule_match("*/bar/b*", ("foo/bar/baz", "foo/bar/bar"))
-
-    def test_matches_single_star_2_neg(self) -> None:
-        self.assert_rule_match(
-            "*/bar/b*", ("foo/koo/bar/baz", "foo/bar/bar/zoo"), should_match=False
-        )
-
-    def test_matches_single_star_3(self) -> None:
-        self.assert_rule_match("*/[be]*/b*", ("foo/bar/baz", "foo/bar/bar"))
-
-    def test_matches_single_star_4(self) -> None:
-        self.assert_rule_match("foo*/bar", ("foofighters/bar", "foofighters.venv/bar"))
-
-    def test_matches_single_star_4_neg(self) -> None:
-        self.assert_rule_match("foo*/bar", ("foofighters/baz/bar",), should_match=False)
-
-    def test_matches_double_star_0(self) -> None:
-        self.assert_rule_match("**", ("a/b/c", "b"))
-
-    def test_matches_double_star_1(self) -> None:
-        self.assert_rule_match("a/**/f", ("a/f", "a/b/c/d/e/f"))
-
-    def test_matches_double_star_2(self) -> None:
-        self.assert_rule_match("a/b/**", ("a/b/d", "a/b/c/d/e/f"))
-
-    def test_matches_double_star_2_neg(self) -> None:
-        self.assert_rule_match("a/b/**", ("a/b",), should_match=False)
-
-    def test_matches_dots(self) -> None:
-        self.assert_rule_match(".*", (".dots", ".dips"))
-
-    def test_matches_dots_relative(self) -> None:
-        self.assert_rule_match("./*.py", ("f.py", "g.py"))
-
-    def test_matches_dots_neg(self) -> None:
-        self.assert_rule_match(
+@pytest.mark.parametrize(
+    "glob,paths",
+    [
+        # Single stars.
+        ("a/b/*/f.py", ("a/b/c/d/f.py", "a/b/f.py")),
+        ("*/bar/b*", ("foo/koo/bar/baz", "foo/bar/bar/zoo")),
+        ("foo*/bar", ("foofighters/baz/bar",)),
+        # Double stars.
+        ("a/b/**", ("a/b",)),
+        # Dots.
+        (
             ".*",
             (
                 "b",
@@ -85,34 +86,11 @@ class FilespecTest(TestBase):
                 "all/nested/.dot",
                 ".some/hidden/nested/dir/file.py",
             ),
-            should_match=False,
-        )
-
-    def test_matches_dirs(self) -> None:
-        self.assert_rule_match("dist/", ("dist",))
-
-    def test_matches_dirs_neg(self) -> None:
-        self.assert_rule_match(
-            "dist/", ("not_dist", "cdist", "dist.py", "dist/dist"), should_match=False
-        )
-
-    def test_matches_dirs_dots(self) -> None:
-        self.assert_rule_match(
-            "build-support/*.venv/", ("build-support/blah.venv", "build-support/rbt.venv")
-        )
-
-    def test_matches_dirs_dots_neg(self) -> None:
-        self.assert_rule_match(
-            "build-support/*.venv/",
-            ("build-support/rbt.venv.but_actually_a_file",),
-            should_match=False,
-        )
-
-    def test_matches_literals(self) -> None:
-        self.assert_rule_match("a", ("a",))
-
-    def test_matches_literal_dir(self) -> None:
-        self.assert_rule_match("a/b/c", ("a/b/c",))
-
-    def test_matches_literal_file(self) -> None:
-        self.assert_rule_match("a/b/c.py", ("a/b/c.py",))
+        ),
+        # Dirs.
+        ("dist/", ("not_dist", "cdist", "dist.py", "dist/dist")),
+        ("build-support/*.venv/", ("build-support/rbt.venv.but_actually_a_file",)),
+    ],
+)
+def test_invalid_matches(rule_runner: RuleRunner, glob: str, paths: Tuple[str, ...]) -> None:
+    assert_rule_match(rule_runner, glob, paths, should_match=False)

@@ -3,9 +3,7 @@
 
 from pants.base.build_environment import pants_version
 from pants.version import VERSION as _VERSION
-from pants.testutil.test_base import TestBase
 
 
-class PantsPluginPantsRequirementTest(TestBase):
-  def test_version(self):
-    self.assertEqual(pants_version(), _VERSION)
+def test_version() -> None:
+  assert pants_version() == _VERSION

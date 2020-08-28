@@ -3,6 +3,8 @@
 
 from dataclasses import dataclass
 
+import pytest
+
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
@@ -15,67 +17,67 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet, Sources, Tags, Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
+from pants.testutil.rule_runner import RuleRunner
 
 
-class FilterEmptySourcesTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
             *filter_empty_sources_rules(),
             QueryRule(FieldSetsWithSources, (FieldSetsWithSourcesRequest, OptionsBootstrapper)),
             QueryRule(TargetsWithSources, (TargetsWithSourcesRequest, OptionsBootstrapper)),
-        )
+        ]
+    )
 
-    def test_filter_field_sets(self) -> None:
-        @dataclass(frozen=True)
-        class MockFieldSet(FieldSet):
-            sources: Sources
-            # Another field to demo that we will preserve the whole FieldSet data structure.
-            tags: Tags
 
-        self.create_file("f1.txt")
-        valid_addr = Address("", target_name="valid")
-        valid_field_set = MockFieldSet(
-            valid_addr, Sources(["f1.txt"], address=valid_addr), Tags(None, address=valid_addr)
-        )
+def test_filter_field_sets(rule_runner: RuleRunner) -> None:
+    @dataclass(frozen=True)
+    class MockFieldSet(FieldSet):
+        sources: Sources
+        # Another field to demo that we will preserve the whole FieldSet data structure.
+        tags: Tags
 
-        empty_addr = Address("", target_name="empty")
-        empty_field_set = MockFieldSet(
-            empty_addr, Sources(None, address=empty_addr), Tags(None, address=empty_addr)
-        )
+    rule_runner.create_file("f1.txt")
+    valid_addr = Address("", target_name="valid")
+    valid_field_set = MockFieldSet(
+        valid_addr, Sources(["f1.txt"], address=valid_addr), Tags(None, address=valid_addr)
+    )
 
-        result = self.request_product(
-            FieldSetsWithSources,
-            [
-                FieldSetsWithSourcesRequest([valid_field_set, empty_field_set]),
-                create_options_bootstrapper(),
-            ],
-        )
-        assert tuple(result) == (valid_field_set,)
+    empty_addr = Address("", target_name="empty")
+    empty_field_set = MockFieldSet(
+        empty_addr, Sources(None, address=empty_addr), Tags(None, address=empty_addr)
+    )
 
-    def test_filter_targets(self) -> None:
-        class MockTarget(Target):
-            alias = "target"
-            core_fields = (Sources,)
+    result = rule_runner.request_product(
+        FieldSetsWithSources,
+        [
+            FieldSetsWithSourcesRequest([valid_field_set, empty_field_set]),
+            create_options_bootstrapper(),
+        ],
+    )
+    assert tuple(result) == (valid_field_set,)
 
-        class MockTargetWithNoSourcesField(Target):
-            alias = "no_sources"
-            core_fields = ()
 
-        self.create_file("f1.txt")
-        valid_tgt = MockTarget(
-            {Sources.alias: ["f1.txt"]}, address=Address("", target_name="valid")
-        )
-        empty_tgt = MockTarget({}, address=Address("", target_name="empty"))
-        invalid_tgt = MockTargetWithNoSourcesField({}, address=Address("", target_name="invalid"))
+def test_filter_targets(rule_runner: RuleRunner) -> None:
+    class MockTarget(Target):
+        alias = "target"
+        core_fields = (Sources,)
 
-        result = self.request_product(
-            TargetsWithSources,
-            [
-                TargetsWithSourcesRequest([valid_tgt, empty_tgt, invalid_tgt]),
-                create_options_bootstrapper(),
-            ],
-        )
-        assert tuple(result) == (valid_tgt,)
+    class MockTargetWithNoSourcesField(Target):
+        alias = "no_sources"
+        core_fields = ()
+
+    rule_runner.create_file("f1.txt")
+    valid_tgt = MockTarget({Sources.alias: ["f1.txt"]}, address=Address("", target_name="valid"))
+    empty_tgt = MockTarget({}, address=Address("", target_name="empty"))
+    invalid_tgt = MockTargetWithNoSourcesField({}, address=Address("", target_name="invalid"))
+
+    result = rule_runner.request_product(
+        TargetsWithSources,
+        [
+            TargetsWithSourcesRequest([valid_tgt, empty_tgt, invalid_tgt]),
+            create_options_bootstrapper(),
+        ],
+    )
+    assert tuple(result) == (valid_tgt,)
