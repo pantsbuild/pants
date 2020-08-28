@@ -9,7 +9,7 @@ from textwrap import dedent
 from typing import List, Optional
 
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, DigestContents, FileContent
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.internals.engine_testutil import (
     assert_equal_with_printing,
     remove_locations_from_traceback,
@@ -610,8 +610,10 @@ class MoreComplicatedEngineAware(TestBase, SchedulerTestBase):
         artifacts = workunit["artifacts"]
         output_digest = artifacts["some_arbitrary_key"]
 
-        output_bytes = streaming_workunit_context.snapshot_digests_to_bytes([output_digest])
-        assert output_bytes == (b"alpha",)
+        output_contents = streaming_workunit_context.snapshot_digests_to_bytes([output_digest])[0]
+        assert len(output_contents) == 1
+        assert isinstance(output_contents[0], FileContent)
+        assert output_contents[0].content == b"alpha"
 
 
 class StreamingWorkunitProcessTests(TestBase):
