@@ -4,7 +4,7 @@
 from abc import ABC
 from typing import Dict, Optional
 
-from pants.engine.fs import Digest
+from pants.engine.fs import Digest, Snapshot
 from pants.util.logging import LogLevel
 
 
@@ -49,10 +49,10 @@ class EngineAwareReturnType(ABC):
         """
         return None
 
-    def artifacts(self) -> Optional[Dict[str, Digest]]:
+    def artifacts(self) -> Optional[Dict[str, Snapshot]]:
         """If implemented, this sets the `artifacts` entry for the workunit of any `@rule`'s that
         return the annotated type.
 
-        `artifacts` is a mapping of arbitrary string keys to `Digest`s.
+        `artifacts` is a mapping of arbitrary string keys to `Snapshot`s.
         """
         return None

@@ -9,7 +9,7 @@ from textwrap import dedent
 from typing import List, Optional
 
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.internals.engine_testutil import (
     assert_equal_with_printing,
     remove_locations_from_traceback,
@@ -535,7 +535,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             val: int
 
             def artifacts(self):
-                return {"some_arbitrary_key": EMPTY_DIGEST}
+                return {"some_arbitrary_key": EMPTY_SNAPSHOT}
 
         @rule(desc="a_rule")
         def a_rule(n: int) -> Output:
@@ -566,15 +566,15 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
 @dataclass(frozen=True)
 class Output(EngineAwareReturnType):
-    val: Digest
+    val: Snapshot
 
     def artifacts(self):
         return {"some_arbitrary_key": self.val}
 
 
 @rule(desc="a_rule")
-def a_rule(digest: Digest) -> Output:
-    return Output(val=digest)
+def a_rule(snapshot: Snapshot) -> Output:
+    return Output(val=snapshot)
 
 
 class MoreComplicatedEngineAware(TestBase, SchedulerTestBase):
@@ -584,6 +584,7 @@ class MoreComplicatedEngineAware(TestBase, SchedulerTestBase):
             *super().rules(),
             a_rule,
             QueryRule(Output, (Digest,)),
+            QueryRule(Output, (Snapshot,)),
         )
 
     def test_more_complicated_engine_aware(self) -> None:
@@ -598,7 +599,8 @@ class MoreComplicatedEngineAware(TestBase, SchedulerTestBase):
             content = b"alpha"
             subset_input = CreateDigest((FileContent(path="a.txt", content=content),))
             subset_digest = self.request_product(Digest, [subset_input])
-            self.request_product(Output, [subset_digest])
+            subset_snapshot = self.request_product(Snapshot, [subset_digest])
+            self.request_product(Output, [subset_snapshot])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(

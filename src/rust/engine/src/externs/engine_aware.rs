@@ -4,7 +4,7 @@
 use crate::core::Value;
 use crate::externs;
 use crate::nodes::lift_digest;
-use cpython::{PyDict, PyString, Python};
+use cpython::{PyDict, PyObject, PyString, Python};
 use hashing::Digest;
 use workunit_store::Level;
 
@@ -73,7 +73,12 @@ impl EngineAwareInformation for Artifacts {
           return None;
         }
       };
-      let digest = match lift_digest(&Value::new(value)) {
+      let digest_value: PyObject = externs::getattr(&Value::new(value), "digest")
+        .map_err(|e| {
+          log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
+        })
+        .ok()?;
+      let digest = match lift_digest(&Value::new(digest_value)) {
         Ok(digest) => digest,
         Err(e) => {
           log::error!("Error in EngineAware.artifacts() implementation: {}", e);
