@@ -66,18 +66,18 @@ class Repl(Goal):
 class ReplRequest:
     digest: Digest
     args: Tuple[str, ...]
-    env: FrozenDict[str, str]
+    extra_env: FrozenDict[str, str]
 
     def __init__(
         self,
         *,
         digest: Digest,
         args: Iterable[str],
-        env: Optional[Mapping[str, str]] = None,
+        extra_env: Optional[Mapping[str, str]] = None,
     ) -> None:
         self.digest = digest
         self.args = tuple(args)
-        self.env = FrozenDict(env or {})
+        self.extra_env = FrozenDict(extra_env or {})
 
 
 @goal_rule
@@ -118,7 +118,7 @@ async def run_repl(
         )
         result = interactive_runner.run(
             InteractiveProcess(
-                argv=request.args, env=request.env, run_in_workspace=True, hermetic_env=False
+                argv=request.args, env=request.extra_env, run_in_workspace=True, hermetic_env=False
             )
         )
     return Repl(result.exit_code)

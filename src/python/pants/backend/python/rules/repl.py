@@ -36,9 +36,11 @@ async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) 
     )
 
     chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
-    env = {**pex_env.environment_dict, "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)}
+    extra_env = {**pex_env.environment_dict, "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)}
 
-    return ReplRequest(digest=merged_digest, args=(repl.in_chroot(requirements_pex.name),), env=env)
+    return ReplRequest(
+        digest=merged_digest, args=(repl.in_chroot(requirements_pex.name),), extra_env=extra_env
+    )
 
 
 class IPythonRepl(ReplImplementation):
@@ -91,13 +93,13 @@ async def create_ipython_repl_request(
         args.append("--ignore-cwd")
 
     chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
-    env = {
+    extra_env = {
         **pex_env.environment_dict,
         "PEX_PATH": repl.in_chroot(requirements_pex_request.output_filename),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }
 
-    return ReplRequest(digest=merged_digest, args=args, env=env)
+    return ReplRequest(digest=merged_digest, args=args, extra_env=extra_env)
 
 
 def rules():
