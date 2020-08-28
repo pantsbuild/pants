@@ -150,7 +150,8 @@ async def infer_python_init_dependencies(
     # Locate __init__.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
     extra_init_files = await Get(
-        AncestorFiles, AncestorFilesRequest("__init__.py", hydrated_sources.snapshot),
+        AncestorFiles,
+        AncestorFilesRequest("__init__.py", hydrated_sources.snapshot),
     )
 
     # And add dependencies on their owners.
@@ -171,7 +172,8 @@ class InferConftestDependencies(InferDependenciesRequest):
 
 @rule
 async def infer_python_conftest_dependencies(
-    request: InferConftestDependencies, python_inference: PythonInference,
+    request: InferConftestDependencies,
+    python_inference: PythonInference,
 ) -> InferredDependencies:
     if not python_inference.conftests:
         return InferredDependencies([], sibling_dependencies_inferrable=False)
@@ -179,7 +181,8 @@ async def infer_python_conftest_dependencies(
     # Locate conftest.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
     extra_conftest_files = await Get(
-        AncestorFiles, AncestorFilesRequest("conftest.py", hydrated_sources.snapshot),
+        AncestorFiles,
+        AncestorFilesRequest("conftest.py", hydrated_sources.snapshot),
     )
 
     # And add dependencies on their owners.

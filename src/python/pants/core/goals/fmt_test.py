@@ -174,7 +174,9 @@ class FmtTest(TestBase):
                     mock=lambda tgts: TargetsWithSources(tgts if include_sources else ()),
                 ),
                 MockGet(
-                    product_type=Digest, subject_type=MergeDigests, mock=lambda _: result_digest,
+                    product_type=Digest,
+                    subject_type=MergeDigests,
+                    mock=lambda _: result_digest,
                 ),
             ],
             union_membership=union_membership,

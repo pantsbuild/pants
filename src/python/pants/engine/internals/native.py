@@ -69,14 +69,20 @@ class Externs:
             if isinstance(res, Get):
                 # Get.
                 return PyGeneratorResponseGet(
-                    res.product_type, res.subject_declared_type, res.subject, res.weak,
+                    res.product_type,
+                    res.subject_declared_type,
+                    res.subject,
+                    res.weak,
                 )
             elif type(res) in (tuple, list):
                 # GetMulti.
                 return PyGeneratorResponseGetMulti(
                     tuple(
                         PyGeneratorResponseGet(
-                            get.product_type, get.subject_declared_type, get.subject, get.weak,
+                            get.product_type,
+                            get.subject_declared_type,
+                            get.subject,
+                            get.weak,
                         )
                         for get in res
                     )
@@ -190,9 +196,18 @@ class Native(metaclass=SingletonMetaclass):
         return PyExecutionRequest()
 
     def new_session(
-        self, scheduler, dynamic_ui: bool, build_id, should_report_workunits: bool,
+        self,
+        scheduler,
+        dynamic_ui: bool,
+        build_id,
+        should_report_workunits: bool,
     ) -> PySession:
-        return PySession(scheduler, dynamic_ui, build_id, should_report_workunits,)
+        return PySession(
+            scheduler,
+            dynamic_ui,
+            build_id,
+            should_report_workunits,
+        )
 
     def new_scheduler(
         self,

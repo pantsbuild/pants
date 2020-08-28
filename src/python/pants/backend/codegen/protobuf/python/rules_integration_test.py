@@ -55,7 +55,7 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
         )
         tgt = self.request_product(WrappedTarget, [Address.parse(spec), bootstrapper]).target
         protocol_sources = self.request_product(
-            HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSources]), bootstrapper],
+            HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSources]), bootstrapper]
         )
         generated_sources = self.request_product(
             GeneratedSources,

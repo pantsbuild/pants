@@ -126,7 +126,7 @@ def test_excludes() -> None:
 
     # `exclude` elements are globs
     assert_rewrite(
-        original="sources=globs(exclude=[globs('ignore.py')]),", expected="sources=['!ignore.py'],",
+        original="sources=globs(exclude=[globs('ignore.py')]),", expected="sources=['!ignore.py'],"
     )
     assert_rewrite(
         original="sources=globs(exclude=[globs('ignore.py'), globs('ignore2.py')]),",
@@ -169,7 +169,7 @@ def test_normalizes_rglobs() -> None:
 
     # Check the intersection with the `exclude` clause
     assert_rewrite(
-        original="sources=rglobs('foo.py', exclude=['*']),", expected="sources=['foo.py', '!*'],",
+        original="sources=rglobs('foo.py', exclude=['*']),", expected="sources=['foo.py', '!*'],"
     )
     assert_rewrite(
         original="sources=globs('foo.py', exclude=[rglobs('*')]),",
@@ -206,7 +206,7 @@ def test_correctly_formats_rewrite() -> None:
 
     # Maintain insertion order for includes
     assert_rewrite(
-        original="sources=globs('dog.py', 'cat.py'),", expected="sources=['dog.py', 'cat.py'],",
+        original="sources=globs('dog.py', 'cat.py'),", expected="sources=['dog.py', 'cat.py'],"
     )
 
 
@@ -219,7 +219,7 @@ def test_warns_when_sources_shares_a_line(caplog) -> None:
         script_restriction=SCRIPT_RESTRICTIONS["sources_must_be_distinct_line"],
     )
     assert_warning(
-        build_file_content="files(sources=globs('foo.py'))", warning_num=0, line_number=1,
+        build_file_content="files(sources=globs('foo.py'))", warning_num=0, line_number=1
     )
     assert_warning(
         build_file_content=dedent(

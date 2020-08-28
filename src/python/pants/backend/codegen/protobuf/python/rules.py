@@ -59,7 +59,7 @@ async def generate_python_from_protobuf(
         ),
     )
     target_stripped_sources_request = Get(
-        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSources]]),
+        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSources]])
     )
 
     (

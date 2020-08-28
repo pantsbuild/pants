@@ -30,7 +30,9 @@ class NativeHandler(StreamHandler):
     method) and proxies logs to the Rust logging infrastructure."""
 
     def __init__(
-        self, log_level: LogLevel, native_filename: Optional[str] = None,
+        self,
+        log_level: LogLevel,
+        native_filename: Optional[str] = None,
     ):
         super().__init__(None)
         self.native = Native()

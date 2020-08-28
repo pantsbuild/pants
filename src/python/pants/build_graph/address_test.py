@@ -116,7 +116,9 @@ def test_subproject_spec() -> None:
     # Ensure that a spec referring to a subproject gets assigned to that subproject properly.
     def parse(spec, relative_to):
         return AddressInput.parse(
-            spec, relative_to=relative_to, subproject_roots=["subprojectA", "path/to/subprojectB"],
+            spec,
+            relative_to=relative_to,
+            subproject_roots=["subprojectA", "path/to/subprojectB"],
         )
 
     # Ensure that a spec in subprojectA is determined correctly.

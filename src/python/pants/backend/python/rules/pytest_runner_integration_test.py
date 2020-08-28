@@ -280,7 +280,8 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             ).encode(),
         )
         self.create_python_library(
-            [library_fc], dependencies=["3rdparty/python:ordered-set"],
+            [library_fc],
+            dependencies=["3rdparty/python:ordered-set"],
         )
         source = FileContent(
             path="test_3rdparty_transitive_dep.py",

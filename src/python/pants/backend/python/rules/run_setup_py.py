@@ -440,7 +440,8 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
-        target_address_spec=target.address.spec, setup_kwargs_str=distutils_repr(setup_kwargs),
+        target_address_spec=target.address.spec,
+        setup_kwargs_str=distutils_repr(setup_kwargs),
     ).encode()
     extra_files_digest = await Get(
         Digest,
@@ -633,7 +634,9 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
             interpreter_constraints=PexInterpreterConstraints(setuptools.interpreter_constraints),
         ),
     )
-    return SetuptoolsSetup(requirements_pex=requirements_pex,)
+    return SetuptoolsSetup(
+        requirements_pex=requirements_pex,
+    )
 
 
 def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:

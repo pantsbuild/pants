@@ -117,7 +117,11 @@ async def get_javac_version_output(
     javac_version_proc_req = Process(
         argv=javac_version_command.gen_argv(), description=javac_version_command.description
     )
-    javac_version_proc_result = await Get(ProcessResult, Process, javac_version_proc_req,)
+    javac_version_proc_result = await Get(
+        ProcessResult,
+        Process,
+        javac_version_proc_req,
+    )
 
     return JavacVersionOutput(javac_version_proc_result.stderr.decode())
 
@@ -266,7 +270,9 @@ class TestInputFileCreation(TestBase):
             Digest, [CreateDigest([FileContent(path=file_name, content=file_contents)])]
         )
         req = Process(
-            argv=("./echo.sh",), input_digest=digest, description="cat the contents of this file",
+            argv=("./echo.sh",),
+            input_digest=digest,
+            description="cat the contents of this file",
         )
 
         with pytest.raises(ExecutionError) as exc:
@@ -286,7 +292,9 @@ class TestInputFileCreation(TestBase):
             ],
         )
         req = Process(
-            argv=("./echo.sh",), input_digest=digest, description="cat the contents of this file",
+            argv=("./echo.sh",),
+            input_digest=digest,
+            description="cat the contents of this file",
         )
 
         result = self.request_product(ProcessResult, [req])
@@ -314,7 +322,10 @@ class ProcessTest(TestBase):
         self.create_file("f1", "one\n")
         self.create_file("f2", "two\n")
 
-        cat_exe_req = CatExecutionRequest(ShellCat(BinaryLocation("/bin/cat")), PathGlobs(["f*"]),)
+        cat_exe_req = CatExecutionRequest(
+            ShellCat(BinaryLocation("/bin/cat")),
+            PathGlobs(["f*"]),
+        )
 
         concatted = self.request_product(Concatted, [cat_exe_req])
         self.assertEqual(Concatted("one\ntwo\n"), concatted)
@@ -369,7 +380,8 @@ class Simple {
         )
 
         request = JavacCompileRequest(
-            BinaryLocation("/usr/bin/javac"), JavacSources(("simple/Simple.java",)),
+            BinaryLocation("/usr/bin/javac"),
+            JavacSources(("simple/Simple.java",)),
         )
         result = self.request_product(JavacCompileResult, [request])
         digest_contents = self.request_product(DigestContents, [result.digest])
@@ -405,7 +417,9 @@ class Broken {
             with open(os.path.join(temp_dir, "roland"), "w") as f:
                 f.write("European Burmese")
             request = Process(
-                argv=("/bin/cat", ".jdk/roland"), description="cat JDK roland", jdk_home=temp_dir,
+                argv=("/bin/cat", ".jdk/roland"),
+                description="cat JDK roland",
+                jdk_home=temp_dir,
             )
             result = self.request_product(ProcessResult, [request])
             self.assertEqual(result.stdout, b"European Burmese")

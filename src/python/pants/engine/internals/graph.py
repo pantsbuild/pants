@@ -423,7 +423,8 @@ def _log_or_raise_unmatched_owners(
 
 @rule
 async def addresses_with_origins_from_filesystem_specs(
-    filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
+    filesystem_specs: FilesystemSpecs,
+    global_options: GlobalOptions,
 ) -> AddressesWithOrigins:
     """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
     owners come from.
@@ -859,7 +860,11 @@ class AmbiguousImplementationsException(Exception):
     there to be one FieldSet."""
 
     def __init__(
-        self, target: Target, field_sets: Iterable[_AbstractFieldSet], *, goal_description: str,
+        self,
+        target: Target,
+        field_sets: Iterable[_AbstractFieldSet],
+        *,
+        goal_description: str,
     ) -> None:
         # TODO: improve this error message. A better error message would explain to users how they
         #  can resolve the issue.

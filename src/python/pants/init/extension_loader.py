@@ -44,7 +44,9 @@ def load_backends_and_plugins(
 
 
 def load_plugins(
-    build_configuration: BuildConfiguration.Builder, plugins: List[str], working_set: WorkingSet,
+    build_configuration: BuildConfiguration.Builder,
+    plugins: List[str],
+    working_set: WorkingSet,
 ) -> None:
     """Load named plugins from the current working_set into the supplied build_configuration.
 

@@ -105,7 +105,7 @@ async def flake8_lint_partition(
         PexProcess(
             requirements_pex,
             argv=generate_args(
-                source_files=source_files, flake8=flake8, report_file_name=report_file_name,
+                source_files=source_files, flake8=flake8, report_file_name=report_file_name
             ),
             input_digest=input_digest,
             output_files=(report_file_name,) if report_file_name else None,

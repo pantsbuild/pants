@@ -130,9 +130,7 @@ class SourceFileValidation(Subsystem):
         """
         )
         super().register_options(register)
-        register(
-            "--config", type=dict, fromfile=True, help=schema_help,
-        )
+        register("--config", type=dict, fromfile=True, help=schema_help)
 
     @memoized_method
     def get_multi_matcher(self):

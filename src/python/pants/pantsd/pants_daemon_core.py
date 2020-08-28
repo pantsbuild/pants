@@ -20,7 +20,9 @@ logger = logging.getLogger(__name__)
 
 class PantsServicesConstructor(Protocol):
     def __call__(
-        self, bootstrap_options: OptionValueContainer, graph_scheduler: GraphScheduler,
+        self,
+        bootstrap_options: OptionValueContainer,
+        graph_scheduler: GraphScheduler,
     ) -> PantsServices:
         ...
 
@@ -93,7 +95,9 @@ class PantsDaemonCore:
         # fingerprints all fingerprintable options in the bootstrap options, which are
         # all used to construct a Scheduler.
         options_fingerprint = OptionsFingerprinter.combined_options_fingerprint_for_scope(
-            GLOBAL_SCOPE, options_bootstrapper.bootstrap_options, invert=True,
+            GLOBAL_SCOPE,
+            options_bootstrapper.bootstrap_options,
+            invert=True,
         )
 
         with self._lifecycle_lock:

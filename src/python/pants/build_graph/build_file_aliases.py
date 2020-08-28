@@ -118,5 +118,6 @@ class BuildFileAliases:
             self.context_aware_object_factories, other.context_aware_object_factories
         )
         return BuildFileAliases(
-            objects=objects, context_aware_object_factories=context_aware_object_factories,
+            objects=objects,
+            context_aware_object_factories=context_aware_object_factories,
         )

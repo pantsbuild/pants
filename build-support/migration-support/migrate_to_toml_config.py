@@ -42,10 +42,8 @@ def main() -> None:
 
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Convert INI config files to TOML config files.",)
-    parser.add_argument(
-        "files", type=Path, nargs="*", help="Config files to convert.",
-    )
+    parser = argparse.ArgumentParser(description="Convert INI config files to TOML config files.")
+    parser.add_argument("files", type=Path, nargs="*", help="Config files to convert.")
     parser.add_argument(
         "-p",
         "--preview",
@@ -84,7 +82,7 @@ def generate_new_config(config: Path) -> List[str]:
         before_value_regex = rf"\s*{option_regex}\s*[:=]\s*"
         valid_value_characters = r"a-zA-Z0-9_.@!:%\*\=\>\<\-\(\)\/"
         value_regex = rf"(?P<value>[{valid_value_characters}]+)"
-        parsed_line = re.match(rf"{before_value_regex}{value_regex}\s*$", line,)
+        parsed_line = re.match(rf"{before_value_regex}{value_regex}\s*$", line)
 
         if parsed_line:
             option, value = parsed_line.groups()

@@ -140,7 +140,7 @@ class IsortIntegrationTest(ExternalToolTestBase):
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.needs_config_source])
         lint_results, fmt_result = self.run_isort(
-            [target], config="[settings]\ncombine_as_imports=True\n",
+            [target], config="[settings]\ncombine_as_imports=True\n"
         )
         assert len(lint_results) == 1
         assert lint_results[0].exit_code == 1

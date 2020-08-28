@@ -46,12 +46,15 @@ def test_generate_request() -> None:
         foobar = create_subsystem(
             FooBar, version=version, known_versions=FooBar.default_known_versions
         )
-        assert ExternalToolRequest(
-            DownloadFile(
-                url=expected_url, expected_digest=Digest(expected_sha256, expected_length)
-            ),
-            f"foobar-{version}/bin/foobar",
-        ) == foobar.get_request(plat)
+        assert (
+            ExternalToolRequest(
+                DownloadFile(
+                    url=expected_url, expected_digest=Digest(expected_sha256, expected_length)
+                ),
+                f"foobar-{version}/bin/foobar",
+            )
+            == foobar.get_request(plat)
+        )
 
     do_test(
         "https://foobar.org/bin/v3.2.0/foobar-3.2.0-osx-x86_64.tgz",

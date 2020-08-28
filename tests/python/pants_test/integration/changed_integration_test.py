@@ -209,8 +209,8 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
         # A `python_library` with `sources=['file.name'] .
         "src/python/sources/sources.py": dict(
             none=["src/python/sources/sources.py"],
-            direct=["src/python/sources", "src/python/sources/sources.py",],
-            transitive=["src/python/sources", "src/python/sources/sources.py",],
+            direct=["src/python/sources", "src/python/sources/sources.py"],
+            transitive=["src/python/sources", "src/python/sources/sources.py"],
         ),
         # An unclaimed source file.
         "src/python/python_targets/test_unclaimed_src.py": dict(none=[], direct=[], transitive=[]),

@@ -46,7 +46,10 @@ class Config(ABC):
 
     @classmethod
     def load_file_contents(
-        cls, file_contents, *, seed_values: Optional[SeedValues] = None,
+        cls,
+        file_contents,
+        *,
+        seed_values: Optional[SeedValues] = None,
     ) -> Union["_EmptyConfig", "_ChainedConfig"]:
         """Loads config from the given string payloads, with later payloads taking precedence over
         earlier ones.
@@ -65,7 +68,10 @@ class Config(ABC):
 
     @classmethod
     def load(
-        cls, config_paths: List[str], *, seed_values: Optional[SeedValues] = None,
+        cls,
+        config_paths: List[str],
+        *,
+        seed_values: Optional[SeedValues] = None,
     ) -> Union["_EmptyConfig", "_ChainedConfig"]:
         """Loads config from the given paths, with later paths taking precedence over earlier ones.
 
@@ -83,7 +89,11 @@ class Config(ABC):
 
     @classmethod
     def _meta_load(
-        cls, open_ctx, config_items: Sequence, *, seed_values: Optional[SeedValues] = None,
+        cls,
+        open_ctx,
+        config_items: Sequence,
+        *,
+        seed_values: Optional[SeedValues] = None,
     ) -> Union["_EmptyConfig", "_ChainedConfig"]:
         if not config_items:
             return _EmptyConfig()
@@ -110,7 +120,9 @@ class Config(ABC):
 
             single_file_configs.append(
                 _SingleFileConfig(
-                    config_path=config_path, content_digest=content_digest, values=config_values,
+                    config_path=config_path,
+                    content_digest=content_digest,
+                    values=config_values,
                 ),
             )
         return _ChainedConfig(tuple(reversed(single_file_configs)))
@@ -279,7 +291,12 @@ class _ConfigValues:
         return recurse(mapping=self.values, remaining_sections=section.split("."))
 
     def _possibly_interpolate_value(
-        self, raw_value: str, *, option: str, section: str, section_values: Dict,
+        self,
+        raw_value: str,
+        *,
+        option: str,
+        section: str,
+        section_values: Dict,
     ) -> str:
         """For any values with %(foo)s, substitute it with the corresponding value from DEFAULT or
         the same section."""
@@ -299,7 +316,10 @@ class _ConfigValues:
             except KeyError as e:
                 bad_reference = e.args[0]
                 raise configparser.InterpolationMissingOptionError(
-                    option, section, raw_value, bad_reference,
+                    option,
+                    section,
+                    raw_value,
+                    bad_reference,
                 )
 
         def recursively_format_str(value: str) -> str:
@@ -351,7 +371,11 @@ class _ConfigValues:
 
     def _stringify_val_without_interpolation(self, raw_value: _TomlValue) -> str:
         return self._stringify_val(
-            raw_value, option="", section="", section_values={}, interpolate=False,
+            raw_value,
+            option="",
+            section="",
+            section_values={},
+            interpolate=False,
         )
 
     @property
@@ -390,7 +414,10 @@ class _ConfigValues:
         if section_values is None:
             raise configparser.NoSectionError(section)
         stringify = partial(
-            self._stringify_val, option=option, section=section, section_values=section_values,
+            self._stringify_val,
+            option=option,
+            section=section,
+            section_values=section_values,
         )
         if option not in section_values:
             if option not in self.defaults:

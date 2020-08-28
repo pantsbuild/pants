@@ -75,7 +75,8 @@ class SchedulerTestBase:
             include_trace_on_error=include_trace_on_error,
         )
         return scheduler.new_session(
-            build_id="buildid_for_test", should_report_workunits=should_report_workunits,
+            build_id="buildid_for_test",
+            should_report_workunits=should_report_workunits,
         )
 
     def execute(self, scheduler, product, *subjects):

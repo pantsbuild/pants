@@ -40,7 +40,7 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
         return PythonLibrary({}, address=Address.parse(":target"))
 
     def run_docformatter(
-        self, targets: List[Target], *, passthrough_args: Optional[str] = None, skip: bool = False,
+        self, targets: List[Target], *, passthrough_args: Optional[str] = None, skip: bool = False
     ) -> Tuple[Sequence[LintResult], FmtResult]:
         args = ["--backend-packages=pants.backend.python.lint.docformatter"]
         if passthrough_args:

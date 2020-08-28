@@ -119,7 +119,10 @@ class PythonSourceFilesTest(ExternalToolTestBase):
         ]
 
         def assert_stripped(
-            *, include_resources: bool, include_files: bool, expected: List[str],
+            *,
+            include_resources: bool,
+            include_files: bool,
+            expected: List[str],
         ) -> None:
             result = self.get_stripped_sources(
                 targets, include_resources=include_resources, include_files=include_files
@@ -164,7 +167,9 @@ class PythonSourceFilesTest(ExternalToolTestBase):
 
         assert_stripped(include_resources=False, include_files=False, expected=["p.py"])
         assert_unstripped(
-            include_resources=False, include_files=False, expected=["src/python/p.py"],
+            include_resources=False,
+            include_files=False,
+            expected=["src/python/p.py"],
         )
 
     def test_top_level_source_root(self) -> None:

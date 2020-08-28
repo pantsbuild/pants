@@ -112,7 +112,8 @@ class MultiPlatformProcess:
     processes: Tuple[Process, ...]
 
     def __init__(
-        self, request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], Process],
+        self,
+        request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], Process],
     ) -> None:
         if len(request_dict) == 0:
             raise ValueError("At least one platform constrained Process must be passed.")
@@ -222,7 +223,9 @@ def fallible_to_exec_result_or_raise(
 
     if fallible_result.exit_code == 0:
         return ProcessResult(
-            fallible_result.stdout, fallible_result.stderr, fallible_result.output_digest,
+            fallible_result.stdout,
+            fallible_result.stderr,
+            fallible_result.output_digest,
         )
     raise ProcessExecutionFailure(
         fallible_result.exit_code,

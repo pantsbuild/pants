@@ -33,7 +33,8 @@ class Parser:
 
     @staticmethod
     def _generate_symbols(
-        target_type_aliases: Iterable[str], object_aliases: BuildFileAliases,
+        target_type_aliases: Iterable[str],
+        object_aliases: BuildFileAliases,
     ) -> Tuple[Dict[str, Any], ParseContext]:
         symbols: Dict[str, Any] = {}
 

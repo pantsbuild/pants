@@ -27,7 +27,8 @@ def test_no_op_when_already_valid(line: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "line", ["\n", "    123  ", "python_library()", "name='hello'", "name='sources'",],
+    "line",
+    ["\n", "    123  ", "python_library()", "name='hello'", "name='sources'"],
 )
 def test_safe_with_unrelated_lines(line: str) -> None:
     assert maybe_rewrite_line(line) is None

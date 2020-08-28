@@ -130,7 +130,10 @@ class PythonDependencyInferenceTest(TestBase):
 
     def test_infer_python_inits(self) -> None:
         options_bootstrapper = create_options_bootstrapper(
-            args=["--backend-packages=pants.backend.python", "--source-root-patterns=src/python",]
+            args=[
+                "--backend-packages=pants.backend.python",
+                "--source-root-patterns=src/python",
+            ]
         )
 
         self.create_file("src/python/root/__init__.py")
@@ -159,7 +162,10 @@ class PythonDependencyInferenceTest(TestBase):
 
     def test_infer_python_conftests(self) -> None:
         options_bootstrapper = create_options_bootstrapper(
-            args=["--backend-packages=pants.backend.python", "--source-root-patterns=src/python",]
+            args=[
+                "--backend-packages=pants.backend.python",
+                "--source-root-patterns=src/python",
+            ]
         )
 
         self.create_file("src/python/root/conftest.py")

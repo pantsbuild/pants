@@ -117,7 +117,10 @@ class TestTest(TestBase):
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
         test_subsystem = create_goal_subsystem(
-            TestSubsystem, debug=debug, use_coverage=use_coverage, output=output,
+            TestSubsystem,
+            debug=debug,
+            use_coverage=use_coverage,
+            output=output,
         )
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
@@ -174,7 +177,9 @@ class TestTest(TestBase):
                 ),
                 # Merge XML results.
                 MockGet(
-                    product_type=Digest, subject_type=MergeDigests, mock=lambda _: EMPTY_DIGEST,
+                    product_type=Digest,
+                    subject_type=MergeDigests,
+                    mock=lambda _: EMPTY_DIGEST,
                 ),
                 MockGet(
                     product_type=CoverageReports,
@@ -227,7 +232,9 @@ class TestTest(TestBase):
 
     def test_debug_target(self) -> None:
         exit_code, _ = self.run_test_rule(
-            field_set=SuccessfulFieldSet, targets=[self.make_target_with_origin()], debug=True,
+            field_set=SuccessfulFieldSet,
+            targets=[self.make_target_with_origin()],
+            debug=True,
         )
         assert exit_code == 0
 

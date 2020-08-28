@@ -128,7 +128,8 @@ class PexInterpreterConstraints(DeduplicatedCollection[str]):
                             str(parsed_constraint) for parsed_constraint in parsed_constraints
                         )
                         for interp, parsed_constraints in itertools.groupby(
-                            parsed_constraints, key=lambda pc: pc.interpreter,
+                            parsed_constraints,
+                            key=lambda pc: pc.interpreter,
                         )
                     }
                     raise ValueError(
@@ -371,7 +372,13 @@ async def create_pex(
 
     merged_digest = await Get(
         Digest,
-        MergeDigests((sources_digest_as_subdir, additional_inputs_digest, constraint_file_digest,)),
+        MergeDigests(
+            (
+                sources_digest_as_subdir,
+                additional_inputs_digest,
+                constraint_file_digest,
+            )
+        ),
     )
 
     description = request.description

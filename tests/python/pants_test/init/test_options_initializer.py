@@ -25,7 +25,7 @@ class OptionsInitializerTest(unittest.TestCase):
     def test_global_options_validation(self):
         # Specify an invalid combination of options.
         ob = OptionsBootstrapper.create(
-            env={}, args=["--backend-packages=[]", "--remote-execution",], allow_pantsrc=False
+            env={}, args=["--backend-packages=[]", "--remote-execution"], allow_pantsrc=False
         )
         build_config = BuildConfigInitializer.get(ob)
         with self.assertRaises(OptionsError) as exc:

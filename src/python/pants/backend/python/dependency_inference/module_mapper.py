@@ -114,7 +114,8 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMap
         module_map = tgt.get(ModuleMappingField).value or {}  # type: ignore[var-annotated]
         for python_req in tgt[PythonRequirementsField].value:
             modules = module_map.get(
-                python_req.project_name, [python_req.project_name.lower().replace("-", "_")],
+                python_req.project_name,
+                [python_req.project_name.lower().replace("-", "_")],
             )
             for module in modules:
                 if module in modules_to_addresses:

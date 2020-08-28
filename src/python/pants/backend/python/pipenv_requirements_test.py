@@ -70,7 +70,9 @@ class PipenvRequirementsTest(TestBase):
         self.assert_pipenv_requirements(
             "pipenv_requirements(module_mapping={'ansicolors': ['colors']})",
             {
-                "default": {"ansicolors": {"version": ">=1.18.0"},},
+                "default": {
+                    "ansicolors": {"version": ">=1.18.0"},
+                },
                 "develop": {
                     "cachetools": {"markers": "python_version ~= '3.5'", "version": "==4.1.1"},
                 },
@@ -116,7 +118,11 @@ class PipenvRequirementsTest(TestBase):
             )
             """
             ),
-            {"default": {"ansicolors": {"version": ">=1.18.0"},},},
+            {
+                "default": {
+                    "ansicolors": {"version": ">=1.18.0"},
+                },
+            },
             expected_file_dep=PythonRequirementsFile(
                 {"sources": ["custom/pipfile/Pipfile.lock"]},
                 address=Address("", target_name="custom_pipfile_target"),

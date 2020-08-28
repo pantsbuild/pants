@@ -36,7 +36,11 @@ class RunRequest:
     env: FrozenDict[str, str]
 
     def __init__(
-        self, *, digest: Digest, args: Iterable[str], env: Optional[Mapping[str, str]] = None,
+        self,
+        *,
+        digest: Digest,
+        args: Iterable[str],
+        env: Optional[Mapping[str, str]] = None,
     ) -> None:
         self.digest = digest
         self.args = tuple(args)
@@ -105,7 +109,9 @@ async def run(
         env = {k: v.format(chroot=tmpdir) for k, v in request.env.items()}
 
         process = InteractiveProcess(
-            argv=(*args, *run_subsystem.args), env=env, run_in_workspace=True,
+            argv=(*args, *run_subsystem.args),
+            env=env,
+            run_in_workspace=True,
         )
         try:
             result = interactive_runner.run(process)

@@ -42,7 +42,9 @@ async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
     dependees_with_roots = await Get(
         Dependees,
         DependeesRequest(
-            owners, transitive=request.dependees == DependeesOption.TRANSITIVE, include_roots=True,
+            owners,
+            transitive=request.dependees == DependeesOption.TRANSITIVE,
+            include_roots=True,
         ),
     )
     return ChangedAddresses(dependees_with_roots)

@@ -215,7 +215,8 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             ),
         )
         self.add_to_build_file(
-            f"{self.package}/math", "python_library()",
+            f"{self.package}/math",
+            "python_library()",
         )
 
         sources_content = [

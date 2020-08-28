@@ -287,10 +287,15 @@ class ArgSplitterTest(unittest.TestCase):
 
     def test_help_detection(self) -> None:
         assert_help = partial(
-            self.assert_valid_split, expected_passthru=None, expected_is_help=True,
+            self.assert_valid_split,
+            expected_passthru=None,
+            expected_is_help=True,
         )
         assert_help_no_arguments = partial(
-            assert_help, expected_goals=[], expected_scope_to_flags={"": []}, expected_specs=[],
+            assert_help,
+            expected_goals=[],
+            expected_scope_to_flags={"": []},
+            expected_specs=[],
         )
         assert_help_no_arguments("./pants")
         assert_help_no_arguments("./pants help")

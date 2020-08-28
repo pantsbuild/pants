@@ -53,7 +53,7 @@ class Setup:
     original_digest: Digest
 
 
-def generate_args(*, source_files: SourceFiles, black: Black, check_only: bool,) -> Tuple[str, ...]:
+def generate_args(*, source_files: SourceFiles, black: Black, check_only: bool) -> Tuple[str, ...]:
     args = []
     if check_only:
         args.append("--check")

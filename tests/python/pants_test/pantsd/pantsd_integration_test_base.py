@@ -24,7 +24,11 @@ def banner(s):
 
 
 def attempts(
-    msg: str, *, delay: float = 0.5, timeout: float = 30, backoff: float = 1.2,
+    msg: str,
+    *,
+    delay: float = 0.5,
+    timeout: float = 30,
+    backoff: float = 1.2,
 ) -> Iterator[None]:
     """A generator that yields a number of times before failing.
 
@@ -122,7 +126,11 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
             workdir = os.path.join(workdir_base, ".workdir.pants.d")
             print(f"\npantsd log is {workdir}/pantsd/pantsd.log")
             pantsd_config = {
-                "GLOBAL": {"pantsd": True, "level": log_level, "pants_subprocessdir": pid_dir,}
+                "GLOBAL": {
+                    "pantsd": True,
+                    "level": log_level,
+                    "pants_subprocessdir": pid_dir,
+                }
             }
 
             if extra_config:
@@ -160,7 +168,11 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
             checker,
         ):
             runner = functools.partial(
-                self.assert_runner, workdir, pantsd_config, extra_env=extra_env, success=success,
+                self.assert_runner,
+                workdir,
+                pantsd_config,
+                extra_env=extra_env,
+                success=success,
             )
             yield PantsdRunContext(
                 runner=runner, checker=checker, workdir=workdir, pantsd_config=pantsd_config
@@ -212,7 +224,7 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
             runs_created,
             expected_runs,
             "Expected {} RunTracker run(s) to be created per pantsd run: was {}".format(
-                expected_runs, runs_created,
+                expected_runs, runs_created
             ),
         )
 

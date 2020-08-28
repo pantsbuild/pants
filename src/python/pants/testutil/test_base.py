@@ -131,7 +131,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         env: Optional[Mapping[str, str]] = None,
     ) -> GoalRuleResult:
         options_bootstrapper = create_options_bootstrapper(
-            args=(*(global_args or []), goal.name, *(args or [])), env=env,
+            args=(*(global_args or []), goal.name, *(args or [])),
+            env=env,
         )
 
         raw_specs = options_bootstrapper.get_full_options(

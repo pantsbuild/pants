@@ -111,10 +111,14 @@ class ModuleMapperTest(TestBase):
         assert result.mapping == FrozenDict(
             {
                 "project.util.dirutil": Address(
-                    "src/python/project/util", relative_file_path="dirutil.py", target_name="util",
+                    "src/python/project/util",
+                    relative_file_path="dirutil.py",
+                    target_name="util",
                 ),
                 "project.util.tarutil": Address(
-                    "src/python/project/util", relative_file_path="tarutil.py", target_name="util",
+                    "src/python/project/util",
+                    relative_file_path="tarutil.py",
+                    target_name="util",
                 ),
                 "project_test.demo_test": Address(
                     "tests/python/project_test/demo_test",
@@ -195,7 +199,9 @@ class ModuleMapperTest(TestBase):
         self.create_file("source_root2/project/subdir/__init__.py")
         self.add_to_build_file("source_root2/project/subdir", "python_library()")
         assert get_owner("project.subdir") == Address(
-            "source_root2/project/subdir", relative_file_path="__init__.py", target_name="subdir",
+            "source_root2/project/subdir",
+            relative_file_path="__init__.py",
+            target_name="subdir",
         )
 
         # Test a module with no owner (stdlib). This also sanity checks that we can handle when

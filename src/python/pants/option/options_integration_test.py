@@ -207,7 +207,8 @@ class TestOptionsIntegration(PantsIntegrationTest):
             pants_run.assert_failure()
             self.assertIn("ERROR] Invalid option 'invalid_global' under [GLOBAL]", pants_run.stderr)
             self.assertIn(
-                "ERROR] Invalid option 'another_invalid_global' under [GLOBAL]", pants_run.stderr,
+                "ERROR] Invalid option 'another_invalid_global' under [GLOBAL]",
+                pants_run.stderr,
             )
 
     def test_invalid_command_line_option_and_invalid_config(self) -> None:
@@ -234,7 +235,8 @@ class TestOptionsIntegration(PantsIntegrationTest):
             )
             pants_run.assert_failure()
             self.assertIn(
-                "Unrecognized command line flag '--invalid' on scope 'pytest'", pants_run.stderr,
+                "Unrecognized command line flag '--invalid' on scope 'pytest'",
+                pants_run.stderr,
             )
 
             # Run with invalid config only.

@@ -28,7 +28,10 @@ class StyleRequest(Generic[_FS], metaclass=ABCMeta):
     prior_formatter_result: Optional[Snapshot] = None
 
     def __init__(
-        self, field_sets: Iterable[_FS], *, prior_formatter_result: Optional[Snapshot] = None,
+        self,
+        field_sets: Iterable[_FS],
+        *,
+        prior_formatter_result: Optional[Snapshot] = None,
     ) -> None:
         self.field_sets = Collection[_FS](field_sets)
         self.prior_formatter_result = prior_formatter_result

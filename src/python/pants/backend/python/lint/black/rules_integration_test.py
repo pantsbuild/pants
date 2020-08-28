@@ -144,7 +144,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
     def test_respects_passthrough_args(self) -> None:
         target = self.make_target([self.needs_config_source])
         lint_results, fmt_result = self.run_black(
-            [target], passthrough_args="--skip-string-normalization",
+            [target], passthrough_args="--skip-string-normalization"
         )
         assert len(lint_results) == 1
         assert lint_results[0].exit_code == 0

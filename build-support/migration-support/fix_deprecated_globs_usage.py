@@ -51,7 +51,7 @@ def create_parser() -> argparse.ArgumentParser:
         description="Modernize BUILD files to no longer use globs, rglobs, and zglobs.",
     )
     parser.add_argument(
-        "folders", type=Path, nargs="+", help="Folders to recursively search for `BUILD` files",
+        "folders", type=Path, nargs="+", help="Folders to recursively search for `BUILD` files"
     )
     parser.add_argument(
         "-p",
@@ -165,7 +165,7 @@ class GlobFunction(NamedTuple):
         if glob_type == GlobType.rglobs:
             include_globs = [cls.normalize_rglob(include) for include in include_globs]
 
-        return GlobFunction(glob_type=glob_type, includes=include_globs, excludes=exclude_globs,)
+        return GlobFunction(glob_type=glob_type, includes=include_globs, excludes=exclude_globs)
 
     def convert_to_sources_list(self, *, use_single_quotes: bool = False) -> str:
         escaped_excludes = [f"!{exclude}" for exclude in self.excludes or ()]
@@ -181,7 +181,7 @@ def use_single_quotes(line: str) -> bool:
 
 
 def warning_msg(
-    *, build_file: Path, lineno: int, field_name: str, replacement: str, script_restriction: str,
+    *, build_file: Path, lineno: int, field_name: str, replacement: str, script_restriction: str
 ) -> str:
     return (
         f"Could not update {build_file} at line {lineno}. This script {script_restriction}. Please "
@@ -255,7 +255,7 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
                     )
                 )
         sources_arg: Optional[ast.keyword] = next(
-            (kwarg for kwarg in target.keywords if kwarg.arg == "sources"), None,
+            (kwarg for kwarg in target.keywords if kwarg.arg == "sources"), None
         )
         if not sources_arg or not isinstance(sources_arg.value, ast.Call):
             continue

@@ -61,7 +61,7 @@ class Dependencies(Goal):
 
 @goal_rule
 async def dependencies(
-    console: Console, addresses: Addresses, dependencies_subsystem: DependenciesSubsystem,
+    console: Console, addresses: Addresses, dependencies_subsystem: DependenciesSubsystem
 ) -> Dependencies:
     if dependencies_subsystem.transitive:
         transitive_targets = await Get(TransitiveTargets, Addresses, addresses)

@@ -44,7 +44,11 @@ class GraphScheduler:
     goal_map: Any
 
     def new_session(
-        self, build_id, dynamic_ui: bool = False, use_colors=True, should_report_workunits=False,
+        self,
+        build_id,
+        dynamic_ui: bool = False,
+        use_colors=True,
+        should_report_workunits=False,
     ) -> "GraphSession":
         session = self.scheduler.new_session(build_id, dynamic_ui, should_report_workunits)
         console = Console(use_colors=use_colors, session=session if dynamic_ui else None)
@@ -159,7 +163,8 @@ class EngineInitializer:
 
     @staticmethod
     def setup_graph(
-        options_bootstrapper: OptionsBootstrapper, build_configuration: BuildConfiguration,
+        options_bootstrapper: OptionsBootstrapper,
+        build_configuration: BuildConfiguration,
     ) -> GraphScheduler:
         native = Native()
         build_root = get_buildroot()
