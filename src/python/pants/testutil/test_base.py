@@ -5,7 +5,6 @@ import logging
 import os
 import unittest
 from abc import ABC, ABCMeta, abstractmethod
-from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
@@ -42,7 +41,6 @@ from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.global_options import ExecutionOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.source import source_root
 from pants.testutil.engine_util import Params
@@ -157,7 +155,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
 
-    def invalidate_for(self, *relpaths):
+    def _invalidate_for(self, *relpaths):
         """Invalidates all files from the relpath, recursively up to the root.
 
         Many python operations implicitly create parent directories, so we assume that touching a
@@ -177,7 +175,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         path = os.path.join(self.build_root, relpath)
         safe_mkdir(path)
-        self.invalidate_for(relpath)
+        self._invalidate_for(relpath)
         return path
 
     def create_file(self, relpath: str, contents: str = "", mode: str = "w") -> str:
@@ -192,7 +190,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         path = os.path.join(self.build_root, relpath)
         with safe_open(path, mode=mode) as fp:
             fp.write(contents)
-        self.invalidate_for(relpath)
+        self._invalidate_for(relpath)
         return path
 
     def create_files(self, path: str, files: Iterable[str]) -> None:
@@ -259,19 +257,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         BuildRoot().path = self.build_root
         self.addCleanup(BuildRoot().reset)
 
-        self.subprocess_dir = os.path.join(self.build_root, ".pids")
-
-        self.options = defaultdict(dict)  # scope -> key-value mapping.
-        self.options[GLOBAL_SCOPE] = {
-            "pants_workdir": self.pants_workdir,
-            "pants_supportdir": os.path.join(self.build_root, "build-support"),
-            "pants_distdir": os.path.join(self.build_root, "dist"),
-            "pants_configdir": os.path.join(self.build_root, "config"),
-            "pants_subprocessdir": self.subprocess_dir,
-        }
-
-        self._build_configuration = self.build_config()
-
     def _reset_engine(self):
         if self._scheduler is not None:
             self._scheduler.invalidate_all_files()
@@ -294,21 +279,17 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             self._scheduler = None
             safe_rmtree(local_store_dir)
 
+    @memoized_method
+    def _build_root(self) -> str:
+        return os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
+
     @property
     def build_root(self) -> str:
         return self._build_root()
 
     @property
     def pants_workdir(self) -> str:
-        return self._pants_workdir()
-
-    @memoized_method
-    def _build_root(self) -> str:
-        return os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
-
-    @memoized_method
-    def _pants_workdir(self) -> str:
-        return os.path.join(self._build_root(), ".pants.d")
+        return os.path.join(self.build_root, ".pants.d")
 
     def _init_engine(self, local_store_dir: Optional[str] = None) -> None:
         if self._scheduler is not None:

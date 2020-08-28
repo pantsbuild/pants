@@ -6,6 +6,7 @@ import logging
 import os
 import subprocess
 import sys
+import unittest
 import unittest.mock
 from contextlib import contextmanager
 
@@ -18,23 +19,25 @@ from pants.pantsd.process_manager import (
     ProcessMetadataManager,
     swallow_psutil_exceptions,
 )
-from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_file_dump
+from pants.util.dirutil import safe_file_dump, safe_mkdtemp
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
 def fake_process(**kwargs):
     proc = unittest.mock.create_autospec(psutil.Process, spec_set=True)
-    [setattr(getattr(proc, k), "return_value", v) for k, v in kwargs.items()]
+    for k, v in kwargs.items():
+        setattr(getattr(proc, k), "return_value", v)
     return proc
 
 
-class TestProcessGroup(TestBase):
+class TestProcessGroup(unittest.TestCase):
+    SUBPROCESS_DIR = safe_mkdtemp()
+
     def setUp(self):
         super().setUp()
-        self.pg = ProcessGroup("test", metadata_base_dir=self.subprocess_dir)
+        self.pg = ProcessGroup("test", metadata_base_dir=self.SUBPROCESS_DIR)
 
     def test_swallow_psutil_exceptions(self):
         with swallow_psutil_exceptions():
@@ -100,16 +103,17 @@ class TestProcessGroup(TestBase):
                 self.assertTrue("_test" in item.name)
 
 
-class TestProcessMetadataManager(TestBase):
+class TestProcessMetadataManager(unittest.TestCase):
     NAME = "_test_"
     TEST_KEY = "TEST"
     TEST_VALUE = "300"
     TEST_VALUE_INT = 300
     BUILDROOT = "/mock_buildroot/"
+    SUBPROCESS_DIR = safe_mkdtemp()
 
     def setUp(self):
         super().setUp()
-        self.pmm = ProcessMetadataManager(metadata_base_dir=self.subprocess_dir)
+        self.pmm = ProcessMetadataManager(metadata_base_dir=self.SUBPROCESS_DIR)
 
     def test_maybe_cast(self):
         self.assertIsNone(self.pmm._maybe_cast(None, int))
@@ -129,7 +133,7 @@ class TestProcessMetadataManager(TestBase):
         ) as mock_mkdir:
             self.pmm._maybe_init_metadata_dir_by_name(self.NAME)
             mock_mkdir.assert_called_once_with(
-                self.pmm._get_metadata_dir_by_name(self.NAME, self.subprocess_dir)
+                self.pmm._get_metadata_dir_by_name(self.NAME, self.SUBPROCESS_DIR)
             )
 
     def test_readwrite_metadata_by_name(self):
@@ -200,7 +204,9 @@ class TestProcessMetadataManager(TestBase):
         self.assertGreater(mock_rm.call_count, 0)
 
 
-class TestProcessManager(TestBase):
+class TestProcessManager(unittest.TestCase):
+    SUBPROCESS_DIR = safe_mkdtemp()
+
     def setUp(self):
         super().setUp()
         # N.B. We pass in `metadata_base_dir` here because ProcessManager (itself a non-task/non-
@@ -209,7 +215,7 @@ class TestProcessManager(TestBase):
         # dependencies in a typical pants run (and integration tests), but not in unit tests.
         # Thus, passing this parameter here short-circuits the subsystem-reliant path for the
         # purposes of unit testing without requiring adhoc subsystem initialization.
-        self.pm = ProcessManager("test", metadata_base_dir=self.subprocess_dir)
+        self.pm = ProcessManager("test", metadata_base_dir=self.SUBPROCESS_DIR)
 
     def test_process_properties(self):
         with unittest.mock.patch.object(
