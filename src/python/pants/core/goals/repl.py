@@ -4,7 +4,7 @@ import os
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, Dict, Mapping, Optional, Tuple, Type, cast
+from typing import ClassVar, Dict, Iterable, Mapping, Optional, Tuple, Type, cast
 
 from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
@@ -72,11 +72,11 @@ class ReplRequest:
         self,
         *,
         digest: Digest,
-        args: Tuple[str, ...],
+        args: Iterable[str],
         env: Optional[Mapping[str, str]] = None,
     ) -> None:
         self.digest = digest
-        self.args = args
+        self.args = tuple(args)
         self.env = FrozenDict(env or {})
 
 
@@ -117,7 +117,9 @@ async def run_repl(
             request.digest, path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix()
         )
         result = interactive_runner.run(
-            InteractiveProcess(argv=request.args, env=request.env, run_in_workspace=True)
+            InteractiveProcess(
+                argv=request.args, env=request.env, run_in_workspace=True, hermetic_env=False
+            )
         )
     return Repl(result.exit_code)
 

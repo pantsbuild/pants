@@ -5,7 +5,7 @@ import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
 from pants.backend.python.rules.coverage import (
@@ -33,7 +33,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.uuid import UUIDRequest
-from pants.engine.process import FallibleProcessResult, InteractiveProcess
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -61,15 +61,15 @@ class PythonTestFieldSet(TestFieldSet):
 
 
 @dataclass(frozen=True)
-class TestTargetSetup:
-    test_runner_pex: Pex
-    args: Tuple[str, ...]
-    input_digest: Digest
-    source_roots: Tuple[str, ...]
-    timeout_seconds: Optional[int]
-    xml_dir: Optional[str]
-    junit_family: str
-    execution_slot_variable: str
+class TestSetupRequest:
+    field_set: PythonTestFieldSet
+    is_debug: bool
+
+
+@dataclass(frozen=True)
+class TestSetup:
+    process: Process
+    results_file_name: Optional[str]
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -77,14 +77,15 @@ class TestTargetSetup:
 
 @rule(level=LogLevel.DEBUG)
 async def setup_pytest_for_target(
-    field_set: PythonTestFieldSet,
+    request: TestSetupRequest,
     pytest: PyTest,
     test_subsystem: TestSubsystem,
     python_setup: PythonSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
-) -> TestTargetSetup:
-    test_addresses = Addresses((field_set.address,))
+    global_options: GlobalOptions,
+) -> TestSetup:
+    test_addresses = Addresses((request.field_set.address,))
 
     transitive_targets = await Get(TransitiveTargets, Addresses, test_addresses)
     all_targets = transitive_targets.closure
@@ -154,7 +155,9 @@ async def setup_pytest_for_target(
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    field_set_source_files_request = Get(SourceFiles, SourceFilesRequest([field_set.sources]))
+    field_set_source_files_request = Get(
+        SourceFiles, SourceFilesRequest([request.field_set.sources])
+    )
 
     (
         pytest_pex,
@@ -183,56 +186,32 @@ async def setup_pytest_for_target(
         ),
     )
 
+    add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
+    output_files = []
+
+    results_file_name = None
+    if pytest.options.junit_xml_dir and not request.is_debug:
+        results_file_name = f"{request.field_set.address.path_safe_spec}.xml"
+        add_opts.extend(
+            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.options.junit_family}")
+        )
+        output_files.append(results_file_name)
+
     coverage_args = []
-    if test_subsystem.use_coverage:
+    if test_subsystem.use_coverage and not request.is_debug:
+        output_files.append(".coverage")
         cov_paths = coverage_subsystem.filter if coverage_subsystem.filter else (".",)
         coverage_args = [
             "--cov-report=",  # Turn off output.
             *itertools.chain.from_iterable(["--cov", cov_path] for cov_path in cov_paths),
         ]
-    return TestTargetSetup(
-        test_runner_pex=test_runner_pex,
-        args=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
-        input_digest=input_digest,
-        source_roots=prepared_sources.source_roots,
-        timeout_seconds=field_set.timeout.calculate_from_global_options(pytest),
-        xml_dir=pytest.options.junit_xml_dir,
-        junit_family=pytest.options.junit_family,
-        execution_slot_variable=pytest.options.execution_slot_var,
-    )
 
+    extra_env = {
+        "PYTEST_ADDOPTS": " ".join(add_opts),
+        "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
+    }
 
-# TODO(#10618): Once this is fixed, move `TestTargetSetup` into an `await Get` so that we only set
-#  up the test if it isn't skipped.
-@rule(desc="Run Pytest", level=LogLevel.DEBUG)
-async def run_python_test(
-    field_set: PythonTestFieldSet,
-    setup: TestTargetSetup,
-    global_options: GlobalOptions,
-    test_subsystem: TestSubsystem,
-) -> TestResult:
-    if field_set.is_conftest():
-        return TestResult.skip(field_set.address)
-
-    add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
-
-    output_files = []
-    # Configure generation of JUnit-compatible test report.
-    test_results_file = None
-    if setup.xml_dir:
-        test_results_file = f"{field_set.address.path_safe_spec}.xml"
-        add_opts.extend(
-            (f"--junitxml={test_results_file}", "-o", f"junit_family={setup.junit_family}")
-        )
-        output_files.append(test_results_file)
-
-    # Configure generation of a coverage report.
-    if test_subsystem.use_coverage:
-        output_files.append(".coverage")
-
-    env = {"PYTEST_ADDOPTS": " ".join(add_opts), "PEX_EXTRA_SYS_PATH": ":".join(setup.source_roots)}
-
-    if test_subsystem.force:
+    if test_subsystem.force and not request.is_debug:
         # This is a slightly hacky way to force the process to run: since the env var
         #  value is unique, this input combination will never have been seen before,
         #  and therefore never cached. The two downsides are:
@@ -241,22 +220,34 @@ async def run_python_test(
         #  2. This run will be cached even though it can never be re-used.
         # TODO: A more principled way of forcing rules to run?
         uuid = await Get(UUID, UUIDRequest())
-        env["__PANTS_FORCE_TEST_RUN__"] = str(uuid)
+        extra_env["__PANTS_FORCE_TEST_RUN__"] = str(uuid)
 
-    result = await Get(
-        FallibleProcessResult,
+    process = await Get(
+        Process,
         PexProcess(
-            setup.test_runner_pex,
-            argv=setup.args,
-            input_digest=setup.input_digest,
-            output_files=tuple(output_files) if output_files else None,
-            description=f"Run Pytest for {field_set.address}",
-            timeout_seconds=setup.timeout_seconds,
-            extra_env=env,
-            execution_slot_variable=setup.execution_slot_variable,
+            test_runner_pex,
+            argv=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
+            extra_env=extra_env,
+            input_digest=input_digest,
+            output_files=output_files,
+            timeout_seconds=request.field_set.timeout.calculate_from_global_options(pytest),
+            execution_slot_variable=pytest.options.execution_slot_var,
+            description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
         ),
     )
+    return TestSetup(process, results_file_name=results_file_name)
+
+
+@rule(desc="Run Pytest", level=LogLevel.DEBUG)
+async def run_python_test(
+    field_set: PythonTestFieldSet, test_subsystem: TestSubsystem, pytest: PyTest
+) -> TestResult:
+    if field_set.is_conftest():
+        return TestResult.skip(field_set.address)
+
+    setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
+    result = await Get(FallibleProcessResult, Process, setup.process)
 
     coverage_data = None
     if test_subsystem.use_coverage:
@@ -269,34 +260,32 @@ async def run_python_test(
             logger.warning(f"Failed to generate coverage data for {field_set.address}.")
 
     xml_results_digest = None
-    if test_results_file:
+    if setup.results_file_name:
         xml_results_snapshot = await Get(
-            Snapshot, DigestSubset(result.output_digest, PathGlobs([test_results_file]))
+            Snapshot, DigestSubset(result.output_digest, PathGlobs([setup.results_file_name]))
         )
-        if xml_results_snapshot.files == (test_results_file,):
+        if xml_results_snapshot.files == (setup.results_file_name,):
             xml_results_digest = await Get(
                 Digest,
-                AddPrefix(xml_results_snapshot.digest, setup.xml_dir),  # type: ignore[arg-type]
+                AddPrefix(xml_results_snapshot.digest, pytest.options.junit_xml_dir),
             )
         else:
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
 
     return TestResult.from_fallible_process_result(
         result,
+        address=field_set.address,
         coverage_data=coverage_data,
         xml_results=xml_results_digest,
-        address=field_set.address,
     )
 
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
-def debug_python_test(field_set: PythonTestFieldSet, setup: TestTargetSetup) -> TestDebugRequest:
+async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
     if field_set.is_conftest():
         return TestDebugRequest(None)
-    process = InteractiveProcess(
-        argv=(setup.test_runner_pex.name, *setup.args), input_digest=setup.input_digest
-    )
-    return TestDebugRequest(process)
+    setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
+    return TestDebugRequest(InteractiveProcess.from_process(setup.process))
 
 
 def rules():
