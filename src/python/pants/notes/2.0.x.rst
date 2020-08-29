@@ -5,6 +5,54 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0a1 (8/28/2020)
+-------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade default Black version to 20.8b1 (#10696)
+  `PR #10696 <https://github.com/pantsbuild/pants/pull/10696>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `test --debug` to be hermetic, but keep `run` and `repl` non-hermetic (#10701)
+  `PR #10701 <https://github.com/pantsbuild/pants/pull/10701>`_
+
+* Properly fix setting a custom coverage config file (#10692)
+  `PR #10692 <https://github.com/pantsbuild/pants/pull/10692>`_
+
+* remoting: output directories in action results reference trees (#10691)
+  `PR #10691 <https://github.com/pantsbuild/pants/pull/10691>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Unify logging implementations and remove simplelog (#10686)
+  `PR #10686 <https://github.com/pantsbuild/pants/pull/10686>`_
+
+Testing
+~~~~~~~
+
+* Rename `run_rule` to `run_rule_with_mocks` (#10702)
+  `PR #10702 <https://github.com/pantsbuild/pants/pull/10702>`_
+
+* Add `RuleRunner` as a Pytest-style replacement to `TestBase` (#10699)
+  `PR #10699 <https://github.com/pantsbuild/pants/pull/10699>`_
+
+* Remove unused `TestBase` setup (#10697)
+  `PR #10697 <https://github.com/pantsbuild/pants/pull/10697>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix stale comments in `logger.rs` (#10695)
+  `PR #10695 <https://github.com/pantsbuild/pants/pull/10695>`_
+
+* Document rule graph construction and open issues (#10690)
+  `PR #10690 <https://github.com/pantsbuild/pants/pull/10690>`_
+
 2.0.0a0 (8/24/2020)
 -------------------
 
