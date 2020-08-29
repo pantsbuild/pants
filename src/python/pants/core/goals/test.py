@@ -405,7 +405,8 @@ async def run_tests(
         console.print_stderr(f"{sigil} {result.address} {status}.")
 
     merged_xml_results = await Get(
-        Digest, MergeDigests(result.xml_results.digest for result in results if result.xml_results),
+        Digest,
+        MergeDigests(result.xml_results.digest for result in results if result.xml_results),
     )
     workspace.write_digest(merged_xml_results)
 

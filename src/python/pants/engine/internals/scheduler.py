@@ -621,12 +621,16 @@ class SchedulerSession:
             tuple(self._scheduler._native.lib.digests_to_bytes(sched_pointer, list(digests))),
         )
 
-    def snapshot_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes]:
+    def snapshots_to_file_contents(
+        self, snapshots: Sequence[Snapshot]
+    ) -> Tuple[Tuple[FileContent]]:
         sched_pointer = self._scheduler._scheduler
         return cast(
-            Tuple[bytes],
+            Tuple[Tuple[FileContent]],
             tuple(
-                self._scheduler._native.lib.snapshot_digests_to_bytes(sched_pointer, list(digests))
+                self._scheduler._native.lib.snapshots_to_file_contents(
+                    sched_pointer, list(snapshots)
+                )
             ),
         )
 

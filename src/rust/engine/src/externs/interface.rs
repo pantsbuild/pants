@@ -365,8 +365,8 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "snapshot_digests_to_bytes",
-    py_fn!(py, snapshot_digests_to_bytes(a: PyScheduler, b: PyList)),
+    "snapshots_to_file_contents",
+    py_fn!(py, snapshots_to_file_contents(a: PyScheduler, b: PyList)),
   )?;
 
   m.add(
@@ -1527,7 +1527,7 @@ fn digests_to_bytes(
   })
 }
 
-fn snapshot_digests_to_bytes(
+fn snapshots_to_file_contents(
   py: Python,
   scheduler_ptr: PyScheduler,
   py_digests: PyList,
@@ -1537,7 +1537,10 @@ fn snapshot_digests_to_bytes(
     let core = scheduler.core.clone();
     let digests: Vec<Digest> = py_digests
       .iter(py)
-      .map(|item| crate::nodes::lift_digest(&item.into()))
+      .map(|item| {
+        let digest: Value = externs::getattr(&item.into(), "digest").unwrap();
+        crate::nodes::lift_digest(&digest)
+      })
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 

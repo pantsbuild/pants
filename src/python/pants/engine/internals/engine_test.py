@@ -567,7 +567,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
         )
         artifacts = workunit["artifacts"]
-        assert artifacts["some_arbitrary_key"] == EMPTY_DIGEST
+        assert artifacts["some_arbitrary_key"] == EMPTY_SNAPSHOT
 
 
 @dataclass(frozen=True)
@@ -618,7 +618,7 @@ class MoreComplicatedEngineAware(TestBase, SchedulerTestBase):
         artifacts = workunit["artifacts"]
         output_digest = artifacts["some_arbitrary_key"]
 
-        output_contents = streaming_workunit_context.snapshot_digests_to_bytes([output_digest])[0]
+        output_contents = streaming_workunit_context.snapshots_to_file_contents([output_digest])[0]
         assert len(output_contents) == 1
         assert isinstance(output_contents[0], FileContent)
         assert output_contents[0].content == b"alpha"

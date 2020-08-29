@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Iterator, Optional, Sequence, Tuple
 
-from pants.engine.fs import Digest
+from pants.engine.fs import Digest, FileContent, Snapshot
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.util.logging import LogLevel
 
@@ -20,10 +20,12 @@ class StreamingWorkunitContext:
         Digests in sequence."""
         return self._scheduler.digests_to_bytes(digests)
 
-    def snapshot_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes]:
-        """Given a list of Digest objects representing the digest from a Snapshot, return a list of
-        the bytes corresponding to each of those Digests in sequence."""
-        return self._scheduler.snapshot_digests_to_bytes(digests)
+    def snapshots_to_file_contents(
+        self, snapshots: Sequence[Snapshot]
+    ) -> Tuple[Tuple[FileContent]]:
+        """Given a sequence of Snapshot objects, return a tuple of the FileContents representing the
+        files contained in those `Snapshot`s in sequence."""
+        return self._scheduler.snapshots_to_file_contents(snapshots)
 
     def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
         """Invoke the internal ensure_remote_has_recursive function, which ensures that a remote
