@@ -257,6 +257,7 @@ class InteractiveProcess:
     env: FrozenDict[str, str]
     input_digest: Digest
     run_in_workspace: bool
+    hermetic_env: bool
 
     def __init__(
         self,
@@ -265,6 +266,7 @@ class InteractiveProcess:
         env: Optional[Mapping[str, str]] = None,
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
+        hermetic_env: bool = True,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -277,6 +279,7 @@ class InteractiveProcess:
         self.env = FrozenDict(env or {})
         self.input_digest = input_digest
         self.run_in_workspace = run_in_workspace
+        self.hermetic_env = hermetic_env
         self.__post_init__()
 
     def __post_init__(self):
@@ -285,6 +288,15 @@ class InteractiveProcess:
                 "InteractiveProcessRequest should use the Workspace API to materialize any needed "
                 "files when it runs in the workspace"
             )
+
+    @classmethod
+    def from_process(cls, process: Process, *, hermetic_env: bool = True) -> "InteractiveProcess":
+        return InteractiveProcess(
+            argv=process.argv,
+            env=process.env,
+            input_digest=process.input_digest,
+            hermetic_env=hermetic_env,
+        )
 
 
 @side_effecting

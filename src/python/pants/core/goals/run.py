@@ -33,18 +33,18 @@ class RunRequest:
     # Values in args and in env can contain the format specifier "{chroot}", which will
     # be substituted with the (absolute) chroot path.
     args: Tuple[str, ...]
-    env: FrozenDict[str, str]
+    extra_env: FrozenDict[str, str]
 
     def __init__(
         self,
         *,
         digest: Digest,
         args: Iterable[str],
-        env: Optional[Mapping[str, str]] = None,
+        extra_env: Optional[Mapping[str, str]] = None,
     ) -> None:
         self.digest = digest
         self.args = tuple(args)
-        self.env = FrozenDict(env or {})
+        self.extra_env = FrozenDict(extra_env or {})
 
 
 class RunSubsystem(GoalSubsystem):
@@ -106,15 +106,16 @@ async def run(
         )
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
-        env = {k: v.format(chroot=tmpdir) for k, v in request.env.items()}
-
-        process = InteractiveProcess(
-            argv=(*args, *run_subsystem.args),
-            env=env,
-            run_in_workspace=True,
-        )
+        extra_env = {k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}
         try:
-            result = interactive_runner.run(process)
+            result = interactive_runner.run(
+                InteractiveProcess(
+                    argv=(*args, *run_subsystem.args),
+                    env=extra_env,
+                    run_in_workspace=True,
+                    hermetic_env=False,
+                )
+            )
             exit_code = result.exit_code
         except Exception as e:
             console.print_stderr(f"Exception when attempting to run {field_set.address}: {e!r}")
