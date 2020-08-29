@@ -36,8 +36,8 @@ from pants.engine.target import (
     TargetWithOrigin,
 )
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine_util import MockConsole, MockGet, run_rule
 from pants.testutil.option_util import create_goal_subsystem
+from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 
@@ -149,7 +149,7 @@ class TestTest(TestBase):
             console_report = ConsoleCoverageReport(f"Ran coverage on {addresses}")
             return CoverageReports(reports=(console_report,))
 
-        result: Test = run_rule(
+        result: Test = run_rule_with_mocks(
             run_tests,
             rule_args=[console, test_subsystem, interactive_runner, workspace, union_membership],
             mock_gets=[

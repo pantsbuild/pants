@@ -19,8 +19,8 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.target import Sources, Target, Targets
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine_util import MockConsole, MockGet, run_rule
 from pants.testutil.option_util import create_goal_subsystem
+from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 
@@ -149,7 +149,7 @@ class FmtTest(TestBase):
     ) -> str:
         console = MockConsole(use_colors=False)
         union_membership = UnionMembership({LanguageFmtTargets: language_target_collection_types})
-        result: Fmt = run_rule(
+        result: Fmt = run_rule_with_mocks(
             fmt,
             rule_args=[
                 console,

@@ -9,8 +9,8 @@ from pants.backend.pants_info.list_target_types import TargetTypesSubsystem, lis
 from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine_util import MockConsole, run_rule
 from pants.testutil.option_util import create_goal_subsystem
+from pants.testutil.rule_runner import MockConsole, run_rule_with_mocks
 
 
 # Note no docstring.
@@ -74,7 +74,7 @@ def run_goal(
     *, union_membership: Optional[UnionMembership] = None, details_target: Optional[str] = None
 ) -> str:
     console = MockConsole(use_colors=False)
-    run_rule(
+    run_rule_with_mocks(
         list_target_types,
         rule_args=[
             RegisteredTargetTypes.create([FortranBinary, FortranLibrary, FortranTests]),

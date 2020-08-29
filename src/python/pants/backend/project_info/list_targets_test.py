@@ -8,8 +8,8 @@ from pants.backend.project_info.list_targets import ListSubsystem, list_targets
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import DescriptionField, ProvidesField, Target, UnexpandedTargets
-from pants.testutil.engine_util import MockConsole, MockGet, run_rule
 from pants.testutil.option_util import create_goal_subsystem
+from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
 
 
 class MockTarget(Target):
@@ -25,7 +25,7 @@ def run_goal(
     provides_columns: Optional[str] = None,
 ) -> Tuple[str, str]:
     console = MockConsole(use_colors=False)
-    run_rule(
+    run_rule_with_mocks(
         list_targets,
         rule_args=[
             Addresses(tgt.address for tgt in targets),

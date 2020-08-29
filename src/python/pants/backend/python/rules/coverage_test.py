@@ -8,8 +8,8 @@ import pytest
 
 from pants.backend.python.rules.coverage import CoverageSubsystem, create_coverage_config
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs
-from pants.testutil.engine_util import MockGet, run_rule
 from pants.testutil.option_util import create_subsystem
+from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 
 
 def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
@@ -35,7 +35,7 @@ def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
         MockGet(product_type=Digest, subject_type=CreateDigest, mock=mock_handle_config),
     ]
 
-    result = run_rule(create_coverage_config, rule_args=[coverage], mock_gets=mock_gets)
+    result = run_rule_with_mocks(create_coverage_config, rule_args=[coverage], mock_gets=mock_gets)
     assert result.digest.fingerprint == "jerry"
     assert len(resolved_config) == 1
     return resolved_config[0]

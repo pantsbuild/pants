@@ -10,6 +10,10 @@ from typing import List, Optional
 
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.internals.engine_testutil import (
+    assert_equal_with_printing,
+    remove_locations_from_traceback,
+)
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
@@ -18,7 +22,6 @@ from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
 )
-from pants.testutil.engine_util import assert_equal_with_printing, remove_locations_from_traceback
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 

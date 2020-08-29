@@ -21,9 +21,8 @@ from pants.source.source_root import (
     get_optional_source_root,
 )
 from pants.source.source_root import rules as source_root_rules
-from pants.testutil.engine_util import MockGet, run_rule
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 
 
 def _find_root(
@@ -49,7 +48,7 @@ def _find_root(
     def _do_find_root(src_root_req: SourceRootRequest) -> OptionalSourceRoot:
         return cast(
             OptionalSourceRoot,
-            run_rule(
+            run_rule_with_mocks(
                 get_optional_source_root,
                 rule_args=[src_root_req, source_root_config],
                 mock_gets=[
@@ -230,7 +229,7 @@ def test_all_roots() -> None:
                 return OptionalSourceRoot(SourceRoot(str(req.path)))
         return OptionalSourceRoot(None)
 
-    output = run_rule(
+    output = run_rule_with_mocks(
         all_roots,
         rule_args=[source_root_config],
         mock_gets=[
@@ -268,7 +267,7 @@ def test_all_roots_with_root_at_buildroot() -> None:
         dirs = ("foo",)  # A python package at the buildroot.
         return Snapshot(Digest("abcdef", 10), (), dirs)
 
-    output = run_rule(
+    output = run_rule_with_mocks(
         all_roots,
         rule_args=[source_root_config],
         mock_gets=[
