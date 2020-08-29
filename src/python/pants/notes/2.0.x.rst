@@ -17,6 +17,9 @@ API Changes
 Bugfixes
 ~~~~~~~~
 
+* Fix `test --debug` to be hermetic, but keep `run` and `repl` non-hermetic (#10701)
+  `PR #10701 <https://github.com/pantsbuild/pants/pull/10701>`_
+
 * Properly fix setting a custom coverage config file (#10692)
   `PR #10692 <https://github.com/pantsbuild/pants/pull/10692>`_
 
@@ -31,9 +34,6 @@ Refactoring, Improvements, and Tooling
 
 Testing
 ~~~~~~~
-
-* Fix `test --debug` to be hermetic, but keep `run` and `repl` non-hermetic (#10701)
-  `PR #10701 <https://github.com/pantsbuild/pants/pull/10701>`_
 
 * Rename `run_rule` to `run_rule_with_mocks` (#10702)
   `PR #10702 <https://github.com/pantsbuild/pants/pull/10702>`_
