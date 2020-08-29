@@ -6,6 +6,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import List, Tuple, cast
 
+from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.engine.fs import Digest, DownloadFile
 from pants.engine.platform import Platform
@@ -176,4 +177,4 @@ async def download_external_tool(request: ExternalToolRequest) -> DownloadedExte
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *archive.rules())

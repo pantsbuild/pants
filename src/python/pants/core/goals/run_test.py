@@ -4,6 +4,8 @@
 import os
 from typing import cast
 
+import pytest
+
 from pants.base.build_root import BuildRoot
 from pants.base.specs import AddressLiteralSpec
 from pants.core.goals.run import Run, RunFieldSet, RunRequest, RunSubsystem, run
@@ -18,97 +20,101 @@ from pants.engine.target import (
 )
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
-from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
-from pants.testutil.test_base import TestBase
+from pants.testutil.rule_runner import MockConsole, MockGet, RuleRunner, run_rule_with_mocks
 
 
-class RunTest(TestBase):
-    def create_mock_run_request(self, program_text: bytes) -> RunRequest:
-        digest = self.request_product(
-            Digest,
-            [
-                CreateDigest(
-                    [FileContent(path="program.py", content=program_text, is_executable=True)]
-                )
-            ],
-        )
-        return RunRequest(digest=digest, args=(os.path.join("{chroot}", "program.py"),))
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner()
 
-    def single_target_run(
-        self,
-        *,
-        console: MockConsole,
-        program_text: bytes,
-        address_spec: str,
-    ) -> Run:
-        workspace = Workspace(self.scheduler)
-        interactive_runner = InteractiveRunner(self.scheduler)
 
-        class TestRunFieldSet(RunFieldSet):
-            required_fields = ()
+def create_mock_run_request(rule_runner: RuleRunner, program_text: bytes) -> RunRequest:
+    digest = rule_runner.request_product(
+        Digest,
+        [CreateDigest([FileContent(path="program.py", content=program_text, is_executable=True)])],
+    )
+    return RunRequest(digest=digest, args=(os.path.join("{chroot}", "program.py"),))
 
-        class TestBinaryTarget(Target):
-            alias = "binary"
-            core_fields = ()
 
-        address = Address.parse(address_spec)
-        target = TestBinaryTarget({}, address=address)
-        target_with_origin = TargetWithOrigin(
-            target, AddressLiteralSpec(address.spec_path, address.target_name)
-        )
-        field_set = TestRunFieldSet.create(target)
+def single_target_run(
+    rule_runner: RuleRunner,
+    *,
+    console: MockConsole,
+    program_text: bytes,
+    address_spec: str,
+) -> Run:
+    workspace = Workspace(rule_runner.scheduler)
+    interactive_runner = InteractiveRunner(rule_runner.scheduler)
 
-        res = run_rule_with_mocks(
-            run,
-            rule_args=[
-                create_goal_subsystem(RunSubsystem, args=[]),
-                create_subsystem(GlobalOptions, pants_workdir=self.pants_workdir),
-                console,
-                interactive_runner,
-                workspace,
-                BuildRoot(),
-            ],
-            mock_gets=[
-                MockGet(
-                    product_type=TargetsToValidFieldSets,
-                    subject_type=TargetsToValidFieldSetsRequest,
-                    mock=lambda _: TargetsToValidFieldSets({target_with_origin: [field_set]}),
-                ),
-                MockGet(
-                    product_type=RunRequest,
-                    subject_type=TestRunFieldSet,
-                    mock=lambda _: self.create_mock_run_request(program_text),
-                ),
-            ],
-        )
-        return cast(Run, res)
+    class TestRunFieldSet(RunFieldSet):
+        required_fields = ()
 
-    def test_normal_run(self) -> None:
-        console = MockConsole(use_colors=False)
-        program_text = b'#!/usr/bin/python\nprint("hello")'
-        res = self.single_target_run(
-            console=console,
-            program_text=program_text,
-            address_spec="some/addr",
-        )
-        assert res.exit_code == 0
+    class TestBinaryTarget(Target):
+        alias = "binary"
+        core_fields = ()
 
-    def test_materialize_input_files(self) -> None:
-        program_text = b'#!/usr/bin/python\nprint("hello")'
-        binary = self.create_mock_run_request(program_text)
-        interactive_runner = InteractiveRunner(self.scheduler)
-        process = InteractiveProcess(
-            argv=("./program.py",),
-            run_in_workspace=False,
-            input_digest=binary.digest,
-        )
-        result = interactive_runner.run(process)
-        assert result.exit_code == 0
+    address = Address.parse(address_spec)
+    target = TestBinaryTarget({}, address=address)
+    target_with_origin = TargetWithOrigin(
+        target, AddressLiteralSpec(address.spec_path, address.target_name)
+    )
+    field_set = TestRunFieldSet.create(target)
 
-    def test_failed_run(self) -> None:
-        console = MockConsole(use_colors=False)
-        program_text = b'#!/usr/bin/python\nraise RuntimeError("foo")'
-        res = self.single_target_run(
-            console=console, program_text=program_text, address_spec="some/addr"
-        )
-        assert res.exit_code == 1
+    res = run_rule_with_mocks(
+        run,
+        rule_args=[
+            create_goal_subsystem(RunSubsystem, args=[]),
+            create_subsystem(GlobalOptions, pants_workdir=rule_runner.pants_workdir),
+            console,
+            interactive_runner,
+            workspace,
+            BuildRoot(),
+        ],
+        mock_gets=[
+            MockGet(
+                product_type=TargetsToValidFieldSets,
+                subject_type=TargetsToValidFieldSetsRequest,
+                mock=lambda _: TargetsToValidFieldSets({target_with_origin: [field_set]}),
+            ),
+            MockGet(
+                product_type=RunRequest,
+                subject_type=TestRunFieldSet,
+                mock=lambda _: create_mock_run_request(rule_runner, program_text),
+            ),
+        ],
+    )
+    return cast(Run, res)
+
+
+def test_normal_run(rule_runner: RuleRunner) -> None:
+    console = MockConsole(use_colors=False)
+    program_text = b'#!/usr/bin/python\nprint("hello")'
+    res = single_target_run(
+        rule_runner,
+        console=console,
+        program_text=program_text,
+        address_spec="some/addr",
+    )
+    assert res.exit_code == 0
+
+
+def test_materialize_input_files(rule_runner: RuleRunner) -> None:
+    program_text = b'#!/usr/bin/python\nprint("hello")'
+    binary = create_mock_run_request(rule_runner, program_text)
+    interactive_runner = InteractiveRunner(rule_runner.scheduler)
+    process = InteractiveProcess(
+        argv=("./program.py",),
+        run_in_workspace=False,
+        input_digest=binary.digest,
+    )
+    result = interactive_runner.run(process)
+    assert result.exit_code == 0
+
+
+def test_failed_run(rule_runner: RuleRunner) -> None:
+    console = MockConsole(use_colors=False)
+    program_text = b'#!/usr/bin/python\nraise RuntimeError("foo")'
+    res = single_target_run(
+        rule_runner, console=console, program_text=program_text, address_spec="some/addr"
+    )
+    assert res.exit_code == 1

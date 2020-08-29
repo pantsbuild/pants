@@ -16,10 +16,12 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
     TwoStepPexRequest,
 )
+from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
+from pants.backend.python.rules.python_sources import rules as python_sources_rules
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
@@ -262,4 +264,4 @@ async def two_step_pex_from_targets(req: TwoStepPexFromTargetsRequest) -> TwoSte
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *pex_rules(), *python_sources_rules())

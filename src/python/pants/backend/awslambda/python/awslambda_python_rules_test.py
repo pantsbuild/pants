@@ -6,6 +6,8 @@ from io import BytesIO
 from typing import Tuple
 from zipfile import ZipFile
 
+import pytest
+
 from pants.backend.awslambda.common.awslambda_common_rules import CreatedAWSLambda
 from pants.backend.awslambda.python.awslambda_python_rules import PythonAwsLambdaFieldSet
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
@@ -16,75 +18,74 @@ from pants.engine.fs import DigestContents
 from pants.engine.rules import QueryRule
 from pants.engine.target import WrappedTarget
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.rule_runner import RuleRunner
 
 
-class TestPythonAWSLambdaCreation(ExternalToolTestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
             *awslambda_python_rules(),
             QueryRule(CreatedAWSLambda, (PythonAwsLambdaFieldSet, OptionsBootstrapper)),
-        )
+        ],
+        target_types=[PythonAWSLambda, PythonLibrary],
+    )
 
-    @classmethod
-    def target_types(cls):
-        return [PythonAWSLambda, PythonLibrary]
 
-    def create_python_awslambda(self, addr: str) -> Tuple[str, bytes]:
-        bootstrapper = create_options_bootstrapper(
-            args=[
-                "--backend-packages=pants.backend.awslambda.python",
-                "--source-root-patterns=src/python",
-            ]
-        )
-        target = self.request_product(WrappedTarget, [Address.parse(addr), bootstrapper]).target
-        created_awslambda = self.request_product(
-            CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target), bootstrapper]
-        )
-        created_awslambda_digest_contents = self.request_product(
-            DigestContents, [created_awslambda.digest]
-        )
-        assert len(created_awslambda_digest_contents) == 1
-        return created_awslambda.zip_file_relpath, created_awslambda_digest_contents[0].content
+def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, bytes]:
+    bootstrapper = create_options_bootstrapper(
+        args=[
+            "--backend-packages=pants.backend.awslambda.python",
+            "--source-root-patterns=src/python",
+        ]
+    )
+    target = rule_runner.request_product(WrappedTarget, [Address.parse(addr), bootstrapper]).target
+    created_awslambda = rule_runner.request_product(
+        CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target), bootstrapper]
+    )
+    created_awslambda_digest_contents = rule_runner.request_product(
+        DigestContents, [created_awslambda.digest]
+    )
+    assert len(created_awslambda_digest_contents) == 1
+    return created_awslambda.zip_file_relpath, created_awslambda_digest_contents[0].content
 
-    def test_create_hello_world_lambda(self) -> None:
-        self.create_file(
-            "src/python/foo/bar/hello_world.py",
-            textwrap.dedent(
-                """
-                def handler(event, context):
-                    print('Hello, World!')
-                """
-            ),
-        )
 
-        self.create_file(
-            "src/python/foo/bar/BUILD",
-            textwrap.dedent(
-                """
-                python_library(
-                  name='hello_world',
-                  sources=['hello_world.py']
-                )
+def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file(
+        "src/python/foo/bar/hello_world.py",
+        textwrap.dedent(
+            """
+            def handler(event, context):
+                print('Hello, World!')
+            """
+        ),
+    )
 
-                python_awslambda(
-                  name='hello_world_lambda',
-                  dependencies=[':hello_world'],
-                  handler='foo.bar.hello_world',
-                  runtime='python3.7'
-                )
-                """
-            ),
-        )
+    rule_runner.add_to_build_file(
+        "src/python/foo/bar",
+        textwrap.dedent(
+            """
+            python_library(
+              name='hello_world',
+              sources=['hello_world.py']
+            )
 
-        zip_file_relpath, content = self.create_python_awslambda(
-            "src/python/foo/bar:hello_world_lambda"
-        )
-        assert "hello_world_lambda.zip" == zip_file_relpath
-        zipfile = ZipFile(BytesIO(content))
-        names = set(zipfile.namelist())
-        assert "lambdex_handler.py" in names
-        assert "foo/bar/hello_world.py" in names
+            python_awslambda(
+              name='hello_world_lambda',
+              dependencies=[':hello_world'],
+              handler='foo.bar.hello_world',
+              runtime='python3.7'
+            )
+            """
+        ),
+    )
+
+    zip_file_relpath, content = create_python_awslambda(
+        rule_runner, "src/python/foo/bar:hello_world_lambda"
+    )
+    assert "hello_world_lambda.zip" == zip_file_relpath
+    zipfile = ZipFile(BytesIO(content))
+    names = set(zipfile.namelist())
+    assert "lambdex_handler.py" in names
+    assert "foo/bar/hello_world.py" in names

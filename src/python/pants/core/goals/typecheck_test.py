@@ -20,7 +20,6 @@ from pants.engine.addresses import Address
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
-from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 
 
@@ -110,85 +109,77 @@ class InvalidRequest(MockTypecheckRequest):
         return -1
 
 
-class TypecheckTest(TestBase):
-    @staticmethod
-    def make_target(address: Optional[Address] = None) -> Target:
-        if address is None:
-            address = Address.parse(":tests")
-        return MockTarget({}, address=address)
+def make_target(address: Optional[Address] = None) -> Target:
+    if address is None:
+        address = Address.parse(":tests")
+    return MockTarget({}, address=address)
 
-    @staticmethod
-    def run_typecheck_rule(
-        *,
-        request_types: List[Type[TypecheckRequest]],
-        targets: List[Target],
-        include_sources: bool = True,
-    ) -> Tuple[int, str]:
-        console = MockConsole(use_colors=False)
-        union_membership = UnionMembership({TypecheckRequest: request_types})
-        result: Typecheck = run_rule_with_mocks(
-            typecheck,
-            rule_args=[console, Targets(targets), union_membership],
-            mock_gets=[
-                MockGet(
-                    product_type=TypecheckResults,
-                    subject_type=TypecheckRequest,
-                    mock=lambda field_set_collection: field_set_collection.typecheck_results,
-                ),
-                MockGet(
-                    product_type=FieldSetsWithSources,
-                    subject_type=FieldSetsWithSourcesRequest,
-                    mock=lambda field_sets: FieldSetsWithSources(
-                        field_sets if include_sources else ()
-                    ),
-                ),
-            ],
-            union_membership=union_membership,
-        )
-        assert not console.stdout.getvalue()
-        return result.exit_code, console.stderr.getvalue()
 
-    def test_empty_target_noops(self) -> None:
-        exit_code, stderr = self.run_typecheck_rule(
-            request_types=[FailingRequest],
-            targets=[self.make_target()],
-            include_sources=False,
-        )
-        assert exit_code == 0
-        assert stderr == ""
+def run_typecheck_rule(
+    *,
+    request_types: List[Type[TypecheckRequest]],
+    targets: List[Target],
+    include_sources: bool = True,
+) -> Tuple[int, str]:
+    console = MockConsole(use_colors=False)
+    union_membership = UnionMembership({TypecheckRequest: request_types})
+    result: Typecheck = run_rule_with_mocks(
+        typecheck,
+        rule_args=[console, Targets(targets), union_membership],
+        mock_gets=[
+            MockGet(
+                product_type=TypecheckResults,
+                subject_type=TypecheckRequest,
+                mock=lambda field_set_collection: field_set_collection.typecheck_results,
+            ),
+            MockGet(
+                product_type=FieldSetsWithSources,
+                subject_type=FieldSetsWithSourcesRequest,
+                mock=lambda field_sets: FieldSetsWithSources(field_sets if include_sources else ()),
+            ),
+        ],
+        union_membership=union_membership,
+    )
+    assert not console.stdout.getvalue()
+    return result.exit_code, console.stderr.getvalue()
 
-    def test_invalid_target_noops(self) -> None:
-        exit_code, stderr = self.run_typecheck_rule(
-            request_types=[InvalidRequest], targets=[self.make_target()]
-        )
-        assert exit_code == 0
-        assert stderr == ""
 
-    def test_summary(self) -> None:
-        good_address = Address.parse(":good")
-        bad_address = Address.parse(":bad")
-        exit_code, stderr = self.run_typecheck_rule(
-            request_types=[
-                ConditionallySucceedsRequest,
-                FailingRequest,
-                SkippedRequest,
-                SuccessfulRequest,
-            ],
-            targets=[
-                self.make_target(good_address),
-                self.make_target(bad_address),
-            ],
-        )
-        assert exit_code == FailingRequest.exit_code([bad_address])
-        assert stderr == dedent(
-            """\
+def test_empty_target_noops() -> None:
+    exit_code, stderr = run_typecheck_rule(
+        request_types=[FailingRequest], targets=[make_target()], include_sources=False
+    )
+    assert exit_code == 0
+    assert stderr == ""
 
-            𐄂 ConditionallySucceedsTypechecker failed.
-            𐄂 FailingTypechecker failed.
-            - SkippedTypechecker skipped.
-            ✓ SuccessfulTypechecker succeeded.
-            """
-        )
+
+def test_invalid_target_noops() -> None:
+    exit_code, stderr = run_typecheck_rule(request_types=[InvalidRequest], targets=[make_target()])
+    assert exit_code == 0
+    assert stderr == ""
+
+
+def test_summary() -> None:
+    good_address = Address.parse(":good")
+    bad_address = Address.parse(":bad")
+    exit_code, stderr = run_typecheck_rule(
+        request_types=[
+            ConditionallySucceedsRequest,
+            FailingRequest,
+            SkippedRequest,
+            SuccessfulRequest,
+        ],
+        targets=[make_target(good_address), make_target(bad_address)],
+    )
+    assert exit_code == FailingRequest.exit_code([bad_address])
+    assert stderr == dedent(
+        """\
+
+        𐄂 ConditionallySucceedsTypechecker failed.
+        𐄂 FailingTypechecker failed.
+        - SkippedTypechecker skipped.
+        ✓ SuccessfulTypechecker succeeded.
+        """
+    )
 
 
 def test_streaming_output_skip() -> None:

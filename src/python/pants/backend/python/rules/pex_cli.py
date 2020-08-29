@@ -8,6 +8,7 @@ from typing import Iterable, Mapping, Optional, Tuple
 from pants.backend.python.rules import pex_environment
 from pants.backend.python.rules.pex_environment import PexEnvironment
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalTool,
@@ -113,4 +114,4 @@ async def setup_pex_cli_process(
 
 
 def rules():
-    return [*collect_rules(), *pex_environment.rules()]
+    return [*collect_rules(), *external_tool.rules(), *pex_environment.rules()]
