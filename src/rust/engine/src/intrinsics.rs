@@ -6,6 +6,7 @@ use crate::nodes::{lift_digest, DownloadedFile, NodeResult, Snapshot};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 
+use fs::RelativePath;
 use futures::compat::Future01CompatExt;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use indexmap::IndexMap;
@@ -311,12 +312,13 @@ fn create_digest_to_digest(
     .iter()
     .map(|file| {
       let filename = externs::project_str(&file, "path");
-      let path: PathBuf = filename.into();
       let bytes = bytes::Bytes::from(externs::project_bytes(&file, "content"));
       let is_executable = externs::project_bool(&file, "is_executable");
 
       let store = context.core.store();
       async move {
+        let path = RelativePath::new(PathBuf::from(filename))
+          .map_err(|e| format!("The file `path` must be relative: {:?}", e))?;
         let digest = store.store_file_bytes(bytes, true).await?;
         let snapshot = store
           .snapshot_of_one_file(path, digest, is_executable)

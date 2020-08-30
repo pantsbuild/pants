@@ -303,7 +303,7 @@ impl Store {
   /// Store a digest under a given file path, returning a Snapshot
   pub async fn snapshot_of_one_file(
     &self,
-    name: PathBuf,
+    name: RelativePath,
     digest: hashing::Digest,
     is_executable: bool,
   ) -> Result<Snapshot, String> {
@@ -322,9 +322,9 @@ impl Store {
       self.clone(),
       Digester { digest },
       vec![fs::PathStat::File {
-        path: name.clone(),
+        path: name.clone().into(),
         stat: fs::File {
-          path: name,
+          path: name.into(),
           is_executable: is_executable,
         },
       }],

@@ -139,6 +139,12 @@ impl AsRef<Path> for RelativePath {
   }
 }
 
+impl Into<PathBuf> for RelativePath {
+  fn into(self) -> PathBuf {
+    self.0
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
   Link(Link),
