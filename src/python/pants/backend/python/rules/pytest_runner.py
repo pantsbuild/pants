@@ -267,7 +267,7 @@ async def run_python_test(
         if xml_results_snapshot.files == (setup.results_file_name,):
             xml_results_snapshot = await Get(
                 Snapshot,
-                AddPrefix(xml_results_snapshot.digest, setup.xml_dir),  # type: ignore[arg-type]
+                AddPrefix(xml_results_snapshot.digest, pytest.options.junit_xml_dir),
             )
         else:
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
@@ -277,7 +277,6 @@ async def run_python_test(
         address=field_set.address,
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
-        address=field_set.address,
     )
 
 

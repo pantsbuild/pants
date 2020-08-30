@@ -9,9 +9,6 @@ from textwrap import dedent
 from typing import List, Optional
 
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.internals.engine_testutil import (
-    assert_equal_with_printing,
-    remove_locations_from_traceback,
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -19,6 +16,10 @@ from pants.engine.fs import (
     Digest,
     FileContent,
     Snapshot,
+)
+from pants.engine.internals.engine_testutil import (
+    assert_equal_with_printing,
+    remove_locations_from_traceback,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase

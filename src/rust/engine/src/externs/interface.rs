@@ -873,10 +873,20 @@ async fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResul
 
   for (artifact_name, digest) in workunit.metadata.artifacts.iter() {
     let store = core.store();
-    let snapshot = store::Snapshot::from_digest(store, *digest).await.unwrap();
+    let snapshot = store::Snapshot::from_digest(store, *digest)
+      .await
+      .map_err(|err_str| {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        PyErr::new::<exc::Exception, _>(py, (err_str,))
+      })?;
     artifact_entries.push((
       externs::store_utf8(artifact_name.as_str()),
-      crate::nodes::Snapshot::store_snapshot(core, &snapshot).unwrap(),
+      crate::nodes::Snapshot::store_snapshot(core, &snapshot).map_err(|err_str| {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        PyErr::new::<exc::Exception, _>(py, (err_str,))
+      })?,
     ))
   }
 
@@ -1538,8 +1548,8 @@ fn snapshots_to_file_contents(
     let digests: Vec<Digest> = py_digests
       .iter(py)
       .map(|item| {
-        let digest: Value = externs::getattr(&item.into(), "digest").unwrap();
-        crate::nodes::lift_digest(&digest)
+        externs::getattr(&item.into(), "digest")
+          .and_then(|digest| crate::nodes::lift_digest(&digest))
       })
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
