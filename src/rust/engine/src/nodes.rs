@@ -629,15 +629,17 @@ impl DownloadedFile {
       .and_then(Iterator::last)
       .map(str::to_owned)
       .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url))?;
-
+    let path = RelativePath::new(&file_name).map_err(|e| {
+      format!(
+        "The file name derived from {} was {} which is not relative: {:?}",
+        &url, &file_name, e
+      )
+    })?;
     let maybe_bytes = core.store().load_file_bytes_with(digest, |_| ()).await?;
     if maybe_bytes.is_none() {
-      DownloadedFile::download(core.clone(), url, file_name.clone(), digest).await?;
+      DownloadedFile::download(core.clone(), url, file_name, digest).await?;
     }
-    core
-      .store()
-      .snapshot_of_one_file(PathBuf::from(file_name), digest, true)
-      .await
+    core.store().snapshot_of_one_file(path, digest, true).await
   }
 
   async fn download(
