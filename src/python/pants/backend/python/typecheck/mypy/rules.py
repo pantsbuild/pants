@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Tuple
 
 from pants.backend.python.rules.pex import (
     Pex,
@@ -16,12 +16,18 @@ from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonS
 from pants.backend.python.rules.python_sources import rules as python_sources_rules
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
-from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
+from pants.core.goals.typecheck import (
+    TypecheckReport,
+    TypecheckRequest,
+    TypecheckResult,
+    TypecheckResults,
+)
 from pants.core.util_rules import pants_bin, source_files, stripped_source_files
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     CreateDigest,
     Digest,
+    DigestSubset,
     FileContent,
     GlobMatchErrorBehavior,
     MergeDigests,
@@ -46,10 +52,14 @@ class MyPyRequest(TypecheckRequest):
     field_set_type = MyPyFieldSet
 
 
-def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
+def generate_args(
+    mypy: MyPy, junit_xml_report: Optional[str], *, file_list_path: str
+) -> Tuple[str, ...]:
     args = []
     if mypy.config:
         args.append(f"--config-file={mypy.config}")
+    if junit_xml_report:
+        args.append(f"--junit-xml={junit_xml_report}")
     args.extend(mypy.args)
     args.append(f"@{file_list_path}")
     return tuple(args)
@@ -109,20 +119,32 @@ async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
         Digest,
         MergeDigests([file_list_digest, srcs_snapshot.digest, pex.digest, config_digest]),
     )
-
+    junit_xml_report_fn = "mypy_junit_results.xml" if mypy.junit_xml else None
     result = await Get(
         FallibleProcessResult,
         PexProcess(
             pex,
-            argv=generate_args(mypy, file_list_path=file_list_path),
+            argv=generate_args(mypy, junit_xml_report_fn, file_list_path=file_list_path),
             input_digest=merged_input_files,
+            output_files=(junit_xml_report_fn,) if junit_xml_report_fn else None,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots)},
             description=f"Run MyPy on {pluralize(len(srcs_snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
+    report = None
+    if junit_xml_report_fn:
+        path_globs = PathGlobs(
+            [junit_xml_report_fn],
+            glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+            description_of_origin="MyPy JUnitXML report file",
+        )
+        junit_xml_report_digest = await Get(Digest, DigestSubset(result.output_digest, path_globs))
+        if junit_xml_report_digest.serialized_bytes_length:
+            report = TypecheckReport(path=mypy.junit_xml / junit_xml_report_fn, digest=junit_xml_report_digest)  # type: ignore[operator]
     return TypecheckResults(
-        [TypecheckResult.from_fallible_process_result(result)], typechecker_name="MyPy"
+        [TypecheckResult.from_fallible_process_result(result, report=report)],
+        typechecker_name="MyPy",
     )
 
 

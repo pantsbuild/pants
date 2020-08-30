@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pathlib import Path
 from typing import Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -39,6 +40,14 @@ class MyPy(PythonToolBase):
             advanced=True,
             help="Path to `mypy.ini` or alternative MyPy config file",
         )
+        register(
+            "--junit-xml-dir",
+            type=str,
+            metavar="<DIR>",
+            default=None,
+            advanced=True,
+            help="Directory for a Junit XML result document(s) with type checking results.",
+        )
 
     @property
     def skip(self) -> bool:
@@ -51,3 +60,7 @@ class MyPy(PythonToolBase):
     @property
     def config(self) -> Optional[str]:
         return cast(Optional[str], self.options.config)
+
+    @property
+    def junit_xml(self) -> Optional[Path]:
+        return Path(self.options.junit_xml_dir) if self.options.junit_xml_dir else None

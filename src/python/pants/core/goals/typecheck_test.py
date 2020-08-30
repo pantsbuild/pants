@@ -17,6 +17,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
+from pants.engine.fs import Workspace
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
@@ -117,18 +118,19 @@ class TypecheckTest(TestBase):
             address = Address.parse(":tests")
         return MockTarget({}, address=address)
 
-    @staticmethod
     def run_typecheck_rule(
+        self,
         *,
         request_types: List[Type[TypecheckRequest]],
         targets: List[Target],
         include_sources: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
+        workspace = Workspace(self.scheduler)
         union_membership = UnionMembership({TypecheckRequest: request_types})
         result: Typecheck = run_rule_with_mocks(
             typecheck,
-            rule_args=[console, Targets(targets), union_membership],
+            rule_args=[console, Targets(targets), workspace, union_membership],
             mock_gets=[
                 MockGet(
                     product_type=TypecheckResults,

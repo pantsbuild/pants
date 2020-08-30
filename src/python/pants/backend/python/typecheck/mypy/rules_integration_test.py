@@ -237,3 +237,13 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert f"{self.package}/math/add.py:5" in result[0].stdout
+
+    def test_failing_source_with_junit_xml(self) -> None:
+        target = self.make_target([self.bad_source])
+        result = self.run_mypy([target], additional_args=["--mypy-junit-xml-dir=dist"])
+        assert len(result) == 1
+        assert result[0].exit_code == 1
+        assert f"{self.package}/bad.py:4" in result[0].stdout
+        assert result[0].report is not None
+        assert result[0].report.digest.serialized_bytes_length > 0
+        assert result[0].report.path.as_posix() == "dist/mypy_junit_results.xml"

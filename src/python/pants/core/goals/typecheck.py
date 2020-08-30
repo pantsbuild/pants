@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Optional, Tuple
 
 from pants.core.goals.style_request import StyleRequest
@@ -11,6 +12,7 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, goal_rule
@@ -24,28 +26,45 @@ from pants.util.strutil import strip_v2_chroot_path
 
 
 @dataclass(frozen=True)
+class TypecheckReport:
+    path: Path
+    digest: Digest
+
+
+@dataclass(frozen=True)
 class TypecheckResult:
     exit_code: int
     stdout: str
     stderr: str
+    report: Optional[TypecheckReport] = None
     partition_description: Optional[str] = None
 
-    @staticmethod
+    @classmethod
     def from_fallible_process_result(
+        cls,
         process_result: FallibleProcessResult,
         *,
         partition_description: Optional[str] = None,
         strip_chroot_path: bool = False,
+        report: Optional[TypecheckReport],
     ) -> "TypecheckResult":
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
-        return TypecheckResult(
+        return cls(
             exit_code=process_result.exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             partition_description=partition_description,
+            report=report,
         )
+
+    def materialize(self, console: Console, workspace: Workspace) -> Optional[Path]:
+        if not self.report:
+            return None
+        workspace.write_digest(self.report.digest, path_prefix=self.report.path.parent.as_posix())
+        console.print_stdout(f"Wrote MyPy JUnit XML results to {self.report.path.as_posix()}")
+        return self.report.path
 
 
 @frozen_after_init
@@ -107,6 +126,10 @@ class TypecheckResults(EngineAwareReturnType):
         message += results_msg
         return message
 
+    def materialize(self, console: Console, workspace: Workspace) -> None:
+        for result in self.results:
+            result.materialize(console, workspace)
+
 
 @union
 class TypecheckRequest(StyleRequest):
@@ -130,7 +153,7 @@ class Typecheck(Goal):
 
 @goal_rule
 async def typecheck(
-    console: Console, targets: Targets, union_membership: UnionMembership
+    console: Console, targets: Targets, workspace: Workspace, union_membership: UnionMembership
 ) -> Typecheck:
     typecheck_request_types = union_membership[TypecheckRequest]
     requests: Iterable[StyleRequest] = tuple(
@@ -158,6 +181,7 @@ async def typecheck(
     if all_results:
         console.print_stderr("")
     for results in sorted(all_results, key=lambda results: results.typechecker_name):
+        results.materialize(console, workspace)
         if results.skipped:
             sigil = console.yellow("-")
             status = "skipped"
