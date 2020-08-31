@@ -5,7 +5,7 @@ import itertools
 import json
 import logging
 from dataclasses import dataclass
-from typing import List, Set, Tuple, cast
+from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.rules.pex import (
@@ -62,7 +62,9 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -167,6 +169,30 @@ class SetupPySources:
 
 
 @dataclass(frozen=True)
+class SetupPyKwargsRequest:
+    exported_target: ExportedTarget
+    requirements: ExportedTargetRequirements
+    sources: SetupPySources
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class SetupPyKwargs(FrozenDict):
+    """The keyword arguments to put in the setup.py file."""
+
+    json_str: str
+
+    def __init__(self, kwargs: Mapping[str, Any]) -> None:
+        super().__init__()
+        # Note that we convert to a `str` so that this type can be hashable.
+        self.json_str = json.dumps(kwargs)
+
+    @property
+    def kwargs(self) -> Dict[str, Any]:
+        return cast(Dict[str, Any], json.loads(self.json_str))
+
+
+@dataclass(frozen=True)
 class SetupPyChrootRequest:
     """A request to create a chroot containing a setup.py and the sources it operates on."""
 
@@ -179,9 +205,9 @@ class SetupPyChroot:
     """A chroot containing a generated setup.py and the sources it operates on."""
 
     digest: Digest
-    # The keywords are embedded in the setup.py file in the digest, so these aren't
-    # strictly needed here, but they are convenient for testing.
-    setup_keywords_json: str
+    # The keywords are embedded in the setup.py file in the Digest, so this isn't strictly needed
+    # here, but it is convenient for testing.
+    setup_keywords: SetupPyKwargs
 
 
 @dataclass(frozen=True)
@@ -390,33 +416,62 @@ async def run_setup_py(
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     exported_target = request.exported_target
 
-    owned_deps = await Get(OwnedDependencies, DependencyOwner(exported_target))
-    transitive_targets = await Get(TransitiveTargets, Addresses([exported_target.target.address]))
+    owned_deps, transitive_targets = await MultiGet(
+        Get(OwnedDependencies, DependencyOwner(exported_target)),
+        Get(TransitiveTargets, Addresses([exported_target.target.address])),
+    )
+
     # files() targets aren't owned by a single exported target - they aren't code, so
     # we allow them to be in multiple dists. This is helpful for, e.g., embedding
     # a standard license file in a dist.
     files_targets = (tgt for tgt in transitive_targets.closure if tgt.has_field(FilesSources))
     targets = Targets(itertools.chain((od.target for od in owned_deps), files_targets))
-    sources = await Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2))
-    requirements = await Get(ExportedTargetRequirements, DependencyOwner(exported_target))
 
-    # Nest the sources under the src/ prefix.
-    src_digest = await Get(Digest, AddPrefix(sources.digest, CHROOT_SOURCE_ROOT))
+    sources, requirements = await MultiGet(
+        Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2)),
+        Get(ExportedTargetRequirements, DependencyOwner(exported_target)),
+    )
 
-    target = exported_target.target
-    provides = exported_target.provides
+    # Generate the setup script.
+    setup_kwargs = await Get(
+        SetupPyKwargs, SetupPyKwargsRequest(exported_target, requirements, sources)
+    )
+    setup_py_content = SETUP_BOILERPLATE.format(
+        target_address_spec=exported_target.target.address.spec,
+        setup_kwargs_str=distutils_repr(setup_kwargs.kwargs),
+    ).encode()
 
-    # Generate the kwargs to the setup() call.
+    files_to_create = [
+        FileContent("setup.py", setup_py_content),
+        FileContent("MANIFEST.in", b"include *.py"),
+    ]
+    extra_files_digest, src_digest = await MultiGet(
+        Get(Digest, CreateDigest(files_to_create)),
+        # Nest the sources under the src/ prefix.
+        Get(Digest, AddPrefix(sources.digest, CHROOT_SOURCE_ROOT)),
+    )
+    chroot_digest = await Get(Digest, MergeDigests((src_digest, extra_files_digest)))
+
+    return SetupPyChroot(chroot_digest, setup_kwargs)
+
+
+@rule
+async def determine_setup_kwargs(request: SetupPyKwargsRequest) -> SetupPyKwargs:
+    provides = request.exported_target.provides
+    target = request.exported_target.target
+
     setup_kwargs = provides.setup_py_keywords.copy()
     setup_kwargs.update(
         {
             "package_dir": {"": CHROOT_SOURCE_ROOT},
-            "packages": sources.packages,
-            "namespace_packages": sources.namespace_packages,
-            "package_data": dict(sources.package_data),
-            "install_requires": tuple(requirements),
+            "packages": request.sources.packages,
+            "namespace_packages": request.sources.namespace_packages,
+            "package_data": dict(request.sources.package_data),
+            "install_requires": tuple(request.requirements),
         }
     )
+
+    # Handle `with_binaries()`.
     key_to_binary_spec = provides.binaries
     keys = list(key_to_binary_spec.keys())
     addresses = await MultiGet(
@@ -438,40 +493,20 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
         console_scripts.append(f"{key}={binary_entry_point}")
 
-    # Generate the setup script.
-    setup_py_content = SETUP_BOILERPLATE.format(
-        target_address_spec=target.address.spec,
-        setup_kwargs_str=distutils_repr(setup_kwargs),
-    ).encode()
-    extra_files_digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent("setup.py", setup_py_content),
-                FileContent(
-                    "MANIFEST.in", "include *.py".encode()
-                ),  # Make sure setup.py is included.
-            ]
-        ),
-    )
-
-    chroot_digest = await Get(Digest, MergeDigests((src_digest, extra_files_digest)))
-    return SetupPyChroot(chroot_digest, json.dumps(setup_kwargs, sort_keys=True))
+    return SetupPyKwargs(setup_kwargs)
 
 
 @rule
 async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
-    python_sources = await Get(
-        StrippedPythonSourceFiles,
-        PythonSourceFilesRequest(
-            targets=request.targets, include_resources=False, include_files=False
-        ),
+    python_sources_request = PythonSourceFilesRequest(
+        targets=request.targets, include_resources=False, include_files=False
     )
-    all_sources = await Get(
-        StrippedPythonSourceFiles,
-        PythonSourceFilesRequest(
-            targets=request.targets, include_resources=True, include_files=True
-        ),
+    all_sources_request = PythonSourceFilesRequest(
+        targets=request.targets, include_resources=True, include_files=True
+    )
+    python_sources, all_sources = await MultiGet(
+        Get(StrippedPythonSourceFiles, PythonSourceFilesRequest, python_sources_request),
+        Get(StrippedPythonSourceFiles, PythonSourceFilesRequest, all_sources_request),
     )
 
     python_files = set(python_sources.stripped_source_files.snapshot.files)
