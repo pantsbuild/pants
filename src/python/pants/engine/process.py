@@ -350,9 +350,12 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     #  depend on either /bin/bash being available on the Process host.
     # TODO(#10507): Running the script directly from a shebang sometimes results in a "Text file
     #  busy" error.
+    #
+    # Note: the backslash after the """ marker ensures that the shebang is at the start of the
+    # script file. Many OSs will not see the shebang if there is intervening whitespace.
     script_path = "./script.sh"
     script_content = dedent(
-        """
+        """\
         #!/usr/bin/env bash
 
         set -euo pipefail
@@ -363,7 +366,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             command -v $1
         fi
         """
-    ).lstrip()
+    )
     script_digest = await Get(
         Digest,
         CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
