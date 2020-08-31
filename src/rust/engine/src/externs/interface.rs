@@ -365,12 +365,6 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "snapshots_to_file_contents",
-    py_fn!(py, snapshots_to_file_contents(a: PyScheduler, b: PyList)),
-  )?;
-
-  m.add(
-    py,
     "ensure_remote_has_recursive",
     py_fn!(py, ensure_remote_has_recursive(a: PyScheduler, b: PyList)),
   )?;
@@ -1534,74 +1528,6 @@ fn digests_to_bytes(
 
     let output_list = PyList::new(py, &bytes_values);
     Ok(output_list)
-  })
-}
-
-fn snapshots_to_file_contents(
-  py: Python,
-  scheduler_ptr: PyScheduler,
-  py_digests: PyList,
-) -> CPyResult<PyList> {
-  use fs::FileContent;
-  with_scheduler(py, scheduler_ptr, |scheduler| {
-    let core = scheduler.core.clone();
-    let digests: Vec<Digest> = py_digests
-      .iter(py)
-      .map(|item| {
-        externs::getattr(&item.into(), "digest")
-          .and_then(|digest| crate::nodes::lift_digest(&digest))
-      })
-      .collect::<Result<Vec<Digest>, _>>()
-      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-
-    let file_content_futures: Vec<_> = digests
-      .into_iter()
-      .map(|digest| {
-        let types = &core.types;
-        let store = core.store();
-        async move {
-          store
-            .contents_for_directory(digest)
-            .compat()
-            .await
-            .and_then(|contents: Vec<FileContent>| {
-              contents
-                .into_iter()
-                .map(|file_content: FileContent| {
-                  crate::nodes::Snapshot::store_file_content(&types, &file_content)
-                })
-                .collect::<Result<_, _>>()
-            })
-        }
-      })
-      .collect();
-
-    let file_content_collection_values: Vec<Vec<PyObject>> = py
-      .allow_threads(|| {
-        core
-          .executor
-          .block_on(future03::try_join_all(file_content_futures).map_ok(
-            |values: Vec<Vec<Value>>| {
-              values
-                .into_iter()
-                .map(|file_value_list: Vec<Value>| {
-                  file_value_list.into_iter().map(|val| val.into()).collect()
-                })
-                .collect::<Vec<_>>()
-            },
-          ))
-      })
-      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-
-    let output_list_of_lists = PyList::new(
-      py,
-      &file_content_collection_values
-        .into_iter()
-        .map(|py_objs: Vec<PyObject>| PyList::new(py, &py_objs).into_object())
-        .collect::<Vec<PyObject>>()
-        .as_slice(),
-    );
-    Ok(output_list_of_lists)
   })
 }
 

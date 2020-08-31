@@ -5,7 +5,7 @@ import configparser
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import PurePath
-from typing import List, Optional, Sequence, Tuple, cast
+from typing import List, Optional, Tuple, cast
 
 from pants.backend.python.rules.pex import (
     Pex,
@@ -297,49 +297,42 @@ async def generate_coverage_reports(
             )
         )
     results = await MultiGet(Get(ProcessResult, PexProcess, process) for process in pex_processes)
-    result_snapshots = await MultiGet(Get(Snapshot, Digest, r.output_digest) for r in results)
-    result_stdouts = tuple(r.stdout for r in results)
+    result_stdouts = tuple(res.stdout for res in results)
+    result_snapshots = await MultiGet(Get(Snapshot, Digest, res.output_digest) for res in results)
+
     coverage_reports.extend(
-        _get_coverage_reports(
-            coverage_subsystem.output_dir, report_types, result_stdouts, result_snapshots
-        )
+        _get_coverage_report(coverage_subsystem.output_dir, report_type, stdout, snapshot)
+        for (report_type, stdout, snapshot) in zip(report_types, result_stdouts, result_snapshots)
     )
+
     return CoverageReports(tuple(coverage_reports))
 
 
-def _get_coverage_reports(
+def _get_coverage_report(
     output_dir: PurePath,
-    report_types: Sequence[CoverageReportType],
-    result_stdouts: Tuple[bytes, ...],
-    result_snapshots: Tuple[Snapshot, ...],
-) -> List[CoverageReport]:
-    coverage_reports: List[CoverageReport] = []
-    for result_snapshot, result_stdout, report_type in zip(
-        result_snapshots, result_stdouts, report_types
-    ):
-        if report_type == CoverageReportType.CONSOLE:
-            coverage_reports.append(ConsoleCoverageReport(result_stdout.decode()))
-            continue
+    report_type: CoverageReportType,
+    result_stdout: bytes,
+    result_snapshot: Snapshot,
+) -> CoverageReport:
+    if report_type == CoverageReportType.CONSOLE:
+        return ConsoleCoverageReport(result_stdout.decode())
 
-        report_file: Optional[PurePath] = None
-        if report_type == CoverageReportType.HTML:
-            report_file = output_dir / "htmlcov" / "index.html"
-        elif report_type == CoverageReportType.XML:
-            report_file = output_dir / "coverage.xml"
-        elif report_type == CoverageReportType.JSON:
-            report_file = output_dir / "coverage.json"
-        else:
-            raise ValueError(f"Invalid coverage report type: {report_type}")
-        coverage_reports.append(
-            FilesystemCoverageReport(
-                report_type=report_type,
-                result_snapshot=result_snapshot,
-                directory_to_materialize_to=output_dir,
-                report_file=report_file,
-            )
-        )
+    report_file: Optional[PurePath] = None
+    if report_type == CoverageReportType.HTML:
+        report_file = output_dir / "htmlcov" / "index.html"
+    elif report_type == CoverageReportType.XML:
+        report_file = output_dir / "coverage.xml"
+    elif report_type == CoverageReportType.JSON:
+        report_file = output_dir / "coverage.json"
+    else:
+        raise ValueError(f"Invalid coverage report type: {report_type}")
 
-    return coverage_reports
+    return FilesystemCoverageReport(
+        report_type=report_type,
+        result_snapshot=result_snapshot,
+        directory_to_materialize_to=output_dir,
+        report_file=report_file,
+    )
 
 
 def rules():

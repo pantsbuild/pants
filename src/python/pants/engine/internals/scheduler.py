@@ -623,15 +623,10 @@ class SchedulerSession:
 
     def snapshots_to_file_contents(
         self, snapshots: Sequence[Snapshot]
-    ) -> Tuple[Tuple[FileContent]]:
-        sched_pointer = self._scheduler._scheduler
-        return cast(
-            Tuple[Tuple[FileContent]],
-            tuple(
-                self._scheduler._native.lib.snapshots_to_file_contents(
-                    sched_pointer, list(snapshots)
-                )
-            ),
+    ) -> Tuple[DigestContents, ...]:
+        return tuple(
+            cast(DigestContents, self.product_request(DigestContents, [snapshot.digest]))
+            for snapshot in snapshots
         )
 
     def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:

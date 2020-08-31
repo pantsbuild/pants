@@ -14,6 +14,7 @@ from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     CreateDigest,
     Digest,
+    DigestContents,
     FileContent,
     Snapshot,
 )
@@ -584,7 +585,7 @@ def a_rule(snapshot: Snapshot) -> Output:
     return Output(val=snapshot)
 
 
-class MoreComplicatedEngineAware(TestBase, SchedulerTestBase):
+class MoreComplicatedEngineAware(TestBase):
     @classmethod
     def rules(cls):
         return (
@@ -621,8 +622,9 @@ class MoreComplicatedEngineAware(TestBase, SchedulerTestBase):
 
         output_contents = streaming_workunit_context.snapshots_to_file_contents([output_digest])[0]
         assert len(output_contents) == 1
-        assert isinstance(output_contents[0], FileContent)
-        assert output_contents[0].content == b"alpha"
+        assert isinstance(output_contents[0], DigestContents)
+        file_contents = tuple(output_contents[0])[0]
+        assert file_contents.content == b"alpha"
 
 
 class StreamingWorkunitProcessTests(TestBase):

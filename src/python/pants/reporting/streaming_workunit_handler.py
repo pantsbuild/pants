@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Iterator, Optional, Sequence, Tuple
 
-from pants.engine.fs import Digest, FileContent, Snapshot
+from pants.engine.fs import Digest, DigestContents, Snapshot
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.util.logging import LogLevel
 
@@ -22,8 +22,8 @@ class StreamingWorkunitContext:
 
     def snapshots_to_file_contents(
         self, snapshots: Sequence[Snapshot]
-    ) -> Tuple[Tuple[FileContent]]:
-        """Given a sequence of Snapshot objects, return a tuple of the FileContents representing the
+    ) -> Tuple[DigestContents, ...]:
+        """Given a sequence of Snapshot objects, return a tuple of DigestContents representing the
         files contained in those `Snapshot`s in sequence."""
         return self._scheduler.snapshots_to_file_contents(snapshots)
 
