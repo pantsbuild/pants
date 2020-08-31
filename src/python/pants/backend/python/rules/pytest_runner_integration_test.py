@@ -342,7 +342,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert result.exit_code == 0
         assert f"{self.package}/test_good.py ." in result.stdout
         assert result.xml_results is not None
-        digest_contents = self.request_product(DigestContents, [result.xml_results])
+        digest_contents = self.request_product(DigestContents, [result.xml_results.digest])
         file = digest_contents[0]
         assert file.path.startswith("dist/test-results")
         assert b"pants_test.test_good" in file.content
