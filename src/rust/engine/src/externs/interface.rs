@@ -359,8 +359,8 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "digests_to_bytes",
-    py_fn!(py, digests_to_bytes(a: PyScheduler, b: PyList)),
+    "single_file_digests_to_bytes",
+    py_fn!(py, single_file_digests_to_bytes(a: PyScheduler, b: PyList)),
   )?;
 
   m.add(
@@ -1488,8 +1488,9 @@ fn ensure_remote_has_recursive(
   })
 }
 
-//Assumes a digest that comes from a snapshot - i.e. it is a directory with a single file in it
-fn digests_to_bytes(
+/// This functions assumes that the Digest in question represents the contents of a single File rather than a Directory,
+/// and will fail on Digests representing a Directory.
+fn single_file_digests_to_bytes(
   py: Python,
   scheduler_ptr: PyScheduler,
   py_digests: PyList,

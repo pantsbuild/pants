@@ -703,7 +703,7 @@ class StreamingWorkunitProcessTests(TestBase):
             # in rust.
             assert str(e) == "Cannot ensure remote has blobs without a remote"
 
-        byte_outputs = self._scheduler.digests_to_bytes([stdout_digest, stderr_digest])
+        byte_outputs = self._scheduler.single_file_digests_to_bytes([stdout_digest, stderr_digest])
         assert byte_outputs[0] == result.stdout
         assert byte_outputs[1] == result.stderr
 
@@ -718,7 +718,7 @@ class StreamingWorkunitProcessTests(TestBase):
             for workunit in completed_workunits:
                 if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
                     digest = workunit["artifacts"]["stdout_digest"]
-                    output = context.digests_to_bytes([digest])
+                    output = context.single_file_digests_to_bytes([digest])
                     assert output == (b"stdout output\n",)
 
         handler = StreamingWorkunitHandler(
