@@ -15,7 +15,7 @@ from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
-from pants.engine.target import Target, WrappedTarget
+from pants.engine.target import Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import RuleRunner
@@ -98,13 +98,9 @@ def make_target(
             """
         ),
     )
-    return rule_runner.request_product(
-        WrappedTarget,
-        [
-            Address(package, target_name=name),
-            create_options_bootstrapper(args=GLOBAL_ARGS),
-        ],
-    ).target
+    return rule_runner.get_target(
+        Address(package, target_name=name), create_options_bootstrapper(args=GLOBAL_ARGS)
+    )
 
 
 def run_mypy(

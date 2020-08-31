@@ -115,9 +115,9 @@ def test_transitive_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     bootstrapper = create_options_bootstrapper()
 
     def get_target(name: str) -> Target:
-        return transitive_targets_rule_runner.request_product(
-            WrappedTarget, [Address("", target_name=name), bootstrapper]
-        ).target
+        return transitive_targets_rule_runner.get_target(
+            Address("", target_name=name), bootstrapper
+        )
 
     t1 = get_target("t1")
     t2 = get_target("t2")
@@ -156,9 +156,9 @@ def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: R
     bootstrapper = create_options_bootstrapper()
 
     def get_target(name: str) -> Target:
-        return transitive_targets_rule_runner.request_product(
-            WrappedTarget, [Address("", target_name=name), bootstrapper]
-        ).target
+        return transitive_targets_rule_runner.get_target(
+            Address("", target_name=name), bootstrapper
+        )
 
     base = get_target("base")
     intermediate = get_target("intermediate")
@@ -322,9 +322,9 @@ def test_resolve_generated_subtarget() -> None:
     rule_runner = RuleRunner(target_types=[MockTarget])
     rule_runner.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
     generated_target_address = Address("demo", relative_file_path="f1.txt", target_name="demo")
-    generated_target = rule_runner.request_product(
-        WrappedTarget, [generated_target_address, create_options_bootstrapper()]
-    ).target
+    generated_target = rule_runner.get_target(
+        generated_target_address, create_options_bootstrapper()
+    )
     assert generated_target == MockTarget(
         {Sources.alias: ["f1.txt"]}, address=generated_target_address
     )
@@ -1166,7 +1166,7 @@ def assert_dependencies_resolved(
     expected: Iterable[Address],
 ) -> None:
     bootstrapper = create_options_bootstrapper()
-    target = rule_runner.request_product(WrappedTarget, [requested_address, bootstrapper]).target
+    target = rule_runner.get_target(requested_address, bootstrapper)
     result = rule_runner.request_product(
         Addresses,
         [DependenciesRequest(target[Dependencies]), bootstrapper],
