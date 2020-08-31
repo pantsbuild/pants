@@ -363,7 +363,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             command -v $1
         fi
         """
-    )
+    ).lstrip()
     script_digest = await Get(
         Digest,
         CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
