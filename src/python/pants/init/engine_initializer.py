@@ -11,6 +11,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine import desktop, fs, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
@@ -70,6 +71,7 @@ class GraphSession:
         InteractiveRunner,
         OptionsBootstrapper,
         Workspace,
+        PantsEnvironment,
     )
 
     def goal_consumed_subsystem_scopes(self, goal_name: str) -> Tuple[str, ...]:
@@ -110,6 +112,7 @@ class GraphSession:
 
         workspace = Workspace(self.scheduler_session)
         interactive_runner = InteractiveRunner(self.scheduler_session)
+        pants_environment = PantsEnvironment()
 
         for goal in goals:
             goal_product = self.goal_map[goal]
@@ -123,7 +126,12 @@ class GraphSession:
                 continue
             # NB: Keep this in sync with the property `goal_param_types`.
             params = Params(
-                specs, options_bootstrapper, self.console, workspace, interactive_runner
+                specs,
+                options_bootstrapper,
+                self.console,
+                workspace,
+                interactive_runner,
+                pants_environment,
             )
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:

@@ -5,7 +5,7 @@ import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional
+from typing import Optional, cast
 from uuid import UUID
 
 from pants.backend.python.goals.coverage_py import (
@@ -31,7 +31,13 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.goals.test import (
+    TestDebugRequest,
+    TestExtraEnv,
+    TestFieldSet,
+    TestResult,
+    TestSubsystem,
+)
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
@@ -86,6 +92,7 @@ async def setup_pytest_for_target(
     python_setup: PythonSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
+    test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
 ) -> TestSetup:
     test_addresses = Addresses((request.field_set.address,))
@@ -213,6 +220,11 @@ async def setup_pytest_for_target(
         "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
     }
+
+    extra_env_from_arguments = test_extra_env.env
+    for key in extra_env_from_arguments:
+        if extra_env_from_arguments[key] is not None:
+            extra_env[key] = cast(str, extra_env_from_arguments[key])
 
     if test_subsystem.force and not request.is_debug:
         # This is a slightly hacky way to force the process to run: since the env var

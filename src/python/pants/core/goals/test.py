@@ -13,6 +13,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -21,7 +22,7 @@ from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnTyp
 from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     Sources,
@@ -29,6 +30,7 @@ from pants.engine.target import (
     TargetsToValidFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -316,6 +318,20 @@ class TestSubsystem(GoalSubsystem):
                 "system supports this."
             ),
         )
+        register(
+            "--extra-env-vars",
+            type=list,
+            member_type=str,
+            default=[],
+            help="Specify a list additional environment variables to include in test processes. Entries are strings "
+            "in the form `ENV_VAR=value` to use explicitly; or just `ENV_VAR` to copy the value of a variable in Pants' "
+            "own environment. `value` may be a string with spaces in it such as `ENV_VAR=has some spaces`. `ENV_VAR=` sets "
+            "a variable to be the empty string.",
+        )
+
+    @property
+    def extra_env_vars(self) -> List[str]:
+        return cast(List[str], self.options.extra_env_vars)
 
     @property
     def debug(self) -> bool:
@@ -338,6 +354,11 @@ class TestSubsystem(GoalSubsystem):
         return cast(bool, self.options.open_coverage)
 
 
+@dataclass(frozen=True)
+class TestExtraEnv:
+    env: FrozenDict[str, Optional[str]]
+
+
 class Test(Goal):
     subsystem_cls = TestSubsystem
 
@@ -351,6 +372,7 @@ async def run_tests(
     interactive_runner: InteractiveRunner,
     workspace: Workspace,
     union_membership: UnionMembership,
+    pants_env: PantsEnvironment,
 ) -> Test:
     if test_subsystem.debug:
         targets_to_valid_field_sets = await Get(
@@ -444,6 +466,18 @@ async def run_tests(
                 interactive_runner.run(process)
 
     return Test(exit_code)
+
+
+@_uncacheable_rule
+def get_filtered_environment(
+    test_subsystem: TestSubsystem, pants_env: PantsEnvironment
+) -> TestExtraEnv:
+    env = (
+        pants_env.get_subset(test_subsystem.extra_env_vars)
+        if test_subsystem.extra_env_vars
+        else FrozenDict({})
+    )
+    return TestExtraEnv(env)
 
 
 @rule(desc="Run tests")
