@@ -193,6 +193,122 @@ fn self_cycle_with_external_dep() {
 }
 
 #[test]
+fn ambiguous_cycle() {
+  let _logger = env_logger::try_init();
+  let rules = vec![
+    (
+      "Root",
+      vec![Rule(
+        "me",
+        vec![
+          DependencyKey("ME", Some("P")),
+          DependencyKey("ME", Some("MPP")),
+        ],
+      )],
+    ),
+    ("ME", vec![Rule("me", vec![DependencyKey("FERR", None)])]),
+    (
+      "FERR",
+      vec![Rule(
+        "ferr",
+        vec![DependencyKey("PD", None), DependencyKey("FPR", None)],
+      )],
+    ),
+    (
+      "PD",
+      vec![
+        Rule("pd_for_p", vec![DependencyKey("P", None)]),
+        Rule("pd_for_mpp", vec![DependencyKey("MPP", None)]),
+      ],
+    ),
+    (
+      "FPR",
+      vec![
+        Rule("fpr_for_p", vec![DependencyKey("P", None)]),
+        Rule("fpr_for_mpp", vec![DependencyKey("MPP", None)]),
+      ],
+    ),
+  ]
+  .into_iter()
+  .collect();
+  let queries = vec![Query::new("Root", vec![])];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
+
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec![], "Root").unwrap();
+}
+
+#[test]
+fn natural_loop() {
+  let rules = vec![
+    (
+      "A",
+      vec![Rule(
+        "a",
+        vec![DependencyKey("D", None), DependencyKey("B", Some("E"))],
+      )],
+    ),
+    (
+      "B",
+      vec![Rule(
+        "b",
+        vec![DependencyKey("E", None), DependencyKey("C", Some("F"))],
+      )],
+    ),
+    (
+      "C",
+      vec![Rule(
+        "c",
+        vec![DependencyKey("F", None), DependencyKey("A", Some("D"))],
+      )],
+    ),
+  ]
+  .into_iter()
+  .collect();
+  let queries = vec![Query::new("A", vec!["D"])];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
+
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec!["D"], "A").unwrap();
+}
+
+/// TODO: Possibly related to https://github.com/pantsbuild/pants/issues/10683.
+#[ignore]
+#[test]
+fn wide_cycle() {
+  let _logger = env_logger::try_init();
+  let rules = vec![
+    (
+      "A",
+      vec![Rule(
+        "sao",
+        vec![
+          DependencyKey("AWO", Some("AS")),
+          DependencyKey("AWO", Some("FS")),
+        ],
+      )],
+    ),
+    (
+      "AWO",
+      vec![
+        Rule("awofs", vec![DependencyKey("FS", None)]),
+        Rule(
+          "awoas",
+          vec![DependencyKey("AS", None), DependencyKey("A", None)],
+        ),
+      ],
+    ),
+  ]
+  .into_iter()
+  .collect();
+  let queries = vec![Query::new("A", vec![])];
+  let graph = RuleGraph::new(&rules, queries).unwrap();
+
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec![], "A").unwrap();
+}
+
+#[test]
 fn mutual_recursion() {
   let rules = vec![
     (
