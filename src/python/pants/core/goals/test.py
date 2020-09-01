@@ -112,7 +112,7 @@ class EnrichedTestResult(EngineAwareReturnType):
     def artifacts(self) -> Optional[Dict[str, Snapshot]]:
         if not self.xml_results:
             return None
-        return {"xml_results_digest": self.xml_results}
+        return {"xml_results": self.xml_results}
 
     def level(self) -> LogLevel:
         if self.skipped:
