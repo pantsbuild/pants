@@ -5,7 +5,7 @@ import configparser
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import PurePath
-from typing import List, Optional, Sequence, Tuple, cast
+from typing import List, Optional, Tuple, cast
 
 from pants.backend.python.rules.pex import (
     Pex,
@@ -35,6 +35,7 @@ from pants.engine.fs import (
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
+    Snapshot,
 )
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -263,13 +264,14 @@ async def generate_coverage_reports(
 
     pex_processes = []
     report_types = []
+    result_snapshot = await Get(Snapshot, Digest, merged_coverage_data.coverage_data)
     coverage_reports: List[CoverageReport] = []
     for report_type in coverage_subsystem.reports:
         if report_type == CoverageReportType.RAW:
             coverage_reports.append(
                 FilesystemCoverageReport(
                     report_type=CoverageReportType.RAW,
-                    result_digest=merged_coverage_data.coverage_data,
+                    result_snapshot=result_snapshot,
                     directory_to_materialize_to=coverage_subsystem.output_dir,
                     report_file=coverage_subsystem.output_dir / ".coverage",
                 )
@@ -295,42 +297,42 @@ async def generate_coverage_reports(
             )
         )
     results = await MultiGet(Get(ProcessResult, PexProcess, process) for process in pex_processes)
+    result_stdouts = tuple(res.stdout for res in results)
+    result_snapshots = await MultiGet(Get(Snapshot, Digest, res.output_digest) for res in results)
+
     coverage_reports.extend(
-        _get_coverage_reports(coverage_subsystem.output_dir, report_types, results)
+        _get_coverage_report(coverage_subsystem.output_dir, report_type, stdout, snapshot)
+        for (report_type, stdout, snapshot) in zip(report_types, result_stdouts, result_snapshots)
     )
+
     return CoverageReports(tuple(coverage_reports))
 
 
-def _get_coverage_reports(
+def _get_coverage_report(
     output_dir: PurePath,
-    report_types: Sequence[CoverageReportType],
-    results: Tuple[ProcessResult, ...],
-) -> List[CoverageReport]:
-    coverage_reports: List[CoverageReport] = []
-    for result, report_type in zip(results, report_types):
-        if report_type == CoverageReportType.CONSOLE:
-            coverage_reports.append(ConsoleCoverageReport(result.stdout.decode()))
-            continue
+    report_type: CoverageReportType,
+    result_stdout: bytes,
+    result_snapshot: Snapshot,
+) -> CoverageReport:
+    if report_type == CoverageReportType.CONSOLE:
+        return ConsoleCoverageReport(result_stdout.decode())
 
-        report_file: Optional[PurePath] = None
-        if report_type == CoverageReportType.HTML:
-            report_file = output_dir / "htmlcov" / "index.html"
-        elif report_type == CoverageReportType.XML:
-            report_file = output_dir / "coverage.xml"
-        elif report_type == CoverageReportType.JSON:
-            report_file = output_dir / "coverage.json"
-        else:
-            raise ValueError(f"Invalid coverage report type: {report_type}")
-        coverage_reports.append(
-            FilesystemCoverageReport(
-                report_type=report_type,
-                result_digest=result.output_digest,
-                directory_to_materialize_to=output_dir,
-                report_file=report_file,
-            )
-        )
+    report_file: Optional[PurePath] = None
+    if report_type == CoverageReportType.HTML:
+        report_file = output_dir / "htmlcov" / "index.html"
+    elif report_type == CoverageReportType.XML:
+        report_file = output_dir / "coverage.xml"
+    elif report_type == CoverageReportType.JSON:
+        report_file = output_dir / "coverage.json"
+    else:
+        raise ValueError(f"Invalid coverage report type: {report_type}")
 
-    return coverage_reports
+    return FilesystemCoverageReport(
+        report_type=report_type,
+        result_snapshot=result_snapshot,
+        directory_to_materialize_to=output_dir,
+        report_file=report_file,
+    )
 
 
 def rules():

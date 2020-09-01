@@ -4,7 +4,7 @@
 use crate::core::Value;
 use crate::externs;
 use crate::nodes::lift_digest;
-use cpython::{PyDict, PyString, Python};
+use cpython::{PyDict, PyObject, PyString, Python};
 use hashing::Digest;
 use workunit_store::Level;
 
@@ -49,7 +49,13 @@ impl EngineAwareInformation for Artifacts {
   type MaybeOutput = Vec<(String, Digest)>;
 
   fn retrieve(value: &Value) -> Option<Self::MaybeOutput> {
-    let artifacts_val: Value = externs::call_method(&value, "artifacts", &[]).ok()?;
+    let artifacts_val: Value = match externs::call_method(&value, "artifacts", &[]) {
+      Ok(value) => value,
+      Err(e) => {
+        log::error!("Error calling `artifacts` method: {}", e);
+        return None;
+      }
+    };
     let artifacts_val: Value = externs::check_for_python_none(artifacts_val)?;
     let gil = Python::acquire_gil();
     let py = gil.python();
@@ -67,7 +73,12 @@ impl EngineAwareInformation for Artifacts {
           return None;
         }
       };
-      let digest = match lift_digest(&Value::new(value)) {
+      let digest_value: PyObject = externs::getattr(&Value::new(value), "digest")
+        .map_err(|e| {
+          log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
+        })
+        .ok()?;
+      let digest = match lift_digest(&Value::new(digest_value)) {
         Ok(digest) => digest,
         Err(e) => {
           log::error!("Error in EngineAware.artifacts() implementation: {}", e);

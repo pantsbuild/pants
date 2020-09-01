@@ -9,7 +9,15 @@ from textwrap import dedent
 from typing import List, Optional
 
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    EMPTY_SNAPSHOT,
+    CreateDigest,
+    Digest,
+    DigestContents,
+    FileContent,
+    Snapshot,
+)
 from pants.engine.internals.engine_testutil import (
     assert_equal_with_printing,
     remove_locations_from_traceback,
@@ -535,7 +543,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             val: int
 
             def artifacts(self):
-                return {"some_arbitrary_key": EMPTY_DIGEST}
+                return {"some_arbitrary_key": EMPTY_SNAPSHOT}
 
         @rule(desc="a_rule")
         def a_rule(n: int) -> Output:
@@ -561,7 +569,90 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
         )
         artifacts = workunit["artifacts"]
-        assert artifacts["some_arbitrary_key"] == EMPTY_DIGEST
+        assert artifacts["some_arbitrary_key"] == EMPTY_SNAPSHOT
+
+
+@dataclass(frozen=True)
+class ComplicatedInput:
+    snapshot_1: Snapshot
+    snapshot_2: Snapshot
+
+
+@dataclass(frozen=True)
+class Output(EngineAwareReturnType):
+    snapshot_1: Snapshot
+    snapshot_2: Snapshot
+
+    def artifacts(self):
+        return {"snapshot_1": self.snapshot_1, "snapshot_2": self.snapshot_2}
+
+
+@rule(desc="a_rule")
+def a_rule(input: ComplicatedInput) -> Output:
+    return Output(snapshot_1=input.snapshot_1, snapshot_2=input.snapshot_2)
+
+
+class MoreComplicatedEngineAware(TestBase):
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            a_rule,
+            QueryRule(Output, (ComplicatedInput,)),
+        )
+
+    def test_more_complicated_engine_aware(self) -> None:
+        tracker = WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            self.scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.TRACE,
+        )
+        with handler.session():
+            input_1 = CreateDigest(
+                (
+                    FileContent(path="a.txt", content=b"alpha"),
+                    FileContent(path="b.txt", content=b"beta"),
+                )
+            )
+            digest_1 = self.request_product(Digest, [input_1])
+            snapshot_1 = self.request_product(Snapshot, [digest_1])
+
+            input_2 = CreateDigest((FileContent(path="g.txt", content=b"gamma"),))
+            digest_2 = self.request_product(Digest, [input_2])
+            snapshot_2 = self.request_product(Snapshot, [digest_2])
+
+            input = ComplicatedInput(snapshot_1=snapshot_1, snapshot_2=snapshot_2)
+
+            self.request_product(Output, [input])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunit = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+        )
+
+        streaming_workunit_context = handler._context
+
+        artifacts = workunit["artifacts"]
+        output_snapshot_1 = artifacts["snapshot_1"]
+        output_snapshot_2 = artifacts["snapshot_2"]
+
+        output_contents_list = streaming_workunit_context.snapshots_to_file_contents(
+            [output_snapshot_1, output_snapshot_2]
+        )
+        assert len(output_contents_list) == 2
+
+        assert isinstance(output_contents_list[0], DigestContents)
+        assert isinstance(output_contents_list[1], DigestContents)
+
+        digest_contents_1 = output_contents_list[0]
+        digest_contents_2 = output_contents_list[1]
+
+        assert len(tuple(x for x in digest_contents_1 if x.content == b"alpha")) == 1
+        assert len(tuple(x for x in digest_contents_1 if x.content == b"beta")) == 1
+
+        assert len(tuple(x for x in digest_contents_2 if x.content == b"gamma")) == 1
 
 
 class StreamingWorkunitProcessTests(TestBase):
@@ -640,7 +731,7 @@ class StreamingWorkunitProcessTests(TestBase):
             # in rust.
             assert str(e) == "Cannot ensure remote has blobs without a remote"
 
-        byte_outputs = self._scheduler.digests_to_bytes([stdout_digest, stderr_digest])
+        byte_outputs = self._scheduler.single_file_digests_to_bytes([stdout_digest, stderr_digest])
         assert byte_outputs[0] == result.stdout
         assert byte_outputs[1] == result.stderr
 
@@ -655,7 +746,7 @@ class StreamingWorkunitProcessTests(TestBase):
             for workunit in completed_workunits:
                 if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
                     digest = workunit["artifacts"]["stdout_digest"]
-                    output = context.digests_to_bytes([digest])
+                    output = context.single_file_digests_to_bytes([digest])
                     assert output == (b"stdout output\n",)
 
         handler = StreamingWorkunitHandler(

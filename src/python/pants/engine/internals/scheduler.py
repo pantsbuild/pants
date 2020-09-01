@@ -614,11 +614,29 @@ class SchedulerSession:
             self._scheduler._scheduler, self._session, _DirectoryDigests(digests)
         )
 
-    def digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes]:
+    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes]:
         sched_pointer = self._scheduler._scheduler
         return cast(
             Tuple[bytes],
-            tuple(self._scheduler._native.lib.digests_to_bytes(sched_pointer, list(digests))),
+            tuple(
+                self._scheduler._native.lib.single_file_digests_to_bytes(
+                    sched_pointer, list(digests)
+                )
+            ),
+        )
+
+    def snapshots_to_file_contents(
+        self, snapshots: Sequence[Snapshot]
+    ) -> Tuple[DigestContents, ...]:
+        """For each input `Snapshot`, yield a single `DigestContents` containing all the
+        `FileContent`s corresponding to the file(s) contained within that `Snapshot`.
+
+        Note that we cannot currently use a parallelized version of `self.product_request` since
+        each snapshot needs to yield a separate `DigestContents`.
+        """
+        return tuple(
+            cast(DigestContents, self.product_request(DigestContents, [snapshot.digest])[0])
+            for snapshot in snapshots
         )
 
     def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:

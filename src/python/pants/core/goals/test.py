@@ -18,7 +18,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.fs import Digest, MergeDigests, Workspace
+from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
@@ -61,7 +61,7 @@ class TestResult:
     stderr: str
     address: Address
     coverage_data: Optional["CoverageData"] = None
-    xml_results: Optional[Digest] = None
+    xml_results: Optional[Snapshot] = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -77,7 +77,7 @@ class TestResult:
         address: Address,
         *,
         coverage_data: Optional["CoverageData"] = None,
-        xml_results: Optional[Digest] = None,
+        xml_results: Optional[Snapshot] = None,
     ) -> "TestResult":
         return cls(
             exit_code=process_result.exit_code,
@@ -97,7 +97,7 @@ class EnrichedTestResult(EngineAwareReturnType):
     address: Address
     output_setting: "ShowOutput"
     coverage_data: Optional["CoverageData"] = None
-    xml_results: Optional[Digest] = None
+    xml_results: Optional[Snapshot] = None
 
     @property
     def skipped(self) -> bool:
@@ -109,10 +109,10 @@ class EnrichedTestResult(EngineAwareReturnType):
             and not self.xml_results
         )
 
-    def artifacts(self) -> Optional[Dict[str, Digest]]:
+    def artifacts(self) -> Optional[Dict[str, Snapshot]]:
         if not self.xml_results:
             return None
-        return {"xml_results_digest": self.xml_results}
+        return {"xml_results": self.xml_results}
 
     def level(self) -> LogLevel:
         if self.skipped:
@@ -200,7 +200,7 @@ class CoverageReport(ABC):
         """
         ...
 
-    def get_artifact(self) -> Optional[Tuple[str, Digest]]:
+    def get_artifact(self) -> Optional[Tuple[str, Snapshot]]:
         return None
 
 
@@ -219,22 +219,22 @@ class ConsoleCoverageReport(CoverageReport):
 class FilesystemCoverageReport(CoverageReport):
     """Materializes a code coverage report to disk."""
 
-    result_digest: Digest
+    result_snapshot: Snapshot
     directory_to_materialize_to: PurePath
     report_file: Optional[PurePath]
     report_type: CoverageReportType
 
     def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
         workspace.write_digest(
-            self.result_digest, path_prefix=str(self.directory_to_materialize_to)
+            self.result_snapshot.digest, path_prefix=str(self.directory_to_materialize_to)
         )
         console.print_stderr(
             f"\nWrote {self.report_type.report_name} coverage report to `{self.directory_to_materialize_to}`"
         )
         return self.report_file
 
-    def get_artifact(self) -> Optional[Tuple[str, Digest]]:
-        return self.report_type.value, self.result_digest
+    def get_artifact(self) -> Optional[Tuple[str, Snapshot]]:
+        return self.report_type.value, self.result_snapshot
 
 
 @dataclass(frozen=True)
@@ -249,7 +249,7 @@ class CoverageReports(EngineAwareReturnType):
                 report_paths.append(report_path)
         return tuple(report_paths)
 
-    def artifacts(self) -> Optional[Dict[str, Digest]]:
+    def artifacts(self) -> Optional[Dict[str, Snapshot]]:
         artifacts = {}
         for report in self.reports:
             artifact = report.get_artifact()
@@ -405,7 +405,8 @@ async def run_tests(
         console.print_stderr(f"{sigil} {result.address} {status}.")
 
     merged_xml_results = await Get(
-        Digest, MergeDigests(result.xml_results for result in results if result.xml_results)
+        Digest,
+        MergeDigests(result.xml_results.digest for result in results if result.xml_results),
     )
     workspace.write_digest(merged_xml_results)
 
