@@ -30,7 +30,7 @@
 mod builder;
 mod rules;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::io;
 
 pub use crate::builder::Builder;
@@ -243,10 +243,7 @@ fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
 }
 
 impl<R: Rule> RuleGraph<R> {
-  pub fn new(
-    rules: &BTreeMap<R::TypeId, Vec<R>>,
-    queries: Vec<Query<R>>,
-  ) -> Result<RuleGraph<R>, String> {
+  pub fn new(rules: Vec<R>, queries: Vec<Query<R>>) -> Result<RuleGraph<R>, String> {
     Builder::new(rules, queries).graph()
   }
 

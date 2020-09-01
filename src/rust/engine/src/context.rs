@@ -250,7 +250,7 @@ impl Core {
     let graph = Arc::new(InvalidatableGraph(Graph::new()));
 
     let http_client = reqwest::Client::new();
-    let rule_graph = RuleGraph::new(tasks.as_map(), tasks.queries().clone())?;
+    let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
 
     let gitignore_file = if use_gitignore {
       let gitignore_path = build_root.join(".gitignore");
