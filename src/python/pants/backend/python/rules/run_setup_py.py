@@ -62,7 +62,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -177,15 +176,18 @@ class SetupPyKwargsRequest:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class SetupPyKwargs(FrozenDict):
+class SetupPyKwargs:
     """The keyword arguments to put in the setup.py file."""
 
     json_str: str
 
     def __init__(self, kwargs: Mapping[str, Any]) -> None:
         super().__init__()
-        # Note that we convert to a `str` so that this type can be hashable.
-        self.json_str = json.dumps(kwargs)
+        # We convert to a `str` so that this type can be hashable. We don't use `FrozenDict`
+        # because it would require that all values are immutable, and we may have lists and
+        # dictionaries as values. It's too difficult/clunky to convert those all, then to convert
+        # them back out of `FrozenDict`.
+        self.json_str = json.dumps(kwargs, sort_keys=True)
 
     @property
     def kwargs(self) -> Dict[str, Any]:
