@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import json
 import textwrap
 from typing import Iterable, Type
 
@@ -22,7 +23,6 @@ from pants.backend.python.rules.run_setup_py import (
     SetupPyChrootRequest,
     SetupPySources,
     SetupPySourcesRequest,
-    determine_setup_kwargs,
     generate_chroot,
     get_exporting_owner,
     get_owned_dependencies,
@@ -68,7 +68,6 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
 def chroot_rule_runner() -> RuleRunner:
     return create_setup_py_rule_runner(
         rules=[
-            determine_setup_kwargs,
             generate_chroot,
             get_sources,
             get_requirements,
@@ -93,7 +92,7 @@ def assert_chroot(
     )
     snapshot = rule_runner.request_product(Snapshot, [chroot.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
-    assert expected_setup_kwargs == chroot.setup_keywords.kwargs
+    assert expected_setup_kwargs == json.loads(chroot.setup_keywords_json)
 
 
 def assert_chroot_error(rule_runner: RuleRunner, addr: str, exc_cls: Type[Exception]) -> None:

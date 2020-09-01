@@ -5,7 +5,7 @@ import itertools
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Set, Tuple, cast
+from typing import List, Set, Tuple, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.rules.pex import (
@@ -29,12 +29,16 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSources,
 )
-from pants.base.specs import AddressLiteralSpec, AddressSpecs, AscendantAddresses
+from pants.base.specs import (
+    AddressLiteralSpec,
+    AddressSpecs,
+    AscendantAddresses,
+    FilesystemLiteralSpec,
+)
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.console import Console
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -63,7 +67,6 @@ from pants.engine.unions import UnionMembership
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -168,43 +171,6 @@ class SetupPySources:
 
 
 @dataclass(frozen=True)
-class SetupKwargsRequest:
-    """A request to generate the kwargs for `setup()` for some target."""
-
-    _exported_target: ExportedTarget
-    requirements: ExportedTargetRequirements
-    sources: SetupPySources
-
-    @property
-    def target(self) -> Target:
-        return self._exported_target.target
-
-    @property
-    def provides(self) -> PythonArtifact:
-        return self._exported_target.provides
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class SetupKwargs:
-    """The keyword arguments to the `setup()` function in the generated `setup.py`."""
-
-    json_str: str
-
-    def __init__(self, kwargs: Mapping[str, Any]) -> None:
-        super().__init__()
-        # We convert to a `str` so that this type can be hashable. We don't use `FrozenDict`
-        # because it would require that all values are immutable, and we may have lists and
-        # dictionaries as values. It's too difficult/clunky to convert those all, then to convert
-        # them back out of `FrozenDict`.
-        self.json_str = json.dumps(kwargs, sort_keys=True)
-
-    @property
-    def kwargs(self) -> Dict[str, Any]:
-        return cast(Dict[str, Any], json.loads(self.json_str))
-
-
-@dataclass(frozen=True)
 class SetupPyChrootRequest:
     """A request to create a chroot containing a setup.py and the sources it operates on."""
 
@@ -217,9 +183,9 @@ class SetupPyChroot:
     """A chroot containing a generated setup.py and the sources it operates on."""
 
     digest: Digest
-    # The keywords are embedded in the setup.py file in the Digest, so this isn't strictly needed
-    # here, but it is convenient for testing.
-    setup_keywords: SetupKwargs
+    # The keywords are embedded in the setup.py file in the digest, so these aren't
+    # strictly needed here, but they are convenient for testing.
+    setup_keywords_json: str
 
 
 @dataclass(frozen=True)
@@ -258,18 +224,19 @@ class SetupPySubsystem(GoalSubsystem):
             type=list,
             member_type=shell_str,
             passthrough=True,
-            help="Arguments to pass directly to setup.py, e.g. "
-            '`--setup-py-args="bdist_wheel --python-tag py36.py37"`. If unspecified, Pants will '
-            "dump the setup.py chroot.",
+            help=(
+                "Arguments to pass directly to setup.py, e.g. `--setup-py-args='bdist_wheel "
+                "--python-tag py36.py37'`. If unspecified, Pants will dump the setup.py chroot."
+            ),
         )
         register(
             "--transitive",
             type=bool,
             default=False,
-            help="If specified, will run the setup.py command recursively on all exported targets that "
-            "the specified targets depend on, in dependency order. This is useful, e.g., when "
-            "the command publishes dists, to ensure that any dependencies of a dist are published "
-            "before it.",
+            help=(
+                "If specified, will run the setup.py command recursively on all exported targets "
+                "that the specified targets depend on, in dependency order."
+            ),
         )
 
     @property
@@ -307,7 +274,6 @@ def validate_args(args: Tuple[str, ...]):
 async def run_setup_pys(
     targets_with_origins: TargetsWithOrigins,
     setup_py_subsystem: SetupPySubsystem,
-    console: Console,
     python_setup: PythonSetup,
     distdir: DistDir,
     workspace: Workspace,
@@ -326,7 +292,7 @@ async def run_setup_pys(
         tgt = target_with_origin.target
         if tgt.has_field(PythonProvidesField):
             exported_targets.append(ExportedTarget(tgt))
-        elif isinstance(target_with_origin.origin, AddressLiteralSpec):
+        elif isinstance(target_with_origin.origin, (AddressLiteralSpec, FilesystemLiteralSpec)):
             explicit_nonexported_targets.append(tgt)
     if explicit_nonexported_targets:
         raise TargetNotExported(
@@ -369,7 +335,7 @@ async def run_setup_pys(
 
         for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
             addr = exported_target.target.address.spec
-            console.print_stderr(f"Writing dist for {addr} under {distdir.relpath}/.")
+            logger.info(f"Writing dist for {addr} under {distdir.relpath}/.")
             workspace.write_digest(setup_py_result.output, path_prefix=str(distdir.relpath))
     else:
         # Just dump the chroot.
@@ -377,7 +343,7 @@ async def run_setup_pys(
             addr = exported_target.target.address.spec
             provides = exported_target.provides
             setup_py_dir = distdir.relpath / f"{provides.name}-{provides.version}"
-            console.print_stderr(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
+            logger.info(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
             workspace.write_digest(chroot.digest, path_prefix=str(setup_py_dir))
 
     return SetupPy(0)
@@ -444,52 +410,27 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         Get(ExportedTargetRequirements, DependencyOwner(exported_target)),
     )
 
-    # Generate the setup script.
-    setup_kwargs = await Get(
-        SetupKwargs, SetupKwargsRequest(exported_target, requirements, sources)
-    )
-    setup_py_content = SETUP_BOILERPLATE.format(
-        target_address_spec=exported_target.target.address.spec,
-        setup_kwargs_str=distutils_repr(setup_kwargs.kwargs),
-    ).encode()
+    target = exported_target.target
+    provides = exported_target.provides
 
-    files_to_create = [
-        FileContent("setup.py", setup_py_content),
-        FileContent("MANIFEST.in", b"include *.py"),
-    ]
-    extra_files_digest, src_digest = await MultiGet(
-        Get(Digest, CreateDigest(files_to_create)),
-        # Nest the sources under the src/ prefix.
-        Get(Digest, AddPrefix(sources.digest, CHROOT_SOURCE_ROOT)),
-    )
-    chroot_digest = await Get(Digest, MergeDigests((src_digest, extra_files_digest)))
-
-    return SetupPyChroot(chroot_digest, setup_kwargs)
-
-
-@rule
-async def determine_setup_kwargs(request: SetupKwargsRequest) -> SetupKwargs:
-    setup_kwargs = request.provides.setup_py_keywords.copy()
+    # Generate the kwargs to the setup() call.
+    setup_kwargs = provides.kwargs.copy()
     setup_kwargs.update(
         {
             "package_dir": {"": CHROOT_SOURCE_ROOT},
-            "packages": request.sources.packages,
-            "namespace_packages": request.sources.namespace_packages,
-            "package_data": dict(request.sources.package_data),
-            "install_requires": tuple(request.requirements),
+            "packages": sources.packages,
+            "namespace_packages": sources.namespace_packages,
+            "package_data": dict(sources.package_data),
+            "install_requires": tuple(requirements),
         }
     )
-
-    # Handle `with_binaries()`.
-    key_to_binary_spec = request.provides.binaries
+    key_to_binary_spec = provides.binaries
     keys = list(key_to_binary_spec.keys())
     addresses = await MultiGet(
         Get(
             Address,
             AddressInput,
-            AddressInput.parse(
-                key_to_binary_spec[key], relative_to=request.target.address.spec_path
-            ),
+            AddressInput.parse(key_to_binary_spec[key], relative_to=target.address.spec_path),
         )
         for key in keys
     )
@@ -498,13 +439,29 @@ async def determine_setup_kwargs(request: SetupKwargsRequest) -> SetupKwargs:
         binary_entry_point = binary.get(PythonEntryPoint).value
         if not binary_entry_point:
             raise InvalidEntryPoint(
-                f"The binary {key} exported by {request.target.address} is not a valid entry point."
+                f"The binary {key} exported by {target.address} is not a valid entry point."
             )
         entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
         console_scripts.append(f"{key}={binary_entry_point}")
 
-    return SetupKwargs(setup_kwargs)
+    # Generate the setup script.
+    setup_py_content = SETUP_BOILERPLATE.format(
+        target_address_spec=target.address.spec,
+        setup_kwargs_str=distutils_repr(setup_kwargs),
+    ).encode()
+    files_to_create = [
+        FileContent("setup.py", setup_py_content),
+        FileContent("MANIFEST.in", "include *.py".encode()),
+    ]
+    extra_files_digest, src_digest = await MultiGet(
+        Get(Digest, CreateDigest(files_to_create)),
+        # Nest the sources under the src/ prefix.
+        Get(Digest, AddPrefix(sources.digest, CHROOT_SOURCE_ROOT)),
+    )
+
+    chroot_digest = await Get(Digest, MergeDigests((src_digest, extra_files_digest)))
+    return SetupPyChroot(chroot_digest, json.dumps(setup_kwargs, sort_keys=True))
 
 
 @rule
