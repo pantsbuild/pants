@@ -573,16 +573,23 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
 
 @dataclass(frozen=True)
+class ComplicatedInput:
+    snapshot_1: Snapshot
+    snapshot_2: Snapshot
+
+
+@dataclass(frozen=True)
 class Output(EngineAwareReturnType):
-    val: Snapshot
+    snapshot_1: Snapshot
+    snapshot_2: Snapshot
 
     def artifacts(self):
-        return {"some_arbitrary_key": self.val}
+        return {"snapshot_1": self.snapshot_1, "snapshot_2": self.snapshot_2}
 
 
 @rule(desc="a_rule")
-def a_rule(snapshot: Snapshot) -> Output:
-    return Output(val=snapshot)
+def a_rule(input: ComplicatedInput) -> Output:
+    return Output(snapshot_1=input.snapshot_1, snapshot_2=input.snapshot_2)
 
 
 class MoreComplicatedEngineAware(TestBase):
@@ -591,8 +598,7 @@ class MoreComplicatedEngineAware(TestBase):
         return (
             *super().rules(),
             a_rule,
-            QueryRule(Output, (Digest,)),
-            QueryRule(Output, (Snapshot,)),
+            QueryRule(Output, (ComplicatedInput,)),
         )
 
     def test_more_complicated_engine_aware(self) -> None:
@@ -604,11 +610,22 @@ class MoreComplicatedEngineAware(TestBase):
             max_workunit_verbosity=LogLevel.TRACE,
         )
         with handler.session():
-            content = b"alpha"
-            subset_input = CreateDigest((FileContent(path="a.txt", content=content),))
-            subset_digest = self.request_product(Digest, [subset_input])
-            subset_snapshot = self.request_product(Snapshot, [subset_digest])
-            self.request_product(Output, [subset_snapshot])
+            input_1 = CreateDigest(
+                (
+                    FileContent(path="a.txt", content=b"alpha"),
+                    FileContent(path="b.txt", content=b"beta"),
+                )
+            )
+            digest_1 = self.request_product(Digest, [input_1])
+            snapshot_1 = self.request_product(Snapshot, [digest_1])
+
+            input_2 = CreateDigest((FileContent(path="g.txt", content=b"gamma"),))
+            digest_2 = self.request_product(Digest, [input_2])
+            snapshot_2 = self.request_product(Snapshot, [digest_2])
+
+            input = ComplicatedInput(snapshot_1=snapshot_1, snapshot_2=snapshot_2)
+
+            self.request_product(Output, [input])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
@@ -618,13 +635,24 @@ class MoreComplicatedEngineAware(TestBase):
         streaming_workunit_context = handler._context
 
         artifacts = workunit["artifacts"]
-        output_digest = artifacts["some_arbitrary_key"]
+        output_snapshot_1 = artifacts["snapshot_1"]
+        output_snapshot_2 = artifacts["snapshot_2"]
 
-        output_contents = streaming_workunit_context.snapshots_to_file_contents([output_digest])[0]
-        assert len(output_contents) == 1
-        assert isinstance(output_contents[0], DigestContents)
-        file_contents = tuple(output_contents[0])[0]
-        assert file_contents.content == b"alpha"
+        output_contents_list = streaming_workunit_context.snapshots_to_file_contents(
+            [output_snapshot_1, output_snapshot_2]
+        )
+        assert len(output_contents_list) == 2
+
+        assert isinstance(output_contents_list[0], DigestContents)
+        assert isinstance(output_contents_list[1], DigestContents)
+
+        digest_contents_1 = output_contents_list[0]
+        digest_contents_2 = output_contents_list[1]
+
+        assert len(tuple(x for x in digest_contents_1 if x.content == b"alpha")) == 1
+        assert len(tuple(x for x in digest_contents_1 if x.content == b"beta")) == 1
+
+        assert len(tuple(x for x in digest_contents_2 if x.content == b"gamma")) == 1
 
 
 class StreamingWorkunitProcessTests(TestBase):
