@@ -16,7 +16,6 @@ from pants.backend.python.target_types import PythonLibrary
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.rules import QueryRule
-from pants.engine.target import WrappedTarget
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import RuleRunner
@@ -40,7 +39,7 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, by
             "--source-root-patterns=src/python",
         ]
     )
-    target = rule_runner.request_product(WrappedTarget, [Address.parse(addr), bootstrapper]).target
+    target = rule_runner.get_target(Address.parse(addr), bootstrapper)
     created_awslambda = rule_runner.request_product(
         CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target), bootstrapper]
     )

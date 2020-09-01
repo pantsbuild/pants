@@ -13,7 +13,6 @@ from pants.backend.python.target_types import (
 from pants.base.build_environment import pants_version
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import WrappedTarget
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
@@ -36,13 +35,9 @@ def assert_pants_requirement(
     expected_module: str = "pants",
 ) -> None:
     rule_runner.add_to_build_file("3rdparty/python", f"{build_file_entry}\n")
-    target = rule_runner.request_product(
-        WrappedTarget,
-        [
-            Address("3rdparty/python", target_name=expected_target_name),
-            create_options_bootstrapper(),
-        ],
-    ).target
+    target = rule_runner.get_target(
+        Address("3rdparty/python", target_name=expected_target_name), create_options_bootstrapper()
+    )
     assert isinstance(target, PythonRequirementLibrary)
     assert target[PythonRequirementsField].value == (
         Requirement.parse(f"{expected_dist}=={pants_version()}"),

@@ -261,6 +261,18 @@ class RuleRunner:
         """
         return self.make_snapshot({fp: "" for fp in files})
 
+    def get_target(
+        self, address: Address, options_bootstrapper: Optional[OptionsBootstrapper] = None
+    ) -> Target:
+        """Find the target for a given address.
+
+        This requires that the target actually exists, i.e. that you called
+        `rule_runner.add_to_build_file()`.
+        """
+        return self.request_product(
+            WrappedTarget, [address, options_bootstrapper or create_options_bootstrapper()]
+        ).target
+
 
 # -----------------------------------------------------------------------------------------------
 # `run_rule_with_mocks()`

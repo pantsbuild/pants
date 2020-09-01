@@ -29,12 +29,16 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSources,
 )
-from pants.base.specs import AddressLiteralSpec, AddressSpecs, AscendantAddresses
+from pants.base.specs import (
+    AddressLiteralSpec,
+    AddressSpecs,
+    AscendantAddresses,
+    FilesystemLiteralSpec,
+)
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.console import Console
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -220,18 +224,19 @@ class SetupPySubsystem(GoalSubsystem):
             type=list,
             member_type=shell_str,
             passthrough=True,
-            help="Arguments to pass directly to setup.py, e.g. "
-            '`--setup-py-args="bdist_wheel --python-tag py36.py37"`. If unspecified, Pants will '
-            "dump the setup.py chroot.",
+            help=(
+                "Arguments to pass directly to setup.py, e.g. `--setup-py-args='bdist_wheel "
+                "--python-tag py36.py37'`. If unspecified, Pants will dump the setup.py chroot."
+            ),
         )
         register(
             "--transitive",
             type=bool,
             default=False,
-            help="If specified, will run the setup.py command recursively on all exported targets that "
-            "the specified targets depend on, in dependency order. This is useful, e.g., when "
-            "the command publishes dists, to ensure that any dependencies of a dist are published "
-            "before it.",
+            help=(
+                "If specified, will run the setup.py command recursively on all exported targets "
+                "that the specified targets depend on, in dependency order."
+            ),
         )
 
     @property
@@ -269,7 +274,6 @@ def validate_args(args: Tuple[str, ...]):
 async def run_setup_pys(
     targets_with_origins: TargetsWithOrigins,
     setup_py_subsystem: SetupPySubsystem,
-    console: Console,
     python_setup: PythonSetup,
     distdir: DistDir,
     workspace: Workspace,
@@ -288,7 +292,7 @@ async def run_setup_pys(
         tgt = target_with_origin.target
         if tgt.has_field(PythonProvidesField):
             exported_targets.append(ExportedTarget(tgt))
-        elif isinstance(target_with_origin.origin, AddressLiteralSpec):
+        elif isinstance(target_with_origin.origin, (AddressLiteralSpec, FilesystemLiteralSpec)):
             explicit_nonexported_targets.append(tgt)
     if explicit_nonexported_targets:
         raise TargetNotExported(
@@ -331,7 +335,7 @@ async def run_setup_pys(
 
         for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
             addr = exported_target.target.address.spec
-            console.print_stderr(f"Writing dist for {addr} under {distdir.relpath}/.")
+            logger.info(f"Writing dist for {addr} under {distdir.relpath}/.")
             workspace.write_digest(setup_py_result.output, path_prefix=str(distdir.relpath))
     else:
         # Just dump the chroot.
@@ -339,7 +343,7 @@ async def run_setup_pys(
             addr = exported_target.target.address.spec
             provides = exported_target.provides
             setup_py_dir = distdir.relpath / f"{provides.name}-{provides.version}"
-            console.print_stderr(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
+            logger.info(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
             workspace.write_digest(chroot.digest, path_prefix=str(setup_py_dir))
 
     return SetupPy(0)
@@ -390,24 +394,27 @@ async def run_setup_py(
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     exported_target = request.exported_target
 
-    owned_deps = await Get(OwnedDependencies, DependencyOwner(exported_target))
-    transitive_targets = await Get(TransitiveTargets, Addresses([exported_target.target.address]))
+    owned_deps, transitive_targets = await MultiGet(
+        Get(OwnedDependencies, DependencyOwner(exported_target)),
+        Get(TransitiveTargets, Addresses([exported_target.target.address])),
+    )
+
     # files() targets aren't owned by a single exported target - they aren't code, so
     # we allow them to be in multiple dists. This is helpful for, e.g., embedding
     # a standard license file in a dist.
     files_targets = (tgt for tgt in transitive_targets.closure if tgt.has_field(FilesSources))
     targets = Targets(itertools.chain((od.target for od in owned_deps), files_targets))
-    sources = await Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2))
-    requirements = await Get(ExportedTargetRequirements, DependencyOwner(exported_target))
 
-    # Nest the sources under the src/ prefix.
-    src_digest = await Get(Digest, AddPrefix(sources.digest, CHROOT_SOURCE_ROOT))
+    sources, requirements = await MultiGet(
+        Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2)),
+        Get(ExportedTargetRequirements, DependencyOwner(exported_target)),
+    )
 
     target = exported_target.target
     provides = exported_target.provides
 
     # Generate the kwargs to the setup() call.
-    setup_kwargs = provides.setup_py_keywords.copy()
+    setup_kwargs = provides.kwargs.copy()
     setup_kwargs.update(
         {
             "package_dir": {"": CHROOT_SOURCE_ROOT},
@@ -443,16 +450,14 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         target_address_spec=target.address.spec,
         setup_kwargs_str=distutils_repr(setup_kwargs),
     ).encode()
-    extra_files_digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent("setup.py", setup_py_content),
-                FileContent(
-                    "MANIFEST.in", "include *.py".encode()
-                ),  # Make sure setup.py is included.
-            ]
-        ),
+    files_to_create = [
+        FileContent("setup.py", setup_py_content),
+        FileContent("MANIFEST.in", "include *.py".encode()),
+    ]
+    extra_files_digest, src_digest = await MultiGet(
+        Get(Digest, CreateDigest(files_to_create)),
+        # Nest the sources under the src/ prefix.
+        Get(Digest, AddPrefix(sources.digest, CHROOT_SOURCE_ROOT)),
     )
 
     chroot_digest = await Get(Digest, MergeDigests((src_digest, extra_files_digest)))
@@ -461,17 +466,15 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
 @rule
 async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
-    python_sources = await Get(
-        StrippedPythonSourceFiles,
-        PythonSourceFilesRequest(
-            targets=request.targets, include_resources=False, include_files=False
-        ),
+    python_sources_request = PythonSourceFilesRequest(
+        targets=request.targets, include_resources=False, include_files=False
     )
-    all_sources = await Get(
-        StrippedPythonSourceFiles,
-        PythonSourceFilesRequest(
-            targets=request.targets, include_resources=True, include_files=True
-        ),
+    all_sources_request = PythonSourceFilesRequest(
+        targets=request.targets, include_resources=True, include_files=True
+    )
+    python_sources, all_sources = await MultiGet(
+        Get(StrippedPythonSourceFiles, PythonSourceFilesRequest, python_sources_request),
+        Get(StrippedPythonSourceFiles, PythonSourceFilesRequest, all_sources_request),
     )
 
     python_files = set(python_sources.stripped_source_files.snapshot.files)

@@ -23,7 +23,7 @@ from pants.backend.python.target_types import (
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule, SubsystemRule
-from pants.engine.target import InferredDependencies, WrappedTarget
+from pants.engine.target import InferredDependencies
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import RuleRunner
@@ -91,7 +91,7 @@ def test_infer_python_imports() -> None:
         if enable_string_imports:
             args.append("--python-infer-string-imports")
         options_bootstrapper = create_options_bootstrapper(args=args)
-        target = rule_runner.request_product(WrappedTarget, [address, options_bootstrapper]).target
+        target = rule_runner.get_target(address, options_bootstrapper)
         return rule_runner.request_product(
             InferredDependencies,
             [InferPythonDependencies(target[PythonSources]), options_bootstrapper],
@@ -152,7 +152,7 @@ def test_infer_python_inits() -> None:
     rule_runner.add_to_build_file("src/python/root/mid/leaf", "python_library()")
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        target = rule_runner.request_product(WrappedTarget, [address, options_bootstrapper]).target
+        target = rule_runner.get_target(address, options_bootstrapper)
         return rule_runner.request_product(
             InferredDependencies,
             [InferInitDependencies(target[PythonSources]), options_bootstrapper],
@@ -195,7 +195,7 @@ def test_infer_python_conftests() -> None:
     rule_runner.add_to_build_file("src/python/root/mid/leaf", "python_tests()")
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        target = rule_runner.request_product(WrappedTarget, [address, options_bootstrapper]).target
+        target = rule_runner.get_target(address, options_bootstrapper)
         return rule_runner.request_product(
             InferredDependencies,
             [InferConftestDependencies(target[PythonSources]), options_bootstrapper],

@@ -51,7 +51,7 @@ class PythonArtifact:
         return f"{self._name}=={self._version}"
 
     @property
-    def setup_py_keywords(self):
+    def kwargs(self):
         return self._kw
 
     @property
