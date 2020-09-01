@@ -3,87 +3,92 @@
 
 from typing import List
 
+import pytest
+
+from pants.backend.python.rules import ancestor_files
 from pants.backend.python.rules.ancestor_files import (
     AncestorFiles,
     AncestorFilesRequest,
-    find_missing_ancestor_files,
     identify_missing_ancestor_files,
 )
-from pants.core.util_rules import stripped_source_files
 from pants.engine.fs import DigestContents
 from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
+from pants.testutil.rule_runner import RuleRunner
 
 
-class InjectAncestorFilesTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            find_missing_ancestor_files,
-            *stripped_source_files.rules(),
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *ancestor_files.rules(),
             QueryRule(AncestorFiles, (AncestorFilesRequest, OptionsBootstrapper)),
-        )
+        ]
+    )
 
-    def assert_injected(
-        self,
-        *,
-        source_roots: List[str],
-        original_declared_files: List[str],
-        original_undeclared_files: List[str],
-        expected_discovered: List[str],
-    ) -> None:
-        for f in original_undeclared_files:
-            self.create_file(f, "# undeclared")
-        request = AncestorFilesRequest(
-            "__init__.py",
-            self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
-        )
-        bootstrapper = create_options_bootstrapper(args=[f"--source-root-patterns={source_roots}"])
-        result = self.request_product(AncestorFiles, [request, bootstrapper]).snapshot
-        assert list(result.files) == sorted(expected_discovered)
 
-        materialized_result = self.request_product(DigestContents, [result.digest])
-        for file_content in materialized_result:
-            path = file_content.path
-            if not path.endswith("__init__.py"):
-                continue
-            assert path in original_declared_files or path in expected_discovered
-            expected = b"# declared" if path in original_declared_files else b"# undeclared"
-            assert file_content.content == expected
+def assert_injected(
+    rule_runner: RuleRunner,
+    *,
+    source_roots: List[str],
+    original_declared_files: List[str],
+    original_undeclared_files: List[str],
+    expected_discovered: List[str],
+) -> None:
+    for f in original_undeclared_files:
+        rule_runner.create_file(f, "# undeclared")
+    request = AncestorFilesRequest(
+        "__init__.py",
+        rule_runner.make_snapshot({fp: "# declared" for fp in original_declared_files}),
+    )
+    bootstrapper = create_options_bootstrapper(args=[f"--source-root-patterns={source_roots}"])
+    result = rule_runner.request_product(AncestorFiles, [request, bootstrapper]).snapshot
+    assert list(result.files) == sorted(expected_discovered)
 
-    def test_unstripped(self) -> None:
-        self.assert_injected(
-            source_roots=["src/python", "tests/python"],
-            original_declared_files=[
-                "src/python/project/lib.py",
-                "src/python/project/subdir/__init__.py",
-                "src/python/project/subdir/lib.py",
-                "src/python/no_init/lib.py",
-            ],
-            original_undeclared_files=[
-                "src/python/project/__init__.py",
-                "tests/python/project/__init__.py",
-            ],
-            expected_discovered=["src/python/project/__init__.py"],
-        )
+    materialized_result = rule_runner.request_product(DigestContents, [result.digest])
+    for file_content in materialized_result:
+        path = file_content.path
+        if not path.endswith("__init__.py"):
+            continue
+        assert path in original_declared_files or path in expected_discovered
+        expected = b"# declared" if path in original_declared_files else b"# undeclared"
+        assert file_content.content == expected
 
-    def test_unstripped_source_root_at_buildroot(self) -> None:
-        self.assert_injected(
-            source_roots=["/"],
-            original_declared_files=[
-                "project/lib.py",
-                "project/subdir/__init__.py",
-                "project/subdir/lib.py",
-                "no_init/lib.py",
-            ],
-            original_undeclared_files=[
-                "project/__init__.py",
-            ],
-            expected_discovered=["project/__init__.py"],
-        )
+
+def test_unstripped(rule_runner: RuleRunner) -> None:
+    assert_injected(
+        rule_runner,
+        source_roots=["src/python", "tests/python"],
+        original_declared_files=[
+            "src/python/project/lib.py",
+            "src/python/project/subdir/__init__.py",
+            "src/python/project/subdir/lib.py",
+            "src/python/no_init/lib.py",
+        ],
+        original_undeclared_files=[
+            "src/python/project/__init__.py",
+            "tests/python/project/__init__.py",
+        ],
+        expected_discovered=["src/python/project/__init__.py"],
+    )
+
+
+def test_unstripped_source_root_at_buildroot(rule_runner: RuleRunner) -> None:
+    assert_injected(
+        rule_runner,
+        source_roots=["/"],
+        original_declared_files=[
+            "project/lib.py",
+            "project/subdir/__init__.py",
+            "project/subdir/lib.py",
+            "no_init/lib.py",
+        ],
+        original_undeclared_files=[
+            "project/__init__.py",
+        ],
+        expected_discovered=["project/__init__.py"],
+    )
 
 
 def test_identify_missing_ancestor_files() -> None:

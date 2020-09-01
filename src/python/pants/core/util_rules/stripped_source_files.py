@@ -5,9 +5,11 @@ import itertools
 from dataclasses import dataclass
 
 from pants.core.util_rules.source_files import SourceFiles
+from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.source.source_root import rules as source_root_rules
 
 
 @dataclass(frozen=True)
@@ -83,4 +85,4 @@ async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *source_root_rules(), *source_files_rules())

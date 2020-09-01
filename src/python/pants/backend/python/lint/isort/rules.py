@@ -17,7 +17,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules import source_files, stripped_source_files
+from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
     Digest,
@@ -158,6 +158,5 @@ def rules():
         UnionRule(PythonFmtRequest, IsortRequest),
         UnionRule(LintRequest, IsortRequest),
         *pex.rules(),
-        *source_files.rules(),
         *stripped_source_files.rules(),
     ]

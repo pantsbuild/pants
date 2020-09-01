@@ -5,6 +5,8 @@ from abc import ABCMeta, abstractmethod
 from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
+import pytest
+
 from pants.core.goals.lint import Lint, LintRequest, LintResult, LintResults, LintSubsystem, lint
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
@@ -15,8 +17,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockConsole, MockGet, run_rule_with_mocks
-from pants.testutil.test_base import TestBase
+from pants.testutil.rule_runner import MockConsole, MockGet, RuleRunner, run_rule_with_mocks
 from pants.util.logging import LogLevel
 
 
@@ -100,116 +101,122 @@ class InvalidRequest(MockLintRequest):
         return -1
 
 
-class LintTest(TestBase):
-    @staticmethod
-    def make_target(address: Optional[Address] = None) -> Target:
-        return MockTarget({}, address=address or Address.parse(":tests"))
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner()
 
-    def run_lint_rule(
-        self,
-        *,
-        lint_request_types: List[Type[LintRequest]],
-        targets: List[Target],
-        per_file_caching: bool,
-        include_sources: bool = True,
-    ) -> Tuple[int, str]:
-        console = MockConsole(use_colors=False)
-        workspace = Workspace(self.scheduler)
-        union_membership = UnionMembership({LintRequest: lint_request_types})
-        result: Lint = run_rule_with_mocks(
-            lint,
-            rule_args=[
-                console,
-                workspace,
-                Targets(targets),
-                create_goal_subsystem(
-                    LintSubsystem, per_file_caching=per_file_caching, per_target_caching=False
-                ),
-                union_membership,
-            ],
-            mock_gets=[
-                MockGet(
-                    product_type=LintResults,
-                    subject_type=LintRequest,
-                    mock=lambda field_set_collection: field_set_collection.lint_results,
-                ),
-                MockGet(
-                    product_type=FieldSetsWithSources,
-                    subject_type=FieldSetsWithSourcesRequest,
-                    mock=lambda field_sets: FieldSetsWithSources(
-                        field_sets if include_sources else ()
-                    ),
-                ),
-                MockGet(
-                    product_type=Digest, subject_type=MergeDigests, mock=lambda _: EMPTY_DIGEST
-                ),
-            ],
-            union_membership=union_membership,
+
+def make_target(address: Optional[Address] = None) -> Target:
+    return MockTarget({}, address=address or Address.parse(":tests"))
+
+
+def run_lint_rule(
+    rule_runner: RuleRunner,
+    *,
+    lint_request_types: List[Type[LintRequest]],
+    targets: List[Target],
+    per_file_caching: bool,
+    include_sources: bool = True,
+) -> Tuple[int, str]:
+    console = MockConsole(use_colors=False)
+    workspace = Workspace(rule_runner.scheduler)
+    union_membership = UnionMembership({LintRequest: lint_request_types})
+    result: Lint = run_rule_with_mocks(
+        lint,
+        rule_args=[
+            console,
+            workspace,
+            Targets(targets),
+            create_goal_subsystem(
+                LintSubsystem, per_file_caching=per_file_caching, per_target_caching=False
+            ),
+            union_membership,
+        ],
+        mock_gets=[
+            MockGet(
+                product_type=LintResults,
+                subject_type=LintRequest,
+                mock=lambda field_set_collection: field_set_collection.lint_results,
+            ),
+            MockGet(
+                product_type=FieldSetsWithSources,
+                subject_type=FieldSetsWithSourcesRequest,
+                mock=lambda field_sets: FieldSetsWithSources(field_sets if include_sources else ()),
+            ),
+            MockGet(product_type=Digest, subject_type=MergeDigests, mock=lambda _: EMPTY_DIGEST),
+        ],
+        union_membership=union_membership,
+    )
+    assert not console.stdout.getvalue()
+    return result.exit_code, console.stderr.getvalue()
+
+
+def test_empty_target_noops(rule_runner: RuleRunner) -> None:
+    def assert_noops(per_file_caching: bool) -> None:
+        exit_code, stderr = run_lint_rule(
+            rule_runner,
+            lint_request_types=[FailingRequest],
+            targets=[make_target()],
+            per_file_caching=per_file_caching,
+            include_sources=False,
         )
-        assert not console.stdout.getvalue()
-        return result.exit_code, console.stderr.getvalue()
+        assert exit_code == 0
+        assert stderr == ""
 
-    def test_empty_target_noops(self) -> None:
-        def assert_noops(per_file_caching: bool) -> None:
-            exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[FailingRequest],
-                targets=[self.make_target()],
-                per_file_caching=per_file_caching,
-                include_sources=False,
-            )
-            assert exit_code == 0
-            assert stderr == ""
+    assert_noops(per_file_caching=False)
+    assert_noops(per_file_caching=True)
 
-        assert_noops(per_file_caching=False)
-        assert_noops(per_file_caching=True)
 
-    def test_invalid_target_noops(self) -> None:
-        def assert_noops(per_file_caching: bool) -> None:
-            exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[InvalidRequest],
-                targets=[self.make_target()],
-                per_file_caching=per_file_caching,
-            )
-            assert exit_code == 0
-            assert stderr == ""
+def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
+    def assert_noops(per_file_caching: bool) -> None:
+        exit_code, stderr = run_lint_rule(
+            rule_runner,
+            lint_request_types=[InvalidRequest],
+            targets=[make_target()],
+            per_file_caching=per_file_caching,
+        )
+        assert exit_code == 0
+        assert stderr == ""
 
-        assert_noops(per_file_caching=False)
-        assert_noops(per_file_caching=True)
+    assert_noops(per_file_caching=False)
+    assert_noops(per_file_caching=True)
 
-    def test_summary(self) -> None:
-        """Test that we render the summary correctly.
 
-        This tests that we:
-        * Merge multiple results belonging to the same linter (`--per-file-caching`).
-        * Decide correctly between skipped, failed, and succeeded.
-        """
-        good_address = Address.parse(":good")
-        bad_address = Address.parse(":bad")
+def test_summary(rule_runner: RuleRunner) -> None:
+    """Test that we render the summary correctly.
 
-        def assert_expected(*, per_file_caching: bool) -> None:
-            exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[
-                    ConditionallySucceedsRequest,
-                    FailingRequest,
-                    SkippedRequest,
-                    SuccessfulRequest,
-                ],
-                targets=[self.make_target(good_address), self.make_target(bad_address)],
-                per_file_caching=per_file_caching,
-            )
-            assert exit_code == FailingRequest.exit_code([bad_address])
-            assert stderr == dedent(
-                """\
+    This tests that we:
+    * Merge multiple results belonging to the same linter (`--per-file-caching`).
+    * Decide correctly between skipped, failed, and succeeded.
+    """
+    good_address = Address.parse(":good")
+    bad_address = Address.parse(":bad")
 
-                𐄂 ConditionallySucceedsLinter failed.
-                𐄂 FailingLinter failed.
-                - SkippedLinter skipped.
-                ✓ SuccessfulLinter succeeded.
-                """
-            )
+    def assert_expected(*, per_file_caching: bool) -> None:
+        exit_code, stderr = run_lint_rule(
+            rule_runner,
+            lint_request_types=[
+                ConditionallySucceedsRequest,
+                FailingRequest,
+                SkippedRequest,
+                SuccessfulRequest,
+            ],
+            targets=[make_target(good_address), make_target(bad_address)],
+            per_file_caching=per_file_caching,
+        )
+        assert exit_code == FailingRequest.exit_code([bad_address])
+        assert stderr == dedent(
+            """\
 
-        assert_expected(per_file_caching=False)
-        assert_expected(per_file_caching=True)
+            𐄂 ConditionallySucceedsLinter failed.
+            𐄂 FailingLinter failed.
+            - SkippedLinter skipped.
+            ✓ SuccessfulLinter succeeded.
+            """
+        )
+
+    assert_expected(per_file_caching=False)
+    assert_expected(per_file_caching=True)
 
 
 def test_streaming_output_skip() -> None:

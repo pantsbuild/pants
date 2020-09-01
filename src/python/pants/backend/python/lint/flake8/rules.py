@@ -15,7 +15,7 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
 from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
-from pants.core.util_rules import source_files, stripped_source_files
+from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, DigestSubset, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult
@@ -160,6 +160,5 @@ def rules():
         *collect_rules(),
         UnionRule(LintRequest, Flake8Request),
         *pex.rules(),
-        *source_files.rules(),
         *stripped_source_files.rules(),
     ]

@@ -7,7 +7,7 @@ from typing import List, Optional
 import pytest
 
 from pants.core.util_rules import stripped_source_files
-from pants.core.util_rules.source_files import SourceFiles
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.scheduler import ExecutionError
@@ -22,6 +22,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *stripped_source_files.rules(),
+            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper)),
             QueryRule(StrippedSourceFiles, (SourceFiles, OptionsBootstrapper)),
         ]
     )

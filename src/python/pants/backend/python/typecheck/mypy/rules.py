@@ -17,7 +17,7 @@ from pants.backend.python.rules.python_sources import rules as python_sources_ru
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
-from pants.core.util_rules import pants_bin, source_files, stripped_source_files
+from pants.core.util_rules import pants_bin
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     CreateDigest,
@@ -130,9 +130,7 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(TypecheckRequest, MyPyRequest),
-        *source_files.rules(),
         *pants_bin.rules(),
         *pex_rules(),
         *python_sources_rules(),
-        *stripped_source_files.rules(),
     ]

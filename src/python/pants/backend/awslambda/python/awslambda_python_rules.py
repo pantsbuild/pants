@@ -12,7 +12,7 @@ from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandler,
     PythonAwsLambdaRuntime,
 )
-from pants.backend.python.rules import pex, pex_from_targets, python_sources
+from pants.backend.python.rules import pex_from_targets
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -26,7 +26,6 @@ from pants.backend.python.rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
-from pants.core.util_rules import stripped_source_files
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
@@ -125,8 +124,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(AWSLambdaFieldSet, PythonAwsLambdaFieldSet),
-        *python_sources.rules(),
-        *pex.rules(),
         *pex_from_targets.rules(),
-        *stripped_source_files.rules(),
     ]
