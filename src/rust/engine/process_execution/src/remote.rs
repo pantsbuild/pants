@@ -991,13 +991,6 @@ pub fn make_execute_request(
     platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
   }
 
-  if !platform_properties
-    .iter()
-    .any(|(k, _)| k == "target_platform")
-  {
-    platform_properties.push(("target_platform".to_owned(), req.target_platform.into()));
-  }
-
   for (name, value) in platform_properties {
     command.mut_platform().mut_properties().push({
       let mut property = bazel_protos::remote_execution::Platform_Property::new();
