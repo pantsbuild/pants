@@ -28,7 +28,7 @@ def test_visualize_to():
 def test_graceful_termination():
     result = run_pants(
         [
-            "--backend-packages=['pants.backend.python', 'internal_backend.rules_for_testing']",
+            "--backend-packages=['pants.backend.python', 'internal_plugins.rules_for_testing']",
             "list-and-die-for-testing",
             "examples/src/python/example/hello/greet",
         ]

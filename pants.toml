@@ -2,8 +2,7 @@
 print_exception_stacktrace = true
 
 # Enable our custom loose-source plugins.
-pythonpath = ["%(buildroot)s/pants-plugins/src/python"]
-
+pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.python",
   "pants.backend.python.lint.black",
@@ -11,7 +10,7 @@ backend_packages.add = [
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "pants.backend.python.typecheck.mypy",
-  "internal_backend.utilities",
+  "internal_plugins.releases",
 ]
 
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
@@ -47,7 +46,8 @@ root_patterns = [
   "tests/*",
   "3rdparty/*",
   "/build-support/bin",
-  "/build-support/migration-support"
+  "/build-support/migration-support",
+  "/pants-plugins",
 ]
 
 [python-setup]
@@ -77,7 +77,7 @@ config = "build-support/mypy/mypy.ini"
 interpreter_constraints=["CPython>=3.6"]
 
 [pants-releases]
-branch_notes = """
+release_notes = """
 {
   'master': 'src/python/pants/notes/master.rst',
   '1.0.x': 'src/python/pants/notes/1.0.x.rst',

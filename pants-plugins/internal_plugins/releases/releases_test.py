@@ -2,9 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import pytest
+from internal_plugins.releases.register import PantsReleases
 from packaging.version import InvalidVersion, Version
-
-from internal_backend.utilities.register import PantsReleases
 
 
 def _branch_name(revision_str: str) -> str:

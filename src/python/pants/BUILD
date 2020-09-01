@@ -22,7 +22,7 @@ python_distribution(
     ':entry_point',
     ':version',
   ],
-  provides=pants_setup_py(
+  provides=setup_py(
     name='pantsbuild.pants',
     description='A scalable build tool for large, complex, heterogeneous repos.',
     namespace_packages=['pants', 'pants.backend'],

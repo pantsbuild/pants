@@ -7,11 +7,11 @@ python_distribution(
     ':testutil',
     ':int-test-for-export',
   ],
-  provides=pants_setup_py(
+  provides=setup_py(
     name='pantsbuild.pants.testutil',
     description='Test support for writing Pants plugins.',
     namespace_packages=['pants.testutil'],
-    additional_classifiers=[
+    classifiers=[
       'Topic :: Software Development :: Testing',
     ]
   )
