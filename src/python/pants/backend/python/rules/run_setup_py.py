@@ -168,16 +168,26 @@ class SetupPySources:
 
 
 @dataclass(frozen=True)
-class SetupPyKwargsRequest:
-    exported_target: ExportedTarget
+class SetupKwargsRequest:
+    """A request to generate the kwargs for `setup()` for some target."""
+
+    _exported_target: ExportedTarget
     requirements: ExportedTargetRequirements
     sources: SetupPySources
+
+    @property
+    def target(self) -> Target:
+        return self._exported_target.target
+
+    @property
+    def provides(self) -> PythonArtifact:
+        return self._exported_target.provides
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class SetupPyKwargs:
-    """The keyword arguments to put in the setup.py file."""
+class SetupKwargs:
+    """The keyword arguments to the `setup()` function in the generated `setup.py`."""
 
     json_str: str
 
@@ -209,7 +219,7 @@ class SetupPyChroot:
     digest: Digest
     # The keywords are embedded in the setup.py file in the Digest, so this isn't strictly needed
     # here, but it is convenient for testing.
-    setup_keywords: SetupPyKwargs
+    setup_keywords: SetupKwargs
 
 
 @dataclass(frozen=True)
@@ -436,7 +446,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     # Generate the setup script.
     setup_kwargs = await Get(
-        SetupPyKwargs, SetupPyKwargsRequest(exported_target, requirements, sources)
+        SetupKwargs, SetupKwargsRequest(exported_target, requirements, sources)
     )
     setup_py_content = SETUP_BOILERPLATE.format(
         target_address_spec=exported_target.target.address.spec,
@@ -458,11 +468,8 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
 
 @rule
-async def determine_setup_kwargs(request: SetupPyKwargsRequest) -> SetupPyKwargs:
-    provides = request.exported_target.provides
-    target = request.exported_target.target
-
-    setup_kwargs = provides.setup_py_keywords.copy()
+async def determine_setup_kwargs(request: SetupKwargsRequest) -> SetupKwargs:
+    setup_kwargs = request.provides.setup_py_keywords.copy()
     setup_kwargs.update(
         {
             "package_dir": {"": CHROOT_SOURCE_ROOT},
@@ -474,13 +481,15 @@ async def determine_setup_kwargs(request: SetupPyKwargsRequest) -> SetupPyKwargs
     )
 
     # Handle `with_binaries()`.
-    key_to_binary_spec = provides.binaries
+    key_to_binary_spec = request.provides.binaries
     keys = list(key_to_binary_spec.keys())
     addresses = await MultiGet(
         Get(
             Address,
             AddressInput,
-            AddressInput.parse(key_to_binary_spec[key], relative_to=target.address.spec_path),
+            AddressInput.parse(
+                key_to_binary_spec[key], relative_to=request.target.address.spec_path
+            ),
         )
         for key in keys
     )
@@ -489,13 +498,13 @@ async def determine_setup_kwargs(request: SetupPyKwargsRequest) -> SetupPyKwargs
         binary_entry_point = binary.get(PythonEntryPoint).value
         if not binary_entry_point:
             raise InvalidEntryPoint(
-                f"The binary {key} exported by {target.address} is not a valid entry point."
+                f"The binary {key} exported by {request.target.address} is not a valid entry point."
             )
         entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
         console_scripts.append(f"{key}={binary_entry_point}")
 
-    return SetupPyKwargs(setup_kwargs)
+    return SetupKwargs(setup_kwargs)
 
 
 @rule
