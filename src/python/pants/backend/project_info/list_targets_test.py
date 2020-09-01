@@ -89,7 +89,7 @@ def test_list_documented() -> None:
 
 
 def test_list_provides() -> None:
-    sample_artifact = PythonArtifact(name="project.demo", version="0.0.0.1")
+    sample_artifact = PythonArtifact(name="project.demo")
     targets = [
         MockTarget({ProvidesField.alias: sample_artifact}, address=Address.parse(":provided")),
         MockTarget({}, address=Address.parse(":not_provided")),

@@ -4,8 +4,9 @@
 import itertools
 import json
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Set, Tuple, cast
+from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.rules.pex import (
@@ -63,10 +64,12 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TransitiveTargets,
 )
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, union
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
+from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -178,14 +181,84 @@ class SetupPyChrootRequest:
     py2: bool  # Whether to use py2 or py3 package semantics.
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class SetupKwargs:
+    """The keyword arguments to the `setup()` function in the generated `setup.py`."""
+
+    json_str: str
+
+    def __init__(
+        self, kwargs: Mapping[str, Any], *, address: Address, _allow_banned_keys: bool = False
+    ) -> None:
+        super().__init__()
+        if "version" not in kwargs:
+            raise ValueError(f"Missing a `version` kwarg in the `provides` field for {address}.")
+
+        if not _allow_banned_keys:
+            for arg in {"data_files", "package_dir", "package_data", "packages"}:
+                if arg in kwargs:
+                    raise ValueError(
+                        f"{arg} cannot be set in the `provides` field for {address}, but it was "
+                        f"set to {kwargs[arg]}. Pants will dynamically set the value for you."
+                    )
+
+        # We convert to a `str` so that this type can be hashable. We don't use `FrozenDict`
+        # because it would require that all values are immutable, and we may have lists and
+        # dictionaries as values. It's too difficult/clunky to convert those all, then to convert
+        # them back out of `FrozenDict`.
+        self.json_str = json.dumps(kwargs, sort_keys=True)
+
+    @memoized_property
+    def kwargs(self) -> Dict[str, Any]:
+        return cast(Dict[str, Any], json.loads(self.json_str))
+
+    @property
+    def name(self) -> str:
+        return cast(str, self.kwargs["name"])
+
+    @property
+    def version(self) -> str:
+        return cast(str, self.kwargs["version"])
+
+
+@union
+@dataclass(frozen=True)  # type: ignore[misc]
+class SetupKwargsPluginRequest(ABC):
+    """An entry point to customize the kwargs used for the `setup()` function, rather than the
+    default behavior of using what was explicitly provided in the BUILD file.
+
+    To add a plugin, subclass `SetupKwargsPluginRequest`, register the rule
+    `UnionRule(SetupKwargsPluginRequest, MyCustomSetupKwargsPluginRequest)`, and add a rule that
+    takes your subclass as a parameter and returns `SetupKwargs`.
+    """
+
+    target: Target
+
+    @classmethod
+    @abstractmethod
+    def is_valid(cls, target: Target) -> bool:
+        """Whether the kwargs implementation should be used for this target or not."""
+
+    @property
+    def explicit_kwargs(self) -> Dict[str, Any]:
+        return self.target[PythonProvidesField].value.kwargs
+
+
+class FinalizedSetupKwargs(SetupKwargs):
+    """The final kwargs used for the `setup()` function, after Pants added requirements and sources
+    information."""
+
+    def __init__(self, kwargs: Mapping[str, Any], *, address: Address) -> None:
+        super().__init__(kwargs, address=address, _allow_banned_keys=True)
+
+
 @dataclass(frozen=True)
 class SetupPyChroot:
     """A chroot containing a generated setup.py and the sources it operates on."""
 
     digest: Digest
-    # The keywords are embedded in the setup.py file in the digest, so these aren't
-    # strictly needed here, but they are convenient for testing.
-    setup_keywords_json: str
+    setup_kwargs: FinalizedSetupKwargs
 
 
 @dataclass(frozen=True)
@@ -341,8 +414,9 @@ async def run_setup_pys(
         # Just dump the chroot.
         for exported_target, chroot in zip(exported_targets, chroots):
             addr = exported_target.target.address.spec
-            provides = exported_target.provides
-            setup_py_dir = distdir.relpath / f"{provides.name}-{provides.version}"
+            setup_py_dir = (
+                distdir.relpath / f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}"
+            )
             logger.info(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
             workspace.write_digest(chroot.digest, path_prefix=str(setup_py_dir))
 
@@ -391,6 +465,29 @@ async def run_setup_py(
 
 
 @rule
+async def determine_setup_kwargs(
+    exported_target: ExportedTarget, union_membership: UnionMembership
+) -> SetupKwargs:
+    target = exported_target.target
+    plugin_requests = union_membership.get(SetupKwargsPluginRequest)  # type: ignore[misc]
+
+    # If no plugins, simply return what the user explicitly specified in a BUILD file.
+    if not plugin_requests:
+        return SetupKwargs(exported_target.provides.kwargs, address=target.address)
+
+    if len(plugin_requests) > 1:
+        possible_plugins = sorted(plugin.__name__ for plugin in plugin_requests)
+        raise ValueError(
+            f"Multiple of the registered `SetupKwargsPluginRequest`s can work on the target "
+            f"{target.address}, and it's ambiguous which to use: {possible_plugins}\n\nPlease "
+            "activate fewer implementations, or make the classmethod `is_valid()` more precise so "
+            "that only one plugin implementation is valid for this target."
+        )
+    plugin_request = tuple(plugin_requests)[0]
+    return await Get(SetupKwargs, SetupKwargsPluginRequest, plugin_request(target))
+
+
+@rule
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     exported_target = request.exported_target
 
@@ -413,8 +510,9 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     target = exported_target.target
     provides = exported_target.provides
 
-    # Generate the kwargs to the setup() call.
-    setup_kwargs = provides.kwargs.copy()
+    # Generate the kwargs for the setup() call. We use a rule to get
+    resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, exported_target)
+    setup_kwargs = resolved_setup_kwargs.kwargs.copy()
     setup_kwargs.update(
         {
             "package_dir": {"": CHROOT_SOURCE_ROOT},
@@ -461,7 +559,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     )
 
     chroot_digest = await Get(Digest, MergeDigests((src_digest, extra_files_digest)))
-    return SetupPyChroot(chroot_digest, json.dumps(setup_kwargs, sort_keys=True))
+    return SetupPyChroot(chroot_digest, FinalizedSetupKwargs(setup_kwargs, address=target.address))
 
 
 @rule
@@ -544,10 +642,13 @@ async def get_requirements(
     req_strs = list(reqs)
 
     # Add the requirements on any exported targets on which we depend.
-    exported_targets_we_depend_on = await MultiGet(
-        Get(ExportedTarget, OwnedDependency(tgt)) for tgt in owned_by_others
+    kwargs_for_exported_targets_we_depend_on = await MultiGet(
+        Get(SetupKwargs, OwnedDependency(tgt)) for tgt in owned_by_others
     )
-    req_strs.extend(et.provides.requirement for et in set(exported_targets_we_depend_on))
+    req_strs.extend(
+        f"{kwargs.name}=={kwargs.version}"
+        for kwargs in set(kwargs_for_exported_targets_we_depend_on)
+    )
 
     return ExportedTargetRequirements(req_strs)
 
