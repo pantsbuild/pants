@@ -1,7 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::core::{Function, TypeId};
@@ -72,6 +71,13 @@ impl DisplayForGraph for Rule {
 impl rule_graph::Rule for Rule {
   type TypeId = TypeId;
   type DependencyKey = DependencyKey;
+
+  fn product(&self) -> TypeId {
+    match self {
+      Rule::Task(t) => t.product,
+      Rule::Intrinsic(i) => i.product,
+    }
+  }
 
   fn dependency_keys(&self) -> Vec<DependencyKey> {
     match self {
@@ -165,11 +171,9 @@ pub struct Intrinsic {
 ///
 #[derive(Clone, Debug)]
 pub struct Tasks {
-  // output product type -> list of rules providing it
-  rules: BTreeMap<TypeId, Vec<Rule>>,
-  // Used during the construction of the tasks map.
+  rules: Vec<Rule>,
+  // Used during the construction of a rule.
   preparing: Option<Task>,
-  // queries
   queries: Vec<Query<Rule>>,
 }
 
@@ -186,13 +190,13 @@ pub struct Tasks {
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
-      rules: BTreeMap::default(),
+      rules: Vec::default(),
       preparing: None,
       queries: Vec::default(),
     }
   }
 
-  pub fn as_map(&self) -> &BTreeMap<TypeId, Vec<Rule>> {
+  pub fn rules(&self) -> &Vec<Rule> {
     &self.rules
   }
 
@@ -202,7 +206,7 @@ impl Tasks {
 
   pub fn intrinsics_set(&mut self, intrinsics: &Intrinsics) {
     for intrinsic in intrinsics.keys() {
-      self.insert_rule(intrinsic.product, Rule::Intrinsic(intrinsic.clone()))
+      self.rules.push(Rule::Intrinsic(intrinsic.clone()))
     }
   }
 
@@ -259,19 +263,7 @@ impl Tasks {
       .preparing
       .take()
       .expect("Must `begin()` a task creation before ending it!");
-    self.insert_rule(task.product, Rule::Task(task))
-  }
-
-  fn insert_rule(&mut self, product: TypeId, rule: Rule) {
-    let rules = self.rules.entry(product).or_insert_with(Vec::new);
-    assert!(
-      !rules.contains(&rule),
-      "{:?} was double-registered for {:?}: {:?}",
-      rule,
-      product,
-      rules,
-    );
-    rules.push(rule);
+    self.rules.push(Rule::Task(task))
   }
 
   pub fn query_add(&mut self, product: TypeId, params: Vec<TypeId>) {

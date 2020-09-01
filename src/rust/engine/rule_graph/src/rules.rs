@@ -78,6 +78,11 @@ pub trait Rule: Clone + Debug + Display + Hash + Eq + Sized + DisplayForGraph + 
   type DependencyKey: DependencyKey<TypeId = Self::TypeId>;
 
   ///
+  /// Returns the product (output) type for this Rule.
+  ///
+  fn product(&self) -> Self::TypeId;
+
+  ///
   /// Return keys for the dependencies of this Rule.
   ///
   fn dependency_keys(&self) -> Vec<Self::DependencyKey>;

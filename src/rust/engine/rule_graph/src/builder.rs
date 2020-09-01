@@ -171,21 +171,29 @@ type MonomorphizedGraph<R> = DiGraph<
 /// Given the set of Rules and Queries, produce a RuleGraph that allows dependency nodes
 /// to be found statically.
 ///
-pub struct Builder<'t, R: Rule> {
-  rules: &'t BTreeMap<R::TypeId, Vec<R>>,
+pub struct Builder<R: Rule> {
+  rules: BTreeMap<R::TypeId, Vec<R>>,
   queries: Vec<Query<R>>,
   params: ParamTypes<R::TypeId>,
 }
 
-impl<'t, R: Rule> Builder<'t, R> {
-  pub fn new(rules: &'t BTreeMap<R::TypeId, Vec<R>>, queries: Vec<Query<R>>) -> Builder<'t, R> {
+impl<R: Rule> Builder<R> {
+  pub fn new(rules: Vec<R>, queries: Vec<Query<R>>) -> Builder<R> {
+    // Group rules by product/return type.
+    let mut rules_by_type = BTreeMap::new();
+    for rule in rules {
+      rules_by_type
+        .entry(rule.product())
+        .or_insert_with(Vec::new)
+        .push(rule);
+    }
     // The set of all input Params in the graph: ie, those provided either via Queries, or via
     // a Rule with a DependencyKey that provides a Param.
     let params = queries
       .iter()
       .flat_map(|query| query.params.iter().cloned())
       .chain(
-        rules
+        rules_by_type
           .values()
           .flatten()
           .flat_map(|rule| rule.dependency_keys())
@@ -193,7 +201,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       )
       .collect::<ParamTypes<_>>();
     Builder {
-      rules,
+      rules: rules_by_type,
       queries,
       params,
     }
