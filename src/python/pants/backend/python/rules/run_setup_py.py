@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-import json
 import logging
+import pickle
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Set, Tuple, cast
@@ -186,7 +186,7 @@ class SetupPyChrootRequest:
 class SetupKwargs:
     """The keyword arguments to the `setup()` function in the generated `setup.py`."""
 
-    json_str: str
+    _pickled_bytes: bytes
 
     def __init__(
         self, kwargs: Mapping[str, Any], *, address: Address, _allow_banned_keys: bool = False
@@ -203,15 +203,15 @@ class SetupKwargs:
                         f"set to {kwargs[arg]}. Pants will dynamically set the value for you."
                     )
 
-        # We convert to a `str` so that this type can be hashable. We don't use `FrozenDict`
-        # because it would require that all values are immutable, and we may have lists and
-        # dictionaries as values. It's too difficult/clunky to convert those all, then to convert
-        # them back out of `FrozenDict`.
-        self.json_str = json.dumps(kwargs, sort_keys=True)
+        # We serialize with `pickle` so that is hashable. We don't use `FrozenDict` because it
+        # would require that all values are immutable, and we may have lists and dictionaries as
+        # values. It's too difficult/clunky to convert those all, then to convert them back out of
+        # `FrozenDict`. We don't use JSON because it does not preserve data types like `tuple`.
+        self._pickled_bytes = pickle.dumps({k: v for k, v in sorted(kwargs.items())})
 
     @memoized_property
     def kwargs(self) -> Dict[str, Any]:
-        return cast(Dict[str, Any], json.loads(self.json_str))
+        return cast(Dict[str, Any], pickle.loads(self._pickled_bytes))
 
     @property
     def name(self) -> str:
