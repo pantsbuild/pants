@@ -222,9 +222,9 @@ class SetupKwargs:
         return cast(str, self.kwargs["version"])
 
 
-# Note: This only exists as a hook for plugins. To resolve `SetupKwargs`, call
-# `await Get(SetupKwargs, ExportedTarget)`, which handles running any plugin implementations vs.
-# using the default implementation.
+# Note: This only exists as a hook for additional logic for the `setup()` kwargs, e.g. for plugin
+# authors. To resolve `SetupKwargs`, call `await Get(SetupKwargs, ExportedTarget)`, which handles
+# running any custom implementations vs. using the default implementation.
 @union
 @dataclass(frozen=True)  # type: ignore[misc]
 class SetupKwargsRequest(ABC):
@@ -472,25 +472,26 @@ async def determine_setup_kwargs(
     exported_target: ExportedTarget, union_membership: UnionMembership
 ) -> SetupKwargs:
     target = exported_target.target
-    plugin_requests = union_membership.get(SetupKwargsRequest)  # type: ignore[misc]
+    setup_kwargs_requests = union_membership.get(SetupKwargsRequest)  # type: ignore[misc]
+    applicable_setup_kwargs_requests = tuple(
+        request for request in setup_kwargs_requests if request.is_applicable(target)
+    )
 
-    # If no plugins, simply return what the user explicitly specified in a BUILD file.
-    if not plugin_requests:
+    # If no provided implementations, fall back to our default implementation that simply returns
+    # what the user explicitly specified in the BUILD file.
+    if not applicable_setup_kwargs_requests:
         return SetupKwargs(exported_target.provides.kwargs, address=target.address)
 
-    applicable_plugin_requests = tuple(
-        plugin_request for plugin_request in plugin_requests if plugin_request.is_applicable(target)
-    )
-    if len(applicable_plugin_requests) > 1:
-        possible_plugins = sorted(plugin.__name__ for plugin in applicable_plugin_requests)
+    if len(applicable_setup_kwargs_requests) > 1:
+        possible_requests = sorted(plugin.__name__ for plugin in applicable_setup_kwargs_requests)
         raise ValueError(
             f"Multiple of the registered `SetupKwargsRequest`s can work on the target "
-            f"{target.address}, and it's ambiguous which to use: {possible_plugins}\n\nPlease "
+            f"{target.address}, and it's ambiguous which to use: {possible_requests}\n\nPlease "
             "activate fewer implementations, or make the classmethod `is_applicable()` more "
-            "precise so that only one plugin implementation is applicable for this target."
+            "precise so that only one implementation is applicable for this target."
         )
-    plugin_request = tuple(applicable_plugin_requests)[0]
-    return await Get(SetupKwargs, SetupKwargsRequest, plugin_request(target))
+    setup_kwargs_request = tuple(applicable_setup_kwargs_requests)[0]
+    return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request(target))
 
 
 @rule
