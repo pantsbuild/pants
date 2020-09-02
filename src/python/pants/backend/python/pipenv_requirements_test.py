@@ -91,6 +91,45 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_properly_creates_extras_requirements(rule_runner: RuleRunner) -> None:
+    """This tests the proper parsing of requirements installed with specified extras."""
+    assert_pipenv_requirements(
+        rule_runner,
+        "pipenv_requirements()",
+        {
+            "default": {"ansicolors": {"version": ">=1.18.0", "extras": ["neon"]}},
+            "develop": {
+                "cachetools": {
+                    "markers": "python_version ~= '3.5'",
+                    "version": "==4.1.1",
+                    "extras": ["ring", "mongo"],
+                }
+            },
+        },
+        expected_file_dep=PythonRequirementsFile(
+            {"sources": ["Pipfile.lock"]}, address=Address("", target_name="Pipfile.lock")
+        ),
+        expected_targets=[
+            PythonRequirementLibrary(
+                {
+                    "requirements": [Requirement.parse("ansicolors[neon]>=1.18.0")],
+                    "dependencies": [":Pipfile.lock"],
+                },
+                address=Address("", target_name="ansicolors"),
+            ),
+            PythonRequirementLibrary(
+                {
+                    "requirements": [
+                        Requirement.parse("cachetools[ring,mongo]==4.1.1;python_version ~= '3.5'")
+                    ],
+                    "dependencies": [":Pipfile.lock"],
+                },
+                address=Address("", target_name="cachetools"),
+            ),
+        ],
+    )
+
+
 def test_supply_python_requirements_file(rule_runner: RuleRunner) -> None:
     """This tests that we can supply our own `_python_requirements_file`."""
     assert_pipenv_requirements(
