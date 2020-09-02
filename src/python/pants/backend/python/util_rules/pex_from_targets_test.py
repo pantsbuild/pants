@@ -6,10 +6,10 @@ from typing import Optional
 
 import pytest
 
-from pants.backend.python.rules import pex_from_targets
-from pants.backend.python.rules.pex import PexRequest, PexRequirements
-from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.pex import PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule

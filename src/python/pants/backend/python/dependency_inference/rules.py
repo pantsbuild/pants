@@ -9,9 +9,9 @@ from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwner
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
-from pants.backend.python.rules import ancestor_files
-from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
+from pants.backend.python.util_rules import ancestor_files
+from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import Digest, DigestContents

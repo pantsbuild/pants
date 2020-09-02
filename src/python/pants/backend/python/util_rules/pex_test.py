@@ -10,7 +10,8 @@ from typing import Dict, Iterable, Iterator, List, Optional, Tuple, cast
 import pytest
 from pkg_resources import Requirement
 
-from pants.backend.python.rules.pex import (
+from pants.backend.python.target_types import PythonInterpreterCompatibility
+from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexPlatforms,
@@ -18,8 +19,7 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.pex import rules as pex_rules
-from pants.backend.python.target_types import PythonInterpreterCompatibility
+from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult

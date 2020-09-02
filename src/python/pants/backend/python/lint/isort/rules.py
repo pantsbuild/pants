@@ -6,15 +6,15 @@ from typing import Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
-from pants.backend.python.rules import pex
-from pants.backend.python.rules.pex import (
+from pants.backend.python.target_types import PythonSources
+from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexProcess,
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import stripped_source_files

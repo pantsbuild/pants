@@ -7,13 +7,13 @@ from typing import Iterable, List, Optional, Type
 import pytest
 
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
-from pants.backend.python.rules.python_sources import (
+from pants.backend.python.target_types import PythonSources
+from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
-from pants.backend.python.rules.python_sources import rules as python_sources_rules
-from pants.backend.python.target_types import PythonSources
+from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule

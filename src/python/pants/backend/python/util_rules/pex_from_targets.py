@@ -9,23 +9,23 @@ from typing import Iterable, Optional, Tuple
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement, parse_requirements
 
-from pants.backend.python.rules.pex import (
+from pants.backend.python.target_types import (
+    PythonInterpreterCompatibility,
+    PythonRequirementsField,
+)
+from pants.backend.python.util_rules.pex import (
     PexInterpreterConstraints,
     PexPlatforms,
     PexRequest,
     PexRequirements,
     TwoStepPexRequest,
 )
-from pants.backend.python.rules.pex import rules as pex_rules
-from pants.backend.python.rules.python_sources import (
+from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
-from pants.backend.python.rules.python_sources import rules as python_sources_rules
-from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonRequirementsField,
-)
+from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
     Digest,

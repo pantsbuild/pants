@@ -7,15 +7,18 @@ from io import StringIO
 from pathlib import PurePath
 from typing import List, Optional, Tuple, cast
 
-from pants.backend.python.rules.pex import (
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexProcess,
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFiles,
+    PythonSourceFilesRequest,
+)
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,

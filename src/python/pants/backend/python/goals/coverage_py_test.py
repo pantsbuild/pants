@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import pytest
 
-from pants.backend.python.rules.coverage import CoverageSubsystem, create_coverage_config
+from pants.backend.python.goals.coverage_py import CoverageSubsystem, create_coverage_config
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks

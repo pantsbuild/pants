@@ -4,10 +4,10 @@
 import pytest
 
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
-from pants.backend.python.rules import pex_from_targets
-from pants.backend.python.rules import repl as python_repl
-from pants.backend.python.rules.pex import PexProcess
+from pants.backend.python.goals import repl as python_repl
 from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.pex import PexProcess
 from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
 from pants.engine.process import Process

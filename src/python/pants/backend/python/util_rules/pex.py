@@ -18,15 +18,15 @@ from typing import (
     TypeVar,
 )
 
+from pkg_resources import Requirement
 from typing_extensions import Protocol
 
-from pants.backend.python.rules import pex_cli
-from pants.backend.python.rules.pex_cli import PexCliProcess
-from pants.backend.python.rules.pex_environment import PexEnvironment, PexRuntimeEnvironment
-from pants.backend.python.rules.util import parse_interpreter_constraint
 from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
+from pants.backend.python.util_rules import pex_cli
+from pants.backend.python.util_rules.pex_cli import PexCliProcess
+from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexRuntimeEnvironment
 from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
@@ -61,6 +61,19 @@ class PexRequirements(DeduplicatedCollection[str]):
     ) -> "PexRequirements":
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
         return PexRequirements({*field_requirements, *additional_requirements})
+
+
+def parse_interpreter_constraint(constraint: str) -> Requirement:
+    """Parse an interpreter constraint, e.g., CPython>=2.7,<3.
+
+    We allow shorthand such as `>=3.7`, which gets expanded to `CPython>=3.7`. See Pex's
+    interpreter.py's `parse_requirement()`.
+    """
+    try:
+        parsed_requirement = Requirement.parse(constraint)
+    except ValueError:
+        parsed_requirement = Requirement.parse(f"CPython{constraint}")
+    return parsed_requirement
 
 
 Spec = Tuple[str, str]  # e.g. (">=", "3.6")

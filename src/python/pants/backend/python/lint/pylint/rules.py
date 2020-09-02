@@ -7,23 +7,23 @@ from dataclasses import dataclass
 from typing import Iterable, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
-from pants.backend.python.rules import pex, python_sources
-from pants.backend.python.rules.pex import (
+from pants.backend.python.target_types import (
+    PythonInterpreterCompatibility,
+    PythonRequirementsField,
+    PythonSources,
+)
+from pants.backend.python.util_rules import pex, python_sources
+from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexProcess,
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.python_sources import (
+from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
-)
-from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonRequirementsField,
-    PythonSources,
 )
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest

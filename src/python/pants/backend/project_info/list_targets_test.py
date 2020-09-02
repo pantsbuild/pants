@@ -5,7 +5,7 @@ from textwrap import dedent
 from typing import List, Optional, Tuple, cast
 
 from pants.backend.project_info.list_targets import ListSubsystem, list_targets
-from pants.backend.python.python_artifact import PythonArtifact
+from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import DescriptionField, ProvidesField, Target, UnexpandedTargets
 from pants.testutil.option_util import create_goal_subsystem

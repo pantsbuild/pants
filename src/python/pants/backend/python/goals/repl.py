@@ -1,11 +1,14 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.rules.pex import Pex, PexRequest, PexRequirements
-from pants.backend.python.rules.pex_environment import PexEnvironment
-from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
 from pants.backend.python.subsystems.ipython import IPython
+from pants.backend.python.util_rules.pex import Pex, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFiles,
+    PythonSourceFilesRequest,
+)
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests

@@ -3,12 +3,15 @@
 
 import os
 
-from pants.backend.python.rules.create_python_binary import PythonBinaryFieldSet
-from pants.backend.python.rules.pex import Pex, PexRequest
-from pants.backend.python.rules.pex_environment import PexEnvironment
-from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
+from pants.backend.python.goals.create_python_binary import PythonBinaryFieldSet
 from pants.backend.python.target_types import PythonBinaryDefaults, PythonBinarySources
+from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFiles,
+    PythonSourceFilesRequest,
+)
 from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
