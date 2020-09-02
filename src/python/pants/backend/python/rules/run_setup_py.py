@@ -507,10 +507,10 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         Get(ExportedTargetRequirements, DependencyOwner(exported_target)),
     )
 
+    # Generate the kwargs for the setup() call. In addition to using the kwargs that are either
+    # explicitly provided or generated via a user's plugin, we add additional kwargs based on the
+    # resolved requirements and sources.
     target = exported_target.target
-    provides = exported_target.provides
-
-    # Generate the kwargs for the setup() call. We use a rule to get
     resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, exported_target)
     setup_kwargs = resolved_setup_kwargs.kwargs.copy()
     setup_kwargs.update(
@@ -522,7 +522,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             "install_requires": tuple(requirements),
         }
     )
-    key_to_binary_spec = provides.binaries
+    key_to_binary_spec = exported_target.provides.binaries
     keys = list(key_to_binary_spec.keys())
     addresses = await MultiGet(
         Get(
