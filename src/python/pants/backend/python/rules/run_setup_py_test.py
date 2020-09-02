@@ -19,7 +19,7 @@ from pants.backend.python.rules.run_setup_py import (
     OwnedDependencies,
     OwnedDependency,
     SetupKwargs,
-    SetupKwargsPluginRequest,
+    SetupKwargsRequest,
     SetupPyChroot,
     SetupPyChrootRequest,
     SetupPySources,
@@ -67,15 +67,15 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
     )
 
 
-# We use a trivial test that our SetupKwargs plugin entry-point works.
-class SetupKwargsPluginDemo(SetupKwargsPluginRequest):
+# We use a trivial test that our SetupKwargs plugin hook works.
+class PluginSetupKwargsRequest(SetupKwargsRequest):
     @classmethod
-    def is_valid(cls, _) -> bool:
+    def is_applicable(cls, _) -> bool:
         return True
 
 
 @rule
-def setup_kwargs_plugin(request: SetupKwargsPluginDemo) -> SetupKwargs:
+def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
     return SetupKwargs(
         {**request.explicit_kwargs, "plugin_demo": "hello world"}, address=request.target.address
     )
@@ -93,7 +93,7 @@ def chroot_rule_runner() -> RuleRunner:
             get_exporting_owner,
             *python_sources.rules(),
             setup_kwargs_plugin,
-            UnionRule(SetupKwargsPluginRequest, SetupKwargsPluginDemo),
+            UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
             QueryRule(SetupPyChroot, (SetupPyChrootRequest, OptionsBootstrapper)),
         ]
     )

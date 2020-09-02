@@ -222,22 +222,25 @@ class SetupKwargs:
         return cast(str, self.kwargs["version"])
 
 
+# Note: This only exists as a hook for plugins. To resolve `SetupKwargs`, call
+# `await Get(SetupKwargs, ExportedTarget)`, which handles running any plugin implementations vs.
+# using the default implementation.
 @union
 @dataclass(frozen=True)  # type: ignore[misc]
-class SetupKwargsPluginRequest(ABC):
-    """An entry point to customize the kwargs used for the `setup()` function, rather than the
-    default behavior of using what was explicitly provided in the BUILD file.
+class SetupKwargsRequest(ABC):
+    """A request to allow setting the kwargs passed to the `setup()` function.
 
-    To add a plugin, subclass `SetupKwargsPluginRequest`, register the rule
-    `UnionRule(SetupKwargsPluginRequest, MyCustomSetupKwargsPluginRequest)`, and add a rule that
-    takes your subclass as a parameter and returns `SetupKwargs`.
+    By default, Pants will pass the kwargs provided in the BUILD file unchanged. To customize this
+    behavior, subclass `SetupKwargsRequest`, register the rule `UnionRule(SetupKwargsRequest,
+    MyCustomSetupKwargsRequest)`, and add a rule that takes your subclass as a parameter and returns
+    `SetupKwargs`.
     """
 
     target: Target
 
     @classmethod
     @abstractmethod
-    def is_valid(cls, target: Target) -> bool:
+    def is_applicable(cls, target: Target) -> bool:
         """Whether the kwargs implementation should be used for this target or not."""
 
     @property
@@ -469,25 +472,25 @@ async def determine_setup_kwargs(
     exported_target: ExportedTarget, union_membership: UnionMembership
 ) -> SetupKwargs:
     target = exported_target.target
-    plugin_requests = union_membership.get(SetupKwargsPluginRequest)  # type: ignore[misc]
+    plugin_requests = union_membership.get(SetupKwargsRequest)  # type: ignore[misc]
 
     # If no plugins, simply return what the user explicitly specified in a BUILD file.
     if not plugin_requests:
         return SetupKwargs(exported_target.provides.kwargs, address=target.address)
 
-    valid_plugin_requests = tuple(
-        plugin_request for plugin_request in plugin_requests if plugin_request.is_valid(target)
+    applicable_plugin_requests = tuple(
+        plugin_request for plugin_request in plugin_requests if plugin_request.is_applicable(target)
     )
-    if len(valid_plugin_requests) > 1:
-        possible_plugins = sorted(plugin.__name__ for plugin in valid_plugin_requests)
+    if len(applicable_plugin_requests) > 1:
+        possible_plugins = sorted(plugin.__name__ for plugin in applicable_plugin_requests)
         raise ValueError(
-            f"Multiple of the registered `SetupKwargsPluginRequest`s can work on the target "
+            f"Multiple of the registered `SetupKwargsRequest`s can work on the target "
             f"{target.address}, and it's ambiguous which to use: {possible_plugins}\n\nPlease "
-            "activate fewer implementations, or make the classmethod `is_valid()` more precise so "
-            "that only one plugin implementation is valid for this target."
+            "activate fewer implementations, or make the classmethod `is_applicable()` more "
+            "precise so that only one plugin implementation is applicable for this target."
         )
-    plugin_request = tuple(valid_plugin_requests)[0]
-    return await Get(SetupKwargs, SetupKwargsPluginRequest, plugin_request(target))
+    plugin_request = tuple(applicable_plugin_requests)[0]
+    return await Get(SetupKwargs, SetupKwargsRequest, plugin_request(target))
 
 
 @rule

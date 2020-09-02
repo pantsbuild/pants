@@ -222,7 +222,7 @@ async def lint(
         request_type(
             request_type.field_set_type.create(target)
             for target in targets
-            if request_type.field_set_type.is_valid(target)
+            if request_type.field_set_type.is_applicable(target)
         )
         for request_type in request_types
     )

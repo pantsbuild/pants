@@ -3,7 +3,7 @@
 
 from packaging.version import Version
 
-from pants.backend.python.rules.run_setup_py import SetupKwargs, SetupKwargsPluginRequest
+from pants.backend.python.rules.run_setup_py import SetupKwargs, SetupKwargsRequest
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Target
@@ -57,9 +57,9 @@ class PantsReleases(Subsystem):
         return notes_file
 
 
-class PantsSetupKwargsRequest(SetupKwargsPluginRequest):
+class PantsSetupKwargsRequest(SetupKwargsRequest):
     @classmethod
-    def is_valid(cls, _: Target) -> bool:
+    def is_applicable(cls, _: Target) -> bool:
         # We always use our custom `setup()` kwargs generator for `python_distribution` targets in
         # this repo.
         return True
@@ -132,4 +132,4 @@ async def pants_setup_kwargs(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(SetupKwargsPluginRequest, PantsSetupKwargsRequest))
+    return (*collect_rules(), UnionRule(SetupKwargsRequest, PantsSetupKwargsRequest))

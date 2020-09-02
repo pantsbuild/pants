@@ -717,7 +717,7 @@ class _AbstractFieldSet(ABC):
 
     @final
     @classmethod
-    def is_valid(cls, tgt: Target) -> bool:
+    def is_applicable(cls, tgt: Target) -> bool:
         return tgt.has_fields(cls.required_fields)
 
     @final
@@ -770,12 +770,12 @@ class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
             sources: FortranSources
             fortran_version: FortranVersion
 
-    This field set may then created from a `Target` through the `is_valid()` and `create()`
+    This field set may then created from a `Target` through the `is_applicable()` and `create()`
     class methods:
 
         field_sets = [
             FortranTestFieldSet.create(tgt) for tgt in targets
-            if FortranTestFieldSet.is_valid(tgt)
+            if FortranTestFieldSet.is_applicable(tgt)
         ]
 
     FieldSets are consumed like any normal dataclass:

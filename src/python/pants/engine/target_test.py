@@ -524,12 +524,12 @@ def test_field_set() -> None:
     no_fields_addr = Address.parse(":no_fields")
     no_fields_tgt = NoFieldsTarget({}, address=no_fields_addr)
 
-    assert FortranFieldSet.is_valid(fortran_tgt) is True
-    assert FortranFieldSet.is_valid(unrelated_tgt) is False
-    assert FortranFieldSet.is_valid(no_fields_tgt) is False
-    # When no fields are required, every target is valid.
+    assert FortranFieldSet.is_applicable(fortran_tgt) is True
+    assert FortranFieldSet.is_applicable(unrelated_tgt) is False
+    assert FortranFieldSet.is_applicable(no_fields_tgt) is False
+    # When no fields are required, every target is applicable.
     for tgt in [fortran_tgt, unrelated_tgt, no_fields_tgt]:
-        assert UnrelatedFieldSet.is_valid(tgt) is True
+        assert UnrelatedFieldSet.is_applicable(tgt) is True
 
     valid_fortran_field_set = FortranFieldSet.create(fortran_tgt)
     assert valid_fortran_field_set.address == fortran_addr
