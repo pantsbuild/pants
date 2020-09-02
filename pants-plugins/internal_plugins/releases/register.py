@@ -14,6 +14,8 @@ from pants.version import PANTS_SEMVER, VERSION
 
 
 class PantsReleases(Subsystem):
+    """Options for Pants's release process."""
+
     options_scope = "pants-releases"
 
     @classmethod
