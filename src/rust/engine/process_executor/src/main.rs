@@ -348,6 +348,10 @@ async fn main() {
     .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
   let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
 
+  let target_platform =
+    PlatformConstraint::try_from(&args.value_of("target-platform").unwrap().to_string())
+      .expect("invalid value for `target-platform");
+
   let request = process_execution::Process {
     argv,
     env,
@@ -360,10 +364,7 @@ async fn main() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
-    target_platform: PlatformConstraint::try_from(
-      &args.value_of("target-platform").unwrap().to_string(),
-    )
-    .expect("invalid value for `target-platform"),
+    target_platform: target_platform,
     is_nailgunnable,
     execution_slot_variable: None,
   };
@@ -392,6 +393,7 @@ async fn main() {
               instance_name: remote_instance_arg,
               cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
               platform_properties,
+              platform: target_platform,
             },
             root_ca_certs,
             oauth_bearer_token,

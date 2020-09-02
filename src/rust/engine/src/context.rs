@@ -161,6 +161,7 @@ impl Core {
       instance_name: remoting_opts.instance_name,
       cache_key_gen_version: remoting_opts.execution_process_cache_namespace,
       platform_properties: remoting_opts.execution_extra_platform_properties,
+      platform:
     };
 
     let local_command_runner = process_execution::local::CommandRunner::new(

@@ -931,6 +931,7 @@ pub fn make_execute_request(
     instance_name,
     cache_key_gen_version,
     mut platform_properties,
+    ..
   } = metadata;
 
   // TODO: Disabling append-only caches in remoting until server support exists due to

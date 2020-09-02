@@ -355,6 +355,7 @@ pub struct ProcessMetadata {
   pub instance_name: Option<String>,
   pub cache_key_gen_version: Option<String>,
   pub platform_properties: Vec<(String, String)>,
+  pub platform: PlatformConstraint,
 }
 
 ///
