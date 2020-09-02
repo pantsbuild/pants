@@ -26,6 +26,7 @@ class LoggingTest(TestBase):
             log_show_rust_3rdparty=False,
             use_color=False,
             show_target=False,
+            log_levels_by_target={},
         )
 
     @contextmanager

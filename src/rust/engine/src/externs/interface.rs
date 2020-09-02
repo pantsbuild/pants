@@ -52,8 +52,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cpython::{
-  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyErr, PyList,
-  PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject, ToPyObject,
+  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyDict, PyErr,
+  PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
+  ToPyObject,
 };
 use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
@@ -64,6 +65,7 @@ use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::{self, RuleGraph};
+use std::collections::hash_map::HashMap;
 use store::SnapshotOps;
 use task_executor::Executor;
 use tempfile::TempDir;
@@ -87,7 +89,10 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "init_logging",
-    py_fn!(py, init_logging(a: u64, b: bool, c: bool, d: bool)),
+    py_fn!(
+      py,
+      init_logging(a: u64, b: bool, c: bool, d: bool, e: PyDict)
+    ),
   )?;
   m.add(
     py,
@@ -1685,13 +1690,29 @@ fn default_config_path(py: Python) -> CPyResult<String> {
 }
 
 fn init_logging(
-  _: Python,
+  py: Python,
   level: u64,
   show_rust_3rdparty_logs: bool,
   use_color: bool,
   show_target: bool,
+  log_levels_by_target: PyDict,
 ) -> PyUnitResult {
-  Logger::init(level, show_rust_3rdparty_logs, use_color, show_target);
+  let log_levels_by_target = log_levels_by_target
+    .items(py)
+    .iter()
+    .map(|(k, v)| {
+      let k: String = k.extract(py).unwrap();
+      let v: u64 = v.extract(py).unwrap();
+      (k, v)
+    })
+    .collect::<HashMap<_, _>>();
+  Logger::init(
+    level,
+    show_rust_3rdparty_logs,
+    use_color,
+    show_target,
+    log_levels_by_target,
+  );
   Ok(None)
 }
 

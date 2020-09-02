@@ -168,7 +168,8 @@ class GlobalOptions(Subsystem):
             "--level",
             type=LogLevel,
             default=LogLevel.INFO,
-            help="Set the logging level.",
+            help="Set the logging level. The logging levels are one of: "
+            '"error", "warn", "info", "debug", "trace".',
         )
         register(
             "--show-log-target",
@@ -176,6 +177,16 @@ class GlobalOptions(Subsystem):
             default=False,
             advanced=True,
             help="Display the target where a log message originates in that log message's output.",
+        )
+
+        register(
+            "--log-levels-by-target",
+            type=dict,
+            default={},
+            advanced=True,
+            help="Set a more specific logging level for one or more logging targets. "
+            "The logging levels are one of: "
+            '"error", "warn", "info", "debug", "trace".',
         )
 
         register(

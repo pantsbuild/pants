@@ -33,6 +33,7 @@ pub struct PantsLogger {
   show_rust_3rdparty_logs: AtomicBool,
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
   show_target: AtomicBool,
+  log_level_filters: Mutex<RefCell<HashMap<String, log::LevelFilter>>>,
 }
 
 impl PantsLogger {
@@ -43,10 +44,28 @@ impl PantsLogger {
       use_color: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
       show_target: AtomicBool::new(false),
+      log_level_filters: Mutex::new(RefCell::new(HashMap::new())),
     }
   }
 
-  pub fn init(max_level: u64, show_rust_3rdparty_logs: bool, use_color: bool, show_target: bool) {
+  pub fn init(
+    max_level: u64,
+    show_rust_3rdparty_logs: bool,
+    use_color: bool,
+    show_target: bool,
+    log_levels_by_target: HashMap<String, u64>,
+  ) {
+    let log_levels_by_target = log_levels_by_target
+      .iter()
+      .map(|(k, v)| {
+        let python_level: PythonLogLevel = (*v).try_into().unwrap_or_else(|e| {
+          panic!("Unrecognized log level from python: {}: {}", v, e);
+        });
+        let level: log::LevelFilter = python_level.into();
+        (k.clone(), level)
+      })
+      .collect::<HashMap<_, _>>();
+
     let max_python_level: Result<PythonLogLevel, _> = max_level.try_into();
     match max_python_level {
       Ok(python_level) => {
@@ -56,6 +75,10 @@ impl PantsLogger {
         PANTS_LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
+        PANTS_LOGGER
+          .log_level_filters
+          .lock()
+          .replace(log_levels_by_target);
         PANTS_LOGGER
           .show_target
           .store(show_target, Ordering::SeqCst);
