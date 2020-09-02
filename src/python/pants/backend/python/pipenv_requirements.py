@@ -67,7 +67,9 @@ class PipenvRequirements:
 
         requirements = {**lock_info.get("default", {}), **lock_info.get("develop", {})}
         for req, info in requirements.items():
-            req_str = f"{req}{info.get('version','')}"
+            extras = [x for x in info.get("extras", [])]
+            extras_str = f"[{','.join(extras)}]" if extras else ""
+            req_str = f"{req}{extras_str}{info.get('version','')}"
             if info.get("markers"):
                 req_str += f";{info['markers']}"
 
