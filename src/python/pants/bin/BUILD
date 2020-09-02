@@ -33,7 +33,7 @@ python_binary(
   emit_warnings=False,
 )
 
-# This binary is for internal use only. It adds deps on internal_backends and build-support config
+# This binary is for internal use only. It adds deps on internal_plugins and build-support config
 # files, both of which are not meant for publishing in the `pantsbuild.pants` sdist.
 python_binary(
   name='pants_local_binary',
@@ -48,7 +48,7 @@ python_binary(
     'build-support/flake8',
     'build-support/mypy',
     'build-support/regexes',
-    'pants-plugins/src/python/internal_backend/utilities',
+    'pants-plugins/internal_plugins/releases',
   ],
   # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
   # dependency on setuptools (for namespace package support).

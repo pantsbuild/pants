@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import json
 import textwrap
 from typing import Iterable, Type
 
@@ -19,10 +18,13 @@ from pants.backend.python.rules.run_setup_py import (
     NoOwnerError,
     OwnedDependencies,
     OwnedDependency,
+    SetupKwargs,
+    SetupKwargsRequest,
     SetupPyChroot,
     SetupPyChrootRequest,
     SetupPySources,
     SetupPySourcesRequest,
+    determine_setup_kwargs,
     generate_chroot,
     get_exporting_owner,
     get_owned_dependencies,
@@ -40,8 +42,9 @@ from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import QueryRule
+from pants.engine.rules import QueryRule, rule
 from pants.engine.target import Targets
+from pants.engine.unions import UnionRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import RuleRunner
@@ -64,16 +67,33 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
     )
 
 
+# We use a trivial test that our SetupKwargs plugin hook works.
+class PluginSetupKwargsRequest(SetupKwargsRequest):
+    @classmethod
+    def is_applicable(cls, _) -> bool:
+        return True
+
+
+@rule
+def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
+    return SetupKwargs(
+        {**request.explicit_kwargs, "plugin_demo": "hello world"}, address=request.target.address
+    )
+
+
 @pytest.fixture
 def chroot_rule_runner() -> RuleRunner:
     return create_setup_py_rule_runner(
         rules=[
+            determine_setup_kwargs,
             generate_chroot,
             get_sources,
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
             *python_sources.rules(),
+            setup_kwargs_plugin,
+            UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
             QueryRule(SetupPyChroot, (SetupPyChrootRequest, OptionsBootstrapper)),
         ]
     )
@@ -92,7 +112,7 @@ def assert_chroot(
     )
     snapshot = rule_runner.request_product(Snapshot, [chroot.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
-    assert expected_setup_kwargs == json.loads(chroot.setup_keywords_json)
+    assert expected_setup_kwargs == chroot.setup_kwargs.kwargs
 
 
 def assert_chroot_error(rule_runner: RuleRunner, addr: str, exc_cls: Type[Exception]) -> None:
@@ -191,11 +211,12 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
         {
             "name": "foo",
             "version": "1.2.3",
+            "plugin_demo": "hello world",
             "package_dir": {"": "src"},
-            "packages": ["foo", "foo.qux"],
-            "namespace_packages": ["foo"],
-            "package_data": {"foo": ["resources/js/code.js"]},
-            "install_requires": ["baz==1.1.1"],
+            "packages": ("foo", "foo.qux"),
+            "namespace_packages": ("foo",),
+            "package_data": {"foo": ("resources/js/code.js",)},
+            "install_requires": ("baz==1.1.1",),
             "entry_points": {"console_scripts": ["foo_main=foo.qux.bin"]},
         },
         "src/python/foo:foo-dist",
@@ -344,6 +365,7 @@ def test_get_sources() -> None:
 def test_get_requirements() -> None:
     rule_runner = create_setup_py_rule_runner(
         rules=[
+            determine_setup_kwargs,
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,

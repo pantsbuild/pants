@@ -137,7 +137,7 @@ async def typecheck(
         lint_request_type(
             lint_request_type.field_set_type.create(target)
             for target in targets
-            if lint_request_type.field_set_type.is_valid(target)
+            if lint_request_type.field_set_type.is_applicable(target)
         )
         for lint_request_type in typecheck_request_types
     )

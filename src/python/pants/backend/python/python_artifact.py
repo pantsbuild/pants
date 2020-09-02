@@ -1,64 +1,43 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Any, Dict
+
 
 class PythonArtifact:
     """Represents a Python setup.py-based project."""
-
-    class MissingArgument(Exception):
-        pass
-
-    class UnsupportedArgument(Exception):
-        pass
-
-    UNSUPPORTED_ARGS = frozenset({"data_files", "package_dir", "package_data", "packages"})
 
     def __init__(self, **kwargs):
         """
         :param kwargs: Passed to `setuptools.setup
           <https://pythonhosted.org/setuptools/setuptools.html>`_.
         """
-        self._kw = kwargs
+        if "name" not in kwargs:
+            raise ValueError("`setup_py()` requires `name` to be specified.")
+        name = kwargs["name"]
+        if not isinstance(name, str):
+            raise ValueError(
+                f"The `name` in `setup_py()` must be a string, but was {repr(name)} with type "
+                f"{type(name)}."
+            )
+
+        self._kw: Dict[str, Any] = kwargs
         self._binaries = {}
-
-        def has(name):
-            value = self._kw.get(name)
-            if value is None:
-                raise self.MissingArgument(f"PythonArtifact requires {name} to be specified!")
-            return value
-
-        def misses(name):
-            if name in self._kw:
-                raise self.UnsupportedArgument(
-                    f"PythonArtifact prohibits {name} from being specified"
-                )
-
-        self._version = has("version")
-        self._name = has("name")
-        for arg in self.UNSUPPORTED_ARGS:
-            misses(arg)
+        self._name: str = name
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @property
-    def version(self):
-        return self._version
-
-    @property
-    def requirement(self):
-        return f"{self._name}=={self._version}"
-
-    @property
-    def kwargs(self):
+    def kwargs(self) -> Dict[str, Any]:
         return self._kw
 
     @property
     def binaries(self):
         return self._binaries
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
     def with_binaries(self, *args, **kw):

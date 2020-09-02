@@ -126,8 +126,8 @@ def create_isolated_git_repo():
             "pants.toml",
             f"""
             [GLOBAL]
-            pythonpath = ["{get_buildroot()}/pants-plugins/src/python"]
-            backend_packages2.add = ["pants.backend.python", "internal_backend.utilities"]
+            pythonpath = ["{get_buildroot()}/pants-plugins"]
+            backend_packages2.add = ["pants.backend.python", "internal_plugins.releases"]
             """,
         )
         copy_into(".gitignore")

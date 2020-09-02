@@ -4,7 +4,7 @@
 import pytest
 from packaging.version import InvalidVersion, Version
 
-from internal_backend.utilities.register import PantsReleases
+from internal_plugins.releases.register import PantsReleases
 
 
 def _branch_name(revision_str: str) -> str:

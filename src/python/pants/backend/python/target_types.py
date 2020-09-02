@@ -449,7 +449,7 @@ class PythonProvidesField(ScalarField, ProvidesField):
     """
 
     expected_type = PythonArtifact
-    expected_type_description = "setup_py(**kwargs)"
+    expected_type_description = "setup_py(name='my-dist', **kwargs)"
     value: PythonArtifact
     required = True
 

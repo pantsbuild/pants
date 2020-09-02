@@ -897,7 +897,7 @@ def find_valid_field_sets(
                 else field_set_type.create(tgt_with_origin.target)
             )
             for field_set_type in field_set_types
-            if field_set_type.is_valid(tgt_with_origin.target)
+            if field_set_type.is_applicable(tgt_with_origin.target)
         ]
         if valid_field_sets:
             targets_to_valid_field_sets[tgt_with_origin] = valid_field_sets
