@@ -12,8 +12,8 @@ from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandler,
     PythonAwsLambdaRuntime,
 )
-from pants.backend.python.rules import pex_from_targets
-from pants.backend.python.rules.pex import (
+from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexPlatforms,
@@ -22,7 +22,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
     TwoStepPex,
 )
-from pants.backend.python.rules.pex_from_targets import (
+from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )

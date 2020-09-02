@@ -5,9 +5,9 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Optional, Tuple
 
-from pants.backend.python.rules import pex_environment
-from pants.backend.python.rules.pex_environment import PexEnvironment
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.util_rules import pex_environment
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,

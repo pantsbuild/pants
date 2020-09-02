@@ -5,8 +5,8 @@ from typing import List
 
 import pytest
 
-from pants.backend.python.rules import ancestor_files
-from pants.backend.python.rules.ancestor_files import (
+from pants.backend.python.util_rules import ancestor_files
+from pants.backend.python.util_rules.ancestor_files import (
     AncestorFiles,
     AncestorFilesRequest,
     identify_missing_ancestor_files,

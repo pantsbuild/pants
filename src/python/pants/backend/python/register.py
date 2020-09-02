@@ -7,24 +7,18 @@ See https://www.pantsbuild.org/docs/python-backend.
 """
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.pants_requirement import PantsRequirement
-from pants.backend.python.pipenv_requirements import PipenvRequirements
-from pants.backend.python.python_artifact import PythonArtifact
-from pants.backend.python.python_requirements import PythonRequirements
-from pants.backend.python.rules import (
-    ancestor_files,
-    coverage,
+from pants.backend.python.goals import (
+    coverage_py,
     create_python_binary,
-    pex,
-    pex_cli,
-    pex_environment,
-    pex_from_targets,
     pytest_runner,
-    python_sources,
     repl,
     run_python_binary,
-    run_setup_py,
+    setup_py,
 )
+from pants.backend.python.macros.pants_requirement import PantsRequirement
+from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
+from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.macros.python_requirements import PythonRequirements
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import (
     PythonBinary,
@@ -33,6 +27,14 @@ from pants.backend.python.target_types import (
     PythonRequirementLibrary,
     PythonRequirementsFile,
     PythonTests,
+)
+from pants.backend.python.util_rules import (
+    ancestor_files,
+    pex,
+    pex_cli,
+    pex_environment,
+    pex_from_targets,
+    python_sources,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.python.python_requirement import PythonRequirement
@@ -55,7 +57,7 @@ def build_file_aliases():
 
 def rules():
     return (
-        *coverage.rules(),
+        *coverage_py.rules(),
         *ancestor_files.rules(),
         *python_sources.rules(),
         *dependency_inference_rules.rules(),
@@ -68,7 +70,7 @@ def rules():
         *python_native_code.rules(),
         *repl.rules(),
         *run_python_binary.rules(),
-        *run_setup_py.rules(),
+        *setup_py.rules(),
         *subprocess_environment.rules(),
     )
 

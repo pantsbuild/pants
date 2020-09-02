@@ -8,25 +8,28 @@ from pathlib import PurePath
 from typing import Optional
 from uuid import UUID
 
-from pants.backend.python.rules.coverage import (
+from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
     CoverageSubsystem,
     PytestCoverageData,
 )
-from pants.backend.python.rules.pex import (
+from pants.backend.python.subsystems.pytest import PyTest
+from pants.backend.python.target_types import (
+    PythonInterpreterCompatibility,
+    PythonTestsSources,
+    PythonTestsTimeout,
+)
+from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexProcess,
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
-from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonTestsSources,
-    PythonTestsTimeout,
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFiles,
+    PythonSourceFilesRequest,
 )
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest

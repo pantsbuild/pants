@@ -4,9 +4,9 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, Type
 
-from pants.backend.python.rules import ancestor_files
-from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources
+from pants.backend.python.util_rules import ancestor_files
+from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest

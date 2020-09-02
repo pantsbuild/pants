@@ -13,8 +13,8 @@ from pex.interpreter import PythonInterpreter
 from pex.resolver import Unsatisfiable
 from pkg_resources import Requirement, WorkingSet
 
-from pants.backend.python.rules import pex
-from pants.backend.python.rules.pex import Pex, PexProcess, PexRequest, PexRequirements
+from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, PexRequirements
 from pants.core.util_rules import archive, external_tool
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.process import Process, ProcessResult

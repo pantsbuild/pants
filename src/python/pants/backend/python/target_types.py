@@ -7,7 +7,7 @@ from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 
 from pkg_resources import Requirement
 
-from pants.backend.python.python_artifact import PythonArtifact
+from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address

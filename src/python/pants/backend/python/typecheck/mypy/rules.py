@@ -4,18 +4,21 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.rules.pex import (
+from pants.backend.python.target_types import PythonSources
+from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexProcess,
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.pex import rules as pex_rules
-from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
-from pants.backend.python.rules.python_sources import rules as python_sources_rules
-from pants.backend.python.target_types import PythonSources
-from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFiles,
+    PythonSourceFilesRequest,
+)
+from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules import pants_bin
 from pants.engine.addresses import Addresses

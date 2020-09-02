@@ -4,11 +4,6 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.rules.pex import PexPlatforms, TwoStepPex
-from pants.backend.python.rules.pex_from_targets import (
-    PexFromTargetsRequest,
-    TwoStepPexFromTargetsRequest,
-)
 from pants.backend.python.target_types import (
     PexAlwaysWriteCache,
     PexEmitWarnings,
@@ -21,6 +16,11 @@ from pants.backend.python.target_types import (
     PythonEntryPoint,
 )
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
+from pants.backend.python.util_rules.pex import PexPlatforms, TwoStepPex
+from pants.backend.python.util_rules.pex_from_targets import (
+    PexFromTargetsRequest,
+    TwoStepPexFromTargetsRequest,
+)
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.goals.run import RunFieldSet
 from pants.core.util_rules.source_files import SourceFiles

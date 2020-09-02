@@ -13,13 +13,13 @@ from pants.backend.python.dependency_inference.rules import (
     infer_python_dependencies,
     infer_python_init_dependencies,
 )
-from pants.backend.python.rules import ancestor_files
 from pants.backend.python.target_types import (
     PythonLibrary,
     PythonRequirementLibrary,
     PythonSources,
     PythonTests,
 )
+from pants.backend.python.util_rules import ancestor_files
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule, SubsystemRule

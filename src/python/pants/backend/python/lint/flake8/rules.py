@@ -5,15 +5,15 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
-from pants.backend.python.rules import pex
-from pants.backend.python.rules.pex import (
+from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
+from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexProcess,
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
 from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest

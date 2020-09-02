@@ -8,10 +8,11 @@ from textwrap import dedent
 from typing import List, Optional
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.rules import pex, pex_from_targets, pytest_runner, python_sources
-from pants.backend.python.rules.coverage import create_coverage_config
-from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
+from pants.backend.python.goals import pytest_runner
+from pants.backend.python.goals.coverage import create_coverage_config
+from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
+from pants.backend.python.util_rules import pex, pex_from_targets, python_sources
 from pants.core.goals.test import TestDebugRequest, TestResult
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
