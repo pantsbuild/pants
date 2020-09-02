@@ -4,7 +4,7 @@
 import pytest
 from pkg_resources import Requirement
 
-from pants.backend.python.pants_requirement import PantsRequirement
+from pants.backend.python.macros.pants_requirement import PantsRequirement
 from pants.backend.python.target_types import (
     ModuleMappingField,
     PythonRequirementLibrary,

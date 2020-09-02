@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import pytest_runner
-from pants.backend.python.goals.coverage import create_coverage_config
+from pants.backend.python.goals.coverage_py import create_coverage_config
 from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.backend.python.util_rules import pex, pex_from_targets, python_sources

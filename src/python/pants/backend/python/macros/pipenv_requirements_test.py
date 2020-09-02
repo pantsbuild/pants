@@ -8,7 +8,7 @@ from typing import Iterable
 import pytest
 from pkg_resources import Requirement
 
-from pants.backend.python.pipenv_requirements import PipenvRequirements
+from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
 from pants.backend.python.target_types import PythonRequirementLibrary, PythonRequirementsFile
 from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.engine.addresses import Address
