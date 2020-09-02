@@ -25,6 +25,7 @@ class LoggingTest(TestBase):
             level=LogLevel.INFO.level,  # Tests assume a log level of INFO
             log_show_rust_3rdparty=False,
             use_color=False,
+            show_target=False,
         )
 
     @contextmanager

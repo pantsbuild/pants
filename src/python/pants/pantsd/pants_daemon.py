@@ -214,8 +214,15 @@ class PantsDaemon(PantsDaemonProcessManager):
         # for further forks.
         with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
             # Reinitialize logging for the daemon context.
-            use_color = self._bootstrap_options.for_global_scope().colors
-            init_rust_logger(self._log_level, self._log_show_rust_3rdparty, use_color=use_color)
+            global_options = self._bootstrap_options.for_global_scope()
+            use_color = global_options.colors
+            show_target = global_options.show_log_target
+            init_rust_logger(
+                self._log_level,
+                self._log_show_rust_3rdparty,
+                use_color=use_color,
+                show_target=show_target,
+            )
 
             level = self._log_level
             ignores = self._bootstrap_options.for_global_scope().ignore_pants_warnings
@@ -249,6 +256,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         # Write the pidfile. The SchedulerService will monitor it after a grace period.
         pid = os.getpid()
+        self._logger.debug(f"pantsd running with PID: {pid}")
         self.write_pid(pid=pid)
         self.write_metadata_by_name(
             "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)

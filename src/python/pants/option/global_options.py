@@ -170,6 +170,13 @@ class GlobalOptions(Subsystem):
             default=LogLevel.INFO,
             help="Set the logging level.",
         )
+        register(
+            "--show-log-target",
+            type=bool,
+            default=False,
+            advanced=True,
+            help="Display the target where a log message originates in that log message's output.",
+        )
 
         register(
             "--log-show-rust-3rdparty",

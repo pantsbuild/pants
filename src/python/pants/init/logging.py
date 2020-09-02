@@ -21,8 +21,10 @@ logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(pants_logging.TRACE, "TRACE")
 
 
-def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool, use_color: bool) -> None:
-    Native().init_rust_logging(log_level.level, log_show_rust_3rdparty, use_color)
+def init_rust_logger(
+    log_level: LogLevel, log_show_rust_3rdparty: bool, use_color: bool, show_target: bool
+) -> None:
+    Native().init_rust_logging(log_level.level, log_show_rust_3rdparty, use_color, show_target)
 
 
 class NativeHandler(StreamHandler):
@@ -38,9 +40,7 @@ class NativeHandler(StreamHandler):
             self.native.setup_stderr_logger()
 
     def emit(self, record: LogRecord) -> None:
-        self.native.write_log(
-            msg=self.format(record), level=record.levelno, target=f"{record.name}:pid={os.getpid()}"
-        )
+        self.native.write_log(msg=self.format(record), level=record.levelno, target=record.name)
 
     def flush(self) -> None:
         self.native.flush_log()
@@ -114,8 +114,9 @@ def setup_logging(global_bootstrap_options):
 
     log_show_rust_3rdparty = global_bootstrap_options.log_show_rust_3rdparty
     use_color = global_bootstrap_options.colors
+    show_target = global_bootstrap_options.show_log_target
 
-    init_rust_logger(global_level, log_show_rust_3rdparty, use_color)
+    init_rust_logger(global_level, log_show_rust_3rdparty, use_color, show_target)
     setup_logging_to_stderr(global_level, warnings_filter_regexes=ignores)
     if log_dir:
         setup_logging_to_file(global_level, log_dir=log_dir, warnings_filter_regexes=ignores)

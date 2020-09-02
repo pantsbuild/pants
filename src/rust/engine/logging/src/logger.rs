@@ -32,6 +32,7 @@ pub struct PantsLogger {
   use_color: AtomicBool,
   show_rust_3rdparty_logs: AtomicBool,
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
+  show_target: AtomicBool,
 }
 
 impl PantsLogger {
@@ -41,10 +42,11 @@ impl PantsLogger {
       show_rust_3rdparty_logs: AtomicBool::new(true),
       use_color: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
+      show_target: AtomicBool::new(false),
     }
   }
 
-  pub fn init(max_level: u64, show_rust_3rdparty_logs: bool, use_color: bool) {
+  pub fn init(max_level: u64, show_rust_3rdparty_logs: bool, use_color: bool, show_target: bool) {
     let max_python_level: Result<PythonLogLevel, _> = max_level.try_into();
     match max_python_level {
       Ok(python_level) => {
@@ -54,6 +56,9 @@ impl PantsLogger {
         PANTS_LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
+        PANTS_LOGGER
+          .show_target
+          .store(show_target, Ordering::SeqCst);
         if set_logger(&*PANTS_LOGGER).is_err() {
           debug!("Logging already initialized.");
         }
@@ -144,6 +149,7 @@ impl Log for PantsLogger {
       cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
     );
 
+    let show_target = self.show_target.load(Ordering::SeqCst);
     let level = record.level();
     let destination_is_file = match destination {
       Destination::Pantsd => true,
@@ -160,7 +166,17 @@ impl Log for PantsLogger {
       Level::Trace => format!("[{}]", level).magenta(),
     };
 
-    let log_string = format!("{} {} {}", time_str, level_marker, record.args());
+    let log_string = if show_target {
+      format!(
+        "{} {} ({}) {}",
+        time_str,
+        level_marker,
+        record.target(),
+        record.args()
+      )
+    } else {
+      format!("{} {} {}", time_str, level_marker, record.args())
+    };
 
     match destination {
       Destination::Stderr => {
