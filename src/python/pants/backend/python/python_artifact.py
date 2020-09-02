@@ -13,12 +13,12 @@ class PythonArtifact:
           <https://pythonhosted.org/setuptools/setuptools.html>`_.
         """
         if "name" not in kwargs:
-            raise ValueError("PythonArtifact (aka `setup_py`) requires `name` to be specified.")
+            raise ValueError("`setup_py()` requires `name` to be specified.")
         name = kwargs["name"]
         if not isinstance(name, str):
             raise ValueError(
-                "The `name` to a PythonArtifact (aka `setup_py`) must be a string, but was "
-                f"{repr(name)} with type {type(name)}."
+                f"The `name` in `setup_py()` must be a string, but was {repr(name)} with type "
+                f"{type(name)}."
             )
 
         self._kw: Dict[str, Any] = kwargs

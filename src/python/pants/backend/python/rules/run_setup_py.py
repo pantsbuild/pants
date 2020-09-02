@@ -475,15 +475,18 @@ async def determine_setup_kwargs(
     if not plugin_requests:
         return SetupKwargs(exported_target.provides.kwargs, address=target.address)
 
-    if len(plugin_requests) > 1:
-        possible_plugins = sorted(plugin.__name__ for plugin in plugin_requests)
+    valid_plugin_requests = tuple(
+        plugin_request for plugin_request in plugin_requests if plugin_request.is_valid(target)
+    )
+    if len(valid_plugin_requests) > 1:
+        possible_plugins = sorted(plugin.__name__ for plugin in valid_plugin_requests)
         raise ValueError(
             f"Multiple of the registered `SetupKwargsPluginRequest`s can work on the target "
             f"{target.address}, and it's ambiguous which to use: {possible_plugins}\n\nPlease "
             "activate fewer implementations, or make the classmethod `is_valid()` more precise so "
             "that only one plugin implementation is valid for this target."
         )
-    plugin_request = tuple(plugin_requests)[0]
+    plugin_request = tuple(valid_plugin_requests)[0]
     return await Get(SetupKwargs, SetupKwargsPluginRequest, plugin_request(target))
 
 
