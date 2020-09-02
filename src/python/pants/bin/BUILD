@@ -33,7 +33,7 @@ python_binary(
   emit_warnings=False,
 )
 
-# This binary is for internal use only. It adds deps on internal_backends and build-support config
+# This binary is for internal use only. It adds deps on internal_plugins and build-support config
 # files, both of which are not meant for publishing in the `pantsbuild.pants` sdist.
 python_binary(
   name='pants_local_binary',

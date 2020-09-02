@@ -25,7 +25,7 @@ class ReferenceGenerator:
     To run use:
 
     ./pants \
-      --backend-packages="-['internal_backend.utilities']" \
+      --backend-packages="-['internal_plugins.releases']" \
       --backend-packages="+['pants.backend.python.lint.bandit', \
         'pants.backend.python.lint.pylint', 'pants.backend.codegen.protobuf.python', \
         'pants.backend.awslambda.python']" \
