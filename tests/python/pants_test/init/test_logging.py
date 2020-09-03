@@ -58,3 +58,47 @@ class LoggingTest(TestBase):
             self.assertEqual(2, len(loglines))
             self.assertIn("[WARN] this is a warning", loglines[0])
             self.assertIn("[INFO] this is some info", loglines[1])
+
+
+class AdvancedLoggingTest(TestBase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # NB: We must set this up at the class level, rather than per-test level, because
+        # `init_rust_logging` must never be called more than once. The Rust logger is global and static,
+        # and initializing it twice in the same test class results in a SIGABRT.
+        Native().init_rust_logging(
+            level=LogLevel.INFO.level,  # Tests assume a log level of INFO
+            log_show_rust_3rdparty=False,
+            use_color=False,
+            show_target=True,
+            log_levels_by_target={
+                "debug_target": LogLevel.DEBUG,
+            },
+        )
+
+    @contextmanager
+    def logger(self, log_level: LogLevel) -> Iterator[Tuple[Logger, NativeHandler, Path]]:
+        native = self.scheduler._scheduler._native
+        # TODO(gregorys) - if this line isn't here this test fails with no stdout. Figure out why.
+        print(f"Native: {native}")
+        logger = logging.getLogger("my_file_logger")
+        with temporary_dir() as tmpdir:
+            handler = setup_logging_to_file(log_level, log_dir=tmpdir)
+            log_file = Path(tmpdir, "pants.log")
+            yield logger, handler, log_file
+
+    def test_log_filtering(self) -> None:
+        with self.logger(LogLevel.INFO) as (file_logger, log_handler, log_file):
+            native = Native()
+            native.write_log(msg="log msg one", level=LogLevel.INFO.level, target="some.target")
+            native.write_log(
+                msg="log msg two", level=LogLevel.DEBUG.level, target="some.other.target"
+            )
+            native.write_log(msg="log msg three", level=LogLevel.DEBUG.level, target="debug_target")
+
+            loglines = log_file.read_text().splitlines()
+
+            assert "[INFO] (some.target) log msg one" in loglines[0]
+            assert "[DEBUG] (debug_target) log msg three" in loglines[1]
+            assert len(loglines) == 2

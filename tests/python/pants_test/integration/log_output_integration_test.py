@@ -31,3 +31,31 @@ def test_completed_log_output() -> None:
     result.assert_success()
     assert "[DEBUG] Starting: Run MyPy on" in result.stderr
     assert "[DEBUG] Completed: Run MyPy on" in result.stderr
+
+
+def test_log_filtering_by_target() -> None:
+    sources = {
+        "src/python/project/__init__.py": "",
+        "src/python/project/lib.py": dedent(
+            """\
+            def add(x: int, y: int) -> int:
+                return x + y
+            """
+        ),
+        "src/python/project/BUILD": "python_library()",
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        result = run_pants(
+            [
+                "--no-pantsd",
+                "--backend-packages=['pants.backend.python']",
+                "--no-dynamic-ui",
+                "--level=info",
+                "--show-log-target",
+                '--log-levels-by-target={"workunit_store": "debug"}',
+                "list",
+                f"{tmpdir}/src/python/project",
+            ]
+        )
+
+        assert "[DEBUG] (workunit_store) Starting: `list` goal" in result.stderr
