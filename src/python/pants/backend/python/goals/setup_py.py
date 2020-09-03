@@ -200,7 +200,14 @@ class SetupKwargs:
             raise ValueError(f"Missing a `version` kwarg in the `provides` field for {address}.")
 
         if not _allow_banned_keys:
-            for arg in {"data_files", "package_dir", "package_data", "packages"}:
+            for arg in {
+                "data_files",
+                "namespace_packages",
+                "package_dir",
+                "package_data",
+                "packages",
+                "install_requires",
+            }:
                 if arg in kwargs:
                     raise ValueError(
                         f"{arg} cannot be set in the `provides` field for {address}, but it was "

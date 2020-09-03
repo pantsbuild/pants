@@ -116,7 +116,7 @@ function pkg_testutil_install_test() {
   shift
   local PIP_ARGS=("$@")
   pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testutil==${version}" && \
-  python -c "import pants.testutil"
+  python -c "import pants.testutil.option_util"
 }
 
 #
