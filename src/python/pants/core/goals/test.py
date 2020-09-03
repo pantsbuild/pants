@@ -324,7 +324,7 @@ class TestSubsystem(GoalSubsystem):
             member_type=str,
             default=[],
             help="Specify a list additional environment variables to include in test processes. Entries are strings "
-            "in the form `ENV_VAR=value` to use explicitly; or just `ENV_VAR` to copy the value of a variable in Pants' "
+            "in the form `ENV_VAR=value` to use explicitly; or just `ENV_VAR` to copy the value of a variable in Pants's "
             "own environment. `value` may be a string with spaces in it such as `ENV_VAR=has some spaces`. `ENV_VAR=` sets "
             "a variable to be the empty string.",
         )

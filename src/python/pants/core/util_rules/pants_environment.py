@@ -13,6 +13,9 @@ from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
+name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
+shorthand_re = re.compile(r"([A-Za-z_]\w*)")
+
 
 @side_effecting
 @frozen_after_init
@@ -27,9 +30,6 @@ class PantsEnvironment:
     the environment rules down to only the ones other rules care about as inputs, in order to avoid
     a lot of cache invalidation if the environment changes spuriously.
     """
-
-    name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
-    shorthand_re = re.compile(r"([A-Za-z_]\w*)")
 
     env: FrozenDict[str, str]
 
@@ -49,10 +49,10 @@ class PantsEnvironment:
         env_var_subset: Dict[str, Optional[str]] = {}
 
         for env_var in requested:
-            name_value_match = self.name_value_re.match(env_var)
+            name_value_match = name_value_re.match(env_var)
             if name_value_match:
                 env_var_subset[name_value_match[1]] = name_value_match[2]
-            elif self.shorthand_re.match(env_var):
+            elif shorthand_re.match(env_var):
                 env_var_subset[env_var] = self.env.get(env_var)
             else:
                 raise ValueError(
