@@ -531,13 +531,19 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     target = exported_target.target
     resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, exported_target)
     setup_kwargs = resolved_setup_kwargs.kwargs.copy()
+    # NB: We are careful to not overwrite these values, but we also don't expect them to have been
+    # set. The user must have have gone out of their way to use a `SetupKwargs` plugin, and to have
+    # specified `SetupKwargs(_allow_banned_keys=True)`.
     setup_kwargs.update(
         {
-            "package_dir": {"": CHROOT_SOURCE_ROOT},
-            "packages": sources.packages,
-            "namespace_packages": sources.namespace_packages,
-            "package_data": dict(sources.package_data),
-            "install_requires": tuple(requirements),
+            "package_dir": {"": CHROOT_SOURCE_ROOT, **setup_kwargs.get("package_dir", {})},
+            "packages": (*sources.packages, *(setup_kwargs.get("packages", []))),
+            "namespace_packages": (
+                *sources.namespace_packages,
+                *setup_kwargs.get("namespace_packages", []),
+            ),
+            "package_data": {**dict(sources.package_data), **setup_kwargs.get("package_data", {})},
+            "install_requires": (*requirements, *setup_kwargs.get("install_requires", [])),
         }
     )
     key_to_binary_spec = exported_target.provides.binaries
