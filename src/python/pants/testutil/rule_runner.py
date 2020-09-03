@@ -27,6 +27,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
@@ -174,6 +175,7 @@ class RuleRunner:
                 options_bootstrapper,
                 Workspace(self.scheduler),
                 InteractiveRunner(self.scheduler),
+                PantsEnvironment(),
             ),
         )
 

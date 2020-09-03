@@ -27,6 +27,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests, Workspace
@@ -121,9 +122,11 @@ def run_test_rule(
         debug=debug,
         use_coverage=use_coverage,
         output=output,
+        extra_env_vars=[],
     )
     interactive_runner = InteractiveRunner(rule_runner.scheduler)
     workspace = Workspace(rule_runner.scheduler)
+    pants_environment = PantsEnvironment()
     union_membership = UnionMembership(
         {TestFieldSet: [field_set], CoverageDataCollection: [MockCoverageDataCollection]}
     )
@@ -158,7 +161,14 @@ def run_test_rule(
 
     result: Test = run_rule_with_mocks(
         run_tests,
-        rule_args=[console, test_subsystem, interactive_runner, workspace, union_membership],
+        rule_args=[
+            console,
+            test_subsystem,
+            interactive_runner,
+            workspace,
+            union_membership,
+            pants_environment,
+        ],
         mock_gets=[
             MockGet(
                 product_type=TargetsToValidFieldSets,

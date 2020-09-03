@@ -13,8 +13,9 @@ from pants.backend.python.goals.coverage_py import create_coverage_config
 from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.backend.python.util_rules import pex, pex_from_targets, python_sources
-from pants.core.goals.test import TestDebugRequest, TestResult
+from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
 from pants.core.util_rules import source_files, stripped_source_files
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
@@ -121,8 +122,11 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *source_files.rules(),
             *stripped_source_files.rules(),
             *dependency_inference_rules.rules(),  # For conftest detection.
-            QueryRule(TestResult, (PythonTestFieldSet, OptionsBootstrapper)),
-            QueryRule(TestDebugRequest, (PythonTestFieldSet, OptionsBootstrapper)),
+            get_filtered_environment,
+            QueryRule(TestResult, (PythonTestFieldSet, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(
+                TestDebugRequest, (PythonTestFieldSet, OptionsBootstrapper, PantsEnvironment)
+            ),
         )
 
     def run_pytest(
@@ -133,6 +137,8 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         junit_xml_dir: Optional[str] = None,
         use_coverage: bool = False,
         execution_slot_var: Optional[str] = None,
+        extra_env_vars: Optional[str] = None,
+        pants_environment: PantsEnvironment = PantsEnvironment(),
     ) -> TestResult:
         args = [
             "--backend-packages=pants.backend.python",
@@ -143,6 +149,8 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         ]
         if passthrough_args:
             args.append(f"--pytest-args='{passthrough_args}'")
+        if extra_env_vars:
+            args.append(f"--test-extra-env-vars={extra_env_vars}")
         if junit_xml_dir:
             args.append(f"--pytest-junit-xml-dir={junit_xml_dir}")
         if use_coverage:
@@ -153,6 +161,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             address = Address(self.package, target_name="target")
         subjects = [
             PythonTestFieldSet.create(PythonTests({}, address=address)),
+            pants_environment,
             create_options_bootstrapper(args=args),
         ]
         test_result = self.request_product(TestResult, subjects)
@@ -393,3 +402,22 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         result = self.run_pytest(execution_slot_var="SLOT")
         assert result.exit_code == 1
         assert re.search(r"Value of slot is \d+", result.stdout)
+
+    def test_extra_arguments(self) -> None:
+        source = FileContent(
+            path="test_extra_args.py",
+            content=dedent(
+                """\
+                import os
+
+                def test_args():
+                    assert os.getenv("SOME_VAR") == "some_value"
+                    assert os.getenv("OTHER_VAR") == "other_value"
+                """
+            ).encode(),
+        )
+        self.create_python_test_target([source])
+        mock_env = PantsEnvironment({"OTHER_VAR": "other_value"})
+        extra_env_vars = '["SOME_VAR=some_value", "OTHER_VAR"]'
+        result = self.run_pytest(extra_env_vars=extra_env_vars, pants_environment=mock_env)
+        assert result.exit_code == 0
