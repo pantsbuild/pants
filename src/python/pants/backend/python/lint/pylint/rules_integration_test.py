@@ -160,7 +160,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
         rule_runner,
         [PY3_ONLY_SOURCES],
         name="py3",
-        # NB: Avoid Python 3.8+ for this test due to issues with asteroid/ast.
+        # NB: Avoid Python 3.8+ for this test due to issues with astroid/ast.
         # See https://github.com/pantsbuild/pants/issues/10547.
         interpreter_constraints="CPython>=3.6,<3.8",
     )

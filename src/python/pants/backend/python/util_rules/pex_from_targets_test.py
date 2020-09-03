@@ -38,7 +38,8 @@ def test_constraints_validation(rule_runner: RuleRunner) -> None:
             python_requirement_library(name="foo", requirements=["foo-bar>=0.1.2"])
             python_requirement_library(name="bar", requirements=["bar==5.5.5"])
             python_requirement_library(name="baz", requirements=["baz"])
-            python_library(name="tgt", sources=[], dependencies=[":foo", ":bar", ":baz"])
+            python_library(name="util", sources=[], dependencies=[":foo", ":bar"])
+            python_library(name="app", sources=[], dependencies=[":util", ":baz"])
             """
         ),
     )
@@ -64,16 +65,19 @@ def test_constraints_validation(rule_runner: RuleRunner) -> None:
         ),
     )
 
-    request = PexFromTargetsRequest(
-        [Address.parse("//:tgt")], output_filename="demo.pex", internal_only=True
-    )
-
     def get_pex_request(
-        constraints_file: Optional[str], resolve_all: Optional[ResolveAllConstraintsOption]
+        constraints_file: Optional[str],
+        resolve_all: Optional[ResolveAllConstraintsOption],
+        *,
+        direct_deps_only: bool = False,
     ) -> PexRequest:
-        args = [
-            "--backend-packages=pants.backend.python",
-        ]
+        args = ["--backend-packages=pants.backend.python"]
+        request = PexFromTargetsRequest(
+            [Address("", target_name="app")],
+            output_filename="demo.pex",
+            internal_only=True,
+            direct_deps_only=direct_deps_only,
+        )
         if resolve_all:
             args.append(f"--python-setup-resolve-all-constraints={resolve_all.value}")
         if constraints_file:
@@ -85,8 +89,20 @@ def test_constraints_validation(rule_runner: RuleRunner) -> None:
     pex_req1 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.NEVER)
     assert pex_req1.requirements == PexRequirements(["foo-bar>=0.1.2", "bar==5.5.5", "baz"])
 
+    pex_req1_direct = get_pex_request(
+        "constraints1.txt", ResolveAllConstraintsOption.NEVER, direct_deps_only=True
+    )
+    assert pex_req1_direct.requirements == PexRequirements(["baz"])
+
     pex_req2 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.ALWAYS)
     assert pex_req2.requirements == PexRequirements(
+        ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "qux==3.4.5"]
+    )
+
+    pex_req2_direct = get_pex_request(
+        "constraints1.txt", ResolveAllConstraintsOption.ALWAYS, direct_deps_only=True
+    )
+    assert pex_req2_direct.requirements == PexRequirements(
         ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "qux==3.4.5"]
     )
 

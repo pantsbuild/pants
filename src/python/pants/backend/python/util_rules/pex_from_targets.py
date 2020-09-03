@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import itertools
 import logging
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
@@ -35,11 +36,12 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import TransitiveTargets
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import Dependencies, DependenciesRequest, Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,7 @@ class PexFromTargetsRequest:
     include_source_files: bool
     additional_sources: Optional[Digest]
     additional_inputs: Optional[Digest]
+    direct_deps_only: bool
     # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
     # the result.
     description: Optional[str] = dataclasses.field(compare=False)
@@ -74,6 +77,7 @@ class PexFromTargetsRequest:
         include_source_files: bool = True,
         additional_sources: Optional[Digest] = None,
         additional_inputs: Optional[Digest] = None,
+        direct_deps_only: bool = False,
         description: Optional[str] = None,
     ) -> None:
         """Request to create a Pex from the transitive closure of the given addresses.
@@ -101,6 +105,8 @@ class PexFromTargetsRequest:
         :param additional_sources: Any additional source files to include in the built Pex.
         :param additional_inputs: Any inputs that are not source files and should not be included
             directly in the Pex, but should be present in the environment when building the Pex.
+        :param direct_deps_only: Only consider the input addresses and their direct dependencies,
+            rather than the transitive closure.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
         """
@@ -114,11 +120,17 @@ class PexFromTargetsRequest:
         self.include_source_files = include_source_files
         self.additional_sources = additional_sources
         self.additional_inputs = additional_inputs
+        self.direct_deps_only = direct_deps_only
         self.description = description
 
     @classmethod
     def for_requirements(
-        cls, addresses: Addresses, *, internal_only: bool, zip_safe: bool = False
+        cls,
+        addresses: Iterable[Address],
+        *,
+        internal_only: bool,
+        zip_safe: bool = False,
+        direct_deps_only: bool = False,
     ) -> "PexFromTargetsRequest":
         """Create an instance that can be used to get a requirements pex.
 
@@ -137,6 +149,7 @@ class PexFromTargetsRequest:
             include_source_files=False,
             additional_args=() if zip_safe else ("--not-zip-safe",),
             internal_only=internal_only,
+            direct_deps_only=direct_deps_only,
         )
 
 
@@ -157,8 +170,15 @@ class TwoStepPexFromTargetsRequest:
 
 @rule(level=LogLevel.DEBUG)
 async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonSetup) -> PexRequest:
-    transitive_targets = await Get(TransitiveTargets, Addresses, request.addresses)
-    all_targets = transitive_targets.closure
+    if request.direct_deps_only:
+        targets = await Get(Targets, Addresses(request.addresses))
+        direct_deps = await MultiGet(
+            Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in targets
+        )
+        all_targets = FrozenOrderedSet(itertools.chain(*direct_deps, targets))
+    else:
+        transitive_targets = await Get(TransitiveTargets, Addresses, request.addresses)
+        all_targets = transitive_targets.closure
 
     input_digests = []
     if request.additional_sources:

@@ -10,7 +10,6 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.repl import ReplImplementation, ReplRequest
-from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -27,7 +26,7 @@ async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) 
         Pex,
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements(
-            Addresses(tgt.address for tgt in repl.targets), internal_only=True
+            (tgt.address for tgt in repl.targets), internal_only=True
         ),
     )
     sources_request = Get(
@@ -60,7 +59,7 @@ async def create_ipython_repl_request(
         PexRequest,
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements(
-            Addresses(tgt.address for tgt in repl.targets), internal_only=True
+            (tgt.address for tgt in repl.targets), internal_only=True
         ),
     )
 
