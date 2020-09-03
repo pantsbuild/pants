@@ -10,7 +10,6 @@ python_distribution(
   provides=setup_py(
     name='pantsbuild.pants.testutil',
     description='Test support for writing Pants plugins.',
-    namespace_packages=['pants.testutil'],
     classifiers=[
       'Topic :: Software Development :: Testing',
     ]
