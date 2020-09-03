@@ -3,7 +3,7 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Tuple
+from typing import Iterable, List, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.target_types import (
@@ -82,7 +82,7 @@ class PylintPartition:
         plugin_targets: Iterable[Target],
     ) -> None:
         field_sets = []
-        targets_with_deps = []
+        targets_with_deps: List[Target] = []
         for target_setup in target_setups:
             field_sets.append(target_setup.field_set)
             targets_with_deps.extend(target_setup.target_with_dependencies)
