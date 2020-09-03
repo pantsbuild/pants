@@ -28,6 +28,9 @@ class PantsEnvironment:
     a lot of cache invalidation if the environment changes spuriously.
     """
 
+    name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
+    shorthand_re = re.compile(r"([A-Za-z_]\w*)")
+
     env: FrozenDict[str, str]
 
     def __init__(self, env: Optional[Mapping[str, str]] = None):
@@ -36,26 +39,24 @@ class PantsEnvironment:
         Explicitly specify the env argument to create a mock environment for testing.
         """
 
-        self.env = FrozenDict(env if env else dict(os.environ))
+        self.env = FrozenDict(env if env else os.environ)
 
     def get_subset(self, requested: Sequence[str]) -> FrozenDict[str, Optional[str]]:
         """Given a list of extra environment variable specifiers as strings, filter the contents of
         the pants environment to only the variables that were specified as a pants configuration
         option."""
 
-        name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
-        shorthand_re = re.compile(r"([A-Za-z_]\w*)")
-
         env_var_subset: Dict[str, Optional[str]] = {}
 
         for env_var in requested:
-            logger.warning(f"ENV_VAR: {env_var}")
-            name_value_match = name_value_re.match(env_var)
+            name_value_match = self.name_value_re.match(env_var)
             if name_value_match:
                 env_var_subset[name_value_match[1]] = name_value_match[2]
-            elif shorthand_re.match(env_var):
+            elif self.shorthand_re.match(env_var):
                 env_var_subset[env_var] = self.env.get(env_var)
             else:
-                logger.warning(f"Invalid extra env var: {env_var}, skipping")
+                raise ValueError(
+                    f"An invalid variable was requested via the --test-extra-env-var mechanism: {env_var}"
+                )
 
         return FrozenDict(env_var_subset)

@@ -19,8 +19,6 @@ from pants.core.util_rules.pants_environment import PantsEnvironment
         (["A="], {"A": ""}),
         # Test string with " literal.
         (['A=has a " in it'], {"A": 'has a " in it'}),
-        # An invalid variable name should be skipped.
-        (["3INVALID=doesn't matter"], {}),
     ],
 )
 def test_pants_environment(input_strs: List[str], expected: Dict[str, str]) -> None:
@@ -28,3 +26,14 @@ def test_pants_environment(input_strs: List[str], expected: Dict[str, str]) -> N
 
     subset = pants_env.get_subset(input_strs)
     assert dict(subset) == expected
+
+
+def test_invalid_variable() -> None:
+    pants_env = PantsEnvironment()
+
+    with pytest.raises(ValueError) as exc:
+        pants_env.get_subset(["3INVALID=doesn't matter"])
+    assert (
+        "An invalid variable was requested via the --test-extra-env-var mechanism: 3INVALID"
+        in str(exc)
+    )
