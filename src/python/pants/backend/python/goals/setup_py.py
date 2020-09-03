@@ -218,7 +218,7 @@ class SetupKwargs:
         # would require that all values are immutable, and we may have lists and dictionaries as
         # values. It's too difficult/clunky to convert those all, then to convert them back out of
         # `FrozenDict`. We don't use JSON because it does not preserve data types like `tuple`.
-        self._pickled_bytes = pickle.dumps({k: v for k, v in sorted(kwargs.items())})
+        self._pickled_bytes = pickle.dumps({k: v for k, v in sorted(kwargs.items())}, protocol=4)
 
     @memoized_property
     def kwargs(self) -> Dict[str, Any]:
