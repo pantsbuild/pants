@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use lazy_static::lazy_static;
-use log::{debug, log, max_level, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
+use log::{debug, log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
 use tokio::task_local;
 use uuid::Uuid;
@@ -29,6 +29,7 @@ lazy_static! {
 
 pub struct PantsLogger {
   log_file: Mutex<Option<File>>,
+  global_level: Mutex<RefCell<LevelFilter>>,
   use_color: AtomicBool,
   show_rust_3rdparty_logs: AtomicBool,
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
@@ -40,6 +41,7 @@ impl PantsLogger {
   pub fn new() -> PantsLogger {
     PantsLogger {
       log_file: Mutex::new(None),
+      global_level: Mutex::new(RefCell::new(LevelFilter::Off)),
       show_rust_3rdparty_logs: AtomicBool::new(true),
       use_color: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
@@ -70,7 +72,11 @@ impl PantsLogger {
     match max_python_level {
       Ok(python_level) => {
         let level: LevelFilter = python_level.into();
-        set_max_level(level);
+        // TODO this should be whatever the most verbose log level specified in log_domain_levels -
+        // but I'm not sure if it's actually much of a gain over just setting this to Trace.
+        set_max_level(LevelFilter::Trace);
+        PANTS_LOGGER.global_level.lock().replace(level);
+
         PANTS_LOGGER.use_color.store(use_color, Ordering::SeqCst);
         PANTS_LOGGER
           .show_rust_3rdparty_logs
@@ -140,12 +146,25 @@ impl PantsLogger {
 
 impl Log for PantsLogger {
   fn enabled(&self, metadata: &Metadata) -> bool {
-    metadata.level() <= max_level()
+    let global_level: LevelFilter = { *self.global_level.lock().borrow() };
+    let enabled_globally = metadata.level() <= global_level;
+    let log_level_filters_lock = self.log_level_filters.lock();
+    let log_level_filters = log_level_filters_lock.borrow();
+    let enabled_for_target = log_level_filters
+      .get(metadata.target())
+      .map(|lf| metadata.level() <= *lf)
+      .unwrap_or(false);
+
+    enabled_globally || enabled_for_target
   }
 
   fn log(&self, record: &Record) {
     use chrono::Timelike;
     use log::Level;
+
+    if !self.enabled(record.metadata()) {
+      return;
+    }
 
     let mut should_log = self.show_rust_3rdparty_logs.load(Ordering::SeqCst);
     if !should_log {
@@ -195,7 +214,7 @@ impl Log for PantsLogger {
         time_str,
         level_marker,
         record.target(),
-        record.args()
+        record.args(),
       )
     } else {
       format!("{} {} {}", time_str, level_marker, record.args())

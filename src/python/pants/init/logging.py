@@ -42,7 +42,7 @@ class NativeHandler(StreamHandler):
         super().__init__(None)
         self.native = Native()
         self.native_filename = native_filename
-        self.setLevel(log_level.level)
+        self.setLevel(pants_logging.TRACE)
         if not self.native_filename:
             self.native.setup_stderr_logger()
 
