@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from json import load
+import json
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
@@ -10,6 +10,8 @@ from pkg_resources import Requirement
 from pants.base.build_environment import get_buildroot
 
 
+# TODO(#10655): add support for PEP 440 direct references (aka VCS style).
+# TODO(#10655): differentiate between Pipfile vs. Pipfile.lock.
 class PipenvRequirements:
     """Translates a Pipenv.lock file into an equivalent set `python_requirement_library` targets.
 
@@ -46,13 +48,10 @@ class PipenvRequirements:
         if the requirements_relpath value is not in the current rel_path
         """
 
-        lock_info = {}
-
         requirements_path = Path(
             get_buildroot(), self._parse_context.rel_path, requirements_relpath
         )
-        with open(requirements_path, "r") as fp:
-            lock_info = load(fp)
+        lock_info = json.loads(requirements_path.read_text())
 
         if pipfile_target:
             requirements_dep = pipfile_target

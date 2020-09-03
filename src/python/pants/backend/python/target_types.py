@@ -3,6 +3,7 @@
 
 import collections.abc
 import os.path
+from textwrap import dedent
 from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 
 from pkg_resources import Requirement
@@ -331,6 +332,37 @@ class PythonLibrary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+def format_invalid_requirement_string_error(
+    value: str, e: Exception, *, description_of_origin: str
+) -> str:
+    prefix = f"Invalid requirement '{value}' in {description_of_origin}: {e}"
+    # We check if they're using Pip-style VCS requirements, and redirect them to instead use PEP
+    # 440 direct references. See https://pip.pypa.io/en/stable/reference/pip_install/#vcs-support.
+    recognized_vcs = {"git", "hg", "svn", "bzr"}
+    if all(f"{vcs}+" not in value for vcs in recognized_vcs):
+        return prefix
+    return dedent(
+        f"""\
+        {prefix}
+
+        It looks like you're trying to use a pip VCS-style requirement?
+        Instead, use a direct reference (PEP 440).
+
+        Instead of this style:
+
+            git+https://github.com/django/django.git#egg=django
+            git+https://github.com/django/django.git@stable/2.1.x#egg=django
+            git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8#egg=django
+
+        Use this style:
+
+            django@ git+https://github.com/django/django.git
+            django@ git+https://github.com/django/django.git@stable/2.1.x
+            django@ git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8
+        """
+    )
+
+
 class PythonRequirementsField(PrimitiveField):
     """A sequence of pip-style requirement strings, e.g. ['foo==1.8', 'bar<=3 ;
     python_version<'3']."""
@@ -365,8 +397,13 @@ class PythonRequirementsField(PrimitiveField):
                     parsed = Requirement.parse(v)
                 except Exception as e:
                     raise InvalidFieldException(
-                        f"Invalid requirement string '{v}' in the '{cls.alias}' field for the "
-                        f"target {address}: {e}"
+                        format_invalid_requirement_string_error(
+                            v,
+                            e,
+                            description_of_origin=(
+                                f"the '{cls.alias}' field for the target {address}"
+                            ),
+                        )
                     )
                 result.append(parsed)
             elif isinstance(v, PythonRequirement):

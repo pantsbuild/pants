@@ -69,6 +69,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
             ansicolors>=1.18.0
             Django==3.2 ; python_version>'3'
             Un-Normalized-PROJECT  # Inline comment.
+            pip@ git+https://github.com/pypa/pip.git
             """
         ),
         expected_file_dep=PythonRequirementsFile(
@@ -98,6 +99,13 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                 },
                 address=Address("", target_name="Un-Normalized-PROJECT"),
             ),
+            PythonRequirementLibrary(
+                {
+                    "dependencies": [":requirements.txt"],
+                    "requirements": [Requirement.parse("pip@ git+https://github.com/pypa/pip.git")],
+                },
+                address=Address("", target_name="pip"),
+            ),
         ],
     )
 
@@ -112,10 +120,20 @@ def test_invalid_req(rule_runner: RuleRunner) -> None:
             expected_file_dep=PythonRequirementsFile({}, address=Address("doesnt_matter")),
             expected_targets=[],
         )
-    assert (
-        "Invalid requirement in requirements.txt at line 3 due to value 'Not A Valid Req == "
-        "3.7'."
-    ) in str(exc.value)
+    assert "Invalid requirement 'Not A Valid Req == 3.7' in requirements.txt at line 3" in str(
+        exc.value
+    )
+
+    # Give a nice error message if it looks like they're using pip VCS-style requirements.
+    with pytest.raises(ExecutionError) as exc:
+        assert_python_requirements(
+            rule_runner,
+            "python_requirements()",
+            "git+https://github.com/pypa/pip.git#egg=pip",
+            expected_file_dep=PythonRequirementsFile({}, address=Address("doesnt_matter")),
+            expected_targets=[],
+        )
+    assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
 
 
 def test_relpath_override(rule_runner: RuleRunner) -> None:

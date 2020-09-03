@@ -6,6 +6,7 @@ from typing import Iterable, Mapping, Optional
 
 from pkg_resources import Requirement
 
+from pants.backend.python.target_types import format_invalid_requirement_string_error
 from pants.base.build_environment import get_buildroot
 
 
@@ -70,8 +71,13 @@ class PythonRequirements:
                 req = Requirement.parse(line)
             except Exception as e:
                 raise ValueError(
-                    f"Invalid requirement in {req_file.relative_to(get_buildroot())} at line "
-                    f"{i + 1} due to value '{line}'.\n\n{e}"
+                    format_invalid_requirement_string_error(
+                        line,
+                        e,
+                        description_of_origin=(
+                            f"{req_file.relative_to(get_buildroot())} at line {i + 1}"
+                        ),
+                    )
                 )
             requirements.append(req)
 

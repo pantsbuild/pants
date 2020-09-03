@@ -67,7 +67,11 @@ def test_translate_source_file_to_entry_point() -> None:
 
 
 def test_requirements_field() -> None:
-    raw_value = ("argparse==1.2.1", "configparser ; python_version<'3'")
+    raw_value = (
+        "argparse==1.2.1",
+        "configparser ; python_version<'3'",
+        "pip@ git+https://github.com/pypa/pip.git",
+    )
     parsed_value = tuple(Requirement.parse(v) for v in raw_value)
 
     assert PythonRequirementsField(raw_value, address=Address("demo")).value == parsed_value
@@ -85,9 +89,16 @@ def test_requirements_field() -> None:
     with pytest.raises(InvalidFieldException) as exc:
         PythonRequirementsField(["not valid! === 3.1"], address=Address("demo"))
     assert (
-        "Invalid requirement string 'not valid! === 3.1' in the 'requirements' field for the "
+        "Invalid requirement 'not valid! === 3.1' in the 'requirements' field for the "
         "target demo:"
     ) in str(exc.value)
+
+    # Give a nice error message if it looks like they're trying to use pip VCS-style requirements.
+    with pytest.raises(InvalidFieldException) as exc:
+        PythonRequirementsField(
+            ["git+https://github.com/pypa/pip.git#egg=pip"], address=Address("demo")
+        )
+    assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
 
     # Check that we still support the deprecated `pants_requirement` object.
     assert (
