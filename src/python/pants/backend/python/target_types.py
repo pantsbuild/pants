@@ -350,15 +350,15 @@ def format_invalid_requirement_string_error(
 
         Instead of this style:
 
-            git+https://github.com/django/django.git#egg=django
-            git+https://github.com/django/django.git@stable/2.1.x#egg=django
-            git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8#egg=django
+            git+https://github.com/django/django.git#egg=Django
+            git+https://github.com/django/django.git@stable/2.1.x#egg=Django
+            git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8#egg=Django
 
-        Use this style:
+        Use this style, where the first value is the name of the dependency:
 
-            django@ git+https://github.com/django/django.git
-            django@ git+https://github.com/django/django.git@stable/2.1.x
-            django@ git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8
+            Django@ git+https://github.com/django/django.git
+            Django@ git+https://github.com/django/django.git@stable/2.1.x
+            Django@ git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8
         """
     )
 
