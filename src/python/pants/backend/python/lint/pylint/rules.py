@@ -1,10 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Tuple
+from typing import Iterable, List, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.target_types import (
@@ -12,7 +11,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSources,
 )
-from pants.backend.python.util_rules import pex, python_sources
+from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -20,6 +19,7 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
     PexRequirements,
 )
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -27,7 +27,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -81,12 +81,14 @@ class PylintPartition:
         interpreter_constraints: PexInterpreterConstraints,
         plugin_targets: Iterable[Target],
     ) -> None:
-        self.field_sets = tuple(target_setup.field_set for target_setup in target_setups)
-        self.targets_with_dependencies = Targets(
-            itertools.chain.from_iterable(
-                target_setup.target_with_dependencies for target_setup in target_setups
-            )
-        )
+        field_sets = []
+        targets_with_deps: List[Target] = []
+        for target_setup in target_setups:
+            field_sets.append(target_setup.field_set)
+            targets_with_deps.extend(target_setup.target_with_dependencies)
+
+        self.field_sets = tuple(field_sets)
+        self.targets_with_dependencies = Targets(targets_with_deps)
         self.interpreter_constraints = interpreter_constraints
         self.plugin_targets = Targets(plugin_targets)
 
@@ -106,17 +108,14 @@ def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ..
 
 @rule(level=LogLevel.DEBUG)
 async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> LintResult:
-    # We build one PEX with Pylint requirements and another with all direct 3rd-party dependencies.
-    # Splitting this into two PEXes gives us finer-grained caching. We then merge via `--pex-path`.
+    # We build one PEX with Pylint requirements (including any first-party plugins), and another
+    # with all direct 3rd-party dependencies. Splitting this into two PEXes gives us finer-grained
+    # caching. We then merge via `--pex-path`. We use `PexFromTargetsRequest.for_requirements()`
+    # to get cache hits with other goals like `test` and `repl`.
     plugin_requirements = PexRequirements.create_from_requirement_fields(
         plugin_tgt[PythonRequirementsField]
         for plugin_tgt in partition.plugin_targets
         if plugin_tgt.has_field(PythonRequirementsField)
-    )
-    target_requirements = PexRequirements.create_from_requirement_fields(
-        tgt[PythonRequirementsField]
-        for tgt in partition.targets_with_dependencies
-        if tgt.has_field(PythonRequirementsField)
     )
     pylint_pex_request = Get(
         Pex,
@@ -129,11 +128,11 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     )
     requirements_pex_request = Get(
         Pex,
-        PexRequest(
-            output_filename="requirements.pex",
+        PexFromTargetsRequest,
+        PexFromTargetsRequest.for_requirements(
+            (field_set.address for field_set in partition.field_sets),
             internal_only=True,
-            requirements=target_requirements,
-            interpreter_constraints=partition.interpreter_constraints,
+            direct_deps_only=True,
         ),
     )
     # TODO(John Sirois): Support shading python binaries:
@@ -244,10 +243,11 @@ async def pylint_lint(
     if pylint.skip:
         return LintResults([], linter_name="Pylint")
 
-    plugin_targets_request = Get(
-        TransitiveTargets,
-        Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins),
+    plugin_target_addresses = await MultiGet(
+        Get(Address, AddressInput, AddressInput.parse(plugin_addr))
+        for plugin_addr in pylint.source_plugins
     )
+    plugin_targets_request = Get(TransitiveTargets, Addresses(plugin_target_addresses))
     linted_targets_request = Get(
         Targets, Addresses(field_set.address for field_set in request.field_sets)
     )
@@ -305,6 +305,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(LintRequest, PylintRequest),
-        *pex.rules(),
-        *python_sources.rules(),
+        *pex_from_targets.rules(),
     ]

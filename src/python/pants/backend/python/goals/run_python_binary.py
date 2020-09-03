@@ -58,7 +58,7 @@ async def create_python_binary_run_request(
     requirements_pex_request = await Get(
         PexRequest,
         PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(Addresses([field_set.address]), internal_only=True),
+        PexFromTargetsRequest.for_requirements([field_set.address], internal_only=True),
     )
 
     requirements_request = Get(Pex, PexRequest, requirements_pex_request)
