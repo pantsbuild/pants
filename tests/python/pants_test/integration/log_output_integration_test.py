@@ -36,12 +36,6 @@ def test_completed_log_output() -> None:
 def test_log_filtering_by_target() -> None:
     sources = {
         "src/python/project/__init__.py": "",
-        "src/python/project/lib.py": dedent(
-            """\
-            def add(x: int, y: int) -> int:
-                return x + y
-            """
-        ),
         "src/python/project/BUILD": "python_library()",
     }
     with setup_tmpdir(sources) as tmpdir:
