@@ -47,7 +47,6 @@ from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option
 from pants.util.logging import LogLevel
 
-
 """
 An overview:
 

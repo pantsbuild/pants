@@ -11,8 +11,9 @@ class Isort(PythonToolBase):
     """The Python import sorter tool (https://timothycrosley.github.io/isort/)."""
 
     options_scope = "isort"
-    default_version = "isort>=4.3.21,<4.4"
-    default_extra_requirements = ["setuptools<45"]  # NB: `<45` is for Python 2 support
+    default_version = "isort[pyproject]>=5.5.1,<5.6"
+    default_extra_requirements = ["setuptools"]
+    default_interpreter_constraints = ["CPython>=3.6"]
     default_entry_point = "isort.main"
 
     @classmethod

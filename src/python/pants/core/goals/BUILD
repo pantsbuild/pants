@@ -13,7 +13,7 @@ python_integration_tests(
   uses_pants_run=True,
   dependencies=[
     'examples/src/python/example:hello_directory',
-    '//:isort_cfg',
+    '//:pyproject',
     'examples:isort_cfg',
   ],
   timeout=240,

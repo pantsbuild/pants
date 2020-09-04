@@ -43,7 +43,6 @@ python_binary(
     '//:build_root',
     '//:pants_toml',
     '//:3rdparty_directory',
-    '//:isort_cfg',
     '//:pyproject',
     'build-support/flake8',
     'build-support/mypy',
