@@ -15,4 +15,4 @@ source "${REPO_ROOT}/build-support/pants_venv"
 source "${REPO_ROOT}/build-support/bin/native/bootstrap_code.sh"
 
 ./pants binary src/python/pants/bin:pants_local_binary || exit 1
-mv dist/pants_local_binary.pex pants.pex
+mv dist/src.python.pants.bin/pants_local_binary.pex pants.pex
