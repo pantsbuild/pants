@@ -50,7 +50,6 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     FieldSet,
-    FieldSetWithOrigin,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -610,15 +609,6 @@ def test_find_valid_field_sets() -> None:
 
         sources: FortranSources
 
-    @union
-    class FieldSetSuperclassWithOrigin(FieldSetWithOrigin):
-        pass
-
-    class FieldSetSubclassWithOrigin(FieldSetSuperclassWithOrigin):
-        required_fields = (FortranSources,)
-
-        sources: FortranSources
-
     rule_runner = RuleRunner(
         rules=[
             QueryRule(
@@ -626,7 +616,6 @@ def test_find_valid_field_sets() -> None:
             ),
             UnionRule(FieldSetSuperclass, FieldSetSubclass1),
             UnionRule(FieldSetSuperclass, FieldSetSubclass2),
-            UnionRule(FieldSetSuperclassWithOrigin, FieldSetSubclassWithOrigin),
         ],
         target_types=[FortranTarget, InvalidTarget],
     )
@@ -694,15 +683,6 @@ def test_find_valid_field_sets() -> None:
             FieldSetSuperclass, [invalid_tgt_with_origin], error_if_no_valid_targets=True
         )
     assert NoValidTargetsException.__name__ in str(exc.value)
-
-    valid_with_origin = find_valid_field_sets(
-        FieldSetSuperclassWithOrigin, [valid_tgt_with_origin, invalid_tgt_with_origin]
-    )
-    assert valid_with_origin.targets == (valid_tgt,)
-    assert valid_with_origin.targets_with_origins == (valid_tgt_with_origin,)
-    assert valid_with_origin.field_sets == (
-        FieldSetSubclassWithOrigin.create(valid_tgt_with_origin),
-    )
 
 
 # -----------------------------------------------------------------------------------------------

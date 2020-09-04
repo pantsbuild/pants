@@ -7,7 +7,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple, Type, Union
+from typing import Dict, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple, Type
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
@@ -41,7 +41,8 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     FieldSet,
-    FieldSetWithOrigin,
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -794,6 +795,8 @@ async def resolve_dependencies(
     return Addresses(sorted(result))
 
 
+# TODO: Rephrase "valid" to "applicable" in the below.
+
 # -----------------------------------------------------------------------------------------------
 # Find valid field sets
 # -----------------------------------------------------------------------------------------------
@@ -879,32 +882,26 @@ class AmbiguousImplementationsException(Exception):
 
 
 @rule
-def find_valid_field_sets(
+async def find_valid_field_sets_for_target_roots(
     request: TargetsToValidFieldSetsRequest,
     targets_with_origins: TargetsWithOrigins,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> TargetsToValidFieldSets:
-    field_set_types: Iterable[
-        Union[Type[FieldSet], Type[FieldSetWithOrigin]]
-    ] = union_membership.union_rules[request.field_set_superclass]
+    field_sets_per_target = await Get(
+        FieldSetsPerTarget,
+        FieldSetsPerTargetRequest(
+            request.field_set_superclass, (two.target for two in targets_with_origins)
+        ),
+    )
     targets_to_valid_field_sets = {}
-    for tgt_with_origin in targets_with_origins:
-        valid_field_sets = [
-            (
-                field_set_type.create(tgt_with_origin)
-                if issubclass(field_set_type, FieldSetWithOrigin)
-                else field_set_type.create(tgt_with_origin.target)
-            )
-            for field_set_type in field_set_types
-            if field_set_type.is_applicable(tgt_with_origin.target)
-        ]
-        if valid_field_sets:
-            targets_to_valid_field_sets[tgt_with_origin] = valid_field_sets
+    for tgt_with_origin, field_sets in zip(targets_with_origins, field_sets_per_target.collection):
+        if field_sets:
+            targets_to_valid_field_sets[tgt_with_origin] = field_sets
     if request.error_if_no_valid_targets and not targets_to_valid_field_sets:
         raise NoValidTargetsException.create_from_field_sets(
             TargetsWithOrigins(targets_with_origins),
-            field_set_types=field_set_types,
+            field_set_types=union_membership.union_rules[request.field_set_superclass],
             goal_description=request.goal_description,
             union_membership=union_membership,
             registered_target_types=registered_target_types,
@@ -919,6 +916,24 @@ def find_valid_field_sets(
             result.targets[0], result.field_sets, goal_description=request.goal_description
         )
     return result
+
+
+@rule
+def find_valid_field_sets(
+    request: FieldSetsPerTargetRequest,
+    union_membership: UnionMembership,
+) -> FieldSetsPerTarget:
+    field_set_types: Iterable[Type[FieldSet]] = union_membership.union_rules[
+        request.field_set_superclass
+    ]
+    return FieldSetsPerTarget(
+        (
+            field_set_type.create(target)
+            for field_set_type in field_set_types
+            if field_set_type.is_applicable(target)
+        )
+        for target in request.targets
+    )
 
 
 def rules():

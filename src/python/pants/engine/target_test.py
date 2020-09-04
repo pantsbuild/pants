@@ -9,7 +9,6 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import pytest
 from typing_extensions import final
 
-from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, PathGlobs, Snapshot
 from pants.engine.rules import Get, rule
@@ -20,7 +19,6 @@ from pants.engine.target import (
     DictStringToStringField,
     DictStringToStringSequenceField,
     FieldSet,
-    FieldSetWithOrigin,
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -34,7 +32,6 @@ from pants.engine.target import (
     StringSequenceField,
     Tags,
     Target,
-    TargetWithOrigin,
     generate_subtarget,
     generate_subtarget_address,
 )
@@ -512,7 +509,7 @@ def test_field_set() -> None:
         unrelated_field: UnrelatedField
 
     @dataclass(frozen=True)
-    class UnrelatedFieldSet(FieldSetWithOrigin):
+    class UnrelatedFieldSet(FieldSet):
         required_fields = ()
 
         unrelated_field: UnrelatedField
@@ -537,16 +534,8 @@ def test_field_set() -> None:
     with pytest.raises(KeyError):
         FortranFieldSet.create(unrelated_tgt)
 
-    origin = FilesystemLiteralSpec("f.txt")
-    assert UnrelatedFieldSet.create(TargetWithOrigin(fortran_tgt, origin)).origin == origin
-    assert (
-        UnrelatedFieldSet.create(TargetWithOrigin(unrelated_tgt, origin)).unrelated_field.value
-        == "configured"
-    )
-    assert (
-        UnrelatedFieldSet.create(TargetWithOrigin(no_fields_tgt, origin)).unrelated_field.value
-        == UnrelatedField.default
-    )
+    assert UnrelatedFieldSet.create(unrelated_tgt).unrelated_field.value == "configured"
+    assert UnrelatedFieldSet.create(no_fields_tgt).unrelated_field.value == UnrelatedField.default
 
 
 # -----------------------------------------------------------------------------------------------

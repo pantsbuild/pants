@@ -740,13 +740,16 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                 sibling = next(exported_ancestor_iter, None)
             if sibling_owners:
                 raise AmbiguousOwnerError(
-                    f"Exporting owners for {target.address} are "
-                    f"ambiguous. Found {exported_ancestor.address} and "
-                    f"{len(sibling_owners)} others: "
+                    f"python_distribution target owning {target.address} is ambiguous. "
+                    f"Found {exported_ancestor.address} and {len(sibling_owners)} others: "
                     f'{", ".join(so.address.spec for so in sibling_owners)}'
                 )
             return ExportedTarget(owner)
-    raise NoOwnerError(f"No exported target owner found for {target.address}")
+    raise NoOwnerError(
+        f"No python_distribution target found to own {target.address}. Note that "
+        f"the owner must be in or above the owned target's directory, and must "
+        f"depend on it (directly or indirectly)."
+    )
 
 
 @rule(desc="Set up setuptools")

@@ -7,10 +7,10 @@ from typing import ClassVar, Generic, Iterable, Optional, Type, TypeVar
 
 from pants.engine.collection import Collection
 from pants.engine.fs import Snapshot
-from pants.engine.target import FieldSetWithOrigin
+from pants.engine.target import FieldSet
 from pants.util.meta import frozen_after_init
 
-_FS = TypeVar("_FS", bound=FieldSetWithOrigin)
+_FS = TypeVar("_FS", bound=FieldSet)
 
 
 @frozen_after_init
