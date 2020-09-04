@@ -168,7 +168,29 @@ class GlobalOptions(Subsystem):
             "--level",
             type=LogLevel,
             default=LogLevel.INFO,
-            help="Set the logging level.",
+            help="Set the logging level. The logging levels are one of: "
+            '"error", "warn", "info", "debug", "trace".',
+        )
+        register(
+            "--show-log-target",
+            type=bool,
+            default=False,
+            advanced=True,
+            help="Display the target where a log message originates in that log message's output. "
+            "This can be helpful when paired with --log-levels-by-target.",
+        )
+
+        register(
+            "--log-levels-by-target",
+            type=dict,
+            default={},
+            advanced=True,
+            help="Set a more specific logging level for one or more logging targets. The names of "
+            "logging targets are specified in log strings when the --show-log-target option is set. "
+            "The logging levels are one of: "
+            '"error", "warn", "info", "debug", "trace". '
+            "All logging targets not specified here use the global log level set with --level. For example, "
+            'you can set `--log-levels-by-target=\'{"workunit_store": "info", "pants.engine.rules": "warn"}\'` ',
         )
 
         register(

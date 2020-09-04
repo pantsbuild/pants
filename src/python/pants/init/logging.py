@@ -6,11 +6,12 @@ import logging
 import os
 import warnings
 from logging import Formatter, Handler, LogRecord, StreamHandler
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.internals.native import Native
+from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir
 from pants.util.logging import LogLevel
 
@@ -21,8 +22,16 @@ logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(pants_logging.TRACE, "TRACE")
 
 
-def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool, use_color: bool) -> None:
-    Native().init_rust_logging(log_level.level, log_show_rust_3rdparty, use_color)
+def init_rust_logger(
+    log_level: LogLevel,
+    log_show_rust_3rdparty: bool,
+    use_color: bool,
+    show_target: bool,
+    log_levels_by_target: Dict[str, LogLevel] = {},
+) -> None:
+    Native().init_rust_logging(
+        log_level.level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
+    )
 
 
 class NativeHandler(StreamHandler):
@@ -33,14 +42,12 @@ class NativeHandler(StreamHandler):
         super().__init__(None)
         self.native = Native()
         self.native_filename = native_filename
-        self.setLevel(log_level.level)
+        self.setLevel(pants_logging.TRACE)
         if not self.native_filename:
             self.native.setup_stderr_logger()
 
     def emit(self, record: LogRecord) -> None:
-        self.native.write_log(
-            msg=self.format(record), level=record.levelno, target=f"{record.name}:pid={os.getpid()}"
-        )
+        self.native.write_log(msg=self.format(record), level=record.levelno, target=record.name)
 
     def flush(self) -> None:
         self.native.flush_log()
@@ -114,11 +121,32 @@ def setup_logging(global_bootstrap_options):
 
     log_show_rust_3rdparty = global_bootstrap_options.log_show_rust_3rdparty
     use_color = global_bootstrap_options.colors
+    show_target = global_bootstrap_options.show_log_target
+    log_levels_by_target = get_log_levels_by_target(global_bootstrap_options)
 
-    init_rust_logger(global_level, log_show_rust_3rdparty, use_color)
+    init_rust_logger(
+        global_level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
+    )
     setup_logging_to_stderr(global_level, warnings_filter_regexes=ignores)
     if log_dir:
         setup_logging_to_file(global_level, log_dir=log_dir, warnings_filter_regexes=ignores)
+
+
+def get_log_levels_by_target(global_bootstrap_options: OptionValueContainer) -> Dict[str, LogLevel]:
+    raw_levels = global_bootstrap_options.log_levels_by_target
+    levels: Dict[str, LogLevel] = {}
+    for key, value in raw_levels.items():
+        if not isinstance(key, str):
+            raise ValueError(
+                "Keys for log_domain_levels must be strings, but was given the key: {key} with type {type(key)}."
+            )
+        if not isinstance(value, str):
+            raise ValueError(
+                "Values for log_domain_levels must be strings, but was given the value: {value} with type {type(value)}."
+            )
+        log_level = LogLevel[value.upper()]
+        levels[key] = log_level
+    return levels
 
 
 def setup_logging_to_stderr(

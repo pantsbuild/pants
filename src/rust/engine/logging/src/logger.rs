@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use lazy_static::lazy_static;
-use log::{debug, log, max_level, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
+use log::{debug, log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
 use tokio::task_local;
 use uuid::Uuid;
@@ -29,31 +29,62 @@ lazy_static! {
 
 pub struct PantsLogger {
   log_file: Mutex<Option<File>>,
+  global_level: Mutex<RefCell<LevelFilter>>,
   use_color: AtomicBool,
   show_rust_3rdparty_logs: AtomicBool,
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
+  show_target: AtomicBool,
+  log_level_filters: Mutex<HashMap<String, log::LevelFilter>>,
 }
 
 impl PantsLogger {
   pub fn new() -> PantsLogger {
     PantsLogger {
       log_file: Mutex::new(None),
+      global_level: Mutex::new(RefCell::new(LevelFilter::Off)),
       show_rust_3rdparty_logs: AtomicBool::new(true),
       use_color: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
+      show_target: AtomicBool::new(false),
+      log_level_filters: Mutex::new(HashMap::new()),
     }
   }
 
-  pub fn init(max_level: u64, show_rust_3rdparty_logs: bool, use_color: bool) {
+  pub fn init(
+    max_level: u64,
+    show_rust_3rdparty_logs: bool,
+    use_color: bool,
+    show_target: bool,
+    log_levels_by_target: HashMap<String, u64>,
+  ) {
+    let log_levels_by_target = log_levels_by_target
+      .iter()
+      .map(|(k, v)| {
+        let python_level: PythonLogLevel = (*v).try_into().unwrap_or_else(|e| {
+          panic!("Unrecognized log level from python: {}: {}", v, e);
+        });
+        let level: log::LevelFilter = python_level.into();
+        (k.clone(), level)
+      })
+      .collect::<HashMap<_, _>>();
+
     let max_python_level: Result<PythonLogLevel, _> = max_level.try_into();
     match max_python_level {
       Ok(python_level) => {
         let level: LevelFilter = python_level.into();
-        set_max_level(level);
+        // TODO this should be whatever the most verbose log level specified in log_domain_levels -
+        // but I'm not sure if it's actually much of a gain over just setting this to Trace.
+        set_max_level(LevelFilter::Trace);
+        PANTS_LOGGER.global_level.lock().replace(level);
+
         PANTS_LOGGER.use_color.store(use_color, Ordering::SeqCst);
         PANTS_LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
+        *PANTS_LOGGER.log_level_filters.lock() = log_levels_by_target;
+        PANTS_LOGGER
+          .show_target
+          .store(show_target, Ordering::SeqCst);
         if set_logger(&*PANTS_LOGGER).is_err() {
           debug!("Logging already initialized.");
         }
@@ -112,12 +143,24 @@ impl PantsLogger {
 
 impl Log for PantsLogger {
   fn enabled(&self, metadata: &Metadata) -> bool {
-    metadata.level() <= max_level()
+    let global_level: LevelFilter = { *self.global_level.lock().borrow() };
+    let enabled_globally = metadata.level() <= global_level;
+    let log_level_filters = self.log_level_filters.lock();
+    let enabled_for_target = log_level_filters
+      .get(metadata.target())
+      .map(|lf| metadata.level() <= *lf)
+      .unwrap_or(false);
+
+    enabled_globally || enabled_for_target
   }
 
   fn log(&self, record: &Record) {
     use chrono::Timelike;
     use log::Level;
+
+    if !self.enabled(record.metadata()) {
+      return;
+    }
 
     let mut should_log = self.show_rust_3rdparty_logs.load(Ordering::SeqCst);
     if !should_log {
@@ -144,6 +187,7 @@ impl Log for PantsLogger {
       cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
     );
 
+    let show_target = self.show_target.load(Ordering::SeqCst);
     let level = record.level();
     let destination_is_file = match destination {
       Destination::Pantsd => true,
@@ -160,7 +204,17 @@ impl Log for PantsLogger {
       Level::Trace => format!("[{}]", level).magenta(),
     };
 
-    let log_string = format!("{} {} {}", time_str, level_marker, record.args());
+    let log_string = if show_target {
+      format!(
+        "{} {} ({}) {}",
+        time_str,
+        level_marker,
+        record.target(),
+        record.args(),
+      )
+    } else {
+      format!("{} {} {}", time_str, level_marker, record.args())
+    };
 
     match destination {
       Destination::Stderr => {
