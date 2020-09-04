@@ -97,7 +97,7 @@ def test_passing_source(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_isort(rule_runner, [target])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
-    assert lint_results[0].stdout == ""
+    assert lint_results[0].stderr == ""
     assert fmt_result.stdout == ""
     assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE])
     assert fmt_result.did_change is False
@@ -108,9 +108,8 @@ def test_failing_source(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_isort(rule_runner, [target])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stdout
-    assert "Fixing" in fmt_result.stdout
-    assert "bad.py" in fmt_result.stdout
+    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stderr
+    assert fmt_result.stdout == "Fixing bad.py\n"
     assert fmt_result.output == get_digest(rule_runner, [FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
@@ -120,10 +119,9 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_isort(rule_runner, [target])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stdout
-    assert "good.py" not in lint_results[0].stdout
-    assert "Fixing" in fmt_result.stdout and "bad.py" in fmt_result.stdout
-    assert "good.py" not in fmt_result.stdout
+    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stderr
+    assert "good.py" not in lint_results[0].stderr
+    assert fmt_result.stdout == "Fixing bad.py\n"
     assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
@@ -136,10 +134,9 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_isort(rule_runner, targets)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stdout
-    assert "good.py" not in lint_results[0].stdout
-    assert "Fixing" in fmt_result.stdout and "bad.py" in fmt_result.stdout
-    assert "good.py" not in fmt_result.stdout
+    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stderr
+    assert "good.py" not in lint_results[0].stderr
+    assert "Fixing bad.py\n" == fmt_result.stdout
     assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
@@ -151,9 +148,8 @@ def test_respects_config_file(rule_runner: RuleRunner) -> None:
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "config.py Imports are incorrectly sorted" in lint_results[0].stdout
-    assert "Fixing" in fmt_result.stdout
-    assert "config.py" in fmt_result.stdout
+    assert "config.py Imports are incorrectly sorted" in lint_results[0].stderr
+    assert fmt_result.stdout == "Fixing needs_config.py\n"
     assert fmt_result.output == get_digest(rule_runner, [FIXED_NEEDS_CONFIG_SOURCE])
     assert fmt_result.did_change is True
 
@@ -163,9 +159,8 @@ def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_isort(rule_runner, [target], passthrough_args="--combine-as")
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "config.py Imports are incorrectly sorted" in lint_results[0].stdout
-    assert "Fixing" in fmt_result.stdout
-    assert "config.py" in fmt_result.stdout
+    assert "config.py Imports are incorrectly sorted" in lint_results[0].stderr
+    assert fmt_result.stdout == "Fixing needs_config.py\n"
     assert fmt_result.output == get_digest(rule_runner, [FIXED_NEEDS_CONFIG_SOURCE])
     assert fmt_result.did_change is True
 
