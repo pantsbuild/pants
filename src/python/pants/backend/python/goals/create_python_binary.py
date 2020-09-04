@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
+import os
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -28,7 +30,10 @@ from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -67,7 +72,9 @@ class PythonBinaryFieldSet(BinaryFieldSet, RunFieldSet):
 
 @rule(level=LogLevel.DEBUG)
 async def create_python_binary(
-    field_set: PythonBinaryFieldSet, python_binary_defaults: PythonBinaryDefaults
+    field_set: PythonBinaryFieldSet,
+    python_binary_defaults: PythonBinaryDefaults,
+    global_options: GlobalOptions,
 ) -> CreatedBinary:
     entry_point = field_set.entry_point.value
     if entry_point is None:
@@ -80,7 +87,21 @@ async def create_python_binary(
         entry_point = PythonBinarySources.translate_source_file_to_entry_point(
             stripped_binary_sources.snapshot.files
         )
-    output_filename = f"{field_set.address.target_name}.pex"
+
+    disambiguated_output_filename = os.path.join(
+        field_set.address.spec_path.replace(os.sep, "."), f"{field_set.address.target_name}.pex"
+    )
+    if global_options.options.pants_distdir_legacy_paths:
+        output_filename = f"{field_set.address.target_name}.pex"
+        logger.warning(
+            f"Writing to the legacy subpath: {output_filename}, which may not be unique. An "
+            f"upcoming version of Pants will switch to writing to the fully-qualified subpath: "
+            f"{disambiguated_output_filename}. You can effect that switch now (and silence this "
+            f"warning) by setting `pants_distdir_legacy_paths = false` in the [GLOBAL] section of "
+            f"pants.toml."
+        )
+    else:
+        output_filename = disambiguated_output_filename
     two_step_pex = await Get(
         TwoStepPex,
         TwoStepPexFromTargetsRequest(

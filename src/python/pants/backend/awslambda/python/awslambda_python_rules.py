@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
+import os
 from dataclasses import dataclass
 
 from pants.backend.awslambda.common.awslambda_common_rules import (
@@ -30,7 +32,10 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -48,10 +53,23 @@ class LambdexSetup:
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
 async def create_python_awslambda(
-    field_set: PythonAwsLambdaFieldSet, lambdex_setup: LambdexSetup
+    field_set: PythonAwsLambdaFieldSet, lambdex_setup: LambdexSetup, global_options: GlobalOptions
 ) -> CreatedAWSLambda:
     # Lambdas typically use the .zip suffix, so we use that instead of .pex.
-    pex_filename = f"{field_set.address.target_name}.zip"
+    disambiguated_pex_filename = os.path.join(
+        field_set.address.spec_path.replace(os.sep, "."), f"{field_set.address.target_name}.zip"
+    )
+    if global_options.options.pants_distdir_legacy_paths:
+        pex_filename = f"{field_set.address.target_name}.zip"
+        logger.warning(
+            f"Writing to the legacy subpath: {pex_filename}, which may not be unique. An "
+            f"upcoming version of Pants will switch to writing to the fully-qualified subpath: "
+            f"{disambiguated_pex_filename}. You can effect that switch now (and silence this "
+            f"warning) by setting `pants_distdir_legacy_paths = false` in the [GLOBAL] section of "
+            f"pants.toml."
+        )
+    else:
+        pex_filename = disambiguated_pex_filename
     # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.
     # (Running the "hello world" lambda in the example code will report the platform, and can be
     # used to verify correctness of these platform strings.)

@@ -37,6 +37,7 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, by
         args=[
             "--backend-packages=pants.backend.awslambda.python",
             "--source-root-patterns=src/python",
+            "--pants-distdir-legacy-paths=false",
         ]
     )
     target = rule_runner.get_target(Address.parse(addr), bootstrapper)
@@ -83,7 +84,7 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner, "src/python/foo/bar:hello_world_lambda"
     )
-    assert "hello_world_lambda.zip" == zip_file_relpath
+    assert "src.python.foo.bar/hello_world_lambda.zip" == zip_file_relpath
     zipfile = ZipFile(BytesIO(content))
     names = set(zipfile.namelist())
     assert "lambdex_handler.py" in names
