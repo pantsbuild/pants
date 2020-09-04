@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -80,7 +81,9 @@ async def create_python_binary(
         entry_point = PythonBinarySources.translate_source_file_to_entry_point(
             stripped_binary_sources.snapshot.files
         )
-    output_filename = f"{field_set.address.target_name}.pex"
+
+    dirname, filename = ([""] + field_set.address.path_safe_spec.rsplit(".", 1))[-2:]
+    output_filename = os.path.join(dirname, f"{filename}.pex")
     two_step_pex = await Get(
         TwoStepPex,
         TwoStepPexFromTargetsRequest(

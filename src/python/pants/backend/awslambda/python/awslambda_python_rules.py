@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from dataclasses import dataclass
 
 from pants.backend.awslambda.common.awslambda_common_rules import (
@@ -51,7 +52,8 @@ async def create_python_awslambda(
     field_set: PythonAwsLambdaFieldSet, lambdex_setup: LambdexSetup
 ) -> CreatedAWSLambda:
     # Lambdas typically use the .zip suffix, so we use that instead of .pex.
-    pex_filename = f"{field_set.address.target_name}.zip"
+    dirname, filename = ([""] + field_set.address.path_safe_spec.rsplit(".", 1))[-2:]
+    pex_filename = os.path.join(dirname, f"{filename}.zip")
     # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.
     # (Running the "hello world" lambda in the example code will report the platform, and can be
     # used to verify correctness of these platform strings.)
