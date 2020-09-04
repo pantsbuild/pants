@@ -19,11 +19,6 @@ files(
 )
 
 files(
-  name = 'isort_cfg',
-  sources = ['.isort.cfg'],
-)
-
-files(
   name = 'pants_toml',
   sources = ['pants.toml'],
 )

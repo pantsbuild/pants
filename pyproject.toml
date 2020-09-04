@@ -13,3 +13,10 @@ exclude = '''
   | compilation_failure
 )/
 '''
+
+
+[tool.isort]
+profile = "black"
+line_length = 100
+color_output = true
+known_first_party = ["internal_plugins", "pants", "pants_test"]
