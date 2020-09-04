@@ -283,6 +283,27 @@ impl HeavyHittersData {
     }
   }
 
+  pub fn render_workunits(&self) -> String {
+    let inner = self.inner.lock();
+    // Include only Started workunits.
+    let graph = inner.graph.filter_map(
+      |_, span_id| {
+        inner.workunit_records.get(span_id).and_then(|workunit| {
+          if matches!(workunit.state, WorkunitState::Started { .. }) {
+            Some(format!("{:?}", workunit))
+          } else {
+            None
+          }
+        })
+      },
+      |_, _| Some("".to_owned()),
+    );
+    format!(
+      "// current workunits:\n{}",
+      petgraph::dot::Dot::with_config(&graph, &[])
+    )
+  }
+
   fn add_started_workunit_to_store(started: Workunit, inner_store: &mut HeavyHittersInnerStore) {
     let span_id = started.span_id;
     let parent_id = started.parent_id;
@@ -447,6 +468,12 @@ impl WorkunitStore {
       store: self.clone(),
       parent_id,
     }))
+  }
+
+  pub fn maybe_log_workunits(&self) {
+    if let Some(hhd) = &self.heavy_hitters_data {
+      log::debug!("{}", hhd.render_workunits())
+    }
   }
 
   ///

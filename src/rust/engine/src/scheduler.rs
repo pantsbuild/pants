@@ -182,6 +182,10 @@ impl Session {
     }
   }
 
+  pub fn maybe_log_workunits(&self) {
+    self.0.workunit_store.maybe_log_workunits()
+  }
+
   fn maybe_display_initialize(&self, executor: &Executor, sender: &mpsc::Sender<ExecutionEvent>) {
     if let Some(display) = &self.0.display {
       let mut display = display.lock();
@@ -468,6 +472,9 @@ impl Scheduler {
 
     let interval = ConsoleUI::render_interval();
     let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
+    // TODO: Make this an option.
+    let workunit_dump_interval = Some(Duration::from_secs(10));
+    let mut workunit_dump_time = workunit_dump_interval.map(|t| Instant::now() + t);
 
     // Spawn and wait for all roots to complete.
     let (sender, receiver) = mpsc::channel();
@@ -483,13 +490,18 @@ impl Scheduler {
           session.write_stderr(&stderr);
         }
         Err(mpsc::RecvTimeoutError::Timeout) => {
-          if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
+          // Just a receive timeout: render, and probably continue.
+          let now = Instant::now();
+          if deadline.map(|d| d < now).unwrap_or(false) {
             // The timeout on the request has been exceeded.
             break Err(ExecutionTermination::PollTimeout);
-          } else {
-            // Just a receive timeout. render and continue.
-            session.maybe_display_render();
           }
+          if workunit_dump_time.map(|d| d < now).unwrap_or(false) {
+            // Dump the workunits at debug level, and reset the timer.
+            session.maybe_log_workunits();
+            workunit_dump_time = workunit_dump_interval.map(|t| Instant::now() + t);
+          }
+          session.maybe_display_render();
         }
         Err(mpsc::RecvTimeoutError::Disconnected) => {
           break Err(ExecutionTermination::Fatal(
