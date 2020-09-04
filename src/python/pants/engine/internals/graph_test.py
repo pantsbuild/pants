@@ -37,7 +37,7 @@ from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
     CycleException,
-    NoValidTargetsException,
+    NoApplicableTargetsException,
     Owners,
     OwnersRequest,
     TooManyTargetsException,
@@ -61,9 +61,9 @@ from pants.engine.target import (
     Sources,
     Tags,
     Target,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
     Targets,
-    TargetsToValidFieldSets,
-    TargetsToValidFieldSetsRequest,
     TargetsWithOrigins,
     TargetWithOrigin,
     TransitiveTargets,
@@ -611,9 +611,7 @@ def test_find_valid_field_sets() -> None:
 
     rule_runner = RuleRunner(
         rules=[
-            QueryRule(
-                TargetsToValidFieldSets, (TargetsToValidFieldSetsRequest, TargetsWithOrigins)
-            ),
+            QueryRule(TargetRootsToFieldSets, (TargetRootsToFieldSetsRequest, TargetsWithOrigins)),
             UnionRule(FieldSetSuperclass, FieldSetSubclass1),
             UnionRule(FieldSetSuperclass, FieldSetSubclass2),
         ],
@@ -630,17 +628,17 @@ def test_find_valid_field_sets() -> None:
         superclass: Type,
         targets_with_origins: Iterable[TargetWithOrigin],
         *,
-        error_if_no_valid_targets: bool = False,
+        error_if_no_applicable_targets: bool = False,
         expect_single_config: bool = False,
-    ) -> TargetsToValidFieldSets:
-        request = TargetsToValidFieldSetsRequest(
+    ) -> TargetRootsToFieldSets:
+        request = TargetRootsToFieldSetsRequest(
             superclass,
             goal_description="fake",
-            error_if_no_valid_targets=error_if_no_valid_targets,
+            error_if_no_applicable_targets=error_if_no_applicable_targets,
             expect_single_field_set=expect_single_config,
         )
         return rule_runner.request_product(
-            TargetsToValidFieldSets,
+            TargetRootsToFieldSets,
             [request, TargetsWithOrigins(targets_with_origins)],
         )
 
@@ -680,9 +678,9 @@ def test_find_valid_field_sets() -> None:
 
     with pytest.raises(ExecutionError) as exc:
         find_valid_field_sets(
-            FieldSetSuperclass, [invalid_tgt_with_origin], error_if_no_valid_targets=True
+            FieldSetSuperclass, [invalid_tgt_with_origin], error_if_no_applicable_targets=True
         )
-    assert NoValidTargetsException.__name__ in str(exc.value)
+    assert NoApplicableTargetsException.__name__ in str(exc.value)
 
 
 # -----------------------------------------------------------------------------------------------

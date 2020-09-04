@@ -722,7 +722,7 @@ class _AbstractFieldSet(ABC):
 
     @final
     @classmethod
-    def valid_target_types(
+    def applicable_target_types(
         cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
     ) -> Tuple[Type[Target], ...]:
         return tuple(
@@ -794,12 +794,9 @@ class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
 _AFS = TypeVar("_AFS", bound=_AbstractFieldSet)
 
 
-# TODO: Rephrase "valid" to "applicable" in the below.
-
-
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetsToValidFieldSets(Generic[_AFS]):
+class TargetRootsToFieldSets(Generic[_AFS]):
     mapping: FrozenDict[TargetWithOrigin, Tuple[_AFS, ...]]
 
     def __init__(self, mapping: Mapping[TargetWithOrigin, Iterable[_AFS]]) -> None:
@@ -826,10 +823,10 @@ class TargetsToValidFieldSets(Generic[_AFS]):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetsToValidFieldSetsRequest(Generic[_AFS]):
+class TargetRootsToFieldSetsRequest(Generic[_AFS]):
     field_set_superclass: Type[_AFS]
     goal_description: str
-    error_if_no_valid_targets: bool
+    error_if_no_applicable_targets: bool
     expect_single_field_set: bool
     # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
     #  `util_rules/filter_empty_sources.py`.
@@ -839,12 +836,12 @@ class TargetsToValidFieldSetsRequest(Generic[_AFS]):
         field_set_superclass: Type[_AFS],
         *,
         goal_description: str,
-        error_if_no_valid_targets: bool,
+        error_if_no_applicable_targets: bool,
         expect_single_field_set: bool = False,
     ) -> None:
         self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
-        self.error_if_no_valid_targets = error_if_no_valid_targets
+        self.error_if_no_applicable_targets = error_if_no_applicable_targets
         self.expect_single_field_set = expect_single_field_set
 
 

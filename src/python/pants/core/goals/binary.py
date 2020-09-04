@@ -9,7 +9,7 @@ from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import FieldSet, TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
+from pants.engine.target import FieldSet, TargetRootsToFieldSets, TargetRootsToFieldSetsRequest
 from pants.engine.unions import union
 
 logger = logging.getLogger(__name__)
@@ -41,9 +41,11 @@ class Binary(Goal):
 @goal_rule
 async def create_binary(workspace: Workspace, dist_dir: DistDir) -> Binary:
     targets_to_valid_field_sets = await Get(
-        TargetsToValidFieldSets,
-        TargetsToValidFieldSetsRequest(
-            BinaryFieldSet, goal_description="the `binary` goal", error_if_no_valid_targets=True
+        TargetRootsToFieldSets,
+        TargetRootsToFieldSetsRequest(
+            BinaryFieldSet,
+            goal_description="the `binary` goal",
+            error_if_no_applicable_targets=True,
         ),
     )
     binaries = await MultiGet(

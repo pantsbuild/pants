@@ -55,9 +55,9 @@ from pants.engine.target import (
     Sources,
     Subtargets,
     Target,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
     Targets,
-    TargetsToValidFieldSets,
-    TargetsToValidFieldSetsRequest,
     TargetsWithOrigins,
     TargetWithOrigin,
     TransitiveTargets,
@@ -664,7 +664,7 @@ class TransitiveExcludesNotSupportedError(ValueError):
         registered_target_types: Sequence[Type[Target]],
         union_membership: UnionMembership,
     ) -> None:
-        valid_target_types = sorted(
+        applicable_target_types = sorted(
             target_type.alias
             for target_type in registered_target_types
             if (
@@ -678,7 +678,7 @@ class TransitiveExcludesNotSupportedError(ValueError):
             f"Bad value '{bad_value}' in the `dependencies` field for {address}. "
             "Transitive excludes with `!!` are not supported for this target type. Did you mean "
             "to use a single `!` for a direct exclude?\n\nTransitive excludes work with these "
-            f"target types: {valid_target_types}"
+            f"target types: {applicable_target_types}"
         )
 
 
@@ -795,32 +795,32 @@ async def resolve_dependencies(
     return Addresses(sorted(result))
 
 
-# TODO: Rephrase "valid" to "applicable" in the below.
-
 # -----------------------------------------------------------------------------------------------
-# Find valid field sets
+# Find applicable field sets
 # -----------------------------------------------------------------------------------------------
 
 
-class NoValidTargetsException(Exception):
+class NoApplicableTargetsException(Exception):
     def __init__(
         self,
         targets_with_origins: TargetsWithOrigins,
         *,
-        valid_target_types: Iterable[Type[Target]],
+        applicable_target_types: Iterable[Type[Target]],
         goal_description: str,
     ) -> None:
-        valid_target_aliases = sorted({target_type.alias for target_type in valid_target_types})
-        invalid_target_aliases = sorted({tgt.alias for tgt in targets_with_origins.targets})
+        applicable_target_aliases = sorted(
+            {target_type.alias for target_type in applicable_target_types}
+        )
+        inapplicable_target_aliases = sorted({tgt.alias for tgt in targets_with_origins.targets})
         specs = sorted(
             {str(target_with_origin.origin) for target_with_origin in targets_with_origins}
         )
         bulleted_list_sep = "\n  * "
         super().__init__(
             f"{goal_description.capitalize()} only works with the following target types:"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(valid_target_aliases)}\n\n"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(applicable_target_aliases)}\n\n"
             f"You specified `{' '.join(specs)}`, which only included the following target types:"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(invalid_target_aliases)}"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(inapplicable_target_aliases)}"
         )
 
     @classmethod
@@ -832,17 +832,17 @@ class NoValidTargetsException(Exception):
         goal_description: str,
         union_membership: UnionMembership,
         registered_target_types: RegisteredTargetTypes,
-    ) -> "NoValidTargetsException":
-        valid_target_types = {
+    ) -> "NoApplicableTargetsException":
+        applicable_target_types = {
             target_type
             for field_set_type in field_set_types
-            for target_type in field_set_type.valid_target_types(
+            for target_type in field_set_type.applicable_target_types(
                 registered_target_types.types, union_membership=union_membership
             )
         }
         return cls(
             targets_with_origins,
-            valid_target_types=valid_target_types,
+            applicable_target_types=applicable_target_types,
             goal_description=goal_description,
         )
 
@@ -859,8 +859,7 @@ class TooManyTargetsException(Exception):
 
 
 class AmbiguousImplementationsException(Exception):
-    """Exception for when a single target has multiple valid FieldSets, but the goal only expects
-    there to be one FieldSet."""
+    """A target has multiple valid FieldSets, but a goal expects there to be one FieldSet."""
 
     def __init__(
         self,
@@ -883,11 +882,11 @@ class AmbiguousImplementationsException(Exception):
 
 @rule
 async def find_valid_field_sets_for_target_roots(
-    request: TargetsToValidFieldSetsRequest,
+    request: TargetRootsToFieldSetsRequest,
     targets_with_origins: TargetsWithOrigins,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
-) -> TargetsToValidFieldSets:
+) -> TargetRootsToFieldSets:
     field_sets_per_target = await Get(
         FieldSetsPerTarget,
         FieldSetsPerTargetRequest(
@@ -898,15 +897,15 @@ async def find_valid_field_sets_for_target_roots(
     for tgt_with_origin, field_sets in zip(targets_with_origins, field_sets_per_target.collection):
         if field_sets:
             targets_to_valid_field_sets[tgt_with_origin] = field_sets
-    if request.error_if_no_valid_targets and not targets_to_valid_field_sets:
-        raise NoValidTargetsException.create_from_field_sets(
+    if request.error_if_no_applicable_targets and not targets_to_valid_field_sets:
+        raise NoApplicableTargetsException.create_from_field_sets(
             TargetsWithOrigins(targets_with_origins),
             field_set_types=union_membership.union_rules[request.field_set_superclass],
             goal_description=request.goal_description,
             union_membership=union_membership,
             registered_target_types=registered_target_types,
         )
-    result = TargetsToValidFieldSets(targets_to_valid_field_sets)
+    result = TargetRootsToFieldSets(targets_to_valid_field_sets)
     if not request.expect_single_field_set:
         return result
     if len(result.targets) > 1:

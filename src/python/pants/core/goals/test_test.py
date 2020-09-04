@@ -35,8 +35,8 @@ from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Sources,
     Target,
-    TargetsToValidFieldSets,
-    TargetsToValidFieldSetsRequest,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
     TargetWithOrigin,
 )
 from pants.engine.unions import UnionMembership
@@ -132,11 +132,11 @@ def run_test_rule(
     )
 
     def mock_find_valid_field_sets(
-        _: TargetsToValidFieldSetsRequest,
-    ) -> TargetsToValidFieldSets:
+        _: TargetRootsToFieldSetsRequest,
+    ) -> TargetRootsToFieldSets:
         if not valid_targets:
-            return TargetsToValidFieldSets({})
-        return TargetsToValidFieldSets(
+            return TargetRootsToFieldSets({})
+        return TargetRootsToFieldSets(
             {
                 tgt_with_origin: [field_set.create(tgt_with_origin.target)]
                 for tgt_with_origin in targets
@@ -171,8 +171,8 @@ def run_test_rule(
         ],
         mock_gets=[
             MockGet(
-                product_type=TargetsToValidFieldSets,
-                subject_type=TargetsToValidFieldSetsRequest,
+                product_type=TargetRootsToFieldSets,
+                subject_type=TargetRootsToFieldSetsRequest,
                 mock=mock_find_valid_field_sets,
             ),
             MockGet(
