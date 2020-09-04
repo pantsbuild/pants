@@ -504,6 +504,7 @@ impl PosixFS {
           format!("Failed to scan directory {:?}: {}", dir_abs, e),
         )
       })?;
+    #[allow(clippy::unnecessary_sort_by)]
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(DirectoryListing(stats))
   }
