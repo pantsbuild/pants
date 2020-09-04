@@ -5,6 +5,66 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0a2 (9/3/2020)
+------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Support adding arbitrary env vars to test processes (#10715)
+  `PR #10715 <https://github.com/pantsbuild/pants/pull/10715>`_
+
+* Add a plugin hook for `setup-py` kwargs  (#10721)
+  `PR #10721 <https://github.com/pantsbuild/pants/pull/10721>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix the `testutil` wheel's imports not working due to namespace packages (#10725)
+  `PR #10725 <https://github.com/pantsbuild/pants/pull/10725>`_
+
+* Fix Pipenv not parsing requirement extras (#10722)
+  `PR #10722 <https://github.com/pantsbuild/pants/pull/10722>`_
+
+* Fix invalid shebang for `BinaryPaths` script (#10710)
+  `PR #10710 <https://github.com/pantsbuild/pants/pull/10710>`_
+
+* Fix retrieval of bytes from artifacts in StreamingWorkunitHandler (#10698)
+  `PR #10698 <https://github.com/pantsbuild/pants/pull/10698>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Improve Pylint to use `--python-setup-resolve-all-constraints` (#10726)
+  `PR #10726 <https://github.com/pantsbuild/pants/pull/10726>`_
+
+* Reorganize `pants/backend/python` (#10724)
+  `PR #10724 <https://github.com/pantsbuild/pants/pull/10724>`_
+
+* Improve RuleGraph convergence time slightly (#10700)
+  `PR #10700 <https://github.com/pantsbuild/pants/pull/10700>`_
+
+* Snapshots of single files store normalized paths. (#10707)
+  `PR #10707 <https://github.com/pantsbuild/pants/pull/10707>`_
+
+* Add product type to the Rule trait to simplify unit testing. (#10720)
+  `PR #10720 <https://github.com/pantsbuild/pants/pull/10720>`_
+
+Testing
+~~~~~~~
+
+* Add `RuleRunner.get_target()` (#10714)
+  `PR #10714 <https://github.com/pantsbuild/pants/pull/10714>`_
+
+* Port more tests from `TestBase` to `RuleRunner` (#10704)
+  `PR #10704 <https://github.com/pantsbuild/pants/pull/10704>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Formalize support for VCS-style requirements via PEP 440 (#10728)
+  `PR #10728 <https://github.com/pantsbuild/pants/pull/10728>`_
+
 2.0.0a1 (8/28/2020)
 -------------------
 
