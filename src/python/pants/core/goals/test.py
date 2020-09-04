@@ -26,8 +26,8 @@ from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, 
 from pants.engine.target import (
     FieldSet,
     Sources,
-    TargetsToValidFieldSets,
-    TargetsToValidFieldSetsRequest,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
@@ -376,9 +376,9 @@ async def run_tests(
 ) -> Test:
     if test_subsystem.debug:
         targets_to_valid_field_sets = await Get(
-            TargetsToValidFieldSets,
-            TargetsToValidFieldSetsRequest(
-                TestFieldSet, goal_description="`test --debug`", error_if_no_valid_targets=True
+            TargetRootsToFieldSets,
+            TargetRootsToFieldSetsRequest(
+                TestFieldSet, goal_description="`test --debug`", error_if_no_applicable_targets=True
             ),
         )
         debug_requests = await MultiGet(
@@ -395,11 +395,11 @@ async def run_tests(
         return Test(exit_code)
 
     targets_to_valid_field_sets = await Get(
-        TargetsToValidFieldSets,
-        TargetsToValidFieldSetsRequest(
+        TargetRootsToFieldSets,
+        TargetRootsToFieldSetsRequest(
             TestFieldSet,
             goal_description=f"the `{test_subsystem.name}` goal",
-            error_if_no_valid_targets=False,
+            error_if_no_applicable_targets=False,
         ),
     )
     field_sets_with_sources = await Get(

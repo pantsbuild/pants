@@ -14,8 +14,8 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Target,
-    TargetsToValidFieldSets,
-    TargetsToValidFieldSetsRequest,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
     TargetWithOrigin,
 )
 from pants.option.global_options import GlobalOptions
@@ -72,9 +72,9 @@ def single_target_run(
         ],
         mock_gets=[
             MockGet(
-                product_type=TargetsToValidFieldSets,
-                subject_type=TargetsToValidFieldSetsRequest,
-                mock=lambda _: TargetsToValidFieldSets({target_with_origin: [field_set]}),
+                product_type=TargetRootsToFieldSets,
+                subject_type=TargetRootsToFieldSetsRequest,
+                mock=lambda _: TargetRootsToFieldSets({target_with_origin: [field_set]}),
             ),
             MockGet(
                 product_type=RunRequest,

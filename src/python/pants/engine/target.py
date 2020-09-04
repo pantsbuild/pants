@@ -722,7 +722,7 @@ class _AbstractFieldSet(ABC):
 
     @final
     @classmethod
-    def valid_target_types(
+    def applicable_target_types(
         cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
     ) -> Tuple[Type[Target], ...]:
         return tuple(
@@ -791,35 +791,12 @@ class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
         )
 
 
-_FSWO = TypeVar("_FSWO", bound="FieldSetWithOrigin")
-
-
-@dataclass(frozen=True)
-class FieldSetWithOrigin(_AbstractFieldSet, metaclass=ABCMeta):
-    """An ad hoc set of fields from a target which are used by rules, along with the original spec
-    used to find the original target.
-
-    See FieldSet for documentation on how subclasses should use this base class.
-    """
-
-    origin: Spec
-
-    @classmethod
-    def create(cls: Type[_FSWO], target_with_origin: TargetWithOrigin) -> _FSWO:
-        tgt = target_with_origin.target
-        return cls(  # type: ignore[call-arg]
-            address=tgt.address,
-            origin=target_with_origin.origin,
-            **_get_field_set_fields_from_target(cls, tgt),
-        )
-
-
 _AFS = TypeVar("_AFS", bound=_AbstractFieldSet)
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetsToValidFieldSets(Generic[_AFS]):
+class TargetRootsToFieldSets(Generic[_AFS]):
     mapping: FrozenDict[TargetWithOrigin, Tuple[_AFS, ...]]
 
     def __init__(self, mapping: Mapping[TargetWithOrigin, Iterable[_AFS]]) -> None:
@@ -846,10 +823,10 @@ class TargetsToValidFieldSets(Generic[_AFS]):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetsToValidFieldSetsRequest(Generic[_AFS]):
+class TargetRootsToFieldSetsRequest(Generic[_AFS]):
     field_set_superclass: Type[_AFS]
     goal_description: str
-    error_if_no_valid_targets: bool
+    error_if_no_applicable_targets: bool
     expect_single_field_set: bool
     # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
     #  `util_rules/filter_empty_sources.py`.
@@ -859,13 +836,34 @@ class TargetsToValidFieldSetsRequest(Generic[_AFS]):
         field_set_superclass: Type[_AFS],
         *,
         goal_description: str,
-        error_if_no_valid_targets: bool,
+        error_if_no_applicable_targets: bool,
         expect_single_field_set: bool = False,
     ) -> None:
         self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
-        self.error_if_no_valid_targets = error_if_no_valid_targets
+        self.error_if_no_applicable_targets = error_if_no_applicable_targets
         self.expect_single_field_set = expect_single_field_set
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class FieldSetsPerTarget(Generic[_AFS]):
+    # One tuple of FieldSet instances per input target.
+    collection: Tuple[Tuple[_AFS, ...], ...]
+
+    def __init__(self, collection: Iterable[Iterable[_AFS]]):
+        self.collection = tuple(tuple(iterable) for iterable in collection)
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class FieldSetsPerTargetRequest(Generic[_AFS]):
+    field_set_superclass: Type[_AFS]
+    targets: Tuple[Target, ...]
+
+    def __init__(self, field_set_superclass: Type[_AFS], targets: Iterable[Target]):
+        self.field_set_superclass = field_set_superclass
+        self.targets = tuple(targets)
 
 
 # -----------------------------------------------------------------------------------------------

@@ -10,7 +10,7 @@ from pants.engine.console import Console
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import FieldSet, TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
+from pants.engine.target import FieldSet, TargetRootsToFieldSets, TargetRootsToFieldSetsRequest
 from pants.engine.unions import union
 
 
@@ -49,11 +49,11 @@ async def create_awslambda(
     workspace: Workspace,
 ) -> AWSLambdaGoal:
     targets_to_valid_field_sets = await Get(
-        TargetsToValidFieldSets,
-        TargetsToValidFieldSetsRequest(
+        TargetRootsToFieldSets,
+        TargetRootsToFieldSetsRequest(
             AWSLambdaFieldSet,
             goal_description="the `awslambda` goal",
-            error_if_no_valid_targets=True,
+            error_if_no_applicable_targets=True,
         ),
     )
     awslambdas = await MultiGet(
