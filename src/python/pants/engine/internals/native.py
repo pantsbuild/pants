@@ -3,7 +3,7 @@
 
 import logging
 import os
-from typing import Dict, Iterable, List, Tuple, Union, cast
+from typing import Dict, Iterable, List, Mapping, Tuple, Union, cast
 
 from typing_extensions import Protocol
 
@@ -137,7 +137,7 @@ class Native(metaclass=SingletonMetaclass):
         log_show_rust_3rdparty: bool,
         use_color: bool,
         show_target: bool,
-        log_levels_by_target: Dict[str, LogLevel],
+        log_levels_by_target: Mapping[str, LogLevel],
     ):
         log_levels_as_ints = {k: v.level for k, v in log_levels_by_target.items()}
         return self.lib.init_logging(

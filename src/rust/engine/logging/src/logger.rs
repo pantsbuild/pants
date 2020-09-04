@@ -34,7 +34,7 @@ pub struct PantsLogger {
   show_rust_3rdparty_logs: AtomicBool,
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
   show_target: AtomicBool,
-  log_level_filters: Mutex<RefCell<HashMap<String, log::LevelFilter>>>,
+  log_level_filters: Mutex<HashMap<String, log::LevelFilter>>,
 }
 
 impl PantsLogger {
@@ -46,7 +46,7 @@ impl PantsLogger {
       use_color: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
       show_target: AtomicBool::new(false),
-      log_level_filters: Mutex::new(RefCell::new(HashMap::new())),
+      log_level_filters: Mutex::new(HashMap::new()),
     }
   }
 
@@ -81,10 +81,7 @@ impl PantsLogger {
         PANTS_LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
-        PANTS_LOGGER
-          .log_level_filters
-          .lock()
-          .replace(log_levels_by_target);
+        *PANTS_LOGGER.log_level_filters.lock() = log_levels_by_target;
         PANTS_LOGGER
           .show_target
           .store(show_target, Ordering::SeqCst);
@@ -148,8 +145,7 @@ impl Log for PantsLogger {
   fn enabled(&self, metadata: &Metadata) -> bool {
     let global_level: LevelFilter = { *self.global_level.lock().borrow() };
     let enabled_globally = metadata.level() <= global_level;
-    let log_level_filters_lock = self.log_level_filters.lock();
-    let log_level_filters = log_level_filters_lock.borrow();
+    let log_level_filters = self.log_level_filters.lock();
     let enabled_for_target = log_level_filters
       .get(metadata.target())
       .map(|lf| metadata.level() <= *lf)

@@ -137,9 +137,13 @@ def get_log_levels_by_target(global_bootstrap_options: OptionValueContainer) -> 
     levels: Dict[str, LogLevel] = {}
     for key, value in raw_levels.items():
         if not isinstance(key, str):
-            raise ValueError("keys for log_domain_levels must be strings")
+            raise ValueError(
+                "Keys for log_domain_levels must be strings, but was given the key: {key} with type {type(key)}."
+            )
         if not isinstance(value, str):
-            raise ValueError("values for log_domain_levels must be strings")
+            raise ValueError(
+                "Values for log_domain_levels must be strings, but was given the value: {value} with type {type(value)}."
+            )
         log_level = LogLevel[value.upper()]
         levels[key] = log_level
     return levels
