@@ -384,6 +384,17 @@ class GlobalOptions(Subsystem):
             default=os.path.join(buildroot, "dist"),
             help="Write end-product artifacts to this dir.",
         )
+        # TODO: Change the default to false in 2.1, deprecate the option in 2.2 and remove in 2.3.
+        register(
+            "--pants-distdir-legacy-paths",
+            type=bool,
+            advanced=True,
+            default=True,
+            help="Whether to write binaries to the pre-2.0 paths under distdir. These legacy "
+            "paths are not qualified by target address, so may be ambiguous.  This option "
+            "is a temporary mechanism for easing transition to 2.0.  We recommemd switching "
+            "to the new, unambiguous paths ASAP, by setting this option to true.",
+        )
         register(
             "--pants-subprocessdir",
             advanced=True,

@@ -37,6 +37,7 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, by
         args=[
             "--backend-packages=pants.backend.awslambda.python",
             "--source-root-patterns=src/python",
+            "--pants-distdir-legacy-paths=false",
         ]
     )
     target = rule_runner.get_target(Address.parse(addr), bootstrapper)

@@ -1,6 +1,8 @@
 [GLOBAL]
 print_exception_stacktrace = true
 
+pants_distdir_legacy_paths = false
+
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
