@@ -82,8 +82,9 @@ async def create_python_binary(
             stripped_binary_sources.snapshot.files
         )
 
-    dirname, filename = ([""] + field_set.address.path_safe_spec.rsplit(".", 1))[-2:]
-    output_filename = os.path.join(dirname, f"{filename}.pex")
+    output_filename = os.path.join(
+        field_set.address.spec_path.replace(os.sep, "."), f"{field_set.address.target_name}.pex"
+    )
     two_step_pex = await Get(
         TwoStepPex,
         TwoStepPexFromTargetsRequest(
