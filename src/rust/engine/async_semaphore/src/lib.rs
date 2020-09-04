@@ -29,29 +29,19 @@
 
 use std::collections::VecDeque;
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll, Waker};
 
 use parking_lot::Mutex;
-
-struct Waiter {
-  id: usize,
-  waker: Waker,
-}
+use tokio::sync::{Semaphore, SemaphorePermit};
 
 struct Inner {
-  waiters: VecDeque<Waiter>,
-  available_ids: VecDeque<usize>,
-  available_permits: usize,
-  // Used as the source of id in Waiters's because
-  // it is monotonically increasing, and only incremented under the mutex lock.
-  next_waiter_id: usize,
+  sema: Semaphore,
+  available_ids: Mutex<VecDeque<usize>>,
 }
 
 #[derive(Clone)]
 pub struct AsyncSemaphore {
-  inner: Arc<Mutex<Inner>>,
+  inner: Arc<Inner>,
 }
 
 impl AsyncSemaphore {
@@ -62,18 +52,15 @@ impl AsyncSemaphore {
     }
 
     AsyncSemaphore {
-      inner: Arc::new(Mutex::new(Inner {
-        waiters: VecDeque::new(),
-        available_ids,
-        available_permits: permits,
-        next_waiter_id: 0,
-      })),
+      inner: Arc::new(Inner {
+        sema: Semaphore::new(permits),
+        available_ids: Mutex::new(available_ids),
+      }),
     }
   }
 
-  pub fn num_waiters(&self) -> usize {
-    let inner = self.inner.lock();
-    inner.waiters.len()
+  pub fn available_permits(&self) -> usize {
+    self.inner.sema.available_permits()
   }
 
   ///
@@ -90,104 +77,33 @@ impl AsyncSemaphore {
     res
   }
 
-  fn acquire(&self) -> PermitFuture {
-    PermitFuture {
+  async fn acquire(&self) -> Permit<'_> {
+    let permit = self.inner.sema.acquire().await;
+    let id = {
+      let mut available_ids = self.inner.available_ids.lock();
+      available_ids
+        .pop_front()
+        .expect("More permits were distributed than ids exist.")
+    };
+    Permit {
       inner: self.inner.clone(),
-      waiter_id: None,
+      _permit: permit,
+      id,
     }
   }
 }
 
-pub struct Permit {
-  inner: Arc<Mutex<Inner>>,
+pub struct Permit<'a> {
+  inner: Arc<Inner>,
+  // NB: Kept for its `Drop` impl.
+  _permit: SemaphorePermit<'a>,
   id: usize,
 }
 
-impl Drop for Permit {
+impl<'a> Drop for Permit<'a> {
   fn drop(&mut self) {
-    let mut inner = self.inner.lock();
-    inner.available_ids.push_back(self.id);
-    if let Some(waiter) = inner.waiters.get(inner.available_permits) {
-      waiter.waker.wake_by_ref()
-    }
-    inner.available_permits += 1;
-  }
-}
-
-#[derive(Clone)]
-pub struct PermitFuture {
-  inner: Arc<Mutex<Inner>>,
-  waiter_id: Option<usize>,
-}
-
-impl Drop for PermitFuture {
-  fn drop(&mut self) {
-    // if task_id is Some then this PermitFuture was added to the waiters queue.
-    if let Some(waiter_id) = self.waiter_id {
-      let mut inner = self.inner.lock();
-      if let Some(waiter_index) = inner
-        .waiters
-        .iter()
-        .position(|waiter| waiter_id == waiter.id)
-      {
-        inner.waiters.remove(waiter_index);
-      }
-    }
-  }
-}
-
-impl Future for PermitFuture {
-  type Output = Permit;
-
-  fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-    let inner = self.inner.clone();
-    let acquired = {
-      let mut inner = inner.lock();
-      if self.waiter_id.is_none() {
-        let waiter_id = inner.next_waiter_id;
-        let this_waiter = Waiter {
-          id: waiter_id,
-          waker: cx.waker().clone(),
-        };
-        self.waiter_id = Some(waiter_id);
-        inner.next_waiter_id += 1;
-        inner.waiters.push_back(this_waiter);
-      }
-      if inner.available_permits == 0 {
-        None
-      } else {
-        let will_issue_permit = {
-          if let Some(front_waiter) = inner.waiters.front() {
-            // This task is the one we notified, so remove it. Otherwise keep it on the
-            // waiters queue so that it doesn't get forgotten.
-            if front_waiter.id == self.waiter_id.unwrap() {
-              inner.waiters.pop_front();
-              // Set the task_id none to indicate that the task is no longer in the
-              // queue, so we don't have to waste time searching for it in the Drop
-              // handler.
-              self.waiter_id = None;
-              let id = inner.available_ids.pop_front().unwrap_or(0); // The unwrap_or case should never happen.
-              Some(id)
-            } else {
-              // Don't issue a permit to this task if it isn't at the head of the line,
-              // we added it as a waiter above.
-              None
-            }
-          } else {
-            None
-          }
-        };
-        if will_issue_permit.is_some() {
-          inner.available_permits -= 1;
-        }
-        will_issue_permit
-      }
-    };
-    if let Some(id) = acquired {
-      Poll::Ready(Permit { inner, id })
-    } else {
-      Poll::Pending
-    }
+    let mut available_ids = self.inner.available_ids.lock();
+    available_ids.push_back(self.id);
   }
 }
 

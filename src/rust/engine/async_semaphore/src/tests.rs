@@ -234,18 +234,17 @@ async fn drop_while_waiting() {
   }
 
   // thread2 will wait for a little while, but then drop its PermitFuture to give up on waiting.
-  tokio::spawn(future::lazy(move |_| {
-    let permit_future = handle2.acquire();
+  tokio::spawn(async move {
+    let permit_future = handle2.acquire().boxed();
     let delay_future = delay_for(Duration::from_millis(100));
-    future::select(delay_future, permit_future).map(move |raced_result| {
-      // We expect to have timed out, because the other Future will not resolve until asked.
-      match raced_result {
-        future::Either::Left(_) => {}
-        future::Either::Right(_) => panic!("Expected to time out."),
-      };
-      tx_thread2_attempt_1.send(()).unwrap();
-    })
-  }));
+    let raced_result = future::select(delay_future, permit_future).await;
+    // We expect to have timed out, because the other Future will not resolve until asked.
+    match raced_result {
+      future::Either::Left(_) => {}
+      future::Either::Right(_) => panic!("Expected to time out."),
+    };
+    tx_thread2_attempt_1.send(()).unwrap();
+  });
 
   tokio::spawn(handle3.with_acquired(move |_id| {
     async {
@@ -312,19 +311,19 @@ async fn dropped_future_is_removed_from_queue() {
   if let Err(_) = timeout(Duration::from_secs(5), gave_up_thread2).await {
     panic!("thread2 didn't give up on acquiring.");
   }
-  assert_eq!(1, sema.num_waiters());
+  assert_eq!(0, sema.available_permits());
 
   // Then cause it to drop its attempt.
   unblock_thread2.send(()).unwrap();
   if let Err(_) = timeout(Duration::from_secs(5), join_handle2).await {
     panic!("thread2 didn't exit.");
   }
-  assert_eq!(0, sema.num_waiters());
+  assert_eq!(0, sema.available_permits());
 
   // Finally, release in thread1.
   unblock_thread1.send(()).unwrap();
   if let Err(_) = timeout(Duration::from_secs(5), join_handle1).await {
     panic!("thread1 didn't exit.");
   }
-  assert_eq!(0, sema.num_waiters());
+  assert_eq!(1, sema.available_permits());
 }
