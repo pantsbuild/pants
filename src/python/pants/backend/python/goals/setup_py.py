@@ -87,20 +87,26 @@ class TargetNotExported(Exception):
     """Indicates a target that was expected to be exported is not."""
 
 
-class NoOwnerError(Exception):
+class InvalidEntryPoint(Exception):
+    """Indicates that a specified binary entry point was invalid."""
+
+
+class OwnershipError(Exception):
+    """An error related to target ownership calculation."""
+
+    def __init__(self, msg: str):
+        super().__init__(
+            f"{msg} See https://www.pantsbuild.org/v2.0/docs/python-setup-py-goal for "
+            f"how python_library targets are mapped to distributions."
+        )
+
+
+class NoOwnerError(OwnershipError):
     """Indicates an exportable target has no owning exported target."""
 
 
-class AmbiguousOwnerError(Exception):
+class AmbiguousOwnerError(OwnershipError):
     """Indicates an exportable target has more than one owning exported target."""
-
-
-class UnsupportedPythonVersion(Exception):
-    """Indicates that the Python version is unsupported for running setup.py commands."""
-
-
-class InvalidEntryPoint(Exception):
-    """Indicates that a specified binary entry point was invalid."""
 
 
 @dataclass(frozen=True)
@@ -739,10 +745,12 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                     sibling_owners.append(sibling)
                 sibling = next(exported_ancestor_iter, None)
             if sibling_owners:
+                all_owners = [exported_ancestor] + sibling_owners
                 raise AmbiguousOwnerError(
-                    f"python_distribution target owning {target.address} is ambiguous. "
-                    f"Found {exported_ancestor.address} and {len(sibling_owners)} others: "
-                    f'{", ".join(so.address.spec for so in sibling_owners)}'
+                    f"Found multiple sibling python_distribution targets that are the closest "
+                    f"ancestor dependees of {target.address} and are therefore candidates to "
+                    f"own it: {', '.join(o.address.spec for o in all_owners)}. Only a "
+                    f"single such owner is allowed, to avoid ambiguity."
                 )
             return ExportedTarget(owner)
     raise NoOwnerError(
