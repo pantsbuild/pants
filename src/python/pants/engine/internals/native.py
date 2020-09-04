@@ -3,7 +3,7 @@
 
 import logging
 import os
-from typing import Dict, Iterable, List, Tuple, Union, cast
+from typing import Dict, Iterable, List, Mapping, Tuple, Union, cast
 
 from typing_extensions import Protocol
 
@@ -26,6 +26,7 @@ from pants.engine.internals.native_engine import (
 )
 from pants.engine.rules import Get
 from pants.engine.unions import union
+from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
 
@@ -130,8 +131,18 @@ class Native(metaclass=SingletonMetaclass):
     def decompress_tarball(self, tarfile_path, dest_dir):
         return self.lib.decompress_tarball(tarfile_path, dest_dir)
 
-    def init_rust_logging(self, level, log_show_rust_3rdparty: bool, use_color: bool):
-        return self.lib.init_logging(level, log_show_rust_3rdparty, use_color)
+    def init_rust_logging(
+        self,
+        level: int,
+        log_show_rust_3rdparty: bool,
+        use_color: bool,
+        show_target: bool,
+        log_levels_by_target: Mapping[str, LogLevel],
+    ):
+        log_levels_as_ints = {k: v.level for k, v in log_levels_by_target.items()}
+        return self.lib.init_logging(
+            level, log_show_rust_3rdparty, use_color, show_target, log_levels_as_ints
+        )
 
     def default_cache_path(self) -> str:
         return cast(str, self.lib.default_cache_path())
