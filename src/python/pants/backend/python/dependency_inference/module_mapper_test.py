@@ -142,6 +142,13 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
               name='un_normalized',
               requirements=['Un-Normalized-Project>3', 'two_owners'],
             )
+
+            python_requirement_library(
+              name='direct_references',
+              requirements=[
+                'pip@ git+https://github.com/pypa/pip.git', 'local_dist@ file:///path/to/dist.whl',
+              ],
+            )
             """
         ),
     )
@@ -150,9 +157,11 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     )
     assert result.mapping == FrozenDict(
         {
-            "colors": Address.parse("3rdparty/python:ansicolors"),
-            "req1": Address.parse("3rdparty/python:req1"),
-            "un_normalized_project": Address.parse("3rdparty/python:un_normalized"),
+            "colors": Address("3rdparty/python", target_name="ansicolors"),
+            "local_dist": Address("3rdparty/python", target_name="direct_references"),
+            "pip": Address("3rdparty/python", target_name="direct_references"),
+            "req1": Address("3rdparty/python", target_name="req1"),
+            "un_normalized_project": Address("3rdparty/python", target_name="un_normalized"),
         }
     )
 
