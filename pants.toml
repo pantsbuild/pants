@@ -68,7 +68,7 @@ extra_requirements.add = [
 ]
 
 [isort]
-version = "isort[colors]>=5.5.1,<5.6"
+version = "isort[pyproject,colors]>=5.5.1,<5.6"
 config = ["pyproject.toml", "examples/.isort.cfg"]
 
 [mypy]
