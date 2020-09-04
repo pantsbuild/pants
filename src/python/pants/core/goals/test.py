@@ -295,7 +295,10 @@ class TestSubsystem(GoalSubsystem):
             "--force",
             type=bool,
             default=False,
-            help="Force the tests to run, even if they could be satisfied from cache.",
+            help=(
+                "Force the tests to run, even if they could be satisfied from cache. You can also "
+                "permanently set this on a test target by setting the field `force_reruns=True`."
+            ),
         )
         register(
             "--output",
@@ -323,10 +326,13 @@ class TestSubsystem(GoalSubsystem):
             type=list,
             member_type=str,
             default=[],
-            help="Specify a list additional environment variables to include in test processes. Entries are strings "
-            "in the form `ENV_VAR=value` to use explicitly; or just `ENV_VAR` to copy the value of a variable in Pants's "
-            "own environment. `value` may be a string with spaces in it such as `ENV_VAR=has some spaces`. `ENV_VAR=` sets "
-            "a variable to be the empty string.",
+            help=(
+                "Specify a list additional environment variables to include in test processes. "
+                "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
+                "`ENV_VAR` to copy the value of a variable in Pants's own environment. "
+                "`value` may be a string with spaces in it such as `ENV_VAR=has some spaces`. "
+                "`ENV_VAR=` sets a variable to be the empty string."
+            ),
         )
 
     @property
@@ -372,7 +378,6 @@ async def run_tests(
     interactive_runner: InteractiveRunner,
     workspace: Workspace,
     union_membership: UnionMembership,
-    pants_env: PantsEnvironment,
 ) -> Test:
     if test_subsystem.debug:
         targets_to_valid_field_sets = await Get(
