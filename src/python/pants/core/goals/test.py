@@ -297,7 +297,7 @@ class TestSubsystem(GoalSubsystem):
             default=False,
             help=(
                 "Force the tests to run, even if they could be satisfied from cache. You can also "
-                "permanently set this on a test target by setting the field `force_reruns=True`."
+                "permanently set this on a test target by setting the field `force_rerun=True`."
             ),
         )
         register(

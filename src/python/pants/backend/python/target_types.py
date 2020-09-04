@@ -291,13 +291,13 @@ class PythonTestsTimeout(IntField):
         return result
 
 
-class PythonTestsForceReruns(BoolField):
+class PythonTestsForceRerun(BoolField):
     """Force the tests to rerun, even if they could be satisfied from cache.
 
     You can also set `--test-force` to temporarily force all tests to rerun.
     """
 
-    alias = "force_reruns"
+    alias = "force_rerun"
     default = False
 
 
@@ -318,7 +318,7 @@ class PythonTests(Target):
         PythonTestsSources,
         PythonTestsDependencies,
         PythonTestsTimeout,
-        PythonTestsForceReruns,
+        PythonTestsForceRerun,
     )
 
 
