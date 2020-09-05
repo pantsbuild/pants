@@ -85,7 +85,7 @@ def create_test_target(
     name: str = "tests",
     dependencies: Optional[List[str]] = None,
     interpreter_constraints: Optional[str] = None,
-    force_rerun: bool = False,
+    force_reruns: bool = False,
 ) -> PythonTests:
     for source_file in source_files:
         rule_runner.create_file(source_file.path, source_file.content.decode())
@@ -97,7 +97,7 @@ def create_test_target(
               name={repr(name)},
               dependencies={dependencies or []},
               compatibility={[interpreter_constraints] if interpreter_constraints else []},
-              force_rerun={force_rerun},
+              force_reruns={force_reruns},
             )
             """
         ),
@@ -427,15 +427,15 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
         "TODO: Figure out why the rule isn't re-evaluated each time, even if `--no-pantsd` is set."
     )
 )
-def test_force_rerun(rule_runner: RuleRunner) -> None:
+def test_force_reruns(rule_runner: RuleRunner) -> None:
     # First, we check that if the option is not set, we use the cache.
     source = FileContent(
-        path=f"{PACKAGE}/test_force_rerun.py",
+        path=f"{PACKAGE}/test_force_reruns.py",
         content=dedent(
             """\
             import time
 
-            def test_force_rerun():
+            def test_force_reruns():
                 print(time.time())
                 assert True is True
             """
@@ -447,7 +447,7 @@ def test_force_rerun(rule_runner: RuleRunner) -> None:
     result2_cached = run_pytest(rule_runner, tgt, passthrough_args="-s")
     assert result1_cached.stdout == result2_cached.stdout
 
-    tgt = create_test_target(rule_runner, [source], name="forced", force_rerun=True)
+    tgt = create_test_target(rule_runner, [source], name="forced", force_reruns=True)
     result1_forced = run_pytest(rule_runner, tgt, passthrough_args="-s")
     result2_forced = run_pytest(rule_runner, tgt, passthrough_args="-s")
     assert result1_forced.stdout != result2_forced.stdout
