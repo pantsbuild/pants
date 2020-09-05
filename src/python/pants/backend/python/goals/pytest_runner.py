@@ -16,7 +16,6 @@ from pants.backend.python.goals.coverage_py import (
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
-    PythonTestsForceReruns,
     PythonTestsSources,
     PythonTestsTimeout,
 )
@@ -60,7 +59,6 @@ class PythonTestFieldSet(TestFieldSet):
 
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
-    force_reruns: PythonTestsForceReruns
 
     def is_conftest(self) -> bool:
         """We skip `conftest.py`, even though it belongs to a `python_tests` target, because it does
@@ -228,7 +226,7 @@ async def setup_pytest_for_target(
         if extra_env_from_arguments[key] is not None:
             extra_env[key] = cast(str, extra_env_from_arguments[key])
 
-    if (request.field_set.force_reruns.value or test_subsystem.force) and not request.is_debug:
+    if test_subsystem.force and not request.is_debug:
         # This is a slightly hacky way to force the process to run: since the env var
         #  value is unique, this input combination will never have been seen before,
         #  and therefore never cached. The two downsides are:
