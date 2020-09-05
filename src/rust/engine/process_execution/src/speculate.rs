@@ -4,7 +4,7 @@ use crate::{
 
 use async_trait::async_trait;
 use futures::future::{self, Either, FutureExt};
-use log::{debug, trace};
+use log::debug;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::delay_for;
@@ -34,11 +34,6 @@ impl SpeculatingCommandRunner {
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    trace!(
-      "Primary command runner queue length: {:?}",
-      self.primary.num_waiters()
-    );
-
     let secondary_request = {
       let command_runner = self.clone();
       let req = req.clone();
@@ -46,10 +41,6 @@ impl SpeculatingCommandRunner {
       async move {
         delay_for(self.speculation_timeout).await;
 
-        trace!(
-          "Secondary command runner queue length: {:?}",
-          command_runner.secondary.num_waiters()
-        );
         command_runner.secondary.run(req, context).await
       }
     };

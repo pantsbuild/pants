@@ -437,10 +437,6 @@ pub trait CommandRunner: Send + Sync {
   /// first candidate that will be run if the multi platform request is submitted to
   /// `fn run(..)`
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process>;
-
-  fn num_waiters(&self) -> usize {
-    panic!("This method is abstract and not implemented for this type")
-  }
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
@@ -481,10 +477,6 @@ impl BoundedCommandRunner {
 
 #[async_trait]
 impl CommandRunner for BoundedCommandRunner {
-  fn num_waiters(&self) -> usize {
-    self.inner.1.num_waiters()
-  }
-
   async fn run(
     &self,
     mut req: MultiPlatformProcess,
