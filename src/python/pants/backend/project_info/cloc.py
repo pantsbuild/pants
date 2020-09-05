@@ -92,16 +92,16 @@ async def run_cloc(
     if not sources_snapshot.snapshot.files:
         return CountLinesOfCode(exit_code=0)
 
-    downloaded_cloc_binary = await Get(
+    scc_program = await Get(
         DownloadedExternalTool, ExternalToolRequest, cloc_binary.get_request(Platform.current)
     )
     input_digest = await Get(
-        Digest, MergeDigests((downloaded_cloc_binary.digest, sources_snapshot.snapshot.digest))
+        Digest, MergeDigests((scc_program.digest, sources_snapshot.snapshot.digest))
     )
     result = await Get(
         ProcessResult,
         Process(
-            argv=(downloaded_cloc_binary.exe, *cloc_subsystem.args),
+            argv=(scc_program.exe, *cloc_subsystem.args),
             input_digest=input_digest,
             description=(
                 f"Count lines of code for {pluralize(len(sources_snapshot.snapshot.files), 'file')}"
