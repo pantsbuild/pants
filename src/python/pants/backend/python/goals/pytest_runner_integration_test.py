@@ -3,421 +3,418 @@
 
 import os
 import re
-from pathlib import Path, PurePath
+from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
+
+import pytest
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import pytest_runner
 from pants.backend.python.goals.coverage_py import create_coverage_config
 from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
-from pants.backend.python.util_rules import pex, pex_from_targets, python_sources
+from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
-from pants.core.util_rules import source_files, stripped_source_files
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
+from pants.testutil.rule_runner import RuleRunner
 
 
-class PytestRunnerIntegrationTest(ExternalToolTestBase):
-
-    source_root = "tests/python"
-    package = os.path.join(source_root, "pants_test")
-    good_source = FileContent(path="test_good.py", content=b"def test():\n  pass\n")
-    bad_source = FileContent(path="test_bad.py", content=b"def test():\n  assert False\n")
-    py3_only_source = FileContent(path="test_py3.py", content=b"def test() -> None:\n  pass\n")
-    library_source = FileContent(path="library.py", content=b"def add_two(x):\n  return x + 2\n")
-    conftest_source = FileContent(
-        path="conftest.py",
-        content=b"def pytest_runtest_setup(item):\n" b"  print('In conftest!')\n",
-    )
-
-    def write_file(self, file_content: FileContent) -> None:
-        self.create_file(
-            relpath=PurePath(self.package, file_content.path).as_posix(),
-            contents=file_content.content.decode(),
-        )
-
-    def create_python_library(
-        self,
-        source_files: List[FileContent],
-        *,
-        name: str = "library",
-        dependencies: Optional[List[str]] = None,
-    ) -> None:
-        for source_file in source_files:
-            self.write_file(source_file)
-        source_globs = [PurePath(source_file.path).name for source_file in source_files] + [
-            "__init__.py"
-        ]
-        self.add_to_build_file(
-            self.package,
-            dedent(
-                f"""\
-                python_library(
-                    name={repr(name)},
-                    sources={source_globs},
-                    dependencies={[*(dependencies or ())]},
-                )
-                """
-            ),
-        )
-        self.create_file(os.path.join(self.package, "__init__.py"))
-
-    def create_python_test_target(
-        self,
-        source_files: List[FileContent],
-        *,
-        dependencies: Optional[List[str]] = None,
-        interpreter_constraints: Optional[str] = None,
-    ) -> None:
-        self.add_to_build_file(
-            relpath=self.package,
-            target=dedent(
-                f"""\
-                python_tests(
-                  name='target',
-                  dependencies={dependencies or []},
-                  compatibility={[interpreter_constraints] if interpreter_constraints else []},
-                )
-                """
-            ),
-        )
-        for source_file in source_files:
-            self.write_file(source_file)
-
-    def setup_thirdparty_dep(self) -> None:
-        self.add_to_build_file(
-            relpath="3rdparty/python",
-            target=dedent(
-                """\
-                python_requirement_library(
-                  name='ordered-set',
-                  requirements=['ordered-set==3.1.1'],
-                )
-                """
-            ),
-        )
-
-    @classmethod
-    def target_types(cls):
-        return [PythonLibrary, PythonTests, PythonRequirementLibrary]
-
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
             create_coverage_config,
             *pytest_runner.rules(),
-            *python_sources.rules(),
-            *pex.rules(),
             *pex_from_targets.rules(),
-            *source_files.rules(),
-            *stripped_source_files.rules(),
             *dependency_inference_rules.rules(),  # For conftest detection.
             get_filtered_environment,
             QueryRule(TestResult, (PythonTestFieldSet, OptionsBootstrapper, PantsEnvironment)),
             QueryRule(
                 TestDebugRequest, (PythonTestFieldSet, OptionsBootstrapper, PantsEnvironment)
             ),
-        )
+        ],
+        target_types=[PythonLibrary, PythonTests, PythonRequirementLibrary],
+    )
 
-    def run_pytest(
-        self,
-        *,
-        address: Optional[Address] = None,
-        passthrough_args: Optional[str] = None,
-        junit_xml_dir: Optional[str] = None,
-        use_coverage: bool = False,
-        execution_slot_var: Optional[str] = None,
-        extra_env_vars: Optional[str] = None,
-        pants_environment: PantsEnvironment = PantsEnvironment(),
-    ) -> TestResult:
-        args = [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns={self.source_root}",
-            # pin to lower versions so that we can run Python 2 tests
-            "--pytest-version=pytest>=4.6.6,<4.7",
-            "--pytest-pytest-plugins=['zipp==1.0.0', 'pytest-cov>=2.8.1,<2.9']",
-        ]
-        if passthrough_args:
-            args.append(f"--pytest-args='{passthrough_args}'")
-        if extra_env_vars:
-            args.append(f"--test-extra-env-vars={extra_env_vars}")
-        if junit_xml_dir:
-            args.append(f"--pytest-junit-xml-dir={junit_xml_dir}")
-        if use_coverage:
-            args.append("--test-use-coverage")
-        if execution_slot_var:
-            args.append(f"--pytest-execution-slot-var={execution_slot_var}")
-        if not address:
-            address = Address(self.package, target_name="target")
-        subjects = [
-            PythonTestFieldSet.create(PythonTests({}, address=address)),
-            pants_environment,
-            create_options_bootstrapper(args=args),
-        ]
-        test_result = self.request_product(TestResult, subjects)
-        debug_request = self.request_product(TestDebugRequest, subjects)
-        if debug_request.process is not None:
-            debug_result = InteractiveRunner(self.scheduler).run(debug_request.process)
-            assert test_result.exit_code == debug_result.exit_code
-        return test_result
 
-    def test_single_passing_test(self) -> None:
-        self.create_python_test_target([self.good_source])
-        result = self.run_pytest()
-        assert result.exit_code == 0
-        assert f"{self.package}/test_good.py ." in result.stdout
+SOURCE_ROOT = "tests/python"
+PACKAGE = os.path.join(SOURCE_ROOT, "pants_test")
+GOOD_SOURCE = FileContent(f"{PACKAGE}/test_good.py", b"def test():\n  pass\n")
+BAD_SOURCE = FileContent(f"{PACKAGE}/test_bad.py", b"def test():\n  assert False\n")
+PY3_ONLY_SOURCE = FileContent(f"{PACKAGE}/test_py3.py", b"def test() -> None:\n  pass\n")
+LIBRARY_SOURCE = FileContent(f"{PACKAGE}/library.py", b"def add_two(x):\n  return x + 2\n")
 
-    def test_single_failing_test(self) -> None:
-        self.create_python_test_target([self.bad_source])
-        result = self.run_pytest()
-        assert result.exit_code == 1
-        assert f"{self.package}/test_bad.py F" in result.stdout
 
-    def test_mixed_sources(self) -> None:
-        self.create_python_test_target([self.good_source, self.bad_source])
-        result = self.run_pytest()
-        assert result.exit_code == 1
-        assert f"{self.package}/test_good.py ." in result.stdout
-        assert f"{self.package}/test_bad.py F" in result.stdout
+def create_python_library(
+    rule_runner: RuleRunner,
+    source_files: List[FileContent],
+    *,
+    name: str = "library",
+    dependencies: Optional[List[str]] = None,
+) -> None:
+    for source_file in source_files:
+        rule_runner.create_file(source_file.path, source_file.content.decode())
+    source_globs = [PurePath(source_file.path).name for source_file in source_files]
+    rule_runner.add_to_build_file(
+        PACKAGE,
+        dedent(
+            f"""\
+            python_library(
+                name={repr(name)},
+                sources={source_globs},
+                dependencies={[*(dependencies or ())]},
+            )
+            """
+        ),
+    )
+    rule_runner.create_file(os.path.join(PACKAGE, "__init__.py"))
 
-    def test_absolute_import(self) -> None:
-        self.create_python_library([self.library_source])
-        source = FileContent(
-            path="test_absolute_import.py",
-            content=dedent(
-                """\
-                from pants_test.library import add_two
 
-                def test():
-                  assert add_two(2) == 4
-                """
-            ).encode(),
-        )
-        self.create_python_test_target([source], dependencies=[":library"])
-        result = self.run_pytest()
-        assert result.exit_code == 0
-        assert f"{self.package}/test_absolute_import.py ." in result.stdout
+def create_test_target(
+    rule_runner: RuleRunner,
+    source_files: List[FileContent],
+    *,
+    name: str = "tests",
+    dependencies: Optional[List[str]] = None,
+    interpreter_constraints: Optional[str] = None,
+) -> PythonTests:
+    for source_file in source_files:
+        rule_runner.create_file(source_file.path, source_file.content.decode())
+    rule_runner.add_to_build_file(
+        relpath=PACKAGE,
+        target=dedent(
+            f"""\
+            python_tests(
+              name={repr(name)},
+              dependencies={dependencies or []},
+              compatibility={[interpreter_constraints] if interpreter_constraints else []},
+            )
+            """
+        ),
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, target_name=name))
+    assert isinstance(tgt, PythonTests)
+    return tgt
 
-    def test_relative_import(self) -> None:
-        self.create_python_library([self.library_source])
-        source = FileContent(
-            path="test_relative_import.py",
-            content=dedent(
-                """\
-                from .library import add_two
 
-                def test():
-                  assert add_two(2) == 4
-                """
-            ).encode(),
-        )
-        self.create_python_test_target([source], dependencies=[":library"])
-        result = self.run_pytest()
-        assert result.exit_code == 0
-        assert f"{self.package}/test_relative_import.py ." in result.stdout
+def setup_thirdparty_dep(rule_runner: RuleRunner) -> None:
+    rule_runner.add_to_build_file(
+        relpath="3rdparty/python",
+        target=(
+            "python_requirement_library(name='ordered-set', requirements=['ordered-set==3.1.1'])"
+        ),
+    )
 
-    def test_transitive_dep(self) -> None:
-        self.create_python_library([self.library_source])
-        transitive_dep_fc = FileContent(
-            path="transitive_dep.py",
-            content=dedent(
-                """\
-                from pants_test.library import add_two
 
-                def add_four(x):
-                  return add_two(x) + 2
-                """
-            ).encode(),
-        )
-        self.create_python_library(
-            [transitive_dep_fc], name="transitive_dep", dependencies=[":library"]
-        )
-        source = FileContent(
-            path="test_transitive_dep.py",
-            content=dedent(
-                """\
-                from pants_test.transitive_dep import add_four
+def run_pytest(
+    rule_runner: RuleRunner,
+    test_target: PythonTests,
+    *,
+    passthrough_args: Optional[str] = None,
+    junit_xml_dir: Optional[str] = None,
+    use_coverage: bool = False,
+    execution_slot_var: Optional[str] = None,
+    extra_env_vars: Optional[str] = None,
+    pants_environment: PantsEnvironment = PantsEnvironment(),
+) -> TestResult:
+    args = [
+        "--backend-packages=pants.backend.python",
+        f"--source-root-patterns={SOURCE_ROOT}",
+        # pin to lower versions so that we can run Python 2 tests
+        "--pytest-version=pytest>=4.6.6,<4.7",
+        "--pytest-pytest-plugins=['zipp==1.0.0', 'pytest-cov>=2.8.1,<2.9']",
+    ]
+    if passthrough_args:
+        args.append(f"--pytest-args='{passthrough_args}'")
+    if extra_env_vars:
+        args.append(f"--test-extra-env-vars={extra_env_vars}")
+    if junit_xml_dir:
+        args.append(f"--pytest-junit-xml-dir={junit_xml_dir}")
+    if use_coverage:
+        args.append("--test-use-coverage")
+    if execution_slot_var:
+        args.append(f"--pytest-execution-slot-var={execution_slot_var}")
+    subjects = [
+        PythonTestFieldSet.create(test_target),
+        pants_environment,
+        create_options_bootstrapper(args=args),
+    ]
+    test_result = rule_runner.request_product(TestResult, subjects)
+    debug_request = rule_runner.request_product(TestDebugRequest, subjects)
+    if debug_request.process is not None:
+        debug_result = InteractiveRunner(rule_runner.scheduler).run(debug_request.process)
+        assert test_result.exit_code == debug_result.exit_code
+    return test_result
 
-                def test():
-                  assert add_four(2) == 6
-                """
-            ).encode(),
-        )
-        self.create_python_test_target([source], dependencies=[":transitive_dep"])
-        result = self.run_pytest()
-        assert result.exit_code == 0
-        assert f"{self.package}/test_transitive_dep.py ." in result.stdout
 
-    def test_thirdparty_dep(self) -> None:
-        self.setup_thirdparty_dep()
-        source = FileContent(
-            path="test_3rdparty_dep.py",
-            content=dedent(
-                """\
-                from ordered_set import OrderedSet
+def test_single_passing_test(rule_runner: RuleRunner) -> None:
+    tgt = create_test_target(rule_runner, [GOOD_SOURCE])
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_good.py ." in result.stdout
 
-                def test():
-                  assert OrderedSet((1, 2)) == OrderedSet([1, 2])
-                """
-            ).encode(),
-        )
-        self.create_python_test_target([source], dependencies=["3rdparty/python:ordered-set"])
-        result = self.run_pytest()
-        assert result.exit_code == 0
-        assert f"{self.package}/test_3rdparty_dep.py ." in result.stdout
 
-    def test_thirdparty_transitive_dep(self) -> None:
-        self.setup_thirdparty_dep()
-        library_fc = FileContent(
-            path="library.py",
-            content=dedent(
-                """\
-                import string
-                from ordered_set import OrderedSet
+def test_single_failing_test(rule_runner: RuleRunner) -> None:
+    tgt = create_test_target(rule_runner, [BAD_SOURCE])
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code == 1
+    assert f"{PACKAGE}/test_bad.py F" in result.stdout
 
-                alphabet = OrderedSet(string.ascii_lowercase)
-                """
-            ).encode(),
-        )
-        self.create_python_library(
-            [library_fc],
-            dependencies=["3rdparty/python:ordered-set"],
-        )
-        source = FileContent(
-            path="test_3rdparty_transitive_dep.py",
-            content=dedent(
-                """\
-                from pants_test.library import alphabet
 
-                def test():
-                  assert 'a' in alphabet and 'z' in alphabet
-                """
-            ).encode(),
-        )
-        self.create_python_test_target([source], dependencies=[":library"])
-        result = self.run_pytest()
-        assert result.exit_code == 0
-        assert f"{self.package}/test_3rdparty_transitive_dep.py ." in result.stdout
+def test_mixed_sources(rule_runner: RuleRunner) -> None:
+    tgt = create_test_target(rule_runner, [GOOD_SOURCE, BAD_SOURCE])
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code == 1
+    assert f"{PACKAGE}/test_good.py ." in result.stdout
+    assert f"{PACKAGE}/test_bad.py F" in result.stdout
 
-    @skip_unless_python27_and_python3_present
-    def test_uses_correct_python_version(self) -> None:
-        self.create_python_test_target(
-            [self.py3_only_source], interpreter_constraints="CPython==2.7.*"
-        )
-        py2_result = self.run_pytest()
-        assert py2_result.exit_code == 2
-        assert "SyntaxError: invalid syntax" in py2_result.stdout
-        Path(
-            self.build_root, self.package, "BUILD"
-        ).unlink()  # Cleanup in order to recreate the target
-        self.create_python_test_target(
-            [self.py3_only_source], interpreter_constraints="CPython>=3.6"
-        )
-        py3_result = self.run_pytest()
-        assert py3_result.exit_code == 0
-        assert f"{self.package}/test_py3.py ." in py3_result.stdout
 
-    def test_respects_passthrough_args(self) -> None:
-        source = FileContent(
-            path="test_config.py",
-            content=dedent(
-                """\
-                def test_run_me():
-                  pass
+def test_absolute_import(rule_runner: RuleRunner) -> None:
+    create_python_library(rule_runner, [LIBRARY_SOURCE])
+    source = FileContent(
+        path=f"{PACKAGE}/test_absolute_import.py",
+        content=dedent(
+            """\
+            from pants_test.library import add_two
 
-                def test_ignore_me():
-                  pass
-                """
-            ).encode(),
-        )
-        self.create_python_test_target([source])
-        result = self.run_pytest(passthrough_args="-k test_run_me")
-        assert result.exit_code == 0
-        assert f"{self.package}/test_config.py ." in result.stdout
-        assert "collected 2 items / 1 deselected / 1 selected" in result.stdout
+            def test():
+              assert add_two(2) == 4
+            """
+        ).encode(),
+    )
+    tgt = create_test_target(rule_runner, [source], dependencies=[":library"])
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_absolute_import.py ." in result.stdout
 
-    def test_junit(self) -> None:
-        self.create_python_test_target([self.good_source])
-        result = self.run_pytest(junit_xml_dir="dist/test-results")
-        assert result.exit_code == 0
-        assert f"{self.package}/test_good.py ." in result.stdout
-        assert result.xml_results is not None
-        digest_contents = self.request_product(DigestContents, [result.xml_results.digest])
-        file = digest_contents[0]
-        assert file.path.startswith("dist/test-results")
-        assert b"pants_test.test_good" in file.content
 
-    def test_coverage(self) -> None:
-        self.create_python_test_target([self.good_source])
-        result = self.run_pytest(use_coverage=True)
-        assert result.exit_code == 0
-        assert f"{self.package}/test_good.py ." in result.stdout
-        assert result.coverage_data is not None
+def test_relative_import(rule_runner: RuleRunner) -> None:
+    create_python_library(rule_runner, [LIBRARY_SOURCE])
+    source = FileContent(
+        path=f"{PACKAGE}/test_relative_import.py",
+        content=dedent(
+            """\
+            from .library import add_two
 
-    def test_conftest_handling(self) -> None:
-        """Tests that we a) inject a dependency on conftest.py and b) skip running directly on
-        conftest.py."""
-        self.create_python_test_target([self.good_source])
-        self.create_file(
-            PurePath(self.source_root, self.conftest_source.path).as_posix(),
-            self.conftest_source.content.decode(),
-        )
-        self.add_to_build_file(self.source_root, "python_tests()")
+            def test():
+              assert add_two(2) == 4
+            """
+        ).encode(),
+    )
+    tgt = create_test_target(rule_runner, [source], dependencies=[":library"])
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_relative_import.py ." in result.stdout
 
-        result = self.run_pytest(passthrough_args="-s")
-        assert result.exit_code == 0
-        assert f"{self.package}/test_good.py In conftest!\n." in result.stdout
 
-        result = self.run_pytest(
-            address=Address(self.source_root, relative_file_path="conftest.py")
-        )
-        assert result.exit_code is None
+def test_transitive_dep(rule_runner: RuleRunner) -> None:
+    create_python_library(rule_runner, [LIBRARY_SOURCE])
+    transitive_dep_fc = FileContent(
+        path=f"{PACKAGE}/transitive_dep.py",
+        content=dedent(
+            """\
+            from pants_test.library import add_two
 
-    def test_execution_slot_variable(self) -> None:
-        source = FileContent(
-            path="test_concurrency_slot.py",
-            content=dedent(
-                """\
-                import os
+            def add_four(x):
+              return add_two(x) + 2
+            """
+        ).encode(),
+    )
+    create_python_library(
+        rule_runner, [transitive_dep_fc], name="transitive_dep", dependencies=[":library"]
+    )
+    source = FileContent(
+        path=f"{PACKAGE}/test_transitive_dep.py",
+        content=dedent(
+            """\
+            from pants_test.transitive_dep import add_four
 
-                def test_fail_printing_slot_env_var():
-                    slot = os.getenv("SLOT")
-                    print(f"Value of slot is {slot}")
-                    # Deliberately fail the test so the SLOT output gets printed to stdout
-                    assert 1 == 2
-                """
-            ).encode(),
-        )
-        self.create_python_test_target([source])
-        result = self.run_pytest(execution_slot_var="SLOT")
-        assert result.exit_code == 1
-        assert re.search(r"Value of slot is \d+", result.stdout)
+            def test():
+              assert add_four(2) == 6
+            """
+        ).encode(),
+    )
+    tgt = create_test_target(rule_runner, [source], dependencies=[":transitive_dep"])
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_transitive_dep.py ." in result.stdout
 
-    def test_extra_arguments(self) -> None:
-        source = FileContent(
-            path="test_extra_args.py",
-            content=dedent(
-                """\
-                import os
 
-                def test_args():
-                    assert os.getenv("SOME_VAR") == "some_value"
-                    assert os.getenv("OTHER_VAR") == "other_value"
-                """
-            ).encode(),
-        )
-        self.create_python_test_target([source])
-        mock_env = PantsEnvironment({"OTHER_VAR": "other_value"})
-        extra_env_vars = '["SOME_VAR=some_value", "OTHER_VAR"]'
-        result = self.run_pytest(extra_env_vars=extra_env_vars, pants_environment=mock_env)
-        assert result.exit_code == 0
+def test_thirdparty_dep(rule_runner: RuleRunner) -> None:
+    setup_thirdparty_dep(rule_runner)
+    source = FileContent(
+        path=f"{PACKAGE}/test_3rdparty_dep.py",
+        content=dedent(
+            """\
+            from ordered_set import OrderedSet
+
+            def test():
+              assert OrderedSet((1, 2)) == OrderedSet([1, 2])
+            """
+        ).encode(),
+    )
+    tgt = create_test_target(rule_runner, [source], dependencies=["3rdparty/python:ordered-set"])
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_3rdparty_dep.py ." in result.stdout
+
+
+def test_thirdparty_transitive_dep(rule_runner: RuleRunner) -> None:
+    setup_thirdparty_dep(rule_runner)
+    library_fc = FileContent(
+        path=f"{PACKAGE}/library.py",
+        content=dedent(
+            """\
+            import string
+            from ordered_set import OrderedSet
+
+            alphabet = OrderedSet(string.ascii_lowercase)
+            """
+        ).encode(),
+    )
+    create_python_library(
+        rule_runner,
+        [library_fc],
+        dependencies=["3rdparty/python:ordered-set"],
+    )
+    source = FileContent(
+        path=f"{PACKAGE}/test_3rdparty_transitive_dep.py",
+        content=dedent(
+            """\
+            from pants_test.library import alphabet
+
+            def test():
+              assert 'a' in alphabet and 'z' in alphabet
+            """
+        ).encode(),
+    )
+    tgt = create_test_target(rule_runner, [source], dependencies=[":library"])
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_3rdparty_transitive_dep.py ." in result.stdout
+
+
+@skip_unless_python27_and_python3_present
+def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
+    tgt = create_test_target(
+        rule_runner, [PY3_ONLY_SOURCE], name="py2", interpreter_constraints="CPython==2.7.*"
+    )
+    py2_result = run_pytest(rule_runner, tgt)
+    assert py2_result.exit_code == 2
+    assert "SyntaxError: invalid syntax" in py2_result.stdout
+
+    tgt = create_test_target(
+        rule_runner, [PY3_ONLY_SOURCE], name="py3", interpreter_constraints="CPython>=3.6"
+    )
+    py3_result = run_pytest(rule_runner, tgt)
+    assert py3_result.exit_code == 0
+    assert f"{PACKAGE}/test_py3.py ." in py3_result.stdout
+
+
+def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+    source = FileContent(
+        path=f"{PACKAGE}/test_config.py",
+        content=dedent(
+            """\
+            def test_run_me():
+              pass
+
+            def test_ignore_me():
+              pass
+            """
+        ).encode(),
+    )
+    tgt = create_test_target(rule_runner, [source])
+    result = run_pytest(rule_runner, tgt, passthrough_args="-k test_run_me")
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_config.py ." in result.stdout
+    assert "collected 2 items / 1 deselected / 1 selected" in result.stdout
+
+
+def test_junit(rule_runner: RuleRunner) -> None:
+    tgt = create_test_target(rule_runner, [GOOD_SOURCE])
+    result = run_pytest(rule_runner, tgt, junit_xml_dir="dist/test-results")
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_good.py ." in result.stdout
+    assert result.xml_results is not None
+    digest_contents = rule_runner.request_product(DigestContents, [result.xml_results.digest])
+    file = digest_contents[0]
+    assert file.path.startswith("dist/test-results")
+    assert b"pants_test.test_good" in file.content
+
+
+def test_coverage(rule_runner: RuleRunner) -> None:
+    tgt = create_test_target(rule_runner, [GOOD_SOURCE])
+    result = run_pytest(rule_runner, tgt, use_coverage=True)
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_good.py ." in result.stdout
+    assert result.coverage_data is not None
+
+
+def test_conftest_handling(rule_runner: RuleRunner) -> None:
+    """Tests that we a) inject a dependency on conftest.py and b) skip running directly on
+    conftest.py."""
+    tgt = create_test_target(rule_runner, [GOOD_SOURCE])
+
+    rule_runner.create_file(
+        f"{SOURCE_ROOT}/conftest.py", "def pytest_runtest_setup(item):\n  print('In conftest!')\n"
+    )
+    rule_runner.add_to_build_file(SOURCE_ROOT, "python_tests()")
+    conftest_tgt = rule_runner.get_target(Address(SOURCE_ROOT, relative_file_path="conftest.py"))
+    assert isinstance(conftest_tgt, PythonTests)
+
+    result = run_pytest(rule_runner, tgt, passthrough_args="-s")
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_good.py In conftest!\n." in result.stdout
+
+    result = run_pytest(rule_runner, conftest_tgt)
+    assert result.exit_code is None
+
+
+def test_execution_slot_variable(rule_runner: RuleRunner) -> None:
+    source = FileContent(
+        path=f"{PACKAGE}/test_concurrency_slot.py",
+        content=dedent(
+            """\
+            import os
+
+            def test_fail_printing_slot_env_var():
+                slot = os.getenv("SLOT")
+                print(f"Value of slot is {slot}")
+                # Deliberately fail the test so the SLOT output gets printed to stdout
+                assert 1 == 2
+            """
+        ).encode(),
+    )
+    tgt = create_test_target(rule_runner, [source])
+    result = run_pytest(rule_runner, tgt, execution_slot_var="SLOT")
+    assert result.exit_code == 1
+    assert re.search(r"Value of slot is \d+", result.stdout)
+
+
+def test_extra_env_vars(rule_runner: RuleRunner) -> None:
+    source = FileContent(
+        path=f"{PACKAGE}/test_extra_env_vars.py",
+        content=dedent(
+            """\
+            import os
+
+            def test_args():
+                assert os.getenv("SOME_VAR") == "some_value"
+                assert os.getenv("OTHER_VAR") == "other_value"
+            """
+        ).encode(),
+    )
+    tgt = create_test_target(rule_runner, [source])
+    mock_env = PantsEnvironment({"OTHER_VAR": "other_value"})
+    extra_env_vars = '["SOME_VAR=some_value", "OTHER_VAR"]'
+    result = run_pytest(rule_runner, tgt, extra_env_vars=extra_env_vars, pants_environment=mock_env)
+    assert result.exit_code == 0
