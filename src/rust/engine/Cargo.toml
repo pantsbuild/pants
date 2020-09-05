@@ -35,7 +35,6 @@ members = [
   "rule_graph",
   "serverset",
   "sharded_lmdb",
-  "tar_api",
   "task_executor",
   "testutil",
   "testutil/mock",
@@ -71,7 +70,6 @@ default-members = [
   "rule_graph",
   "serverset",
   "sharded_lmdb",
-  "tar_api",
   "task_executor",
   "testutil",
   "testutil/mock",
@@ -123,7 +121,6 @@ rule_graph = { path = "rule_graph" }
 sharded_lmdb = { path = "sharded_lmdb" }
 smallvec = "0.6"
 store = { path = "fs/store" }
-tar_api = { path = "tar_api" }
 task_executor = { path = "task_executor" }
 tempfile = "3"
 time = "0.1.40"

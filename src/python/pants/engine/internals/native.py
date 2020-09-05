@@ -128,9 +128,6 @@ class Native(metaclass=SingletonMetaclass):
         """Load the native engine as a python module."""
         return native_engine
 
-    def decompress_tarball(self, tarfile_path, dest_dir):
-        return self.lib.decompress_tarball(tarfile_path, dest_dir)
-
     def init_rust_logging(
         self,
         level: int,

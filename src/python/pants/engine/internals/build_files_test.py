@@ -8,7 +8,6 @@ from typing import Iterable, Optional, Set, cast
 import pytest
 
 from pants.base.exceptions import ResolveError
-from pants.base.project_tree import Dir
 from pants.base.specs import (
     AddressLiteralSpec,
     AddressSpec,
@@ -27,6 +26,7 @@ from pants.engine.addresses import (
 )
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
+    AddressFamilyDir,
     evaluate_preludes,
     parse_address_family,
     strip_address_origins,
@@ -51,7 +51,7 @@ def test_parse_address_family_empty() -> None:
             Parser(target_type_aliases=[], object_aliases=BuildFileAliases()),
             create_subsystem(GlobalOptions, build_patterns=["BUILD"], build_ignore=[]),
             BuildFilePreludeSymbols(FrozenDict()),
-            Dir("/dev/null"),
+            AddressFamilyDir("/dev/null"),
         ],
         mock_gets=[
             MockGet(
