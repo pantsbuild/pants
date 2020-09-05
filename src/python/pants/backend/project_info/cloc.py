@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import cast
+from typing import Tuple
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -9,45 +9,41 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
 )
 from pants.engine.console import Console
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    MergeDigests,
-    SourcesSnapshot,
-)
+from pants.engine.fs import Digest, MergeDigests, SourcesSnapshot
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.option.custom_types import shell_str
+from pants.util.enums import match
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
 class ClocBinary(ExternalTool):
-    """The cloc lines-of-code counter (https://github.com/AlDanial/cloc)."""
+    """The SCC lines-of-code counter (https://github.com/boyter/scc)."""
 
     options_scope = "cloc-binary"
     name = "cloc"
-    default_version = "1.80"
+    default_version = "2.12.0"
     default_known_versions = [
-        "1.80|darwin|2b23012b1c3c53bd6b9dd43cd6aa75715eed4feb2cb6db56ac3fbbd2dffeac9d|546279",
-        "1.80|linux |2b23012b1c3c53bd6b9dd43cd6aa75715eed4feb2cb6db56ac3fbbd2dffeac9d|546279",
+        "2.12.0|darwin|70b7002cd1e4541cb37b7b9cbc0eeedd13ceacb49628e82ab46332bb2e65a5a6|1842530",
+        "2.12.0|linux|8eca3e98fe8a78d417d3779a51724515ac4459760d3ec256295f80954a0da044|1753059",
     ]
 
-    def generate_url(self, _: Platform) -> str:
+    def generate_url(self, plat: Platform) -> str:
+        plat_str = match(plat, {Platform.darwin: "apple-darwin", Platform.linux: "unknown-linux"})
         return (
-            f"https://github.com/AlDanial/cloc/releases/download/{self.version}/"
-            f"cloc-{self.version}.pl"
+            f"https://github.com/boyter/scc/releases/download/v{self.version}/scc-{self.version}-"
+            f"x86_64-{plat_str}.zip"
         )
 
     def generate_exe(self, _: Platform) -> str:
-        return f"./cloc-{self.version}.pl"
+        return "./scc"
 
 
 class CountLinesOfCodeSubsystem(GoalSubsystem):
-    """Count lines of code."""
+    """Count lines of code using the SCC program (https://github.com/boyter/scc)."""
 
     name = "cloc"
 
@@ -59,11 +55,27 @@ class CountLinesOfCodeSubsystem(GoalSubsystem):
             type=bool,
             default=False,
             help="Show information about files ignored by cloc.",
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "This option no longer does anything, as we switched the cloc implementation from "
+                "the `cloc` Perl script to SCC (Succinct Code Counter). Instead, use "
+                "`--cloc-args='-v'` to see what SCC skips."
+            ),
+        )
+        register(
+            "--args",
+            type=list,
+            member_type=shell_str,
+            passthrough=True,
+            help=(
+                'Arguments to pass directly to SCC, e.g. `--cloc-args="--no-cocomo"`. Refer to '
+                "https://github.com/boyter/scc."
+            ),
         )
 
     @property
-    def ignored(self) -> bool:
-        return cast(bool, self.options.ignored)
+    def args(self) -> Tuple[str, ...]:
+        return tuple(self.options.args)
 
 
 class CountLinesOfCode(Goal):
@@ -77,62 +89,27 @@ async def run_cloc(
     cloc_binary: ClocBinary,
     sources_snapshot: SourcesSnapshot,
 ) -> CountLinesOfCode:
-    """Runs the cloc Perl script."""
     if not sources_snapshot.snapshot.files:
         return CountLinesOfCode(exit_code=0)
 
-    input_files_filename = "input_files.txt"
-    input_file_digest = await Get(
-        Digest,
-        CreateDigest(
-            [FileContent(input_files_filename, "\n".join(sources_snapshot.snapshot.files).encode())]
-        ),
-    )
     downloaded_cloc_binary = await Get(
         DownloadedExternalTool, ExternalToolRequest, cloc_binary.get_request(Platform.current)
     )
-    digest = await Get(
-        Digest,
-        MergeDigests(
-            (input_file_digest, downloaded_cloc_binary.digest, sources_snapshot.snapshot.digest)
+    input_digest = await Get(
+        Digest, MergeDigests((downloaded_cloc_binary.digest, sources_snapshot.snapshot.digest))
+    )
+    result = await Get(
+        ProcessResult,
+        Process(
+            argv=(downloaded_cloc_binary.exe, *cloc_subsystem.args),
+            input_digest=input_digest,
+            description=(
+                f"Count lines of code for {pluralize(len(sources_snapshot.snapshot.files), 'file')}"
+            ),
+            level=LogLevel.DEBUG,
         ),
     )
-
-    report_filename = "report.txt"
-    ignore_filename = "ignored.txt"
-
-    cmd = (
-        "/usr/bin/perl",
-        downloaded_cloc_binary.exe,
-        "--skip-uniqueness",  # Skip the file uniqueness check.
-        f"--ignored={ignore_filename}",  # Write the names and reasons of ignored files to this file.
-        f"--report-file={report_filename}",  # Write the output to this file rather than stdout.
-        f"--list-file={input_files_filename}",  # Read an exhaustive list of files to process from this file.
-    )
-    req = Process(
-        argv=cmd,
-        input_digest=digest,
-        output_files=(report_filename, ignore_filename),
-        description=(
-            f"Count lines of code for {pluralize(len(sources_snapshot.snapshot.files), 'file')}"
-        ),
-        level=LogLevel.DEBUG,
-    )
-    exec_result = await Get(ProcessResult, Process, req)
-
-    report_digest_contents = await Get(DigestContents, Digest, exec_result.output_digest)
-    reports = {
-        file_content.path: file_content.content.decode() for file_content in report_digest_contents
-    }
-
-    for line in reports[report_filename].splitlines():
-        console.print_stdout(line)
-
-    if cloc_subsystem.ignored:
-        console.print_stderr("\nIgnored the following files:")
-        for line in reports[ignore_filename].splitlines():
-            console.print_stderr(line)
-
+    console.print_stdout(result.stdout.decode())
     return CountLinesOfCode(exit_code=0)
 
 

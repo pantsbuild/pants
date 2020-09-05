@@ -34,16 +34,16 @@ def assert_counts(
         (
             line
             for line in stdout.splitlines()
-            if len(line.split()) == 5 and line.split()[0] == lang
+            if len(line.split()) in (6, 7) and line.split()[0] == lang
         ),
         None,
     )
-    assert summary_line is not None, f"Found no output line for {lang}"
+    assert summary_line is not None, f"Found no output line for {lang} given stdout:\n {stdout}"
     fields = summary_line.split()
     assert num_files == int(fields[1])
-    assert blank == int(fields[2])
-    assert comment == int(fields[3])
-    assert code == int(fields[4])
+    assert blank == int(fields[3])
+    assert comment == int(fields[4])
+    assert code == int(fields[5])
 
 
 def test_cloc(rule_runner: RuleRunner) -> None:
@@ -67,33 +67,18 @@ def test_cloc(rule_runner: RuleRunner) -> None:
     assert_counts(result.stdout, "Elixir", comment=1, code=1)
 
 
-def test_ignored(rule_runner: RuleRunner) -> None:
-    py_dir = "src/py/foo"
-    rule_runner.create_file(f"{py_dir}/foo.py", "print('some code')")
-    rule_runner.create_file(f"{py_dir}/empty.py", "")
-    rule_runner.add_to_build_file(py_dir, "python_library()")
-
-    result = rule_runner.run_goal_rule(CountLinesOfCode, args=[py_dir, "--cloc-ignored"])
+def test_passthrough_args(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file("foo.py", "print('hello world!')\n")
+    rule_runner.add_to_build_file("", "python_library(name='foo')")
+    result = rule_runner.run_goal_rule(CountLinesOfCode, args=["--args='--no-cocomo'", "//:foo"])
     assert result.exit_code == 0
-    assert "Ignored the following files:" in result.stderr
-    assert "empty.py: zero sized file" in result.stderr
+    assert_counts(result.stdout, "Python", code=1)
+    assert "Estimated Cost to Develop" not in result.stdout
 
 
-def test_filesystem_specs_with_owners(rule_runner: RuleRunner) -> None:
-    """Even if a file belongs to a target which has multiple sources, we should only run over the
-    specified file."""
-    py_dir = "src/py/foo"
-    rule_runner.create_file(f"{py_dir}/foo.py", "print('some code')")
-    rule_runner.create_file(f"{py_dir}/bar.py", "print('some code')\nprint('more code')")
-    rule_runner.add_to_build_file(py_dir, "python_library()")
-    result = rule_runner.run_goal_rule(CountLinesOfCode, args=[f"{py_dir}/foo.py"])
-    assert result.exit_code == 0
-    assert_counts(result.stdout, "Python", num_files=1, code=1)
-
-
-def test_filesystem_specs_without_owners(rule_runner: RuleRunner) -> None:
-    """Unlike most goals, cloc works on any readable file in the build root, regardless of whether
-    it's declared in a BUILD file."""
+def test_files_without_owners(rule_runner: RuleRunner) -> None:
+    """cloc works on any readable file in the build root, regardless of whether it's declared in a
+    BUILD file."""
     rule_runner.create_file("test/foo.ex", 'IO.puts("im a free thinker!")')
     rule_runner.create_file("test/foo.hs", 'main = putStrLn "Whats Pants, precious?"')
     result = rule_runner.run_goal_rule(CountLinesOfCode, args=["test/foo.*"])
