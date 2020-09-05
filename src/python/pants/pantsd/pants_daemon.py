@@ -86,15 +86,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
     @classmethod
-    def create(cls, options_bootstrapper) -> "PantsDaemon":
-        """
-        :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
-        :param bool full_init: Whether or not to fully initialize an engine et al for the purposes
-                                of spawning a new daemon. `full_init=False` is intended primarily
-                                for lightweight lifecycle checks (since there is a ~1s overhead to
-                                initialize the engine). See the impl of `maybe_launch` for an example
-                                of the intended usage.
-        """
+    def create(cls, options_bootstrapper: OptionsBootstrapper) -> "PantsDaemon":
         native = Native()
         native.override_thread_logging_destination_to_just_pantsd()
 
@@ -312,8 +304,11 @@ class PantsDaemon(PantsDaemonProcessManager):
             self._logger.info("exiting.")
 
 
-def launch():
+def launch_new_pantsd_instance():
     """An external entrypoint that spawns a new pantsd instance."""
-    PantsDaemon.create(
-        OptionsBootstrapper.create(env=os.environ, args=sys.argv, allow_pantsrc=True)
-    ).run_sync()
+
+    options_bootstrapper = OptionsBootstrapper.create(
+        env=os.environ, args=sys.argv, allow_pantsrc=True
+    )
+    daemon = PantsDaemon.create(options_bootstrapper)
+    daemon.run_sync()

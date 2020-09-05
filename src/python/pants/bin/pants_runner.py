@@ -85,7 +85,8 @@ class PantsRunner:
 
         if self._should_run_with_pantsd(global_bootstrap_options):
             try:
-                return RemotePantsRunner(self.args, self.env, options_bootstrapper).run(start_time)
+                remote_runner = RemotePantsRunner(self.args, self.env, options_bootstrapper)
+                return remote_runner.run()
             except RemotePantsRunner.Fallback as e:
                 logger.warning("Client exception: {!r}, falling back to non-daemon mode".format(e))
 
