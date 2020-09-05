@@ -15,7 +15,7 @@ from pants.engine.addresses import (
     AddressWithOrigin,
     BuildFileAddress,
 )
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Snapshot
+from pants.engine.fs import DigestContents, FileListing, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -55,8 +55,8 @@ async def evaluate_preludes(global_options: GlobalOptions) -> BuildFilePreludeSy
 async def resolve_address(address_input: AddressInput) -> Address:
     # Determine the type of the path_component of the input.
     if address_input.path_component:
-        snapshot = await Get(Snapshot, PathGlobs(globs=(address_input.path_component,)))
-        is_file, is_dir = bool(snapshot.files), bool(snapshot.dirs)
+        file_listing = await Get(FileListing, PathGlobs(globs=(address_input.path_component,)))
+        is_file, is_dir = bool(file_listing.files), bool(file_listing.dirs)
     else:
         # It is an address in the root directory.
         is_file, is_dir = False, True
@@ -184,17 +184,17 @@ async def addresses_with_origins_from_address_specs(
         if filtering_disabled or specs_filter.matches(addr, target_adaptor):
             matched_addresses.add(addr)
 
-    # Then, convert all `AddressGlobSpecs`. Snapshot all BUILD files covered by the specs, then
+    # Then, convert all `AddressGlobSpecs`. Resolve all BUILD files covered by the specs, then
     # group by directory.
-    snapshot = await Get(
-        Snapshot,
+    file_listing = await Get(
+        FileListing,
         PathGlobs,
         address_specs.to_path_globs(
             build_patterns=global_options.options.build_patterns,
             build_ignore_patterns=global_options.options.build_ignore,
         ),
     )
-    dirnames = {os.path.dirname(f) for f in snapshot.files}
+    dirnames = {os.path.dirname(f) for f in file_listing.files}
     address_families = await MultiGet(Get(AddressFamily, Dir(d)) for d in dirnames)
     address_family_by_directory = {af.namespace: af for af in address_families}
 

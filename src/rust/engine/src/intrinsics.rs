@@ -2,7 +2,7 @@ use crate::context::Context;
 use crate::core::{throw, Value};
 use crate::externs;
 use crate::nodes::MultiPlatformExecuteProcess;
-use crate::nodes::{lift_digest, DownloadedFile, NodeResult, Snapshot};
+use crate::nodes::{lift_digest, DownloadedFile, FileListing, NodeResult, Snapshot};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 
@@ -47,6 +47,13 @@ impl Intrinsics {
         inputs: vec![types.path_globs],
       },
       Box::new(path_globs_to_digest),
+    );
+    intrinsics.insert(
+      Intrinsic {
+        product: types.file_listing,
+        inputs: vec![types.path_globs],
+      },
+      Box::new(path_globs_to_file_listing),
     );
     intrinsics.insert(
       Intrinsic {
@@ -179,7 +186,7 @@ fn multi_platform_process_request_to_process_result(
         externs::store_bytes(&stdout_bytes),
         externs::store_bytes(&stderr_bytes),
         externs::store_i64(result.exit_code.into()),
-        Snapshot::store_directory(&core, &result.output_directory),
+        Snapshot::store_directory_digest(&core, &result.output_directory),
         externs::unsafe_call(core.types.platform, &[externs::store_utf8(&platform_name)]),
       ],
     ))
@@ -221,7 +228,7 @@ fn remove_prefix_request_to_digest(
       .strip_prefix(input_digest, PathBuf::from(prefix))
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
-    Ok(Snapshot::store_directory(&core, &digest))
+    Ok(Snapshot::store_directory_digest(&core, &digest))
   }
   .boxed()
 }
@@ -240,7 +247,7 @@ fn add_prefix_request_to_digest(
       .add_prefix(input_digest, PathBuf::from(prefix))
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
-    Ok(Snapshot::store_directory(&core, &digest))
+    Ok(Snapshot::store_directory_digest(&core, &digest))
   }
   .boxed()
 }
@@ -272,7 +279,7 @@ fn merge_digests_request_to_digest(
       .merge(digests.map_err(|e| throw(&e))?)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
-    Ok(Snapshot::store_directory(&core, &digest))
+    Ok(Snapshot::store_directory_digest(&core, &digest))
   }
   .boxed()
 }
@@ -284,8 +291,8 @@ fn download_file_to_digest(
   let core = context.core.clone();
   async move {
     let key = externs::acquire_key_for(args.pop().unwrap())?;
-    let snapshot = context.get(DownloadedFile(key)).await?;
-    Ok(Snapshot::store_directory(&core, &snapshot.digest))
+    let digest = context.get(DownloadedFile(key)).await?;
+    Ok(Snapshot::store_directory_digest(&core, &digest))
   }
   .boxed()
 }
@@ -298,7 +305,20 @@ fn path_globs_to_digest(
   async move {
     let key = externs::acquire_key_for(args.pop().unwrap())?;
     let digest = context.get(Snapshot(key)).await?;
-    Ok(Snapshot::store_directory(&core, &digest))
+    Ok(Snapshot::store_directory_digest(&core, &digest))
+  }
+  .boxed()
+}
+
+fn path_globs_to_file_listing(
+  context: Context,
+  mut args: Vec<Value>,
+) -> BoxFuture<'static, NodeResult<Value>> {
+  let core = context.core.clone();
+  async move {
+    let key = externs::acquire_key_for(args.pop().unwrap())?;
+    let file_listing = context.get(FileListing(key)).await?;
+    FileListing::store_file_listing(&core, &file_listing).map_err(|e: String| throw(&e))
   }
   .boxed()
 }
@@ -336,7 +356,7 @@ fn create_digest_to_digest(
       .merge(digests)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
-    Ok(Snapshot::store_directory(&context.core, &digest))
+    Ok(Snapshot::store_directory_digest(&context.core, &digest))
   }
   .boxed()
 }
@@ -357,7 +377,7 @@ fn digest_subset_to_digest(
       .subset(original_digest, subset_params)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
-    Ok(Snapshot::store_directory(&context.core, &digest))
+    Ok(Snapshot::store_directory_digest(&context.core, &digest))
   }
   .boxed()
 }

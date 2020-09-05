@@ -406,6 +406,7 @@ py_class!(class PyTypes |py| {
       _cls,
       directory_digest: PyType,
       snapshot: PyType,
+      file_listing: PyType,
       file_content: PyType,
       digest_contents: PyType,
       address: PyType,
@@ -434,6 +435,7 @@ py_class!(class PyTypes |py| {
         RefCell::new(Some(Types {
         directory_digest: externs::type_for(directory_digest),
         snapshot: externs::type_for(snapshot),
+        file_listing: externs::type_for(file_listing),
         file_content: externs::type_for(file_content),
         digest_contents: externs::type_for(digest_contents),
         address: externs::type_for(address),
@@ -892,14 +894,14 @@ async fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResul
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stdout_digest"),
-      crate::nodes::Snapshot::store_directory(core, stdout_digest),
+      crate::nodes::Snapshot::store_directory_digest(core, stdout_digest),
     ));
   }
 
   if let Some(stderr_digest) = &workunit.metadata.stderr.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stderr_digest"),
-      crate::nodes::Snapshot::store_directory(core, stderr_digest),
+      crate::nodes::Snapshot::store_directory_digest(core, stderr_digest),
     ));
   }
 
@@ -1459,7 +1461,7 @@ fn merge_directories(
           .core
           .executor
           .block_on(scheduler.core.store().merge(digests))
-          .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir).into())
+          .map(|dir| nodes::Snapshot::store_directory_digest(&scheduler.core, &dir).into())
           .map_err(|e| format!("{:?}", e))
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))

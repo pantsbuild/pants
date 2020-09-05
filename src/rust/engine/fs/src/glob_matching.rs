@@ -359,15 +359,19 @@ pub trait GlobMatching<E: Display + Send + Sync + 'static>: VFS<E> {
   ///
   /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand).
   ///
-  async fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> Result<Option<PathStat>, E> {
-    GlobMatchingImplementation::canonicalize(self, symbolic_path, link).await
+  async fn canonicalize_link(
+    &self,
+    symbolic_path: PathBuf,
+    link: Link,
+  ) -> Result<Option<PathStat>, E> {
+    GlobMatchingImplementation::canonicalize_link(self, symbolic_path, link).await
   }
 
   ///
   /// Recursively expands PathGlobs into PathStats while applying excludes.
   ///
-  async fn expand(&self, path_globs: PreparedPathGlobs) -> Result<Vec<PathStat>, E> {
-    GlobMatchingImplementation::expand(self, path_globs).await
+  async fn expand_globs(&self, path_globs: PreparedPathGlobs) -> Result<Vec<PathStat>, E> {
+    GlobMatchingImplementation::expand_globs(self, path_globs).await
   }
 }
 
@@ -420,7 +424,11 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
               Ok(None)
             } else {
               match stat {
-                Stat::Link(l) => context.canonicalize(stat_symbolic_path, l.clone()).await,
+                Stat::Link(l) => {
+                  context
+                    .canonicalize_link(stat_symbolic_path, l.clone())
+                    .await
+                }
                 Stat::Dir(d) => Ok(Some(PathStat::dir(stat_symbolic_path, d.clone()))),
                 Stat::File(f) => Ok(Some(PathStat::file(stat_symbolic_path, f.clone()))),
               }
@@ -434,7 +442,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
     Ok(path_stats.into_iter().filter_map(|pso| pso).collect())
   }
 
-  async fn expand(&self, path_globs: PreparedPathGlobs) -> Result<Vec<PathStat>, E> {
+  async fn expand_globs(&self, path_globs: PreparedPathGlobs) -> Result<Vec<PathStat>, E> {
     let PreparedPathGlobs {
       include,
       exclude,
@@ -632,7 +640,11 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
     Ok(child_matches.into_iter().any(|m| m))
   }
 
-  async fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> Result<Option<PathStat>, E> {
+  async fn canonicalize_link(
+    &self,
+    symbolic_path: PathBuf,
+    link: Link,
+  ) -> Result<Option<PathStat>, E> {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
     let context = self.clone();
     // If the link destination can't be parsed as PathGlob(s), it is broken.
@@ -649,7 +661,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
     let path_globs =
       PreparedPathGlobs::from_globs(link_globs).map_err(|e| Self::mk_error(e.as_str()))?;
     let mut path_stats = context
-      .expand(path_globs)
+      .expand_globs(path_globs)
       .map_err(move |e| Self::mk_error(&format!("While expanding link {:?}: {}", link.0, e)))
       .await?;
 
