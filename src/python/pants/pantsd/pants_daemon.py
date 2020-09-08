@@ -15,7 +15,12 @@ from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
 from pants.init.engine_initializer import GraphScheduler
-from pants.init.logging import clear_logging_handlers, init_rust_logger, setup_logging_to_file
+from pants.init.logging import (
+    clear_logging_handlers,
+    init_rust_logger,
+    setup_logging_to_file,
+    setup_warning_filtering,
+)
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
@@ -87,11 +92,14 @@ class PantsDaemon(PantsDaemonProcessManager):
 
     @classmethod
     def create(cls, options_bootstrapper: OptionsBootstrapper) -> "PantsDaemon":
-        native = Native()
-        native.override_thread_logging_destination_to_just_pantsd()
 
         bootstrap_options = options_bootstrapper.bootstrap_options
         bootstrap_options_values = bootstrap_options.for_global_scope()
+
+        setup_warning_filtering(bootstrap_options_values.ignore_pants_warnings or [])
+
+        native = Native()
+        native.override_thread_logging_destination_to_just_pantsd()
 
         core = PantsDaemonCore(cls._setup_services)
 
@@ -217,12 +225,9 @@ class PantsDaemon(PantsDaemonProcessManager):
             )
 
             level = self._log_level
-            ignores = self._bootstrap_options.for_global_scope().ignore_pants_warnings
             clear_logging_handlers()
             log_dir = os.path.join(self._work_dir, self.name)
-            log_handler = setup_logging_to_file(
-                level, log_dir=log_dir, log_filename=self.LOG_NAME, warnings_filter_regexes=ignores
-            )
+            log_handler = setup_logging_to_file(level, log_dir=log_dir, log_filename=self.LOG_NAME)
 
             self._native.override_thread_logging_destination_to_just_pantsd()
 
