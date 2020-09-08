@@ -79,11 +79,11 @@ struct ParamsLabeled<R: Rule> {
 }
 
 impl<R: Rule> ParamsLabeled<R> {
-  fn new(node: Node<R>) -> ParamsLabeled<R> {
+  fn new(node: Node<R>, out_set: ParamTypes<R::TypeId>) -> ParamsLabeled<R> {
     ParamsLabeled {
       node,
       in_set: ParamTypes::new(),
-      out_set: ParamTypes::new(),
+      out_set,
     }
   }
 }
@@ -159,8 +159,12 @@ enum EdgePrunedReason {
   SmallerParamSetAvailable,
 }
 
-type Graph<R> = DiGraph<Node<R>, <R as Rule>::DependencyKey, u32>;
+// A node labeled with an out_set.
+type Graph<R> =
+  DiGraph<(Node<R>, ParamTypes<<R as Rule>::TypeId>), <R as Rule>::DependencyKey, u32>;
+// A node labeled with both an out_set and in_set.
 type ParamsLabeledGraph<R> = DiGraph<ParamsLabeled<R>, <R as Rule>::DependencyKey, u32>;
+// A node labeled with both an out_set and in_set, and possibly marked deleted.
 type MonomorphizedGraph<R> = DiGraph<
   MaybeDeleted<ParamsLabeled<R>, NodePrunedReason>,
   MaybeDeleted<<R as Rule>::DependencyKey, EdgePrunedReason>,
@@ -229,105 +233,193 @@ impl<R: Rule> Builder<R> {
   fn initial_polymorphic(&self) -> Result<Graph<R>, String> {
     let mut graph: Graph<R> = DiGraph::new();
 
-    // Initialize the graph with nodes for all Queries, Rules, and Params.
+    // Initialize the graph with nodes for Queries and Params
     let queries = self
       .queries
       .iter()
-      .map(|query| (query, graph.add_node(Node::Query(query.clone()))))
-      .collect::<HashMap<_, _>>();
-    let rules = self
-      .rules
-      .values()
-      .flatten()
-      .cloned()
-      .map(|rule| (rule.clone(), graph.add_node(Node::Rule(rule))))
+      .map(|query| {
+        (
+          query,
+          graph.add_node((
+            Node::Query(query.clone()),
+            query.params.iter().cloned().collect(),
+          )),
+        )
+      })
       .collect::<HashMap<_, _>>();
     let params = self
       .params
       .iter()
       .cloned()
-      .map(|param| (param, graph.add_node(Node::Param(param))))
+      .map(|param| {
+        (
+          param,
+          graph.add_node((Node::Param(param), ParamTypes::new())),
+        )
+      })
       .collect::<HashMap<_, _>>();
 
+    // Rules are created on the fly based on the out_set of dependees.
+    let mut rules: HashMap<(R, ParamTypes<R::TypeId>), NodeIndex<u32>> = HashMap::new();
+    let mut satisfiable_nodes: HashSet<Node<R>> = HashSet::new();
+    let mut unsatisfiable_nodes: HashMap<NodeIndex<u32>, Vec<R::DependencyKey>> = HashMap::new();
+
     // Starting from Queries, visit all reachable nodes in the graph.
-    let mut visited = graph.visit_map();
+    let mut visited = HashSet::new();
     let mut to_visit = queries.values().cloned().collect::<Vec<_>>();
+    let mut iteration = 0;
     while let Some(node_id) = to_visit.pop() {
       if !visited.visit(node_id) {
         continue;
       }
-
-      // Visit the dependency keys of the node (if it has any).
-      for dependency_key in graph[node_id].dependency_keys() {
-        let mut matched = false;
-
-        // If the Params can provide the type directly, add that.
-        if dependency_key.provided_param().is_none()
-          && params.contains_key(&dependency_key.product())
-        {
-          graph.add_edge(
-            node_id,
-            *params.get(&dependency_key.product()).unwrap(),
-            dependency_key,
-          );
-          matched = true;
-        }
-        // If there are any rules which can produce the desired type, add them.
-        for rule in self
-          .rules
-          .get(&dependency_key.product())
-          .cloned()
-          .unwrap_or_else(Vec::new)
-        {
-          let rule_id = rules.get(&rule).unwrap();
-          graph.add_edge(node_id, *rule_id, dependency_key);
-          to_visit.push(*rule_id);
-          matched = true
-        }
-
-        if !matched {
-          let root_hint = if dependency_key.provided_param().is_none() {
-            "\nIf rather than being computed by a rule, that type should be provided \
-              from outside the rule graph, consider adding it as an input for the relevant QueryRule."
-          } else {
-            ""
-          };
-          return Err(format!(
-              "No installed rules return the type {}: Is the rule that you're expecting to run registered?{}",
-              dependency_key.product(),
-              root_hint,
-          ));
-        }
-      }
-    }
-
-    if log::log_enabled!(log::Level::Debug) {
-      for scc in petgraph::algo::kosaraju_scc(&graph) {
-        // Each strongly connected component containing more than one node represents a loop.
-        if scc.len() < 2 {
-          continue;
-        }
-
-        let loop_members = scc.into_iter().collect::<HashSet<_>>();
-        let sccgraph = graph.filter_map(
-          |node_id, node| {
-            if loop_members.contains(&node_id) {
-              Some(node.clone())
-            } else {
-              None
-            }
-          },
-          |_, edge_weight| Some(*edge_weight),
-        );
-
+      iteration += 1;
+      if iteration % 1000 == 0 {
         log::debug!(
-          "// strongly connected component:\n{}",
-          petgraph::dot::Dot::with_config(&sccgraph, &[])
+          "initial_polymorphic iteration {}: {} nodes",
+          iteration,
+          graph.node_count()
         );
+      }
+
+      // Collect the candidates that might satisfy the dependency keys of the node (if it has any).
+      let candidates_by_key = graph[node_id]
+        .0
+        .dependency_keys()
+        .into_iter()
+        .map(|dependency_key| {
+          let mut candidates = Vec::new();
+          if dependency_key.provided_param().is_none()
+            && graph[node_id].1.contains(&dependency_key.product())
+          {
+            candidates.push(Node::Param(dependency_key.product()));
+          }
+
+          if let Some(rules) = self.rules.get(&dependency_key.product()) {
+            candidates.extend(rules.iter().map(|r| Node::Rule(r.clone())));
+          };
+
+          (dependency_key, candidates)
+        })
+        .collect::<HashMap<_, _>>();
+
+      // If any dependency keys could not be satisfied, continue.
+      let unsatisfiable_keys = candidates_by_key
+        .iter()
+        .filter_map(|(dependency_key, candidates)| {
+          if candidates.is_empty() {
+            Some(*dependency_key)
+          } else {
+            None
+          }
+        })
+        .collect::<Vec<_>>();
+      if !unsatisfiable_keys.is_empty() {
+        unsatisfiable_nodes.insert(node_id, unsatisfiable_keys);
+        continue;
+      }
+
+      // Determine which Params are unambiguously consumed by this node: we eagerly remove them
+      // from the out_set of all other dependencies to shrink the total number of unique nodes
+      // created during this phase. The rest will be chosen during monomorphize, where the out_set
+      // shrinks further.
+      let consumed_from_out_set = candidates_by_key
+        .values()
+        .filter_map(|candidates| {
+          if candidates.len() != 1 {
+            None
+          } else if let Node::Param(p) = candidates[0] {
+            Some(p)
+          } else {
+            None
+          }
+        })
+        .collect::<HashSet<_>>();
+
+      // Create nodes for each of the candidates using the computed out_set.
+      let out_set = graph[node_id]
+        .1
+        .iter()
+        .filter(|p| !consumed_from_out_set.contains(p))
+        .cloned()
+        .collect::<ParamTypes<_>>();
+      for (dependency_key, candidates) in candidates_by_key {
+        for candidate in candidates {
+          match candidate {
+            Node::Param(_) => {
+              graph.add_edge(
+                node_id,
+                *params.get(&dependency_key.product()).unwrap(),
+                dependency_key,
+              );
+            }
+            Node::Rule(rule) => {
+              // If the key provides a Param for the Rule to consume, include it in the out_set for
+              // the dependency node.
+              let out_set = if let Some(provided_param) = dependency_key.provided_param() {
+                let mut out_set = out_set.clone();
+                out_set.insert(provided_param);
+                out_set
+              } else {
+                out_set.clone()
+              };
+              let rule_id = rules
+                .entry((rule.clone(), out_set.clone()))
+                .or_insert_with(|| graph.add_node((Node::Rule(rule.clone()), out_set)));
+              graph.add_edge(node_id, *rule_id, dependency_key);
+              to_visit.push(*rule_id);
+            }
+            Node::Query(_) => unreachable!("A Query may not be a dependency."),
+          }
+        }
+      }
+
+      satisfiable_nodes.insert(graph[node_id].0.clone());
+    }
+
+    // If any Rules had unsatisfiable copies but no satisfiable copies, error eagerly.
+    // TODO: Render all of these in a flat list.
+    for (node_id, dependency_keys) in &unsatisfiable_nodes {
+      let (node, out_set) = &graph[*node_id];
+      if satisfiable_nodes.contains(node) {
+        continue;
+      }
+
+      for dependency_key in dependency_keys {
+        log::debug!(
+          "no source of {} for {} with {}",
+          dependency_key,
+          node,
+          params_str(&out_set),
+        );
+        let root_hint = if dependency_key.provided_param().is_none() {
+          "\nIf rather than being computed by a rule, that type should be provided \
+            from outside the rule graph, consider adding it as an input for the relevant QueryRule."
+        } else {
+          ""
+        };
+        // TODO: This needs clarifying, because it's now context specific: it might also be because
+        // the out_set of the dependee did not provide the type.
+        return Err(format!(
+            "No installed rules return the type {}: Is the rule that you're expecting to run registered?{}",
+            dependency_key.product(),
+            root_hint,
+        ));
       }
     }
 
-    Ok(graph)
+    // Remove all unsatisfiable nodes.
+    // TODO: Should maybe preserve these as MaybeDeleted for the purposes of error messages, in
+    // case a rule that should have been used was eliminated due to the lack of a Param.
+    Ok(graph.filter_map(
+      |node_id, node| {
+        if !unsatisfiable_nodes.contains_key(&node_id) {
+          Some(node.clone())
+        } else {
+          None
+        }
+      },
+      |_, edge_weight| Some(*edge_weight),
+    ))
   }
 
   ///
@@ -572,24 +664,15 @@ impl<R: Rule> Builder<R> {
       // create, and the dependees and dependencies to give it (respectively).
       let mut monomorphizations = HashMap::new();
       for (out_set, dependees) in dependees_by_out_set {
-        for (in_set, dependencies) in Self::monomorphizations(
+        for (node, dependencies) in Self::monomorphizations(
           &graph,
           node_id,
           out_set.clone(),
           &minimal_in_set,
           &dependencies_by_key,
         ) {
-          // Add this set of dependees and dependencies to the relevant output node.
-          let key = ParamsLabeled {
-            node: node.node.clone(),
-            in_set: in_set.clone(),
-            // NB: See the method doc. Although our dependees could technically still provide a
-            // larger set of params, anything not in the in_set is not consumed in this subgraph,
-            // and the out_set shrinks correspondingly to avoid creating redundant nodes.
-            out_set: out_set.intersection(&in_set).cloned().collect(),
-          };
           let entry = monomorphizations
-            .entry(key.clone())
+            .entry(node)
             .or_insert_with(|| (HashSet::new(), HashSet::new()));
           entry.0.extend(dependees.iter().cloned());
           entry.1.extend(dependencies);
@@ -815,30 +898,28 @@ impl<R: Rule> Builder<R> {
   }
 
   ///
-  /// Execute live variable analysis to determine which Params are used and provided by each node.
+  /// Execute live variable analysis to determine which Params are used by each node.
   ///
   /// See https://en.wikipedia.org/wiki/Live_variable_analysis
   ///
   fn live_param_labeled_graph(&self, graph: Graph<R>) -> ParamsLabeledGraph<R> {
-    // Add in and out sets for each node, with all sets empty initially.
+    // Add in_sets for each node, with all sets empty initially.
     let mut graph: ParamsLabeledGraph<R> = graph.map(
-      |_node_id, node| ParamsLabeled::new(node.clone()),
+      |_node_id, node| ParamsLabeled::new(node.0.clone(), node.1.clone()),
       |_edge_id, edge_weight| *edge_weight,
     );
 
     // Because the leaves of the graph (generally Param nodes) are the most significant source of
     // information, we start there. But we will eventually visit all reachable nodes, possibly
-    // multiple times. Information flows both up (the in_sets) and down (the out_sets) this
-    // graph.
+    // multiple times. Information flows up (the in_sets) this graph.
     let mut to_visit = graph
       .externals(Direction::Outgoing)
       .collect::<VecDeque<_>>();
     while let Some(node_id) = to_visit.pop_front() {
-      let (new_in_set, new_out_set) = match &graph[node_id].node {
+      let new_in_set = match &graph[node_id].node {
         Node::Rule(_) => {
-          // Rules have in_sets computed from their dependencies, and out_sets computed from their
-          // dependees and any provided params.
-          let in_set = Self::dependencies_in_set(
+          // Rules have in_sets computed from their dependencies.
+          Some(Self::dependencies_in_set(
             node_id,
             graph
               .edges_directed(node_id, Direction::Outgoing)
@@ -849,23 +930,15 @@ impl<R: Rule> Builder<R> {
                   &graph[edge_ref.target()].in_set,
                 )
               }),
-          );
-          let out_set = Self::dependees_out_set(
-            &graph,
-            node_id,
-            graph
-              .edges_directed(node_id, Direction::Incoming)
-              .map(|edge_ref| (*edge_ref.weight(), edge_ref.source())),
-          );
-          (Some(in_set), Some(out_set))
+          ))
         }
         Node::Param(p) => {
           // Params are always leaves with an in-set of their own value, and no out-set.
           let mut in_set = ParamTypes::new();
           in_set.insert(*p);
-          (Some(in_set), None)
+          Some(in_set)
         }
-        Node::Query(q) => {
+        Node::Query(_) => {
           // Queries are always roots which declare some parameters.
           let in_set = Self::dependencies_in_set(
             node_id,
@@ -879,7 +952,7 @@ impl<R: Rule> Builder<R> {
                 )
               }),
           );
-          (Some(in_set), Some(q.params.clone()))
+          Some(in_set)
         }
       };
 
@@ -887,13 +960,6 @@ impl<R: Rule> Builder<R> {
         if in_set != graph[node_id].in_set {
           to_visit.extend(graph.neighbors_directed(node_id, Direction::Incoming));
           graph[node_id].in_set = in_set;
-        }
-      }
-
-      if let Some(out_set) = new_out_set {
-        if out_set != graph[node_id].out_set {
-          to_visit.extend(graph.neighbors_directed(node_id, Direction::Outgoing));
-          graph[node_id].out_set = out_set;
         }
       }
     }
@@ -1133,8 +1199,11 @@ impl<R: Rule> Builder<R> {
   /// Takes a Graph that has been pruned to eliminate unambiguous choices: any duplicate edges at
   /// this point are errors.
   ///
-  fn finalize(self, pruned_graph: ParamsLabeledGraph<R>) -> Result<RuleGraph<R>, String> {
-    let graph = pruned_graph;
+  fn finalize(self, graph: ParamsLabeledGraph<R>) -> Result<RuleGraph<R>, String> {
+    log::debug!(
+      "// finalizing with:\n{}",
+      petgraph::dot::Dot::with_config(&graph, &[])
+    );
 
     let entry_for = |node_id| -> Entry<R> {
       let ParamsLabeled { node, in_set, .. }: &ParamsLabeled<R> = &graph[node_id];
@@ -1290,33 +1359,6 @@ impl<R: Rule> Builder<R> {
   }
 
   ///
-  /// Calculates the out_set required to satisfy the given set of dependee edges.
-  ///
-  fn dependees_out_set(
-    graph: &ParamsLabeledGraph<R>,
-    node_id: NodeIndex<u32>,
-    dependee_edges: impl Iterator<Item = (R::DependencyKey, NodeIndex<u32>)>,
-  ) -> ParamTypes<R::TypeId> {
-    // Union the out_sets of our dependees, plus any Params "provided" (ie "declared variables"
-    // in the context of live variable analysis) by the relevant DependencyKeys.
-    let mut out_set = ParamTypes::new();
-    for (dependency_key, dependee_id) in dependee_edges {
-      if dependee_id == node_id {
-        // A self-edge to this node does not contribute Params to its out_set: see the reasoning
-        // in `Self::dependencies_in_set`.
-        continue;
-      }
-
-      out_set.extend(graph[dependee_id].out_set.iter().cloned());
-      if let Some(p) = dependency_key.provided_param() {
-        // If the DependencyKey "provides" the Param, it is added to our out_set as well.
-        out_set.insert(p);
-      }
-    }
-    out_set
-  }
-
-  ///
   /// Given a node and a mapping of all legal sources of each of its dependencies, generates a
   /// simplified node for each legal set.
   ///
@@ -1338,7 +1380,7 @@ impl<R: Rule> Builder<R> {
     out_set: ParamTypes<R::TypeId>,
     minimal_in_set: &HashSet<NodeIndex<u32>>,
     deps: &[Vec<(R::DependencyKey, NodeIndex<u32>)>],
-  ) -> HashMap<ParamTypes<R::TypeId>, HashSet<(R::DependencyKey, NodeIndex<u32>)>> {
+  ) -> HashMap<ParamsLabeled<R>, HashSet<(R::DependencyKey, NodeIndex<u32>)>> {
     let mut combinations = HashMap::new();
 
     // We start by computing per-dependency in_sets, and filtering out dependencies that will be
@@ -1348,10 +1390,15 @@ impl<R: Rule> Builder<R> {
       .map(|choices| {
         choices
           .iter()
-          .filter_map(|(dependency_key, dependency_id)| {
-            // NB: We cannot filter provided params here, because we don't know yet what the computed
-            // in_set will be if this edge represents a self-edge.
-
+          .filter(|(_, dependency_id)| {
+            // If the candidate is a Param, it must be present in the out_set.
+            if let Node::Param(ref p) = graph[*dependency_id].0.node {
+              out_set.contains(p)
+            } else {
+              true
+            }
+          })
+          .map(|(dependency_key, dependency_id)| {
             let dependency_in_set = Self::dependency_in_set(
               node_id,
               &dependency_key,
@@ -1359,19 +1406,7 @@ impl<R: Rule> Builder<R> {
               &graph[*dependency_id].0.in_set,
             )
             .collect::<ParamTypes<_>>();
-
-            // If the dependency's in_set is minimal, we can eliminate the dependency if the
-            // out_set we're generating is missing any of the Params from the in_set. If it's
-            // not minimal, then it might shrink further in the future, and so we cannot eliminate
-            // it quite yet.
-            if minimal_in_set.contains(&dependency_id)
-              && dependency_in_set.difference(&out_set).next().is_some()
-            {
-              // The in_set contained a requirement not present in the out_set.
-              None
-            } else {
-              Some((*dependency_key, *dependency_id, dependency_in_set))
-            }
+            (*dependency_key, *dependency_id, dependency_in_set)
           })
           .collect()
       })
@@ -1387,8 +1422,8 @@ impl<R: Rule> Builder<R> {
           in_set
         });
 
-      // Confirm that this combination of deps is satisfiable.
-      let satisfiable = combination
+      // Confirm that this combination of deps is satisfiable in terms of the in_set.
+      let in_set_satisfiable = combination
         .iter()
         .all(|(dependency_key, dependency_id, _)| {
           let dependency_in_set = if *dependency_id == node_id {
@@ -1404,13 +1439,54 @@ impl<R: Rule> Builder<R> {
             .map(|p| dependency_in_set.contains(&p))
             .unwrap_or(true)
         });
-      if !satisfiable {
+      if !in_set_satisfiable {
+        continue;
+      }
+
+      // Compute the out_set for this combination: any Params that are consumed here are removed
+      // from the out_set that Rule dependencies will be allowed to consume. Params that weren't
+      // present in the out_set were already filtered near the top of this method.
+      let out_set = {
+        let consumed_by_params = combination
+          .iter()
+          .filter_map(|(_, dependency_id, _)| match graph[*dependency_id].0.node {
+            Node::Param(p) => Some(p),
+            _ => None,
+          })
+          .collect::<ParamTypes<_>>();
+
+        out_set
+          .difference(&consumed_by_params)
+          .cloned()
+          .collect::<ParamTypes<R::TypeId>>()
+      };
+
+      // We can eliminate this candidate if any dependencies have minimal in_sets which contain
+      // values not present in the computed out_set (meaning that they consume a Param that isn't
+      // in scope). If their in_sets are not minimal, then they might shrink further in the future,
+      // and so we cannot eliminate them quite yet.
+      let out_set_satisfiable = combination
+        .iter()
+        .all(|(dk, dependency_id, dependency_in_set)| {
+          matches!(graph[*dependency_id].0.node, Node::Param(_))
+            || !minimal_in_set.contains(&dependency_id)
+            || dependency_in_set.difference(&out_set).next().is_none()
+        });
+      if !out_set_satisfiable {
         continue;
       }
 
       // If we've made it this far, we're worth recording. Huzzah!
+      let entry = ParamsLabeled {
+        node: graph[node_id].0.node.clone(),
+        in_set: in_set.clone(),
+        // NB: See the method doc. Although our dependees could technically still provide a
+        // larger set of params, anything not in the in_set is not consumed in this subgraph,
+        // and the out_set shrinks correspondingly to avoid creating redundant nodes.
+        out_set: out_set.intersection(&in_set).cloned().collect(),
+      };
       combinations
-        .entry(in_set)
+        .entry(entry)
         .or_insert_with(HashSet::new)
         .extend(combination.into_iter().map(|(dk, di, _)| (*dk, *di)));
     }

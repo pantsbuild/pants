@@ -73,7 +73,7 @@ fn ambiguity() {
 }
 
 #[test]
-fn nested_basic() {
+fn nested_single() {
   let rules = vec![
     Rule("a", "a_from_b", vec![DependencyKey("b", Some("c"))]),
     Rule(
@@ -215,10 +215,8 @@ fn natural_loop() {
   graph.find_root_edges(vec!["D"], "A").unwrap();
 }
 
-/// TODO: Possibly related to https://github.com/pantsbuild/pants/issues/10683.
-#[ignore]
 #[test]
-fn wide_cycle() {
+fn multi_path_cycle() {
   let _logger = env_logger::try_init();
   let rules = vec![
     Rule(
@@ -276,6 +274,7 @@ fn mutual_recursion() {
 
 #[test]
 fn wide() {
+  let _logger = env_logger::try_init();
   let rules = vec![
     Rule("Output", "one", vec![DependencyKey("Output", Some("A"))]),
     Rule(
