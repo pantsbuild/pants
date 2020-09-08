@@ -3,8 +3,8 @@
 
 import pytest
 
-from pants.backend.project_info import cloc
-from pants.backend.project_info.cloc import CountLinesOfCode
+from pants.backend.project_info import count_loc
+from pants.backend.project_info.count_loc import CountLinesOfCode
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.util_rules import external_tool
 from pants.engine.target import Sources, Target
@@ -23,7 +23,8 @@ class ElixirTarget(Target):
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*cloc.rules(), *external_tool.rules()], target_types=[PythonLibrary, ElixirTarget]
+        rules=[*count_loc.rules(), *external_tool.rules()],
+        target_types=[PythonLibrary, ElixirTarget],
     )
 
 
@@ -46,7 +47,7 @@ def assert_counts(
     assert code == int(fields[5])
 
 
-def test_cloc(rule_runner: RuleRunner) -> None:
+def test_count_loc(rule_runner: RuleRunner) -> None:
     py_dir = "src/py/foo"
     rule_runner.create_file(
         f"{py_dir}/foo.py", '# A comment.\n\nprint("some code")\n# Another comment.'

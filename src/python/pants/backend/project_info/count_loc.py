@@ -20,11 +20,10 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-class ClocBinary(ExternalTool):
-    """The SCC lines-of-code counter (https://github.com/boyter/scc)."""
+class SuccinctCodeCounter(ExternalTool):
+    """The Succinct Code Counter (https://github.com/boyter/scc)."""
 
-    options_scope = "cloc-binary"
-    name = "cloc"
+    options_scope = "succinct-code-counter"
     default_version = "2.12.0"
     default_known_versions = [
         "2.12.0|darwin|70b7002cd1e4541cb37b7b9cbc0eeedd13ceacb49628e82ab46332bb2e65a5a6|1842530",
@@ -43,33 +42,21 @@ class ClocBinary(ExternalTool):
 
 
 class CountLinesOfCodeSubsystem(GoalSubsystem):
-    """Count lines of code using the SCC program (https://github.com/boyter/scc)."""
+    """Count lines of code using Succinct Code Counter (https://github.com/boyter/scc)."""
 
-    name = "cloc"
+    name = "count-loc"
 
     @classmethod
     def register_options(cls, register) -> None:
         super().register_options(register)
-        register(
-            "--ignored",
-            type=bool,
-            default=False,
-            help="Show information about files ignored by cloc.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "This option no longer does anything, as we switched the cloc implementation from "
-                "the `cloc` Perl script to SCC (Succinct Code Counter). Instead, use "
-                "`--cloc-args='-v'` to see what SCC skips."
-            ),
-        )
         register(
             "--args",
             type=list,
             member_type=shell_str,
             passthrough=True,
             help=(
-                'Arguments to pass directly to SCC, e.g. `--cloc-args="--no-cocomo"`. Refer to '
-                "https://github.com/boyter/scc."
+                'Arguments to pass directly to SCC, e.g. `--count-loc-args="--no-cocomo"`. Refer '
+                "to https://github.com/boyter/scc."
             ),
         )
 
@@ -83,17 +70,19 @@ class CountLinesOfCode(Goal):
 
 
 @goal_rule
-async def run_cloc(
+async def count_loc(
     console: Console,
-    cloc_subsystem: CountLinesOfCodeSubsystem,
-    cloc_binary: ClocBinary,
+    count_loc_subsystem: CountLinesOfCodeSubsystem,
+    succinct_code_counter: SuccinctCodeCounter,
     sources_snapshot: SourcesSnapshot,
 ) -> CountLinesOfCode:
     if not sources_snapshot.snapshot.files:
         return CountLinesOfCode(exit_code=0)
 
     scc_program = await Get(
-        DownloadedExternalTool, ExternalToolRequest, cloc_binary.get_request(Platform.current)
+        DownloadedExternalTool,
+        ExternalToolRequest,
+        succinct_code_counter.get_request(Platform.current),
     )
     input_digest = await Get(
         Digest, MergeDigests((scc_program.digest, sources_snapshot.snapshot.digest))
@@ -101,7 +90,7 @@ async def run_cloc(
     result = await Get(
         ProcessResult,
         Process(
-            argv=(scc_program.exe, *cloc_subsystem.args),
+            argv=(scc_program.exe, *count_loc_subsystem.args),
             input_digest=input_digest,
             description=(
                 f"Count lines of code for {pluralize(len(sources_snapshot.snapshot.files), 'file')}"
