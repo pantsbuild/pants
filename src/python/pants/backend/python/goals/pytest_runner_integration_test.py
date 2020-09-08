@@ -10,12 +10,19 @@ from typing import List, Optional
 import pytest
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import pytest_runner
+from pants.backend.python.goals import create_python_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_coverage_config
 from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
+from pants.backend.python.target_types import (
+    PythonBinary,
+    PythonLibrary,
+    PythonRequirementLibrary,
+    PythonTests,
+)
 from pants.backend.python.util_rules import pex_from_targets
+from pants.core.goals import binary
 from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
+from pants.core.util_rules import distdir
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
@@ -35,13 +42,16 @@ def rule_runner() -> RuleRunner:
             *pytest_runner.rules(),
             *pex_from_targets.rules(),
             *dependency_inference_rules.rules(),  # For conftest detection.
+            *distdir.rules(),
+            *binary.rules(),
+            *create_python_binary.rules(),
             get_filtered_environment,
             QueryRule(TestResult, (PythonTestFieldSet, OptionsBootstrapper, PantsEnvironment)),
             QueryRule(
                 TestDebugRequest, (PythonTestFieldSet, OptionsBootstrapper, PantsEnvironment)
             ),
         ],
-        target_types=[PythonLibrary, PythonTests, PythonRequirementLibrary],
+        target_types=[PythonBinary, PythonLibrary, PythonTests, PythonRequirementLibrary],
     )
 
 
@@ -51,6 +61,7 @@ GOOD_SOURCE = FileContent(f"{PACKAGE}/test_good.py", b"def test():\n  pass\n")
 BAD_SOURCE = FileContent(f"{PACKAGE}/test_bad.py", b"def test():\n  assert False\n")
 PY3_ONLY_SOURCE = FileContent(f"{PACKAGE}/test_py3.py", b"def test() -> None:\n  pass\n")
 LIBRARY_SOURCE = FileContent(f"{PACKAGE}/library.py", b"def add_two(x):\n  return x + 2\n")
+BINARY_SOURCE = FileContent(f"{PACKAGE}/say_hello.py", b"print('Hello, test!')")
 
 
 def create_python_library(
@@ -103,6 +114,21 @@ def create_test_target(
     tgt = rule_runner.get_target(Address(PACKAGE, target_name=name))
     assert isinstance(tgt, PythonTests)
     return tgt
+
+
+def create_python_binary_target(rule_runner: RuleRunner, source_file: FileContent) -> None:
+    rule_runner.create_file(source_file.path, source_file.content.decode())
+    rule_runner.add_to_build_file(
+        relpath=PACKAGE,
+        target=dedent(
+            f"""\
+            python_binary(
+              name='bin',
+              sources=['{PurePath(source_file.path).name}'],
+            )
+            """
+        ),
+    )
 
 
 def setup_thirdparty_dep(rule_runner: RuleRunner) -> None:
@@ -417,4 +443,23 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
     mock_env = PantsEnvironment({"OTHER_VAR": "other_value"})
     extra_env_vars = '["SOME_VAR=some_value", "OTHER_VAR"]'
     result = run_pytest(rule_runner, tgt, extra_env_vars=extra_env_vars, pants_environment=mock_env)
+    assert result.exit_code == 0
+
+
+def test_binary_dependency(rule_runner: RuleRunner) -> None:
+    create_python_binary_target(rule_runner, BINARY_SOURCE)
+
+    test_source = FileContent(
+        path=f"{PACKAGE}/test_binary_call.py",
+        content=dedent(
+            """\
+            import subprocess
+
+            def test_embedded_binary():
+                assert  b"Hello, test!" in subprocess.check_output(args=['./bin.pex'])
+            """
+        ).encode(),
+    )
+    tgt = create_test_target(rule_runner, [test_source], dependencies=[":bin"])
+    result = run_pytest(rule_runner, tgt, passthrough_args="-s")
     assert result.exit_code == 0

@@ -40,7 +40,7 @@ class Binary(Goal):
 
 @goal_rule
 async def create_binary(workspace: Workspace, dist_dir: DistDir) -> Binary:
-    targets_to_valid_field_sets = await Get(
+    target_roots_to_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
             BinaryFieldSet,
@@ -50,7 +50,7 @@ async def create_binary(workspace: Workspace, dist_dir: DistDir) -> Binary:
     )
     binaries = await MultiGet(
         Get(CreatedBinary, BinaryFieldSet, field_set)
-        for field_set in targets_to_valid_field_sets.field_sets
+        for field_set in target_roots_to_field_sets.field_sets
     )
     merged_snapshot = await Get(Snapshot, MergeDigests(binary.digest for binary in binaries))
     workspace.write_digest(merged_snapshot.digest, path_prefix=str(dist_dir.relpath))
