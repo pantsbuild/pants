@@ -31,6 +31,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
+from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -44,7 +45,7 @@ from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathG
 from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets
+from pants.engine.target import FieldSetsPerTarget, FieldSetsPerTargetRequest, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
@@ -163,6 +164,17 @@ async def setup_pytest_for_target(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
 
+    # Create any binaries that the test depends on (directly or indirectly).
+    # Note that these need not be Python binaries.
+    field_sets_per_target = await Get(
+        FieldSetsPerTarget,
+        FieldSetsPerTargetRequest(BinaryFieldSet, all_targets),
+    )
+    binaries = await MultiGet(
+        Get(CreatedBinary, BinaryFieldSet, field_set)
+        for field_set in field_sets_per_target.field_sets
+    )
+
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
     field_set_source_files_request = Get(
@@ -192,6 +204,7 @@ async def setup_pytest_for_target(
                 requirements_pex.digest,
                 pytest_pex.digest,
                 test_runner_pex.digest,
+                *(binary.digest for binary in binaries),
             )
         ),
     )
