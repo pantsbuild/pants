@@ -31,7 +31,7 @@
 use crate::rules::{DependencyKey, ParamTypes, Query, Rule};
 use crate::{params_str, Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, RuleGraph};
 
-use std::collections::{hash_map, BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use indexmap::IndexSet;
 use petgraph::graph::{DiGraph, EdgeReference, NodeIndex};
@@ -148,10 +148,11 @@ impl<T: std::fmt::Display, Reason: std::fmt::Debug> std::fmt::Display for MaybeD
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
 enum NodePrunedReason {
+  Ambiguous,
   Monomorphized,
   NoDependees,
-  NoValidCombinationsOfDependencies,
   NoSourceOfParam,
+  NoValidCombinationsOfDependencies,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
@@ -490,29 +491,9 @@ impl<R: Rule> Builder<R> {
       }
     };
 
-    // TODO: Unfortunately, monomorphize is not completely monotonic (for reasons I can't nail
-    // down), and so it is possible for nodes to split fruitlessly in loops, where each iteration
-    // of the loop results in identical splits of each intermediate node. We could hypothetically
-    // break these loops by shrinking the in_set/out_sets synthetically (ie: removing Params until
-    // the loop converged), but it's likely that that would result in strange error cases.
-    //
-    // Instead, we force the phase to be monotonic by recording splits that we have executed, and
-    // considering the re-execution of the same split to be a noop. If this results in a loop of
-    // nodes that cannot be further reduced, it's likely that that loop will not be the only way to
-    // satisfy a dependency: if it is, then at least we have preserved the loop for error
-    // reporting.
-    let mut splits: HashMap<ParamsLabeled<R>, Vec<HashSet<ParamsLabeled<R>>>> = HashMap::new();
-
-    // Rules are not always split in disjoint ways, so as they are further split, they might become
-    // identical to other splits. We attempt to re-join with existing identical Rule nodes to keep
-    // the node count more reasonable.
-    let mut rules: HashMap<ParamsLabeled<R>, _> = graph
-      .node_references()
-      .filter_map(|node_ref| match node_ref.weight().0.node {
-        Node::Rule(_) => Some((node_ref.weight().0.clone(), node_ref.id())),
-        _ => None,
-      })
-      .collect();
+    // If a node splits the same way multiple times without becoming minimal, we mark it ambiguous
+    // the second time.
+    let mut suspected_ambiguous = HashSet::new();
 
     let mut iteration = 0;
     let mut maybe_in_loop = HashSet::new();
@@ -581,9 +562,7 @@ impl<R: Rule> Builder<R> {
 
         // But we ensure that its out_set is accurate before continuing.
         if node.out_set != node.in_set {
-          rules.remove(&node);
           graph.node_weight_mut(node_id).unwrap().0.out_set = graph[node_id].0.in_set.clone();
-          rules.insert(graph[node_id].0.clone(), node_id);
         }
         continue;
       }
@@ -663,64 +642,44 @@ impl<R: Rule> Builder<R> {
       // disjoint in_sets, and that the in/out sets are accurate based on any transitive changes
       // above or below this node. If both of these conditions are satisified, the node is valid.
       //
-      // See the TODO on `splits`.
-      if let Some((_, dependencies)) = monomorphizations.get(&graph[node_id].0) {
-        // We generated an identical node: if there was only one output node and its dependencies were
-        // also identical, then we have nooped.
-        let original_dependencies = || {
-          graph
-            .edges_directed(node_id, Direction::Outgoing)
-            .filter_map(|edge_ref| {
-              if graph[edge_ref.target()].is_deleted() {
-                None
-              } else {
-                edge_ref.weight().inner().map(|dk| (*dk, edge_ref.target()))
-              }
-            })
-            .collect::<HashSet<_>>()
-        };
-        if monomorphizations.len() == 1 && dependencies == &original_dependencies() {
-          // This node cannot be reduced. If its dependencies had minimal in_sets, then it now also
-          // has a minimal in_set.
-          maybe_mark_minimal_in_set(&mut minimal_in_set, &graph, node_id);
-          if looping {
-            log::debug!(
-              "not able to reduce {:?}: {} (had {} monomorphizations)",
-              node_id,
-              graph[node_id],
-              monomorphizations.len()
-            );
+      // If a node splits in a way that results in an identical node once, we mark it suspected
+      // ambiguous: if it does so again, we mark it deleted as ambiguous.
+      let is_suspected_ambiguous =
+        if let Some((_, dependencies)) = monomorphizations.get(&graph[node_id].0) {
+          // We generated an identical node: if there was only one output node and its dependencies were
+          // also identical, then we have nooped.
+          let had_original_dependencies = dependencies
+            == &graph
+              .edges_directed(node_id, Direction::Outgoing)
+              .filter_map(|edge_ref| {
+                if graph[edge_ref.target()].is_deleted() {
+                  None
+                } else {
+                  edge_ref.weight().inner().map(|dk| (*dk, edge_ref.target()))
+                }
+              })
+              .collect::<HashSet<_>>();
+          if had_original_dependencies && monomorphizations.len() == 1 {
+            // This node cannot be reduced. If its dependencies had minimal in_sets, then it now also
+            // has a minimal in_set.
+            maybe_mark_minimal_in_set(&mut minimal_in_set, &graph, node_id);
+            if looping {
+              log::debug!(
+                "not able to reduce {:?}: {} (had {} monomorphizations)",
+                node_id,
+                graph[node_id],
+                monomorphizations.len()
+              );
+            }
+            continue;
           }
-          continue;
-        }
 
-        // Otherwise, see if this exact split has occurred before: if so, noop.
-        let split_output = monomorphizations.keys().cloned().collect::<HashSet<_>>();
-        if splits
-          .get(&graph[node_id].0)
-          .map(|split_outputs| split_outputs.contains(&split_output))
-          .unwrap_or(false)
-        {
-          // This exact split has been executed before: noop. See the TODO on `splits`.
-          if looping {
-            log::debug!(
-              "re-observed split:\n  {}\n  to\n  {}",
-              graph[node_id],
-              split_output
-                .iter()
-                .map(|n| n.to_string())
-                .collect::<Vec<_>>()
-                .join("\n  ")
-            );
-          }
-          continue;
-        }
-        // Else, record it for later.
-        splits
-          .entry(graph[node_id].0.clone())
-          .or_insert_with(Vec::new)
-          .push(split_output);
-      }
+          // If more than one node was generated, but one of them had the original dependencies, then
+          // the node is potentially ambiguous.
+          had_original_dependencies
+        } else {
+          false
+        };
 
       if looping {
         log::debug!("{}", debug_str);
@@ -746,22 +705,36 @@ impl<R: Rule> Builder<R> {
       }
 
       // Needs changes. Mark this node deleted.
+      let ambiguous = is_suspected_ambiguous && suspected_ambiguous.contains(&node_id);
       graph
         .node_weight_mut(node_id)
         .unwrap()
-        .mark_deleted(if !monomorphizations.is_empty() {
+        .mark_deleted(if ambiguous {
+          NodePrunedReason::Ambiguous
+        } else if !monomorphizations.is_empty() {
           NodePrunedReason::Monomorphized
         } else if had_dependees {
           NodePrunedReason::NoValidCombinationsOfDependencies
         } else {
           NodePrunedReason::NoDependees
         });
-      rules.remove(&graph[node_id].0);
       // And schedule visits for all dependees and dependencies.
       to_visit.extend(graph.neighbors_undirected(node_id));
 
       // Generate a replacement node for each monomorphization of this rule.
       for (new_node, (dependees, dependencies)) in monomorphizations {
+        let is_suspected_ambiguous_node = if is_suspected_ambiguous {
+          let is_identical = new_node == graph[node_id].0;
+          if ambiguous && is_identical {
+            // This is the identical copy of an ambiguous node: the original node has been deleted
+            // as ambiguous, and we skip creating the new copy.
+            continue;
+          }
+          is_identical
+        } else {
+          false
+        };
+
         if looping {
           log::debug!(
             "   generating {:#?}, with {} dependees and {} dependencies ({} minimal) which consumes: {:#?}",
@@ -776,67 +749,35 @@ impl<R: Rule> Builder<R> {
           );
         }
 
-        let (replacement_id, is_new_node) = match rules.entry(new_node.clone()) {
-          hash_map::Entry::Occupied(oe) => {
-            // We're adding edges to an existing node. Ensure that we visit it later to square
-            // that.
-            // NB: Because these edges do not affect the size of the in_set of this node, if it
-            // already had a minimal_in_set, it still does, despite not being monomorphic any
-            // longer.
-            let existing_id = *oe.get();
-            to_visit.insert(existing_id);
-            (existing_id, false)
-          }
-          hash_map::Entry::Vacant(ve) => {
-            let new_node_id = graph.add_node(MaybeDeleted::new(new_node));
-            (*ve.insert(new_node_id), true)
-          }
-        };
+        let replacement_id = graph.add_node(MaybeDeleted::new(new_node));
+        if is_suspected_ambiguous_node {
+          // We suspect that this node is ambiguous, but aren't sure yet: if it splits again the
+          // same way in the future, it will be deleted as ambiguous.
+          suspected_ambiguous.insert(replacement_id);
+        }
 
         if looping {
-          let keyword = if is_new_node { "creating" } else { "using" };
-          log::debug!("node: {}: {:?}", keyword, replacement_id);
+          log::debug!("node: creating: {:?}", replacement_id);
         }
 
         // Give all dependees edges to the new node.
         for (dependency_key, dependee_id) in &dependees {
-          // Add a new edge (and confirm that we're not creating a duplicate if this is not a new
-          // node).
-          let is_new_edge = || {
-            graph
-              .edges_directed(*dependee_id, Direction::Outgoing)
-              .all(|edge_ref| {
-                edge_ref.target() != replacement_id
-                  || edge_ref.weight().inner() != Some(dependency_key)
-              })
-          };
-          if is_new_node || is_new_edge() {
-            let mut edge = MaybeDeleted::new(*dependency_key);
-            if let Some(p) = dependency_key.provided_param() {
-              // NB: If the edge is invalid because it does not consume the provide param, we
-              // create it as deleted with that reason.
-              if !graph[replacement_id].0.in_set.contains(&p) {
-                edge.mark_deleted(EdgePrunedReason::DoesNotConsumeProvidedParam);
-              }
+          // Add a new edge.
+          let mut edge = MaybeDeleted::new(*dependency_key);
+          if let Some(p) = dependency_key.provided_param() {
+            // NB: If the edge is invalid because it does not consume the provide param, we
+            // create it as deleted with that reason.
+            if !graph[replacement_id].0.in_set.contains(&p) {
+              edge.mark_deleted(EdgePrunedReason::DoesNotConsumeProvidedParam);
             }
-            if looping {
-              log::debug!("dependee edge: adding: ({:?}, {})", dependee_id, edge);
-            }
-            graph.add_edge(*dependee_id, replacement_id, edge);
-          } else if looping {
-            log::debug!(
-              "dependee edge: skipping existing: {:?}",
-              (dependee_id, dependency_key)
-            );
           }
+          if looping {
+            log::debug!("dependee edge: adding: ({:?}, {})", dependee_id, edge);
+          }
+          graph.add_edge(*dependee_id, replacement_id, edge);
         }
 
-        // And give the replacement node edges to this combination of dependencies (while confirming that we
-        // don't create dupes).
-        let existing_edges = graph
-          .edges_directed(replacement_id, Direction::Outgoing)
-          .filter_map(|edge_ref| edge_ref.weight().inner().map(|dk| (*dk, edge_ref.target())))
-          .collect::<HashSet<_>>();
+        // And give the replacement node edges to this combination of dependencies.
         for (dependency_key, dependency_id) in dependencies {
           // NB: When a node depends on itself, we adjust the destination of that self-edge to point to
           // the new node.
@@ -845,32 +786,21 @@ impl<R: Rule> Builder<R> {
           } else {
             dependency_id
           };
-          if existing_edges.contains(&(dependency_key, dependency_id)) {
-            if looping {
-              log::debug!(
-                "dependency edge: skipping existing: {:?}",
-                (dependency_key, dependency_id)
-              );
-            }
-          } else {
-            if looping {
-              log::debug!(
-                "dependency edge: adding: {:?}",
-                (dependency_key, dependency_id)
-              );
-            }
-            graph.add_edge(
-              replacement_id,
-              dependency_id,
-              MaybeDeleted::new(dependency_key),
+          if looping {
+            log::debug!(
+              "dependency edge: adding: {:?}",
+              (dependency_key, dependency_id)
             );
           }
+          graph.add_edge(
+            replacement_id,
+            dependency_id,
+            MaybeDeleted::new(dependency_key),
+          );
         }
 
-        // Now that all edges have been created, maybe mark it minimal.
-        if is_new_node {
-          maybe_mark_minimal_in_set(&mut minimal_in_set, &graph, replacement_id);
-        }
+        // Now that all edges have been created, maybe mark it minimal and potentially ambiguous.
+        maybe_mark_minimal_in_set(&mut minimal_in_set, &graph, replacement_id);
       }
     }
 
