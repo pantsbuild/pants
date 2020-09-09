@@ -86,9 +86,12 @@ async def setup_black(
         python_setup,
     )
     tool_interpreter_constraints = PexInterpreterConstraints(
-        black.interpreter_constraints
-        if not all_interpreter_constraints.requires_python38_or_newer()
-        else ("CPython>=3.8",)
+        ("CPython>=3.8",)
+        if (
+            all_interpreter_constraints.requires_python38_or_newer()
+            and black.options.is_default("interpreter_constraints")
+        )
+        else black.interpreter_constraints
     )
 
     black_pex_request = Get(

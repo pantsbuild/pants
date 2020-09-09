@@ -13,6 +13,7 @@ class MyPy(PythonToolBase):
     options_scope = "mypy"
     default_version = "mypy==0.782"
     default_entry_point = "mypy"
+    # See `mypy/rules.py`. We only use these default constraints in some situations.
     default_interpreter_constraints = ["CPython>=3.5"]
 
     @classmethod

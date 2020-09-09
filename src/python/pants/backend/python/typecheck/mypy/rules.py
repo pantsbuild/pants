@@ -80,9 +80,18 @@ async def mypy_typecheck(
     #  * MyPy requires running with Python 3.5+. If run with Python 3.5 - 3.7, MyPy can understand
     #     Python 2.7 and 3.4-3.7 thanks to the typed-ast library, but it can't understand 3.8+ If
     #     run with Python 3.8, it can understand 2.7 and 3.4-3.8. So, we need to check if the user
-    #     has code that requires Python 3.8+, and if so, use a tighter requirement. We only do this
-    #     if <3.8 can't be used, as we don't want a loose requirement like `>=3.6` to result in
-    #     requiring Python 3.8, which would error if 3.8 is not installed on the machine.
+    #     has code that requires Python 3.8+, and if so, use a tighter requirement.
+    #
+    #     On top of this, MyPy parses the AST using the value from `python_version`. If this is not
+    #     configured, it defaults to the interpreter being used. This means that running the
+    #     interpreter with Py35 would choke on f-strings in Python 3.6, unless the user set
+    #     `python_version`. We don't want to make the user set this up. (If they do, MyPy will use
+    #     `python_version`, rather than defaulting to the executing interpreter).
+    #
+    #     We only apply these optimizations if the user did not configure
+    #     `--mypy-interpreter-constraints`, and if we are know that there are no Py35 or Py27
+    #     constraints, as we would assume that their code is compatible with those ASTs, and we
+    #     want looser constraints to make it more flexible to install MyPy.
     #  * We must resolve third-party dependencies. This should use whatever the actual code's
     #     constraints are, as the constraints for the tool can be different than for the
     #     requirements.
@@ -95,11 +104,16 @@ async def mypy_typecheck(
         ),
         python_setup,
     )
-    tool_interpreter_constraints = PexInterpreterConstraints(
-        mypy.interpreter_constraints
-        if not all_interpreter_constraints.requires_python38_or_newer()
-        else ("CPython>=3.8",)
-    )
+    if not mypy.options.is_default("interpreter_constraints"):
+        tool_interpreter_constraints = mypy.interpreter_constraints
+    elif all_interpreter_constraints.requires_python38_or_newer():
+        tool_interpreter_constraints = ("CPython>=3.8",)
+    elif all_interpreter_constraints.requires_python37_or_newer():
+        tool_interpreter_constraints = ("CPython>=3.7",)
+    elif all_interpreter_constraints.requires_python36_or_newer():
+        tool_interpreter_constraints = ("CPython>=3.6",)
+    else:
+        tool_interpreter_constraints = mypy.interpreter_constraints
 
     prepared_sources_request = Get(
         PythonSourceFiles,
@@ -111,7 +125,7 @@ async def mypy_typecheck(
             output_filename="mypy.pex",
             internal_only=True,
             requirements=PexRequirements(mypy.all_requirements),
-            interpreter_constraints=tool_interpreter_constraints,
+            interpreter_constraints=PexInterpreterConstraints(tool_interpreter_constraints),
             entry_point=mypy.entry_point,
         ),
     )

@@ -206,34 +206,60 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
                 return True
         return False
 
+    def _requires_python3_version_or_newer(
+        self, *, allowed_versions: Iterable[str], prior_version: str
+    ) -> bool:
+        # Assume any 3.x release has no more than 13 releases. The max is currently 10.
+        patch_versions = list(reversed(range(0, 13)))
+        # We only need to look at the prior Python release. For example, consider Python 3.8+
+        # looking at 3.7. If using something like `>=3.5`, Py37 will be included.
+        # `==3.6.*,!=3.7.*,==3.8.*` is extremely unlikely, and even that will work correctly as
+        # it's an invalid constraint so setuptools returns False always. `['==2.7.*', '==3.8.*']`
+        # will fail because not every single constraint is exclusively 3.8.
+        prior_versions = [f"{prior_version}.{p}" for p in patch_versions]
+        allowed_versions = [
+            f"{major_minor}.{p}" for major_minor in allowed_versions for p in patch_versions
+        ]
+        for req in self:
+            if any(
+                req.specifier.contains(prior) for prior in prior_versions  # type: ignore[attr-defined]
+            ):
+                return False
+            if not any(
+                req.specifier.contains(allowed) for allowed in allowed_versions  # type: ignore[attr-defined]
+            ):
+                return False
+        return True
+
+    def requires_python36_or_newer(self) -> bool:
+        """Checks if the constraints are all for Python 3.6+.
+
+        This will return False if Python 3.6 is allowed, but prior versions like 3.5 are also
+        allowed.
+        """
+        return self._requires_python3_version_or_newer(
+            allowed_versions=["3.6", "3.7", "3.8", "3.9"], prior_version="3.5"
+        )
+
+    def requires_python37_or_newer(self) -> bool:
+        """Checks if the constraints are all for Python 3.7+.
+
+        This will return False if Python 3.7 is allowed, but prior versions like 3.6 are also
+        allowed.
+        """
+        return self._requires_python3_version_or_newer(
+            allowed_versions=["3.7", "3.8", "3.9"], prior_version="3.6"
+        )
+
     def requires_python38_or_newer(self) -> bool:
         """Checks if the constraints are all for Python 3.8+.
 
         This will return False if Python 3.8 is allowed, but prior versions like 3.7 are also
         allowed.
         """
-        # Assume any 3.x release has no more than 13 releases. The max is currently 10.
-        patch_versions = list(reversed(range(0, 13)))
-        # We only need to look at Python 3.7. If using something like `>=3.5`, Py37 will be
-        # included. `==3.6.*,!=3.7.*,==3.8.*` is extremely unlikely, and even that will work
-        # correctly as it's an invalid constraint so setuptools returns False always.
-        # `['==2.7.*', '==3.8.*']` will fail because not every single constraint is exclusively 3.8.
-        py37_versions = [f"3.7.{v}" for v in patch_versions]
-        py38_versions = [f"3.8.{v}" for v in patch_versions]
-        py39_versions = [f"3.9.{v}" for v in patch_versions]
-        for req in self:
-            if any(
-                req.specifier.contains(py37_version) for py37_version in py37_versions  # type: ignore[attr-defined]
-            ):
-                return False
-            works_with_py38_or_py39 = any(
-                req.specifier.contains(py38_version) for py38_version in py38_versions  # type: ignore[attr-defined]
-            ) or any(
-                req.specifier.contains(py39_version) for py39_version in py39_versions  # type: ignore[attr-defined]
-            )
-            if not works_with_py38_or_py39:
-                return False
-        return True
+        return self._requires_python3_version_or_newer(
+            allowed_versions=["3.8", "3.9"], prior_version="3.7"
+        )
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
