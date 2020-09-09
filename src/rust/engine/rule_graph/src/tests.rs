@@ -59,6 +59,17 @@ fn insufficient_query() {
 }
 
 #[test]
+fn no_rules() {
+  let rules: Vec<Rule> = vec![];
+  let queries = vec![Query::new("a", vec![])];
+
+  assert!(RuleGraph::new(rules, queries)
+    .err()
+    .unwrap()
+    .contains("No installed rules return the type a"));
+}
+
+#[test]
 fn ambiguity() {
   let rules = vec![
     Rule("a", "a_from_b", vec![DependencyKey("b", None)]),
@@ -853,7 +864,7 @@ impl super::DisplayForGraph for Rule {
 
 impl fmt::Display for Rule {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    write!(f, "{:?}", self)
+    write!(f, "{}({}) -> {}", self.1, self.2.len(), self.0)
   }
 }
 

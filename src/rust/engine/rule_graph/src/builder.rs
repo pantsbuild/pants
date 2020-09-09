@@ -139,7 +139,7 @@ impl<T, Reason> MaybeDeleted<T, Reason> {
 impl<T: std::fmt::Display, Reason: std::fmt::Debug> std::fmt::Display for MaybeDeleted<T, Reason> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     if let Some(ref reason) = self.1 {
-      write!(f, "Deleted({}, reason: {:?})", self.0, reason,)
+      write!(f, "Deleted(reason: {:?}, {})", reason, self.0)
     } else {
       write!(f, "{}", self.0)
     }
@@ -151,6 +151,7 @@ enum NodePrunedReason {
   Monomorphized,
   NoDependees,
   NoValidCombinationsOfDependencies,
+  NoSourceOfParam,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
@@ -159,17 +160,27 @@ enum EdgePrunedReason {
   SmallerParamSetAvailable,
 }
 
-// A node labeled with an out_set.
+// Nodes labeled with out_sets.
 type Graph<R> =
   DiGraph<(Node<R>, ParamTypes<<R as Rule>::TypeId>), <R as Rule>::DependencyKey, u32>;
-// A node labeled with both an out_set and in_set.
-type ParamsLabeledGraph<R> = DiGraph<ParamsLabeled<R>, <R as Rule>::DependencyKey, u32>;
-// A node labeled with both an out_set and in_set, and possibly marked deleted.
+// Nodes labeled with out_sets and possibly marked deleted.
+type OutLabeledGraph<R> = DiGraph<
+  MaybeDeleted<(Node<R>, ParamTypes<<R as Rule>::TypeId>), NodePrunedReason>,
+  <R as Rule>::DependencyKey,
+  u32,
+>;
+// Nodes labeled with both an out_set and in_set, and possibly marked deleted.
+type LabeledGraph<R> =
+  DiGraph<MaybeDeleted<ParamsLabeled<R>, NodePrunedReason>, <R as Rule>::DependencyKey, u32>;
+// Nodes labeled with both out_sets and in_sets, and both edges and nodes possibly marked deleted.
 type MonomorphizedGraph<R> = DiGraph<
   MaybeDeleted<ParamsLabeled<R>, NodePrunedReason>,
   MaybeDeleted<<R as Rule>::DependencyKey, EdgePrunedReason>,
   u32,
 >;
+// Node labeled with in_sets.
+type InLabeledGraph<R> =
+  DiGraph<(Node<R>, ParamTypes<<R as Rule>::TypeId>), <R as Rule>::DependencyKey, u32>;
 
 ///
 /// Given the set of Rules and Queries, produce a RuleGraph that allows dependency nodes
@@ -213,9 +224,7 @@ impl<R: Rule> Builder<R> {
 
   pub fn graph(self) -> Result<RuleGraph<R>, String> {
     // 1. build a polymorphic graph
-    //    * only consideration: whether something is a valid input Param _anywhere_ in the graph, and
-    //      that we can't satisfy a Get with a Param
-    let initial_polymorphic_graph = self.initial_polymorphic()?;
+    let initial_polymorphic_graph = self.initial_polymorphic();
     // 2. run live variable analysis on the polymorphic graph to gather a conservative (ie, overly
     //    large) set of used Params.
     let polymorphic_live_params_graph = self.live_param_labeled_graph(initial_polymorphic_graph);
@@ -230,7 +239,7 @@ impl<R: Rule> Builder<R> {
     self.finalize(pruned_edges_graph)
   }
 
-  fn initial_polymorphic(&self) -> Result<Graph<R>, String> {
+  fn initial_polymorphic(&self) -> OutLabeledGraph<R> {
     let mut graph: Graph<R> = DiGraph::new();
 
     // Initialize the graph with nodes for Queries and Params
@@ -376,50 +385,17 @@ impl<R: Rule> Builder<R> {
       satisfiable_nodes.insert(graph[node_id].0.clone());
     }
 
-    // If any Rules had unsatisfiable copies but no satisfiable copies, error eagerly.
-    // TODO: Render all of these in a flat list.
-    for (node_id, dependency_keys) in &unsatisfiable_nodes {
-      let (node, out_set) = &graph[*node_id];
-      if satisfiable_nodes.contains(node) {
-        continue;
-      }
-
-      for dependency_key in dependency_keys {
-        log::debug!(
-          "no source of {} for {} with {}",
-          dependency_key,
-          node,
-          params_str(&out_set),
-        );
-        let root_hint = if dependency_key.provided_param().is_none() {
-          "\nIf rather than being computed by a rule, that type should be provided \
-            from outside the rule graph, consider adding it as an input for the relevant QueryRule."
-        } else {
-          ""
-        };
-        // TODO: This needs clarifying, because it's now context specific: it might also be because
-        // the out_set of the dependee did not provide the type.
-        return Err(format!(
-            "No installed rules return the type {}: Is the rule that you're expecting to run registered?{}",
-            dependency_key.product(),
-            root_hint,
-        ));
-      }
-    }
-
-    // Remove all unsatisfiable nodes.
-    // TODO: Should maybe preserve these as MaybeDeleted for the purposes of error messages, in
-    // case a rule that should have been used was eliminated due to the lack of a Param.
-    Ok(graph.filter_map(
+    // Mark all unsatisfiable nodes deleted.
+    graph.map(
       |node_id, node| {
-        if !unsatisfiable_nodes.contains_key(&node_id) {
-          Some(node.clone())
-        } else {
-          None
+        let mut result = MaybeDeleted::new(node.clone());
+        if unsatisfiable_nodes.contains_key(&node_id) {
+          result.mark_deleted(NodePrunedReason::NoSourceOfParam);
         }
+        result
       },
-      |_, edge_weight| Some(*edge_weight),
-    ))
+      |_, edge_weight| *edge_weight,
+    )
   }
 
   ///
@@ -450,13 +426,13 @@ impl<R: Rule> Builder<R> {
   /// a node has multiple sources of a particular dependency with the _same_ param requirements.
   /// This represents ambiguity that must be handled (likely by erroring) in later phases.
   ///
-  fn monomorphize(graph: ParamsLabeledGraph<R>) -> MonomorphizedGraph<R> {
+  fn monomorphize(graph: LabeledGraph<R>) -> MonomorphizedGraph<R> {
     // The monomorphized graph contains nodes and edges that have been marked deleted, because:
     //   1. we expose which nodes and edges were deleted to allow for improved error messages
     //   2. it is slow to delete nodes/edges with petgraph: marking them is much cheaper.
     // Initialize with no deleted nodes/edges.
     let mut graph: MonomorphizedGraph<R> = graph.map(
-      |_node_id, node| MaybeDeleted::new(node.clone()),
+      |_node_id, node| node.clone(),
       |_edge_id, edge_weight| MaybeDeleted::new(*edge_weight),
     );
 
@@ -635,9 +611,9 @@ impl<R: Rule> Builder<R> {
       };
       let had_dependees = !dependees_by_out_set.is_empty();
 
-      if looping {
-        log::debug!(
-          "creating monomorphizations (from {} dependee sets and {:?} dependencies) for {:?}: {:#?} with {:#?} and {:#?}",
+      let debug_str = if looping {
+        format!(
+          "creating monomorphizations (from {} dependee sets and {:?} dependencies) for {:?}: {} with {:#?} and {:#?}",
           dependees_by_out_set.len(),
           dependencies_by_key
         .iter()
@@ -657,8 +633,10 @@ impl<R: Rule> Builder<R> {
         .keys()
         .map(|out_set| params_str(&out_set))
         .collect::<Vec<_>>(),
-        );
-      }
+        )
+      } else {
+        "".to_owned()
+      };
 
       // Generate the monomorphizations of this Node, where each key is a potential node to
       // create, and the dependees and dependencies to give it (respectively).
@@ -745,8 +723,10 @@ impl<R: Rule> Builder<R> {
       }
 
       if looping {
+        log::debug!("{}", debug_str);
+
         maybe_in_loop.insert(node_id);
-        if maybe_in_loop.len() > 40 {
+        if maybe_in_loop.len() > 5 {
           let subgraph = graph.filter_map(
             |node_id, node| {
               if maybe_in_loop.contains(&node_id) {
@@ -902,10 +882,15 @@ impl<R: Rule> Builder<R> {
   ///
   /// See https://en.wikipedia.org/wiki/Live_variable_analysis
   ///
-  fn live_param_labeled_graph(&self, graph: Graph<R>) -> ParamsLabeledGraph<R> {
+  fn live_param_labeled_graph(&self, graph: OutLabeledGraph<R>) -> LabeledGraph<R> {
     // Add in_sets for each node, with all sets empty initially.
-    let mut graph: ParamsLabeledGraph<R> = graph.map(
-      |_node_id, node| ParamsLabeled::new(node.0.clone(), node.1.clone()),
+    let mut graph: LabeledGraph<R> = graph.map(
+      |_node_id, node| {
+        MaybeDeleted(
+          ParamsLabeled::new((node.0).0.clone(), (node.0).1.clone()),
+          node.1,
+        )
+      },
       |_edge_id, edge_weight| *edge_weight,
     );
 
@@ -916,18 +901,23 @@ impl<R: Rule> Builder<R> {
       .externals(Direction::Outgoing)
       .collect::<VecDeque<_>>();
     while let Some(node_id) = to_visit.pop_front() {
-      let new_in_set = match &graph[node_id].node {
+      if graph[node_id].is_deleted() {
+        continue;
+      }
+
+      let new_in_set = match &graph[node_id].0.node {
         Node::Rule(_) => {
           // Rules have in_sets computed from their dependencies.
           Some(Self::dependencies_in_set(
             node_id,
             graph
               .edges_directed(node_id, Direction::Outgoing)
+              .filter(|edge_ref| !graph[edge_ref.target()].is_deleted())
               .map(|edge_ref| {
                 (
                   *edge_ref.weight(),
                   edge_ref.target(),
-                  &graph[edge_ref.target()].in_set,
+                  &graph[edge_ref.target()].0.in_set,
                 )
               }),
           ))
@@ -944,11 +934,12 @@ impl<R: Rule> Builder<R> {
             node_id,
             graph
               .edges_directed(node_id, Direction::Outgoing)
+              .filter(|edge_ref| !graph[edge_ref.target()].is_deleted())
               .map(|edge_ref| {
                 (
                   *edge_ref.weight(),
                   edge_ref.target(),
-                  &graph[edge_ref.target()].in_set,
+                  &graph[edge_ref.target()].0.in_set,
                 )
               }),
           );
@@ -957,9 +948,9 @@ impl<R: Rule> Builder<R> {
       };
 
       if let Some(in_set) = new_in_set {
-        if in_set != graph[node_id].in_set {
+        if in_set != graph[node_id].0.in_set {
           to_visit.extend(graph.neighbors_directed(node_id, Direction::Incoming));
-          graph[node_id].in_set = in_set;
+          graph[node_id].0.in_set = in_set;
         }
       }
     }
@@ -968,7 +959,7 @@ impl<R: Rule> Builder<R> {
   }
 
   ///
-  /// After nodes have been monomorphizedthey have the smallest dependency sets possible.
+  /// After nodes have been monomorphized they have the smallest dependency sets possible.
   /// In cases where a node still has more than one source of a dependency, this phase statically
   /// decides which source of each DependencyKey to use, and prunes edges to the rest.
   ///
@@ -976,21 +967,18 @@ impl<R: Rule> Builder<R> {
   /// slowly to collect all errored nodes (including those that have been deleted), and render the
   /// most specific error possible.
   ///
-  fn prune_edges(&self, mut graph: MonomorphizedGraph<R>) -> Result<ParamsLabeledGraph<R>, String> {
+  fn prune_edges(&self, mut graph: MonomorphizedGraph<R>) -> Result<InLabeledGraph<R>, String> {
     // Walk from roots, choosing one source for each DependencyKey of each node.
     let mut visited = graph.visit_map();
     let mut errored = HashMap::new();
-    // NB: We visit any node that is enqueued, even if it is deleted. But because we filter to
-    // Queries at the root (which are never deleted by monomorphize), a deleted node will only be
-    // enqueued in where we have already encountered an error and are continuing on to find a
-    // root cause.
+    // NB: We visit any node that is enqueued, even if it is deleted.
     let mut to_visit = graph
       .node_references()
-      .filter_map(|node_ref| match node_ref.weight().inner() {
-        Some(ParamsLabeled {
+      .filter_map(|node_ref| match node_ref.weight().0 {
+        ParamsLabeled {
           node: Node::Query(_),
           ..
-        }) => Some(node_ref.id()),
+        } => Some(node_ref.id()),
         _ => None,
       })
       .collect::<Vec<_>>();
@@ -1005,20 +993,19 @@ impl<R: Rule> Builder<R> {
       let edges_by_dependency_key = Self::edges_by_dependency_key(&graph, node_id, true);
       let mut edges_to_delete = Vec::new();
       for (dependency_key, edge_refs) in edges_by_dependency_key {
-        // Filter out any that are not satisfiable for this node based on its type and in/out sets,
-        // and any that were deleted/invalid.
+        // Filter out any dependencies that are not satisfiable for this node based on its type and
+        // in/out sets and any that were deleted/invalid.
         let relevant_edge_refs: Vec<_> = match node {
           Node::Query(q) => {
             // Only dependencies with in_sets that are a subset of our params can be used.
             edge_refs
               .iter()
               .filter(|edge_ref| {
-                if edge_ref.weight().is_deleted() || graph[edge_ref.target()].is_deleted() {
-                  false
-                } else {
-                  let dependency_in_set = &graph[edge_ref.target()].0.in_set;
-                  dependency_in_set.is_subset(&q.params)
-                }
+                !edge_ref.weight().is_deleted() && !graph[edge_ref.target()].is_deleted()
+              })
+              .filter(|edge_ref| {
+                let dependency_in_set = &graph[edge_ref.target()].0.in_set;
+                dependency_in_set.is_subset(&q.params)
               })
               .collect()
           }
@@ -1027,9 +1014,10 @@ impl<R: Rule> Builder<R> {
             edge_refs
               .iter()
               .filter(|edge_ref| {
-                if edge_ref.weight().is_deleted() || graph[edge_ref.target()].is_deleted() {
-                  false
-                } else if let Some(provided_param) = dependency_key.provided_param() {
+                !edge_ref.weight().is_deleted() && !graph[edge_ref.target()].is_deleted()
+              })
+              .filter(|edge_ref| {
+                if let Some(provided_param) = dependency_key.provided_param() {
                   graph[edge_ref.target()].0.in_set.contains(&provided_param)
                 } else {
                   true
@@ -1070,7 +1058,7 @@ impl<R: Rule> Builder<R> {
         };
         match chosen_edges.len() {
           1 => {
-            // Schedule this dependency to be visited, and mark all other choices deleted.
+            // Schedule this dependency to be visited, and mark edges to all other choices deleted.
             let chosen_edge = chosen_edges[0];
             to_visit.push(chosen_edge.target());
             edges_to_delete.extend(
@@ -1081,48 +1069,36 @@ impl<R: Rule> Builder<R> {
             );
           }
           0 => {
-            // Render all candidates, and traverse any edges that were deleted for interesting reasons.
-            to_visit.extend(
-              edge_refs
-                .iter()
-                .filter(|edge_ref| match graph[edge_ref.target()].deleted_reason() {
-                  None | Some(NodePrunedReason::NoValidCombinationsOfDependencies) => true,
-                  _ => false,
-                })
-                .map(|edge_ref| edge_ref.target()),
-            );
-            errored.insert(
-              node_id,
-              format!(
-                "No source of dependency {} for {}. All potential sources were eliminated: {:#?}",
-                dependency_key,
-                node,
+            // If there were no live nodes for this DependencyKey, traverse into any nodes
+            // that were deleted. We do not traverse deleted edges, as they represent this node
+            // having eliminated the dependency for a specific reason that we should render here.
+            if edge_refs
+              .iter()
+              .all(|edge_ref| graph[edge_ref.target()].deleted_reason().is_some())
+            {
+              to_visit.extend(
                 edge_refs
                   .iter()
-                  .map(|edge_ref| {
-                    let node = &graph[edge_ref.target()];
-                    let reason_suffix = if let Some(reason) = node.deleted_reason() {
-                      format!("{:?}: ", reason)
-                    } else {
-                      "".to_owned()
-                    };
-                    format!(
-                      "{}{} (for {})",
-                      reason_suffix,
-                      node.0.node,
-                      params_str(&node.0.in_set)
-                    )
+                  .filter(|edge_ref| match graph[edge_ref.target()].deleted_reason() {
+                    Some(NodePrunedReason::Ambiguous)
+                    | Some(NodePrunedReason::NoSourceOfParam)
+                    | Some(NodePrunedReason::NoValidCombinationsOfDependencies) => true,
+                    _ => false,
                   })
-                  .collect::<Vec<_>>()
-              ),
+                  .map(|edge_ref| edge_ref.target()),
+              );
+            }
+            errored.entry(node_id).or_insert_with(Vec::new).push(
+              self.render_no_source_of_dependency_error(&graph, &node, dependency_key, edge_refs),
             );
           }
           _ => {
             // Render and visit only the chosen candidates to see why they were ambiguous.
             to_visit.extend(chosen_edges.iter().map(|edge_ref| edge_ref.target()));
-            errored.insert(
-              node_id,
-              format!(
+            errored
+              .entry(node_id)
+              .or_insert_with(Vec::new)
+              .push(format!(
                 "Too many sources of dependency {} for {}: {:#?}",
                 dependency_key,
                 node,
@@ -1136,8 +1112,7 @@ impl<R: Rule> Builder<R> {
                     )
                   })
                   .collect::<Vec<_>>()
-              ),
-            );
+              ));
           }
         }
       }
@@ -1151,7 +1126,7 @@ impl<R: Rule> Builder<R> {
       Ok(graph.filter_map(
         |_node_id, node| {
           if let Some(node) = node.inner() {
-            Some(node.clone())
+            Some((node.node.clone(), node.in_set.clone()))
           } else {
             None
           }
@@ -1166,13 +1141,70 @@ impl<R: Rule> Builder<R> {
       ))
     } else {
       // Render the most specific errors.
-      Err(Self::render_errored(&graph, errored))
+      Err(Self::render_prune_errors(&graph, errored))
     }
   }
 
-  fn render_errored(
+  fn render_no_source_of_dependency_error(
+    &self,
     graph: &MonomorphizedGraph<R>,
-    errored: HashMap<NodeIndex<u32>, String>,
+    node: &Node<R>,
+    dependency_key: R::DependencyKey,
+    edge_refs: Vec<EdgeReference<MaybeDeleted<R::DependencyKey, EdgePrunedReason>, u32>>,
+  ) -> String {
+    if self.rules.contains_key(&dependency_key.product()) {
+      format!(
+        "No source of dependency {} for {}. All potential sources were eliminated: {:#?}",
+        dependency_key,
+        node,
+        edge_refs
+          .iter()
+          .map(|edge_ref| {
+            // An edge being deleted carries more information than a node being deleted, because a
+            // deleted edge from X to Y describes specifically why X cannot use Y.
+            let node = &graph[edge_ref.target()];
+            let reason = edge_ref
+              .weight()
+              .deleted_reason()
+              .map(|r| format!("{:?}", r))
+              .or_else(|| node.deleted_reason().map(|r| format!("{:?}", r)));
+            let reason_suffix = if let Some(reason) = reason {
+              format!("{}: ", reason)
+            } else {
+              "".to_owned()
+            };
+            format!(
+              "{}{} (for {})",
+              reason_suffix,
+              node.0.node,
+              params_str(&node.0.in_set)
+            )
+          })
+          .collect::<Vec<_>>()
+      )
+    } else if dependency_key.provided_param().is_none() {
+      format!(
+        "No installed rules return the type {}, and it was not provided by potential \
+        callers of {}.\nIf that type should be computed by a rule, ensure that that \
+        rule is installed.\nIf it should be provided by a caller, ensure that it is included \
+        in any relevant Query or Get.",
+        dependency_key.product(),
+        node,
+      )
+    } else {
+      format!(
+        "No installed rules return the type {} to satisfy {} for {}.\nEnsure that the rule you are \
+        expecting to use is installed.",
+        dependency_key.product(),
+        dependency_key,
+        node,
+      )
+    }
+  }
+
+  fn render_prune_errors(
+    graph: &MonomorphizedGraph<R>,
+    errored: HashMap<NodeIndex<u32>, Vec<String>>,
   ) -> String {
     // Leaf errors have no dependencies in the errored map.
     let mut leaf_errors = errored
@@ -1182,10 +1214,30 @@ impl<R: Rule> Builder<R> {
           .neighbors_directed(node_id, Direction::Outgoing)
           .any(|dependency_id| errored.contains_key(&dependency_id) && node_id != dependency_id)
       })
-      .map(|(_, error)| error.replace("\n", "\n    "))
+      .flat_map(|(_, errors)| {
+        let mut errors = errors.clone();
+        errors.sort();
+        errors.into_iter().map(|e| e.trim().replace("\n", "\n    "))
+      })
       .collect::<Vec<_>>();
 
     leaf_errors.sort();
+
+    let subgraph = graph.filter_map(
+      |node_id, node| {
+        if let Some(errors) = errored.get(&node_id) {
+          Some(format!("{}:\n{}", node, errors.join("\n")))
+        } else {
+          None
+        }
+      },
+      |_, edge_weight| Some(edge_weight.clone()),
+    );
+
+    log::debug!(
+      "// errored subgraph:\n{}",
+      petgraph::dot::Dot::with_config(&subgraph, &[])
+    );
 
     format!(
       "Encountered {} rule graph error{}:\n  {}",
@@ -1199,14 +1251,9 @@ impl<R: Rule> Builder<R> {
   /// Takes a Graph that has been pruned to eliminate unambiguous choices: any duplicate edges at
   /// this point are errors.
   ///
-  fn finalize(self, graph: ParamsLabeledGraph<R>) -> Result<RuleGraph<R>, String> {
-    log::debug!(
-      "// finalizing with:\n{}",
-      petgraph::dot::Dot::with_config(&graph, &[])
-    );
-
+  fn finalize(self, graph: InLabeledGraph<R>) -> Result<RuleGraph<R>, String> {
     let entry_for = |node_id| -> Entry<R> {
-      let ParamsLabeled { node, in_set, .. }: &ParamsLabeled<R> = &graph[node_id];
+      let (node, in_set): &(Node<R>, ParamTypes<_>) = &graph[node_id];
       match node {
         Node::Rule(rule) => Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
           params: in_set.clone(),
@@ -1467,7 +1514,7 @@ impl<R: Rule> Builder<R> {
       // and so we cannot eliminate them quite yet.
       let out_set_satisfiable = combination
         .iter()
-        .all(|(dk, dependency_id, dependency_in_set)| {
+        .all(|(_, dependency_id, dependency_in_set)| {
           matches!(graph[*dependency_id].0.node, Node::Param(_))
             || !minimal_in_set.contains(&dependency_id)
             || dependency_in_set.difference(&out_set).next().is_none()
