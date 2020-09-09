@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -39,8 +38,6 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
-logger = logging.getLogger(__name__)
-
 
 @dataclass(frozen=True)
 class MyPyFieldSet(FieldSet):
@@ -77,7 +74,7 @@ async def mypy_typecheck(
     )
 
     # Interpreter constraints are tricky with MyPy:
-    #  * MyPy requires running with Python 3.5+. If run with Python 3.5 - 3.7, MyPy can understand
+    #  * MyPy requires running with Python 3.5+. If run with Python 3.5-3.7, MyPy can understand
     #     Python 2.7 and 3.4-3.7 thanks to the typed-ast library, but it can't understand 3.8+ If
     #     run with Python 3.8, it can understand 2.7 and 3.4-3.8. So, we need to check if the user
     #     has code that requires Python 3.8+, and if so, use a tighter requirement.
@@ -90,11 +87,11 @@ async def mypy_typecheck(
     #
     #     We only apply these optimizations if the user did not configure
     #     `--mypy-interpreter-constraints`, and if we are know that there are no Py35 or Py27
-    #     constraints, as we would assume that their code is compatible with those ASTs, and we
-    #     want looser constraints to make it more flexible to install MyPy.
+    #     constraints. If they use Py27 or Py35, this implies that they're not using Py36+ syntax,
+    #     so it's fine to use the Py35 parser. We want the loosest constraints possible to make it
+    #     more flexible to install MyPy.
     #  * We must resolve third-party dependencies. This should use whatever the actual code's
-    #     constraints are, as the constraints for the tool can be different than for the
-    #     requirements.
+    #     constraints are. The constraints for the tool can be different than for the requirements.
     #  * The runner Pex should use the same constraints as the tool Pex.
     all_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
