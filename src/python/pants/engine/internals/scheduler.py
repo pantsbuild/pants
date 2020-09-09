@@ -12,8 +12,6 @@ from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, U
 from typing_extensions import TypedDict
 
 from pants.base.exception_sink import ExceptionSink
-from pants.base.project_tree import Dir, File, Link
-from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
@@ -132,25 +130,18 @@ class Scheduler:
             snapshot=Snapshot,
             file_content=FileContent,
             digest_contents=DigestContents,
-            address=Address,
             path_globs=PathGlobs,
             merge_digests=MergeDigests,
             add_prefix=AddPrefix,
             remove_prefix=RemovePrefix,
             create_digest=CreateDigest,
-            dir=Dir,
-            file=File,
-            link=Link,
+            digest_subset=DigestSubset,
+            download_file=DownloadFile,
             platform=Platform,
             multi_platform_process=MultiPlatformProcess,
             process_result=FallibleProcessResultWithPlatform,
             coroutine=CoroutineType,
-            download_file=DownloadFile,
-            string=str,
-            bytes=bytes,
-            interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
-            digest_subset=DigestSubset,
             engine_aware_parameter=EngineAwareParameter,
         )
 
@@ -362,10 +353,6 @@ class Scheduler:
 
 
 class _PathGlobsAndRootCollection(Collection[PathGlobsAndRoot]):
-    pass
-
-
-class _DirectoryDigests(Collection[Digest]):
     pass
 
 
@@ -602,16 +589,6 @@ class SchedulerSession:
             self._scheduler._scheduler,
             self._session,
             _PathGlobsAndRootCollection(path_globs_and_roots),
-        )
-
-    def merge_directories(self, digests):
-        """Merges any number of directories.
-
-        :param digests: Tuple of directory digests.
-        :return: A Digest.
-        """
-        return self._scheduler._native.lib.merge_directories(
-            self._scheduler._scheduler, self._session, _DirectoryDigests(digests)
         )
 
     def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes]:

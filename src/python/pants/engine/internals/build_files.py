@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
+from dataclasses import dataclass
 from typing import Any, Dict
 
 from pants.base.exceptions import ResolveError
-from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpec, AddressSpecs
 from pants.engine.addresses import (
     Address,
@@ -75,12 +75,22 @@ async def resolve_address(address_input: AddressInput) -> Address:
         )
 
 
+@dataclass(frozen=True)
+class AddressFamilyDir:
+    """The directory to find addresses for.
+
+    This does _not_ recurse into subdirectories.
+    """
+
+    path: str
+
+
 @rule
 async def parse_address_family(
     parser: Parser,
     global_options: GlobalOptions,
     prelude_symbols: BuildFilePreludeSymbols,
-    directory: Dir,
+    directory: AddressFamilyDir,
 ) -> AddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -107,7 +117,7 @@ async def parse_address_family(
 
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
-    address_family = await Get(AddressFamily, Dir(address.spec_path))
+    address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
     owning_address = address.maybe_convert_to_base_target()
     if address_family.get_target_adaptor(owning_address) is None:
         raise ResolveError.did_you_mean(
@@ -132,7 +142,7 @@ async def find_target_adaptor(address: Address) -> TargetAdaptor:
         raise ValueError(
             f"Subtargets are not resident in BUILD files, and so do not have TargetAdaptors: {address}"
         )
-    address_family = await Get(AddressFamily, Dir(address.spec_path))
+    address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
     target_adaptor = address_family.get_target_adaptor(address)
     if target_adaptor is None:
         raise ResolveError.did_you_mean(
@@ -195,7 +205,7 @@ async def addresses_with_origins_from_address_specs(
         ),
     )
     dirnames = {os.path.dirname(f) for f in snapshot.files}
-    address_families = await MultiGet(Get(AddressFamily, Dir(d)) for d in dirnames)
+    address_families = await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
     address_family_by_directory = {af.namespace: af for af in address_families}
 
     for glob_spec in address_specs.globs:
