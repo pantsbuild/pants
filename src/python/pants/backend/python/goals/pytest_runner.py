@@ -6,7 +6,6 @@ import logging
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Optional, cast
-from uuid import UUID
 
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
@@ -42,7 +41,7 @@ from pants.core.goals.test import (
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.internals.uuid import UUIDRequest
+from pants.engine.internals.uuid import UUID, UUIDRequest
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetsPerTarget, FieldSetsPerTargetRequest, TransitiveTargets

@@ -4,6 +4,7 @@
 import random
 import uuid
 from dataclasses import dataclass, field
+from uuid import UUID as UUID
 
 from pants.engine.rules import _uncacheable_rule, collect_rules
 
@@ -14,7 +15,7 @@ class UUIDRequest:
 
 
 @_uncacheable_rule
-async def generate_uuid(_: UUIDRequest) -> uuid.UUID:
+async def generate_uuid(_: UUIDRequest) -> UUID:
     """A rule to generate a UUID.
 
     Useful primarily to force a rule to re-run: a rule that `await Get`s on a UUIDRequest will be

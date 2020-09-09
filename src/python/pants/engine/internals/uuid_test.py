@@ -1,11 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from uuid import UUID
-
 import pytest
 
-from pants.engine.internals.uuid import UUIDRequest
+from pants.engine.internals.uuid import UUID, UUIDRequest
 from pants.engine.internals.uuid import rules as uuid_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner

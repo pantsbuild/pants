@@ -10,8 +10,9 @@ from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Unio
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
+from pants.engine.internals.uuid import UUID, UUIDRequest
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.rules import Get, collect_rules, rule, side_effecting
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, side_effecting
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -367,9 +368,15 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         fi
         """
     )
-    script_digest = await Get(
-        Digest,
-        CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
+
+    # We get a UUID so that we ignore the cache every time, as this script depends on the state of
+    # the external environment.
+    script_digest, uuid = await MultiGet(
+        Get(
+            Digest,
+            CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
+        ),
+        Get(UUID, UUIDRequest()),
     )
 
     paths = []
@@ -381,7 +388,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             level=LogLevel.DEBUG,
             input_digest=script_digest,
             argv=[script_path, request.binary_name],
-            env={"PATH": search_path},
+            env={"PATH": search_path, "__PANTS_UUID__": str(uuid)},
         ),
     )
     if result.exit_code == 0:
