@@ -69,17 +69,11 @@ class RemotePantsRunner:
         args: List[str],
         env: Mapping[str, str],
         options_bootstrapper: OptionsBootstrapper,
-        stdin=None,
-        stdout=None,
-        stderr=None,
     ) -> None:
         """
         :param args: The arguments (e.g. sys.argv) for this run.
         :param env: The environment (e.g. os.environ) for this run.
         :param options_bootstrapper: The bootstrap options.
-        :param file stdin: The stream representing stdin.
-        :param file stdout: The stream representing stdout.
-        :param file stderr: The stream representing stderr.
         """
         self._start_time = time.time()
         self._args = args
@@ -87,9 +81,6 @@ class RemotePantsRunner:
         self._options_bootstrapper = options_bootstrapper
         self._bootstrap_options = options_bootstrapper.bootstrap_options
         self._client = PantsDaemonClient(self._bootstrap_options)
-        self._stdin = stdin or sys.stdin
-        self._stdout = stdout or sys.stdout.buffer
-        self._stderr = stderr or sys.stderr.buffer
 
     @contextmanager
     def _trapped_signals(self, client, pid: int):
@@ -107,15 +98,14 @@ class RemotePantsRunner:
         """Minimal backoff strategy for daemon restarts."""
         time.sleep(attempt + (attempt - 1))
 
-    def _run_pants_with_retry(
-        self, pantsd_handle: PantsDaemonClient.Handle, retries: int = 3
-    ) -> ExitCode:
-        """Runs pants remotely with retry and recovery for nascent executions.
+    def run(self) -> ExitCode:
+        """Runs pants remotely with retry and recovery for nascent executions."""
 
-        :param pantsd_handle: A Handle for the daemon to connect to.
-        """
+        pantsd_handle = self._client.maybe_launch()
+        retries = 3
+
         attempt = 1
-        while 1:
+        while True:
             logger.debug(
                 "connecting to pantsd on port {} (attempt {}/{})".format(
                     pantsd_handle.port, attempt, retries
@@ -151,7 +141,7 @@ class RemotePantsRunner:
         port = pantsd_handle.port
         pid = pantsd_handle.pid
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
-        ng_env = NailgunProtocol.ttynames_to_env(self._stdin, self._stdout, self._stderr)
+        ng_env = NailgunProtocol.ttynames_to_env(sys.stdin, sys.stdout.buffer, sys.stderr.buffer)
         modified_env = {
             **self._env,
             **ng_env,
@@ -161,17 +151,13 @@ class RemotePantsRunner:
             ),
         }
 
-        assert isinstance(port, int), "port {} is not an integer! It has type {}.".format(
-            port, type(port)
-        )
-
         # Instantiate a NailgunClient.
         client = NailgunClient(
             port=port,
             remote_pid=pid,
-            ins=self._stdin,
-            out=self._stdout,
-            err=self._stderr,
+            ins=sys.stdin,
+            out=sys.stdout.buffer,
+            err=sys.stderr.buffer,
             exit_on_broken_pipe=True,
             metadata_base_dir=pantsd_handle.metadata_base_dir,
         )
@@ -204,6 +190,3 @@ class RemotePantsRunner:
                 nailgun_error, exception_suffix
             )
         )
-
-    def run(self, start_time: float) -> ExitCode:
-        return self._run_pants_with_retry(self._client.maybe_launch())

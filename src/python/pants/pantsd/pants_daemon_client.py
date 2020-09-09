@@ -8,6 +8,8 @@ from pants.option.options import Options
 from pants.pantsd import pants_daemon
 from pants.pantsd.process_manager import PantsDaemonProcessManager
 
+logger = logging.getLogger(__name__)
+
 
 class PantsDaemonClient(PantsDaemonProcessManager):
     """A client for interacting with a "potentially running" pantsd instance."""
@@ -26,7 +28,6 @@ class PantsDaemonClient(PantsDaemonProcessManager):
 
     def __init__(self, bootstrap_options: Options):
         super().__init__(bootstrap_options, daemon_entrypoint=pants_daemon.__name__)
-        self._logger = logging.getLogger(__name__)
 
     def maybe_launch(self) -> "PantsDaemonClient.Handle":
         """Creates and launches a daemon instance if one does not already exist."""
@@ -36,9 +37,9 @@ class PantsDaemonClient(PantsDaemonProcessManager):
             else:
                 # We're already launched.
                 return PantsDaemonClient.Handle(
-                    self.await_pid(10),
-                    self.await_socket(10),
-                    self._metadata_base_dir,
+                    pid=self.await_pid(10),
+                    port=self.await_socket(10),
+                    metadata_base_dir=self._metadata_base_dir,
                 )
 
     def restart(self) -> "PantsDaemonClient.Handle":
@@ -53,10 +54,10 @@ class PantsDaemonClient(PantsDaemonProcessManager):
         N.B. This should always be called under care of the `lifecycle_lock`.
         """
         self.terminate()
-        self._logger.debug("launching pantsd")
+        logger.debug("Launching pantsd")
         self.daemon_spawn()
         # Wait up to 60 seconds each for pantsd to write its pidfile and open its socket.
         pantsd_pid = self.await_pid(60)
         listening_port = self.await_socket(60)
-        self._logger.debug(f"pantsd is running at pid {self.pid}, pailgun port is {listening_port}")
+        logger.debug(f"pantsd is running at pid {self.pid}, pailgun port is {listening_port}")
         return self.Handle(pantsd_pid, listening_port, self._metadata_base_dir)

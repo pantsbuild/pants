@@ -11,7 +11,7 @@ import time
 import traceback
 from abc import ABCMeta
 from contextlib import contextmanager
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
 import psutil
 
@@ -292,7 +292,6 @@ class ProcessManager(ProcessMetadataManager):
         pid=None,
         socket=None,
         process_name=None,
-        socket_type=int,
         metadata_base_dir=None,
     ):
         """
@@ -300,14 +299,12 @@ class ProcessManager(ProcessMetadataManager):
         :param int pid: The process pid. Overrides fetching of the self.pid @property.
         :param string socket: The socket metadata. Overrides fetching of the self.socket @property.
         :param string process_name: The process name for cmdline executable name matching.
-        :param type socket_type: The type to be used for socket type casting (e.g. int).
         :param str metadata_base_dir: The overridden base directory for process metadata.
         """
         super().__init__(metadata_base_dir)
         self._name = name.lower().strip()
         self._pid = pid
         self._socket = socket
-        self._socket_type = socket_type
         self._process_name = process_name
         self._buildroot = get_buildroot()
         self._process = None
@@ -365,7 +362,7 @@ class ProcessManager(ProcessMetadataManager):
     @property
     def socket(self):
         """The running processes socket/port information (or None)."""
-        return self._socket or self.read_metadata_by_name(self._name, "socket", self._socket_type)
+        return self._socket or self.read_metadata_by_name(self._name, "socket", int)
 
     @classmethod
     def get_subprocess_output(cls, command, ignore_stderr=True, **kwargs):
@@ -385,26 +382,32 @@ class ProcessManager(ProcessMetadataManager):
             subprocess_output = getattr(e, "output", "").strip()
             raise cls.ExecutionError(str(e), subprocess_output)
 
-    def await_pid(self, timeout):
+    def await_pid(self, timeout: float) -> int:
         """Wait up to a given timeout for a process to write pid metadata."""
-        return self.await_metadata_by_name(
-            self._name,
-            "pid",
-            f"{self._name} to start",
-            f"{self._name} started",
-            timeout,
-            caster=int,
+        return cast(
+            int,
+            self.await_metadata_by_name(
+                self._name,
+                "pid",
+                f"{self._name} to start",
+                f"{self._name} started",
+                timeout,
+                caster=int,
+            ),
         )
 
-    def await_socket(self, timeout):
+    def await_socket(self, timeout: float) -> int:
         """Wait up to a given timeout for a process to write socket info."""
-        return self.await_metadata_by_name(
-            self._name,
-            "socket",
-            f"{self._name} socket to be opened",
-            f"{self._name} socket opened",
-            timeout,
-            caster=self._socket_type,
+        return cast(
+            int,
+            self.await_metadata_by_name(
+                self._name,
+                "socket",
+                f"{self._name} socket to be opened",
+                f"{self._name} socket opened",
+                timeout,
+                caster=int,
+            ),
         )
 
     def write_pid(self, pid=None):
@@ -730,7 +733,7 @@ class PantsDaemonProcessManager(FingerprintedProcessManager, metaclass=ABCMeta):
     def post_fork_child(self):
         """Post-fork() child callback for ProcessManager.daemon_spawn()."""
         spawn_control_env = dict(
-            PANTS_ENTRYPOINT=f"{self._daemon_entrypoint}:launch",
+            PANTS_ENTRYPOINT=f"{self._daemon_entrypoint}:launch_new_pantsd_instance",
             # The daemon should run under the same sys.path as us; so we ensure
             # this. NB: It will scrub PYTHONPATH once started to avoid infecting
             # its own unrelated subprocesses.
@@ -743,7 +746,7 @@ class PantsDaemonProcessManager(FingerprintedProcessManager, metaclass=ABCMeta):
 
         spawn_control_env_vars = " ".join(f"{k}={v}" for k, v in spawn_control_env.items())
         cmd_line = " ".join(cmd)
-        self._logger.debug(f"cmd is: {spawn_control_env_vars} {cmd_line}")
+        logger.debug(f"pantsd command is: {spawn_control_env_vars} {cmd_line}")
 
         # TODO: Improve error handling on launch failures.
         os.spawnve(os.P_NOWAIT, sys.executable, cmd, env=exec_env)

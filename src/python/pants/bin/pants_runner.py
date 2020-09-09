@@ -9,7 +9,7 @@ from typing import List, Mapping
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
 from pants.bin.remote_pants_runner import RemotePantsRunner
-from pants.init.logging import setup_logging
+from pants.init.logging import setup_logging, setup_warning_filtering
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -75,6 +75,7 @@ class PantsRunner:
         workdir_src = init_workdir(global_bootstrap_options)
         ExceptionSink.reset_log_location(workdir_src)
 
+        setup_warning_filtering(global_bootstrap_options.ignore_pants_warnings or [])
         # We enable logging here, and everything before it will be routed through regular
         # Python logging.
         setup_logging(global_bootstrap_options)
@@ -85,7 +86,8 @@ class PantsRunner:
 
         if self._should_run_with_pantsd(global_bootstrap_options):
             try:
-                return RemotePantsRunner(self.args, self.env, options_bootstrapper).run(start_time)
+                remote_runner = RemotePantsRunner(self.args, self.env, options_bootstrapper)
+                return remote_runner.run()
             except RemotePantsRunner.Fallback as e:
                 logger.warning("Client exception: {!r}, falling back to non-daemon mode".format(e))
 
