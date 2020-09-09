@@ -232,7 +232,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         ),
     )
     return LintResult.from_fallible_process_result(
-        result, partition_description=str(sorted(partition.interpreter_constraints))
+        result, partition_description=str(sorted(str(c) for c in partition.interpreter_constraints))
     )
 
 

@@ -8,7 +8,7 @@ from typing import Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
-from pants.backend.python.target_types import PythonSources
+from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -26,6 +26,7 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
+from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -35,6 +36,7 @@ class BlackFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
+    interpreter_constraints: PythonInterpreterCompatibility
 
 
 class BlackRequest(PythonFmtRequest, LintRequest):
@@ -71,14 +73,34 @@ def generate_args(*, source_files: SourceFiles, black: Black, check_only: bool) 
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_black(setup_request: SetupRequest, black: Black) -> Setup:
-    requirements_pex_request = Get(
+async def setup_black(
+    setup_request: SetupRequest, black: Black, python_setup: PythonSetup
+) -> Setup:
+    # Black requires 3.6+ but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6, and 3.7.
+    # However, typed-ast does not understand 3.8, so instead we must run Black with Python 3.8 when
+    # relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement like
+    # `>=3.6` to result in requiring Python 3.8, which would error if 3.8 is not installed on the
+    # machine.
+    all_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+        (field_set.interpreter_constraints for field_set in setup_request.request.field_sets),
+        python_setup,
+    )
+    tool_interpreter_constraints = PexInterpreterConstraints(
+        ("CPython>=3.8",)
+        if (
+            all_interpreter_constraints.requires_python38_or_newer()
+            and black.options.is_default("interpreter_constraints")
+        )
+        else black.interpreter_constraints
+    )
+
+    black_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="black.pex",
             internal_only=True,
             requirements=PexRequirements(black.all_requirements),
-            interpreter_constraints=PexInterpreterConstraints(black.interpreter_constraints),
+            interpreter_constraints=tool_interpreter_constraints,
             entry_point=black.entry_point,
         ),
     )
@@ -97,8 +119,8 @@ async def setup_black(setup_request: SetupRequest, black: Black) -> Setup:
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
 
-    source_files, requirements_pex, config_digest = await MultiGet(
-        source_files_request, requirements_pex_request, config_digest_request
+    source_files, black_pex, config_digest = await MultiGet(
+        source_files_request, black_pex_request, config_digest_request
     )
     source_files_snapshot = (
         source_files.snapshot
@@ -108,13 +130,13 @@ async def setup_black(setup_request: SetupRequest, black: Black) -> Setup:
 
     input_digest = await Get(
         Digest,
-        MergeDigests((source_files_snapshot.digest, requirements_pex.digest, config_digest)),
+        MergeDigests((source_files_snapshot.digest, black_pex.digest, config_digest)),
     )
 
     process = await Get(
         Process,
         PexProcess(
-            requirements_pex,
+            black_pex,
             argv=generate_args(
                 source_files=source_files, black=black, check_only=setup_request.check_only
             ),

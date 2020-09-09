@@ -9,7 +9,7 @@ import pickle
 from abc import ABC, abstractmethod
 from collections import abc, defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Mapping, Set, Tuple, cast
+from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
@@ -26,7 +26,6 @@ from pants.backend.python.util_rules.pex import (
     PexProcess,
     PexRequest,
     PexRequirements,
-    parse_interpreter_constraint,
 )
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
@@ -405,14 +404,19 @@ async def run_setup_pys(
         )
         exported_targets = list(FrozenOrderedSet(owners))
 
-    py2 = is_python2(
-        python_setup.compatibilities_or_constraints(
-            target_with_origin.target.get(PythonInterpreterCompatibility).value
+    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+        (
+            target_with_origin.target[PythonInterpreterCompatibility]
             for target_with_origin in targets_with_origins
-        )
+            if target_with_origin.target.has_field(PythonInterpreterCompatibility)
+        ),
+        python_setup,
     )
     chroots = await MultiGet(
-        Get(SetupPyChroot, SetupPyChrootRequest(exported_target, py2))
+        Get(
+            SetupPyChroot,
+            SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
+        )
         for exported_target in exported_targets
     )
 
@@ -955,21 +959,6 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
             cast(ast.Call, ast_node), ("__name__",)
         ):
             return True
-    return False
-
-
-def is_python2(compatibilities_or_constraints: Iterable[str]) -> bool:
-    """Checks if we should assume python2 code."""
-
-    def iter_reqs():
-        for constraint in compatibilities_or_constraints:
-            yield parse_interpreter_constraint(constraint)
-
-    for req in iter_reqs():
-        for python_27_ver in range(0, 18):  # The last python 2.7 version was 2.7.18.
-            if req.specifier.contains(f"2.7.{python_27_ver}"):
-                # At least one constraint limits us to Python 2, so assume that.
-                return True
     return False
 
 

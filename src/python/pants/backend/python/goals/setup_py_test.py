@@ -30,7 +30,6 @@ from pants.backend.python.goals.setup_py import (
     get_owned_dependencies,
     get_requirements,
     get_sources,
-    is_python2,
     validate_args,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
@@ -808,32 +807,3 @@ def test_declares_pkg_resources_namespace_package(python_src: str) -> None:
 )
 def test_does_not_declare_pkg_resources_namespace_package(python_src: str) -> None:
     assert not declares_pkg_resources_namespace_package(python_src)
-
-
-@pytest.mark.parametrize(
-    "constraints",
-    [
-        ["CPython>=2.7,<3"],
-        ["CPython>=2.7,<3", "CPython>=3.6"],
-        ["CPython>=2.7.13"],
-        ["CPython>=2.7.13,<2.7.16"],
-        ["CPython>=2.7.13,!=2.7.16"],
-        ["PyPy>=2.7,<3"],
-    ],
-)
-def test_is_python2(constraints):
-    assert is_python2(constraints)
-
-
-@pytest.mark.parametrize(
-    "constraints",
-    [
-        ["CPython>=3.6"],
-        ["CPython>=3.7"],
-        ["CPython>=3.6", "CPython>=3.8"],
-        ["CPython!=2.7.*"],
-        ["PyPy>=3.6"],
-    ],
-)
-def test_is_not_python2(constraints):
-    assert not is_python2(constraints)
