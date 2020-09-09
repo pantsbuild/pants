@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import functools
 import logging
 import os
 import signal
@@ -526,83 +525,15 @@ class ProcessManager(ProcessMetadataManager):
         if purge:
             self.purge_metadata(force=True)
 
-    def daemonize(
-        self,
-        pre_fork_opts=None,
-        post_fork_parent_opts=None,
-        post_fork_child_opts=None,
-        fork_context=None,
-        write_pid=True,
-    ):
-        """Perform a double-fork, execute callbacks and write the child pid file.
-
-        The double-fork here is necessary to truly daemonize the subprocess such that it can never
-        take control of a tty. The initial fork and setsid() creates a new, isolated process group
-        and also makes the first child a session leader (which can still acquire a tty). By forking a
-        second time, we ensure that the second child can never acquire a controlling terminal because
-        it's no longer a session leader - but it now has its own separate process group.
-
-        Additionally, a normal daemon implementation would typically perform an os.umask(0) to reset
-        the processes file mode creation mask post-fork. We do not do this here (and in daemon_spawn
-        below) due to the fact that the daemons that pants would run are typically personal user
-        daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
-        differ in their permissions without good reason - in this case, we want to inherit the umask.
-
-        :param fork_context: A function which accepts and calls a function that will call fork. This
-          is not a contextmanager/generator because that would make interacting with native code more
-          challenging. If no fork_context is passed, the fork function is called directly.
-        """
-
-        def double_fork():
-            logger.debug("forking %s", self)
-            pid = os.fork()
-            if pid == 0:
-                os.setsid()
-                second_pid = os.fork()
-                if second_pid == 0:
-                    return False, True
-                else:
-                    if write_pid:
-                        self.write_pid(second_pid)
-                    return False, False
-            else:
-                # This prevents un-reaped, throw-away parent processes from lingering in the process table.
-                os.waitpid(pid, 0)
-                return True, False
-
-        fork_func = functools.partial(fork_context, double_fork) if fork_context else double_fork
-
-        # Perform the double fork (optionally under the fork_context). Three outcomes are possible after
-        # the double fork: we're either the original parent process, the middle double-fork process, or
-        # the child. We assert below that a process is not somehow both the parent and the child.
-        self.purge_metadata()
-        self.pre_fork(**pre_fork_opts or {})
-        is_parent, is_child = fork_func()
-
-        try:
-            if not is_parent and not is_child:
-                # Middle process.
-                os._exit(0)
-            elif is_parent:
-                assert not is_child
-                self.post_fork_parent(**post_fork_parent_opts or {})
-            else:
-                assert not is_parent
-                os.chdir(self._buildroot)
-                self.post_fork_child(**post_fork_child_opts or {})
-        except Exception:
-            logger.critical(traceback.format_exc())
-            os._exit(0)
-
     def daemon_spawn(
         self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None
     ):
         """Perform a single-fork to run a subprocess and write the child pid file.
 
         Use this if your post_fork_child block invokes a subprocess via subprocess.Popen(). In this
-        case, a second fork such as used in daemonize() is extraneous given that Popen() also forks.
-        Using this daemonization method vs daemonize() leaves the responsibility of writing the pid
-        to the caller to allow for library-agnostic flexibility in subprocess execution.
+        case, a second fork is extraneous given that Popen() also forks. Using this daemonization
+        method leaves the responsibility of writing the pid to the caller to allow for library-
+        agnostic flexibility in subprocess execution.
         """
         self.purge_metadata()
         self.pre_fork(**pre_fork_opts or {})
