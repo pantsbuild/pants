@@ -34,7 +34,11 @@ from pants.util.frozendict import FrozenDict
 
 def test_merge_interpreter_constraints() -> None:
     def assert_merged(*, inp: List[List[str]], expected: List[str]) -> None:
-        assert PexInterpreterConstraints.merge_constraint_sets(inp) == expected
+        result = sorted(str(req) for req in PexInterpreterConstraints.merge_constraint_sets(inp))
+        # Requirement.parse() sorts specs differently than we'd like, so we convert each str to a
+        # Requirement.
+        normalized_expected = sorted(str(Requirement.parse(v)) for v in expected)
+        assert result == normalized_expected
 
     # Multiple constraint sets get merged so that they are ANDed.
     # A & B => A & B
@@ -124,6 +128,66 @@ def test_merge_interpreter_constraints() -> None:
 
     # Ensure we can handle empty input.
     assert_merged(inp=[], expected=[])
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        ["CPython>=2.7,<3"],
+        ["CPython>=2.7,<3", "CPython>=3.6"],
+        ["CPython>=2.7.13"],
+        ["CPython>=2.7.13,<2.7.16"],
+        ["CPython>=2.7.13,!=2.7.16"],
+        ["PyPy>=2.7,<3"],
+    ],
+)
+def test_interpreter_constraints_includes_python2(constraints) -> None:
+    assert PexInterpreterConstraints(constraints).includes_python2() is True
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        ["CPython>=3.6"],
+        ["CPython>=3.7"],
+        ["CPython>=3.6", "CPython>=3.8"],
+        ["CPython!=2.7.*"],
+        ["PyPy>=3.6"],
+    ],
+)
+def test_interpreter_constraints_do_not_include_python2(constraints):
+    assert PexInterpreterConstraints(constraints).includes_python2() is False
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        ["CPython==3.8.*"],
+        ["CPython==3.8.1"],
+        ["CPython==3.9.1"],
+        ["CPython>=3.8"],
+        ["CPython>=3.9"],
+        ["CPython==3.8.*", "CPython==3.9.*"],
+        ["PyPy>=3.8"],
+    ],
+)
+def test_interpreter_constraints_require_python38(constraints) -> None:
+    assert PexInterpreterConstraints(constraints).requires_python38_or_newer() is True
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        ["CPython==3.7.*"],
+        ["CPython==3.7.3"],
+        ["CPython>=3.6"],
+        ["CPython==3.7.*", "CPython==3.8.*"],
+        ["CPython==3.5.3", "CPython==3.8.3"],
+        ["PyPy>=3.6"],
+    ],
+)
+def test_interpreter_constraints_do_not_require_python38(constraints):
+    assert PexInterpreterConstraints(constraints).requires_python38_or_newer() is False
 
 
 @dataclass(frozen=True)
@@ -336,7 +400,7 @@ def test_entry_point(rule_runner: RuleRunner) -> None:
 def test_interpreter_constraints(rule_runner: RuleRunner) -> None:
     constraints = PexInterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
     pex_info = create_pex_and_get_pex_info(rule_runner, interpreter_constraints=constraints)
-    assert set(pex_info["interpreter_constraints"]) == set(constraints)
+    assert set(pex_info["interpreter_constraints"]) == {str(c) for c in constraints}
 
 
 def test_additional_args(rule_runner: RuleRunner) -> None:

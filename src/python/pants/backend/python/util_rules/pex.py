@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import functools
 import itertools
 import logging
 from dataclasses import dataclass
@@ -10,12 +11,12 @@ from typing import (
     Iterable,
     List,
     Mapping,
-    NamedTuple,
     Optional,
     Sequence,
     Set,
     Tuple,
     TypeVar,
+    Union,
 )
 
 from pkg_resources import Requirement
@@ -46,6 +47,7 @@ from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 
@@ -63,33 +65,6 @@ class PexRequirements(DeduplicatedCollection[str]):
         return PexRequirements({*field_requirements, *additional_requirements})
 
 
-def parse_interpreter_constraint(constraint: str) -> Requirement:
-    """Parse an interpreter constraint, e.g., CPython>=2.7,<3.
-
-    We allow shorthand such as `>=3.7`, which gets expanded to `CPython>=3.7`. See Pex's
-    interpreter.py's `parse_requirement()`.
-    """
-    try:
-        parsed_requirement = Requirement.parse(constraint)
-    except ValueError:
-        parsed_requirement = Requirement.parse(f"CPython{constraint}")
-    return parsed_requirement
-
-
-Spec = Tuple[str, str]  # e.g. (">=", "3.6")
-
-
-class ParsedConstraint(NamedTuple):
-    interpreter: str
-    specs: FrozenSet[Spec]
-
-    def __str__(self) -> str:
-        specs = ",".join(
-            f"{op}{version}" for op, version in sorted(self.specs, key=lambda spec: spec[1])
-        )
-        return f"{self.interpreter}{specs}"
-
-
 # This protocol allows us to work with any arbitrary FieldSet. See
 # https://mypy.readthedocs.io/en/stable/protocols.html.
 class FieldSetWithCompatibility(Protocol):
@@ -105,11 +80,29 @@ class FieldSetWithCompatibility(Protocol):
 _FS = TypeVar("_FS", bound=FieldSetWithCompatibility)
 
 
-class PexInterpreterConstraints(DeduplicatedCollection[str]):
-    sort_input = True
+# Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
+class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
+    def __init__(self, constraints: Iterable[Union[str, Requirement]] = ()) -> None:
+        super().__init__(
+            v if isinstance(v, Requirement) else self.parse_constraint(v)
+            for v in sorted(constraints)
+        )
 
     @staticmethod
-    def merge_constraint_sets(constraint_sets: Iterable[Iterable[str]]) -> List[str]:
+    def parse_constraint(constraint: str) -> Requirement:
+        """Parse an interpreter constraint, e.g., CPython>=2.7,<3.
+
+        We allow shorthand such as `>=3.7`, which gets expanded to `CPython>=3.7`. See Pex's
+        interpreter.py's `parse_requirement()`.
+        """
+        try:
+            parsed_requirement = Requirement.parse(constraint)
+        except ValueError:
+            parsed_requirement = Requirement.parse(f"CPython{constraint}")
+        return parsed_requirement
+
+    @classmethod
+    def merge_constraint_sets(cls, constraint_sets: Iterable[Iterable[str]]) -> List[Requirement]:
         """Given a collection of constraints sets, merge by ORing within each individual constraint
         set and ANDing across each distinct constraint set.
 
@@ -120,29 +113,26 @@ class PexInterpreterConstraints(DeduplicatedCollection[str]):
         # identical top-level parsed constraint sets.
         if not constraint_sets:
             return []
-        parsed_constraint_sets: Set[FrozenSet[ParsedConstraint]] = set()
+        parsed_constraint_sets: Set[FrozenSet[Requirement]] = set()
         for constraint_set in constraint_sets:
             # Each element (a ParsedConstraint) will get ORed.
-            parsed_constraint_set: Set[ParsedConstraint] = set()
-            for constraint in constraint_set:
-                parsed_requirement = parse_interpreter_constraint(constraint)
-                interpreter = parsed_requirement.project_name
-                specs = frozenset(parsed_requirement.specs)
-                parsed_constraint_set.add(ParsedConstraint(interpreter, specs))
-            parsed_constraint_sets.add(frozenset(parsed_constraint_set))
+            parsed_constraint_set = frozenset(
+                cls.parse_constraint(constraint) for constraint in constraint_set
+            )
+            parsed_constraint_sets.add(parsed_constraint_set)
 
-        def and_constraints(parsed_constraints: Sequence[ParsedConstraint]) -> ParsedConstraint:
-            merged_specs: Set[Spec] = set()
-            expected_interpreter = parsed_constraints[0][0]
+        def and_constraints(parsed_constraints: Sequence[Requirement]) -> Requirement:
+            merged_specs: Set[Tuple[str, str]] = set()
+            expected_interpreter = parsed_constraints[0].project_name
             for parsed_constraint in parsed_constraints:
-                if parsed_constraint.interpreter != expected_interpreter:
+                if parsed_constraint.project_name != expected_interpreter:
                     attempted_interpreters = {
                         interp: sorted(
                             str(parsed_constraint) for parsed_constraint in parsed_constraints
                         )
                         for interp, parsed_constraints in itertools.groupby(
                             parsed_constraints,
-                            key=lambda pc: pc.interpreter,
+                            key=lambda pc: pc.project_name,
                         )
                     }
                     raise ValueError(
@@ -151,13 +141,23 @@ class PexInterpreterConstraints(DeduplicatedCollection[str]):
                         f"{attempted_interpreters}."
                     )
                 merged_specs.update(parsed_constraint.specs)
-            return ParsedConstraint(expected_interpreter, frozenset(merged_specs))
+
+            formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
+            return Requirement.parse(f"{expected_interpreter}{formatted_specs}")
+
+        def cmp_constraints(req1: Requirement, req2: Requirement) -> int:
+            if req1.project_name != req2.project_name:
+                return -1 if req1.project_name < req2.project_name else 1
+            if req1.specs == req2.specs:
+                return 0
+            return -1 if req1.specs < req2.specs else 1
 
         return sorted(
             {
-                str(and_constraints(constraints_product))
+                and_constraints(constraints_product)
                 for constraints_product in itertools.product(*parsed_constraint_sets)
-            }
+            },
+            key=functools.cmp_to_key(cmp_constraints),
         )
 
     @classmethod
@@ -187,8 +187,53 @@ class PexInterpreterConstraints(DeduplicatedCollection[str]):
     def generate_pex_arg_list(self) -> List[str]:
         args = []
         for constraint in self:
-            args.extend(["--interpreter-constraint", constraint])
+            args.extend(["--interpreter-constraint", str(constraint)])
         return args
+
+    def includes_python2(self) -> bool:
+        """Checks if any of the constraints include Python 2.
+
+        This will return True even if the code works with Python 3 too, so long as at least one of
+        the constraints works with Python 2.
+        """
+        py27_patch_versions = list(
+            reversed(range(0, 18))
+        )  # The last python 2.7 version was 2.7.18.
+        for req in self:
+            if any(
+                req.specifier.contains(f"2.7.{p}") for p in py27_patch_versions  # type: ignore[attr-defined]
+            ):
+                return True
+        return False
+
+    def requires_python38_or_newer(self) -> bool:
+        """Checks if the constraints are all for Python 3.8+.
+
+        This will return False if Python 3.8 is allowed, but prior versions like 3.7 are also
+        allowed.
+        """
+        # Assume any 3.x release has no more than 13 releases. The max is currently 10.
+        patch_versions = list(reversed(range(0, 13)))
+        # We only need to look at Python 3.7. If using something like `>=3.5`, Py37 will be
+        # included. `==3.6.*,!=3.7.*,==3.8.*` is extremely unlikely, and even that will work
+        # correctly as it's an invalid constraint so setuptools returns False always.
+        # `['==2.7.*', '==3.8.*']` will fail because not every single constraint is exclusively 3.8.
+        py37_versions = [f"3.7.{v}" for v in patch_versions]
+        py38_versions = [f"3.8.{v}" for v in patch_versions]
+        py39_versions = [f"3.9.{v}" for v in patch_versions]
+        for req in self:
+            if any(
+                req.specifier.contains(py37_version) for py37_version in py37_versions  # type: ignore[attr-defined]
+            ):
+                return False
+            works_with_py38_or_py39 = any(
+                req.specifier.contains(py38_version) for py38_version in py38_versions  # type: ignore[attr-defined]
+            ) or any(
+                req.specifier.contains(py39_version) for py39_version in py39_versions  # type: ignore[attr-defined]
+            )
+            if not works_with_py38_or_py39:
+                return False
+        return True
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
