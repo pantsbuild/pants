@@ -4,7 +4,6 @@
 import logging
 import sys
 import time
-from contextlib import contextmanager
 from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink, SignalHandler
@@ -20,12 +19,11 @@ logger = logging.getLogger(__name__)
 
 
 class PailgunClientSignalHandler(SignalHandler):
-    def __init__(self, pailgun_client, pid, timeout=1, *args, **kwargs):
-        assert isinstance(pailgun_client, NailgunClient)
+    def __init__(self, pailgun_client: NailgunClient, pid: int, timeout: float = 1):
         self._pailgun_client = pailgun_client
         self._timeout = timeout
         self.pid = pid
-        super().__init__(*args, **kwargs)
+        super().__init__(pantsd_instance=False)
 
     def _forward_signal_with_timeout(self, signum, signame):
         # TODO Consider not accessing the private function _maybe_last_pid here, or making it public.
@@ -82,17 +80,6 @@ class RemotePantsRunner:
         self._bootstrap_options = options_bootstrapper.bootstrap_options
         self._client = PantsDaemonClient(self._bootstrap_options)
 
-    @contextmanager
-    def _trapped_signals(self, client, pid: int):
-        """A contextmanager that handles SIGINT (control-c) and SIGQUIT (control-\\) remotely."""
-        signal_handler = PailgunClientSignalHandler(
-            client,
-            pid=pid,
-            timeout=self._bootstrap_options.for_global_scope().pantsd_pailgun_quit_timeout,
-        )
-        with ExceptionSink.trapped_signals(signal_handler):
-            yield
-
     @staticmethod
     def _backoff(attempt):
         """Minimal backoff strategy for daemon restarts."""
@@ -140,6 +127,9 @@ class RemotePantsRunner:
     def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
         port = pantsd_handle.port
         pid = pantsd_handle.pid
+
+        global_options = self._bootstrap_options.for_global_scope()
+
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
         ng_env = NailgunProtocol.ttynames_to_env(sys.stdin, sys.stdout.buffer, sys.stderr.buffer)
         modified_env = {
@@ -147,7 +137,7 @@ class RemotePantsRunner:
             **ng_env,
             "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(self._start_time),
             "PANTSD_REQUEST_TIMEOUT_LIMIT": str(
-                self._bootstrap_options.for_global_scope().pantsd_timeout_when_multiple_invocations
+                global_options.pantsd_timeout_when_multiple_invocations
             ),
         }
 
@@ -162,7 +152,9 @@ class RemotePantsRunner:
             metadata_base_dir=pantsd_handle.metadata_base_dir,
         )
 
-        with self._trapped_signals(client, pantsd_handle.pid), STTYSettings.preserved():
+        timeout = global_options.pantsd_pailgun_quit_timeout
+        pantsd_signal_handler = PailgunClientSignalHandler(client, pid=pid, timeout=timeout)
+        with ExceptionSink.trapped_signals(pantsd_signal_handler), STTYSettings.preserved():
             # Execute the command on the pailgun.
             return client.execute(self._args[0], self._args[1:], modified_env)
 

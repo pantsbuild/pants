@@ -481,7 +481,7 @@ class SchedulerSession:
             ),
         )
 
-        ExceptionSink.toggle_ignoring_sigint_v2_engine(False)
+        ExceptionSink.toggle_ignoring_sigint(False)
 
         self._maybe_visualize()
 

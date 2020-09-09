@@ -10,7 +10,7 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
-from typing import Optional
+from typing import Callable, Dict, Iterator
 
 import setproctitle
 
@@ -33,7 +33,7 @@ class SignalHandler:
     """
 
     @property
-    def signal_handler_mapping(self):
+    def signal_handler_mapping(self) -> Dict[signal.Signals, Callable]:
         """A dict mapping (signal number) -> (a method handling the signal)."""
         # Could use an enum here, but we never end up doing any matching on the specific signal value,
         # instead just iterating over the registered signals to set handlers, so a dict is probably
@@ -44,39 +44,20 @@ class SignalHandler:
             signal.SIGTERM: self.handle_sigterm,
         }
 
-    def __init__(self):
+    def __init__(self, *, pantsd_instance: bool):
         self._ignore_sigint_lock = threading.Lock()
-        self._threads_ignoring_sigint = 0
-        self._ignoring_sigint_v2_engine = False
-
-    def _check_sigint_gate_is_correct(self):
-        assert (
-            self._threads_ignoring_sigint >= 0
-        ), "This should never happen, someone must have modified the counter outside of SignalHandler."
+        self._ignoring_sigint = False
+        self._pantsd_instance = pantsd_instance
 
     def _handle_sigint_if_enabled(self, signum, _frame):
         with self._ignore_sigint_lock:
-            self._check_sigint_gate_is_correct()
-            threads_ignoring_sigint = self._threads_ignoring_sigint
-            ignoring_sigint_v2_engine = self._ignoring_sigint_v2_engine
-        if threads_ignoring_sigint == 0 and not ignoring_sigint_v2_engine:
-            self.handle_sigint(signum, _frame)
+            if not self._ignoring_sigint:
+                self.handle_sigint(signum, _frame)
 
-    def _toggle_ignoring_sigint_v2_engine(self, toggle: bool):
-        with self._ignore_sigint_lock:
-            self._ignoring_sigint_v2_engine = toggle
-
-    @contextmanager
-    def _ignoring_sigint(self):
-        with self._ignore_sigint_lock:
-            self._check_sigint_gate_is_correct()
-            self._threads_ignoring_sigint += 1
-        try:
-            yield
-        finally:
+    def _toggle_ignoring_sigint(self, toggle: bool) -> None:
+        if not self._pantsd_instance:
             with self._ignore_sigint_lock:
-                self._threads_ignoring_sigint -= 1
-                self._check_sigint_gate_is_correct()
+                self._ignoring_sigint = toggle
 
     def handle_sigint(self, signum, _frame):
         raise KeyboardInterrupt("User interrupted execution with control-c!")
@@ -114,10 +95,8 @@ class ExceptionSink:
     _interactive_output_stream = None
     # Whether to print a stacktrace in any fatal error message printed to the terminal.
     _should_print_backtrace_to_terminal = True
-    # An instance of `SignalHandler` which is invoked to handle a static set of specific
-    # nonfatal signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they
-    # don't need to exit immediately).
-    _signal_handler: Optional[SignalHandler] = None
+
+    _signal_handler: SignalHandler = SignalHandler(pantsd_instance=False)
 
     # These persistent open file descriptors are kept so the signal handler can do almost no work
     # (and lets faulthandler figure out signal safety).
@@ -281,20 +260,14 @@ class ExceptionSink:
         fileobj.flush()
 
     @classmethod
-    def reset_signal_handler(cls, signal_handler):
-        """Class state:
+    def reset_signal_handler(cls, signal_handler: SignalHandler) -> SignalHandler:
+        """Given a SignalHandler, uses the `signal` std library functionality to set the pants
+        process's signal handlers to those specified in the object.
 
-        - Overwrites `cls._signal_handler`.
-        OS state:
-        - Overwrites signal handlers for SIGINT, SIGQUIT, and SIGTERM.
-
-        NB: This method calls signal.signal(), which will crash if not called from the main thread!
-
-        :returns: The :class:`SignalHandler` that was previously registered, or None if this is
-                  the first time this method was called.
+        Note that since this calls `signal.signal()`, it will crash if not the main thread. Returns
+        the previously-registered signal handler.
         """
-        assert isinstance(signal_handler, SignalHandler)
-        # NB: Modify process-global state!
+
         for signum, handler in signal_handler.signal_handler_mapping.items():
             signal.signal(signum, handler)
             # Retry any system calls interrupted by any of the signals we just installed handlers for
@@ -303,13 +276,13 @@ class ExceptionSink:
             signal.siginterrupt(signum, False)
 
         previous_signal_handler = cls._signal_handler
-        # NB: Mutate the class variables!
         cls._signal_handler = signal_handler
+
         return previous_signal_handler
 
     @classmethod
     @contextmanager
-    def trapped_signals(cls, new_signal_handler):
+    def trapped_signals(cls, new_signal_handler: SignalHandler) -> Iterator[None]:
         """A contextmanager which temporarily overrides signal handling.
 
         NB: This method calls signal.signal(), which will crash if not called from the main thread!
@@ -321,23 +294,16 @@ class ExceptionSink:
             cls.reset_signal_handler(previous_signal_handler)
 
     @classmethod
-    @contextmanager
-    def ignoring_sigint(cls):
-        """A contextmanager which disables handling sigint in the current signal handler. This
-        allows threads that are not the main thread to ignore sigint.
+    def toggle_ignoring_sigint(cls, toggle: bool) -> None:
+        """This method is used to temporarily disable responding to the SIGINT signal sent by a
+        Ctrl-C in the terminal.
 
-        NB: Only use this if you can't use ExceptionSink.trapped_signals().
-
-        Class state:
-        - Toggles `self._ignore_sigint` in `cls._signal_handler`.
+        We currently only use this to implement disabling catching SIGINT while an
+        InteractiveProcess is running (where we want that process to catch it), and only when pantsd
+        is not enabled (if pantsd is enabled, the client will actually catch SIGINT and forward it
+        to the server, so we don't want the server process to ignore it.
         """
-        with cls._signal_handler._ignoring_sigint():
-            yield
-
-    @classmethod
-    def toggle_ignoring_sigint_v2_engine(cls, toggle: bool) -> None:
-        assert cls._signal_handler is not None
-        cls._signal_handler._toggle_ignoring_sigint_v2_engine(toggle)
+        cls._signal_handler._toggle_ignoring_sigint(toggle)
 
     @classmethod
     def _iso_timestamp_for_now(cls):
@@ -453,12 +419,16 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 # import time.
 # Set the log location for writing logs before bootstrap options are parsed.
 ExceptionSink.reset_log_location(os.getcwd())
+
 # NB: Mutate process-global state!
 sys.excepthook = ExceptionSink.log_exception
+
 # Sets a SIGUSR2 handler.
 ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer)
-# Sets a handler that logs nonfatal signals to the exception sink.
-ExceptionSink.reset_signal_handler(SignalHandler())
+
+# Setup a default signal handler.
+ExceptionSink.reset_signal_handler(SignalHandler(pantsd_instance=False))
+
 # Set whether to print stacktraces on exceptions or signals during import time.
 # NB: This will be overridden by bootstrap options in PantsRunner, so we avoid printing out a full
 # stacktrace when a user presses control-c during import time unless the environment variable is set

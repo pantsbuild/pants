@@ -11,7 +11,7 @@ from typing import IO, Any, Iterator
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink
+from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
 from pants.init.engine_initializer import GraphScheduler
@@ -173,15 +173,9 @@ class PantsDaemon(PantsDaemonProcessManager):
         self._native = native
         self._build_root = get_buildroot()
         self._work_dir = work_dir
-        self._log_level = log_level
         self._server = server
         self._core = core
         self._bootstrap_options = bootstrap_options
-        self._log_show_rust_3rdparty = (
-            bootstrap_options.for_global_scope().log_show_rust_3rdparty
-            if bootstrap_options
-            else True
-        )
 
         self._logger = logging.getLogger(__name__)
 
@@ -215,19 +209,22 @@ class PantsDaemon(PantsDaemonProcessManager):
         with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
             # Reinitialize logging for the daemon context.
             global_options = self._bootstrap_options.for_global_scope()
+            log_level = global_options.level
             use_color = global_options.colors
             show_target = global_options.show_log_target
+            show_rust_3rdparty = global_options.log_show_rust_3rdparty
             init_rust_logger(
-                self._log_level,
-                self._log_show_rust_3rdparty,
+                log_level,
+                log_show_rust_3rdparty=show_rust_3rdparty,
                 use_color=use_color,
                 show_target=show_target,
             )
 
-            level = self._log_level
             clear_logging_handlers()
             log_dir = os.path.join(self._work_dir, self.name)
-            log_handler = setup_logging_to_file(level, log_dir=log_dir, log_filename=self.LOG_NAME)
+            log_handler = setup_logging_to_file(
+                log_level, log_dir=log_dir, log_filename=self.LOG_NAME
+            )
 
             self._native.override_thread_logging_destination_to_just_pantsd()
 
@@ -237,7 +234,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             sys.stdout = _LoggerStream(logging.getLogger(), logging.INFO, log_handler)  # type: ignore[assignment]
             sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, log_handler)  # type: ignore[assignment]
 
-            self._logger.debug("logging initialized")
+            self._logger.debug("Logging reinitialized in pantsd context")
             yield log_handler.stream
 
     def _write_nailgun_port(self):
@@ -266,6 +263,8 @@ class PantsDaemon(PantsDaemonProcessManager):
         # Switch log output to the daemon's log stream from here forward.
         self._close_stdio()
         with self._pantsd_logging() as log_stream:
+
+            ExceptionSink.reset_signal_handler(SignalHandler(pantsd_instance=True))
 
             # We don't have any stdio streams to log to anymore, so we log to a file.
             # We don't override the faulthandler destination because the stream we get will proxy things
