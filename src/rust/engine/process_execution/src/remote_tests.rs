@@ -97,7 +97,7 @@ async fn make_execute_request() {
   want_command.mut_arguments().push("yo".to_owned());
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned());
     env.set_value("none".to_owned());
     env
   });
@@ -183,7 +183,7 @@ async fn make_execute_request_with_instance_name() {
   want_command.mut_arguments().push("yo".to_owned());
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned());
     env.set_value("none".to_owned());
     env
   });
@@ -282,7 +282,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   want_command.mut_arguments().push("yo".to_owned());
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned());
     env.set_value("none".to_owned());
     env
   });
@@ -363,7 +363,7 @@ async fn make_execute_request_with_jdk() {
   want_command.mut_arguments().push("yo".to_owned());
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned());
     env.set_value("none".to_owned());
     env
   });
@@ -418,7 +418,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   want_command.mut_arguments().push("yo".to_owned());
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned());
     env.set_value("none".to_owned());
     env
   });
@@ -530,7 +530,7 @@ async fn make_execute_request_with_timeout() {
   want_command.mut_arguments().push("yo".to_owned());
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned());
     env.set_value("none".to_owned());
     env
   });
