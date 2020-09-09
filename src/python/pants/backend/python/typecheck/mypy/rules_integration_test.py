@@ -8,7 +8,7 @@ from typing import List, Optional, Sequence
 import pytest
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
@@ -30,7 +30,7 @@ def rule_runner() -> RuleRunner:
             *dependency_inference_rules.rules(),  # Used for import inference.
             QueryRule(TypecheckResults, (MyPyRequest, OptionsBootstrapper)),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonLibrary, PythonRequirementLibrary],
     )
 
 
@@ -196,6 +196,96 @@ def test_skip(rule_runner: RuleRunner) -> None:
     assert not result
 
 
+def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            python_requirement_library(
+                name="more-itertools",
+                requirements=["more-itertools==8.4.0"],
+            )
+            """
+        ),
+    )
+    source_file = FileContent(
+        f"{PACKAGE}/itertools.py",
+        dedent(
+            """\
+            from more_itertools import flatten
+
+            assert flatten(42) == [4, 2]
+            """
+        ).encode(),
+    )
+    target = make_target(rule_runner, [source_file])
+    result = run_mypy(rule_runner, [target])
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert f"{PACKAGE}/itertools.py:3" in result[0].stdout
+
+
+def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            python_requirement_library(
+                name='django',
+                requirements=['Django==2.2.5'],
+            )
+            """
+        ),
+    )
+    settings_file = FileContent(
+        f"{PACKAGE}/settings.py",
+        dedent(
+            """\
+            from django.urls import URLPattern
+
+            DEBUG = True
+            DEFAULT_FROM_EMAIL = "webmaster@example.com"
+            SECRET_KEY = "not so secret"
+            MY_SETTING = URLPattern(pattern="foo", callback=lambda: None)
+            """
+        ).encode(),
+    )
+    app_file = FileContent(
+        f"{PACKAGE}/app.py",
+        dedent(
+            """\
+            from django.utils import text
+
+            assert "forty-two" == text.slugify("forty two")
+            assert "42" == text.slugify(42)
+            """
+        ).encode(),
+    )
+    target = make_target(rule_runner, [settings_file, app_file])
+    config_content = dedent(
+        """\
+        [mypy]
+        plugins =
+            mypy_django_plugin.main
+
+        [mypy.plugins.django-stubs]
+        django_settings_module = project.settings
+        """
+    )
+    result = run_mypy(
+        rule_runner,
+        [target],
+        config=config_content,
+        additional_args=[
+            "--mypy-extra-requirements=django-stubs==1.5.0",
+            "--mypy-version=mypy==0.770",
+        ],
+    )
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert "src/python/project/app.py:4" in result[0].stdout
+
+
 def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.create_file(f"{PACKAGE}/util/__init__.py")
     rule_runner.create_file(
@@ -232,10 +322,10 @@ def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/app.py",
             dedent(
                 """\
-                    from project.math.add import add
+                from project.math.add import add
 
-                    print(add(2, 4))
-                    """
+                print(add(2, 4))
+                """
             ).encode(),
         ),
         FileContent(f"{PACKAGE}/__init__.py", b""),
