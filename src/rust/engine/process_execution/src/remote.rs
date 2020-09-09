@@ -39,6 +39,11 @@ use crate::{
 // CommandRunner.
 pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
+// Environment variable which is exclusively used for cache key invalidation.
+// This may be not specified in an Process, and may be populated only by the
+// CommandRunner.
+pub const CACHE_KEY_TARGET_PLATFORM: &str = "PANTS_CACHE_KEY_TARGET_PLATFORM";
+
 #[derive(Debug)]
 pub enum OperationOrStatus {
   Operation(bazel_protos::operations::Operation),
@@ -915,12 +920,13 @@ pub fn make_execute_request(
   let mut command = bazel_protos::remote_execution::Command::new();
   command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
   for (name, value) in &req.env {
-    if name.as_str() == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME {
+    if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME || name == CACHE_KEY_TARGET_PLATFORM {
       return Err(format!(
         "Cannot set env var with name {} as that is reserved for internal use by pants",
-        CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
+        name
       ));
     }
+
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(name.to_string());
     env.set_value(value.to_string());
@@ -931,7 +937,6 @@ pub fn make_execute_request(
     instance_name,
     cache_key_gen_version,
     mut platform_properties,
-    ..
   } = metadata;
 
   // TODO: Disabling append-only caches in remoting until server support exists due to
@@ -949,6 +954,14 @@ pub fn make_execute_request(
     env.set_value(cache_key_gen_version);
     command.mut_environment_variables().push(env);
   }
+
+  {
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name(CACHE_KEY_TARGET_PLATFORM.to_string());
+    env.set_value(req.target_platform.into());
+    command.mut_environment_variables().push(env);
+  }
+
   let mut output_files = req
     .output_files
     .iter()

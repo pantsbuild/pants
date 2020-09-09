@@ -26,7 +26,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "1100709"]
+#![type_length_limit = "1257309"]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
@@ -393,7 +393,6 @@ async fn main() {
               instance_name: remote_instance_arg,
               cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
               platform_properties,
-              platform: target_platform,
             },
             root_ca_certs,
             oauth_bearer_token,

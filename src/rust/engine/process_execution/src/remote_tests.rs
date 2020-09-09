@@ -97,6 +97,12 @@ async fn make_execute_request() {
   want_command.mut_arguments().push("yo".to_owned());
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_value("none".to_owned());
+    env
+  });
+  want_command.mut_environment_variables().push({
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name("SOME".to_owned());
     env.set_value("value".to_owned());
     env
@@ -116,10 +122,10 @@ async fn make_execute_request() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "0e290a4926d69eabd0be14fb85707532c5da224e6949f4fe3adbb9ec3e41e442",
+        "369820f9643feb39980c51fb6d35d59567256946ff3234a371cba8f4de95339c",
       )
       .unwrap(),
-      74,
+      115,
     ))
       .into(),
   );
@@ -129,7 +135,7 @@ async fn make_execute_request() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "687a950251abfad83345ee0b0631f7215bbe520f38b2f48377172c6d55a5cb22",
+        "51cda3b6c18ddd47005162010e898b20faf842b3ba1a840d1a619bd962d53192",
       )
       .unwrap(),
       140,
@@ -177,6 +183,12 @@ async fn make_execute_request_with_instance_name() {
   want_command.mut_arguments().push("yo".to_owned());
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_value("none".to_owned());
+    env
+  });
+  want_command.mut_environment_variables().push({
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name("SOME".to_owned());
     env.set_value("value".to_owned());
     env
@@ -201,10 +213,10 @@ async fn make_execute_request_with_instance_name() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "12111c5c43433f428dfd53ba1f44dfdcad1ae88ecf4560930eeb8eec54551c99",
+        "ce536af7c6334e325a99507409535d50acf05338d4cbdd031425bdaa55a87d6d",
       )
       .unwrap(),
-      103,
+      144,
     ))
       .into(),
   );
@@ -215,10 +227,10 @@ async fn make_execute_request_with_instance_name() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "f850dad74061fb0919212274da8137d647dde16ec1623c13f0f8eafa4d83a823",
+        "11cc69e6e2376c57a54a42db3d3dd22b2996a1527f976589d2d200623097b5c8",
       )
       .unwrap(),
-      140,
+      141,
     ))
       .into(),
   );
@@ -270,14 +282,20 @@ async fn make_execute_request_with_cache_key_gen_version() {
   want_command.mut_arguments().push("yo".to_owned());
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name("SOME".to_owned());
-    env.set_value("value".to_owned());
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_value("none".to_owned());
     env
   });
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(crate::remote::CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_owned());
     env.set_value("meep".to_owned());
+    env
+  });
+  want_command.mut_environment_variables().push({
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name("SOME".to_owned());
+    env.set_value("value".to_owned());
     env
   });
   want_command
@@ -298,10 +316,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "2ed92edba7b453be26df08fab5b3b84767f6d7aa9bc39a052d8466804702ce4f",
+        "09e54a4817a36e164a0e395fac36091fd5b4aac185b8bafa90842ac4aff92a34",
       )
       .unwrap(),
-      111,
+      152,
     ))
       .into(),
   );
@@ -311,10 +329,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "44e408f63f9567bfe39718dae3cba7844e49d93240bea24c5452cab15f11c711",
+        "dc554a1ed77588e1bac90896dcfeba255f8178ebc01893231415841109216944",
       )
       .unwrap(),
-      140,
+      141,
     ))
       .into(),
   );
@@ -343,6 +361,12 @@ async fn make_execute_request_with_jdk() {
   let mut want_command = bazel_protos::remote_execution::Command::new();
   want_command.mut_arguments().push("/bin/echo".to_owned());
   want_command.mut_arguments().push("yo".to_owned());
+  want_command.mut_environment_variables().push({
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_value("none".to_owned());
+    env
+  });
   want_command.mut_platform().mut_properties().push({
     let mut property = bazel_protos::remote_execution::Platform_Property::new();
     property.set_name("JDK_SYMLINK".to_owned());
@@ -354,10 +378,10 @@ async fn make_execute_request_with_jdk() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "f373f421b328ddeedfba63542845c0423d7730f428dd8e916ec6a38243c98448",
+        "9e969561212af080f0b6c346cdf954265a489f9c9fae63d11d61869174b13e29",
       )
       .unwrap(),
-      38,
+      79,
     ))
       .into(),
   );
@@ -367,7 +391,7 @@ async fn make_execute_request_with_jdk() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "b1fb7179ce496995a4e3636544ec000dca1b951f1f6216493f6c7608dc4dd910",
+        "f90182cd453f36577868fc05a605ac84c19882c18bd907ff241923d98a7bca1e",
       )
       .unwrap(),
       140,
@@ -392,6 +416,12 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let mut want_command = bazel_protos::remote_execution::Command::new();
   want_command.mut_arguments().push("/bin/echo".to_owned());
   want_command.mut_arguments().push("yo".to_owned());
+  want_command.mut_environment_variables().push({
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_value("none".to_owned());
+    env
+  });
   want_command.mut_platform().mut_properties().push({
     let mut property = bazel_protos::remote_execution::Platform_Property::new();
     property.set_name("FIRST".to_owned());
@@ -427,10 +457,10 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "edeef568ddd1e0deed8c75e803e306bbec94a3403295bab8ffe7fbb3accdabe5",
+        "8d59966fac1f1a7c209ca33f8ca003ed3985b9835043fc114c45aaafa119a77b",
       )
       .unwrap(),
-      93,
+      134,
     ))
       .into(),
   );
@@ -440,10 +470,10 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "c0c0f1d79f91f60ce12d769e43a2c6f890e962d0d074b8677b0f6a83c1338cbb",
+        "190e7b28a9e32be6cb0beaad97d175c6882857991598de3585c91aec183b14b3",
       )
       .unwrap(),
-      140,
+      141,
     ))
       .into(),
   );
@@ -500,6 +530,12 @@ async fn make_execute_request_with_timeout() {
   want_command.mut_arguments().push("yo".to_owned());
   want_command.mut_environment_variables().push({
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name(crate::remote::CACHE_KEY_TARGET_PLATFORM.to_owned());
+    env.set_value("none".to_owned());
+    env
+  });
+  want_command.mut_environment_variables().push({
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name("SOME".to_owned());
     env.set_value("value".to_owned());
     env
@@ -519,10 +555,10 @@ async fn make_execute_request_with_timeout() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "0e290a4926d69eabd0be14fb85707532c5da224e6949f4fe3adbb9ec3e41e442",
+        "369820f9643feb39980c51fb6d35d59567256946ff3234a371cba8f4de95339c",
       )
       .unwrap(),
-      74,
+      115,
     ))
       .into(),
   );
@@ -536,7 +572,7 @@ async fn make_execute_request_with_timeout() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "fbb659ede2ba2b563860e9c0292f1ff960cbe5dcfb298eb18aabaa118966cdd5",
+        "151e4bfce1244eb7ae74ed09d8759088557d9c63fbaaa5fcca662998266f4b09",
       )
       .unwrap(),
       144,
@@ -772,7 +808,7 @@ async fn server_rejecting_execute_request_gives_error() {
       ExpectedAPICall::GetActionResult {
         action_digest: hashing::Digest(
           hashing::Fingerprint::from_hex_string(
-            "1bdce449d3b1f821e84e96dbf7e0f6e006a5b3b72b0065b04b4cd7b6e8af4428",
+            "bf10cd168ad711602f7a241cbcbc9a3d32497fdd1465d8a01d4549ee7d8ebc08",
           )
           .unwrap(),
           142,
@@ -1571,7 +1607,7 @@ async fn execute_missing_file_errors_if_unknown() {
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::GetActionResult {
         action_digest: hashing::Digest(
           hashing::Fingerprint::from_hex_string(
-            "a49b627d67dfb58a82ac9ba2cf7648c1a482930c41f9ad93c3fcd8fc9e7aa0c2",
+            "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
           )
           .unwrap(),
           144,
