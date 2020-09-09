@@ -21,30 +21,14 @@ from pants.util.strutil import pluralize
 
 
 class SuccinctCodeCounter(ExternalTool):
-    """The Succinct Code Counter (https://github.com/boyter/scc)."""
+    """The Succinct Code Counter, aka `scc` (https://github.com/boyter/scc)."""
 
-    options_scope = "succinct-code-counter"
+    options_scope = "scc"
     default_version = "2.12.0"
     default_known_versions = [
         "2.12.0|darwin|70b7002cd1e4541cb37b7b9cbc0eeedd13ceacb49628e82ab46332bb2e65a5a6|1842530",
         "2.12.0|linux|8eca3e98fe8a78d417d3779a51724515ac4459760d3ec256295f80954a0da044|1753059",
     ]
-
-    def generate_url(self, plat: Platform) -> str:
-        plat_str = match(plat, {Platform.darwin: "apple-darwin", Platform.linux: "unknown-linux"})
-        return (
-            f"https://github.com/boyter/scc/releases/download/v{self.version}/scc-{self.version}-"
-            f"x86_64-{plat_str}.zip"
-        )
-
-    def generate_exe(self, _: Platform) -> str:
-        return "./scc"
-
-
-class CountLinesOfCodeSubsystem(GoalSubsystem):
-    """Count lines of code using Succinct Code Counter (https://github.com/boyter/scc)."""
-
-    name = "count-loc"
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -64,6 +48,22 @@ class CountLinesOfCodeSubsystem(GoalSubsystem):
     def args(self) -> Tuple[str, ...]:
         return tuple(self.options.args)
 
+    def generate_url(self, plat: Platform) -> str:
+        plat_str = match(plat, {Platform.darwin: "apple-darwin", Platform.linux: "unknown-linux"})
+        return (
+            f"https://github.com/boyter/scc/releases/download/v{self.version}/scc-{self.version}-"
+            f"x86_64-{plat_str}.zip"
+        )
+
+    def generate_exe(self, _: Platform) -> str:
+        return "./scc"
+
+
+class CountLinesOfCodeSubsystem(GoalSubsystem):
+    """Count lines of code using `scc` (Succinct Code Counter, https://github.com/boyter/scc)."""
+
+    name = "count-loc"
+
 
 class CountLinesOfCode(Goal):
     subsystem_cls = CountLinesOfCodeSubsystem
@@ -72,7 +72,6 @@ class CountLinesOfCode(Goal):
 @goal_rule
 async def count_loc(
     console: Console,
-    count_loc_subsystem: CountLinesOfCodeSubsystem,
     succinct_code_counter: SuccinctCodeCounter,
     sources_snapshot: SourcesSnapshot,
 ) -> CountLinesOfCode:
@@ -90,7 +89,7 @@ async def count_loc(
     result = await Get(
         ProcessResult,
         Process(
-            argv=(scc_program.exe, *count_loc_subsystem.args),
+            argv=(scc_program.exe, *succinct_code_counter.args),
             input_digest=input_digest,
             description=(
                 f"Count lines of code for {pluralize(len(sources_snapshot.snapshot.files), 'file')}"

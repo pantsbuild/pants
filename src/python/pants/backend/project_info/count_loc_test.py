@@ -71,7 +71,7 @@ def test_count_loc(rule_runner: RuleRunner) -> None:
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.create_file("foo.py", "print('hello world!')\n")
     rule_runner.add_to_build_file("", "python_library(name='foo')")
-    result = rule_runner.run_goal_rule(CountLinesOfCode, args=["--args='--no-cocomo'", "//:foo"])
+    result = rule_runner.run_goal_rule(CountLinesOfCode, args=["//:foo", "--", "--no-cocomo"])
     assert result.exit_code == 0
     assert_counts(result.stdout, "Python", code=1)
     assert "Estimated Cost to Develop" not in result.stdout
