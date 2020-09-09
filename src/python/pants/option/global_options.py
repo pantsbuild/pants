@@ -242,7 +242,8 @@ class GlobalOptions(Subsystem):
             help="Regexps matching warning strings to ignore, e.g. "
             '["DEPRECATED: scope some_scope will be removed"]. The regexps will be matched '
             "from the start of the warning string, and will always be case-insensitive. "
-            "See the `warnings` Python module documentation for more background on how these are used.",
+            "See the `warnings` Python module documentation for more background "
+            "on how these are used.",
         )
         register(
             "--option-name-check-distance",
