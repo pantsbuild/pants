@@ -45,8 +45,10 @@ def main() -> None:
         run_rust_tests()
     if args.jvm_tests:
         run_jvm_tests()
-    if args.integration_tests:
-        run_integration_tests(shard=args.integration_shard)
+    if args.integration_tests_v1:
+        run_integration_tests_v1(shard=args.integration_shard)
+    if args.integration_tests_v2:
+        run_integration_tests_v2(shard=args.integration_shard)
     if args.plugin_tests:
         run_plugin_tests()
     if args.platform_specific_tests:
@@ -112,7 +114,14 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rust-tests", action="store_true", help="Run Rust tests.")
     parser.add_argument("--jvm-tests", action="store_true", help="Run JVM tests.")
     parser.add_argument(
-        "--integration-tests", action="store_true", help="Run Python integration tests",
+        "--integration-tests-v1",
+        action="store_true",
+        help="Run Python integration tests w/ V1 runner.",
+    )
+    parser.add_argument(
+        "--integration-tests-v2",
+        action="store_true",
+        help="Run Python integration tests w/ V2 runner.",
     )
     parser.add_argument(
         "--integration-shard",
@@ -485,7 +494,7 @@ def run_jvm_tests() -> None:
     )
 
 
-def run_integration_tests(*, shard: Optional[str]) -> None:
+def run_integration_tests_v1(*, shard: Optional[str]) -> None:
     target_sets = TestTargetSets.calculate(test_type=TestType.integration)
     if target_sets.v1_no_chroot:
         _run_command(
@@ -499,12 +508,37 @@ def run_integration_tests(*, shard: Optional[str]) -> None:
     if target_sets.v1_chroot:
         _run_command(
             command=TestStrategy.v1_chroot.pants_command(
-                targets=target_sets.v1_chroot.union(target_sets.v2_local), shard=shard
+                targets=target_sets.v1_chroot, shard=shard
             ),
             slug="IntegrationTestsV1Chroot",
             start_message="Running integration tests via V1 chroot strategy.",
             die_message="Integration test failure (V1 chroot)",
         )
+
+
+def run_integration_tests_v2(*, shard: Optional[str]) -> None:
+    target_sets = TestTargetSets.calculate(test_type=TestType.integration)
+    local_targets = sorted(target_sets.v2_local)
+
+    if shard is None:
+        selected_targets = local_targets
+    else:
+        shard_str, _, nshards_str = shard.partition("/")
+        target_shard = int(shard_str)
+        nshards = int(nshards_str)
+
+        # See https://stackoverflow.com/a/14861842.
+        q, r = divmod(len(local_targets), nshards)
+        indices = [q * i + min(i, r) for i in range(nshards + 1)]
+        partitions = [local_targets[indices[i]:indices[i + 1]] for i in range(nshards)]
+        selected_targets = partitions[target_shard]
+
+    _run_command(
+        command=TestStrategy.v2_local.pants_command(targets=selected_targets),
+        slug="IntegrationTestsV2Local",
+        start_message="Running integration tests via V2 local strategy.",
+        die_message="Integration test failure (V2 local)",
+    )
 
 
 def run_plugin_tests() -> None:

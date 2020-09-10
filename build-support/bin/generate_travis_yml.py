@@ -610,22 +610,44 @@ def build_wheels_osx() -> Dict:
 # -------------------------------------------------------------------------
 
 
-def integration_tests(python_version: PythonVersion) -> List[Dict]:
-    num_integration_shards = 15
+def integration_tests_v1(python_version: PythonVersion) -> List[Dict]:
+    num_integration_shards = 6
 
     def make_shard(*, shard_num: int) -> Dict:
         shard = {
             **linux_shard(python_version=python_version),
-            "name": f"Integration tests shard {shard_num} (Python {python_version.decimal})",
+            "name": f"Integration tests - V1 - shard {shard_num} (Python {python_version.decimal})",
             "script": [
                 (
-                    "./build-support/bin/ci.py --integration-tests --integration-shard "
+                    "./build-support/bin/ci.py --integration-tests-v1 --integration-shard "
                     f"{shard_num}/{num_integration_shards} --python-version {python_version.decimal}"
                 ),
             ],
         }
         safe_append(
-            shard, "env", f"CACHE_NAME=integration.shard_{shard_num}.py{python_version.number}",
+            shard, "env", f"CACHE_NAME=integration.v1.shard_{shard_num}.py{python_version.number}",
+        )
+        return shard
+
+    return [make_shard(shard_num=i) for i in range(num_integration_shards)]
+
+
+def integration_tests_v2(python_version: PythonVersion) -> List[Dict]:
+    num_integration_shards = 8
+
+    def make_shard(*, shard_num: int) -> Dict:
+        shard = {
+            **linux_shard(python_version=python_version),
+            "name": f"Integration tests - V2 - shard {shard_num} (Python {python_version.decimal})",
+            "script": [
+                (
+                    "./build-support/bin/ci.py --integration-tests-v2 --integration-shard "
+                    f"{shard_num}/{num_integration_shards} --python-version {python_version.decimal}"
+                ),
+            ],
+        }
+        safe_append(
+            shard, "env", f"CACHE_NAME=integration.v2.shard_{shard_num}.py{python_version.number}",
         )
         return shard
 
@@ -855,8 +877,10 @@ def main() -> None:
                     # TODO: fix Cargo audit. Run `build-support/bin/ci.py --cargo-audit` locally.
                     # cargo_audit(),
                     *[unit_tests(v) for v in supported_python_versions],
-                    *integration_tests(PythonVersion.py36),
-                    *integration_tests(PythonVersion.py37),
+                    *integration_tests_v1(PythonVersion.py36),
+                    *integration_tests_v1(PythonVersion.py37),
+                    *integration_tests_v2(PythonVersion.py36),
+                    *integration_tests_v2(PythonVersion.py37),
                     rust_tests_linux(),
                     rust_tests_osx(),
                     build_wheels_linux(),
