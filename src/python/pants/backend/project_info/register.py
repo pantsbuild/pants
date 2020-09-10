@@ -4,7 +4,7 @@
 """Information on your project, such as listing the targets in your project."""
 
 from pants.backend.project_info import (
-    cloc,
+    count_loc,
     dependees,
     dependencies,
     filedeps,
@@ -17,7 +17,7 @@ from pants.backend.project_info import (
 
 def rules():
     return [
-        *cloc.rules(),
+        *count_loc.rules(),
         *dependees.rules(),
         *dependencies.rules(),
         *filedeps.rules(),

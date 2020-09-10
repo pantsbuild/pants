@@ -855,6 +855,10 @@ class FieldSetsPerTarget(Generic[_AFS]):
     def __init__(self, collection: Iterable[Iterable[_AFS]]):
         self.collection = tuple(tuple(iterable) for iterable in collection)
 
+    @memoized_property
+    def field_sets(self) -> Tuple[_AFS, ...]:
+        return tuple(itertools.chain.from_iterable(self.collection))
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)

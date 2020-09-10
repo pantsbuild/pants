@@ -333,41 +333,8 @@ class FSTest(TestBase, SchedulerTestBase):
         assert list(snapshot.files) == files
         assert snapshot.digest == digest
 
-    def test_merge_zero_directories(self) -> None:
-        assert self.scheduler.merge_directories(()) == EMPTY_DIGEST
-
-    def test_synchronously_merge_directories(self) -> None:
-        with temporary_dir() as temp_dir:
-            Path(temp_dir, "roland").write_text("European Burmese")
-            Path(temp_dir, "susannah").write_text("Not sure actually")
-            (
-                empty_snapshot,
-                roland_snapshot,
-                susannah_snapshot,
-                both_snapshot,
-            ) = self.scheduler.capture_snapshots(
-                (
-                    PathGlobsAndRoot(PathGlobs(["doesnotmatch"]), temp_dir),
-                    PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
-                    PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
-                    PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),
-                )
-            )
-
-            empty_merged = self.scheduler.merge_directories((empty_snapshot.digest,))
-            assert empty_snapshot.digest == empty_merged
-
-            roland_merged = self.scheduler.merge_directories(
-                (roland_snapshot.digest, empty_snapshot.digest)
-            )
-            assert roland_snapshot.digest == roland_merged
-
-            both_merged = self.scheduler.merge_directories(
-                (roland_snapshot.digest, susannah_snapshot.digest)
-            )
-            assert both_snapshot.digest == both_merged
-
-    def test_asynchronously_merge_digests(self) -> None:
+    def test_merge_digests(self) -> None:
+        assert self.request_product(Digest, [MergeDigests([])]) == EMPTY_DIGEST
         with temporary_dir() as temp_dir:
             Path(temp_dir, "roland").write_text("European Burmese")
             Path(temp_dir, "susannah").write_text("Not sure actually")

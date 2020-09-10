@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import functools
 import logging
 import os
 import signal
@@ -11,7 +10,7 @@ import time
 import traceback
 from abc import ABCMeta
 from contextlib import contextmanager
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
 import psutil
 
@@ -292,7 +291,6 @@ class ProcessManager(ProcessMetadataManager):
         pid=None,
         socket=None,
         process_name=None,
-        socket_type=int,
         metadata_base_dir=None,
     ):
         """
@@ -300,14 +298,12 @@ class ProcessManager(ProcessMetadataManager):
         :param int pid: The process pid. Overrides fetching of the self.pid @property.
         :param string socket: The socket metadata. Overrides fetching of the self.socket @property.
         :param string process_name: The process name for cmdline executable name matching.
-        :param type socket_type: The type to be used for socket type casting (e.g. int).
         :param str metadata_base_dir: The overridden base directory for process metadata.
         """
         super().__init__(metadata_base_dir)
         self._name = name.lower().strip()
         self._pid = pid
         self._socket = socket
-        self._socket_type = socket_type
         self._process_name = process_name
         self._buildroot = get_buildroot()
         self._process = None
@@ -365,7 +361,7 @@ class ProcessManager(ProcessMetadataManager):
     @property
     def socket(self):
         """The running processes socket/port information (or None)."""
-        return self._socket or self.read_metadata_by_name(self._name, "socket", self._socket_type)
+        return self._socket or self.read_metadata_by_name(self._name, "socket", int)
 
     @classmethod
     def get_subprocess_output(cls, command, ignore_stderr=True, **kwargs):
@@ -385,26 +381,32 @@ class ProcessManager(ProcessMetadataManager):
             subprocess_output = getattr(e, "output", "").strip()
             raise cls.ExecutionError(str(e), subprocess_output)
 
-    def await_pid(self, timeout):
+    def await_pid(self, timeout: float) -> int:
         """Wait up to a given timeout for a process to write pid metadata."""
-        return self.await_metadata_by_name(
-            self._name,
-            "pid",
-            f"{self._name} to start",
-            f"{self._name} started",
-            timeout,
-            caster=int,
+        return cast(
+            int,
+            self.await_metadata_by_name(
+                self._name,
+                "pid",
+                f"{self._name} to start",
+                f"{self._name} started",
+                timeout,
+                caster=int,
+            ),
         )
 
-    def await_socket(self, timeout):
+    def await_socket(self, timeout: float) -> int:
         """Wait up to a given timeout for a process to write socket info."""
-        return self.await_metadata_by_name(
-            self._name,
-            "socket",
-            f"{self._name} socket to be opened",
-            f"{self._name} socket opened",
-            timeout,
-            caster=self._socket_type,
+        return cast(
+            int,
+            self.await_metadata_by_name(
+                self._name,
+                "socket",
+                f"{self._name} socket to be opened",
+                f"{self._name} socket opened",
+                timeout,
+                caster=int,
+            ),
         )
 
     def write_pid(self, pid=None):
@@ -523,83 +525,15 @@ class ProcessManager(ProcessMetadataManager):
         if purge:
             self.purge_metadata(force=True)
 
-    def daemonize(
-        self,
-        pre_fork_opts=None,
-        post_fork_parent_opts=None,
-        post_fork_child_opts=None,
-        fork_context=None,
-        write_pid=True,
-    ):
-        """Perform a double-fork, execute callbacks and write the child pid file.
-
-        The double-fork here is necessary to truly daemonize the subprocess such that it can never
-        take control of a tty. The initial fork and setsid() creates a new, isolated process group
-        and also makes the first child a session leader (which can still acquire a tty). By forking a
-        second time, we ensure that the second child can never acquire a controlling terminal because
-        it's no longer a session leader - but it now has its own separate process group.
-
-        Additionally, a normal daemon implementation would typically perform an os.umask(0) to reset
-        the processes file mode creation mask post-fork. We do not do this here (and in daemon_spawn
-        below) due to the fact that the daemons that pants would run are typically personal user
-        daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
-        differ in their permissions without good reason - in this case, we want to inherit the umask.
-
-        :param fork_context: A function which accepts and calls a function that will call fork. This
-          is not a contextmanager/generator because that would make interacting with native code more
-          challenging. If no fork_context is passed, the fork function is called directly.
-        """
-
-        def double_fork():
-            logger.debug("forking %s", self)
-            pid = os.fork()
-            if pid == 0:
-                os.setsid()
-                second_pid = os.fork()
-                if second_pid == 0:
-                    return False, True
-                else:
-                    if write_pid:
-                        self.write_pid(second_pid)
-                    return False, False
-            else:
-                # This prevents un-reaped, throw-away parent processes from lingering in the process table.
-                os.waitpid(pid, 0)
-                return True, False
-
-        fork_func = functools.partial(fork_context, double_fork) if fork_context else double_fork
-
-        # Perform the double fork (optionally under the fork_context). Three outcomes are possible after
-        # the double fork: we're either the original parent process, the middle double-fork process, or
-        # the child. We assert below that a process is not somehow both the parent and the child.
-        self.purge_metadata()
-        self.pre_fork(**pre_fork_opts or {})
-        is_parent, is_child = fork_func()
-
-        try:
-            if not is_parent and not is_child:
-                # Middle process.
-                os._exit(0)
-            elif is_parent:
-                assert not is_child
-                self.post_fork_parent(**post_fork_parent_opts or {})
-            else:
-                assert not is_parent
-                os.chdir(self._buildroot)
-                self.post_fork_child(**post_fork_child_opts or {})
-        except Exception:
-            logger.critical(traceback.format_exc())
-            os._exit(0)
-
     def daemon_spawn(
         self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None
     ):
         """Perform a single-fork to run a subprocess and write the child pid file.
 
         Use this if your post_fork_child block invokes a subprocess via subprocess.Popen(). In this
-        case, a second fork such as used in daemonize() is extraneous given that Popen() also forks.
-        Using this daemonization method vs daemonize() leaves the responsibility of writing the pid
-        to the caller to allow for library-agnostic flexibility in subprocess execution.
+        case, a second fork is extraneous given that Popen() also forks. Using this daemonization
+        method leaves the responsibility of writing the pid to the caller to allow for library-
+        agnostic flexibility in subprocess execution.
         """
         self.purge_metadata()
         self.pre_fork(**pre_fork_opts or {})
@@ -730,7 +664,7 @@ class PantsDaemonProcessManager(FingerprintedProcessManager, metaclass=ABCMeta):
     def post_fork_child(self):
         """Post-fork() child callback for ProcessManager.daemon_spawn()."""
         spawn_control_env = dict(
-            PANTS_ENTRYPOINT=f"{self._daemon_entrypoint}:launch",
+            PANTS_ENTRYPOINT=f"{self._daemon_entrypoint}:launch_new_pantsd_instance",
             # The daemon should run under the same sys.path as us; so we ensure
             # this. NB: It will scrub PYTHONPATH once started to avoid infecting
             # its own unrelated subprocesses.
@@ -743,7 +677,7 @@ class PantsDaemonProcessManager(FingerprintedProcessManager, metaclass=ABCMeta):
 
         spawn_control_env_vars = " ".join(f"{k}={v}" for k, v in spawn_control_env.items())
         cmd_line = " ".join(cmd)
-        self._logger.debug(f"cmd is: {spawn_control_env_vars} {cmd_line}")
+        logger.debug(f"pantsd command is: {spawn_control_env_vars} {cmd_line}")
 
         # TODO: Improve error handling on launch failures.
         os.spawnve(os.P_NOWAIT, sys.executable, cmd, env=exec_env)

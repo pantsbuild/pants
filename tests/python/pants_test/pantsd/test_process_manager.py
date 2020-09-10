@@ -475,21 +475,6 @@ class TestProcessManager(unittest.TestCase):
             if chk_post_parent:
                 mock_post_parent.assert_called_once_with(self.pm)
 
-    def test_daemonize_parent(self):
-        with self.mock_daemonize_context() as mock_fork:
-            mock_fork.side_effect = [1, 1]  # Simulate the parent.
-            self.pm.daemonize(write_pid=False)
-
-    def test_daemonize_child(self):
-        with self.mock_daemonize_context(chk_post_child=True) as mock_fork:
-            mock_fork.side_effect = [0, 0]  # Simulate the child.
-            self.pm.daemonize(write_pid=False)
-
-    def test_daemonize_child_parent(self):
-        with self.mock_daemonize_context(chk_post_parent=True) as mock_fork:
-            mock_fork.side_effect = [1, 1]  # Simulate the original parent process.
-            self.pm.daemonize(write_pid=False)
-
     def test_daemon_spawn_parent(self):
         with self.mock_daemonize_context(chk_post_parent=True) as mock_fork:
             mock_fork.return_value = 1  # Simulate the parent.

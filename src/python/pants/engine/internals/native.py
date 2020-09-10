@@ -128,9 +128,6 @@ class Native(metaclass=SingletonMetaclass):
         """Load the native engine as a python module."""
         return native_engine
 
-    def decompress_tarball(self, tarfile_path, dest_dir):
-        return self.lib.decompress_tarball(tarfile_path, dest_dir)
-
     def init_rust_logging(
         self,
         level: int,
@@ -244,9 +241,9 @@ class Native(metaclass=SingletonMetaclass):
             oauth_bearer_token_path=execution_options.remote_oauth_bearer_token_path,
             store_thread_count=execution_options.remote_store_thread_count,
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
-            store_chunk_upload_timeout=execution_options.remote_store_connection_limit,
-            store_rpc_retries=execution_options.remote_store_chunk_upload_timeout_seconds,
-            store_connection_limit=execution_options.remote_store_rpc_retries,
+            store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
+            store_rpc_retries=execution_options.remote_store_rpc_retries,
+            store_connection_limit=execution_options.remote_store_connection_limit,
             execution_extra_platform_properties=tuple(
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties

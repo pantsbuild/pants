@@ -6,7 +6,7 @@ import logging
 import os
 import warnings
 from logging import Formatter, Handler, LogRecord, StreamHandler
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
@@ -32,6 +32,12 @@ def init_rust_logger(
     Native().init_rust_logging(
         log_level.level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
     )
+
+
+def setup_warning_filtering(warnings_filter_regexes: Iterable[str]) -> None:
+    """Sets up regex-based ignores for messages using the Python warnings system."""
+    for message_regexp in warnings_filter_regexes or ():
+        warnings.filterwarnings(action="ignore", message=message_regexp)
 
 
 class NativeHandler(StreamHandler):
@@ -83,7 +89,7 @@ def set_logging_handlers(handlers: Tuple[Handler, ...]):
         logger.addHandler(handler)
 
 
-def _common_logging_setup(level: LogLevel, warnings_filter_regexes: Optional[List[str]]) -> None:
+def _common_logging_setup(level: LogLevel) -> None:
     def trace_fn(self, message, *args, **kwargs):
         if self.isEnabledFor(LogLevel.TRACE.level):
             self._log(LogLevel.TRACE.level, message, *args, **kwargs)
@@ -94,9 +100,6 @@ def _common_logging_setup(level: LogLevel, warnings_filter_regexes: Optional[Lis
     level.set_level_for(logger)
     # This routes warnings through our loggers instead of straight to raw stderr.
     logging.captureWarnings(True)
-
-    for message_regexp in warnings_filter_regexes or ():
-        warnings.filterwarnings(action="ignore", message=message_regexp)
 
     if logger.isEnabledFor(LogLevel.TRACE.level):
         http.client.HTTPConnection.debuglevel = 1  # type: ignore[attr-defined]
@@ -115,7 +118,6 @@ def setup_logging(global_bootstrap_options):
     if get_logging_handlers():
         raise AssertionError("setup_logging should not be called while Handlers are installed.")
 
-    ignores = global_bootstrap_options.ignore_pants_warnings
     global_level = global_bootstrap_options.level
     log_dir = global_bootstrap_options.logdir
 
@@ -127,9 +129,9 @@ def setup_logging(global_bootstrap_options):
     init_rust_logger(
         global_level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
     )
-    setup_logging_to_stderr(global_level, warnings_filter_regexes=ignores)
+    setup_logging_to_stderr(global_level)
     if log_dir:
-        setup_logging_to_file(global_level, log_dir=log_dir, warnings_filter_regexes=ignores)
+        setup_logging_to_file(global_level, log_dir=log_dir)
 
 
 def get_log_levels_by_target(global_bootstrap_options: OptionValueContainer) -> Dict[str, LogLevel]:
@@ -149,15 +151,13 @@ def get_log_levels_by_target(global_bootstrap_options: OptionValueContainer) -> 
     return levels
 
 
-def setup_logging_to_stderr(
-    level: LogLevel, *, warnings_filter_regexes: Optional[List[str]] = None
-) -> None:
+def setup_logging_to_stderr(level: LogLevel) -> None:
     """Sets up Python logging to stderr, proxied to Rust via a NativeHandler.
 
     We deliberately set the most verbose logging possible (i.e. the TRACE log level), here, and let
     the Rust logging faculties take care of filtering.
     """
-    _common_logging_setup(level, warnings_filter_regexes)
+    _common_logging_setup(level)
 
     python_logger = logging.getLogger(None)
     handler = NativeHandler(level)
@@ -171,12 +171,11 @@ def setup_logging_to_file(
     *,
     log_dir: str,
     log_filename: str = "pants.log",
-    warnings_filter_regexes: Optional[List[str]] = None,
 ) -> NativeHandler:
     native = Native()
     logger = logging.getLogger(None)
 
-    _common_logging_setup(level, warnings_filter_regexes)
+    _common_logging_setup(level)
 
     safe_mkdir(log_dir)
     log_path = os.path.join(log_dir, log_filename)

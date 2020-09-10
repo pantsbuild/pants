@@ -18,6 +18,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -26,7 +27,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *mypy_rules(),
-            *dependency_inference_rules.rules(),  # Used for `__init__.py` inference.
+            *dependency_inference_rules.rules(),  # Used for import inference.
             QueryRule(TypecheckResults, (MyPyRequest, OptionsBootstrapper)),
         ],
         target_types=[PythonLibrary],
@@ -81,6 +82,7 @@ def make_target(
     *,
     package: Optional[str] = None,
     name: str = "target",
+    interpreter_constraints: Optional[str] = None,
 ) -> Target:
     if not package:
         package = PACKAGE
@@ -94,6 +96,7 @@ def make_target(
             python_library(
                 name={repr(name)},
                 sources={source_globs},
+                compatibility={repr(interpreter_constraints)},
             )
             """
         ),
@@ -242,3 +245,25 @@ def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/math/add.py:5" in result[0].stdout
+
+
+@skip_unless_python38_present
+def test_works_with_python38(rule_runner: RuleRunner) -> None:
+    """MyPy's typed-ast dependency does not understand Python 3.8, so we must instead run MyPy with
+    Python 3.8 when relevant."""
+    rule_runner.create_file(f"{PACKAGE}/__init__.py")
+    py38_sources = FileContent(
+        f"{PACKAGE}/py38.py",
+        dedent(
+            """\
+            x = 0
+            if y := x:
+                print("x is truthy and now assigned to y")
+            """
+        ).encode(),
+    )
+    target = make_target(rule_runner, [py38_sources], interpreter_constraints=">=3.8")
+    result = run_mypy(rule_runner, [target])
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert "Success: no issues found" in result[0].stdout.strip()

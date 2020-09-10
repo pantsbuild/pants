@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from textwrap import dedent
 from typing import List, Optional, Sequence, Tuple
 
 import pytest
@@ -17,6 +18,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -28,22 +30,32 @@ def rule_runner() -> RuleRunner:
             QueryRule(LintResults, (BlackRequest, OptionsBootstrapper)),
             QueryRule(FmtResult, (BlackRequest, OptionsBootstrapper)),
             QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper)),
-        ]
+        ],
+        target_types=[PythonLibrary],
     )
 
 
-GOOD_SOURCE = FileContent(path="good.py", content=b'animal = "Koala"\n')
-BAD_SOURCE = FileContent(path="bad.py", content=b'name=    "Anakin"\n')
-FIXED_BAD_SOURCE = FileContent(path="bad.py", content=b'name = "Anakin"\n')
+GOOD_SOURCE = FileContent("good.py", b'animal = "Koala"\n')
+BAD_SOURCE = FileContent("bad.py", b'name=    "Anakin"\n')
+FIXED_BAD_SOURCE = FileContent("bad.py", b'name = "Anakin"\n')
 # Note the single quotes, which Black does not like by default. To get Black to pass, it will
 # need to successfully read our config/CLI args.
-NEEDS_CONFIG_SOURCE = FileContent(path="needs_config.py", content=b"animal = 'Koala'\n")
+NEEDS_CONFIG_SOURCE = FileContent("needs_config.py", b"animal = 'Koala'\n")
 
 
-def make_target(rule_runner: RuleRunner, source_files: List[FileContent]) -> Target:
+def make_target(
+    rule_runner: RuleRunner,
+    source_files: List[FileContent],
+    *,
+    name: str = "target",
+    interpreter_constraints: Optional[str] = None,
+) -> Target:
     for source_file in source_files:
-        rule_runner.create_file(f"{source_file.path}", source_file.content.decode())
-    return PythonLibrary({}, address=Address.parse(":target"))
+        rule_runner.create_file(source_file.path, source_file.content.decode())
+    rule_runner.add_to_build_file(
+        "", f"python_library(name='{name}', compatibility={repr(interpreter_constraints)})\n"
+    )
+    return rule_runner.get_target(Address("", target_name=name))
 
 
 def run_black(
@@ -122,7 +134,10 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
-    targets = [make_target(rule_runner, [GOOD_SOURCE]), make_target(rule_runner, [BAD_SOURCE])]
+    targets = [
+        make_target(rule_runner, [GOOD_SOURCE], name="good"),
+        make_target(rule_runner, [BAD_SOURCE], name="bad"),
+    ]
     lint_results, fmt_result = run_black(rule_runner, targets)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
@@ -163,4 +178,34 @@ def test_skip(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_black(rule_runner, [target], skip=True)
     assert not lint_results
     assert fmt_result.skipped is True
+    assert fmt_result.did_change is False
+
+
+@skip_unless_python38_present
+def test_works_with_python38(rule_runner: RuleRunner) -> None:
+    """Black's typed-ast dependency does not understand Python 3.8, so we must instead run Black
+    with Python 3.8 when relevant."""
+    py38_sources = FileContent(
+        "py38.py",
+        dedent(
+            """\
+            import datetime
+
+            x = True
+            if y := x:
+                print("x is truthy and now assigned to y")
+
+
+            class Foo:
+                pass
+            """
+        ).encode(),
+    )
+    target = make_target(rule_runner, [py38_sources], interpreter_constraints=">=3.8")
+    lint_results, fmt_result = run_black(rule_runner, [target])
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 0
+    assert "1 file would be left unchanged" in lint_results[0].stderr
+    assert "1 file left unchanged" in fmt_result.stderr
+    assert fmt_result.output == get_digest(rule_runner, [py38_sources])
     assert fmt_result.did_change is False

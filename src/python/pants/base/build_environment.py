@@ -7,14 +7,14 @@ from typing import Optional
 
 from pants.base.build_root import BuildRoot
 from pants.scm.scm import Scm
-from pants.version import VERSION as _VERSION
+from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
 
 def pants_version() -> str:
     """Returns the pants semantic version number as a string: http://semver.org/"""
-    return _VERSION
+    return VERSION
 
 
 def get_buildroot() -> str:

@@ -66,7 +66,6 @@ use logging::logger::PANTS_LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
-use store::SnapshotOps;
 use task_executor::Executor;
 use tempfile::TempDir;
 use workunit_store::{Workunit, WorkunitState};
@@ -146,14 +145,6 @@ py_module_initializer!(native_engine, |py, m| {
   )?;
   m.add(
     py,
-    "merge_directories",
-    py_fn!(
-      py,
-      merge_directories(a: PyScheduler, b: PySession, c: PyObject)
-    ),
-  )?;
-  m.add(
-    py,
     "capture_snapshots",
     py_fn!(
       py,
@@ -167,11 +158,6 @@ py_module_initializer!(native_engine, |py, m| {
       py,
       run_local_interactive_process(a: PyScheduler, b: PySession, c: PyObject)
     ),
-  )?;
-  m.add(
-    py,
-    "decompress_tarball",
-    py_fn!(py, decompress_tarball(a: String, b: String)),
   )?;
 
   m.add(
@@ -409,25 +395,18 @@ py_class!(class PyTypes |py| {
       paths: PyType,
       file_content: PyType,
       digest_contents: PyType,
-      address: PyType,
       path_globs: PyType,
       merge_digests: PyType,
       add_prefix: PyType,
       remove_prefix: PyType,
       create_digest: PyType,
-      dir: PyType,
-      file: PyType,
-      link: PyType,
+      digest_subset: PyType,
+      download_file: PyType,
       platform: PyType,
       multi_platform_process: PyType,
       process_result: PyType,
       coroutine: PyType,
-      download_file: PyType,
-      string: PyType,
-      bytes: PyType,
-      interactive_process: PyType,
       interactive_process_result: PyType,
-      digest_subset: PyType,
       engine_aware_parameter: PyType
   ) -> CPyResult<Self> {
     Self::create_instance(
@@ -438,25 +417,18 @@ py_class!(class PyTypes |py| {
         paths: externs::type_for(paths),
         file_content: externs::type_for(file_content),
         digest_contents: externs::type_for(digest_contents),
-        address: externs::type_for(address),
         path_globs: externs::type_for(path_globs),
         merge_digests: externs::type_for(merge_digests),
         add_prefix: externs::type_for(add_prefix),
         remove_prefix: externs::type_for(remove_prefix),
         create_digest: externs::type_for(create_digest),
-        dir: externs::type_for(dir),
-        file: externs::type_for(file),
-        link: externs::type_for(link),
+        digest_subset: externs::type_for(digest_subset),
+        download_file: externs::type_for(download_file),
         platform: externs::type_for(platform),
         multi_platform_process: externs::type_for(multi_platform_process),
         process_result: externs::type_for(process_result),
         coroutine: externs::type_for(coroutine),
-        download_file: externs::type_for(download_file),
-        string: externs::type_for(string),
-        bytes: externs::type_for(bytes),
-        interactive_process: externs::type_for(interactive_process),
         interactive_process_result: externs::type_for(interactive_process_result),
-        digest_subset: externs::type_for(digest_subset),
         engine_aware_parameter: externs::type_for(engine_aware_parameter),
     })),
     )
@@ -1154,25 +1126,6 @@ fn check_invalidation_watcher_liveness(py: Python, scheduler_ptr: PyScheduler) -
   })
 }
 
-fn decompress_tarball(py: Python, tar_path: String, output_dir: String) -> PyUnitResult {
-  let tar_path = PathBuf::from(tar_path);
-  let output_dir = PathBuf::from(output_dir);
-
-  // TODO: Need to do a whole lot more releasing of the GIL.
-  py.allow_threads(|| tar_api::decompress_tgz(tar_path.as_path(), output_dir.as_path()))
-    .map_err(|e| {
-      let e = format!(
-        "Failed to untar {} to {}: {:?}",
-        tar_path.display(),
-        output_dir.display(),
-        e
-      );
-      let gil = Python::acquire_gil();
-      PyErr::new::<exc::Exception, _>(gil.python(), (e,))
-    })
-    .map(|()| None)
-}
-
 fn graph_len(py: Python, scheduler_ptr: PyScheduler) -> CPyResult<u64> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     py.allow_threads(|| Ok(scheduler.core.graph.len() as u64))
@@ -1434,35 +1387,6 @@ fn capture_snapshots(
           future03::try_join_all(snapshot_futures)
             .map_ok(|values| externs::store_tuple(values).into()),
         )
-      })
-      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
-    })
-  })
-}
-
-fn merge_directories(
-  py: Python,
-  scheduler_ptr: PyScheduler,
-  session_ptr: PySession,
-  directories_value: PyObject,
-) -> CPyResult<PyObject> {
-  let digests = externs::project_iterable(&directories_value.into())
-    .iter()
-    .map(|v| nodes::lift_digest(v))
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
-
-  with_scheduler(py, scheduler_ptr, |scheduler| {
-    with_session(py, session_ptr, |session| {
-      // TODO: A parent_id should be an explicit argument.
-      session.workunit_store().init_thread_state(None);
-      py.allow_threads(|| {
-        scheduler
-          .core
-          .executor
-          .block_on(scheduler.core.store().merge(digests))
-          .map(|dir| nodes::Snapshot::store_directory_digest(&scheduler.core, &dir).into())
-          .map_err(|e| format!("{:?}", e))
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
     })
