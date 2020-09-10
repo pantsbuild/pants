@@ -446,20 +446,21 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-def test_binary_dependency(rule_runner: RuleRunner) -> None:
+def test_runtime_binary_dependency(rule_runner: RuleRunner) -> None:
     create_python_binary_target(rule_runner, BINARY_SOURCE)
-
-    test_source = FileContent(
-        path=f"{PACKAGE}/test_binary_call.py",
-        content=dedent(
+    rule_runner.create_file(
+        f"{PACKAGE}/test_binary_call.py",
+        dedent(
             """\
             import subprocess
 
             def test_embedded_binary():
                 assert  b"Hello, test!" in subprocess.check_output(args=['./bin.pex'])
             """
-        ).encode(),
+        ),
     )
-    tgt = create_test_target(rule_runner, [test_source], dependencies=[":bin"])
+    rule_runner.add_to_build_file(PACKAGE, "python_tests(runtime_binary_dependencies=[':bin'])")
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_binary_call.py"))
+    assert isinstance(tgt, PythonTests)
     result = run_pytest(rule_runner, tgt, passthrough_args="-s")
     assert result.exit_code == 0
