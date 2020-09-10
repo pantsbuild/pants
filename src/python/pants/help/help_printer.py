@@ -175,14 +175,14 @@ class HelpPrinter:
         formatted_lines = help_formatter.format_options(oshi)
         goal_info = self._all_help_info.name_to_goal_info.get(scope)
         if goal_info:
-            related_scopes = sorted(set(goal_info.consumed_scopes) - {GLOBAL_SCOPE})
+            related_scopes = sorted(set(goal_info.consumed_scopes) - {GLOBAL_SCOPE, goal_info.name})
             if related_scopes:
                 related_subsystems_label = "Related subsystems:"
                 if self._use_color:
                     related_subsystems_label = green(related_subsystems_label)
                 formatted_lines.append(f"{related_subsystems_label} {', '.join(related_scopes)}")
                 formatted_lines.append("")
-        return "\n".join(formatted_lines)
+        return "\n".join(formatted_lines).rstrip()
 
     def _get_help_json(self) -> str:
         """Return a JSON object containing all the help info we have, for every scope."""
