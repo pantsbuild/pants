@@ -4,7 +4,8 @@
 from typing import Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.option.custom_types import file_option, shell_str
+from pants.engine.addresses import AddressInput
+from pants.option.custom_types import file_option, shell_str, target_option
 
 
 class MyPy(PythonToolBase):
@@ -40,6 +41,18 @@ class MyPy(PythonToolBase):
             advanced=True,
             help="Path to `mypy.ini` or alternative MyPy config file",
         )
+        register(
+            "--source-plugins",
+            type=list,
+            member_type=target_option,
+            advanced=True,
+            help=(
+                "An optional list of `mypy_source_plugin` target addresses. This allows you to "
+                "load custom plugins defined in source code. Run the goal `target-types "
+                "--details=mypy_source_plugin` for instructions, including how to load "
+                "third-party plugins."
+            ),
+        )
 
     @property
     def skip(self) -> bool:
@@ -52,3 +65,7 @@ class MyPy(PythonToolBase):
     @property
     def config(self) -> Optional[str]:
         return cast(Optional[str], self.options.config)
+
+    @property
+    def source_plugins(self) -> Tuple[AddressInput, ...]:
+        return tuple(AddressInput.parse(v) for v in self.options.source_plugins)

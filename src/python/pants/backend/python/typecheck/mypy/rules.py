@@ -1,12 +1,13 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
 from typing import Tuple
 
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
+from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources, PythonRequirementsField
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
@@ -23,7 +24,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules import pants_bin
-from pants.engine.addresses import Addresses
+from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -104,7 +105,7 @@ LAUNCHER_FILE = FileContent(
 
 
 # TODO(#10131): Improve performance, e.g. by leveraging the MyPy cache.
-# TODO(#10131): Support first-party plugins and .pyi files.
+# TODO(#10131): Support .pyi files.
 @rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
 async def mypy_typecheck(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
@@ -112,9 +113,24 @@ async def mypy_typecheck(
     if mypy.skip:
         return TypecheckResults([], typechecker_name="MyPy")
 
-    transitive_targets, launcher_script = await MultiGet(
-        Get(TransitiveTargets, Addresses(fs.address for fs in request.field_sets)),
+    plugin_target_addresses = await MultiGet(
+        Get(Address, AddressInput, plugin_addr) for plugin_addr in mypy.source_plugins
+    )
+
+    plugin_transitive_targets_request = Get(TransitiveTargets, Addresses(plugin_target_addresses))
+    typechecked_transitive_targets_request = Get(
+        TransitiveTargets, Addresses(fs.address for fs in request.field_sets)
+    )
+    plugin_transitive_targets, typechecked_transitive_targets, launcher_script = await MultiGet(
+        plugin_transitive_targets_request,
+        typechecked_transitive_targets_request,
         Get(Digest, CreateDigest([LAUNCHER_FILE])),
+    )
+
+    plugin_requirements = PexRequirements.create_from_requirement_fields(
+        plugin_tgt[PythonRequirementsField]
+        for plugin_tgt in plugin_transitive_targets.closure
+        if plugin_tgt.has_field(PythonRequirementsField)
     )
 
     # Interpreter constraints are tricky with MyPy:
@@ -140,7 +156,9 @@ async def mypy_typecheck(
     all_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
             tgt[PythonInterpreterCompatibility]
-            for tgt in transitive_targets.closure
+            for tgt in itertools.chain(
+                typechecked_transitive_targets.closure, plugin_transitive_targets.closure
+            )
             if tgt.has_field(PythonInterpreterCompatibility)
         ),
         python_setup,
@@ -156,9 +174,11 @@ async def mypy_typecheck(
     else:
         tool_interpreter_constraints = mypy.interpreter_constraints
 
-    prepared_sources_request = Get(
-        PythonSourceFiles,
-        PythonSourceFilesRequest(transitive_targets.closure),
+    plugin_sources_request = Get(
+        PythonSourceFiles, PythonSourceFilesRequest(plugin_transitive_targets.closure)
+    )
+    typechecked_sources_request = Get(
+        PythonSourceFiles, PythonSourceFilesRequest(typechecked_transitive_targets.closure)
     )
 
     tool_pex_request = Get(
@@ -166,7 +186,9 @@ async def mypy_typecheck(
         PexRequest(
             output_filename="mypy.pex",
             internal_only=True,
-            requirements=PexRequirements(mypy.all_requirements),
+            requirements=PexRequirements(
+                itertools.chain(mypy.all_requirements, plugin_requirements)
+            ),
             interpreter_constraints=PexInterpreterConstraints(tool_interpreter_constraints),
             entry_point=mypy.entry_point,
         ),
@@ -207,17 +229,27 @@ async def mypy_typecheck(
         ),
     )
 
-    prepared_sources, tool_pex, requirements_pex, runner_pex, config_digest = await MultiGet(
-        prepared_sources_request,
+    (
+        plugin_sources,
+        typechecked_sources,
+        tool_pex,
+        requirements_pex,
+        runner_pex,
+        config_digest,
+    ) = await MultiGet(
+        plugin_sources_request,
+        typechecked_sources_request,
         tool_pex_request,
         requirements_pex_request,
         runner_pex_request,
         config_digest_request,
     )
 
-    srcs_snapshot = prepared_sources.source_files.snapshot
+    typechecked_srcs_snapshot = typechecked_sources.source_files.snapshot
     file_list_path = "__files.txt"
-    python_files = "\n".join(f for f in srcs_snapshot.files if f.endswith(".py"))
+    python_files = "\n".join(
+        f for f in typechecked_sources.source_files.snapshot.files if f.endswith(".py")
+    )
     file_list_digest = await Get(
         Digest,
         CreateDigest([FileContent(file_list_path, python_files.encode())]),
@@ -228,7 +260,8 @@ async def mypy_typecheck(
         MergeDigests(
             [
                 file_list_digest,
-                srcs_snapshot.digest,
+                plugin_sources.source_files.snapshot.digest,
+                typechecked_srcs_snapshot.digest,
                 tool_pex.digest,
                 requirements_pex.digest,
                 runner_pex.digest,
@@ -237,14 +270,17 @@ async def mypy_typecheck(
         ),
     )
 
+    all_used_source_roots = sorted(
+        set(itertools.chain(plugin_sources.source_roots, typechecked_sources.source_roots))
+    )
     result = await Get(
         FallibleProcessResult,
         PexProcess(
             runner_pex,
             argv=generate_args(mypy, file_list_path=file_list_path),
             input_digest=merged_input_files,
-            extra_env={"PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots)},
-            description=f"Run MyPy on {pluralize(len(srcs_snapshot.files), 'file')}.",
+            extra_env={"PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots)},
+            description=f"Run MyPy on {pluralize(len(typechecked_srcs_snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )

@@ -9,6 +9,7 @@ import pytest
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.typecheck.mypy.plugin_target_type import MyPySourcePlugin
 from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
@@ -30,7 +31,7 @@ def rule_runner() -> RuleRunner:
             *dependency_inference_rules.rules(),  # Used for import inference.
             QueryRule(TypecheckResults, (MyPyRequest, OptionsBootstrapper)),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary],
+        target_types=[PythonLibrary, PythonRequirementLibrary, MyPySourcePlugin],
     )
 
 
@@ -237,7 +238,11 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    settings_file = FileContent(
+    # We hijack `--mypy-source-plugins` for our settings.py file to ensure that it is always used,
+    # even if the files we're checking don't need it. Typically, this option expects
+    # `mypy_source_plugin` targets, but that's not actually validated. We only want this specific
+    # file to be permanently included, not the whole original target, so we will use a file address.
+    rule_runner.create_file(
         f"{PACKAGE}/settings.py",
         dedent(
             """\
@@ -248,9 +253,9 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
             SECRET_KEY = "not so secret"
             MY_SETTING = URLPattern(pattern="foo", callback=lambda: None)
             """
-        ).encode(),
+        ),
     )
-    app_file = FileContent(
+    rule_runner.create_file(
         f"{PACKAGE}/app.py",
         dedent(
             """\
@@ -259,9 +264,11 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
             assert "forty-two" == text.slugify("forty two")
             assert "42" == text.slugify(42)
             """
-        ).encode(),
+        ),
     )
-    target = make_target(rule_runner, [settings_file, app_file])
+    rule_runner.add_to_build_file(PACKAGE, "python_library()")
+    app_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
+
     config_content = dedent(
         """\
         [mypy]
@@ -274,11 +281,12 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     )
     result = run_mypy(
         rule_runner,
-        [target],
+        [app_tgt],
         config=config_content,
         additional_args=[
             "--mypy-extra-requirements=django-stubs==1.5.0",
             "--mypy-version=mypy==0.770",
+            f"--mypy-source-plugins={PACKAGE}/settings.py",
         ],
     )
     assert len(result) == 1
@@ -357,3 +365,142 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "Success: no issues found" in result[0].stdout.strip()
+
+
+def test_source_plugin(rule_runner: RuleRunner) -> None:
+    # NB: We make this source plugin fairly complex by having it use transitive dependencies.
+    # This is to ensure that we can correctly support plugins with dependencies.
+    # The plugin changes the return type of functions ending in `__overridden_by_plugin` to have a
+    # return type of `None`.
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            python_requirement_library(
+                name='mypy',
+                requirements=['mypy==0.782'],
+            )
+
+            python_requirement_library(
+                name="more-itertools",
+                requirements=["more-itertools==8.4.0"],
+            )
+            """
+        ),
+    )
+    rule_runner.create_file("pants-plugins/plugins/subdir/__init__.py")
+    rule_runner.create_file(
+        "pants-plugins/plugins/subdir/dep.py",
+        dedent(
+            """\
+            from more_itertools import flatten
+
+            def is_overridable_function(name: str) -> bool:
+                assert list(flatten([[1, 2], [3, 4]])) == [1, 2, 3, 4]
+                return name.endswith("__overridden_by_plugin")
+            """
+        ),
+    )
+    rule_runner.add_to_build_file("pants-plugins/plugins/subdir", "python_library()")
+
+    # The plugin can depend on code located anywhere in the project; its dependencies need not be in
+    # the same directory.
+    rule_runner.create_file(f"{PACKAGE}/subdir/__init__.py")
+    rule_runner.create_file(f"{PACKAGE}/subdir/util.py", "def noop() -> None:\n    pass\n")
+    rule_runner.add_to_build_file(f"{PACKAGE}/subdir", "python_library()")
+
+    rule_runner.create_file("pants-plugins/plugins/__init__.py")
+    rule_runner.create_file(
+        "pants-plugins/plugins/change_return_type.py",
+        dedent(
+            """\
+            from typing import Callable, Optional, Type
+
+            from mypy.plugin import FunctionContext, Plugin
+            from mypy.types import NoneType, Type as MyPyType
+
+            from plugins.subdir.dep import is_overridable_function
+            from project.subdir.util import noop
+
+            noop()
+
+            class AutoAddFieldPlugin(Plugin):
+                def get_function_hook(
+                    self, fullname: str
+                ) -> Optional[Callable[[FunctionContext], MyPyType]]:
+                    return hook if is_overridable_function(fullname) else None
+
+
+            def hook(ctx: FunctionContext) -> MyPyType:
+                return NoneType()
+
+
+            def plugin(_version: str) -> Type[Plugin]:
+                return AutoAddFieldPlugin
+            """
+        ),
+    )
+    rule_runner.add_to_build_file(
+        "pants-plugins/plugins",
+        dedent(
+            """\
+            mypy_source_plugin(
+                name='change_return_type',
+                sources=['change_return_type.py'],
+            )
+            """
+        ),
+    )
+
+    config_content = dedent(
+        """\
+        [mypy]
+        plugins =
+            plugins.change_return_type
+        """
+    )
+
+    test_file_content = dedent(
+        """\
+        def add(x: int, y: int) -> int:
+            return x + y
+
+
+        def add__overridden_by_plugin(x: int, y: int) -> int:
+            return x  + y
+
+
+        result = add__overridden_by_plugin(1, 1)
+        assert add(result, 2) == 4
+        """
+    ).encode()
+
+    def run_mypy_with_plugin(tgt: Target) -> TypecheckResult:
+        result = run_mypy(
+            rule_runner,
+            [tgt],
+            additional_args=[
+                "--mypy-source-plugins=['pants-plugins/plugins:change_return_type']",
+                "--source-root-patterns=['pants-plugins', 'src/python']",
+            ],
+            config=config_content,
+        )
+        assert len(result) == 1
+        return result[0]
+
+    target = make_target(
+        rule_runner, [FileContent(f"{PACKAGE}/test_source_plugin.py", test_file_content)]
+    )
+    result = run_mypy_with_plugin(target)
+    assert result.exit_code == 1
+    assert f"{PACKAGE}/test_source_plugin.py:10" in result.stdout
+    # We want to ensure we don't accidentally check the source plugin itself.
+    assert "(checked 1 source file)" in result.stdout
+
+    # We also want to ensure that running MyPy on the plugin itself still works.
+    plugin_tgt = rule_runner.get_target(
+        Address("pants-plugins/plugins", target_name="change_return_type")
+    )
+    result = run_mypy_with_plugin(plugin_tgt)
+    assert result.exit_code == 0
+    assert "Success: no issues found in 1 source file" in result.stdout

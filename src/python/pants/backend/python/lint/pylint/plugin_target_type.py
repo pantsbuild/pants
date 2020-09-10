@@ -7,7 +7,6 @@ from pants.engine.target import Dependencies, Target
 
 class PylintPluginSources(PythonSources):
     required = True
-    expected_file_extensions = (".py",)
 
 
 # NB: We solely subclass this to change the docstring.
@@ -26,7 +25,7 @@ class PylintSourcePlugin(Target):
     To load a source plugin:
 
         1. Write your plugin. See http://pylint.pycqa.org/en/latest/how_tos/plugins.html.
-        2. Define a `pylint_source_plugin` target with the plugin's Python files included in the
+        2. Define a `pylint_source_plugin` target with the plugin's Python file(s) included in the
             `sources` field.
         3. Add the parent directory of your target to the `root_patterns` option in the `[source]`
             scope. For example, if your plugin is at `build-support/pylint/custom_plugin.py`, add
@@ -49,10 +48,7 @@ class PylintSourcePlugin(Target):
     third-party dependencies or are located in the same directory or a subdirectory.
 
     Other targets can depend on this target. This allows you to write a `python_tests` target for
-    this code.
-
-    You can define the `provides` field to release this plugin as a distribution
-    (https://www.pantsbuild.org/docs/python-setup-py-goal).
+    this code or a `python_distribution` target to distribute the plugin externally.
     """
 
     alias = "pylint_source_plugin"

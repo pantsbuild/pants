@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
@@ -122,7 +123,9 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         PexRequest(
             output_filename="pylint.pex",
             internal_only=True,
-            requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
+            requirements=PexRequirements(
+                itertools.chain(pylint.all_requirements, plugin_requirements)
+            ),
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )
@@ -244,8 +247,7 @@ async def pylint_lint(
         return LintResults([], linter_name="Pylint")
 
     plugin_target_addresses = await MultiGet(
-        Get(Address, AddressInput, AddressInput.parse(plugin_addr))
-        for plugin_addr in pylint.source_plugins
+        Get(Address, AddressInput, plugin_addr) for plugin_addr in pylint.source_plugins
     )
     plugin_targets_request = Get(TransitiveTargets, Addresses(plugin_target_addresses))
     linted_targets_request = Get(

@@ -8,6 +8,11 @@ https://mypy.readthedocs.io/en/stable/.
 """
 
 from pants.backend.python.typecheck.mypy import rules as mypy_rules
+from pants.backend.python.typecheck.mypy.plugin_target_type import MyPySourcePlugin
+
+
+def target_types():
+    return [MyPySourcePlugin]
 
 
 def rules():
