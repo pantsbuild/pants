@@ -7,7 +7,7 @@ from typing import List, cast
 
 from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
-from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwner
+from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.backend.python.util_rules import ancestor_files
@@ -113,7 +113,7 @@ async def infer_python_dependencies(
     )
     digest_contents = await Get(DigestContents, Digest, stripped_sources.snapshot.digest)
 
-    owner_requests: List[Get[PythonModuleOwner, PythonModule]] = []
+    owners_requests: List[Get[PythonModuleOwners, PythonModule]] = []
     for file_content, module in zip(digest_contents, modules):
         file_imports_obj = find_python_imports(
             file_content.content.decode(), module_name=module.module
@@ -123,17 +123,15 @@ async def infer_python_dependencies(
             if python_inference.string_imports
             else file_imports_obj.explicit_imports
         )
-        owner_requests.extend(
-            Get(PythonModuleOwner, PythonModule(imported_module))
+        owners_requests.extend(
+            Get(PythonModuleOwners, PythonModule(imported_module))
             for imported_module in detected_imports
             if imported_module not in combined_stdlib
         )
 
-    owner_per_import = await MultiGet(owner_requests)
-    result = (
-        owner.address
-        for owner in owner_per_import
-        if owner.address and owner.address != request.sources_field.address
+    owners_per_import = await MultiGet(owners_requests)
+    result = sorted(
+        set(itertools.chain.from_iterable(owners_per_import)) - {request.sources_field.address}
     )
     return InferredDependencies(result, sibling_dependencies_inferrable=True)
 

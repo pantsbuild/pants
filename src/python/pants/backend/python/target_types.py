@@ -39,7 +39,7 @@ from pants.python.python_setup import PythonSetup
 
 
 class PythonSources(Sources):
-    expected_file_extensions = (".py",)
+    expected_file_extensions = (".py", ".pyi")
 
 
 class PythonInterpreterCompatibility(StringOrStringSequenceField):
@@ -246,7 +246,15 @@ class PythonBinary(Target):
 
 
 class PythonTestsSources(PythonSources):
-    default = ("test_*.py", "*_test.py", "tests.py", "conftest.py")
+    default = (
+        "test_*.py",
+        "*_test.py",
+        "tests.py",
+        "conftest.py",
+        "test_*.pyi",
+        "*_test.pyi",
+        "tests.pyi",
+    )
 
 
 class PythonTestsDependencies(Dependencies):
@@ -323,7 +331,7 @@ class PythonTests(Target):
 
 
 class PythonLibrarySources(PythonSources):
-    default = ("*.py",) + tuple(f"!{pat}" for pat in PythonTestsSources.default)
+    default = ("*.py", "*.pyi") + tuple(f"!{pat}" for pat in PythonTestsSources.default)
 
 
 class PythonLibrary(Target):

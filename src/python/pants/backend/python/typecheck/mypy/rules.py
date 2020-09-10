@@ -252,7 +252,7 @@ async def mypy_typecheck(
     typechecked_srcs_snapshot = typechecked_sources.source_files.snapshot
     file_list_path = "__files.txt"
     python_files = "\n".join(
-        f for f in typechecked_sources.source_files.snapshot.files if f.endswith(".py")
+        f for f in typechecked_sources.source_files.snapshot.files if f.endswith((".py", ".pyi"))
     )
     file_list_digest = await Get(
         Digest,

@@ -369,6 +369,77 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert "Success: no issues found" in result[0].stdout.strip()
 
 
+def test_type_stubs(rule_runner: RuleRunner) -> None:
+    """Test both that type stubs for our own code work, and also for third party code."""
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            python_requirement_library(
+                name="ansicolors",
+                requirements=["ansicolors"],
+                module_mapping={'ansicolors': ['colors']},
+            )
+            """
+        ),
+    )
+
+    rule_runner.create_file("mypy_stubs/__init__.py")
+    rule_runner.create_file(
+        "mypy_stubs/colors.pyi",
+        dedent(
+            """\
+            def red(s: str) -> str:
+                ...
+            """
+        )
+    )
+
+    rule_runner.create_file(f"{PACKAGE}/util/__init__.py")
+    rule_runner.create_file(
+        f"{PACKAGE}/util/untyped.py",
+        dedent(
+            """\
+            def add(x, y):
+                return x + y
+            """
+        )
+    )
+    rule_runner.create_file(
+        f"{PACKAGE}/util/untyped.pyi",
+        dedent(
+            """\
+            def add(x: int, y: int) -> int:
+                ...
+            """
+        )
+    )
+    rule_runner.add_to_build_file(f"{PACKAGE}/util", "python_library()")
+
+    rule_runner.create_file(f"{PACKAGE}/__init__.py")
+    rule_runner.create_file(
+        f"{PACKAGE}/app.py",
+        dedent(
+            """\
+            from colors import red
+            from project.util.untyped import add
+
+            z = add(2, 2.0)
+            print(red(z))
+            """
+        )
+    )
+    rule_runner.add_to_build_file(PACKAGE, "python_library()")
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
+    result = run_mypy(
+        rule_runner,
+        [tgt],
+        additional_args=["--source-root-patterns=['mypy_stubs', 'src/python']"]
+    )
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+
+
 def test_source_plugin(rule_runner: RuleRunner) -> None:
     # NB: We make this source plugin fairly complex by having it use transitive dependencies.
     # This is to ensure that we can correctly support plugins with dependencies.

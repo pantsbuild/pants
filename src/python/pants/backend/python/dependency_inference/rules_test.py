@@ -53,6 +53,7 @@ def test_infer_python_imports() -> None:
     )
 
     rule_runner.create_file("src/python/str_import/subdir/f.py")
+    rule_runner.create_file("src/python/str_import/subdir/f.pyi")
     rule_runner.add_to_build_file("src/python/str_import/subdir", "python_library()")
 
     rule_runner.create_file("src/python/util/dep.py")
@@ -120,6 +121,7 @@ def test_infer_python_imports() -> None:
         [
             Address("src/python", relative_file_path="app.py", target_name="python"),
             Address("src/python/str_import/subdir", relative_file_path="f.py"),
+            Address("src/python/str_import/subdir", relative_file_path="f.pyi"),
         ],
         sibling_dependencies_inferrable=True,
     )
