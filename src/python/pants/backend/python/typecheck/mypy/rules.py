@@ -7,7 +7,11 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import Tuple
 
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources, PythonRequirementsField
+from pants.backend.python.target_types import (
+    PythonInterpreterCompatibility,
+    PythonRequirementsField,
+    PythonSources,
+)
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (

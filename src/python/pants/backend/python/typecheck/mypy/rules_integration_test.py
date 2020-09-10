@@ -405,6 +405,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
 
     # The plugin can depend on code located anywhere in the project; its dependencies need not be in
     # the same directory.
+    rule_runner.create_file(f"{PACKAGE}/__init__.py")
     rule_runner.create_file(f"{PACKAGE}/subdir/__init__.py")
     rule_runner.create_file(f"{PACKAGE}/subdir/util.py", "def noop() -> None:\n    pass\n")
     rule_runner.add_to_build_file(f"{PACKAGE}/subdir", "python_library()")
@@ -495,7 +496,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 1
     assert f"{PACKAGE}/test_source_plugin.py:10" in result.stdout
     # We want to ensure we don't accidentally check the source plugin itself.
-    assert "(checked 1 source file)" in result.stdout
+    assert "(checked 2 source files)" in result.stdout
 
     # We also want to ensure that running MyPy on the plugin itself still works.
     plugin_tgt = rule_runner.get_target(
@@ -503,4 +504,4 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     )
     result = run_mypy_with_plugin(plugin_tgt)
     assert result.exit_code == 0
-    assert "Success: no issues found in 1 source file" in result.stdout
+    assert "Success: no issues found in 7 source files" in result.stdout
