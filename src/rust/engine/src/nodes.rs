@@ -490,13 +490,13 @@ impl From<Scandir> for NodeKey {
 ///
 /// A node that captures Vec<PathStat> for resolved files/dirs from PathGlobs.
 ///
-/// This is similar to the Snapshot node, but avoids writing to LMDB store as a performance
-/// optimization.
+/// This is similar to the Snapshot node, but avoids digesting the files and writing to LMDB store
+/// as a performance optimization.
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct FileListing(pub Key);
+pub struct Paths(pub Key);
 
-impl FileListing {
+impl Paths {
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<Vec<PathStat>> {
     context
       .expand_globs(path_globs)
@@ -504,7 +504,7 @@ impl FileListing {
       .await
   }
 
-  pub fn store_file_listing(core: &Arc<Core>, item: &[PathStat]) -> Result<Value, String> {
+  pub fn store_paths(core: &Arc<Core>, item: &[PathStat]) -> Result<Value, String> {
     let mut files = Vec::new();
     let mut dirs = Vec::new();
     for ps in item.iter() {
@@ -518,27 +518,27 @@ impl FileListing {
       }
     }
     Ok(externs::unsafe_call(
-      core.types.file_listing,
+      core.types.paths,
       &[externs::store_tuple(files), externs::store_tuple(dirs)],
     ))
   }
 }
 
 #[async_trait]
-impl WrappedNode for FileListing {
-  type Item = Vec<PathStat>;
+impl WrappedNode for Paths {
+  type Item = Arc<Vec<PathStat>>;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Vec<PathStat>> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<Vec<PathStat>>> {
     let path_globs = Snapshot::lift_path_globs(&externs::val_for(&self.0))
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let path_stats = Self::create(context, path_globs).await?;
-    Ok(path_stats)
+    Ok(Arc::new(path_stats))
   }
 }
 
-impl From<FileListing> for NodeKey {
-  fn from(n: FileListing) -> Self {
-    NodeKey::FileListing(n)
+impl From<Paths> for NodeKey {
+  fn from(n: Paths) -> Self {
+    NodeKey::Paths(n)
   }
 }
 
@@ -1039,7 +1039,7 @@ pub enum NodeKey {
   Scandir(Scandir),
   Select(Box<Select>),
   Snapshot(Snapshot),
-  FileListing(FileListing),
+  Paths(Paths),
   Task(Box<Task>),
 }
 
@@ -1051,7 +1051,7 @@ impl NodeKey {
       &NodeKey::Select(ref s) => format!("{}", s.product),
       &NodeKey::Task(ref s) => format!("{}", s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
-      &NodeKey::FileListing(..) => "FileListing".to_string(),
+      &NodeKey::Paths(..) => "Paths".to_string(),
       &NodeKey::DigestFile(..) => "DigestFile".to_string(),
       &NodeKey::ReadLink(..) => "LinkDest".to_string(),
       &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
@@ -1071,7 +1071,7 @@ impl NodeKey {
       &NodeKey::MultiPlatformExecuteProcess { .. }
       | &NodeKey::Select { .. }
       | &NodeKey::Snapshot { .. }
-      | &NodeKey::FileListing { .. }
+      | &NodeKey::Paths { .. }
       | &NodeKey::Task { .. }
       | &NodeKey::DownloadedFile { .. } => None,
     }
@@ -1094,7 +1094,7 @@ impl NodeKey {
       NodeKey::Task(ref task) => task.task.display_info.name.clone(),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.workunit_name(),
       NodeKey::Snapshot(..) => "snapshot".to_string(),
-      NodeKey::FileListing(..) => "file_listing".to_string(),
+      NodeKey::Paths(..) => "paths".to_string(),
       NodeKey::DigestFile(..) => "digest_file".to_string(),
       NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
       NodeKey::ReadLink(..) => "read_link".to_string(),
@@ -1114,7 +1114,7 @@ impl NodeKey {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.0)),
-      NodeKey::FileListing(ref s) => Some(format!("Finding files: {}", s.0)),
+      NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.0)),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => Some(mp_epr.0.user_facing_name()),
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
@@ -1237,11 +1237,7 @@ impl Node for NodeKey {
         }
         NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
         NodeKey::Snapshot(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
-        NodeKey::FileListing(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::FileListing)
-            .await
-        }
+        NodeKey::Paths(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Paths).await,
         NodeKey::Task(n) => {
           n.run_wrapped_node(context)
             .map_ok(|python_rule_output| {
@@ -1314,7 +1310,7 @@ impl Display for NodeKey {
         write!(f, "@rule({})", task.task.display_info.name)
       }
       &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.0),
-      &NodeKey::FileListing(ref s) => write!(f, "FileListing({})", s.0),
+      &NodeKey::Paths(ref s) => write!(f, "Paths({})", s.0),
     }
   }
 }
@@ -1343,7 +1339,7 @@ pub enum NodeOutput {
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(Box<ProcessResult>),
-  FileListing(Vec<PathStat>),
+  Paths(Arc<Vec<PathStat>>),
   Value(Value),
 }
 
@@ -1356,7 +1352,7 @@ impl NodeOutput {
       }
       NodeOutput::DirectoryListing(_)
       | NodeOutput::LinkDest(_)
-      | NodeOutput::FileListing(_)
+      | NodeOutput::Paths(_)
       | NodeOutput::Value(_) => vec![],
     }
   }
@@ -1400,12 +1396,12 @@ impl TryFrom<NodeOutput> for hashing::Digest {
   }
 }
 
-impl TryFrom<NodeOutput> for Vec<PathStat> {
+impl TryFrom<NodeOutput> for Arc<Vec<PathStat>> {
   type Error = ();
 
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeOutput::FileListing(v) => Ok(v),
+      NodeOutput::Paths(v) => Ok(v),
       _ => Err(()),
     }
   }

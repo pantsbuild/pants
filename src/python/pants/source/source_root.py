@@ -10,7 +10,7 @@ from typing import Dict, Iterable, Optional, Set, Tuple, Union
 
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.fs import FileListing, PathGlobs
+from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
 from pants.option.subsystem import Subsystem
@@ -279,10 +279,8 @@ async def get_optional_source_root(
                 raise InvalidMarkerFileError(
                     f"Marker filename must be a base name: {marker_filename}"
                 )
-        file_listing = await Get(
-            FileListing, PathGlobs([str(path / mf) for mf in marker_filenames])
-        )
-        if len(file_listing.files) > 0:
+        paths = await Get(Paths, PathGlobs([str(path / mf) for mf in marker_filenames]))
+        if len(paths.files) > 0:
             return OptionalSourceRoot(SourceRoot(str(path)))
 
     # The requested path itself is not a source root, but maybe its parent is.
@@ -330,25 +328,19 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
         marker_file_matches.add(f"**/{marker_filename}")
 
     # Match the patterns against actual files, to find the roots that actually exist.
-    pattern_file_listing, marker_file_listing = await MultiGet(
-        Get(FileListing, PathGlobs(globs=sorted(pattern_matches))),
-        Get(FileListing, PathGlobs(globs=sorted(marker_file_matches))),
+    pattern_paths, marker_paths = await MultiGet(
+        Get(Paths, PathGlobs(globs=sorted(pattern_matches))),
+        Get(Paths, PathGlobs(globs=sorted(marker_file_matches))),
     )
 
     responses = await MultiGet(
         itertools.chain(
-            (
-                Get(OptionalSourceRoot, SourceRootRequest(PurePath(d)))
-                for d in pattern_file_listing.dirs
-            ),
+            (Get(OptionalSourceRoot, SourceRootRequest(PurePath(d))) for d in pattern_paths.dirs),
             # We don't technically need to issue a SourceRootRequest for the marker files,
             # since we know that their immediately enclosing dir is a source root by definition.
             # However we may as well verify this formally, so that we're not replicating that
             # logic here.
-            (
-                Get(OptionalSourceRoot, SourceRootRequest(PurePath(f)))
-                for f in marker_file_listing.files
-            ),
+            (Get(OptionalSourceRoot, SourceRootRequest(PurePath(f))) for f in marker_paths.files),
         )
     )
     all_source_roots = {

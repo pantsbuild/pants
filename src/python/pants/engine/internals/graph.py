@@ -30,9 +30,9 @@ from pants.engine.collection import Collection
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     Digest,
-    FileListing,
     MergeDigests,
     PathGlobs,
+    Paths,
     Snapshot,
     SourcesSnapshot,
 )
@@ -103,15 +103,15 @@ async def generate_subtargets(address: Address, global_options: GlobalOptions) -
         return Subtargets(base_target, ())
 
     # Generate a subtarget per source.
-    file_listing = await Get(FileListing, PathGlobs, sources_field_path_globs)
-    sources_field.validate_resolved_files(file_listing.files)
+    paths = await Get(Paths, PathGlobs, sources_field_path_globs)
+    sources_field.validate_resolved_files(paths.files)
     wrapped_subtargets = await MultiGet(
         Get(
             WrappedTarget,
             Address,
             generate_subtarget_address(address, full_file_name=subtarget_file),
         )
-        for subtarget_file in file_listing.files
+        for subtarget_file in paths.files
     )
 
     return Subtargets(base_target, tuple(wt.target for wt in wrapped_subtargets))
@@ -340,9 +340,9 @@ class Owners(Collection[Address]):
 @rule
 async def find_owners(owners_request: OwnersRequest) -> Owners:
     # Determine which of the sources are live and which are deleted.
-    sources_set_file_listing = await Get(FileListing, PathGlobs(owners_request.sources))
+    sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
 
-    live_files = FrozenOrderedSet(sources_set_file_listing.files)
+    live_files = FrozenOrderedSet(sources_paths.files)
     deleted_files = FrozenOrderedSet(s for s in owners_request.sources if s not in live_files)
     live_dirs = FrozenOrderedSet(os.path.dirname(s) for s in live_files)
     deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
@@ -435,9 +435,9 @@ async def addresses_with_origins_from_filesystem_specs(
     exactly one file in its `sources` field.
     """
     owners_not_found_behavior = global_options.options.owners_not_found_behavior
-    file_listing_per_include = await MultiGet(
+    paths_per_include = await MultiGet(
         Get(
-            FileListing,
+            Paths,
             PathGlobs,
             filesystem_specs.path_globs_for_spec(
                 spec, owners_not_found_behavior.to_glob_match_error_behavior()
@@ -446,8 +446,7 @@ async def addresses_with_origins_from_filesystem_specs(
         for spec in filesystem_specs.includes
     )
     owners_per_include = await MultiGet(
-        Get(Owners, OwnersRequest(sources=file_listing.files))
-        for file_listing in file_listing_per_include
+        Get(Owners, OwnersRequest(sources=paths.files)) for paths in paths_per_include
     )
     addresses_to_specs: Dict[Address, FilesystemSpec] = {}
     for spec, owners in zip(filesystem_specs.includes, owners_per_include):

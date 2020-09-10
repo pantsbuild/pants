@@ -40,11 +40,11 @@ class Snapshot:
 
 
 @dataclass(frozen=True)
-class FileListing:
-    """A FileListing is a collection of sorted file paths and dir paths.
+class Paths:
+    """A Paths object is a collection of sorted file paths and dir paths.
 
-    FileListing is like a Snapshot, but has a performance optimization that it does not save a
-    Digest to the LMDB store.
+    Paths is like a Snapshot, but has a performance optimization that it does digest the files or
+    save them to the LMDB store.
     """
 
     files: Tuple[str, ...]
@@ -277,5 +277,5 @@ def rules():
         QueryRule(Digest, (DigestSubset,)),
         QueryRule(DigestContents, (Digest,)),
         QueryRule(Snapshot, (Digest,)),
-        QueryRule(FileListing, (PathGlobs,)),
+        QueryRule(Paths, (PathGlobs,)),
     )

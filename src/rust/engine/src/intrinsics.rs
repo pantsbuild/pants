@@ -2,7 +2,7 @@ use crate::context::Context;
 use crate::core::{throw, Value};
 use crate::externs;
 use crate::nodes::MultiPlatformExecuteProcess;
-use crate::nodes::{lift_digest, DownloadedFile, FileListing, NodeResult, Snapshot};
+use crate::nodes::{lift_digest, DownloadedFile, NodeResult, Paths, Snapshot};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 
@@ -50,10 +50,10 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
-        product: types.file_listing,
+        product: types.paths,
         inputs: vec![types.path_globs],
       },
-      Box::new(path_globs_to_file_listing),
+      Box::new(path_globs_to_paths),
     );
     intrinsics.insert(
       Intrinsic {
@@ -310,15 +310,15 @@ fn path_globs_to_digest(
   .boxed()
 }
 
-fn path_globs_to_file_listing(
+fn path_globs_to_paths(
   context: Context,
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
     let key = externs::acquire_key_for(args.pop().unwrap())?;
-    let file_listing = context.get(FileListing(key)).await?;
-    FileListing::store_file_listing(&core, &file_listing).map_err(|e: String| throw(&e))
+    let paths = context.get(Paths(key)).await?;
+    Paths::store_paths(&core, &paths).map_err(|e: String| throw(&e))
   }
   .boxed()
 }

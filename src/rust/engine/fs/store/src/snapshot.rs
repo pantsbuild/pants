@@ -73,6 +73,7 @@ impl Snapshot {
 
     let path_stats = Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter))
       .collect::<Vec<_>>();
+    // The path stats should already be normalized; this is an assertion that they're valid.
     let path_stats = PathStat::normalize_path_stats(path_stats)?;
     Ok(Snapshot { digest, path_stats })
   }

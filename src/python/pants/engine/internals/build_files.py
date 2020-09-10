@@ -15,7 +15,7 @@ from pants.engine.addresses import (
     AddressWithOrigin,
     BuildFileAddress,
 )
-from pants.engine.fs import DigestContents, FileListing, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -55,8 +55,8 @@ async def evaluate_preludes(global_options: GlobalOptions) -> BuildFilePreludeSy
 async def resolve_address(address_input: AddressInput) -> Address:
     # Determine the type of the path_component of the input.
     if address_input.path_component:
-        file_listing = await Get(FileListing, PathGlobs(globs=(address_input.path_component,)))
-        is_file, is_dir = bool(file_listing.files), bool(file_listing.dirs)
+        paths = await Get(Paths, PathGlobs(globs=(address_input.path_component,)))
+        is_file, is_dir = bool(paths.files), bool(paths.dirs)
     else:
         # It is an address in the root directory.
         is_file, is_dir = False, True
@@ -186,15 +186,15 @@ async def addresses_with_origins_from_address_specs(
 
     # Then, convert all `AddressGlobSpecs`. Resolve all BUILD files covered by the specs, then
     # group by directory.
-    file_listing = await Get(
-        FileListing,
+    paths = await Get(
+        Paths,
         PathGlobs,
         address_specs.to_path_globs(
             build_patterns=global_options.options.build_patterns,
             build_ignore_patterns=global_options.options.build_ignore,
         ),
     )
-    dirnames = {os.path.dirname(f) for f in file_listing.files}
+    dirnames = {os.path.dirname(f) for f in paths.files}
     address_families = await MultiGet(Get(AddressFamily, Dir(d)) for d in dirnames)
     address_family_by_directory = {af.namespace: af for af in address_families}
 

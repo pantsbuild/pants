@@ -406,7 +406,7 @@ py_class!(class PyTypes |py| {
       _cls,
       directory_digest: PyType,
       snapshot: PyType,
-      file_listing: PyType,
+      paths: PyType,
       file_content: PyType,
       digest_contents: PyType,
       address: PyType,
@@ -435,7 +435,7 @@ py_class!(class PyTypes |py| {
         RefCell::new(Some(Types {
         directory_digest: externs::type_for(directory_digest),
         snapshot: externs::type_for(snapshot),
-        file_listing: externs::type_for(file_listing),
+        paths: externs::type_for(paths),
         file_content: externs::type_for(file_content),
         digest_contents: externs::type_for(digest_contents),
         address: externs::type_for(address),
