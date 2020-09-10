@@ -26,6 +26,7 @@ from pants.engine.target import (
     Sources,
     StringField,
     StringOrStringSequenceField,
+    StringSequenceField,
     Target,
 )
 from pants.option.subsystem import Subsystem
@@ -258,6 +259,16 @@ class PythonTestsDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
+class PythonRuntimeBinaryDependencies(StringSequenceField):
+    """Addresses to binary targets that will be built and included in this target at runtime.
+
+    These binary targets do not necessarily need to be `python_binary` targets; they can be any
+    targets accepted by `./pants binary`
+    """
+
+    alias = "runtime_binary_dependencies"
+
+
 class PythonTestsTimeout(IntField):
     """A timeout (in seconds) which covers the total runtime of all tests in this target.
 
@@ -307,6 +318,7 @@ class PythonTests(Target):
         *COMMON_PYTHON_FIELDS,
         PythonTestsSources,
         PythonTestsDependencies,
+        PythonRuntimeBinaryDependencies,
         PythonTestsTimeout,
     )
 

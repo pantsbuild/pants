@@ -5,7 +5,7 @@ import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, cast
+from typing import Optional, Tuple, cast
 from uuid import UUID
 
 from pants.backend.python.goals.coverage_py import (
@@ -16,6 +16,7 @@ from pants.backend.python.goals.coverage_py import (
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
+    PythonRuntimeBinaryDependencies,
     PythonTestsSources,
     PythonTestsTimeout,
 )
@@ -40,12 +41,17 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses
+from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSetsPerTarget, FieldSetsPerTargetRequest, TransitiveTargets
+from pants.engine.target import (
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
+    Targets,
+    TransitiveTargets,
+)
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
@@ -60,6 +66,7 @@ class PythonTestFieldSet(TestFieldSet):
 
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
+    runtime_binary_dependencies: PythonRuntimeBinaryDependencies
 
     def is_conftest(self) -> bool:
         """We skip `conftest.py`, even though it belongs to a `python_tests` target, because it does
@@ -164,16 +171,26 @@ async def setup_pytest_for_target(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
 
-    # Create any binaries that the test depends on (directly or indirectly).
-    # Note that these need not be Python binaries.
-    field_sets_per_target = await Get(
-        FieldSetsPerTarget,
-        FieldSetsPerTargetRequest(BinaryFieldSet, all_targets),
-    )
-    binaries = await MultiGet(
-        Get(CreatedBinary, BinaryFieldSet, field_set)
-        for field_set in field_sets_per_target.field_sets
-    )
+    # Create any binaries that the test depends on through the `runtime_binary_dependencies` field.
+    binaries: Tuple[CreatedBinary, ...] = ()
+    if request.field_set.runtime_binary_dependencies.value:
+        runtime_binary_addresses = await MultiGet(
+            Get(
+                Address,
+                AddressInput,
+                AddressInput.parse(v, relative_to=request.field_set.address.spec_path),
+            )
+            for v in request.field_set.runtime_binary_dependencies.value
+        )
+        runtime_binary_targets = await Get(Targets, Addresses(runtime_binary_addresses))
+        field_sets_per_target = await Get(
+            FieldSetsPerTarget,
+            FieldSetsPerTargetRequest(BinaryFieldSet, runtime_binary_targets),
+        )
+        binaries = await MultiGet(
+            Get(CreatedBinary, BinaryFieldSet, field_set)
+            for field_set in field_sets_per_target.field_sets
+        )
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
