@@ -17,6 +17,7 @@ from typing import (
     Iterator,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -174,7 +175,7 @@ class AsyncField(Field, metaclass=ABCMeta):
             # Example extension point provided by this field. Subclasses can override this to do
             # whatever validation they'd like. Each AsyncField must define its own entry points
             # like this to allow subclasses to change behavior.
-            def validate_snapshot(self, snapshot: Snapshot) -> None:
+            def validate_resolved_files(self, files: Sequence[str]) -> None:
                 pass
 
 
@@ -191,7 +192,7 @@ class AsyncField(Field, metaclass=ABCMeta):
         @rule
         def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
             result = await Get(Snapshot, PathGlobs(request.field.sanitized_raw_value))
-            request.field.validate_snapshot(result)
+            request.field.validate_resolved_files(result.files)
             ...
             return HydratedSources(result)
 
@@ -1221,9 +1222,9 @@ class Sources(AsyncField):
             )
         return tuple(sorted(value_or_default))
 
-    def validate_snapshot(self, snapshot: Snapshot) -> None:
-        """Perform any additional validation on the resulting snapshot, e.g. ensuring that certain
-        banned files are not used.
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        """Perform any additional validation on the resulting source files, e.g. ensuring that
+        certain banned files are not used.
 
         To enforce that the resulting files end in certain extensions, such as `.py` or `.java`, set
         the class property `expected_file_extensions`.
@@ -1233,9 +1234,7 @@ class Sources(AsyncField):
         """
         if self.expected_file_extensions is not None:
             bad_files = [
-                fp
-                for fp in snapshot.files
-                if not PurePath(fp).suffix in self.expected_file_extensions
+                fp for fp in files if not PurePath(fp).suffix in self.expected_file_extensions
             ]
             if bad_files:
                 expected = (
@@ -1250,7 +1249,7 @@ class Sources(AsyncField):
                     f"`dependencies` field?"
                 )
         if self.expected_num_files is not None:
-            num_files = len(snapshot.files)
+            num_files = len(files)
             is_bad_num_files = (
                 num_files not in self.expected_num_files
                 if isinstance(self.expected_num_files, range)

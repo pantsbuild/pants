@@ -325,7 +325,7 @@ impl Store {
         path: name.clone().into(),
         stat: fs::File {
           path: name.into(),
-          is_executable: is_executable,
+          is_executable,
         },
       }],
     )

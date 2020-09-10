@@ -443,7 +443,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         ));
         let store_copy = store.clone();
         let paths = posix_fs
-          .expand(
+          .expand_globs(
             fs::PathGlobs::new(
               args
                 .values_of("globs")

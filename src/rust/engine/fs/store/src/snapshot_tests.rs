@@ -520,7 +520,7 @@ fn make_file_stat(root: &Path, relpath: &Path, contents: &[u8], is_executable: b
 
 pub async fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
   let mut v = posix_fs
-    .expand(
+    .expand_globs(
       // Don't error or warn if there are no paths matched -- that is a valid state.
       PathGlobs::new(
         vec!["**".to_owned()],

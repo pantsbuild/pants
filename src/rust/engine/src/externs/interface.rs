@@ -392,6 +392,7 @@ py_class!(class PyTypes |py| {
       _cls,
       directory_digest: PyType,
       snapshot: PyType,
+      paths: PyType,
       file_content: PyType,
       digest_contents: PyType,
       path_globs: PyType,
@@ -413,6 +414,7 @@ py_class!(class PyTypes |py| {
         RefCell::new(Some(Types {
         directory_digest: externs::type_for(directory_digest),
         snapshot: externs::type_for(snapshot),
+        paths: externs::type_for(paths),
         file_content: externs::type_for(file_content),
         digest_contents: externs::type_for(digest_contents),
         path_globs: externs::type_for(path_globs),
@@ -864,14 +866,14 @@ async fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResul
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stdout_digest"),
-      crate::nodes::Snapshot::store_directory(core, stdout_digest),
+      crate::nodes::Snapshot::store_directory_digest(core, stdout_digest),
     ));
   }
 
   if let Some(stderr_digest) = &workunit.metadata.stderr.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stderr_digest"),
-      crate::nodes::Snapshot::store_directory(core, stderr_digest),
+      crate::nodes::Snapshot::store_directory_digest(core, stderr_digest),
     ));
   }
 

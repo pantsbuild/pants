@@ -7,7 +7,7 @@ from typing import Iterable, Optional, cast
 
 import pytest
 
-from pants.engine.fs import Digest, PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import (
@@ -38,12 +38,12 @@ def _find_root(
     )
 
     # This inner function is passed as the callable to the mock, to allow recursion in the rule.
-    def _mock_fs_check(pathglobs: PathGlobs) -> Snapshot:
+    def _mock_fs_check(pathglobs: PathGlobs) -> Paths:
         for glob in pathglobs.globs:
             if glob in (existing_marker_files or []):
                 d, f = os.path.split(pathglobs.globs[0])
-                return Snapshot(digest=Digest("111", 111), files=(f,), dirs=(d,))
-        return Snapshot(digest=Digest("000", 000), files=tuple(), dirs=tuple())
+                return Paths(files=(f,), dirs=(d,))
+        return Paths(files=tuple(), dirs=tuple())
 
     def _do_find_root(src_root_req: SourceRootRequest) -> OptionalSourceRoot:
         return cast(
@@ -57,7 +57,7 @@ def _find_root(
                         subject_type=SourceRootRequest,
                         mock=_do_find_root,
                     ),
-                    MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=_mock_fs_check),
+                    MockGet(product_type=Paths, subject_type=PathGlobs, mock=_mock_fs_check),
                 ],
             ),
         )
@@ -220,8 +220,8 @@ def test_all_roots() -> None:
     )
 
     # This function mocks out reading real directories off the file system.
-    def provider_rule(_: PathGlobs) -> Snapshot:
-        return Snapshot(Digest("abcdef", 10), (), dirs)
+    def provider_rule(_: PathGlobs) -> Paths:
+        return Paths((), dirs)
 
     def source_root_mock_rule(req: SourceRootRequest) -> OptionalSourceRoot:
         for d in dirs:
@@ -233,7 +233,7 @@ def test_all_roots() -> None:
         all_roots,
         rule_args=[source_root_config],
         mock_gets=[
-            MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
+            MockGet(product_type=Paths, subject_type=PathGlobs, mock=provider_rule),
             MockGet(
                 product_type=OptionalSourceRoot,
                 subject_type=SourceRootRequest,
@@ -263,15 +263,15 @@ def test_all_roots_with_root_at_buildroot() -> None:
     )
 
     # This function mocks out reading real directories off the file system
-    def provider_rule(_: PathGlobs) -> Snapshot:
+    def provider_rule(_: PathGlobs) -> Paths:
         dirs = ("foo",)  # A python package at the buildroot.
-        return Snapshot(Digest("abcdef", 10), (), dirs)
+        return Paths((), dirs)
 
     output = run_rule_with_mocks(
         all_roots,
         rule_args=[source_root_config],
         mock_gets=[
-            MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
+            MockGet(product_type=Paths, subject_type=PathGlobs, mock=provider_rule),
             MockGet(
                 product_type=OptionalSourceRoot,
                 subject_type=SourceRootRequest,

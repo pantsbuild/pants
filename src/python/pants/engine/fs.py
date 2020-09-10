@@ -40,6 +40,18 @@ class Snapshot:
 
 
 @dataclass(frozen=True)
+class Paths:
+    """A Paths object is a collection of sorted file paths and dir paths.
+
+    Paths is like a Snapshot, but has a performance optimization that it does digest the files or
+    save them to the LMDB store.
+    """
+
+    files: Tuple[str, ...]
+    dirs: Tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class FileContent:
     """The content of a file."""
 
@@ -265,4 +277,5 @@ def rules():
         QueryRule(Digest, (DigestSubset,)),
         QueryRule(DigestContents, (Digest,)),
         QueryRule(Snapshot, (Digest,)),
+        QueryRule(Paths, (PathGlobs,)),
     )

@@ -1284,7 +1284,7 @@ pub fn extract_output_files(
     let files_digest = Snapshot::digest_from_path_stats(
       store.clone(),
       StoreOneOffRemoteDigest::new(path_map),
-      &path_stats,
+      path_stats,
     )
     .map_err(move |error| {
       format!(

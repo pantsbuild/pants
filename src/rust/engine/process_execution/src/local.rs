@@ -103,7 +103,7 @@ impl CommandRunner {
 
     Box::pin(async move {
       let path_stats = posix_fs
-        .expand(output_globs)
+        .expand_globs(output_globs)
         .map_err(|err| format!("Error expanding output globs: {}", err))
         .await?;
       Snapshot::from_path_stats(

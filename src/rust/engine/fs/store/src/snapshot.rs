@@ -40,25 +40,11 @@ impl Snapshot {
   >(
     store: Store,
     file_digester: S,
-    mut path_stats: Vec<PathStat>,
+    path_stats: Vec<PathStat>,
   ) -> Result<Snapshot, String> {
-    #[allow(clippy::unnecessary_sort_by)]
-    path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-
-    // The helper assumes that if a Path has multiple children, it must be a directory.
-    // Proactively error if we run into identically named files, because otherwise we will treat
-    // them like empty directories.
-    let pre_dedupe_len = path_stats.len();
-    path_stats.dedup_by(|a, b| a.path() == b.path());
-    if path_stats.len() != pre_dedupe_len {
-      return Err(format!(
-        "Snapshots must be constructed from unique path stats; got duplicates in {:?}",
-        path_stats
-      ));
-    }
+    let path_stats = PathStat::normalize_path_stats(path_stats)?;
     let digest =
       Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &path_stats).await?;
-
     Ok(Snapshot { digest, path_stats })
   }
 
@@ -85,11 +71,10 @@ impl Snapshot {
       .compat()
       .await?;
 
-    let mut path_stats =
-      Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter))
-        .collect::<Vec<_>>();
-    #[allow(clippy::unnecessary_sort_by)]
-    path_stats.sort_by(|l, r| l.path().cmp(&r.path()));
+    let path_stats = Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter))
+      .collect::<Vec<_>>();
+    // The path stats should already be normalized; this is an assertion that they're valid.
+    let path_stats = PathStat::normalize_path_stats(path_stats)?;
     Ok(Snapshot { digest, path_stats })
   }
 
@@ -99,13 +84,10 @@ impl Snapshot {
   >(
     store: Store,
     file_digester: S,
-    path_stats: &[PathStat],
+    path_stats: Vec<PathStat>,
   ) -> Result<Digest, String> {
-    let mut sorted_path_stats = path_stats.to_owned();
-    #[allow(clippy::unnecessary_sort_by)]
-    sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
-      .await
+    let path_stats = PathStat::normalize_path_stats(path_stats)?;
+    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &path_stats).await
   }
 
   // NB: This function is recursive, and so cannot be directly marked async:
@@ -282,7 +264,7 @@ impl Snapshot {
       )?);
 
       let path_stats = posix_fs
-        .expand(path_globs)
+        .expand_globs(path_globs)
         .await
         .map_err(|err| format!("Error expanding globs: {}", err))?;
       Snapshot::from_path_stats(
