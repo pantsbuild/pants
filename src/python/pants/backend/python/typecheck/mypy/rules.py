@@ -2,10 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from pathlib import PurePath
+from textwrap import dedent
 from typing import Tuple
 
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -13,12 +16,11 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules import pants_bin
 from pants.engine.addresses import Addresses
@@ -59,9 +61,50 @@ def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
     return tuple(args)
 
 
+# MyPy searches for types for a package in packages containing a `py.types` marker file or else in
+# a sibling `<package>-stubs` package as per PEP-0561. Going further than that PEP, MyPy restricts
+# its search to `site-packages`. Since PEX deliberately isolates itself from `site-packages` as
+# part of its raison d'être, we monkey-patch `site.getsitepackages` to look inside the scrubbed
+# PEX sys.path before handing off to `mypy`.
+#
+# As a complication, MyPy does its own validation to ensure packages aren't both available in
+# site-packages and on the PYTHONPATH. As such, we elide all PYTHONPATH entries from artificial
+# site-packages we set up since MyPy will manually scan PYTHONPATH outside this PEX to find
+# packages. We also elide the values of PEX_EXTRA_SYS_PATH, which will be relative paths unlike
+# every other entry of sys.path. (We can't directly look for PEX_EXTRA_SYS_PATH because Pex scrubs
+# it.)
+#
+# See:
+#   https://mypy.readthedocs.io/en/stable/installed_packages.html#installed-packages
+#   https://www.python.org/dev/peps/pep-0561/#stub-only-packages
+#   https://github.com/python/mypy/blob/f743b0af0f62ce4cf8612829e50310eb0a019724/mypy/sitepkgs.py#L22-L28
+LAUNCHER_FILE = FileContent(
+    "__pants_mypy_launcher.py",
+    dedent(
+        """\
+        import os
+        import runpy
+        import site
+        import sys
+
+        PYTHONPATH = frozenset(
+            os.path.realpath(p)
+            for p in os.environ.get('PYTHONPATH', '').split(os.pathsep)
+        )
+        site.getsitepackages = lambda: [
+            p for p in sys.path
+            if os.path.realpath(p) not in PYTHONPATH and os.path.isabs(p)
+        ]
+        site.getusersitepackages = lambda: ''  # i.e, the CWD.
+
+        runpy.run_module('mypy', run_name='__main__')
+        """
+    ).encode(),
+)
+
+
 # TODO(#10131): Improve performance, e.g. by leveraging the MyPy cache.
-# TODO(#10131): Support plugins and type stubs.
-# TODO(#10131): Support third-party requirements.
+# TODO(#10131): Support first-party plugins and .pyi files.
 @rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
 async def mypy_typecheck(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
@@ -69,8 +112,9 @@ async def mypy_typecheck(
     if mypy.skip:
         return TypecheckResults([], typechecker_name="MyPy")
 
-    transitive_targets = await Get(
-        TransitiveTargets, Addresses(fs.address for fs in request.field_sets)
+    transitive_targets, launcher_script = await MultiGet(
+        Get(TransitiveTargets, Addresses(fs.address for fs in request.field_sets)),
+        Get(Digest, CreateDigest([LAUNCHER_FILE])),
     )
 
     # Interpreter constraints are tricky with MyPy:
@@ -79,14 +123,14 @@ async def mypy_typecheck(
     #     run with Python 3.8, it can understand 2.7 and 3.4-3.8. So, we need to check if the user
     #     has code that requires Python 3.8+, and if so, use a tighter requirement.
     #
-    #     On top of this, MyPy parses the AST using the value from `python_version`. If this is not
-    #     configured, it defaults to the interpreter being used. This means that running the
-    #     interpreter with Py35 would choke on f-strings in Python 3.6, unless the user set
+    #     On top of this, MyPy parses the AST using the value from `python_version` from mypy.ini.
+    #     If this is not configured, it defaults to the interpreter being used. This means that
+    #     running MyPy with Py35 would choke on f-strings in Python 3.6, unless the user set
     #     `python_version`. We don't want to make the user set this up. (If they do, MyPy will use
     #     `python_version`, rather than defaulting to the executing interpreter).
     #
     #     We only apply these optimizations if the user did not configure
-    #     `--mypy-interpreter-constraints`, and if we are know that there are no Py35 or Py27
+    #     `--mypy-interpreter-constraints`, and if we know that there are no Py35 or Py27
     #     constraints. If they use Py27 or Py35, this implies that they're not using Py36+ syntax,
     #     so it's fine to use the Py35 parser. We want the loosest constraints possible to make it
     #     more flexible to install MyPy.
@@ -116,7 +160,8 @@ async def mypy_typecheck(
         PythonSourceFiles,
         PythonSourceFilesRequest(transitive_targets.closure),
     )
-    pex_request = Get(
+
+    tool_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="mypy.pex",
@@ -126,6 +171,33 @@ async def mypy_typecheck(
             entry_point=mypy.entry_point,
         ),
     )
+    requirements_pex_request = Get(
+        Pex,
+        PexFromTargetsRequest,
+        PexFromTargetsRequest.for_requirements(
+            (field_set.address for field_set in request.field_sets), internal_only=True
+        ),
+    )
+    runner_pex_request = Get(
+        Pex,
+        PexRequest(
+            output_filename="mypy_runner.pex",
+            internal_only=True,
+            sources=launcher_script,
+            interpreter_constraints=PexInterpreterConstraints(tool_interpreter_constraints),
+            entry_point=PurePath(LAUNCHER_FILE.path).stem,
+            additional_args=(
+                "--pex-path",
+                ":".join(
+                    (
+                        tool_pex_request.subject.output_filename,
+                        requirements_pex_request.subject.output_filename,
+                    )
+                ),
+            ),
+        ),
+    )
+
     config_digest_request = Get(
         Digest,
         PathGlobs(
@@ -134,8 +206,13 @@ async def mypy_typecheck(
             description_of_origin="the option `--mypy-config`",
         ),
     )
-    prepared_sources, pex, config_digest = await MultiGet(
-        prepared_sources_request, pex_request, config_digest_request
+
+    prepared_sources, tool_pex, requirements_pex, runner_pex, config_digest = await MultiGet(
+        prepared_sources_request,
+        tool_pex_request,
+        requirements_pex_request,
+        runner_pex_request,
+        config_digest_request,
     )
 
     srcs_snapshot = prepared_sources.source_files.snapshot
@@ -148,13 +225,22 @@ async def mypy_typecheck(
 
     merged_input_files = await Get(
         Digest,
-        MergeDigests([file_list_digest, srcs_snapshot.digest, pex.digest, config_digest]),
+        MergeDigests(
+            [
+                file_list_digest,
+                srcs_snapshot.digest,
+                tool_pex.digest,
+                requirements_pex.digest,
+                runner_pex.digest,
+                config_digest,
+            ]
+        ),
     )
 
     result = await Get(
         FallibleProcessResult,
         PexProcess(
-            pex,
+            runner_pex,
             argv=generate_args(mypy, file_list_path=file_list_path),
             input_digest=merged_input_files,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots)},
@@ -172,6 +258,5 @@ def rules():
         *collect_rules(),
         UnionRule(TypecheckRequest, MyPyRequest),
         *pants_bin.rules(),
-        *pex_rules(),
-        *python_sources_rules(),
+        *pex_from_targets.rules(),
     ]
