@@ -129,20 +129,20 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
         "src/python/foo/bar/baz",
         textwrap.dedent(
             """
-        python_distribution(
-            name="baz-dist",
-            dependencies=[':baz'],
-            provides=setup_py(
-                name='baz',
-                version='1.1.1'
+            python_distribution(
+                name="baz-dist",
+                dependencies=[':baz'],
+                provides=setup_py(
+                    name='baz',
+                    version='1.1.1'
+                )
             )
-        )
-
-        python_library()
-        """
+    
+            python_library()
+            """
         ),
     )
-    chroot_rule_runner.create_file("src/python/foo/bar/baz/baz.py", "")
+    chroot_rule_runner.create_file("src/python/foo/bar/baz/baz.py")
     chroot_rule_runner.add_to_build_file(
         "src/python/foo/qux",
         textwrap.dedent(
@@ -155,6 +155,8 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
     )
     chroot_rule_runner.create_file("src/python/foo/qux/__init__.py")
     chroot_rule_runner.create_file("src/python/foo/qux/qux.py")
+    # Add a `.pyi` stub file to ensure we include it in the final result.
+    chroot_rule_runner.create_file("src/python/foo/qux/qux.pyi")
     chroot_rule_runner.add_to_build_file(
         "src/python/foo/resources", 'resources(sources=["js/code.js"])'
     )
@@ -196,6 +198,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "src/files/README.txt",
             "src/foo/qux/__init__.py",
             "src/foo/qux/qux.py",
+            "src/foo/qux/qux.pyi",
             "src/foo/resources/js/code.js",
             "src/foo/__init__.py",
             "src/foo/foo.py",

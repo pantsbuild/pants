@@ -355,8 +355,8 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
         [
             CreateDigest(
                 (
-                    FileContent(path="main.py", content=b'print("from main")'),
-                    FileContent(path="subdir/sub.py", content=b'print("from sub")'),
+                    FileContent("main.py", b'print("from main")'),
+                    FileContent("subdir/sub.py", b'print("from sub")'),
                 )
             ),
         ],

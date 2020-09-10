@@ -459,3 +459,13 @@ def test_runtime_binary_dependency(rule_runner: RuleRunner) -> None:
     assert isinstance(tgt, PythonTests)
     result = run_pytest(rule_runner, tgt, passthrough_args="-s")
     assert result.exit_code == 0
+
+
+def test_skip_type_stubs(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file(f"{PACKAGE}/test_foo.pyi", "def test_foo() -> None:\n    ...\n")
+    rule_runner.add_to_build_file(PACKAGE, "python_tests()")
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_foo.pyi"))
+    assert isinstance(tgt, PythonTests)
+
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code is None

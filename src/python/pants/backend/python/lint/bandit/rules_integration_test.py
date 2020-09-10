@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Sequence
+from typing import Any, List, Optional, Sequence
 
 import pytest
 
@@ -26,10 +26,10 @@ def rule_runner() -> RuleRunner:
     )
 
 
-GOOD_SOURCE = FileContent(path="good.py", content=b"hashlib.sha256()\n")
+GOOD_SOURCE = FileContent("good.py", b"hashlib.sha256()\n")
 # MD5 is a insecure hashing function
-BAD_SOURCE = FileContent(path="bad.py", content=b"hashlib.md5()\n")
-PY3_ONLY_SOURCE = FileContent(path="py3.py", content=b"version: str = 'Py3 > Py2'\n")
+BAD_SOURCE = FileContent("bad.py", b"hashlib.md5()\n")
+PY3_ONLY_SOURCE = FileContent("py3.py", b"version: str = 'Py3 > Py2'\n")
 
 
 def make_target(
@@ -73,13 +73,17 @@ def run_bandit(
     return results.results
 
 
-def test_passing_source(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [GOOD_SOURCE])
-    result = run_bandit(rule_runner, [target])
+def assert_success(rule_runner: RuleRunner, target: Target, **kwargs: Any) -> None:
+    result = run_bandit(rule_runner, [target], **kwargs)
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "No issues identified." in result[0].stdout.strip()
     assert result[0].report is None
+
+
+def test_passing_source(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [GOOD_SOURCE])
+    assert_success(rule_runner, target)
 
 
 def test_failing_source(rule_runner: RuleRunner) -> None:
@@ -149,20 +153,12 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
 
 def test_respects_config_file(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    result = run_bandit(rule_runner, [target], config="skips: ['B303']\n")
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "No issues identified." in result[0].stdout.strip()
-    assert result[0].report is None
+    assert_success(rule_runner, target, config="skips: ['B303']\n")
 
 
 def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    result = run_bandit(rule_runner, [target], passthrough_args="--skip B303")
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "No issues identified." in result[0].stdout.strip()
-    assert result[0].report is None
+    assert_success(rule_runner, target, passthrough_args="--skip B303")
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
@@ -200,3 +196,14 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     assert (
         "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in report_files[0].content.decode()
     )
+
+
+def test_type_stubs(rule_runner: RuleRunner) -> None:
+    """Ensure that running over a type stub file doesn't cause issues."""
+    type_stub = FileContent("good.pyi", b"def add(x: int, y: int) -> int:\n  return x + y")
+    # First check when the stub has no sibling `.py` file.
+    target = make_target(rule_runner, [type_stub])
+    assert_success(rule_runner, target)
+    # Then check with a sibling `.py`.
+    target = make_target(rule_runner, [GOOD_SOURCE, type_stub])
+    assert_success(rule_runner, target)

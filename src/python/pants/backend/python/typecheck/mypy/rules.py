@@ -7,7 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
@@ -117,6 +117,25 @@ def config_path_globs(mypy: MyPy) -> PathGlobs:
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
         description_of_origin="the option `--mypy-config`",
     )
+
+
+def determine_python_files(files: Iterable[str]) -> Tuple[str, ...]:
+    """We run over all .py and .pyi files, but .pyi files take precedence.
+
+    MyPy will error if we say to run over the same module with both its .py and .pyi files, so we
+    must be careful to only use the .pyi stub.
+    """
+    result: OrderedSet[str] = OrderedSet()
+    for f in files:
+        if f.endswith(".pyi"):
+            py_file = f[:-1]
+            result.discard(py_file)
+            result.add(f)
+        elif f.endswith(".py"):
+            pyi_file = f + "i"
+            if pyi_file not in result:
+                result.add(f)
+    return tuple(result)
 
 
 # MyPy searches for types for a package in packages containing a `py.types` marker file or else in
@@ -263,7 +282,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
     typechecked_srcs_snapshot = typechecked_sources.source_files.snapshot
     file_list_path = "__files.txt"
     python_files = "\n".join(
-        f for f in typechecked_sources.source_files.snapshot.files if f.endswith(".py")
+        determine_python_files(typechecked_sources.source_files.snapshot.files)
     )
     create_file_list_request = Get(
         Digest,
@@ -313,7 +332,6 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
 
 
 # TODO(#10864): Improve performance, e.g. by leveraging the MyPy cache.
-# TODO(#10131): Support .pyi files.
 @rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
 async def mypy_typecheck(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup

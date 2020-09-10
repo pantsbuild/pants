@@ -66,13 +66,13 @@ class PythonTestFieldSet(TestFieldSet):
     timeout: PythonTestsTimeout
     runtime_binary_dependencies: PythonRuntimeBinaryDependencies
 
-    def is_conftest(self) -> bool:
-        """We skip `conftest.py`, even though it belongs to a `python_tests` target, because it does
-        not have any tests to run on."""
-        return (
-            not self.address.is_base_target
-            and PurePath(self.address.filename).name == "conftest.py"
-        )
+    def is_conftest_or_type_stub(self) -> bool:
+        """We skip both `conftest.py` and `.pyi` stubs, even though though they often belong to a
+        `python_tests` target, because they do not have any tests to run on."""
+        if self.address.is_base_target:
+            return False
+        file_name = PurePath(self.address.filename)
+        return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
 
 
 @dataclass(frozen=True)
@@ -248,7 +248,7 @@ async def setup_pytest_for_target(
 async def run_python_test(
     field_set: PythonTestFieldSet, test_subsystem: TestSubsystem, pytest: PyTest
 ) -> TestResult:
-    if field_set.is_conftest():
+    if field_set.is_conftest_or_type_stub():
         return TestResult.skip(field_set.address)
 
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
@@ -287,7 +287,7 @@ async def run_python_test(
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
 async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
-    if field_set.is_conftest():
+    if field_set.is_conftest_or_type_stub():
         return TestDebugRequest(None)
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(
