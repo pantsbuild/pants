@@ -4,6 +4,8 @@
 import os
 import time
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_run_integration_test import ensure_daemon
 from pants.util.contextutil import temporary_dir
@@ -44,6 +46,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
     def test_v2_goal_validation_both(self):
         self.do_command("--v1", "--v2", "filedeps", ":", success=True)
 
+    @pytest.mark.skip(reason="flaky")
     def test_v2_list_loop(self):
         # Create a BUILD file in a nested temporary directory, and add additional targets to it.
         with self.pantsd_test_context(log_level="info") as (

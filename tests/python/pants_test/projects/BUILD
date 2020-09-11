@@ -37,7 +37,7 @@ python_tests(
     sources=["test_maven_layout_integration.py"],
     dependencies=[":projects_test_base", "testprojects/maven_layout:all_directories",],
     tags={"integration", "partially_type_checked"},
-    timeout=300,
+    timeout=600,
 )
 
 python_tests(
