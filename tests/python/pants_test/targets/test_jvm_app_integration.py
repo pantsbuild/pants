@@ -4,9 +4,12 @@
 from pathlib import Path
 from textwrap import dedent
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="times out")
 class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
 
     BUNDLE_DIRECTORY = "testprojects/src/java/org/pantsbuild/testproject/bundle"

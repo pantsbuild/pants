@@ -633,7 +633,7 @@ def integration_tests_v1(python_version: PythonVersion) -> List[Dict]:
 
 
 def integration_tests_v2(python_version: PythonVersion) -> List[Dict]:
-    num_integration_shards = 8
+    num_integration_shards = 7
 
     def make_shard(*, shard_num: int) -> Dict:
         shard = {

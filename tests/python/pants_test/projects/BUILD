@@ -49,7 +49,7 @@ python_tests(
         "testprojects/src/protobuf/org/pantsbuild/testproject:all_directories",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=300,
+    timeout=500,
 )
 
 python_tests(
