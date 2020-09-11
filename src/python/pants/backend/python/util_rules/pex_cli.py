@@ -77,7 +77,7 @@ class PexCliProcess:
 async def setup_pex_cli_process(
     request: PexCliProcess,
     pex_binary: PexBinary,
-    pex_environment: PexEnvironment,
+    pex_env: PexEnvironment,
     python_native_code: PythonNativeCode,
 ) -> Process:
     downloaded_pex_bin = await Get(
@@ -93,11 +93,9 @@ async def setup_pex_cli_process(
     )
 
     pex_root_path = ".cache/pex_root"
-    argv = pex_environment.create_argv(
-        downloaded_pex_bin.exe, *request.argv, "--pex-root", pex_root_path
-    )
+    argv = pex_env.create_argv(downloaded_pex_bin.exe, *request.argv, "--pex-root", pex_root_path)
     env = {
-        **pex_environment.environment_dict,
+        **pex_env.environment_dict,
         **python_native_code.environment_dict,
         **(request.extra_env or {}),
     }

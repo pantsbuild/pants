@@ -52,6 +52,9 @@ root_patterns = [
   "/pants-plugins",
 ]
 
+[subprocess-environment]
+env_vars = ["LANG", "LC_ALL"]
+
 [python-setup]
 requirement_constraints = "3rdparty/python/constraints.txt"
 resolve_all_constraints = "nondeployables"

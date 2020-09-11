@@ -1,0 +1,121 @@
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+import logging
+import os
+from dataclasses import dataclass
+from typing import List
+
+from pants.core.util_rules.pants_environment import PantsEnvironment
+from pants.engine.rules import _uncacheable_rule, collect_rules
+from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
+
+logger = logging.getLogger(__name__)
+
+
+# Names of env vars that can be set on all subprocesses via config.
+SETTABLE_ENV_VARS = (
+    # Customarily used to control i18n settings.
+    "LANG",
+    "LC_CTYPE",
+    "LC_ALL",
+    # Customarily used to control proxy settings in various processes.
+    "http_proxy",
+    "https_proxy",
+    "ftp_proxy",
+    "all_proxy",
+    "no_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "FTP_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+)
+
+
+# TODO: We may want to support different sets of env vars for different types of process.
+#  Can be done via scoped subsystems, possibly.  However we should only do this if there
+#  is a real need.
+class SubprocessEnvironment(Subsystem):
+    """Environment settings for forked subprocesses."""
+
+    options_scope = "subprocess-environment"
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--lang",
+            type=str,
+            default=os.environ.get("LANG"),
+            advanced=True,
+            help="Override the `LANG` environment variable for any forked subprocesses.",
+            removal_version="2.1.0.dev0",
+            removal_hint="Use the env_vars option in this scope instead.",
+        )
+        register(
+            "--lc-all",
+            type=str,
+            default=os.environ.get("LC_ALL"),
+            advanced=True,
+            help="Override the `LC_ALL` environment variable for any forked subprocesses.",
+            removal_version="2.1.0.dev0",
+            removal_hint="Use the env_vars option in this scope instead.",
+        )
+        register(
+            "--env-vars",
+            type=list,
+            member_type=str,
+            default=[],
+            advanced=True,
+            help=(
+                "Environment variables to set for process invocations. "
+                "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
+                "or just `ENV_VAR` to copy the value from Pants's own environment. `value` may "
+                "be a string with spaces in it such as `ENV_VAR=has some spaces`. `ENV_VAR=` sets "
+                "a variable to be the empty string. Each ENV_VAR must be one of "
+                f"{','.join(SETTABLE_ENV_VARS)}."
+            ),
+        )
+
+    @property
+    def env_vars_to_set(self) -> List[str]:
+        ret: List[str] = list(self.options.env_vars)
+
+        # Inject values from the old --lang, --lc-all options if set.
+        env_var_names = {env_var.split("=", 1)[0] for env_var in self.options.env_vars}
+
+        def handle_deprecated(env_var_name: str):
+            val = self.options[env_var_name.lower()]
+            if env_var_name not in env_var_names and val:
+                logger.warning(
+                    f"Setting {env_var_name}={val} on subprocesses due to use of deprecated option "
+                    f"[{self.options_scope}].{env_var_name.lower()}. If you wish to continue to "
+                    f"set this option, do so by adding '{env_var_name}=value' (or '{env_var_name}' "
+                    f"to take the value from Pants's environment) to the "
+                    f"[{self.options_scope}].env_var option."
+                )
+
+        handle_deprecated("LANG")
+        handle_deprecated("LC_ALL")
+
+        return ret
+
+
+@dataclass(frozen=True)
+class SubprocessEnvironmentVars:
+    vars: FrozenDict[str, str]
+
+
+@_uncacheable_rule
+def get_subprocess_environment(
+    subproc_env: SubprocessEnvironment, pants_env: PantsEnvironment
+) -> SubprocessEnvironmentVars:
+    return SubprocessEnvironmentVars(
+        pants_env.get_subset(subproc_env.env_vars_to_set, SETTABLE_ENV_VARS)
+    )
+
+
+def rules():
+    return collect_rules()

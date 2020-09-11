@@ -9,6 +9,7 @@ from pants.backend.python.lint.bandit.rules import BanditFieldSet, BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.core.goals.lint import LintResult, LintResults
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.rules import QueryRule
@@ -22,7 +23,10 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*bandit_rules(), QueryRule(LintResults, (BanditRequest, OptionsBootstrapper))],
+        rules=[
+            *bandit_rules(),
+            QueryRule(LintResults, (BanditRequest, OptionsBootstrapper, PantsEnvironment)),
+        ],
     )
 
 
@@ -70,6 +74,7 @@ def run_bandit(
         [
             BanditRequest(BanditFieldSet.create(tgt) for tgt in targets),
             create_options_bootstrapper(args=args),
+            PantsEnvironment(),
         ],
     )
     return results.results

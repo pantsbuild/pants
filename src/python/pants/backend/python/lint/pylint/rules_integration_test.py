@@ -12,6 +12,7 @@ from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.goals.lint import LintResult, LintResults
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
@@ -25,7 +26,10 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*pylint_rules(), QueryRule(LintResults, (PylintRequest, OptionsBootstrapper))],
+        rules=[
+            *pylint_rules(),
+            QueryRule(LintResults, (PylintRequest, OptionsBootstrapper, PantsEnvironment)),
+        ],
         target_types=[PythonLibrary, PythonRequirementLibrary, PylintSourcePlugin],
     )
 
@@ -100,6 +104,7 @@ def run_pylint(
         [
             PylintRequest(PylintFieldSet.create(tgt) for tgt in targets),
             create_options_bootstrapper(args=args),
+            PantsEnvironment(),
         ],
     )
     return results.results
