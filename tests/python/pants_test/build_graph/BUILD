@@ -74,7 +74,7 @@ python_tests(
     'testprojects/src/python:build_file_imports_module_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 75,
+  timeout = 150,
 )
 
 python_tests(

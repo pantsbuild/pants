@@ -39,7 +39,7 @@ python_tests(
     'contrib/scrooge:thrift_tests_directory',
   ],
   tags={'integration', 'partially_type_checked'},
-  timeout=270,
+  timeout=600,
 )
 
 python_tests(
@@ -50,7 +50,7 @@ python_tests(
     'contrib/scrooge:thrift_tests_directory',
   ],
   tags={'integration', 'partially_type_checked'},
-  timeout=240,
+  timeout=400,
 )
 
 python_tests(

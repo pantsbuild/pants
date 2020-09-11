@@ -16,7 +16,7 @@ python_tests(
     'src/python/pants/testutil:task_test_base',
   ],
   tags = {'partially_type_checked'},
-  timeout=120,
+  timeout=240,
 )
 
 
@@ -34,5 +34,5 @@ python_tests(
     'src/python/pants/testutil:int-test',
   ],
   tags={'integration', 'partially_type_checked'},
-  timeout=600,
+  timeout=1200,
 )

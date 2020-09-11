@@ -39,7 +39,7 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
   ],
-  timeout=720,
+  timeout=880,
   tags={'integration', 'partially_type_checked'},
 )
 
@@ -61,7 +61,7 @@ python_tests(
     'contrib/node:examples_directory',
     'contrib/node:testprojects_directory',
   ],
-  timeout=180,
+  timeout=400,
   tags={'integration', 'partially_type_checked'},
 )
 
@@ -72,7 +72,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'contrib/node:examples_directory',
   ],
-  timeout=180,
+  timeout=400,
   tags={'integration', 'partially_type_checked'},
 )
 

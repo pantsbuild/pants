@@ -70,8 +70,11 @@ class TestInterpreterCache(TestBase):
         bad_interpreter_requirement = self._make_bad_requirement(repo_default_requirement)
         with self._setup_cache(constraints=[bad_interpreter_requirement]) as (cache, _):
             self.assertIn(
-                self._interpreter.identity,
-                [interp.identity for interp in cache.setup(filters=(repo_default_requirement,))],
+                str(self._interpreter.identity.requirement),
+                [
+                    str(interp.identity.requirement)
+                    for interp in cache.setup(filters=(repo_default_requirement,))
+                ],
             )
 
     @skip_unless_python27_and_python36_present

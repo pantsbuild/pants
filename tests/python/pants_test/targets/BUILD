@@ -49,7 +49,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 300,
+  timeout = 600,
 )
 
 python_tests(

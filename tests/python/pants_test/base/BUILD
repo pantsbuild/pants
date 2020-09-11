@@ -32,7 +32,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 530,
+  timeout = 850,
 )
 
 python_tests(
@@ -205,5 +205,5 @@ python_tests(
     'testprojects/src/python:unicode_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 120,
+  timeout = 250,
 )

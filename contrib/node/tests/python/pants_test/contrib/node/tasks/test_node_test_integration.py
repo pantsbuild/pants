@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
+import pytest
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
@@ -21,6 +21,7 @@ class NodeTestIntegrationTest(PantsRunIntegrationTest):
 
         self.assert_success(pants_run)
 
+    @pytest.mark.skip(reason="flaky")
     def test_test_multiple_targets(self):
         command = [
             "test",

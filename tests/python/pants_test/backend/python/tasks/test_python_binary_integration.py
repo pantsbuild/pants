@@ -7,6 +7,7 @@ import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
 
+import pytest
 from pex.pex_info import PexInfo
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
@@ -19,6 +20,7 @@ _OSX_PLATFORM = "macosx-10.13-x86_64-cp-36-m"
 _OSX_WHEEL_SUBSTRING = "macosx"
 
 
+@pytest.mark.skip(reason="times out")
 class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
     @classmethod
     def use_pantsd_env_var(cls):

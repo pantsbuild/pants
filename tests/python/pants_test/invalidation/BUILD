@@ -33,5 +33,5 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:strictdeps_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 480,
+  timeout = 700,
 )

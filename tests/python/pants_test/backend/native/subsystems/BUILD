@@ -13,5 +13,5 @@ python_tests(
     'src/python/pants/testutil/subsystem',
   ],
   tags={'platform_specific_behavior', 'partially_type_checked'},
-  timeout=120,
+  timeout=300,
 )
