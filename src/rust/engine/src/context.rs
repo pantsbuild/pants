@@ -266,16 +266,13 @@ impl Core {
 
     // These certs are for downloads, not to be confused with the ones used for remoting.
     let ca_certs = if let Some(ref path) = ca_certs_path {
-      let mut buf = Vec::new();
+      let mut content = String::new();
       std::fs::File::open(path)
-        .and_then(|mut f| f.read_to_end(&mut buf))
+        .and_then(|mut f| f.read_to_string(&mut content))
         .map_err(|err| format!("Error reading root CA certs file {:?}: {}", path, err))?;
-      let content = std::str::from_utf8(&buf)
-        .map_err(|err| format!("Error decoding root CA certs file {:?}: {}", path, err))?;
-
       let pem_re = Regex::new(PEM_RE_STR).unwrap();
       let certs_res: Result<Vec<reqwest::Certificate>, _> = pem_re
-        .find_iter(content)
+        .find_iter(&content)
         .map(|mat| reqwest::Certificate::from_pem(mat.as_str().as_bytes()))
         .collect();
       certs_res.map_err(|err| {
