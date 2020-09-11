@@ -188,6 +188,7 @@ class EngineInitializer:
             local_store_dir=bootstrap_options.local_store_dir,
             local_execution_root_dir=bootstrap_options.local_execution_root_dir,
             named_caches_dir=bootstrap_options.named_caches_dir,
+            ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
             native=native,
             include_trace_on_error=bootstrap_options.print_exception_stacktrace,
@@ -205,6 +206,7 @@ class EngineInitializer:
         local_store_dir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
+        ca_certs_path: Optional[str] = None,
         build_root: Optional[str] = None,
         include_trace_on_error: bool = True,
     ) -> GraphScheduler:
@@ -276,6 +278,11 @@ class EngineInitializer:
         def ensure_absolute_path(v: str) -> str:
             return Path(v).resolve().as_posix()
 
+        def ensure_optional_absolute_path(v: Optional[str]) -> Optional[str]:
+            if v is None:
+                return None
+            return ensure_absolute_path(v)
+
         scheduler = Scheduler(
             native=native,
             ignore_patterns=pants_ignore_patterns,
@@ -284,6 +291,7 @@ class EngineInitializer:
             local_store_dir=ensure_absolute_path(local_store_dir),
             local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
             named_caches_dir=ensure_absolute_path(named_caches_dir),
+            ca_certs_path=ensure_optional_absolute_path(ca_certs_path),
             rules=rules,
             union_membership=union_membership,
             execution_options=execution_options,

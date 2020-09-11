@@ -694,6 +694,14 @@ class GlobalOptions(Subsystem):
             default=os.path.join(get_pants_cachedir(), "named_caches"),
         )
         register(
+            "--ca-certs-path",
+            advanced=True,
+            type=str,
+            default=None,
+            help="Path to a file containing PEM-format CA certificates used for verifying secure "
+            "connections when downloading files required by a build.",
+        )
+        register(
             "--remote-execution",
             advanced=True,
             type=bool,

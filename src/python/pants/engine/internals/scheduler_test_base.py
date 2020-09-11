@@ -49,6 +49,7 @@ class SchedulerTestBase:
         include_trace_on_error=True,
         should_report_workunits=False,
         execution_options=None,
+        ca_certs_path=None,
     ):
         """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
         rules = rules or []
@@ -69,6 +70,7 @@ class SchedulerTestBase:
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
+            ca_certs_path=ca_certs_path,
             rules=rules,
             union_membership=UnionMembership({}),
             execution_options=execution_options or DEFAULT_EXECUTION_OPTIONS,

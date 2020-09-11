@@ -316,6 +316,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
+            ca_certs_path=global_options.ca_certs_path,
             native=Native(),
             options_bootstrapper=options_bootstrapper,
             build_root=self.build_root,

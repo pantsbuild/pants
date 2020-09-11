@@ -36,3 +36,8 @@ resources(
     'native_engine.so.metadata',
   ],
 )
+
+resources(
+  name='tls_testing',
+  sources=['tls_testing/rsa/*']
+)

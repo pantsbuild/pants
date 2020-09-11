@@ -4,6 +4,7 @@
 import logging
 import os
 import shutil
+import ssl
 import sys
 import tempfile
 import termios
@@ -326,10 +327,13 @@ def maybe_profiled(profile_path: Optional[str]) -> Iterator[None]:
 
 
 @contextmanager
-def http_server(handler_class: Type) -> Iterator[int]:
+def http_server(handler_class: Type, ssl_context: Optional[ssl.SSLContext] = None) -> Iterator[int]:
     def serve(port_queue: "Queue[int]", shutdown_queue: "Queue[bool]") -> None:
         httpd = TCPServer(("", 0), handler_class)
         httpd.timeout = 0.1
+        if ssl_context:
+            httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
+
         port_queue.put(httpd.server_address[1])
         while shutdown_queue.empty():
             httpd.handle_request()

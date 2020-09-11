@@ -4,7 +4,9 @@
 import hashlib
 import logging
 import os
+import pkgutil
 import shutil
+import ssl
 import tarfile
 import time
 import unittest
@@ -43,13 +45,34 @@ from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
 
-class FSTest(TestBase, SchedulerTestBase):
+class FSTestBase(TestBase, SchedulerTestBase):
+    @staticmethod
+    def assert_snapshot_equals(snapshot: Snapshot, files: List[str], digest: Digest) -> None:
+        assert list(snapshot.files) == files
+        assert snapshot.digest == digest
+
+    def prime_store_with_roland_digest(self) -> Digest:
+        """This method primes the store with a directory of a file named 'roland' and contents
+        'European Burmese'."""
+        with temporary_dir() as temp_dir:
+            with open(os.path.join(temp_dir, "roland"), "w") as f:
+                f.write("European Burmese")
+            globs = PathGlobs(["*"])
+            snapshot = self.scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
+
+            expected_digest = Digest(
+                "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80
+            )
+            self.assert_snapshot_equals(snapshot, ["roland"], expected_digest)
+        return expected_digest
+
+
+class FSTest(FSTestBase):
     @classmethod
     def rules(cls):
         return (
             *super().rules(),
             QueryRule(Snapshot, (DigestSubset,)),
-            QueryRule(Snapshot, (DownloadFile,)),
         )
 
     _original_src = os.path.join(
@@ -328,13 +351,7 @@ class FSTest(TestBase, SchedulerTestBase):
                 )
             assert "doesnotexist" in str(cm.exception)
 
-    @staticmethod
-    def assert_snapshot_equals(snapshot: Snapshot, files: List[str], digest: Digest) -> None:
-        assert list(snapshot.files) == files
-        assert snapshot.digest == digest
-
-    def test_merge_digests(self) -> None:
-        assert self.request_product(Digest, [MergeDigests([])]) == EMPTY_DIGEST
+    def test_asynchronously_merge_digests(self) -> None:
         with temporary_dir() as temp_dir:
             Path(temp_dir, "roland").write_text("European Burmese")
             Path(temp_dir, "susannah").write_text("Not sure actually")
@@ -558,110 +575,6 @@ class FSTest(TestBase, SchedulerTestBase):
             )
             assert len(captured.warnings()) == 0
 
-    def prime_store_with_roland_digest(self) -> Digest:
-        """This method primes the store with a directory of a file named 'roland' and contents
-        'European Burmese'."""
-        with temporary_dir() as temp_dir:
-            with open(os.path.join(temp_dir, "roland"), "w") as f:
-                f.write("European Burmese")
-            globs = PathGlobs(["*"])
-            snapshot = self.scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
-
-            expected_digest = Digest(
-                "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80
-            )
-            self.assert_snapshot_equals(snapshot, ["roland"], expected_digest)
-        return expected_digest
-
-    pantsbuild_digest = Digest(
-        "f461fc99bcbe18e667687cf672c2dc68dc5c5db77c5bd426c9690e5c9cec4e3b", 184
-    )
-
-    def test_download(self) -> None:
-        with self.isolated_local_store():
-            with http_server(StubHandler) as port:
-                snapshot = self.request_product(
-                    Snapshot,
-                    [
-                        DownloadFile(
-                            f"http://localhost:{port}/do_not_remove_or_edit.txt",
-                            self.pantsbuild_digest,
-                        )
-                    ],
-                )
-                self.assert_snapshot_equals(
-                    snapshot,
-                    ["do_not_remove_or_edit.txt"],
-                    Digest("03bb499daabafc60212d2f4b2fab49b47b35b83a90c056224c768d52bce02691", 102),
-                )
-
-    def test_download_missing_file(self) -> None:
-        with self.isolated_local_store():
-            with http_server(StubHandler) as port:
-                with self.assertRaises(ExecutionError) as cm:
-                    self.request_product(
-                        Snapshot,
-                        [DownloadFile(f"http://localhost:{port}/notfound", self.pantsbuild_digest)],
-                    )
-                assert "404" in str(cm.exception)
-
-    def test_download_wrong_digest(self) -> None:
-        with self.isolated_local_store():
-            with http_server(StubHandler) as port:
-                with self.assertRaises(ExecutionError) as cm:
-                    self.request_product(
-                        Snapshot,
-                        [
-                            DownloadFile(
-                                f"http://localhost:{port}/do_not_remove_or_edit.txt",
-                                Digest(
-                                    self.pantsbuild_digest.fingerprint,
-                                    self.pantsbuild_digest.serialized_bytes_length + 1,
-                                ),
-                            )
-                        ],
-                    )
-                assert "wrong digest" in str(cm.exception).lower()
-
-    # It's a shame that this isn't hermetic, but setting up valid local HTTPS certificates is a pain.
-    def test_download_https(self) -> None:
-        with self.isolated_local_store():
-            snapshot = self.request_product(
-                Snapshot,
-                [
-                    DownloadFile(
-                        "https://binaries.pantsbuild.org/do_not_remove_or_edit.txt",
-                        Digest(
-                            "f461fc99bcbe18e667687cf672c2dc68dc5c5db77c5bd426c9690e5c9cec4e3b", 184
-                        ),
-                    )
-                ],
-            )
-            self.assert_snapshot_equals(
-                snapshot,
-                ["do_not_remove_or_edit.txt"],
-                Digest("03bb499daabafc60212d2f4b2fab49b47b35b83a90c056224c768d52bce02691", 102),
-            )
-
-    def test_caches_downloads(self) -> None:
-        with self.isolated_local_store():
-            with http_server(StubHandler) as port:
-                self.prime_store_with_roland_digest()
-
-                # This would error if we hit the HTTP server, because 404,
-                # but we're not going to hit the HTTP server because it's cached,
-                # so we shouldn't see an error...
-                url = DownloadFile(
-                    f"http://localhost:{port}/roland",
-                    Digest("693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16),
-                )
-                snapshot = self.request_product(Snapshot, [url])
-                self.assert_snapshot_equals(
-                    snapshot,
-                    ["roland"],
-                    Digest("9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819", 82),
-                )
-
     def generate_original_digest(self) -> Digest:
         content = b"dummy content"
         return self.request_product(
@@ -865,13 +778,116 @@ class FSTest(TestBase, SchedulerTestBase):
         self.assert_mutated_digest(mutation_function)
 
 
-class StubHandler(BaseHTTPRequestHandler):
-    # See https://binaries.pantsbuild.org/do_not_remove_or_edit.txt
-    response_text = b"""Some tests rely on the existence of this file, with this exact content.
-Edit only if you know what you're doing.
+class DownloadsTest(FSTestBase):
+    file_digest = Digest("8fcbc50cda241aee7238c71e87c27804e7abc60675974eaf6567aa16366bc105", 14)
 
-See src/python/pants/engine/fs_test.py in the pants repo for details.
-"""
+    expected_snapshot_digest = Digest(
+        "4c9cf91fcd7ba1abbf7f9a0a1c8175556a82bee6a398e34db3284525ac24a3ad", 84
+    )
+
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            QueryRule(Snapshot, (DownloadFile,)),
+        )
+
+    def test_download(self) -> None:
+        with self.isolated_local_store():
+            with http_server(StubHandler) as port:
+                snapshot = self.request_product(
+                    Snapshot,
+                    [DownloadFile(f"http://localhost:{port}/file.txt", self.file_digest)],
+                )
+                self.assert_snapshot_equals(
+                    snapshot,
+                    ["file.txt"],
+                    self.expected_snapshot_digest,
+                )
+
+    def test_download_missing_file(self) -> None:
+        with self.isolated_local_store():
+            with http_server(StubHandler) as port:
+                with self.assertRaises(ExecutionError) as cm:
+                    self.request_product(
+                        Snapshot,
+                        [DownloadFile(f"http://localhost:{port}/notfound", self.file_digest)],
+                    )
+                assert "404" in str(cm.exception)
+
+    def test_download_wrong_digest(self) -> None:
+        with self.isolated_local_store():
+            with http_server(StubHandler) as port:
+                with self.assertRaises(ExecutionError) as cm:
+                    self.request_product(
+                        Snapshot,
+                        [
+                            DownloadFile(
+                                f"http://localhost:{port}/file.txt",
+                                Digest(
+                                    self.file_digest.fingerprint,
+                                    self.file_digest.serialized_bytes_length + 1,
+                                ),
+                            )
+                        ],
+                    )
+                assert "wrong digest" in str(cm.exception).lower()
+
+    def test_caches_downloads(self) -> None:
+        with self.isolated_local_store():
+            with http_server(StubHandler) as port:
+                self.prime_store_with_roland_digest()
+
+                # This would error if we hit the HTTP server, because 404,
+                # but we're not going to hit the HTTP server because it's cached,
+                # so we shouldn't see an error...
+                url = DownloadFile(
+                    f"http://localhost:{port}/roland",
+                    Digest("693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16),
+                )
+                snapshot = self.request_product(Snapshot, [url])
+                self.assert_snapshot_equals(
+                    snapshot,
+                    ["roland"],
+                    Digest("9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819", 82),
+                )
+
+    def test_download_https(self) -> None:
+        # Note that this also tests that the custom certs functionality works.
+        with temporary_dir() as temp_dir:
+
+            def write_resource(name: str) -> Path:
+                path = Path(temp_dir) / name
+                data = pkgutil.get_data("pants.engine.internals", f"tls_testing/rsa/{name}")
+                assert data is not None
+                path.write_bytes(data)
+                return path
+
+            server_cert = write_resource("server.crt")
+            server_key = write_resource("server.key")
+            cert_chain = write_resource("server.chain")
+
+            scheduler = self.mk_scheduler(
+                rules=[*fs_rules(), QueryRule(Snapshot, (DownloadFile,))],
+                ca_certs_path=str(cert_chain),
+            )
+            with self.isolated_local_store():
+                ssl_context = ssl.SSLContext()
+                ssl_context.load_cert_chain(certfile=str(server_cert), keyfile=str(server_key))
+
+                with http_server(StubHandler, ssl_context=ssl_context) as port:
+                    snapshot = self.execute(
+                        scheduler,
+                        Snapshot,
+                        DownloadFile(f"https://localhost:{port}/file.txt", self.file_digest),
+                    )[0]
+                    self.assert_snapshot_equals(
+                        snapshot, ["file.txt"], self.expected_snapshot_digest
+                    )
+
+
+class StubHandler(BaseHTTPRequestHandler):
+    response_text = b"Hello, client!"
 
     def do_HEAD(self):
         self.send_headers()
@@ -881,7 +897,7 @@ See src/python/pants/engine/fs_test.py in the pants repo for details.
         self.wfile.write(self.response_text)
 
     def send_headers(self):
-        code = 200 if self.path == "/do_not_remove_or_edit.txt" else 404
+        code = 200 if self.path == "/file.txt" else 404
         self.send_response(code)
         self.send_header("Content-Type", "text/utf-8")
         self.send_header("Content-Length", f"{len(self.response_text)}")

@@ -48,6 +48,7 @@ def create_scheduler(rules, validate=True, native=None):
         local_store_dir="./.pants.d/lmdb_store",
         local_execution_root_dir="./.pants.d",
         named_caches_dir="./.pants.d/named_caches",
+        ca_certs_path=None,
         rules=rules,
         union_membership=UnionMembership({}),
         execution_options=DEFAULT_EXECUTION_OPTIONS,
