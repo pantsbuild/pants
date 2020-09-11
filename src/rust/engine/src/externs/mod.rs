@@ -58,6 +58,12 @@ pub fn is_union(ty: TypeId) -> bool {
   })
 }
 
+pub fn is_truthy(value: &PyObject) -> bool {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  value.is_true(py).unwrap()
+}
+
 pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
   let gil = Python::acquire_gil();
   let py = gil.python();

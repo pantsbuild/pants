@@ -319,7 +319,12 @@ py_module_initializer!(native_engine, |py, m| {
     "scheduler_execute",
     py_fn!(
       py,
-      scheduler_execute(a: PyScheduler, b: PySession, c: PyExecutionRequest)
+      scheduler_execute(
+        a: PyScheduler,
+        b: PySession,
+        c: PyExecutionRequest,
+        d: PyObject
+      )
     ),
   )?;
   m.add(
@@ -957,13 +962,15 @@ fn scheduler_execute(
   scheduler_ptr: PyScheduler,
   session_ptr: PySession,
   execution_request_ptr: PyExecutionRequest,
+  python_signal_fn: PyObject,
 ) -> CPyResult<PyTuple> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_execution_request(py, execution_request_ptr, |execution_request| {
       with_session(py, session_ptr, |session| {
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
-        py.allow_threads(|| scheduler.execute(execution_request, session))
+        let python_signal_fn: Value = python_signal_fn.into();
+        py.allow_threads(|| scheduler.execute(execution_request, session, python_signal_fn))
           .map(|root_results| {
             let py_results = root_results
               .into_iter()

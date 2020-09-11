@@ -10,7 +10,7 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
-from typing import Callable, Dict, Iterator
+from typing import Callable, Dict, Iterator, Optional
 
 import setproctitle
 
@@ -49,7 +49,7 @@ class SignalHandler:
         self._ignoring_sigint = False
         self._pantsd_instance = pantsd_instance
 
-    def _handle_sigint_if_enabled(self, signum, _frame):
+    def _handle_sigint_if_enabled(self, signum: int, _frame):
         with self._ignore_sigint_lock:
             if not self._ignoring_sigint:
                 self.handle_sigint(signum, _frame)
@@ -59,7 +59,8 @@ class SignalHandler:
             with self._ignore_sigint_lock:
                 self._ignoring_sigint = toggle
 
-    def handle_sigint(self, signum, _frame):
+    def handle_sigint(self, signum: int, _frame):
+        ExceptionSink._signal_sent = signum
         raise KeyboardInterrupt("User interrupted execution with control-c!")
 
     # TODO(#7406): figure out how to let sys.exit work in a signal handler instead of having to raise
@@ -79,9 +80,11 @@ class SignalHandler:
             super(SignalHandler.SignalHandledNonLocalExit, self).__init__()
 
     def handle_sigquit(self, signum, _frame):
+        ExceptionSink._signal_sent = signum
         raise self.SignalHandledNonLocalExit(signum, "SIGQUIT")
 
     def handle_sigterm(self, signum, _frame):
+        ExceptionSink._signal_sent = signum
         raise self.SignalHandledNonLocalExit(signum, "SIGTERM")
 
 
@@ -103,11 +106,17 @@ class ExceptionSink:
     _pid_specific_error_fileobj = None
     _shared_error_fileobj = None
 
+    _signal_sent: Optional[int] = None
+
     def __new__(cls, *args, **kwargs):
         raise TypeError("Instances of {} are not allowed to be constructed!".format(cls.__name__))
 
     class ExceptionSinkError(Exception):
         pass
+
+    @classmethod
+    def signal_sent(cls) -> Optional[int]:
+        return cls._signal_sent
 
     @classmethod
     def reset_should_print_backtrace_to_terminal(cls, should_print_backtrace):

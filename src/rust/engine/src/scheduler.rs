@@ -12,6 +12,7 @@ use futures::future;
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
+use crate::externs;
 use crate::nodes::{NodeKey, Select, Visualizer};
 
 use graph::{InvalidationResult, LastObserved};
@@ -459,6 +460,7 @@ impl Scheduler {
     &self,
     request: &ExecutionRequest,
     session: &Session,
+    python_signal: Value,
   ) -> Result<Vec<Result<Value, Failure>>, ExecutionTermination> {
     debug!(
       "Launching {} roots (poll={}).",
@@ -474,6 +476,19 @@ impl Scheduler {
     session.maybe_display_initialize(&self.core.executor, &sender);
     self.execute_helper(request, session, sender);
     let result = loop {
+      match externs::call(&python_signal, &[]) {
+        Ok(value) => {
+          if externs::is_truthy(&*value) {
+            return Err(ExecutionTermination::KeyboardInterrupt);
+          }
+        }
+        Err(e) => {
+          return Err(ExecutionTermination::Fatal(format!(
+            "Error when checking Python signal state: {}",
+            e
+          )))
+        }
+      };
       match receiver.recv_timeout(Self::refresh_delay(interval, deadline)) {
         Ok(ExecutionEvent::Completed(res)) => {
           // Completed successfully.
