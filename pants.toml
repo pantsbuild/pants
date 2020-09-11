@@ -75,6 +75,7 @@ config = ["pyproject.toml", "examples/.isort.cfg"]
 
 [mypy]
 config = "build-support/mypy/mypy.ini"
+source_plugins = ["pants-plugins/mypy_plugins:total_ordering"]
 
 [pants-releases]
 release_notes = """

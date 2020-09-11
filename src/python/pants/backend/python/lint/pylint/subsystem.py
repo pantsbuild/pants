@@ -1,9 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, cast
+from typing import List, Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.engine.addresses import AddressInput
 from pants.option.custom_types import file_option, shell_str, target_option
 
 
@@ -66,5 +67,5 @@ class Pylint(PythonToolBase):
         return cast(Optional[str], self.options.config)
 
     @property
-    def source_plugins(self) -> List[str]:
-        return cast(List[str], self.options.source_plugins)
+    def source_plugins(self) -> Tuple[AddressInput, ...]:
+        return tuple(AddressInput.parse(v) for v in self.options.source_plugins)

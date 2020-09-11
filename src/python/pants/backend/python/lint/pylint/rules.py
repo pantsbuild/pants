@@ -244,8 +244,7 @@ async def pylint_lint(
         return LintResults([], linter_name="Pylint")
 
     plugin_target_addresses = await MultiGet(
-        Get(Address, AddressInput, AddressInput.parse(plugin_addr))
-        for plugin_addr in pylint.source_plugins
+        Get(Address, AddressInput, plugin_addr) for plugin_addr in pylint.source_plugins
     )
     plugin_targets_request = Get(TransitiveTargets, Addresses(plugin_target_addresses))
     linted_targets_request = Get(

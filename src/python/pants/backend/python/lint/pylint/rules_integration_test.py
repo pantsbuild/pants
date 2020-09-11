@@ -333,6 +333,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
 def test_source_plugin(rule_runner: RuleRunner) -> None:
     # NB: We make this source plugin fairly complex by having it use transitive dependencies.
     # This is to ensure that we can correctly support plugins with dependencies.
+    # The plugin bans `print()`.
     rule_runner.add_to_build_file(
         "",
         dedent(
@@ -350,30 +351,34 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
         ),
     )
     rule_runner.create_file(
-        "build-support/plugins/subdir/dep.py",
+        "pants-plugins/plugins/subdir/dep.py",
         dedent(
             """\
             from colors import red
 
             def is_print(node):
                 _ = red("Test that transitive deps are loaded.")
-                return node.func.name == "print"
+                return hasattr(node.func, "name") and node.func.name == "print"
             """
         ),
     )
     rule_runner.add_to_build_file(
-        "build-support/plugins/subdir", "python_library(dependencies=['//:colors'])"
+        "pants-plugins/plugins/subdir", "python_library(dependencies=['//:colors'])"
     )
     rule_runner.create_file(
-        "build-support/plugins/print_plugin.py",
+        "pants-plugins/plugins/print_plugin.py",
         dedent(
             """\
+            '''Docstring.'''
+
             from pylint.checkers import BaseChecker
             from pylint.interfaces import IAstroidChecker
 
             from subdir.dep import is_print
 
             class PrintChecker(BaseChecker):
+                '''Docstring.'''
+
                 __implements__ = IAstroidChecker
                 name = "print_plugin"
                 msgs = {
@@ -381,22 +386,25 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
                 }
 
                 def visit_call(self, node):
+                    '''Docstring.'''
                     if is_print(node):
                         self.add_message("print-statement-used", node=node)
 
+
             def register(linter):
+                '''Docstring.'''
                 linter.register_checker(PrintChecker(linter))
             """
         ),
     )
     rule_runner.add_to_build_file(
-        "build-support/plugins",
+        "pants-plugins/plugins",
         dedent(
             """\
             pylint_source_plugin(
                 name='print_plugin',
                 sources=['print_plugin.py'],
-                dependencies=['//:pylint', 'build-support/plugins/subdir'],
+                dependencies=['//:pylint', 'pants-plugins/plugins/subdir'],
             )
             """
         ),
@@ -407,18 +415,31 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
         load-plugins=print_plugin
         """
     )
+
+    def run_pylint_with_plugin(tgt: Target) -> LintResult:
+        result = run_pylint(
+            rule_runner,
+            [tgt],
+            additional_args=[
+                "--pylint-source-plugins=['pants-plugins/plugins:print_plugin']",
+                f"--source-root-patterns=['pants-plugins/plugins', '{PACKAGE}']",
+            ],
+            config=config_content,
+        )
+        assert len(result) == 1
+        return result[0]
+
     target = make_target(
         rule_runner, [FileContent(f"{PACKAGE}/source_plugin.py", b"'''Docstring.'''\nprint()\n")]
     )
-    result = run_pylint(
-        rule_runner,
-        [target],
-        additional_args=[
-            "--pylint-source-plugins=['build-support/plugins:print_plugin']",
-            f"--source-root-patterns=['build-support/plugins', '{PACKAGE}']",
-        ],
-        config=config_content,
+    result = run_pylint_with_plugin(target)
+    assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert f"{PACKAGE}/source_plugin.py:2:0: C9871" in result.stdout
+
+    # Ensure that running Pylint on the plugin itself still works.
+    plugin_tgt = rule_runner.get_target(
+        Address("pants-plugins/plugins", target_name="print_plugin")
     )
-    assert len(result) == 1
-    assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
-    assert f"{PACKAGE}/source_plugin.py:2:0: C9871" in result[0].stdout
+    result = run_pylint_with_plugin(plugin_tgt)
+    assert result.exit_code == 0
+    assert "Your code has been rated at 10.00/10" in result.stdout
