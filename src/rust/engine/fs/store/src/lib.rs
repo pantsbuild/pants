@@ -367,7 +367,7 @@ impl Store {
   ///
   pub async fn record_directory(
     &self,
-    directory: &bazel_protos::remote_execution::Directory,
+    directory: &remexec::Directory,
     initial_lease: bool,
   ) -> Result<Digest, String> {
     let local = self.local.clone();
@@ -389,7 +389,7 @@ impl Store {
   pub async fn load_directory(
     &self,
     digest: Digest,
-  ) -> Result<Option<(bazel_protos::remote_execution::Directory, LoadMetadata)>, String> {
+  ) -> Result<Option<(remexec::Directory, LoadMetadata)>, String> {
     self
       .load_bytes_with(
         EntryType::Directory,
@@ -397,7 +397,7 @@ impl Store {
         // Trust that locally stored values were canonical when they were written into the CAS,
         // don't bother to check this, as it's slightly expensive.
         move |bytes: &[u8]| {
-          let mut directory = bazel_protos::remote_execution::Directory::new();
+          let mut directory = remexec::Directory::new();
           directory.merge_from_bytes(&bytes).map_err(|e| {
             format!(
               "LMDB corruption: Directory bytes for {:?} were not valid: {:?}",
@@ -409,7 +409,7 @@ impl Store {
         // Eagerly verify that CAS-returned Directories are canonical, so that we don't write them
         // into our local store.
         move |bytes: Bytes| {
-          let mut directory = bazel_protos::remote_execution::Directory::new();
+          let mut directory = remexec::Directory::new();
           directory.merge_from_bytes(&bytes).map_err(|e| {
             format!(
               "CAS returned Directory proto for {:?} which was not valid: {:?}",
@@ -982,12 +982,7 @@ impl Store {
   ///
   pub fn walk<
     T: Send + 'static,
-    F: Fn(
-        &Store,
-        &PathBuf,
-        Digest,
-        &bazel_protos::remote_execution::Directory,
-      ) -> BoxFuture<T, String>
+    F: Fn(&Store, &PathBuf, Digest, &remexec::Directory) -> BoxFuture<T, String>
       + Send
       + Sync
       + 'static,
@@ -1010,12 +1005,7 @@ impl Store {
 
   fn walk_helper<
     T: Send + 'static,
-    F: Fn(
-        &Store,
-        &PathBuf,
-        Digest,
-        &bazel_protos::remote_execution::Directory,
-      ) -> BoxFuture<T, String>
+    F: Fn(&Store, &PathBuf, Digest, &remexec::Directory) -> BoxFuture<T, String>
       + Send
       + Sync
       + 'static,

@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 
 from pants.engine.collection import Collection
 from pants.engine.rules import QueryRule, side_effecting
@@ -66,12 +66,26 @@ class FileContent:
         )
 
 
+@dataclass(frozen=True)
+class Directory:
+    """The path to a directory."""
+
+    path: str
+
+    def __repr__(self) -> str:
+        return f"Directory({self.path})"
+
+
 class DigestContents(Collection[FileContent]):
     """The file contents of a Digest."""
 
 
-class CreateDigest(Collection[FileContent]):
-    """A request to create a Digest with the input FileContent values.
+class CreateDigest(Collection[Union[FileContent, Directory]]):
+    """A request to create a Digest with the input FileContent and/or Directory values.
+
+    The engine will create any parent directories necessary, e.g. `FileContent('a/b/c.txt')` will
+    result in `a/`, `a/b`, and `a/b/c.txt` being created. You only need to use `Directory` to
+    create an empty directory.
 
     This does _not_ actually materialize the digest to the build root. You must use
     `engine.fs.Workspace` in a `@goal_rule` to save the resulting digest to disk.

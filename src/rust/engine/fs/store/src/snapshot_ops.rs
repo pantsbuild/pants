@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use bazel_protos::remote_execution as remexec;
 use bytes::Bytes;
 use fs::{
-  ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
-  SINGLE_STAR_GLOB,
+  ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob, PreparedPathGlobs, RelativePath,
+  DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
 };
 use futures::future::{self as future03, FutureExt, TryFutureExt};
 use glob::Pattern;
@@ -779,7 +779,38 @@ pub trait SnapshotOps: StoreWrapper + 'static {
     let SubsetParams { globs } = params;
     snapshot_glob_match(self.clone(), digest, globs).await
   }
+
+  async fn create_empty_dir(&self, path: RelativePath) -> Result<Digest, SnapshotOpsError> {
+    let path: PathBuf = path.into();
+    let mut digest = EMPTY_DIGEST;
+    let mut components = path.components();
+    while let Some(parent) = components.next_back() {
+      let parent = match &parent {
+        Component::Normal(p) => p,
+        x => {
+          return Err(
+            format!(
+              "Cannot add component \"{:?}\" of directory path `{}`.",
+              x,
+              path.display(),
+            )
+            .into(),
+          )
+        }
+      };
+      let mut dir_node = remexec::DirectoryNode::new();
+      dir_node.set_name(osstring_as_utf8(parent.to_os_string())?);
+      dir_node.set_digest((&digest).into());
+
+      let mut out_dir = remexec::Directory::new();
+      out_dir.set_directories(protobuf::RepeatedField::from_vec(vec![dir_node]));
+
+      digest = self.record_directory(&out_dir).await?;
+    }
+    Ok(digest)
+  }
 }
+
 impl<T: StoreWrapper + 'static> SnapshotOps for T {}
 
 struct PartiallyExpandedDirectoryContext {

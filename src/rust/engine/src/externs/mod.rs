@@ -165,6 +165,15 @@ pub fn store_bool(val: bool) -> Value {
 }
 
 ///
+/// Check if a Python object has the specified field.
+///
+pub fn hasattr(value: &Value, field: &str) -> bool {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  value.hasattr(py, field).expect("")
+}
+
+///
 /// Gets an attribute of the given value as the given type.
 ///
 fn getattr<T>(value: &Value, field: &str) -> Result<T, String>

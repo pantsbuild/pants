@@ -19,6 +19,7 @@ def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
     def mock_handle_config(request: CreateDigest) -> Digest:
         assert len(request) == 1
         assert request[0].path == ".coveragerc"
+        assert isinstance(request[0], FileContent)
         assert request[0].is_executable is False
         resolved_config.append(request[0].content.decode())
         return Digest("jerry", 30)

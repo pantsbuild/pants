@@ -24,6 +24,7 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     DigestSubset,
+    Directory,
     DownloadFile,
     FileContent,
     GlobMatchErrorBehavior,
@@ -48,6 +49,7 @@ class FSTest(TestBase, SchedulerTestBase):
     def rules(cls):
         return (
             *super().rules(),
+            QueryRule(Snapshot, (CreateDigest,)),
             QueryRule(Snapshot, (DigestSubset,)),
             QueryRule(Snapshot, (DownloadFile,)),
         )
@@ -484,6 +486,19 @@ class FSTest(TestBase, SchedulerTestBase):
                 "28c47f77867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root "
                 "directory contained non-matching directory named: books and file named: index"
             ) in str(exc.value)
+
+    def test_create_empty_directory(self) -> None:
+        res = self.request_product(Snapshot, [CreateDigest([Directory("a/")])])
+        assert res.dirs == ("a",)
+        assert not res.files
+        assert res.digest != EMPTY_DIGEST
+
+        res = self.request_product(
+            Snapshot, [CreateDigest([Directory("x/y/z"), Directory("m"), Directory("m/n")])]
+        )
+        assert res.dirs == ("m", "m/n", "x", "x/y", "x/y/z")
+        assert not res.files
+        assert res.digest != EMPTY_DIGEST
 
     def test_lift_digest_to_snapshot(self) -> None:
         digest = self.prime_store_with_roland_digest()
