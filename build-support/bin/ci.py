@@ -530,7 +530,7 @@ def run_integration_tests_v2(*, shard: Optional[str]) -> None:
         # See https://stackoverflow.com/a/14861842.
         q, r = divmod(len(local_targets), nshards)
         indices = [q * i + min(i, r) for i in range(nshards + 1)]
-        partitions = [local_targets[indices[i]:indices[i + 1]] for i in range(nshards)]
+        partitions = [local_targets[indices[i] : indices[i + 1]] for i in range(nshards)]
         selected_targets = partitions[target_shard]
 
     _run_command(

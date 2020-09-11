@@ -22,7 +22,7 @@ python_tests(
     'src/python/pants/testutil:git_util',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout=540,
+  timeout=800,
 )
 
 python_tests(

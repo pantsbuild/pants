@@ -67,7 +67,7 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
     'examples/src/java/org/pantsbuild/example:javac_directory',
   ],
-  timeout = 530,
+  timeout = 760,
   tags = {'integration', 'partially_type_checked'},
 )
 

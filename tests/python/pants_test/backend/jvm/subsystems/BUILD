@@ -76,7 +76,7 @@ python_tests(
     'testprojects/3rdparty:managed_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 480,
+  timeout = 600,
 )
 
 python_tests(

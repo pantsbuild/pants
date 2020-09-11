@@ -11,6 +11,6 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:annotation_directory',
     'testprojects/src/java/org/pantsbuild/testproject:publish_directory',
   ],
-  timeout = 240,
+  timeout = 400,
   tags = {'integration', 'partially_type_checked'},
 )

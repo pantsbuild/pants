@@ -11,6 +11,7 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
+@pytest.mark.skip(reason="flaky")
 class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
 
     JarSet = namedtuple("JarSet", ["jersey", "jsr311"])
