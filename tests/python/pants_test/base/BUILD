@@ -205,5 +205,5 @@ python_tests(
     'testprojects/src/python:unicode_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 120,
+  timeout = 250,
 )

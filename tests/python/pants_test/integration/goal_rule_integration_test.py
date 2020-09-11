@@ -13,6 +13,7 @@ from pants.util.dirutil import fast_relpath, safe_file_dump
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
+@pytest.mark.skip(reason="flaky")
 class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
     list_target = "examples/src/java/org/pantsbuild/example/hello::"
