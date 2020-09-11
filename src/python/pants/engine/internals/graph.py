@@ -229,7 +229,17 @@ async def resolve_targets_with_origins(
 class CycleException(Exception):
     def __init__(self, subject: Address, path: Tuple[Address, ...]) -> None:
         path_string = "\n".join((f"-> {a}" if a == subject else f"   {a}") for a in path)
-        super().__init__(f"Dependency graph contained a cycle:\n{path_string}")
+        super().__init__(
+            f"The dependency graph contained a cycle:\n{path_string}\n\nTo fix this, first verify "
+            "if your code has an actual import cycle. If it does, you likely need to re-architect "
+            "your code to avoid the cycle.\n\nIf there is no cycle in your code, then you may need "
+            "to use more granular targets. Split up the problematic targets into smaller targets "
+            "with more granular `sources` fields so that you can adjust the `dependencies` fields "
+            "to avoid introducing a cycle.\n\nAlternatively, use Python dependency inference "
+            "(`--python-infer-imports`), rather than explicit `dependencies`. Pants will infer "
+            "dependencies on specific files, rather than entire targets. This extra precision "
+            "means that you will only have cycles if your code actually does have cycles in it."
+        )
         self.subject = subject
         self.path = path
 
