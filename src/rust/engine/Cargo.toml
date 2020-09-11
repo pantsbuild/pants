@@ -116,6 +116,7 @@ num_enum = "0.4"
 parking_lot = "0.11"
 process_execution = { path = "process_execution" }
 rand = "0.6"
+regex = "1"
 reqwest = { version = "0.10", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
 sharded_lmdb = { path = "sharded_lmdb" }
