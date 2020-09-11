@@ -269,7 +269,13 @@ impl Core {
       let mut content = String::new();
       std::fs::File::open(path)
         .and_then(|mut f| f.read_to_string(&mut content))
-        .map_err(|err| format!("Error reading root CA certs file {:?}: {}", path, err))?;
+        .map_err(|err| {
+          format!(
+            "Error reading root CA certs file {}: {}",
+            path.display(),
+            err
+          )
+        })?;
       let pem_re = Regex::new(PEM_RE_STR).unwrap();
       let certs_res: Result<Vec<reqwest::Certificate>, _> = pem_re
         .find_iter(&content)
@@ -277,8 +283,9 @@ impl Core {
         .collect();
       certs_res.map_err(|err| {
         format!(
-          "Error parsing PEM from root CA certs file {:?}: {}",
-          path, err
+          "Error parsing PEM from root CA certs file {}: {}",
+          path.display(),
+          err
         )
       })?
     } else {
