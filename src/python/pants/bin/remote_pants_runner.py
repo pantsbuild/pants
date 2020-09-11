@@ -34,7 +34,7 @@ class PailgunClientSignalHandler(SignalHandler):
         )
         self._pailgun_client.set_exit_timeout(
             timeout=self._timeout,
-            reason=KeyboardInterrupt("Interrupted by user over pailgun client!"),
+            reason=KeyboardInterrupt("Sending user interrupt to pantsd"),
         )
         self._pailgun_client.maybe_send_signal(signum)
 
