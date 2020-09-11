@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
@@ -123,9 +122,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         PexRequest(
             output_filename="pylint.pex",
             internal_only=True,
-            requirements=PexRequirements(
-                itertools.chain(pylint.all_requirements, plugin_requirements)
-            ),
+            requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )

@@ -11,8 +11,8 @@ from mypy.plugins.common import add_method
 
 
 class TotalOrderingPlugin(Plugin):
-    """This MyPy plugin inserts method type stubs for the "missing" ordering methods the
-    `@total_ordering` class decorator will fill in dynamically."""
+    """This inserts method type stubs for the "missing" ordering methods that the `@total_ordering`
+    class decorator will fill in dynamically."""
 
     def get_class_decorator_hook(
         self, fullname: str
