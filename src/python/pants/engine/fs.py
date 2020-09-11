@@ -53,7 +53,11 @@ class Paths:
 
 @dataclass(frozen=True)
 class FileContent:
-    """The content of a file."""
+    """The content of a file.
+
+    This can be used to create a new Digest with `Get(Digest, CreateDigest)`. You can also get back
+    a list of `FileContent` objects by using `Get(DigestContents, Digest)`.
+    """
 
     path: str
     content: bytes
@@ -68,12 +72,15 @@ class FileContent:
 
 @dataclass(frozen=True)
 class Directory:
-    """The path to a directory."""
+    """The path to a directory.
+
+    This can be used to create empty directories with `Get(Digest, CreateDigest)`.
+    """
 
     path: str
 
     def __repr__(self) -> str:
-        return f"Directory({self.path})"
+        return f"Directory({repr(self.path)})"
 
 
 class DigestContents(Collection[FileContent]):

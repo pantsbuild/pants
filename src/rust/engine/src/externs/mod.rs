@@ -170,7 +170,7 @@ pub fn store_bool(val: bool) -> Value {
 pub fn hasattr(value: &Value, field: &str) -> bool {
   let gil = Python::acquire_gil();
   let py = gil.python();
-  value.hasattr(py, field).expect("")
+  value.hasattr(py, field).unwrap()
 }
 
 ///
