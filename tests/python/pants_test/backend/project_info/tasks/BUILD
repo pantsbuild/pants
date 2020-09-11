@@ -97,7 +97,7 @@ python_tests(
     ':resolve_jars_test_mixin',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 630,
+  timeout = 750,
 )
 
 python_tests(

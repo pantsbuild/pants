@@ -8,6 +8,7 @@ import pytest
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="Is not working properly")
 class PytestRunTimeoutIntegrationTest(PantsRunIntegrationTest):
 
     # NB: Occasionally running a test in CI may take multiple seconds. The tests in this file which

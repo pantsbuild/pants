@@ -39,7 +39,7 @@ python_tests(
     'testprojects/tests/scala/org/pantsbuild/testproject:cp-directories_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 600,
+  timeout = 850,
 )
 
 python_tests(

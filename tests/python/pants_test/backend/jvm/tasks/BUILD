@@ -88,7 +88,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:deployexcludes_directory',
     'testprojects/src/java/org/pantsbuild/testproject:manifest_directory',
   ],
-  timeout=800,
+  timeout=960,
   tags = {'integration', 'partially_type_checked'},
 )
 
@@ -745,7 +745,7 @@ python_tests(
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
   ],
-  timeout=600,
+  timeout=800,
   tags = {'integration', 'partially_type_checked'},
 )
 
@@ -782,7 +782,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:junit_directory',
   ],
-  timeout=450,
+  timeout=700,
   tags = {'integration', 'partially_type_checked'},
 )
 
@@ -840,7 +840,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:testjvms_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 600,
+  timeout = 800,
 )
 
 python_tests(

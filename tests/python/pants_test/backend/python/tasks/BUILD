@@ -107,7 +107,7 @@ python_tests(
         "testprojects/tests/python/pants:timeout_directory",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=600,
+    timeout=850,
 )
 
 python_tests(
@@ -176,7 +176,7 @@ python_tests(
         "testprojects/src/python:interpreter_selection_directory",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=240,
+    timeout=500,
 )
 
 python_tests(
