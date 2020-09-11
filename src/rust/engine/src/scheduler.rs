@@ -460,7 +460,7 @@ impl Scheduler {
     &self,
     request: &ExecutionRequest,
     session: &Session,
-    python_signal: Value,
+    python_signal_fn: Value,
   ) -> Result<Vec<Result<Value, Failure>>, ExecutionTermination> {
     debug!(
       "Launching {} roots (poll={}).",
@@ -476,20 +476,13 @@ impl Scheduler {
     session.maybe_display_initialize(&self.core.executor, &sender);
     self.execute_helper(request, session, sender);
     let result = loop {
-      match externs::call(&python_signal, &[]) {
-        Ok(value) => {
-          if externs::is_truthy(&*value) {
-            return Err(ExecutionTermination::KeyboardInterrupt);
-          }
-        }
-        Err(e) => {
-          return Err(ExecutionTermination::Fatal(format!(
-            "Error when checking Python signal state: {}",
-            e
-          )))
-        }
-      };
-      match receiver.recv_timeout(Self::refresh_delay(interval, deadline)) {
+      let execution_event = receiver.recv_timeout(Self::refresh_delay(interval, deadline));
+
+      if let Some(termination) = maybe_break_execution_loop(&python_signal_fn) {
+        return Err(termination);
+      }
+
+      match execution_event {
         Ok(ExecutionEvent::Completed(res)) => {
           // Completed successfully.
           break Ok(Self::execute_record_results(&request.roots, &session, res));
@@ -525,6 +518,22 @@ impl Scheduler {
       .and_then(|deadline| deadline.checked_duration_since(Instant::now()))
       .map(|duration_till_deadline| std::cmp::min(refresh_interval, duration_till_deadline))
       .unwrap_or(refresh_interval)
+  }
+}
+
+fn maybe_break_execution_loop(python_signal_fn: &Value) -> Option<ExecutionTermination> {
+  match externs::call(&python_signal_fn, &[]) {
+    Ok(value) => {
+      if externs::is_truthy(&*value) {
+        Some(ExecutionTermination::KeyboardInterrupt)
+      } else {
+        None
+      }
+    }
+    Err(e) => Some(ExecutionTermination::Fatal(format!(
+      "Error when checking Python signal state: {}",
+      e
+    ))),
   }
 }
 
