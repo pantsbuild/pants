@@ -15,6 +15,7 @@ use crate::core::{Failure, Params, TypeId, Value};
 use crate::externs;
 use crate::nodes::{NodeKey, Select, Visualizer};
 
+use cpython::Python;
 use graph::{InvalidationResult, LastObserved};
 use log::{debug, info, warn};
 use parking_lot::Mutex;
@@ -522,18 +523,32 @@ impl Scheduler {
 }
 
 fn maybe_break_execution_loop(python_signal_fn: &Value) -> Option<ExecutionTermination> {
-  match externs::call(&python_signal_fn, &[]) {
+  match externs::call_function(&python_signal_fn, &[]) {
     Ok(value) => {
-      if externs::is_truthy(&*value) {
+      if externs::is_truthy(&value) {
         Some(ExecutionTermination::KeyboardInterrupt)
       } else {
         None
       }
     }
-    Err(e) => Some(ExecutionTermination::Fatal(format!(
-      "Error when checking Python signal state: {}",
-      e
-    ))),
+    Err(mut e) => {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      if e
+        .instance(py)
+        .cast_as::<cpython::exc::KeyboardInterrupt>(py)
+        .is_ok()
+      {
+        Some(ExecutionTermination::KeyboardInterrupt)
+      } else {
+        let failure = Failure::from_py_err(py, e);
+        std::mem::drop(gil);
+        Some(ExecutionTermination::Fatal(format!(
+          "Error when checking Python signal state: {}",
+          failure
+        )))
+      }
+    }
   }
 }
 

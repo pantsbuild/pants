@@ -337,12 +337,17 @@ pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value,
     .map_err(|py_err| Failure::from_py_err(gil.python(), py_err))
 }
 
-pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
+pub fn call_function(func: &Value, args: &[Value]) -> Result<PyObject, PyErr> {
   let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let gil = Python::acquire_gil();
   let args_tuple = PyTuple::new(gil.python(), &arg_handles);
-  func
-    .call(gil.python(), args_tuple, None)
+  func.call(gil.python(), args_tuple, None)
+}
+
+pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
+  let output = call_function(func, args);
+  let gil = Python::acquire_gil();
+  output
     .map(Value::from)
     .map_err(|py_err| Failure::from_py_err(gil.python(), py_err))
 }
