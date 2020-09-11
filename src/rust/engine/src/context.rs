@@ -36,10 +36,10 @@ use watch::{Invalidatable, InvalidationWatcher};
 const GIGABYTES: usize = 1024 * 1024 * 1024;
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
-// and requires single PEM blocks. There is a pem crate that can decode multiple certificates
-// from a single buffer, but it is not suitable for our use because we don't want to decode
-// the certificates, but rather pass them as source to reqwest. The pem also inappropriately
-// squelches errors.
+// and requires single PEM blocks. There is a crate (https://crates.io/crates/pem) that can decode
+// multiple certificates from a single buffer, but it is not suitable for our use because we don't
+// want to decode the certificates, but rather pass them as source to reqwest. That crate also
+// inappropriately squelches errors.
 //
 // Instead we make our own use of a copy of the regex used by the pem crate.  Note:
 //   - The leading (?s) which sets the flag to allow . to match \n.
