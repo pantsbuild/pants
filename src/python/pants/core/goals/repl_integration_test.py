@@ -10,6 +10,7 @@ from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import PexProcess
 from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.process import Process
 from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -23,7 +24,7 @@ def rule_runner() -> RuleRunner:
             *repl_rules(),
             *python_repl.rules(),
             *pex_from_targets.rules(),
-            QueryRule(Process, (PexProcess, OptionsBootstrapper)),
+            QueryRule(Process, (PexProcess, OptionsBootstrapper, PantsEnvironment)),
         ],
         target_types=[PythonLibrary, ProtobufLibrary],
     )

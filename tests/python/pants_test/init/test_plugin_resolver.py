@@ -16,6 +16,7 @@ from pkg_resources import Requirement, WorkingSet
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, PexRequirements
 from pants.core.util_rules import archive, external_tool
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
@@ -43,8 +44,8 @@ class PluginResolverTest(TestBase):
             *pex.rules(),
             *external_tool.rules(),
             *archive.rules(),
-            QueryRule(Pex, (PexRequest, OptionsBootstrapper)),
-            QueryRule(Process, (PexProcess, OptionsBootstrapper)),
+            QueryRule(Pex, (PexRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(Process, (PexProcess, OptionsBootstrapper, PantsEnvironment)),
             QueryRule(ProcessResult, (Process,)),
         )
 
@@ -58,6 +59,7 @@ class PluginResolverTest(TestBase):
                     requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"]),
                 ),
                 create_options_bootstrapper(args=["--backend-packages=pants.backend.python"]),
+                PantsEnvironment(),
             ],
         )
 
@@ -196,7 +198,8 @@ class PluginResolverTest(TestBase):
             working_set, chroot, repo_dir, cache_dir = results
 
             # Kill the repo source dir and re-resolve.  If the PluginResolver truly detects exact
-            # requirements it should skip any resolves and load directly from the still in-tact cache.
+            # requirements it should skip any resolves and load directly from the still intact
+            # cache.
             safe_rmtree(repo_dir)
 
             with self.plugin_resolution(
