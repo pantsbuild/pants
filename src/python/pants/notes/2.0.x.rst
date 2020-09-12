@@ -5,6 +5,90 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0a3 (9/11/2020)
+-------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Replace `cloc` with `count-loc`, using much faster SCC program (#10740)
+  `PR #10740 <https://github.com/pantsbuild/pants/pull/10740>`_
+
+* Upgrade default isort from 4.6 to 5.5 (#10737)
+  `PR #10737 <https://github.com/pantsbuild/pants/pull/10737>`_
+
+* Disambiguate binary and lambda output. (#10735)
+  `PR #10735 <https://github.com/pantsbuild/pants/pull/10735>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `runtime_binary_dependencies` field to `python_tests` target (#10756)
+  `PR #10756 <https://github.com/pantsbuild/pants/pull/10756>`_
+
+* Pass proxy-related env vars through to Pex calls. (#10762)
+  `PR #10762 <https://github.com/pantsbuild/pants/pull/10762>`_
+
+* Support custom CA bundles. (#10757)
+  `PR #10757 <https://github.com/pantsbuild/pants/pull/10757>`_
+
+* Add support to MyPy for first-party plugins (#10755)
+  `PR #10755 <https://github.com/pantsbuild/pants/pull/10755>`_
+
+* Filter log levels by target (#10729)
+  `PR #10729 <https://github.com/pantsbuild/pants/pull/10729>`_
+
+Bugfixes
+~~~~~~~~
+
+* fix incorrect mapping of parameters into PyRemotingOptions struct (#10752)
+  `PR #10752 <https://github.com/pantsbuild/pants/pull/10752>`_
+
+* Fix MyPy to work by default with Python 3.6+ code and Black with 3.8+ code (#10750)
+  `PR #10750 <https://github.com/pantsbuild/pants/pull/10750>`_
+
+* Temporarily disable 3rd-party requirements support for MyPy (#10765)
+  `PR #10765 <https://github.com/pantsbuild/pants/pull/10765>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Support binary dependencies in tests. (#10744)
+  `PR #10744 <https://github.com/pantsbuild/pants/pull/10744>`_
+
+* Add support to MyPy for third-party requirements and stubs (PEP 561) (#10753)
+  `PR #10753 <https://github.com/pantsbuild/pants/pull/10753>`_
+
+* Add new intrinsic `Paths` to avoid snapshotting (#10741)
+  `PR #10741 <https://github.com/pantsbuild/pants/pull/10741>`_
+
+* Remove unused FFI types and `tar_api.rs` (#10742)
+  `PR #10742 <https://github.com/pantsbuild/pants/pull/10742>`_
+
+* Remove daemonize method + tests (#10749)
+  `PR #10749 <https://github.com/pantsbuild/pants/pull/10749>`_
+
+* Some refactoring around pantsd and warning filtering (#10748)
+  `PR #10748 <https://github.com/pantsbuild/pants/pull/10748>`_
+
+* Refactor `pytest_runner_integration_test.py` (#10736)
+  `PR #10736 <https://github.com/pantsbuild/pants/pull/10736>`_
+
+* Switch the backend of AsyncSemaphore to tokio's Semaphore. (#10738)
+  `PR #10738 <https://github.com/pantsbuild/pants/pull/10738>`_
+
+* Refactor find_valid_field_sets. (#10732)
+  `PR #10732 <https://github.com/pantsbuild/pants/pull/10732>`_
+
+* Upgrade to Rust v1.46.0 (#10694)
+  `PR #10694 <https://github.com/pantsbuild/pants/pull/10694>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix `./pants help $goal` showing the goal in "related subsystems" (#10754)
+  `PR #10754 <https://github.com/pantsbuild/pants/pull/10754>`_
+
 2.0.0a2 (9/3/2020)
 ------------------
 
