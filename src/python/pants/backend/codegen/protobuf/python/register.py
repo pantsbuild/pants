@@ -18,11 +18,3 @@ def rules():
 
 def target_types():
     return [ProtobufLibrary]
-
-
-raise Exception(
-    "The pants.backend.codege.protobuf.python backend is temporarily disabled for this 2.0 alpha "
-    "release, due to performance issues. If you require protobuf support, please do not use this "
-    "Pants release.  This is a very temporary measure, to allow alpha testing to proceed on other "
-    "features. Protobuf support will be fully restored before the 2.0 release."
-)

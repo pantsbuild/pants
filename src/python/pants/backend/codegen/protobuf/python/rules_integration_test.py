@@ -26,7 +26,6 @@ from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
 
-@pytest.mark.skip(reason="TODO(#10683)")
 class ProtobufPythonIntegrationTest(ExternalToolTestBase):
     @classmethod
     def target_types(cls):
