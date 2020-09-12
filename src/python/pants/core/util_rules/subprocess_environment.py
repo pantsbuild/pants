@@ -80,7 +80,7 @@ class SubprocessEnvironment(Subsystem):
         )
 
     @property
-    def env_vars_to_set(self) -> List[str]:
+    def env_vars_to_pass_to_subprocesses(self) -> List[str]:
         ret: List[str] = list(self.options.env_vars)
 
         # Inject values from the old --lang, --lc-all options if set.
@@ -113,7 +113,7 @@ def get_subprocess_environment(
     subproc_env: SubprocessEnvironment, pants_env: PantsEnvironment
 ) -> SubprocessEnvironmentVars:
     return SubprocessEnvironmentVars(
-        pants_env.get_subset(subproc_env.env_vars_to_set, SETTABLE_ENV_VARS)
+        pants_env.get_subset(subproc_env.env_vars_to_pass_to_subprocesses, SETTABLE_ENV_VARS)
     )
 
 
