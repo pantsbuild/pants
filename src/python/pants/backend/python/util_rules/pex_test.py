@@ -3,6 +3,7 @@
 
 import json
 import os.path
+import textwrap
 import zipfile
 from dataclasses import dataclass
 from typing import Dict, Iterable, Iterator, List, Optional, Tuple, cast
@@ -20,6 +21,7 @@ from pants.backend.python.util_rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
@@ -317,8 +319,8 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_rules(),
-            QueryRule(Pex, (PexRequest, OptionsBootstrapper)),
-            QueryRule(Process, (PexProcess, OptionsBootstrapper)),
+            QueryRule(Pex, (PexRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(Process, (PexProcess, OptionsBootstrapper, PantsEnvironment)),
             QueryRule(ProcessResult, (Process,)),
         ]
     )
@@ -354,6 +356,7 @@ def create_pex_and_get_all_data(
             create_options_bootstrapper(
                 args=["--backend-packages=pants.backend.python", *additional_pants_args]
             ),
+            PantsEnvironment(),
         ],
     )
     rule_runner.scheduler.write_digest(pex.digest)
@@ -405,7 +408,7 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
                     FileContent(path="main.py", content=b'print("from main")'),
                     FileContent(path="subdir/sub.py", content=b'print("from sub")'),
                 )
-            )
+            ),
         ],
     )
     pex_output = create_pex_and_get_all_data(rule_runner, entry_point="main", sources=sources)
@@ -415,8 +418,7 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
     assert "main.py" in pex_files
     assert "subdir/sub.py" in pex_files
 
-    # We reasonably expect there to be a python interpreter on the test-running
-    # process's path.
+    # We reasonably expect there to be a python interpreter on the test-running process's path.
     env = {"PATH": os.getenv("PATH", "")}
 
     process = Process(
@@ -427,6 +429,52 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
     )
     result = rule_runner.request_product(ProcessResult, [process])
     assert result.stdout == b"from main\n"
+
+
+def test_pex_environment(rule_runner: RuleRunner) -> None:
+    sources = rule_runner.request_product(
+        Digest,
+        [
+            CreateDigest(
+                (
+                    FileContent(
+                        path="main.py",
+                        content=textwrap.dedent(
+                            """
+                        from os import environ
+                        print(f"LANG={environ.get('LANG')}")
+                        print(f"ftp_proxy={environ.get('ftp_proxy')}")
+                        """
+                        ).encode(),
+                    ),
+                )
+            ),
+        ],
+    )
+    pex_output = create_pex_and_get_all_data(rule_runner, entry_point="main", sources=sources)
+
+    process = rule_runner.request_product(
+        Process,
+        [
+            PexProcess(
+                pex_output["pex"],
+                argv=["python", "test.pex"],
+                input_digest=pex_output["pex"].digest,
+                description="Run the pex and check its reported environment",
+            ),
+            create_options_bootstrapper(
+                args=[
+                    "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
+                    "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
+                ]
+            ),
+            PantsEnvironment({"LANG": "es_PY.UTF-8"}),
+        ],
+    )
+
+    result = rule_runner.request_product(ProcessResult, [process])
+    assert b"LANG=es_PY.UTF-8" in result.stdout
+    assert b"ftp_proxy=dummyproxy" in result.stdout
 
 
 def test_resolves_dependencies(rule_runner: RuleRunner) -> None:

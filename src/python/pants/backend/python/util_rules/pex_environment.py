@@ -5,8 +5,8 @@ import os
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Optional, Tuple, cast
 
-from pants.backend.python.subsystems import subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
+from pants.core.util_rules import subprocess_environment
+from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine import process
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.process import BinaryPathRequest, BinaryPaths
@@ -129,8 +129,8 @@ class PexEnvironment(EngineAwareReturnType):
 @rule(desc="Find PEX Python", level=LogLevel.DEBUG)
 async def find_pex_python(
     python_setup: PythonSetup,
-    pex_runtime_environment: PexRuntimeEnvironment,
-    subprocess_environment: SubprocessEnvironment,
+    pex_runtime_env: PexRuntimeEnvironment,
+    subprocess_env_vars: SubprocessEnvironmentVars,
 ) -> PexEnvironment:
     # PEX files are compatible with bootstrapping via python2.7 or python 3.5+. The bootstrap
     # code will then re-exec itself if the underlying PEX user code needs a more specific python
@@ -144,7 +144,7 @@ async def find_pex_python(
                     search_path=python_setup.interpreter_search_paths, binary_name=binary_name
                 ),
             )
-            for binary_name in pex_runtime_environment.bootstrap_interpreter_names
+            for binary_name in pex_runtime_env.bootstrap_interpreter_names
         ]
     )
 
@@ -155,9 +155,9 @@ async def find_pex_python(
         return None
 
     return PexEnvironment(
-        path=pex_runtime_environment.path,
+        path=pex_runtime_env.path,
         interpreter_search_paths=tuple(python_setup.interpreter_search_paths),
-        subprocess_environment_dict=FrozenDict(subprocess_environment.environment_dict),
+        subprocess_environment_dict=subprocess_env_vars.vars,
         bootstrap_python=first_python_binary(),
     )
 

@@ -218,7 +218,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def rules(cls):
-        return [*source_root.rules(), QueryRule(WrappedTarget, (Address, OptionsBootstrapper))]
+        return [
+            *source_root.rules(),
+            QueryRule(WrappedTarget, (Address, OptionsBootstrapper)),
+        ]
 
     @classmethod
     def target_types(cls) -> Sequence[Type[Target]]:

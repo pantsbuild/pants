@@ -5,7 +5,7 @@ import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Tuple, cast
+from typing import Optional, Tuple
 from uuid import UUID
 
 from pants.backend.python.goals.coverage_py import (
@@ -251,10 +251,7 @@ async def setup_pytest_for_target(
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
     }
 
-    extra_env_from_arguments = test_extra_env.env
-    for key in extra_env_from_arguments:
-        if extra_env_from_arguments[key] is not None:
-            extra_env[key] = cast(str, extra_env_from_arguments[key])
+    extra_env.update(test_extra_env.env)
 
     if test_subsystem.force and not request.is_debug:
         # This is a slightly hacky way to force the process to run: since the env var

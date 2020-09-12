@@ -13,6 +13,7 @@ from pants.backend.awslambda.python.awslambda_python_rules import PythonAwsLambd
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.python.target_types import PythonLibrary
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.rules import QueryRule
@@ -26,7 +27,9 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *awslambda_python_rules(),
-            QueryRule(CreatedAWSLambda, (PythonAwsLambdaFieldSet, OptionsBootstrapper)),
+            QueryRule(
+                CreatedAWSLambda, (PythonAwsLambdaFieldSet, OptionsBootstrapper, PantsEnvironment)
+            ),
         ],
         target_types=[PythonAWSLambda, PythonLibrary],
     )
@@ -42,7 +45,7 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, by
     )
     target = rule_runner.get_target(Address.parse(addr), bootstrapper)
     created_awslambda = rule_runner.request_product(
-        CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target), bootstrapper]
+        CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target), bootstrapper, PantsEnvironment()]
     )
     created_awslambda_digest_contents = rule_runner.request_product(
         DigestContents, [created_awslambda.digest]

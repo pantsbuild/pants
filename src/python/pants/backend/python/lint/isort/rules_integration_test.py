@@ -10,6 +10,7 @@ from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -25,9 +26,9 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *isort_rules(),
-            QueryRule(LintResults, (IsortRequest, OptionsBootstrapper)),
-            QueryRule(FmtResult, (IsortRequest, OptionsBootstrapper)),
-            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper)),
+            QueryRule(LintResults, (IsortRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(FmtResult, (IsortRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper, PantsEnvironment)),
         ]
     )
 
@@ -71,18 +72,24 @@ def run_isort(
         args.append("--isort-skip")
     options_bootstrapper = create_options_bootstrapper(args=args)
     field_sets = [IsortFieldSet.create(tgt) for tgt in targets]
+    pants_env = PantsEnvironment()
     lint_results = rule_runner.request_product(
-        LintResults, [IsortRequest(field_sets), options_bootstrapper]
+        LintResults, [IsortRequest(field_sets), options_bootstrapper, pants_env]
     )
     input_sources = rule_runner.request_product(
         SourceFiles,
-        [SourceFilesRequest(field_set.sources for field_set in field_sets), options_bootstrapper],
+        [
+            SourceFilesRequest(field_set.sources for field_set in field_sets),
+            options_bootstrapper,
+            pants_env,
+        ],
     )
     fmt_result = rule_runner.request_product(
         FmtResult,
         [
             IsortRequest(field_sets, prior_formatter_result=input_sources.snapshot),
             options_bootstrapper,
+            pants_env,
         ],
     )
     return lint_results.results, fmt_result
