@@ -40,7 +40,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.process import MultiPlatformProcess, Process, ProcessResult
+from pants.engine.process import MultiPlatformProcess, Process, ProcessResult, VolatileProcess
 from pants.engine.rules import Get, collect_rules, rule
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
@@ -564,6 +564,7 @@ class PexProcess:
     output_directories: Optional[Tuple[str, ...]]
     timeout_seconds: Optional[int]
     execution_slot_variable: Optional[str]
+    volatile: bool
 
     def __init__(
         self,
@@ -578,6 +579,7 @@ class PexProcess:
         output_directories: Optional[Iterable[str]] = None,
         timeout_seconds: Optional[int] = None,
         execution_slot_variable: Optional[str] = None,
+        volatile: bool = False,
     ) -> None:
         self.pex = pex
         self.argv = tuple(argv)
@@ -589,6 +591,7 @@ class PexProcess:
         self.output_directories = tuple(output_directories) if output_directories else None
         self.timeout_seconds = timeout_seconds
         self.execution_slot_variable = execution_slot_variable
+        self.volatile = volatile
 
 
 @rule
@@ -601,7 +604,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         always_use_shebang=request.pex.internal_only,
     )
     env = {**pex_environment.environment_dict, **(request.extra_env or {})}
-    return Process(
+    process = Process(
         argv,
         description=request.description,
         level=request.level,
@@ -612,6 +615,9 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
     )
+    if not request.volatile:
+        return process
+    return await Get(Process, VolatileProcess(process))
 
 
 def rules():
