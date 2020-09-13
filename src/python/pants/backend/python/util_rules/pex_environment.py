@@ -154,6 +154,12 @@ async def find_pex_python(
 
                             major, minor = sys.version_info[:2]
                             if (major, minor) == (2, 7) or (major == 3 and minor >= 5):
+                                # Here we hash the underlying python interpreter executable to
+                                # ensure we detect changes in the real interpreter that might
+                                # otherwise be masked by pyenv shim scripts found on the search
+                                # path. Naively, just printing out the full version_info would be
+                                # enough, but that does not account for supported abi changes (e.g.:
+                                # a pyenv switch from a py27mu interpreter to a py27m interpreter.
                                 import hashlib
                                 hasher = hashlib.sha256()
                                 with open(sys.executable, "rb") as fp:

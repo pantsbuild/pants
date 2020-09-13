@@ -316,6 +316,17 @@ class InteractiveRunner:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathRequest:
+    """Request to find a binary of a given name.
+
+    If `test_args` are specified all binaries that are found will be executed with these args and
+    only those binaries whose test executions exit with return code 0 will be retained.
+    Additionally, if test execution includes stdout content, that will be used to fingerprint the
+    binary path so that upgrades and downgrades can be detected. A reasonable test for many programs
+    might be to pass `["--version"]` for `test_args` since it will both ensure the program runs and
+    also produce stdout text that changes upon upgrade or downgrade of the binary at the discovered
+    path.
+    """
+
     search_path: Tuple[str, ...]
     binary_name: str
     test_args: Optional[Tuple[str, ...]]
@@ -459,9 +470,8 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     results = await MultiGet(
         Get(
             FallibleProcessResult,
-            Process(
-                argv=[path, *request.test_args],
-                description=f"Test binary {path}.",
+            UncacheableProcess(
+                Process(argv=[path, *request.test_args], description=f"Test binary {path}.")
             ),
         )
         for path in found_paths
