@@ -5,8 +5,7 @@ import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Tuple, cast
-from uuid import UUID
+from typing import Optional, Tuple
 
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
@@ -43,7 +42,6 @@ from pants.core.goals.test import (
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -251,21 +249,7 @@ async def setup_pytest_for_target(
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
     }
 
-    extra_env_from_arguments = test_extra_env.env
-    for key in extra_env_from_arguments:
-        if extra_env_from_arguments[key] is not None:
-            extra_env[key] = cast(str, extra_env_from_arguments[key])
-
-    if test_subsystem.force and not request.is_debug:
-        # This is a slightly hacky way to force the process to run: since the env var
-        #  value is unique, this input combination will never have been seen before,
-        #  and therefore never cached. The two downsides are:
-        #  1. This leaks into the test's environment, albeit with a funky var name that is
-        #     unlikely to cause problems in practice.
-        #  2. This run will be cached even though it can never be re-used.
-        # TODO: A more principled way of forcing rules to run?
-        uuid = await Get(UUID, UUIDRequest())
-        extra_env["__PANTS_FORCE_TEST_RUN__"] = str(uuid)
+    extra_env.update(test_extra_env.env)
 
     process = await Get(
         Process,
@@ -279,6 +263,7 @@ async def setup_pytest_for_target(
             execution_slot_variable=pytest.options.execution_slot_var,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
+            uncacheable=test_subsystem.force and not request.is_debug,
         ),
     )
     return TestSetup(process, results_file_name=results_file_name)

@@ -11,6 +11,7 @@ from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -27,9 +28,9 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *black_rules(),
-            QueryRule(LintResults, (BlackRequest, OptionsBootstrapper)),
-            QueryRule(FmtResult, (BlackRequest, OptionsBootstrapper)),
-            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper)),
+            QueryRule(LintResults, (BlackRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(FmtResult, (BlackRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper, PantsEnvironment)),
         ],
         target_types=[PythonLibrary],
     )
@@ -76,14 +77,16 @@ def run_black(
         args.append("--black-skip")
     options_bootstrapper = create_options_bootstrapper(args=args)
     field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
+    pants_env = PantsEnvironment()
     lint_results = rule_runner.request_product(
-        LintResults, [BlackRequest(field_sets), options_bootstrapper]
+        LintResults, [BlackRequest(field_sets), options_bootstrapper, pants_env]
     )
     input_sources = rule_runner.request_product(
         SourceFiles,
         [
             SourceFilesRequest(field_set.sources for field_set in field_sets),
             options_bootstrapper,
+            pants_env,
         ],
     )
     fmt_result = rule_runner.request_product(
@@ -91,6 +94,7 @@ def run_black(
         [
             BlackRequest(field_sets, prior_formatter_result=input_sources.snapshot),
             options_bootstrapper,
+            pants_env,
         ],
     )
     return lint_results.results, fmt_result

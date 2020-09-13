@@ -13,6 +13,7 @@ from pants.backend.python.typecheck.mypy.plugin_target_type import MyPySourcePlu
 from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
@@ -29,7 +30,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *mypy_rules(),
             *dependency_inference_rules.rules(),  # Used for import inference.
-            QueryRule(TypecheckResults, (MyPyRequest, OptionsBootstrapper)),
+            QueryRule(TypecheckResults, (MyPyRequest, OptionsBootstrapper, PantsEnvironment)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary, MyPySourcePlugin],
     )
@@ -131,6 +132,7 @@ def run_mypy(
         [
             MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets),
             create_options_bootstrapper(args=args),
+            PantsEnvironment(),
         ],
     )
     return result.results
@@ -197,6 +199,7 @@ def test_skip(rule_runner: RuleRunner) -> None:
     assert not result
 
 
+@pytest.mark.xfail(reason="Temporarily disabled 3rd-party support")
 def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file(
         "",
@@ -226,6 +229,7 @@ def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/itertools.py:3" in result[0].stdout
 
 
+@pytest.mark.xfail(reason="Temporarily disabled 3rd-party support")
 def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file(
         "",
@@ -367,6 +371,7 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert "Success: no issues found" in result[0].stdout.strip()
 
 
+@pytest.mark.xfail(reason="Temporarily disabled 3rd-party support, and this plugin uses that")
 def test_source_plugin(rule_runner: RuleRunner) -> None:
     # NB: We make this source plugin fairly complex by having it use transitive dependencies.
     # This is to ensure that we can correctly support plugins with dependencies.

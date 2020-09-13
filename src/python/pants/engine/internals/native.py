@@ -3,7 +3,7 @@
 
 import logging
 import os
-from typing import Dict, Iterable, List, Mapping, Tuple, Union, cast
+from typing import Dict, Iterable, List, Mapping, Optional, Tuple, Union, cast
 
 from typing_extensions import Protocol
 
@@ -224,6 +224,7 @@ class Native(metaclass=SingletonMetaclass):
         local_store_dir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
+        ca_certs_path: Optional[str],
         ignore_patterns: List[str],
         use_gitignore: bool,
         execution_options,
@@ -273,6 +274,7 @@ class Native(metaclass=SingletonMetaclass):
             local_store_dir,
             local_execution_root_dir,
             named_caches_dir,
+            ca_certs_path,
             ignore_patterns,
             use_gitignore,
             remoting_options,

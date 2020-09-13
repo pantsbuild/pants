@@ -16,6 +16,7 @@ from pants.core.util_rules import (
     pants_bin,
     source_files,
     stripped_source_files,
+    subprocess_environment,
 )
 from pants.source import source_root
 
@@ -38,6 +39,7 @@ def rules():
         *stripped_source_files.rules(),
         *archive.rules(),
         *external_tool.rules(),
+        *subprocess_environment.rules(),
         *source_root.rules(),
     ]
 

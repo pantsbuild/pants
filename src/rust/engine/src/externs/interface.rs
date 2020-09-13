@@ -340,6 +340,7 @@ py_module_initializer!(native_engine, |py, m| {
         local_store_dir_buf: String,
         local_execution_root_dir_buf: String,
         named_caches_dir_buf: String,
+        ca_certs_path: Option<String>,
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
         remoting_options: PyRemotingOptions,
@@ -733,6 +734,7 @@ fn scheduler_create(
   local_store_dir_buf: String,
   local_execution_root_dir_buf: String,
   named_caches_dir_buf: String,
+  ca_certs_path_buf: Option<String>,
   ignore_patterns: Vec<String>,
   use_gitignore: bool,
   remoting_options: PyRemotingOptions,
@@ -763,6 +765,7 @@ fn scheduler_create(
       PathBuf::from(local_store_dir_buf),
       PathBuf::from(local_execution_root_dir_buf),
       PathBuf::from(named_caches_dir_buf),
+      ca_certs_path_buf.map(PathBuf::from),
       remoting_options.options(py).clone(),
       exec_strategy_opts.options(py).clone(),
     )

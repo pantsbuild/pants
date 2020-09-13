@@ -93,6 +93,7 @@ class Scheduler:
         local_store_dir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
+        ca_certs_path: Optional[str],
         rules: FrozenOrderedSet[Rule],
         union_membership: UnionMembership,
         execution_options: ExecutionOptions,
@@ -105,10 +106,10 @@ class Scheduler:
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
         :param use_gitignore: If set, pay attention to .gitignore files.
         :param build_root: The build root as a string.
-        :param work_dir: The pants work dir.
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param local_execution_root_dir: The directory to use for local execution sandboxes.
         :param named_caches_dir: The directory to use as the root for named mutable caches.
+        :param ca_certs_path: Path to pem file for custom CA, if needed.
         :param rules: A set of Rules which is used to compute values in the graph.
         :param union_membership: All the registered and normalized union rules.
         :param execution_options: Execution options for (remote) processes.
@@ -153,6 +154,7 @@ class Scheduler:
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
+            ca_certs_path=ca_certs_path,
             ignore_patterns=ignore_patterns,
             use_gitignore=use_gitignore,
             execution_options=execution_options,

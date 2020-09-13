@@ -2,14 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import hashlib
 import logging
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union
+from uuid import UUID
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
+from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
 from pants.util.frozendict import FrozenDict
@@ -312,23 +316,64 @@ class InteractiveRunner:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathRequest:
+    """Request to find a binary of a given name.
+
+    If `test_args` are specified all binaries that are found will be executed with these args and
+    only those binaries whose test executions exit with return code 0 will be retained.
+    Additionally, if test execution includes stdout content, that will be used to fingerprint the
+    binary path so that upgrades and downgrades can be detected. A reasonable test for many programs
+    might be to pass `["--version"]` for `test_args` since it will both ensure the program runs and
+    also produce stdout text that changes upon upgrade or downgrade of the binary at the discovered
+    path.
+    """
+
     search_path: Tuple[str, ...]
     binary_name: str
+    test_args: Optional[Tuple[str, ...]]
 
-    def __init__(self, *, search_path: Iterable[str], binary_name: str) -> None:
+    def __init__(
+        self,
+        *,
+        search_path: Iterable[str],
+        binary_name: str,
+        test_args: Optional[Iterable[str]] = None,
+    ) -> None:
         self.search_path = tuple(OrderedSet(search_path))
         self.binary_name = binary_name
+        self.test_args = tuple(test_args or ())
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class BinaryPath:
+    path: str
+    fingerprint: str
+
+    def __init__(self, path: str, fingerprint: Optional[str] = None) -> None:
+        self.path = path
+        self.fingerprint = self._fingerprint() if fingerprint is None else fingerprint
+
+    @staticmethod
+    def _fingerprint(content: Optional[Union[bytes, bytearray, memoryview]] = None) -> str:
+        hasher = hashlib.sha256() if content is None else hashlib.sha256(content)
+        return hasher.hexdigest()
+
+    @classmethod
+    def fingerprinted(
+        cls, path: str, representative_content: Union[bytes, bytearray, memoryview]
+    ) -> "BinaryPath":
+        return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPaths(EngineAwareReturnType):
     binary_name: str
-    paths: Tuple[str, ...]
+    paths: Tuple[BinaryPath, ...]
 
-    def __init__(self, binary_name: str, paths: Iterable[str]):
+    def __init__(self, binary_name: str, paths: Optional[Iterable[BinaryPath]] = None):
         self.binary_name = binary_name
-        self.paths = tuple(OrderedSet(paths))
+        self.paths = tuple(OrderedSet(paths) if paths else ())
 
     def message(self) -> str:
         if not self.paths:
@@ -339,18 +384,42 @@ class BinaryPaths(EngineAwareReturnType):
         return found_msg
 
     @property
-    def first_path(self) -> Optional[str]:
+    def first_path(self) -> Optional[BinaryPath]:
         """Return the first path to the binary that was discovered, if any."""
         return next(iter(self.paths), None)
+
+
+@dataclass(frozen=True)
+class UncacheableProcess:
+    """Ensures the wrapped Process will always be run and its results never re-used."""
+
+    process: Process
+
+
+@rule
+async def make_process_uncacheable(uncacheable_process: UncacheableProcess) -> Process:
+    uuid = await Get(UUID, UUIDRequest())
+
+    process = uncacheable_process.process
+    env = dict(process.env)
+
+    # This is a slightly hacky way to force the process to run: since the env var
+    #  value is unique, this input combination will never have been seen before,
+    #  and therefore never cached. The two downsides are:
+    #  1. This leaks into the process' environment, albeit with a funky var name that is
+    #     unlikely to cause problems in practice.
+    #  2. This run will be cached even though it can never be re-used.
+    # TODO: A more principled way of forcing rules to run?
+    env["__PANTS_FORCE_PROCESS_RUN__"] = str(uuid)
+
+    return dataclasses.replace(process, env=FrozenDict(env))
 
 
 @rule(desc="Find binary path", level=LogLevel.DEBUG)
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # TODO(John Sirois): Replace this script with a statically linked native binary so we don't
     #  depend on either /bin/bash being available on the Process host.
-    # TODO(#10507): Running the script directly from a shebang sometimes results in a "Text file
-    #  busy" error.
-    #
+
     # Note: the backslash after the """ marker ensures that the shebang is at the start of the
     # script file. Many OSs will not see the shebang if there is intervening whitespace.
     script_path = "./script.sh"
@@ -372,22 +441,49 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
     )
 
-    paths = []
     search_path = create_path_env_var(request.search_path)
     result = await Get(
         FallibleProcessResult,
-        Process(
-            description=f"Searching for `{request.binary_name}` on PATH={search_path}",
-            level=LogLevel.DEBUG,
-            input_digest=script_digest,
-            argv=[script_path, request.binary_name],
-            env={"PATH": search_path},
+        # We use a volatile process to force re-run since any binary found on the host system today
+        # could be gone tomorrow. Ideally we'd only do this for local processes since all known
+        # remoting configurations include a static container image as part of their cache key which
+        # automatically avoids this problem.
+        UncacheableProcess(
+            Process(
+                description=f"Searching for `{request.binary_name}` on PATH={search_path}",
+                level=LogLevel.DEBUG,
+                input_digest=script_digest,
+                argv=[script_path, request.binary_name],
+                env={"PATH": search_path},
+            )
         ),
     )
-    if result.exit_code == 0:
-        paths.extend(result.stdout.decode().splitlines())
 
-    return BinaryPaths(binary_name=request.binary_name, paths=paths)
+    binary_paths = BinaryPaths(binary_name=request.binary_name)
+    if result.exit_code != 0:
+        return binary_paths
+
+    found_paths = result.stdout.decode().splitlines()
+    if not request.test_args:
+        return dataclasses.replace(binary_paths, paths=[BinaryPath(path) for path in found_paths])
+
+    results = await MultiGet(
+        Get(
+            FallibleProcessResult,
+            UncacheableProcess(
+                Process(argv=[path, *request.test_args], description=f"Test binary {path}.")
+            ),
+        )
+        for path in found_paths
+    )
+    return dataclasses.replace(
+        binary_paths,
+        paths=[
+            BinaryPath.fingerprinted(path, result.stdout)
+            for path, result in zip(found_paths, results)
+            if result.exit_code == 0
+        ],
+    )
 
 
 def rules():
