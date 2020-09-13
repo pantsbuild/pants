@@ -224,8 +224,10 @@ fn remove_prefix_request_to_digest(
     let input_digest =
       lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
     let prefix = externs::project_str(&args[0], "prefix");
+    let prefix = RelativePath::new(PathBuf::from(prefix))
+      .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
-      .strip_prefix(input_digest, PathBuf::from(prefix))
+      .strip_prefix(input_digest, prefix)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     Ok(Snapshot::store_directory_digest(&core, &digest))
@@ -243,8 +245,10 @@ fn add_prefix_request_to_digest(
     let input_digest =
       lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
     let prefix = externs::project_str(&args[0], "prefix");
+    let prefix = RelativePath::new(PathBuf::from(prefix))
+      .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
-      .add_prefix(input_digest, PathBuf::from(prefix))
+      .add_prefix(input_digest, prefix)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     Ok(Snapshot::store_directory_digest(&core, &digest))

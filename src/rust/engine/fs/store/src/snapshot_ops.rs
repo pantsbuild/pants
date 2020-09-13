@@ -20,7 +20,7 @@ use log::log_enabled;
 use std::collections::HashSet;
 use std::convert::From;
 use std::iter::Iterator;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -662,23 +662,10 @@ pub trait SnapshotOps: StoreWrapper + 'static {
   async fn add_prefix(
     &self,
     mut digest: Digest,
-    prefix: PathBuf,
+    prefix: RelativePath,
   ) -> Result<Digest, SnapshotOpsError> {
-    let mut components = prefix.components();
-    while let Some(parent) = components.next_back() {
-      let parent = match &parent {
-        Component::Normal(p) => p,
-        x => {
-          return Err(
-            format!(
-              "Cannot add component \"{:?}\" of path prefix `{}`.",
-              x,
-              prefix.display(),
-            )
-            .into(),
-          )
-        }
-      };
+    let prefix: PathBuf = prefix.into();
+    while let Some(parent) = prefix.iter().next_back() {
       let mut dir_node = remexec::DirectoryNode::new();
       dir_node.set_name(osstring_as_utf8(parent.to_os_string())?);
       dir_node.set_digest((&digest).into());
@@ -695,11 +682,11 @@ pub trait SnapshotOps: StoreWrapper + 'static {
   async fn strip_prefix(
     &self,
     root_digest: Digest,
-    prefix: PathBuf,
+    prefix: RelativePath,
   ) -> Result<Digest, SnapshotOpsError> {
     let mut dir = self.load_directory_or_err(root_digest).await?;
     let mut already_stripped = PathBuf::new();
-    let mut prefix = prefix;
+    let mut prefix: PathBuf = prefix.into();
     loop {
       let has_already_stripped_any = already_stripped.components().next().is_some();
 
@@ -781,33 +768,7 @@ pub trait SnapshotOps: StoreWrapper + 'static {
   }
 
   async fn create_empty_dir(&self, path: RelativePath) -> Result<Digest, SnapshotOpsError> {
-    let path: PathBuf = path.into();
-    let mut digest = EMPTY_DIGEST;
-    let mut components = path.components();
-    while let Some(parent) = components.next_back() {
-      let parent = match &parent {
-        Component::Normal(p) => p,
-        x => {
-          return Err(
-            format!(
-              "Cannot add component \"{:?}\" of directory path `{}`.",
-              x,
-              path.display(),
-            )
-            .into(),
-          )
-        }
-      };
-      let mut dir_node = remexec::DirectoryNode::new();
-      dir_node.set_name(osstring_as_utf8(parent.to_os_string())?);
-      dir_node.set_digest((&digest).into());
-
-      let mut out_dir = remexec::Directory::new();
-      out_dir.set_directories(protobuf::RepeatedField::from_vec(vec![dir_node]));
-
-      digest = self.record_directory(&out_dir).await?;
-    }
-    Ok(digest)
+    self.add_prefix(EMPTY_DIGEST, path).await
   }
 }
 
