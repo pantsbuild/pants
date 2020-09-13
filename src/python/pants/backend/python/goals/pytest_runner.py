@@ -263,7 +263,7 @@ async def setup_pytest_for_target(
             execution_slot_variable=pytest.options.execution_slot_var,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
-            volatile=test_subsystem.force and not request.is_debug,
+            uncacheable=test_subsystem.force and not request.is_debug,
         ),
     )
     return TestSetup(process, results_file_name=results_file_name)

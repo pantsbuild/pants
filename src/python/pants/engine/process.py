@@ -347,17 +347,17 @@ class BinaryPaths(EngineAwareReturnType):
 
 
 @dataclass(frozen=True)
-class VolatileProcess:
-    """Ensures the wrapped Process will always be run and its cached results never re-used."""
+class UncacheableProcess:
+    """Ensures the wrapped Process will always be run and its results never re-used."""
 
     process: Process
 
 
 @rule
-async def make_process_volatile(volatile_process: VolatileProcess) -> Process:
+async def make_process_volatile(uncacheable_process: UncacheableProcess) -> Process:
     uuid = await Get(UUID, UUIDRequest())
 
-    process = volatile_process.process
+    process = uncacheable_process.process
     env = dict(process.env)
 
     env["__PANTS_FORCE_PROCESS_RUN__"] = str(uuid)
@@ -406,7 +406,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         # could be gone tomorrow. Ideally we'd only do this for local processes since all known
         # remoting configurations include a static container image as part of their cache key which
         # automatically avoids this problem.
-        VolatileProcess(
+        UncacheableProcess(
             Process(
                 description=f"Searching for `{request.binary_name}` on PATH={search_path}",
                 level=LogLevel.DEBUG,
