@@ -50,13 +50,15 @@ async def find_open_program(request: OpenFilesRequest, plat: Platform) -> OpenFi
     if plat == Platform.darwin:
         processes = [
             InteractiveProcess(
-                argv=(open_program_paths.first_path, *(str(f) for f in request.files)),
+                argv=(open_program_paths.first_path.path, *(str(f) for f in request.files)),
                 run_in_workspace=True,
             )
         ]
     else:
         processes = [
-            InteractiveProcess(argv=(open_program_paths.first_path, str(f)), run_in_workspace=True)
+            InteractiveProcess(
+                argv=(open_program_paths.first_path.path, str(f)), run_in_workspace=True
+            )
             for f in request.files
         ]
 

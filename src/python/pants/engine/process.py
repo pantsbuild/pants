@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import hashlib
 import logging
 from dataclasses import dataclass
 from textwrap import dedent
@@ -11,6 +12,7 @@ from uuid import UUID
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
+from pants.engine.internals.selectors import MultiGet
 from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
@@ -314,23 +316,64 @@ class InteractiveRunner:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathRequest:
+    """Request to find a binary of a given name.
+
+    If `test_args` are specified all binaries that are found will be executed with these args and
+    only those binaries whose test executions exit with return code 0 will be retained.
+    Additionally, if test execution includes stdout content, that will be used to fingerprint the
+    binary path so that upgrades and downgrades can be detected. A reasonable test for many programs
+    might be to pass `["--version"]` for `test_args` since it will both ensure the program runs and
+    also produce stdout text that changes upon upgrade or downgrade of the binary at the discovered
+    path.
+    """
+
     search_path: Tuple[str, ...]
     binary_name: str
+    test_args: Optional[Tuple[str, ...]]
 
-    def __init__(self, *, search_path: Iterable[str], binary_name: str) -> None:
+    def __init__(
+        self,
+        *,
+        search_path: Iterable[str],
+        binary_name: str,
+        test_args: Optional[Iterable[str]] = None,
+    ) -> None:
         self.search_path = tuple(OrderedSet(search_path))
         self.binary_name = binary_name
+        self.test_args = tuple(test_args or ())
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class BinaryPath:
+    path: str
+    fingerprint: str
+
+    def __init__(self, path: str, fingerprint: Optional[str] = None) -> None:
+        self.path = path
+        self.fingerprint = self._fingerprint() if fingerprint is None else fingerprint
+
+    @staticmethod
+    def _fingerprint(content: Optional[Union[bytes, bytearray, memoryview]] = None) -> str:
+        hasher = hashlib.sha256() if content is None else hashlib.sha256(content)
+        return hasher.hexdigest()
+
+    @classmethod
+    def fingerprinted(
+        cls, path: str, representative_content: Union[bytes, bytearray, memoryview]
+    ) -> "BinaryPath":
+        return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPaths(EngineAwareReturnType):
     binary_name: str
-    paths: Tuple[str, ...]
+    paths: Tuple[BinaryPath, ...]
 
-    def __init__(self, binary_name: str, paths: Iterable[str]):
+    def __init__(self, binary_name: str, paths: Optional[Iterable[BinaryPath]] = None):
         self.binary_name = binary_name
-        self.paths = tuple(OrderedSet(paths))
+        self.paths = tuple(OrderedSet(paths) if paths else ())
 
     def message(self) -> str:
         if not self.paths:
@@ -341,7 +384,7 @@ class BinaryPaths(EngineAwareReturnType):
         return found_msg
 
     @property
-    def first_path(self) -> Optional[str]:
+    def first_path(self) -> Optional[BinaryPath]:
         """Return the first path to the binary that was discovered, if any."""
         return next(iter(self.paths), None)
 
@@ -398,7 +441,6 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
     )
 
-    paths = []
     search_path = create_path_env_var(request.search_path)
     result = await Get(
         FallibleProcessResult,
@@ -416,10 +458,32 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             )
         ),
     )
-    if result.exit_code == 0:
-        paths.extend(result.stdout.decode().splitlines())
 
-    return BinaryPaths(binary_name=request.binary_name, paths=paths)
+    binary_paths = BinaryPaths(binary_name=request.binary_name)
+    if result.exit_code != 0:
+        return binary_paths
+
+    found_paths = result.stdout.decode().splitlines()
+    if not request.test_args:
+        return dataclasses.replace(binary_paths, paths=[BinaryPath(path) for path in found_paths])
+
+    results = await MultiGet(
+        Get(
+            FallibleProcessResult,
+            UncacheableProcess(
+                Process(argv=[path, *request.test_args], description=f"Test binary {path}.")
+            ),
+        )
+        for path in found_paths
+    )
+    return dataclasses.replace(
+        binary_paths,
+        paths=[
+            BinaryPath.fingerprinted(path, result.stdout)
+            for path, result in zip(found_paths, results)
+            if result.exit_code == 0
+        ],
+    )
 
 
 def rules():
