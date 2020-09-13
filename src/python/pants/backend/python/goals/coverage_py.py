@@ -3,6 +3,7 @@
 
 import configparser
 from dataclasses import dataclass
+from enum import Enum
 from io import StringIO
 from pathlib import PurePath
 from typing import List, Optional, Tuple, cast
@@ -25,7 +26,6 @@ from pants.core.goals.test import (
     CoverageDataCollection,
     CoverageReport,
     CoverageReports,
-    CoverageReportType,
     FilesystemCoverageReport,
 )
 from pants.engine.addresses import Address
@@ -66,6 +66,30 @@ when it generates the report, so we populate all the source files.
 
 Step 4: `test.py` outputs the final report.
 """
+
+
+class CoverageReportType(Enum):
+    CONSOLE = ("console", "report")
+    XML = ("xml", None)
+    HTML = ("html", None)
+    RAW = ("raw", None)
+    JSON = ("json", None)
+
+    _report_name: str
+
+    def __new__(cls, value: str, report_name: Optional[str] = None) -> "CoverageReportType":
+        member: "CoverageReportType" = object.__new__(cls)
+        member._value_ = value
+        member._report_name = report_name if report_name is not None else value
+        return member
+
+    @property
+    def report_name(self) -> str:
+        return self._report_name
+
+    @property
+    def value(self) -> str:
+        return cast(str, super().value)
 
 
 class CoverageSubsystem(PythonToolBase):
@@ -272,7 +296,7 @@ async def generate_coverage_reports(
         if report_type == CoverageReportType.RAW:
             coverage_reports.append(
                 FilesystemCoverageReport(
-                    report_type=CoverageReportType.RAW,
+                    report_type=CoverageReportType.RAW.value,
                     result_snapshot=result_snapshot,
                     directory_to_materialize_to=coverage_subsystem.output_dir,
                     report_file=coverage_subsystem.output_dir / ".coverage",
@@ -319,7 +343,7 @@ def _get_coverage_report(
     if report_type == CoverageReportType.CONSOLE:
         return ConsoleCoverageReport(result_stdout.decode())
 
-    report_file: Optional[PurePath] = None
+    report_file: Optional[PurePath]
     if report_type == CoverageReportType.HTML:
         report_file = output_dir / "htmlcov" / "index.html"
     elif report_type == CoverageReportType.XML:
@@ -330,7 +354,7 @@ def _get_coverage_report(
         raise ValueError(f"Invalid coverage report type: {report_type}")
 
     return FilesystemCoverageReport(
-        report_type=report_type,
+        report_type=report_type.value,
         result_snapshot=result_snapshot,
         directory_to_materialize_to=output_dir,
         report_file=report_file,
