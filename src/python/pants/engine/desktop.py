@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Tuple
@@ -64,7 +63,7 @@ async def find_open_program(request: OpenFilesRequest, plat: Platform) -> OpenFi
                 # to the various XDG_* environment variables, DISPLAY and other X11 variables are
                 # required. Instead of attempting to track all of these we just export the full user
                 # environment since this is not a cached process.
-                env=os.environ,
+                hermetic_env=False,
             )
             for f in request.files
         ]
