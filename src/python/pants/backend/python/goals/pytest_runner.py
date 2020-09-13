@@ -6,7 +6,6 @@ import logging
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Optional, Tuple
-from uuid import UUID
 
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
@@ -43,7 +42,6 @@ from pants.core.goals.test import (
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -253,17 +251,6 @@ async def setup_pytest_for_target(
 
     extra_env.update(test_extra_env.env)
 
-    if test_subsystem.force and not request.is_debug:
-        # This is a slightly hacky way to force the process to run: since the env var
-        #  value is unique, this input combination will never have been seen before,
-        #  and therefore never cached. The two downsides are:
-        #  1. This leaks into the test's environment, albeit with a funky var name that is
-        #     unlikely to cause problems in practice.
-        #  2. This run will be cached even though it can never be re-used.
-        # TODO: A more principled way of forcing rules to run?
-        uuid = await Get(UUID, UUIDRequest())
-        extra_env["__PANTS_FORCE_TEST_RUN__"] = str(uuid)
-
     process = await Get(
         Process,
         PexProcess(
@@ -276,6 +263,7 @@ async def setup_pytest_for_target(
             execution_slot_variable=pytest.options.execution_slot_var,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
+            uncacheable=test_subsystem.force and not request.is_debug,
         ),
     )
     return TestSetup(process, results_file_name=results_file_name)

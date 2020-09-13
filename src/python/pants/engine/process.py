@@ -6,10 +6,12 @@ import logging
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union
+from uuid import UUID
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
+from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
 from pants.util.frozendict import FrozenDict
@@ -344,13 +346,37 @@ class BinaryPaths(EngineAwareReturnType):
         return next(iter(self.paths), None)
 
 
+@dataclass(frozen=True)
+class UncacheableProcess:
+    """Ensures the wrapped Process will always be run and its results never re-used."""
+
+    process: Process
+
+
+@rule
+async def make_process_uncacheable(uncacheable_process: UncacheableProcess) -> Process:
+    uuid = await Get(UUID, UUIDRequest())
+
+    process = uncacheable_process.process
+    env = dict(process.env)
+
+    # This is a slightly hacky way to force the process to run: since the env var
+    #  value is unique, this input combination will never have been seen before,
+    #  and therefore never cached. The two downsides are:
+    #  1. This leaks into the process' environment, albeit with a funky var name that is
+    #     unlikely to cause problems in practice.
+    #  2. This run will be cached even though it can never be re-used.
+    # TODO: A more principled way of forcing rules to run?
+    env["__PANTS_FORCE_PROCESS_RUN__"] = str(uuid)
+
+    return dataclasses.replace(process, env=FrozenDict(env))
+
+
 @rule(desc="Find binary path", level=LogLevel.DEBUG)
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # TODO(John Sirois): Replace this script with a statically linked native binary so we don't
     #  depend on either /bin/bash being available on the Process host.
-    # TODO(#10507): Running the script directly from a shebang sometimes results in a "Text file
-    #  busy" error.
-    #
+
     # Note: the backslash after the """ marker ensures that the shebang is at the start of the
     # script file. Many OSs will not see the shebang if there is intervening whitespace.
     script_path = "./script.sh"
@@ -376,12 +402,18 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     search_path = create_path_env_var(request.search_path)
     result = await Get(
         FallibleProcessResult,
-        Process(
-            description=f"Searching for `{request.binary_name}` on PATH={search_path}",
-            level=LogLevel.DEBUG,
-            input_digest=script_digest,
-            argv=[script_path, request.binary_name],
-            env={"PATH": search_path},
+        # We use a volatile process to force re-run since any binary found on the host system today
+        # could be gone tomorrow. Ideally we'd only do this for local processes since all known
+        # remoting configurations include a static container image as part of their cache key which
+        # automatically avoids this problem.
+        UncacheableProcess(
+            Process(
+                description=f"Searching for `{request.binary_name}` on PATH={search_path}",
+                level=LogLevel.DEBUG,
+                input_digest=script_digest,
+                argv=[script_path, request.binary_name],
+                env={"PATH": search_path},
+            )
         ),
     )
     if result.exit_code == 0:
