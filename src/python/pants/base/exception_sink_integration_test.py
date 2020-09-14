@@ -32,8 +32,6 @@ Exception message:.* 1 Exception encountered:
   ResolveError: 'this-target-does-not-exist' was not found in namespace '{namespace}'\\. Did you mean one of:
 """,
         )
-        # Ensure we write all output such as stderr and reporting files before closing any streams.
-        self.assertNotIn("Exception message: I/O operation on closed file.", file_contents)
 
     def _get_log_file_paths(self, workdir, pid):
         pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=workdir)
@@ -135,8 +133,6 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
                 pid=pid, signum=signum, signame=signame
             ),
         )
-        # Ensure we write all output such as stderr and reporting files before closing any streams.
-        self.assertNotIn("Exception message: I/O operation on closed file.", contents)
 
     def test_dumps_logs_on_signal(self):
         """Send signals which are handled, but don't get converted into a KeyboardInterrupt."""

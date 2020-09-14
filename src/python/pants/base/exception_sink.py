@@ -79,6 +79,12 @@ class SignalHandler:
             self.traceback_lines = traceback.format_stack()
             super(SignalHandler.SignalHandledNonLocalExit, self).__init__()
 
+            if "I/O operation on closed file" in self.traceback_lines:
+                logger.debug(
+                    "SignalHandledNonLocalExit: unexpected appearance of "
+                    "'I/O operation on closed file' in traceback"
+                )
+
     def handle_sigquit(self, signum, _frame):
         ExceptionSink._signal_sent = signum
         raise self.SignalHandledNonLocalExit(signum, "SIGQUIT")
