@@ -12,8 +12,10 @@ use futures::future;
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
+use crate::externs;
 use crate::nodes::{NodeKey, Select, Visualizer};
 
+use cpython::Python;
 use graph::{InvalidationResult, LastObserved};
 use log::{debug, info, warn};
 use parking_lot::Mutex;
@@ -459,6 +461,7 @@ impl Scheduler {
     &self,
     request: &ExecutionRequest,
     session: &Session,
+    python_signal_fn: Value,
   ) -> Result<Vec<Result<Value, Failure>>, ExecutionTermination> {
     debug!(
       "Launching {} roots (poll={}).",
@@ -474,7 +477,13 @@ impl Scheduler {
     session.maybe_display_initialize(&self.core.executor, &sender);
     self.execute_helper(request, session, sender);
     let result = loop {
-      match receiver.recv_timeout(Self::refresh_delay(interval, deadline)) {
+      let execution_event = receiver.recv_timeout(Self::refresh_delay(interval, deadline));
+
+      if let Some(termination) = maybe_break_execution_loop(&python_signal_fn) {
+        return Err(termination);
+      }
+
+      match execution_event {
         Ok(ExecutionEvent::Completed(res)) => {
           // Completed successfully.
           break Ok(Self::execute_record_results(&request.roots, &session, res));
@@ -510,6 +519,36 @@ impl Scheduler {
       .and_then(|deadline| deadline.checked_duration_since(Instant::now()))
       .map(|duration_till_deadline| std::cmp::min(refresh_interval, duration_till_deadline))
       .unwrap_or(refresh_interval)
+  }
+}
+
+fn maybe_break_execution_loop(python_signal_fn: &Value) -> Option<ExecutionTermination> {
+  match externs::call_function(&python_signal_fn, &[]) {
+    Ok(value) => {
+      if externs::is_truthy(&value) {
+        Some(ExecutionTermination::KeyboardInterrupt)
+      } else {
+        None
+      }
+    }
+    Err(mut e) => {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      if e
+        .instance(py)
+        .cast_as::<cpython::exc::KeyboardInterrupt>(py)
+        .is_ok()
+      {
+        Some(ExecutionTermination::KeyboardInterrupt)
+      } else {
+        let failure = Failure::from_py_err(py, e);
+        std::mem::drop(gil);
+        Some(ExecutionTermination::Fatal(format!(
+          "Error when checking Python signal state: {}",
+          failure
+        )))
+      }
+    }
   }
 }
 

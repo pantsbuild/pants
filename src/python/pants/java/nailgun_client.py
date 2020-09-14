@@ -43,7 +43,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
         self._exit_timeout = None
         self._exit_reason = None
 
-    def _set_exit_timeout(self, timeout, reason):
+    def _set_exit_timeout(self, timeout: float, reason: type) -> None:
         """Set a timeout for the remainder of the session, along with an exception to raise. which
         is implemented by NailgunProtocol.
 
@@ -245,7 +245,7 @@ class NailgunClient:
         else:
             return sock
 
-    def set_exit_timeout(self, timeout, reason):
+    def set_exit_timeout(self, timeout: float, reason: type) -> None:
         """Expose the inner session object's exit timeout setter."""
         self._session._set_exit_timeout(timeout, reason)
 

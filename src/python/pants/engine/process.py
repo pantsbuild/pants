@@ -309,7 +309,7 @@ class InteractiveRunner:
     _scheduler: "SchedulerSession"
 
     def run(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        ExceptionSink.toggle_ignoring_sigint_v2_engine(True)
+        ExceptionSink.toggle_ignoring_sigint(True)
         return self._scheduler.run_local_interactive_process(request)
 
 
