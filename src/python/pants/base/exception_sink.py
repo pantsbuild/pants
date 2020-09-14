@@ -314,16 +314,19 @@ class ExceptionSink:
             cls.reset_signal_handler(previous_signal_handler)
 
     @classmethod
-    def toggle_ignoring_sigint(cls, toggle: bool) -> None:
-        """This method is used to temporarily disable responding to the SIGINT signal sent by a
-        Ctrl-C in the terminal.
+    @contextmanager
+    def ignoring_sigint(cls) -> Iterator[None]:
+        """This method provides a context that temporarily disables responding to the SIGINT signal
+        sent by a Ctrl-C in the terminal.
 
         We currently only use this to implement disabling catching SIGINT while an
         InteractiveProcess is running (where we want that process to catch it), and only when pantsd
         is not enabled (if pantsd is enabled, the client will actually catch SIGINT and forward it
         to the server, so we don't want the server process to ignore it.
         """
-        cls._signal_handler._toggle_ignoring_sigint(toggle)
+        cls._signal_handler._toggle_ignoring_sigint(True)
+        yield
+        cls._signal_handler._toggle_ignoring_sigint(False)
 
     @classmethod
     def _iso_timestamp_for_now(cls):
