@@ -37,7 +37,7 @@ If a user makes a request to the engine that does not have a corresponding `Quer
 
 The `Param`s that are available to a `Rule` are made available by the `Rule`'s dependees (its "callers"), but similar to how `Rule`s are not called by name, neither are all of their `Param`s passed explicitly at each use site. A `Rule` will be used to compute the output value for a `DependencyKey`: i.e., a positional argument, `Get` result, or `Query` result. Of these usage sites, only `Query` specifies the complete set of `Params` that will be available: the other two usages (positional arguments and `Get`s) are able to use any Param that will be "in scope" at the use site.
 
-`Params` flow down the graph from `Query`s and the provided `Param`s of `Get`s: their presence does not need to be re-declared at each intermediate callsite, and so a `Param` injected into a subgraph by a `Query` or `Get` is available to a consumer arbitrarily deep in that subgraph.
+`Params` flow down the graph from `Query`s and the provided `Param`s of `Get`s: their presence does not need to be re-declared at each intermediate callsite. When a `Rule` consumes a `Param` as a positional argument, that `Param` will no longer be available to that `Rule`'s dependencies (but it might still be present in other subgraphs adjacent to that `Rule`).
 
 ## Goals
 
@@ -49,9 +49,16 @@ If either of the goals were removed, `RuleGraph` construction might be more stra
 1. If rather than being type-driven, `Rule`s called one another by name, you could statically determine their input `Params` by walking the call graph of `Rule`s by name, and collecting their transitive input `Params`.
 2. If rather than needing to compute a minimum set of `Param` inputs for the memoization key, we instead required that all usage sites explicitly declared all `Param`s that their dependencies might need, we could relatively easily eliminate candidates based on the combination of `Param` types at a use site. And if we were willing to have very large memoization keys, we could continue to have simple callsites, but skip pruning the `Params` that pass from a dependee to a dependency at runtime, and include any `Params` declared in any of a `Rule`s transitive dependees to be part of its identity.
 
-But both of the goals are important, because together they allow for an API that is* (should be: see the "Issue Overview" section) very easy to write `Rule`s for, with minimal boilerplate required to get the inputs needed for a `Rule` to compute a value, and minimal invalidation. Because the identity of a `Rule` is computed from its transitive input `Param`s rather than from its positional arguments, `Rule`s can accept arbitrarily-many large input values (which don't need to implement hash) with no impact on its memoization hit rate.
+But both of the goals are important because together they allow for an API that is easy to write `Rule`s for, with minimal boilerplate required to get the inputs needed for a `Rule` to compute a value, and minimal invalidation. Because the identity of a `Rule` is computed from its transitive input `Param`s rather than from its positional arguments, `Rule`s can accept arbitrarily-many large input values (which don't need to implement hash) with no impact on its memoization hit rate.
 
-On the other hand, we _are_ willing to add constraints in order to make the graph easier to compute. For example, one constraint (which aligns reasonably well with user's expectations) is that only `Rule` dependencies that use the input `Param` of a `Get` are eligible to be used: so a `Get(X, Y)` (`Get` an output type of `X` for an input type of `Y`) will only be satisfied by a subgraph that actually consumes `Y`.
+## Constraints
+
+There are a few constraints that decide which `Rule`s are able to provide dependencies for one another:
+* `param_consumption` - When a `Rule` directly uses a `Param` as a positional argument, that `Param` is removed from scope for any of that `Rule`'s dependencies.
+    * For example, for a `Rule` `y` with a positional argument `A` and a `Get(B, C)`: if there is a `Param` `A` in scope at `y` and it is used to satisfy the positional argument, it cannot also be used to (transitively) to satisfy the `Get(B, C)` (i.e., a hyptothetical rule that consumes both `A` and `C` would not be eligible in that position).
+    * On the other hand, for a `Rule` `w` with `Get(B, C)` and `Get(D, E)`, if there is a `Param` `A` in scope at `w`, two dependency `Rule`s that consume `A` (transitively) _can_ be used to satisfy those `Get`s. Only consuming a `Param` as a positional argument removes it from scope.
+* `provided_params` - When deciding whether one `Rule` can use another `Rule` to provide the output type of a `Get`, a constraint is applied that the candidate depedency must (transitively) consume the `Param` that is provided by the `Get`.
+    * For example: if a `Rule` `z` has a `Get(A, B)`, only `Rule`s that compute an `A` and (transitively) consume a `B` are eligible to be used. This also means that a `Param` `A` which is already in scope for `Rule` `z` is not eligible to be used, because it would trivially not consume `B`.
 
 ## Implementation
 
@@ -59,118 +66,13 @@ As of [3a188a1e06](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d
 
 The construction algorithm is broken up into phases:
 
-1. [initial_polymorphic](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/builder.rs#L221) - Building a polymorphic graph, where all `Rule`s or `Param`s that compute a particular output type are included, but without regard for which `Param`s are available at the use site. This phase will fail fast if no `Query` or `Get` anywhere in the graph provides a particular `Param` type. During this phase nodes may have multiple dependency edges per `DependencyKey`, which is what makes them "polymorphic": each of the possible ways to compute a dependency will likely have different input `Param` requirements, and each node in this phase represents all of them.
-2. [live_param_labeled](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/builder.rs#L749-L754) - Run [live variable analysis](https://en.wikipedia.org/wiki/Live_variable_analysis) on the polymorphic graph to compute the initial set of `Params` used by each node in the graph. Because nodes in the polymorphic graph have references to all possible sources of a particular dependency type, the computed set is conservative (i.e., overly large).
+1. [initial_polymorphic](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/builder.rs#L221) - Builds a polymorphic graph while computing an "out-set" for each node in the graph by accounting for which `Param`s are available at each use site. During this phase nodes may have multiple dependency edges per `DependencyKey`, which is what makes them "polymorphic". Each of the possible ways to compute a dependency will likely have different input `Param` requirements, and each node in this phase represents all of those possibilities.
+2. [live_param_labeled](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/builder.rs#L749-L754) - Run [live variable analysis](https://en.wikipedia.org/wiki/Live_variable_analysis) on the polymorphic graph to compute the initial "in-set" of `Params` used by each node in the graph. Because nodes in the polymorphic graph have references to all possible sources of a particular dependency type, the computed set is conservative (i.e., overly large).
     * For example: if a `Rule` `x` has exactly one `DependencyKey`, but there are two potential dependencies to provide that `DependencyKey` with input `Param`s `{A,B}` and `{B,C}` (respectively), then at this phase the input `Param`s for `x` must be the union of all possibilities: `{A,B,C}`.
     * If we were to stop `RuleGraph` construction at this phase, it would be necessary to do a form of [dynamic dispatch](https://en.wikipedia.org/wiki/Dynamic_dispatch) at runtime to decide which source of a dependency to use based on the `Param`s that were currently in scope. And the sets of `Param`s used in the memoization key for each `Rule` would still be overly large, causing excess invalidation.
-3. [monomorphize](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/builder.rs#L325-L353) - "Monomorphize" the polymorphic graph by using the in/out sets initialized during live variable analysis to partition nodes (and their dependees) for each valid combination of their dependencies. Combinations of depedencies that would be invalid (because a dependency's in-set does not consume a provided `Param`, or consumes a `Param` that isn't present in the out-set) are not generated, which causes some pruning of the graph to happen during this phase. Unfortunately, this phase remains the most complicated: while it is implemented using an algorithm similar to live variable analysis, the fit isn't perfect, and so there is a special case to break out of fruitless loops: see the "splits" TODO in `fn monomorphize`.
+3. [monomorphize](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/builder.rs#L325-L353) - "Monomorphize" the polymorphic graph by using the out-set of available `Param`s (initialized during `initial_polymorphic`) and the in-set of consumed `Param`s (computed during `live_param_labeled`) to partition nodes (and their dependees) for each valid combination of their dependencies. Combinations of dependencies that would be invalid (see the Constraints section) are not generated, which causes some pruning of the graph to happen during this phase.
     * Continuing the example from above: the goal of monomorphize is to create one copy of `Rule` `x` per legal combination of its `DependencyKey`. Assuming that both of `x`'s dependencies remain legal (i.e. that all of `{A,B,C}` are still in scope in the dependees of `x`, etc), then two copies of `x` will be created: one that uses the first dependency and has an in-set of `{A,B}`, and another that uses the second dependency and has an in-set of `{B,C}`.
 4. [prune_edges](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/builder.rs#L836-L845) - Once the monomorphic graph has [converged](https://en.wikipedia.org/wiki/Data-flow_analysis#Convergence), each node in the graph will ideally have exactly one source of each `DependencyKey` (with the exception of `Query`s, which are not monomorphized). This phase validates that, and chooses the smallest input `Param` set to use for each `Query`. In cases where a node has more that one dependency per `DependencyKey`, it is because given a particular set of input `Params` there was more than one valid way to compute a dependency. This can happen either because there were too many `Param`s in scope, or because there were multiple `Rule`s with the same `Param` requirements.
-    * This phase is the second phase that renders errors. If a node has too many sources of a `DependencyKey`, this phase will recurse to attempt to locate the node in the `Rule` graph where the ambiguity was introduced. Likewise, if a node has no source of a `DependencyKey`, this phase will recurse on deleted nodes (which are preserved by `monomorphize`) to attempt to locate the bottom-most `Rule` that was missing a `DependencyKey`.
-5. [finalize](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/builder.rs#L1064-L1068) - Once the graph is known to be valid, generate the final static `RuleGraph` for all `Rule`s reachable from `Query`s.
-
-## Issue Overview
-
-As mentioned above, the "monomorphize" phase (which might be a misnomer: references to prior art/names appreciated!) of rule graph construction needs further work. While the live variable analysis phase is fully cycle tolerant, monomorphization does not always [converge](https://en.wikipedia.org/wiki/Data-flow_analysis#Convergence) in the presence of cycles, meaning that without special casing, nodes can split fruitlessly in loops.
-
-Cycles/loops are in general supported by the rule graph via recursion. Both simple and mutual recursion (written using the high level @rule syntax) converge without any special casing in monomorphize: 
-
-```
-@rule
-async def fibonacci(n: int) -> Fibonacci:
-    if n < 2:
-        return Fibonacci(n)
-    x, y = await Get(Fib, int(n - 2)), await Get(Fib, int(n - 1))
-    return Fibonacci(x.val + y.val)
-```
-
-```
-@rule
-async def is_even(n: int) -> IsEven:
-    ...
-
-@rule
-async def is_odd(n: int) -> IsEven:
-    ...
-```
-
-But as the set of rules in Pants has grown, more cycles have made their way into graphs: the base set of rules (with no plugins loaded) contains some [irreducible](https://arcb.csc.ncsu.edu/~mueller/ftp/pub/mueller/papers/toplas2184.pdf) loops containing ten to twenty nodes with multiple loop headers. Examples (with external entrypoints filtered out): [one](https://gist.github.com/stuhood/568413333a9e4785a2f60928d3c02067), [two](https://gist.github.com/stuhood/5ee7d45d4f94674968e13b7fc34f9b6b).
-
-The special case mentioned above to break out of monomorphize if it is not converging allows us to successfully construct graphs for most of these dozen-node cases (relatively quickly: 4000 node visits to construct a 450 node output graph), but larger cases can take exponentially longer, and the special case causes us to break out with errors in cases that should be resolvable.
-
-### Example
-
-One minimal problematic testcase (`fn wide_cycle` in `src/rust/engine/rule_graph/src/tests.rs`) looks like:
-```
-@rule
-async def sao() -> A:
-    .. = Get(AWO, AS, ..)
-    .. = Get(AWO, FS, ..)
-
-@rule
-async def awofs(fs: FS) -> AWO:
-    ...
-
-@rule
-async def awoas(as: AS, a: A) -> AWO:
-    ...
-```
-... which results in a polymorphic graph that looks like:
-```
-// initial polymorphic:
-digraph {
-    0 [label="Query(A for )"]
-    1 [label="Rule(\"sao\", [DependencyKey(\"AWO\", Some(\"AS\")), DependencyKey(\"AWO\", Some(\"FS\"))])"]
-    2 [label="Rule(\"awofs\", [DependencyKey(\"FS\", None)])"]
-    3 [label="Rule(\"awoas\", [DependencyKey(\"AS\", None), DependencyKey(\"A\", None)])"]
-    4 [label="Param(AS)"]
-    5 [label="Param(FS)"]
-    0 -> 1 [label="DependencyKey(\"A\", None)"]
-    1 -> 2 [label="DependencyKey(\"AWO\", Some(\"AS\"))"]
-    1 -> 3 [label="DependencyKey(\"AWO\", Some(\"AS\"))"]
-    1 -> 2 [label="DependencyKey(\"AWO\", Some(\"FS\"))"]
-    1 -> 3 [label="DependencyKey(\"AWO\", Some(\"FS\"))"]
-    3 -> 4 [label="DependencyKey(\"AS\", None)"]
-    3 -> 1 [label="DependencyKey(\"A\", None)"]
-    2 -> 5 [label="DependencyKey(\"FS\", None)"]
-}
-```
-
-If you were to hand-solve this graph, you'd end up with:
-```
-// hand solved
-digraph {
-    0 [label="Query(A for )"]
-    1 [label="Rule(\"sao\", [DependencyKey(\"AWO\", Some(\"AS\")), DependencyKey(\"AWO\", Some(\"FS\"))])"]
-    2 [label="Rule(\"awofs\", [DependencyKey(\"FS\", None)])"]
-    3 [label="Rule(\"awoas\", [DependencyKey(\"AS\", None), DependencyKey(\"A\", None)])"]
-    4 [label="Param(AS)"]
-    5 [label="Param(FS)"]
-    0 -> 1 [label="DependencyKey(\"A\", None)"]
-    // Eliminated because the target does not consume `AS`.
-    1 -> 2 [label="DependencyKey(\"AWO\", Some(\"AS\"))" color="red"]
-    1 -> 3 [label="DependencyKey(\"AWO\", Some(\"AS\"))"]
-    1 -> 2 [label="DependencyKey(\"AWO\", Some(\"FS\"))"]
-    // Eliminated because although the target does transitively consume `FS`
-    // (via awoas->sao->awofs->FS) it consumes the instance that is provided on
-    // the `sao->awofs` edge, rather than the instance provided here.
-    1 -> 3 [label="DependencyKey(\"AWO\", Some(\"FS\"))" color="red"]
-    3 -> 4 [label="DependencyKey(\"AS\", None)"]
-    3 -> 1 [label="DependencyKey(\"A\", None)"]
-    2 -> 5 [label="DependencyKey(\"FS\", None)"]
-}
-```
-
-But (likely) due to how we special case (see the "splits" TODO) the breaking of cycles, the graph does not end up properly pruned.
-
-### Possible Angles
-
-#### Monotonicity vs Global Information
-
-It is unclear precisely what factors the monomorphize phase should use on a node-by-node basis to decide whether a node should be split or whether to noop. The implementation started out similar to live variable analysis, which is expected to be monotonic and converge (meaning that the in/out sets would get smaller/larger over time in a lattice). The [special casing we've introduced](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/builder.rs#L386-L397) around "giving up" when a node would attempt a split that we had previously recorded attempts to use global information to decide that further splitting is fruitless, but it's possible that there is a cycle-safe way to inspect a set of nodes that have stabilized?
-
-We've also explored converting our irreducible loops to reducible loops using [Janssen/Corporaal](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.46.3925&rep=rep1&type=pdf), but the reducible graph does not appear to converge more quickly. It's possible that some property of a [dominator tree](https://en.wikipedia.org/wiki/Dominator_(graph_theory)) would help here? Being able to differentiate "back" edges might allow for better local information.
-
-#### Adjusting Phases
-
-It's possible that rather than generating a polymorphic graph as a first step, that there is a viable strategy for directly generating a monomorphic graph without regard for requirements, and then running live variable analysis on that before pruning. The challenge with this though seems to be the same as the challenge with dynamically splitting nodes during monomorphize: deciding how many times to split the nodes of a cycle.
+    * This phase is the only phase that renders errors: all of the other phases mark nodes and edges "deleted" for particular reasons, and this phase consumes that record. A node that has been deleted indicates that that node is unsatisfiable for some reason, while an edge that has been deleted indicates that the source node was not able to consume the target node for some reason.
+    * If a node has too many sources of a `DependencyKey`, this phase will recurse to attempt to locate the node in the `Rule` graph where the ambiguity was introduced. Likewise, if a node has no source of a `DependencyKey`, this phase will recurse on deleted nodes (which are preserved by the other phases) to attempt to locate the bottom-most `Rule` that was missing a `DependencyKey`.
+5. [finalize](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/builder.rs#L1064-L1068) - After `prune_edges` the graph is known to be valid, and this phase generates the final static `RuleGraph` for all `Rule`s reachable from `Query`s.
