@@ -6,6 +6,7 @@ import functools
 import itertools
 import logging
 from dataclasses import dataclass
+from textwrap import dedent
 from typing import (
     FrozenSet,
     Iterable,
@@ -27,7 +28,11 @@ from pants.backend.python.target_types import PythonPlatforms as PythonPlatforms
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
-from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexRuntimeEnvironment
+from pants.backend.python.util_rules.pex_environment import (
+    PexEnvironment,
+    PexRuntimeEnvironment,
+    PythonExecutable,
+)
 from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
@@ -336,6 +341,15 @@ class PexRequest:
         self.entry_point = entry_point
         self.additional_args = tuple(additional_args)
         self.description = description
+        self.__post_init__()
+
+    def __post_init__(self):
+        if self.internal_only and self.platforms:
+            raise ValueError(
+                "Internal only PEXes can only constrain interpreters with interpreter_constraints."
+                f"Given platform constraints {self.platforms} for internal only pex request: "
+                f"{self}."
+            )
 
 
 @dataclass(frozen=True)
@@ -359,7 +373,7 @@ class Pex:
 
     digest: Digest
     name: str
-    internal_only: bool
+    python: Optional[PythonExecutable]
 
 
 @dataclass(frozen=True)
@@ -374,6 +388,49 @@ class TwoStepPex:
 
 
 logger = logging.getLogger(__name__)
+
+
+@rule
+async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -> PythonExecutable:
+    process = await Get(
+        Process,
+        PexCliProcess(
+            description=f"Find interpreter for constraints: {interpreter_constraints}",
+            # Here we run the Pex CLI with no requirements which just selects an interpreter and
+            # normally starts an isolated repl. By passing `--` we force the repl to instead act as
+            # an interpreter (the selected one) and tell us about itself. The upshot is we run the
+            # Pex interpreter selection logic unperturbed but without resolving any distributions.
+            argv=(
+                *interpreter_constraints.generate_pex_arg_list(),
+                "--",
+                "-c",
+                # N.B.: The following code snippet must be compatible with Python 2.7 and
+                # Python 3.5+.
+                dedent(
+                    """\
+                    import hashlib
+                    import os
+                    import sys
+
+                    python = os.path.realpath(sys.executable)
+                    print(python)
+
+                    hasher = hashlib.sha256()
+                    with open(python, "rb") as fp:
+                      # We pick 8192 for efficiency of reads and fingerprint updates
+                      # (writes) since it's a common OS buffer size and an even
+                      # multiple of the hash block size.
+                      for chunk in iter(lambda: fp.read(8192), b""):
+                          hasher.update(chunk)
+                    print(hasher.hexdigest())
+                    """
+                ),
+            ),
+        ),
+    )
+    result = await Get(ProcessResult, UncacheableProcess(process))
+    path, fingerprint = result.stdout.decode().strip().splitlines()
+    return PythonExecutable(path=path, fingerprint=fingerprint)
 
 
 @rule(level=LogLevel.DEBUG)
@@ -399,14 +456,15 @@ async def create_pex(
         *request.additional_args,
     ]
 
-    if request.internal_only:
-        # This will result in a faster build, but worse compatibility at runtime.
-        argv.append("--use-first-matching-interpreter")
-
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
     # flags are mutually exclusive. See https://github.com/pantsbuild/pex/issues/957.
-    if request.platforms:
+    python: Optional[PythonExecutable] = None
+    if request.internal_only:
+        python = await Get(
+            PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints
+        )
+    elif request.platforms:
         # TODO(#9560): consider validating that these platforms are valid with the interpreter
         #  constraints.
         argv.extend(request.platforms.generate_pex_arg_list())
@@ -479,6 +537,7 @@ async def create_pex(
     process = await Get(
         Process,
         PexCliProcess(
+            python=python,
             argv=argv,
             additional_input_digest=merged_digest,
             description=description,
@@ -501,11 +560,7 @@ async def create_pex(
         if log_output:
             logger.info("%s", log_output)
 
-    return Pex(
-        digest=result.output_digest,
-        name=request.output_filename,
-        internal_only=request.internal_only,
-    )
+    return Pex(digest=result.output_digest, name=request.output_filename, python=python)
 
 
 @rule(level=LogLevel.DEBUG)
@@ -599,9 +654,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
     argv = pex_environment.create_argv(
         f"./{request.pex.name}",
         *request.argv,
-        # If the Pex isn't distributed to users, then we must use the shebang because we will have
-        # used the flag `--use-first-matching-interpreter`, which requires running via shebang.
-        always_use_shebang=request.pex.internal_only,
+        python=request.pex.python,
     )
     env = {**pex_environment.environment_dict, **(request.extra_env or {})}
     process = Process(

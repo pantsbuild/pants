@@ -315,32 +315,43 @@ class InteractiveRunner:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
+class BinaryPathTest:
+    args: Tuple[str, ...]
+    fingerprint_stdout: bool
+
+    def __init__(self, args: Iterable[str], fingerprint_stdout: bool = True) -> None:
+        self.args = tuple(args)
+        self.fingerprint_stdout = fingerprint_stdout
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class BinaryPathRequest:
     """Request to find a binary of a given name.
 
-    If `test_args` are specified all binaries that are found will be executed with these args and
+    If a `test` is specified all binaries that are found will be executed with the test args and
     only those binaries whose test executions exit with return code 0 will be retained.
     Additionally, if test execution includes stdout content, that will be used to fingerprint the
     binary path so that upgrades and downgrades can be detected. A reasonable test for many programs
-    might be to pass `["--version"]` for `test_args` since it will both ensure the program runs and
+    might be `BinaryPathTest(args=["--version"])` since it will both ensure the program runs and
     also produce stdout text that changes upon upgrade or downgrade of the binary at the discovered
     path.
     """
 
     search_path: Tuple[str, ...]
     binary_name: str
-    test_args: Optional[Tuple[str, ...]]
+    test: Optional[BinaryPathTest]
 
     def __init__(
         self,
         *,
         search_path: Iterable[str],
         binary_name: str,
-        test_args: Optional[Iterable[str]] = None,
+        test: Optional[BinaryPathTest] = None,
     ) -> None:
         self.search_path = tuple(OrderedSet(search_path))
         self.binary_name = binary_name
-        self.test_args = tuple(test_args or ())
+        self.test = test
 
 
 @frozen_after_init
@@ -464,7 +475,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         return binary_paths
 
     found_paths = result.stdout.decode().splitlines()
-    if not request.test_args:
+    if not request.test:
         return dataclasses.replace(binary_paths, paths=[BinaryPath(path) for path in found_paths])
 
     results = await MultiGet(
@@ -474,7 +485,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 Process(
                     description=f"Test binary {path}.",
                     level=LogLevel.DEBUG,
-                    argv=[path, *request.test_args],
+                    argv=[path, *request.test.args],
                 )
             ),
         )
@@ -484,6 +495,8 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         binary_paths,
         paths=[
             BinaryPath.fingerprinted(path, result.stdout)
+            if request.test.fingerprint_stdout
+            else BinaryPath(path, result.stdout.decode())
             for path, result in zip(found_paths, results)
             if result.exit_code == 0
         ],
