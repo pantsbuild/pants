@@ -133,8 +133,8 @@ class RunTracker(Subsystem):
             default=[],
             help="Option scopes to record in stats on run completion. "
             "Options may be selected by joining the scope and the option with a ^ character, "
-            "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass "
-            "`GLOBAL^pantsd`, add a '*' to the list to capture all known scopes",
+            "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "
+            "Add a '*' to the list to capture all known scopes.",
         )
 
     def __init__(self, *args, **kwargs):
