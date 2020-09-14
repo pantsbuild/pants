@@ -100,11 +100,16 @@ class ExceptionSink:
     # NB: see the bottom of this file where we call reset_log_location() and other mutators in order
     # to properly setup global state.
     _log_dir = None
+
     # Where to log stacktraces to in a SIGUSR2 handler.
     _interactive_output_stream = None
+
     # Whether to print a stacktrace in any fatal error message printed to the terminal.
     _should_print_backtrace_to_terminal = True
 
+    # An instance of `SignalHandler` which is invoked to handle a static set of specific
+    # nonfatal signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they
+    # don't need to exit immediately).
     _signal_handler: SignalHandler = SignalHandler(pantsd_instance=False)
 
     # These persistent open file descriptors are kept so the signal handler can do almost no work

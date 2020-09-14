@@ -346,10 +346,10 @@ pub fn call_function(func: &Value, args: &[Value]) -> Result<PyObject, PyErr> {
 
 pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
   let output = call_function(func, args);
-  let gil = Python::acquire_gil();
-  output
-    .map(Value::from)
-    .map_err(|py_err| Failure::from_py_err(gil.python(), py_err))
+  output.map(Value::from).map_err(|py_err| {
+    let gil = Python::acquire_gil();
+    Failure::from_py_err(gil.python(), py_err)
+  })
 }
 
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
