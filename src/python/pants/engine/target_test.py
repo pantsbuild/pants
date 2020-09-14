@@ -724,8 +724,10 @@ def test_dict_string_to_string_field() -> None:
     class Example(DictStringToStringField):
         alias = "example"
 
-    addr = Address.parse(":example")
+    addr = Address("", target_name="example")
 
+    assert Example(None, address=addr).value is None
+    assert Example({}, address=addr).value == FrozenDict()
     assert Example({"hello": "world"}, address=addr).value == FrozenDict({"hello": "world"})
 
     def assert_invalid_type(raw_value: Any) -> None:
@@ -734,6 +736,14 @@ def test_dict_string_to_string_field() -> None:
 
     for v in [0, object(), "hello", ["hello"], {"hello": 0}, {0: "world"}]:
         assert_invalid_type(v)
+
+    # Regression test that a default can be set.
+    class ExampleDefault(DictStringToStringField):
+        alias = "example"
+        # Note that we use `FrozenDict` so that the object can be hashable.
+        default = FrozenDict({"default": "val"})
+
+    assert ExampleDefault(None, address=addr).value == FrozenDict({"default": "val"})
 
 
 def test_dict_string_to_string_sequence_field() -> None:
@@ -756,6 +766,14 @@ def test_dict_string_to_string_sequence_field() -> None:
 
     for v in [0, object(), "hello", ["hello"], {"hello": "world"}, {0: ["world"]}]:
         assert_invalid_type(v)
+
+    # Regression test that a default can be set.
+    class ExampleDefault(DictStringToStringSequenceField):
+        alias = "example"
+        # Note that we use `FrozenDict` so that the object can be hashable.
+        default = FrozenDict({"default": ("val",)})
+
+    assert ExampleDefault(None, address=addr).value == FrozenDict({"default": ("val",)})
 
 
 # -----------------------------------------------------------------------------------------------
