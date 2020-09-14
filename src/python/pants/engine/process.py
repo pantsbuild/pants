@@ -471,7 +471,11 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         Get(
             FallibleProcessResult,
             UncacheableProcess(
-                Process(argv=[path, *request.test_args], description=f"Test binary {path}.")
+                Process(
+                    description=f"Test binary {path}.",
+                    level=LogLevel.DEBUG,
+                    argv=[path, *request.test_args],
+                )
             ),
         )
         for path in found_paths
