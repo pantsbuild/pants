@@ -324,9 +324,12 @@ class ExceptionSink:
         is not enabled (if pantsd is enabled, the client will actually catch SIGINT and forward it
         to the server, so we don't want the server process to ignore it.
         """
-        cls._signal_handler._toggle_ignoring_sigint(True)
-        yield
-        cls._signal_handler._toggle_ignoring_sigint(False)
+
+        try:
+            cls._signal_handler._toggle_ignoring_sigint(True)
+            yield
+        finally:
+            cls._signal_handler._toggle_ignoring_sigint(False)
 
     @classmethod
     def _iso_timestamp_for_now(cls):
