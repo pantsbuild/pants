@@ -134,7 +134,7 @@ class RunTracker(Subsystem):
             help="Option scopes to record in stats on run completion. "
             "Options may be selected by joining the scope and the option with a ^ character, "
             "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass "
-            "`GLOBAL^pantsd`",
+            "`GLOBAL^pantsd`, add a '*' to the list to capture all known scopes",
         )
 
     def __init__(self, *args, **kwargs):
@@ -610,7 +610,10 @@ class RunTracker(Subsystem):
 
     def _get_options_to_record(self) -> dict:
         recorded_options = {}
-        for scope in self.options.stats_option_scopes_to_record:
+        scopes = self.options.stats_option_scopes_to_record
+        if "*" in scopes:
+            scopes = self._all_options.known_scope_to_info.keys()
+        for scope in scopes:
             scope_and_maybe_option = scope.split("^")
             recorded_options[scope] = self._get_option_to_record(*scope_and_maybe_option)
         return recorded_options
