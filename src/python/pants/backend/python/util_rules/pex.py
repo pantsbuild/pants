@@ -456,20 +456,23 @@ async def create_pex(
         *request.additional_args,
     ]
 
+    python: Optional[PythonExecutable] = None
+
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
     # flags are mutually exclusive. See https://github.com/pantsbuild/pex/issues/957.
-    python: Optional[PythonExecutable] = None
-    if request.internal_only:
-        python = await Get(
-            PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints
-        )
-    elif request.platforms:
+    if request.platforms:
         # TODO(#9560): consider validating that these platforms are valid with the interpreter
         #  constraints.
         argv.extend(request.platforms.generate_pex_arg_list())
     else:
         argv.extend(request.interpreter_constraints.generate_pex_arg_list())
+        # N.B: An internal-only PexRequest is validated to never have platforms set so we only need
+        # perform interpreter lookup in this branch.
+        if request.internal_only:
+            python = await Get(
+                PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints
+            )
 
     argv.append("--no-emit-warnings")
     verbosity = pex_runtime_environment.verbosity
