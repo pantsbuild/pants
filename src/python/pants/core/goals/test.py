@@ -36,26 +36,6 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-class CoverageReportType(Enum):
-    CONSOLE = ("console", "report")
-    XML = ("xml", None)
-    HTML = ("html", None)
-    RAW = ("raw", None)
-    JSON = ("json", None)
-
-    _report_name: str
-
-    def __new__(cls, value: str, report_name: Optional[str] = None) -> "CoverageReportType":
-        member: "CoverageReportType" = object.__new__(cls)
-        member._value_ = value
-        member._report_name = report_name if report_name is not None else value
-        return member
-
-    @property
-    def report_name(self) -> str:
-        return self._report_name
-
-
 @dataclass(frozen=True)
 class TestResult:
     exit_code: Optional[int]
@@ -224,19 +204,19 @@ class FilesystemCoverageReport(CoverageReport):
     result_snapshot: Snapshot
     directory_to_materialize_to: PurePath
     report_file: Optional[PurePath]
-    report_type: CoverageReportType
+    report_type: str
 
     def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
         workspace.write_digest(
             self.result_snapshot.digest, path_prefix=str(self.directory_to_materialize_to)
         )
         console.print_stderr(
-            f"\nWrote {self.report_type.report_name} coverage report to `{self.directory_to_materialize_to}`"
+            f"\nWrote {self.report_type} coverage report to `{self.directory_to_materialize_to}`"
         )
         return self.report_file
 
     def get_artifact(self) -> Optional[Tuple[str, Snapshot]]:
-        return self.report_type.value, self.result_snapshot
+        return self.report_type, self.result_snapshot
 
 
 @dataclass(frozen=True)

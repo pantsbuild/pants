@@ -57,7 +57,13 @@ async def find_open_program(request: OpenFilesRequest, plat: Platform) -> OpenFi
     else:
         processes = [
             InteractiveProcess(
-                argv=(open_program_paths.first_path.path, str(f)), run_in_workspace=True
+                argv=(open_program_paths.first_path.path, str(f)),
+                run_in_workspace=True,
+                # The xdg-open binary needs many environment variables to work properly. In addition
+                # to the various XDG_* environment variables, DISPLAY and other X11 variables are
+                # required. Instead of attempting to track all of these we just export the full user
+                # environment since this is not a cached process.
+                hermetic_env=False,
             )
             for f in request.files
         ]
