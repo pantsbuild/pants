@@ -5,16 +5,15 @@ import dataclasses
 import hashlib
 import logging
 from dataclasses import dataclass
-from enum import Enum
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union
 from uuid import UUID
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.internals.uuid import UUIDRequest, UUIDScope
+from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
 from pants.util.frozendict import FrozenDict
@@ -316,43 +315,32 @@ class InteractiveRunner:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class BinaryPathTest:
-    args: Tuple[str, ...]
-    fingerprint_stdout: bool
-
-    def __init__(self, args: Iterable[str], fingerprint_stdout: bool = True) -> None:
-        self.args = tuple(args)
-        self.fingerprint_stdout = fingerprint_stdout
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
 class BinaryPathRequest:
     """Request to find a binary of a given name.
 
-    If a `test` is specified all binaries that are found will be executed with the test args and
+    If `test_args` are specified all binaries that are found will be executed with these args and
     only those binaries whose test executions exit with return code 0 will be retained.
     Additionally, if test execution includes stdout content, that will be used to fingerprint the
     binary path so that upgrades and downgrades can be detected. A reasonable test for many programs
-    might be `BinaryPathTest(args=["--version"])` since it will both ensure the program runs and
+    might be to pass `["--version"]` for `test_args` since it will both ensure the program runs and
     also produce stdout text that changes upon upgrade or downgrade of the binary at the discovered
     path.
     """
 
     search_path: Tuple[str, ...]
     binary_name: str
-    test: Optional[BinaryPathTest]
+    test_args: Optional[Tuple[str, ...]]
 
     def __init__(
         self,
         *,
         search_path: Iterable[str],
         binary_name: str,
-        test: Optional[BinaryPathTest] = None,
+        test_args: Optional[Iterable[str]] = None,
     ) -> None:
         self.search_path = tuple(OrderedSet(search_path))
         self.binary_name = binary_name
-        self.test = test
+        self.test_args = tuple(test_args or ())
 
 
 @frozen_after_init
@@ -401,27 +389,16 @@ class BinaryPaths(EngineAwareReturnType):
         return next(iter(self.paths), None)
 
 
-class ProcessScope(Enum):
-    PER_CALL = UUIDScope.PER_CALL
-    PER_SESSION = UUIDScope.PER_SESSION
-
-
 @dataclass(frozen=True)
 class UncacheableProcess:
-    """Ensures the wrapped Process will be run once per scope and its results never re-used.
-
-    By default the scope is PER_CALL which ensures the Process is re-run on every call.
-    """
+    """Ensures the wrapped Process will always be run and its results never re-used."""
 
     process: Process
-    scope: ProcessScope = ProcessScope.PER_CALL
 
 
 @rule
 async def make_process_uncacheable(uncacheable_process: UncacheableProcess) -> Process:
-    uuid = await Get(
-        UUID, UUIDRequest, UUIDRequest.scoped(cast(UUIDScope, uncacheable_process.scope.value))
-    )
+    uuid = await Get(UUID, UUIDRequest())
 
     process = uncacheable_process.process
     env = dict(process.env)
@@ -478,8 +455,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 input_digest=script_digest,
                 argv=[script_path, request.binary_name],
                 env={"PATH": search_path},
-            ),
-            scope=ProcessScope.PER_SESSION,
+            )
         ),
     )
 
@@ -488,7 +464,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         return binary_paths
 
     found_paths = result.stdout.decode().splitlines()
-    if not request.test:
+    if not request.test_args:
         return dataclasses.replace(binary_paths, paths=[BinaryPath(path) for path in found_paths])
 
     results = await MultiGet(
@@ -498,9 +474,8 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 Process(
                     description=f"Test binary {path}.",
                     level=LogLevel.DEBUG,
-                    argv=[path, *request.test.args],
-                ),
-                scope=ProcessScope.PER_SESSION,
+                    argv=[path, *request.test_args],
+                )
             ),
         )
         for path in found_paths
@@ -509,8 +484,6 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         binary_paths,
         paths=[
             BinaryPath.fingerprinted(path, result.stdout)
-            if request.test.fingerprint_stdout
-            else BinaryPath(path, result.stdout.decode())
             for path, result in zip(found_paths, results)
             if result.exit_code == 0
         ],

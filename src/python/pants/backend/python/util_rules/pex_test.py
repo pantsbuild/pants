@@ -518,7 +518,9 @@ def test_entry_point(rule_runner: RuleRunner) -> None:
 
 def test_interpreter_constraints(rule_runner: RuleRunner) -> None:
     constraints = PexInterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
-    pex_info = create_pex_and_get_pex_info(rule_runner, interpreter_constraints=constraints)
+    pex_info = create_pex_and_get_pex_info(
+        rule_runner, interpreter_constraints=constraints, internal_only=False
+    )
     assert set(pex_info["interpreter_constraints"]) == {str(c) for c in constraints}
 
 
@@ -537,7 +539,6 @@ def test_platforms(rule_runner: RuleRunner) -> None:
         requirements=PexRequirements(["cryptography==2.9"]),
         platforms=platforms,
         interpreter_constraints=constraints,
-        internal_only=False,  # Internal only PEXes do not support (foreign) platforms.
     )
     assert any(
         "cryptography-2.9-cp27-cp27mu-manylinux2010_x86_64.whl" in fp for fp in pex_output["files"]
