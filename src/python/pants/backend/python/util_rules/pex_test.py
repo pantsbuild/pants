@@ -337,11 +337,10 @@ def create_pex_and_get_all_data(
     additional_inputs: Optional[Digest] = None,
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
-    internal_only: bool = True,
 ) -> Dict:
     request = PexRequest(
         output_filename="test.pex",
-        internal_only=internal_only,
+        internal_only=True,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         platforms=platforms,
@@ -384,7 +383,6 @@ def create_pex_and_get_pex_info(
     sources: Optional[Digest] = None,
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
-    internal_only: bool = True,
 ) -> Dict:
     return cast(
         Dict,
@@ -397,7 +395,6 @@ def create_pex_and_get_pex_info(
             sources=sources,
             additional_pants_args=additional_pants_args,
             additional_pex_args=additional_pex_args,
-            internal_only=internal_only,
         )["info"],
     )
 
@@ -537,7 +534,6 @@ def test_platforms(rule_runner: RuleRunner) -> None:
         requirements=PexRequirements(["cryptography==2.9"]),
         platforms=platforms,
         interpreter_constraints=constraints,
-        internal_only=False,  # Internal only PEXes do not support (foreign) platforms.
     )
     assert any(
         "cryptography-2.9-cp27-cp27mu-manylinux2010_x86_64.whl" in fp for fp in pex_output["files"]
