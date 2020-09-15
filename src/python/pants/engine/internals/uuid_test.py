@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 
-from pants.engine.internals.uuid import UUIDRequest
+from pants.engine.internals.uuid import UUIDRequest, UUIDScope
 from pants.engine.internals.uuid import rules as uuid_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -16,13 +16,33 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(rules=[*uuid_rules(), QueryRule(UUID, (UUIDRequest,))])
 
 
-def test_distinct_uuids(rule_runner: RuleRunner) -> None:
+def test_distinct_uuids_default_scope(rule_runner: RuleRunner) -> None:
     uuid1 = rule_runner.request_product(UUID, [UUIDRequest()])
     uuid2 = rule_runner.request_product(UUID, [UUIDRequest()])
     assert uuid1 != uuid2
 
 
-def test_identical_uuids(rule_runner: RuleRunner) -> None:
-    uuid1 = rule_runner.request_product(UUID, [UUIDRequest(randomizer=0.0)])
-    uuid2 = rule_runner.request_product(UUID, [UUIDRequest(randomizer=0.0)])
+def test_distinct_uuids_different_scopes(rule_runner: RuleRunner) -> None:
+    uuid1 = rule_runner.request_product(UUID, [UUIDRequest(scope="this")])
+    uuid2 = rule_runner.request_product(UUID, [UUIDRequest(scope="that")])
+    assert uuid1 != uuid2
+
+
+def test_identical_uuids_same_scope(rule_runner: RuleRunner) -> None:
+    uuid1 = rule_runner.request_product(UUID, [UUIDRequest(scope="this")])
+    uuid2 = rule_runner.request_product(UUID, [UUIDRequest(scope="this")])
+    assert uuid1 == uuid2
+
+
+def test_distinct_uuids_call_scope(rule_runner: RuleRunner) -> None:
+    uuid1 = rule_runner.request_product(UUID, [UUIDRequest()])
+    uuid2 = rule_runner.request_product(UUID, [UUIDRequest(scope="bob")])
+    uuid3 = rule_runner.request_product(UUID, [UUIDRequest.scoped(UUIDScope.PER_CALL)])
+    uuid4 = rule_runner.request_product(UUID, [UUIDRequest.scoped(UUIDScope.PER_CALL)])
+    assert uuid1 != uuid2 != uuid3 != uuid4
+
+
+def test_identical_uuids_session_scope(rule_runner: RuleRunner) -> None:
+    uuid1 = rule_runner.request_product(UUID, [UUIDRequest.scoped(UUIDScope.PER_SESSION)])
+    uuid2 = rule_runner.request_product(UUID, [UUIDRequest.scoped(UUIDScope.PER_SESSION)])
     assert uuid1 == uuid2

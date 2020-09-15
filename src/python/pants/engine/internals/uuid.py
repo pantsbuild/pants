@@ -1,28 +1,49 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import random
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from enum import Enum
+from typing import Optional, cast
 
-from pants.engine.rules import _uncacheable_rule, collect_rules
+from pants.engine.rules import collect_rules, rule
+from pants.util.meta import frozen_after_init
 
 
-@dataclass(frozen=True)
+class UUIDScope(Enum):
+    PER_CALL = "call"
+    PER_SESSION = "session"
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class UUIDRequest:
-    randomizer: float = field(default_factory=random.random)
+    @staticmethod
+    def _to_scope_name(scope: UUIDScope) -> str:
+        if scope == UUIDScope.PER_CALL:
+            return uuid.uuid4().hex
+        return cast(str, scope.value)
+
+    @classmethod
+    def scoped(cls, scope: UUIDScope) -> "UUIDRequest":
+        return cls(cls._to_scope_name(scope))
+
+    scope: str
+
+    def __init__(self, scope: Optional[str] = None) -> None:
+        self.scope = scope if scope is not None else self._to_scope_name(UUIDScope.PER_CALL)
 
 
-@_uncacheable_rule
+@rule
 async def generate_uuid(_: UUIDRequest) -> uuid.UUID:
     """A rule to generate a UUID.
 
     Useful primarily to force a rule to re-run: a rule that `await Get`s on a UUIDRequest will be
     uncacheable, because this rule is itself uncacheable.
 
-    Note that this will return a new UUID each time if request multiple times in a single session.
-    If you want two requests to return the same UUID, set the `randomizer` field in both
-    requests to some fixed value.
+    Note that this will return a new UUID each time if requested multiple times in a single session.
+    If you want two requests to return the same UUID, set the `scope` field in both requests to some
+    fixed scope value.
     """
     return uuid.uuid4()
 
