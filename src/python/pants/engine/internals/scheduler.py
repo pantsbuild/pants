@@ -346,8 +346,8 @@ class Scheduler:
     def lease_files_in_graph(self, session):
         self._native.lib.lease_files_in_graph(self._scheduler, session)
 
-    def garbage_collect_store(self):
-        self._native.lib.garbage_collect_store(self._scheduler)
+    def garbage_collect_store(self, target_size_bytes: int):
+        self._native.lib.garbage_collect_store(self._scheduler, target_size_bytes)
 
     def new_session(
         self,
@@ -659,5 +659,5 @@ class SchedulerSession:
     def lease_files_in_graph(self):
         self._scheduler.lease_files_in_graph(self._session)
 
-    def garbage_collect_store(self):
-        self._scheduler.garbage_collect_store()
+    def garbage_collect_store(self, target_size_bytes: int):
+        self._scheduler.garbage_collect_store(target_size_bytes)

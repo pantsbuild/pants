@@ -663,13 +663,14 @@ impl Store {
     match self.local.shrink(target_size_bytes, shrink_behavior) {
       Ok(size) => {
         if size > target_size_bytes {
-          Err(format!(
-            "Garbage collection attempted to target {} bytes but could only shrink to {} bytes",
-            target_size_bytes, size
-          ))
-        } else {
-          Ok(())
+          log::warn!(
+            "Garbage collection attempted to shrink the store to {} bytes but {} bytes \
+            are currently in use.",
+            target_size_bytes,
+            size
+          )
         }
+        Ok(())
       }
       Err(err) => Err(format!("Garbage collection failed: {:?}", err)),
     }
