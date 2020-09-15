@@ -410,20 +410,20 @@ Exception message: {exception_message}{maybe_newline}
         # Generate an unhandled exception report fit to be printed to the terminal.
         logger.exception(exc)
 
-    _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\
-Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_traceback}
-"""
-
     @classmethod
     def _handle_signal_gracefully(cls, signum, signame, traceback_lines):
         """Signal handler for non-fatal signals which raises or logs an error."""
+
+        def gen_formatted(formatted_traceback: str) -> str:
+            return f"Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_traceback}"
+
         # Extract the stack, and format an entry to be written to the exception log.
         formatted_traceback = cls._format_traceback(
             traceback_lines=traceback_lines, should_print_backtrace=True
         )
-        signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
-            signum=signum, signame=signame, formatted_traceback=formatted_traceback
-        )
+
+        signal_error_log_entry = gen_formatted(formatted_traceback)
+
         # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
         # descriptors reentrantly, which raises an IOError).
         # This method catches any exceptions raised within it.
@@ -434,9 +434,9 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
             traceback_lines=traceback_lines,
             should_print_backtrace=cls._should_print_backtrace_to_terminal,
         )
-        terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
-            signum=signum, signame=signame, formatted_traceback=formatted_traceback_for_terminal
-        )
+
+        terminal_log_entry = gen_formatted(formatted_traceback_for_terminal)
+
         # Print the output via standard logging.
         logger.error(terminal_log_entry)
 
