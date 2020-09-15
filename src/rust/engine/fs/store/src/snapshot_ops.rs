@@ -665,7 +665,8 @@ pub trait SnapshotOps: StoreWrapper + 'static {
     prefix: RelativePath,
   ) -> Result<Digest, SnapshotOpsError> {
     let prefix: PathBuf = prefix.into();
-    while let Some(parent) = prefix.iter().next_back() {
+    let mut prefix_iter = prefix.iter();
+    while let Some(parent) = prefix_iter.next_back() {
       let mut dir_node = remexec::DirectoryNode::new();
       dir_node.set_name(osstring_as_utf8(parent.to_os_string())?);
       dir_node.set_digest((&digest).into());
