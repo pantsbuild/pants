@@ -20,7 +20,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
+from pants.util.meta import classproperty, frozen_after_init
 
 
 class PexBinary(ExternalTool):
@@ -28,11 +28,21 @@ class PexBinary(ExternalTool):
 
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.14"
-    default_known_versions = [
-        f"v2.1.14|{plat}|12937da9ad5ad2c60564aa35cb4b3992ba3cc5ef7efedd44159332873da6fe46|2637138"
-        for plat in ["darwin", "linux "]
-    ]
+    default_version = "v2.1.16"
+
+    @classproperty
+    def default_known_versions(cls):
+        return [
+            "|".join(
+                (
+                    cls.default_version,
+                    plat,
+                    "38712847654254088a23394728f9a5fb93c6c83631300e7ab427ec780a88f653",
+                    "2662638",
+                )
+            )
+            for plat in ["darwin", "linux"]
+        ]
 
     def generate_url(self, _: Platform) -> str:
         return f"https://github.com/pantsbuild/pex/releases/download/{self.version}/pex"
