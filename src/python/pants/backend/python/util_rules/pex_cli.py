@@ -41,7 +41,7 @@ class PexBinary(ExternalTool):
                     "2662638",
                 )
             )
-            for plat in ["darwin", "linux "]
+            for plat in ["darwin", "linux"]
         ]
 
     def generate_url(self, _: Platform) -> str:
