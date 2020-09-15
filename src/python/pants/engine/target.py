@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import collections.abc
 import dataclasses
 import itertools
 import os.path
@@ -1149,7 +1150,7 @@ class DictStringToStringField(PrimitiveField, metaclass=ABCMeta):
         invalid_type_exception = InvalidFieldTypeException(
             address, cls.alias, raw_value, expected_type="a dictionary of string -> string"
         )
-        if not isinstance(value_or_default, dict):
+        if not isinstance(value_or_default, collections.abc.Mapping):
             raise invalid_type_exception
         if not all(isinstance(k, str) and isinstance(v, str) for k, v in value_or_default.items()):
             raise invalid_type_exception
@@ -1173,7 +1174,7 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
             raw_value,
             expected_type="a dictionary of string -> an iterable of strings",
         )
-        if not isinstance(value_or_default, dict):
+        if not isinstance(value_or_default, collections.abc.Mapping):
             raise invalid_type_exception
         result = {}
         for k, v in value_or_default.items():
