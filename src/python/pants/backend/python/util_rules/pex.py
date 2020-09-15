@@ -45,7 +45,13 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.process import MultiPlatformProcess, Process, ProcessResult, UncacheableProcess
+from pants.engine.process import (
+    MultiPlatformProcess,
+    Process,
+    ProcessResult,
+    ProcessScope,
+    UncacheableProcess,
+)
 from pants.engine.rules import Get, collect_rules, rule
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
@@ -428,7 +434,9 @@ async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -
             ),
         ),
     )
-    result = await Get(ProcessResult, UncacheableProcess(process))
+    result = await Get(
+        ProcessResult, UncacheableProcess(process=process, scope=ProcessScope.PER_SESSION)
+    )
     path, fingerprint = result.stdout.decode().strip().splitlines()
     return PythonExecutable(path=path, fingerprint=fingerprint)
 

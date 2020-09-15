@@ -5,15 +5,16 @@ import dataclasses
 import hashlib
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union, cast
 from uuid import UUID
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.internals.uuid import UUIDRequest
+from pants.engine.internals.uuid import UUIDRequest, UUIDScope
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
 from pants.util.frozendict import FrozenDict
@@ -400,16 +401,27 @@ class BinaryPaths(EngineAwareReturnType):
         return next(iter(self.paths), None)
 
 
+class ProcessScope(Enum):
+    PER_CALL = UUIDScope.PER_CALL
+    PER_SESSION = UUIDScope.PER_SESSION
+
+
 @dataclass(frozen=True)
 class UncacheableProcess:
-    """Ensures the wrapped Process will always be run and its results never re-used."""
+    """Ensures the wrapped Process will be run once per scope and its results never re-used.
+
+    By default the scope is PER_CALL which ensures the Process is re-run on every call.
+    """
 
     process: Process
+    scope: ProcessScope = ProcessScope.PER_CALL
 
 
 @rule
 async def make_process_uncacheable(uncacheable_process: UncacheableProcess) -> Process:
-    uuid = await Get(UUID, UUIDRequest())
+    uuid = await Get(
+        UUID, UUIDRequest, UUIDRequest.scoped(cast(UUIDScope, uncacheable_process.scope.value))
+    )
 
     process = uncacheable_process.process
     env = dict(process.env)
@@ -466,7 +478,8 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 input_digest=script_digest,
                 argv=[script_path, request.binary_name],
                 env={"PATH": search_path},
-            )
+            ),
+            scope=ProcessScope.PER_SESSION,
         ),
     )
 
@@ -486,7 +499,8 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                     description=f"Test binary {path}.",
                     level=LogLevel.DEBUG,
                     argv=[path, *request.test.args],
-                )
+                ),
+                scope=ProcessScope.PER_SESSION,
             ),
         )
         for path in found_paths
