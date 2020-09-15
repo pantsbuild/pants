@@ -136,6 +136,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     ) -> None:
         untagged_dependencies = {
             tgt
+            # NB: We explicitly want to get *all* transitive dependencies here, regardless of
+            # whether or not the --transitive flag was provided, so that we can make this warning.
             for tgt in Target.closure_for_targets(target_roots=tagged_target_roots)
             if tag_name not in tgt.tags and self.is_non_synthetic_python_target(tgt)
         }
@@ -149,11 +151,17 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
             f"these dependencies.\n{formatted_targets}"
         )
 
+    def _maybe_transitive_target_closure(self, target_roots: Iterable[Target]):
+        if self.get_options().transitive:
+            return Target.closure_for_targets(target_roots=target_roots)
+        else:
+            return target_roots
+
     def _calculate_python_sources(self, target_roots: Iterable[Target]) -> List[str]:
         """Filter targets to generate a set of source files from the given targets."""
         all_targets = {
             tgt
-            for tgt in Target.closure_for_targets(target_roots=target_roots)
+            for tgt in self._maybe_transitive_target_closure(target_roots)
             if self.is_non_synthetic_python_target(tgt)
         }
         whitelist_tag_name = self.get_options().whitelist_tag_name
@@ -248,6 +256,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         return PEX(pex_dir, py3_interpreter)
 
     def execute(self):
+        if self.skip_execution:
+            return
         mypy_interpreter = self.find_mypy_interpreter()
         if not mypy_interpreter:
             raise TaskError(
@@ -262,7 +272,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
 
         # Determine interpreter used by the sources so we can tell mypy.
         interpreter_for_targets = self._interpreter_cache.select_interpreter_for_targets(
-            self.context.target_roots
+            self._maybe_transitive_target_closure(self.context.target_roots)
         )
         if not interpreter_for_targets:
             raise TaskError("No Python interpreter compatible with specified sources.")

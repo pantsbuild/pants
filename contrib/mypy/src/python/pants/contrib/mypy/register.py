@@ -12,7 +12,7 @@ class MypyStandalone(MypyTask):
         super().register_options(register)
         register('--skip', type=bool, default=False, help='Skip running mypy.')
         register('--transitive', type=bool, default=False,
-                 help='Whether to run mypy on transitive dependencies of the given pythohn targets.')
+                 help='Whether to run mypy on transitive dependencies of the given python targets.')
 
 
 def register_goals():

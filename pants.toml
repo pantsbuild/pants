@@ -56,6 +56,7 @@ backend_packages.add = [
   "pants.contrib.googlejavaformat",
   "pants.contrib.jax_ws",
   "pants.contrib.scalajs",
+  "pants.contrib.mypy",
   "pants.contrib.node",
   "pants.contrib.python.checks",
   "pants.contrib.scrooge",
