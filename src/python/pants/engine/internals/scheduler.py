@@ -492,8 +492,6 @@ class SchedulerSession:
             ),
         )
 
-        ExceptionSink.toggle_ignoring_sigint(False)
-
         self._maybe_visualize()
 
         logger.debug(
