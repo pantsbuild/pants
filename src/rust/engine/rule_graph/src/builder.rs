@@ -224,7 +224,7 @@ impl<R: Rule> Builder<R> {
   }
 
   pub fn graph(self) -> Result<RuleGraph<R>, String> {
-    // 1. build a polymorphic graph
+    // 1. build a polymorphic graph, where nodes might have multiple legal sources of dependencies
     let initial_polymorphic_graph = self.initial_polymorphic();
     // 2. run live variable analysis on the polymorphic graph to gather a conservative (ie, overly
     //    large) set of used Params.
@@ -240,6 +240,13 @@ impl<R: Rule> Builder<R> {
     self.finalize(pruned_edges_graph)
   }
 
+  ///
+  /// Builds a polymorphic graph while computing an out_set for each node in the graph by accounting
+  /// for which `Param`s are available at each use site. During this phase, nodes may have multiple
+  /// dependency edges per `DependencyKey`, which is what makes them "polymorphic". Each of the
+  /// possible ways to compute a dependency will likely have different input `Param` requirements,
+  /// and each node in this phase represents all of those possibilities.
+  ///
   fn initial_polymorphic(&self) -> OutLabeledGraph<R> {
     let mut graph: Graph<R> = DiGraph::new();
 
@@ -403,10 +410,9 @@ impl<R: Rule> Builder<R> {
   /// Splits Rules in the graph that have multiple valid sources of a dependency, and recalculates
   /// their in/out sets to attempt to re-join with other copies of the Rule with identical sets.
   /// Similar to `live_param_labeled_graph`, this is an analysis that propagates both up and down
-  /// the graph (and maintains the in/out sets initialized by `live_param_labeled_graph` while doing
-  /// so). Visiting a node might cause us to split it and re-calculate the in/out sets for each
-  /// split; we then visit the nodes affected by the split to ensure that they are updated as well,
-  /// and so on.
+  /// the graph (and maintains the in/out sets while doing so). Visiting a node might cause us to
+  /// split it and re-calculate the in/out sets for each split; we then visit the nodes affected
+  /// by the split to ensure that they are updated as well, and so on.
   ///
   /// During this phase, the out_set of a node is used to determine which Params are legal to
   /// consume in each subgraph: as this information propagates down the graph, Param dependencies
@@ -889,7 +895,7 @@ impl<R: Rule> Builder<R> {
   }
 
   ///
-  /// After nodes have been monomorphized they have the smallest dependency sets possible.
+  /// After nodes have been monomorphized, they have the smallest dependency sets possible.
   /// In cases where a node still has more than one source of a dependency, this phase statically
   /// decides which source of each DependencyKey to use, and prunes edges to the rest.
   ///

@@ -388,7 +388,7 @@ fn reduced_source_roots() {
 }
 
 #[test]
-fn reduced_mpp() {
+fn reduced_codegen_cycle() {
   let _logger = env_logger::try_init();
   let rules = vec![
     Rule(
