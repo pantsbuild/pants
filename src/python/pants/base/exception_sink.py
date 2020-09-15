@@ -15,7 +15,6 @@ from typing import Callable, Dict, Iterator, Optional
 import setproctitle
 
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.meta import classproperty
 from pants.util.osutil import Pid
 
 logger = logging.getLogger(__name__)
@@ -104,9 +103,6 @@ class ExceptionSink:
     # Where to log stacktraces to in a SIGUSR2 handler.
     _interactive_output_stream = None
 
-    # Whether to print a stacktrace in any fatal error message printed to the terminal.
-    _should_print_backtrace_to_terminal = True
-
     # An instance of `SignalHandler` which is invoked to handle a static set of specific
     # nonfatal signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they
     # don't need to exit immediately).
@@ -128,15 +124,6 @@ class ExceptionSink:
     @classmethod
     def signal_sent(cls) -> Optional[int]:
         return cls._signal_sent
-
-    @classmethod
-    def reset_should_print_backtrace_to_terminal(cls, should_print_backtrace):
-        """Set whether a backtrace gets printed to the terminal error stream on a fatal error.
-
-        Class state:
-        - Overwrites `cls._should_print_backtrace_to_terminal`.
-        """
-        cls._should_print_backtrace_to_terminal = should_print_backtrace
 
     # All reset_* methods are ~idempotent!
     @classmethod
@@ -221,10 +208,6 @@ class ExceptionSink:
             cls._log_exception(
                 "Cannot reset interactive_output_stream -- stream (probably stderr) is closed"
             )
-
-    @classproperty
-    def should_print_exception_stacktrace(cls):
-        return cls._should_print_backtrace_to_terminal
 
     @classmethod
     def exceptions_log_path(cls, for_pid=None, in_dir=None):
@@ -410,20 +393,20 @@ Exception message: {exception_message}{maybe_newline}
         # Generate an unhandled exception report fit to be printed to the terminal.
         logger.exception(exc)
 
-    _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\
-Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_traceback}
-"""
-
     @classmethod
     def _handle_signal_gracefully(cls, signum, signame, traceback_lines):
         """Signal handler for non-fatal signals which raises or logs an error."""
+
+        def gen_formatted(formatted_traceback: str) -> str:
+            return f"Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_traceback}"
+
         # Extract the stack, and format an entry to be written to the exception log.
         formatted_traceback = cls._format_traceback(
             traceback_lines=traceback_lines, should_print_backtrace=True
         )
-        signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
-            signum=signum, signame=signame, formatted_traceback=formatted_traceback
-        )
+
+        signal_error_log_entry = gen_formatted(formatted_traceback)
+
         # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
         # descriptors reentrantly, which raises an IOError).
         # This method catches any exceptions raised within it.
@@ -432,11 +415,11 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
         # Create a potentially-abbreviated traceback for the terminal or other interactive stream.
         formatted_traceback_for_terminal = cls._format_traceback(
             traceback_lines=traceback_lines,
-            should_print_backtrace=cls._should_print_backtrace_to_terminal,
+            should_print_backtrace=True,
         )
-        terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
-            signum=signum, signame=signame, formatted_traceback=formatted_traceback_for_terminal
-        )
+
+        terminal_log_entry = gen_formatted(formatted_traceback_for_terminal)
+
         # Print the output via standard logging.
         logger.error(terminal_log_entry)
 
@@ -454,12 +437,3 @@ ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer)
 
 # Setup a default signal handler.
 ExceptionSink.reset_signal_handler(SignalHandler(pantsd_instance=False))
-
-# Set whether to print stacktraces on exceptions or signals during import time.
-# NB: This will be overridden by bootstrap options in PantsRunner, so we avoid printing out a full
-# stacktrace when a user presses control-c during import time unless the environment variable is set
-# to explicitly request it. The exception log will have any stacktraces regardless so this should
-# not hamper debugging.
-ExceptionSink.reset_should_print_backtrace_to_terminal(
-    should_print_backtrace=os.environ.get("PANTS_PRINT_EXCEPTION_STACKTRACE", "True") == "True"
-)

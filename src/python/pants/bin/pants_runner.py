@@ -80,10 +80,6 @@ class PantsRunner:
         # Python logging.
         setup_logging(global_bootstrap_options)
 
-        ExceptionSink.reset_should_print_backtrace_to_terminal(
-            global_bootstrap_options.print_exception_stacktrace
-        )
-
         if self._should_run_with_pantsd(global_bootstrap_options):
             try:
                 remote_runner = RemotePantsRunner(self.args, self.env, options_bootstrapper)
