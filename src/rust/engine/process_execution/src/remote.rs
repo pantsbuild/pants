@@ -39,6 +39,11 @@ use crate::{
 // CommandRunner.
 pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
+// Environment variable which is exclusively used for cache key invalidation.
+// This may be not specified in an Process, and may be populated only by the
+// CommandRunner.
+pub const CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_TARGET_PLATFORM";
+
 #[derive(Debug)]
 pub enum OperationOrStatus {
   Operation(bazel_protos::operations::Operation),
@@ -915,12 +920,14 @@ pub fn make_execute_request(
   let mut command = bazel_protos::remote_execution::Command::new();
   command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
   for (name, value) in &req.env {
-    if name.as_str() == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME {
+    if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME || name == CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+    {
       return Err(format!(
         "Cannot set env var with name {} as that is reserved for internal use by pants",
-        CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
+        name
       ));
     }
+
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(name.to_string());
     env.set_value(value.to_string());
@@ -948,6 +955,14 @@ pub fn make_execute_request(
     env.set_value(cache_key_gen_version);
     command.mut_environment_variables().push(env);
   }
+
+  {
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name(CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_string());
+    env.set_value(req.target_platform.into());
+    command.mut_environment_variables().push(env);
+  }
+
   let mut output_files = req
     .output_files
     .iter()
@@ -989,13 +1004,6 @@ pub fn make_execute_request(
     // allowing you to specify a jdk-version platform property, and it will put a JDK at a
     // well-known path in the docker container you specify in which to run.
     platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
-  }
-
-  if !platform_properties
-    .iter()
-    .any(|(k, _)| k == "target_platform")
-  {
-    platform_properties.push(("target_platform".to_owned(), req.target_platform.into()));
   }
 
   for (name, value) in platform_properties {

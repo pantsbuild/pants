@@ -26,7 +26,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "1880979"]
+#![type_length_limit = "1881004"]
 
 use std::convert::TryInto;
 use std::io::{self, Write};
@@ -47,7 +47,7 @@ use parking_lot::Mutex;
 use protobuf::Message;
 use rand::seq::SliceRandom;
 use serde_derive::Serialize;
-use store::{Snapshot, Store, StoreFileByDigest, UploadSummary};
+use store::{Snapshot, SnapshotOps, SnapshotOpsError, Store, StoreFileByDigest, UploadSummary};
 use tokio::runtime::Handle;
 
 #[derive(Debug)]
@@ -155,6 +155,12 @@ to this directory.",
                   .takes_value(true)
                   .default_value("binary")
                   .possible_values(&["binary", "recursive-file-list", "recursive-file-list-with-digests", "text"]),
+              )
+              .arg(
+                Arg::with_name("child-dir")
+                    .long("child-dir")
+                    .takes_value(true)
+                    .help("Relative path of child Directory inside the Directory represented by the digest to navigate to before operating.")
               )
               .arg(Arg::with_name("fingerprint").required(true).takes_value(
                 true,
@@ -481,7 +487,19 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .unwrap()
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
-        let digest = Digest(fingerprint, size_bytes);
+        let mut digest = Digest(fingerprint, size_bytes);
+
+        if let Some(prefix_to_strip) = args.value_of("child-dir") {
+          digest = store
+            .strip_prefix(digest, PathBuf::from(prefix_to_strip))
+            .await
+            .map_err(|err| match err {
+              SnapshotOpsError::String(string)
+              | SnapshotOpsError::DigestMergeFailure(string)
+              | SnapshotOpsError::GlobMatchError(string) => string,
+            })?;
+        }
+
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
           "binary" => {
             let maybe_directory = store.load_directory(digest).await?;

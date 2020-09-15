@@ -7,7 +7,7 @@ from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.util_rules import pex_environment
-from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -20,7 +20,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
+from pants.util.meta import classproperty, frozen_after_init
 
 
 class PexBinary(ExternalTool):
@@ -28,11 +28,21 @@ class PexBinary(ExternalTool):
 
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.14"
-    default_known_versions = [
-        f"v2.1.14|{plat}|12937da9ad5ad2c60564aa35cb4b3992ba3cc5ef7efedd44159332873da6fe46|2637138"
-        for plat in ["darwin", "linux "]
-    ]
+    default_version = "v2.1.16"
+
+    @classproperty
+    def default_known_versions(cls):
+        return [
+            "|".join(
+                (
+                    cls.default_version,
+                    plat,
+                    "38712847654254088a23394728f9a5fb93c6c83631300e7ab427ec780a88f653",
+                    "2662638",
+                )
+            )
+            for plat in ["darwin", "linux"]
+        ]
 
     def generate_url(self, _: Platform) -> str:
         return f"https://github.com/pantsbuild/pex/releases/download/{self.version}/pex"
@@ -50,6 +60,7 @@ class PexCliProcess:
     extra_env: Optional[FrozenDict[str, str]]
     output_files: Optional[Tuple[str, ...]]
     output_directories: Optional[Tuple[str, ...]]
+    python: Optional[PythonExecutable]
 
     def __init__(
         self,
@@ -60,6 +71,7 @@ class PexCliProcess:
         extra_env: Optional[Mapping[str, str]] = None,
         output_files: Optional[Iterable[str]] = None,
         output_directories: Optional[Iterable[str]] = None,
+        python: Optional[PythonExecutable] = None,
     ) -> None:
         self.argv = tuple(argv)
         self.description = description
@@ -67,6 +79,7 @@ class PexCliProcess:
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
+        self.python = python
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -93,7 +106,9 @@ async def setup_pex_cli_process(
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
     pex_root_path = ".cache/pex_root"
-    argv = pex_env.create_argv(downloaded_pex_bin.exe, *request.argv, "--pex-root", pex_root_path)
+    argv = pex_env.create_argv(
+        downloaded_pex_bin.exe, *request.argv, "--pex-root", pex_root_path, python=request.python
+    )
     env = {
         # Ensure Pex and its subprocesses create temporary files in the the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we

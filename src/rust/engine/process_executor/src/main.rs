@@ -26,7 +26,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "1100709"]
+#![type_length_limit = "1257309"]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
@@ -348,6 +348,10 @@ async fn main() {
     .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
   let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
 
+  let target_platform =
+    PlatformConstraint::try_from(&args.value_of("target-platform").unwrap().to_string())
+      .expect("invalid value for `target-platform");
+
   let request = process_execution::Process {
     argv,
     env,
@@ -360,10 +364,7 @@ async fn main() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
-    target_platform: PlatformConstraint::try_from(
-      &args.value_of("target-platform").unwrap().to_string(),
-    )
-    .expect("invalid value for `target-platform"),
+    target_platform: target_platform,
     is_nailgunnable,
     execution_slot_variable: None,
   };

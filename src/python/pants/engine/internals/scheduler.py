@@ -314,9 +314,20 @@ class Scheduler:
         return {"started": result[0], "completed": result[1]}
 
     def _run_and_return_roots(self, session, execution_request):
+        def python_signal() -> bool:
+            """This function checks to see whether the main Python thread has responded to a signal.
+
+            It is invoked by the Rust scheduler, and if it returns true, the scheduler will
+            gracefully shut down.
+            """
+            return ExceptionSink.signal_sent() is not None
+
         try:
             raw_roots = self._native.lib.scheduler_execute(
-                self._scheduler, session, execution_request
+                self._scheduler,
+                session,
+                execution_request,
+                python_signal,
             )
         except self._native.lib.PollTimeout:
             raise ExecutionTimeoutError("Timed out")
@@ -481,7 +492,7 @@ class SchedulerSession:
             ),
         )
 
-        ExceptionSink.toggle_ignoring_sigint_v2_engine(False)
+        ExceptionSink.toggle_ignoring_sigint(False)
 
         self._maybe_visualize()
 
