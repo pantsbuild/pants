@@ -5,6 +5,87 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0b0 (9/15/2020)
+-------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to Pex 2.1.16. (#10782)
+  `PR #10782 <https://github.com/pantsbuild/pants/pull/10782>`_
+
+* Restore running internal only PEXes via discovered Python (#10779) (#10788)
+  `PR #10779 <https://github.com/pantsbuild/pants/pull/10779>`_
+
+Bugfixes
+~~~~~~~~
+
+* @rules consume params to prevent some types of ambiguity (#10764)
+  `PR #10764 <https://github.com/pantsbuild/pants/pull/10764>`_
+
+* Fix xdg-open. (#10773)
+  `PR #10773 <https://github.com/pantsbuild/pants/pull/10773>`_
+
+* Hide BinaryPath test processes from TUI by default. (#10774)
+  `PR #10774 <https://github.com/pantsbuild/pants/pull/10774>`_
+
+* Signal handling fixes (#10758)
+  `PR #10758 <https://github.com/pantsbuild/pants/pull/10758>`_
+
+* Fix UUIDRequest scoping. (#10780)
+  `PR #10780 <https://github.com/pantsbuild/pants/pull/10780>`_
+
+* Fix `DictStringToStringField` not working with default values (#10776)
+  `PR #10776 <https://github.com/pantsbuild/pants/pull/10776>`_
+
+* Sandbox Pex temporary files. (#10772)
+  `PR #10772 <https://github.com/pantsbuild/pants/pull/10772>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* remoting: move target_platform property into environment variable (#10713)
+  `PR #10713 <https://github.com/pantsbuild/pants/pull/10713>`_
+
+* Add the ability to capture all known scope options in run tracker. (#10778)
+  `PR #10778 <https://github.com/pantsbuild/pants/pull/10778>`_
+
+* fs_util cat-proto has --child-dir arg (#10228)
+  `PR #10228 <https://github.com/pantsbuild/pants/pull/10228>`_
+
+* Simplify --print-exception-stacktrace logic (#10786)
+  `PR #10786 <https://github.com/pantsbuild/pants/pull/10786>`_
+
+* Various ExceptionSink improvements (#10781)
+  `PR #10781 <https://github.com/pantsbuild/pants/pull/10781>`_
+
+* Revert "Run internal only pexes via discovered python. (#10779)" (#10785)
+  `PR #10785 <https://github.com/pantsbuild/pants/pull/10785>`_
+
+* Support volatile processes. (#10768)
+  `PR #10768 <https://github.com/pantsbuild/pants/pull/10768>`_
+
+* Run internal only pexes via discovered python. (#10779)
+  `PR #10779 <https://github.com/pantsbuild/pants/pull/10779>`_
+
+* Fix a leaking pytest-cov abstraction. (#10775)
+  `PR #10775 <https://github.com/pantsbuild/pants/pull/10775>`_
+
+* Support tests for BinaryPaths. (#10770)
+  `PR #10770 <https://github.com/pantsbuild/pants/pull/10770>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Prepare 1.30.1rc2 (#10783)
+  `PR #10783 <https://github.com/pantsbuild/pants/pull/10783>`_
+
+* Prepare 1.30.1rc1 (#10766)
+  `PR #10766 <https://github.com/pantsbuild/pants/pull/10766>`_
+
+* Explain how to fix dependency cycles (#10761)
+  `PR #10761 <https://github.com/pantsbuild/pants/pull/10761>`_
+
 2.0.0a3 (9/11/2020)
 -------------------
 
