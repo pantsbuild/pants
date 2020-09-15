@@ -53,6 +53,5 @@ python_binary(
   # dependency on setuptools (for namespace package support).
   emit_warnings=False,
   # To allow for loading `native_engine.so` when built as a pex, we set zip_safe=False.
-  # This is the default, but we set it here explicitly, for emphasis.
   zip_safe=False,
 )
