@@ -287,6 +287,13 @@ impl Store {
   }
 
   ///
+  /// Remove a file locally, returning true if it existed, or false otherwise.
+  ///
+  pub async fn remove_file(&self, digest: Digest) -> Result<bool, String> {
+    self.local.remove(EntryType::File, digest).await
+  }
+
+  ///
   /// Store a file locally.
   ///
   pub async fn store_file_bytes(

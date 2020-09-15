@@ -2,9 +2,12 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
   Process, ProcessMetadata,
 };
+
+use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
 
+use futures::compat::Future01CompatExt;
 use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
 use store::Store;
 use tempfile::TempDir;
@@ -125,4 +128,57 @@ async fn failures_not_cached() {
   assert_ne!(results.uncached, results.maybe_cached);
   assert_eq!(results.uncached.unwrap().exit_code, 1);
   assert_eq!(results.maybe_cached.unwrap().exit_code, 127); // aka the return code for file not found
+}
+
+#[tokio::test]
+async fn recover_from_missing_store_contents() {
+  let (local, store, _local_runner_dir) = create_local_runner();
+  let (caching, _cache_dir) = create_cached_runner(local, store.clone());
+  let (process, _script_path, _script_dir) = create_script(0);
+
+  // Run once to cache the process.
+  let first_result = caching
+    .run(process.clone().into(), Context::default())
+    .await
+    .unwrap();
+
+  // Delete the first child of the output directory parent to confirm that we ensure that more
+  // than just the root of the output is present when hitting the cache.
+  {
+    let output_dir_digest = first_result.output_directory;
+    let (output_dir, _) = store
+      .load_directory(output_dir_digest)
+      .await
+      .unwrap()
+      .unwrap();
+    let output_child_digest = output_dir
+      .get_files()
+      .first()
+      .unwrap()
+      .get_digest()
+      .try_into()
+      .unwrap();
+    let removed = store.remove_file(output_child_digest).await.unwrap();
+    assert!(removed);
+    assert!(store
+      .contents_for_directory(output_dir_digest)
+      .compat()
+      .await
+      .err()
+      .is_some())
+  }
+
+  // Ensure that we don't fail if we re-run.
+  let second_result = caching
+    .run(process.clone().into(), Context::default())
+    .await
+    .unwrap();
+
+  // And that the entire output directory can be loaded.
+  assert!(store
+    .contents_for_directory(second_result.output_directory)
+    .compat()
+    .await
+    .ok()
+    .is_some())
 }
