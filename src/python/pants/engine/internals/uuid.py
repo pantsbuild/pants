@@ -18,6 +18,11 @@ class UUIDScope(Enum):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class UUIDRequest:
+    scope: str
+
+    def __init__(self, scope: Optional[str] = None) -> None:
+        self.scope = scope if scope is not None else self._to_scope_name(UUIDScope.PER_CALL)
+
     @staticmethod
     def _to_scope_name(scope: UUIDScope) -> str:
         if scope == UUIDScope.PER_CALL:
@@ -27,11 +32,6 @@ class UUIDRequest:
     @classmethod
     def scoped(cls, scope: UUIDScope) -> "UUIDRequest":
         return cls(cls._to_scope_name(scope))
-
-    scope: str
-
-    def __init__(self, scope: Optional[str] = None) -> None:
-        self.scope = scope if scope is not None else self._to_scope_name(UUIDScope.PER_CALL)
 
 
 @rule
