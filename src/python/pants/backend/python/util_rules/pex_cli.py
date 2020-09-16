@@ -7,7 +7,7 @@ from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.util_rules import pex_environment
-from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -60,6 +60,7 @@ class PexCliProcess:
     extra_env: Optional[FrozenDict[str, str]]
     output_files: Optional[Tuple[str, ...]]
     output_directories: Optional[Tuple[str, ...]]
+    python: Optional[PythonExecutable]
 
     def __init__(
         self,
@@ -70,6 +71,7 @@ class PexCliProcess:
         extra_env: Optional[Mapping[str, str]] = None,
         output_files: Optional[Iterable[str]] = None,
         output_directories: Optional[Iterable[str]] = None,
+        python: Optional[PythonExecutable] = None,
     ) -> None:
         self.argv = tuple(argv)
         self.description = description
@@ -77,6 +79,7 @@ class PexCliProcess:
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
+        self.python = python
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -105,7 +108,9 @@ async def setup_pex_cli_process(
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
     pex_root_path = ".cache/pex_root"
-    argv = pex_env.create_argv(downloaded_pex_bin.exe, *request.argv, "--pex-root", pex_root_path)
+    argv = pex_env.create_argv(
+        downloaded_pex_bin.exe, *request.argv, "--pex-root", pex_root_path, python=request.python
+    )
     env = {
         # Ensure Pex and its subprocesses create temporary files in the the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we
