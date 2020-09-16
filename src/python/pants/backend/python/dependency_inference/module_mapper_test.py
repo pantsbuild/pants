@@ -100,7 +100,7 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     # not generate subtargets.
     rule_runner.create_file("tests/python/project_test/demo_test/__init__.py")
     rule_runner.add_to_build_file("tests/python/project_test/demo_test", "python_library()")
-    result = rule_runner.request_product(FirstPartyModuleToAddressMapping, [options_bootstrapper])
+    result = rule_runner.request(FirstPartyModuleToAddressMapping, [options_bootstrapper])
     assert result.mapping == FrozenDict(
         {
             "project.util.dirutil": Address(
@@ -152,9 +152,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    result = rule_runner.request_product(
-        ThirdPartyModuleToAddressMapping, [create_options_bootstrapper()]
-    )
+    result = rule_runner.request(ThirdPartyModuleToAddressMapping, [create_options_bootstrapper()])
     assert result.mapping == FrozenDict(
         {
             "colors": Address("3rdparty/python", target_name="ansicolors"),
@@ -172,7 +170,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     )
 
     def get_owner(module: str) -> Optional[Address]:
-        return rule_runner.request_product(
+        return rule_runner.request(
             PythonModuleOwner, [PythonModule(module), options_bootstrapper]
         ).address
 

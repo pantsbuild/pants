@@ -23,10 +23,8 @@ def test_options_parse_scoped(rule_runner: RuleRunner) -> None:
     options_bootstrapper = create_options_bootstrapper(
         args=["-ldebug"], env=dict(PANTS_PANTSD="True", PANTS_BUILD_IGNORE='["ignoreme/"]')
     )
-    global_options = rule_runner.request_product(
-        ScopedOptions, [Scope(GLOBAL_SCOPE), options_bootstrapper]
-    )
-    python_setup_options = rule_runner.request_product(
+    global_options = rule_runner.request(ScopedOptions, [Scope(GLOBAL_SCOPE), options_bootstrapper])
+    python_setup_options = rule_runner.request(
         ScopedOptions, [Scope("python-setup"), options_bootstrapper]
     )
 
@@ -40,7 +38,7 @@ def test_options_parse_memoization(rule_runner: RuleRunner) -> None:
     # Confirm that re-executing with a new-but-identical Options object results in memoization.
 
     def parse(ob):
-        return rule_runner.request_product(ScopedOptions, [Scope(GLOBAL_SCOPE), ob])
+        return rule_runner.request(ScopedOptions, [Scope(GLOBAL_SCOPE), ob])
 
     # If two OptionsBootstrapper instances are not equal, memoization will definitely not kick in.
     one_opts = create_options_bootstrapper()

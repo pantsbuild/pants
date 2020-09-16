@@ -101,15 +101,13 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     _scheduler: Optional[SchedulerSession] = None
 
-    _P = TypeVar("_P")
+    _O = TypeVar("_O")
 
-    def request_product(
-        self, product_type: Type["TestBase._P"], subjects: Iterable[Any]
-    ) -> "TestBase._P":
+    def request(self, output_type: Type["TestBase._O"], inputs: Iterable[Any]) -> "TestBase._O":
         result = assert_single_element(
-            self.scheduler.product_request(product_type, [Params(*subjects)])
+            self.scheduler.product_request(output_type, [Params(*inputs)])
         )
-        return cast(TestBase._P, result)
+        return cast(TestBase._O, result)
 
     def run_goal_rule(
         self,

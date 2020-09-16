@@ -53,11 +53,11 @@ def _find_root(
                 rule_args=[src_root_req, source_root_config],
                 mock_gets=[
                     MockGet(
-                        product_type=OptionalSourceRoot,
-                        subject_type=SourceRootRequest,
+                        output_type=OptionalSourceRoot,
+                        input_type=SourceRootRequest,
                         mock=_do_find_root,
                     ),
-                    MockGet(product_type=Paths, subject_type=PathGlobs, mock=_mock_fs_check),
+                    MockGet(output_type=Paths, input_type=PathGlobs, mock=_mock_fs_check),
                 ],
             ),
         )
@@ -233,10 +233,10 @@ def test_all_roots() -> None:
         all_roots,
         rule_args=[source_root_config],
         mock_gets=[
-            MockGet(product_type=Paths, subject_type=PathGlobs, mock=provider_rule),
+            MockGet(output_type=Paths, input_type=PathGlobs, mock=provider_rule),
             MockGet(
-                product_type=OptionalSourceRoot,
-                subject_type=SourceRootRequest,
+                output_type=OptionalSourceRoot,
+                input_type=SourceRootRequest,
                 mock=source_root_mock_rule,
             ),
         ],
@@ -271,10 +271,10 @@ def test_all_roots_with_root_at_buildroot() -> None:
         all_roots,
         rule_args=[source_root_config],
         mock_gets=[
-            MockGet(product_type=Paths, subject_type=PathGlobs, mock=provider_rule),
+            MockGet(output_type=Paths, input_type=PathGlobs, mock=provider_rule),
             MockGet(
-                product_type=OptionalSourceRoot,
-                subject_type=SourceRootRequest,
+                output_type=OptionalSourceRoot,
+                input_type=SourceRootRequest,
                 mock=lambda req: OptionalSourceRoot(SourceRoot(".")),
             ),
         ],
@@ -293,7 +293,7 @@ def test_source_roots_request() -> None:
         files=(PurePath("src/python/foo/bar.py"), PurePath("tests/python/foo/bar_test.py")),
         dirs=(PurePath("src/python/foo"), PurePath("src/python/baz/qux")),
     )
-    res = rule_runner.request_product(
+    res = rule_runner.request(
         SourceRootsResult,
         [
             req,

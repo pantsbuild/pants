@@ -13,6 +13,6 @@ def test_platform_on_local_epr_result() -> None:
     process = Process(
         argv=("/bin/echo", "test"), description="Run some program that will exit cleanly."
     )
-    result = rule_runner.request_product(FallibleProcessResultWithPlatform, [process])
+    result = rule_runner.request(FallibleProcessResultWithPlatform, [process])
     assert result.exit_code == 0
     assert result.platform == this_platform

@@ -73,10 +73,10 @@ def run_isort(
     options_bootstrapper = create_options_bootstrapper(args=args)
     field_sets = [IsortFieldSet.create(tgt) for tgt in targets]
     pants_env = PantsEnvironment()
-    lint_results = rule_runner.request_product(
+    lint_results = rule_runner.request(
         LintResults, [IsortRequest(field_sets), options_bootstrapper, pants_env]
     )
-    input_sources = rule_runner.request_product(
+    input_sources = rule_runner.request(
         SourceFiles,
         [
             SourceFilesRequest(field_set.sources for field_set in field_sets),
@@ -84,7 +84,7 @@ def run_isort(
             pants_env,
         ],
     )
-    fmt_result = rule_runner.request_product(
+    fmt_result = rule_runner.request(
         FmtResult,
         [
             IsortRequest(field_sets, prior_formatter_result=input_sources.snapshot),
@@ -96,7 +96,7 @@ def run_isort(
 
 
 def get_digest(rule_runner: RuleRunner, source_files: List[FileContent]) -> Digest:
-    return rule_runner.request_product(Digest, [CreateDigest(source_files)])
+    return rule_runner.request(Digest, [CreateDigest(source_files)])
 
 
 def test_passing_source(rule_runner: RuleRunner) -> None:

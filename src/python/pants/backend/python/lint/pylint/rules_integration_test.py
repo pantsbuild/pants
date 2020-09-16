@@ -99,7 +99,7 @@ def run_pylint(
         args.append("--pylint-skip")
     if additional_args:
         args.extend(additional_args)
-    results = rule_runner.request_product(
+    results = rule_runner.request(
         LintResults,
         [
             PylintRequest(PylintFieldSet.create(tgt) for tgt in targets),

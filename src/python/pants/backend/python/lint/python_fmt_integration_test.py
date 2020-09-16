@@ -48,14 +48,14 @@ def run_black_and_isort(
         "--backend-packages=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
         *(extra_args or []),
     ]
-    results = rule_runner.request_product(
+    results = rule_runner.request(
         LanguageFmtResults, [targets, create_options_bootstrapper(args=args), PantsEnvironment()]
     )
     return results
 
 
 def get_digest(rule_runner: RuleRunner, source_files: List[FileContent]) -> Digest:
-    return rule_runner.request_product(Digest, [CreateDigest(source_files)])
+    return rule_runner.request(Digest, [CreateDigest(source_files)])
 
 
 def test_multiple_formatters_changing_the_same_file(rule_runner: RuleRunner) -> None:

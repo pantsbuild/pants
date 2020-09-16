@@ -70,9 +70,9 @@ class Externs:
             if isinstance(res, Get):
                 # Get.
                 return PyGeneratorResponseGet(
-                    res.product_type,
-                    res.subject_declared_type,
-                    res.subject,
+                    res.output_type,
+                    res.input_type,
+                    res.input,
                     res.weak,
                 )
             elif type(res) in (tuple, list):
@@ -80,9 +80,9 @@ class Externs:
                 return PyGeneratorResponseGetMulti(
                     tuple(
                         PyGeneratorResponseGet(
-                            get.product_type,
-                            get.subject_declared_type,
-                            get.subject,
+                            get.output_type,
+                            get.input_type,
+                            get.input,
                             get.weak,
                         )
                         for get in res

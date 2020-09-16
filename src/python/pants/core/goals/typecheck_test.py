@@ -128,13 +128,13 @@ def run_typecheck_rule(
         rule_args=[console, Targets(targets), union_membership],
         mock_gets=[
             MockGet(
-                product_type=TypecheckResults,
-                subject_type=TypecheckRequest,
+                output_type=TypecheckResults,
+                input_type=TypecheckRequest,
                 mock=lambda field_set_collection: field_set_collection.typecheck_results,
             ),
             MockGet(
-                product_type=FieldSetsWithSources,
-                subject_type=FieldSetsWithSourcesRequest,
+                output_type=FieldSetsWithSources,
+                input_type=FieldSetsWithSourcesRequest,
                 mock=lambda field_sets: FieldSetsWithSources(field_sets if include_sources else ()),
             ),
         ],

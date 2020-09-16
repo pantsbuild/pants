@@ -39,7 +39,7 @@ def assert_python_requirements(
 ) -> None:
     rule_runner.add_to_build_file("", f"{build_file_entry}\n")
     rule_runner.create_file(requirements_txt_relpath, requirements_txt)
-    targets = rule_runner.request_product(
+    targets = rule_runner.request(
         Targets,
         [
             Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([])),

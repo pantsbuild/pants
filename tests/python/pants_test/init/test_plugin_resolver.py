@@ -50,7 +50,7 @@ class PluginResolverTest(TestBase):
         )
 
     def _create_pex(self) -> Pex:
-        return self.request_product(
+        return self.request(
             Pex,
             [
                 PexRequest(
@@ -67,7 +67,7 @@ class PluginResolverTest(TestBase):
         self, plugin: str, version: str, setup_py_args: Iterable[str], install_dir: str
     ) -> None:
         pex_obj = self._create_pex()
-        source_digest = self.request_product(
+        source_digest = self.request(
             Digest,
             [
                 CreateDigest(
@@ -86,9 +86,7 @@ class PluginResolverTest(TestBase):
                 )
             ],
         )
-        merged_digest = self.request_product(
-            Digest, [MergeDigests([pex_obj.digest, source_digest])]
-        )
+        merged_digest = self.request(Digest, [MergeDigests([pex_obj.digest, source_digest])])
 
         process = Process(
             argv=("python", "setup-py-runner.pex", "setup.py") + tuple(setup_py_args),
@@ -99,8 +97,8 @@ class PluginResolverTest(TestBase):
             description="Run setup.py",
             output_directories=("dist/",),
         )
-        result = self.request_product(ProcessResult, [process])
-        result_snapshot = self.request_product(Snapshot, [result.output_digest])
+        result = self.request(ProcessResult, [process])
+        result_snapshot = self.request(Snapshot, [result.output_digest])
         self.scheduler.write_digest(result.output_digest, path_prefix="output")
         safe_mkdir(install_dir)
         for path in result_snapshot.files:

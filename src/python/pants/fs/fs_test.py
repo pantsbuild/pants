@@ -50,7 +50,7 @@ def test_write_digest() -> None:
     # TODO(#8336): at some point, this test should require that Workspace only be invoked from
     #  an @goal_rule
     workspace = Workspace(rule_runner.scheduler)
-    digest = rule_runner.request_product(
+    digest = rule_runner.request(
         Digest,
         [CreateDigest([FileContent("a.txt", b"hello"), FileContent("subdir/b.txt", b"goodbye")])],
     )
