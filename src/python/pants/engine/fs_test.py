@@ -423,9 +423,7 @@ class FSTest(FSTestBase):
         assert digest == output_digest
 
         # Illegal.
-        with self.assertRaisesRegex(
-            Exception, r"The `prefix` must be relative."
-        ):
+        with self.assertRaisesRegex(Exception, r"The `prefix` must be relative."):
             self.request_product(Digest, [AddPrefix(digest, "../something")])
 
     def test_remove_prefix(self) -> None:
