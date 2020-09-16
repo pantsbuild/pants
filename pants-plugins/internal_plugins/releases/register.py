@@ -40,7 +40,10 @@ class PantsReleases(Subsystem):
         suffix = version.public[len(version.base_version) :]
         components = version.base_version.split(".") + [suffix]
         if suffix != "" and not (
-            suffix.startswith("rc") or suffix.startswith("a") or suffix.startswith(".dev")
+            suffix.startswith("rc")
+            or suffix.startswith("a")
+            or suffix.startswith("b")
+            or suffix.startswith(".dev")
         ):
             raise ValueError(f"Unparseable pants version number: {version}")
         return "{}.{}.x".format(*components[:2])
