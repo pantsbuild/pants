@@ -7,7 +7,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
-use futures01::Future;
+use futures::{future as future03, FutureExt};
 use log::{debug, warn};
 use protobuf::Message;
 use serde::{Deserialize, Serialize};
@@ -66,7 +66,7 @@ impl crate::CommandRunner for CommandRunner {
     match self.lookup(key).await {
       Ok(Some(result)) => return Ok(result),
       Err(err) => {
-        warn!(
+        debug!(
           "Error loading process execution result from local cache: {} - continuing to execute",
           err
         );
@@ -80,7 +80,7 @@ impl crate::CommandRunner for CommandRunner {
     let result = command_runner.underlying.run(req, context).await?;
     if result.exit_code == 0 {
       if let Err(err) = command_runner.store(key, &result).await {
-        debug!(
+        warn!(
           "Error storing process execution result to local cache: {} - ignoring and continuing",
           err
         );
@@ -97,6 +97,7 @@ impl CommandRunner {
   ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
     use bazel_protos::remote_execution::ExecuteResponse;
 
+    // See whether there is a cache entry.
     let maybe_execute_response: Option<(ExecuteResponse, Platform)> = self
       .process_execution_store
       .load_bytes_with(fingerprint, move |bytes| {
@@ -114,19 +115,39 @@ impl CommandRunner {
       })
       .await?;
 
-    if let Some((execute_response, platform)) = maybe_execute_response {
+    // Deserialize the cache entry if it existed.
+    let result = if let Some((execute_response, platform)) = maybe_execute_response {
       crate::remote::populate_fallible_execution_result(
         self.file_store.clone(),
         execute_response,
         vec![],
         platform,
       )
-      .map(Some)
       .compat()
-      .await
+      .await?
     } else {
-      Ok(None)
-    }
+      return Ok(None);
+    };
+
+    // Ensure that all digests in the result are loadable, erroring if any are not.
+    let _ = future03::try_join_all(vec![
+      self
+        .file_store
+        .ensure_local_has_file(result.stdout_digest)
+        .boxed(),
+      self
+        .file_store
+        .ensure_local_has_file(result.stderr_digest)
+        .boxed(),
+      self
+        .file_store
+        .ensure_local_has_recursive_directory(result.output_directory)
+        .compat()
+        .boxed(),
+    ])
+    .await?;
+
+    Ok(Some(result))
   }
 
   async fn store(
