@@ -13,14 +13,19 @@ class StoreGCService(PantsService):
 
     This service both ensures that in-use files continue to be present in the engine's Store, and
     performs occasional garbage collection to bound the size of the engine's Store.
+
+    NB: The lease extension interval should be significantly less than the rust-side
+    sharded_lmdb::DEFAULT_LEASE_TIME to ensure that valid leases are extended well before they
+    might expire.
     """
 
     def __init__(
         self,
         scheduler: Scheduler,
         period_secs=10,
-        lease_extension_interval_secs=(30 * 60),
-        gc_interval_secs=(4 * 60 * 60),
+        lease_extension_interval_secs=(15 * 60),
+        gc_interval_secs=(1 * 60 * 60),
+        target_size_bytes=(4 * 1024 * 1024 * 1024),
     ):
         super().__init__()
         self._scheduler_session = scheduler.new_session(build_id="store_gc_service_session")
@@ -29,6 +34,7 @@ class StoreGCService(PantsService):
         self._period_secs = period_secs
         self._lease_extension_interval_secs = lease_extension_interval_secs
         self._gc_interval_secs = gc_interval_secs
+        self._target_size_bytes = target_size_bytes
 
         self._set_next_gc()
         self._set_next_lease_extension()
@@ -51,7 +57,7 @@ class StoreGCService(PantsService):
         if time.time() < self._next_gc:
             return
         self._logger.info("Garbage collecting store")
-        self._scheduler_session.garbage_collect_store()
+        self._scheduler_session.garbage_collect_store(self._target_size_bytes)
         self._logger.info("Done garbage collecting store")
         self._set_next_gc()
 

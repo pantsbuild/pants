@@ -197,7 +197,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "garbage_collect_store",
-    py_fn!(py, garbage_collect_store(a: PyScheduler)),
+    py_fn!(py, garbage_collect_store(a: PyScheduler, b: usize)),
   )?;
   m.add(
     py,
@@ -1282,13 +1282,17 @@ fn set_panic_handler(_: Python) -> PyUnitResult {
   Ok(None)
 }
 
-fn garbage_collect_store(py: Python, scheduler_ptr: PyScheduler) -> PyUnitResult {
+fn garbage_collect_store(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  target_size_bytes: usize,
+) -> PyUnitResult {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     py.allow_threads(|| {
-      scheduler.core.store().garbage_collect(
-        store::DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
-        store::ShrinkBehavior::Fast,
-      )
+      scheduler
+        .core
+        .store()
+        .garbage_collect(target_size_bytes, store::ShrinkBehavior::Fast)
     })
     .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
     .map(|()| None)
