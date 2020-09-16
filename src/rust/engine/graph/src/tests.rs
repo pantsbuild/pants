@@ -349,6 +349,34 @@ async fn uncachable_node_only_runs_once() {
 }
 
 #[tokio::test]
+async fn uncachable_deps_node_only_runs_once_per_session() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new());
+
+  let context = {
+    let mut uncacheable = HashSet::new();
+    uncacheable.insert(TNode::new(1));
+    TContext::new(graph.clone()).with_uncacheable(uncacheable)
+  };
+
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+
+  let expected_node_runs = vec![TNode::new(2), TNode::new(1), TNode::new(0)];
+
+  assert_eq!(context.runs(), expected_node_runs);
+
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+
+  assert_eq!(context.runs(), expected_node_runs);
+}
+
+#[tokio::test]
 async fn retries() {
   let _logger = env_logger::try_init();
   let graph = Arc::new(Graph::new());
