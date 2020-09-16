@@ -1,0 +1,41 @@
+# The Runtime Graph
+
+## Overview
+
+Pants' runtime [Graph](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/lib.rs#L547-L572) contains [Node](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/node.rs#L18-L36)s that represent memoized user logic and have a known output type. Edges between `Node`s represent data dependencies, which allow `Node`s to be invalidated when their inputs have changed.
+
+## Nodes
+
+The `Graph` trait is generic for testing purposes, but in Pants' production usage, the `Node` trait [is implemented for](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/src/nodes.rs#L1132-L1139) `@rule`s and intrinsics (essentially, `@rule`s implemented in Rust). The `Node` is a single generic parameter, and so from the `Graph`'s perspective, all `Node` instances are identical: the production usage implements `Node` [using an enum](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/src/nodes.rs#L1030-L1044) in order to isolate data and logic used for different purposes (running `@rule`s, running intrinsics, etc).
+
+### Inputs and Identity
+
+The `Node` trait requires both `Eq` and `Hash`, so a `Node` is its own memoization key and "identity". When an instance of a `Node` runs (via its [`run` method](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/node.rs#L30)), it has two sources of information that it can consume: its own fields/identity, and a [`NodeContext` object](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/node.rs#L66-L117) which allows it to request the values of other `Node`s and access any other information which should not contribute to the `Node`'s identity.
+
+For example: the [`Node` implementation for a `@rule`](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/src/nodes.rs#L936-L996) (called "Task" for historical reasons) holds information that uniquely identifies that instance of the `@rule`: the `Task` struct differentiates it from other `@rule` definitions, and the `Params` (the inputs that will be used to compute its positional arguments and `Get`s) differentiate it from other instances of the same `@rule` definition.
+
+### Execution
+
+When a external caller requests the output for a `Node` (via [get](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/lib.rs#L689-L704)), the `Graph` does a `HashMap` lookup for the `Node` to locate an `Entry` object for that node. The `Entry` object stores the current state of the node, including whether it is [`NotStarted`, `Running`, or `Completed`](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/entry.rs#L153-L191).
+
+In the simplest case, if the `Node` is already `Completed`, the `Graph` immediately returns the Node's result value from the `Entry`. If the `Node` is currently `Running`, the caller will be added as a waiter on the `Entry`, and pushed a value when it is ready. Finally, if the `Node` is `NotStarted`, its `run` method is launched (concurrently on a `tokio` task) and the `Entry` moves to the `Running` state.
+
+Continuing the example above: the `Node` implementation for a `@rule` uses information (pre-computed by the `RuleGraph`) about the `@rule`'s signature to [request the values of `Node`s for the positional arguments of the `@rule`](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/src/nodes.rs#L941-L966), and then runs the `@rule` function. If the result of running the `@rule` is a generator value, the `Node` then continues running to request more `Node` values for `Get`s: otherwise it completes with the result value.
+
+## Invalidation
+
+When a `Node` requests the value of another `Node`, it does so via `NodeContext::get` ([implemented for the `Context` struct](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/src/context.rs#L418-L456) in production usage), which ends up calling `Graph::get`. Unlike an external caller, when a `Node` requests another `Node`, an edge is created in the `Graph` to record the dependency between the two `Node` instances. This tracking is used to implement invalidation of `Node`s.
+
+At any point (perhaps concurrently with `Node`s running), external threads may call [Graph::invalidate_from_roots](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/lib.rs#L401-L407) to indicate that the result values of particular `Node` instances are no longer valid for some reason. Because the identity of a `Node` is immutable (see the "Inputs and Identity" section above), invalidation almost always needs to occur because some information that the `Node` fetched using the `Context` (or direct use of syscalls, etc) is no longer valid. In production usage, invalidation occurs due to filesystem changes: a file watching thread [calls invalidate_from_roots](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/src/context.rs#L351-L362) for `Node` types that are associated with syscalls to read files when it suspects that files on disk have changed.
+
+Confusingly, "root" in the context of `invalidate_from_roots` means a root in the dependee graph: calling the method for a root `Node` will clear the value of that `Node`, and mark the transitive dependees of that `Node` "dirty". The cleared `Node` will definitely re-run when it is next requested (it goes back to the `NotStarted` state), but dirty `Node`s will only re-run if they cannot be "cleaned": see below.
+
+### Dirtying and Cleaning
+
+When the `Entry` for a `Node` is marked dirty by "Invalidation" (see above) we only _suspect_ that it might need to re-run, because one of its dependencies has been cleared. To determine whether it _actually_ needs to re-run, the next time the dirty `Node` is requested, `Graph::get` (via [`Entry::get_node_result`](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/entry.rs#L361-L374)) will compare the [`Generation` values](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/entry.rs#L37-L57) of the dependencies used to compute the previous value of the `Node` with their current `Generation` values. If none of the (`Generation` values) of the `Node` have changed, then it does not need to re-run: this is called "cleaning".
+
+When a `Node` _does_ need to re-run for some reason (either due to having been cleared by invalidation, or being marked dirty and then failing to be cleaned), its previous and new result are compared to determine whether its `Generation` value should increment. The `Generation` value avoids the need to keep multiple copies of a `Node`'s result value in memory over time, and makes cleaning cheaper by converting potentially expensive equality checks into integer comparisons.
+
+## Uncacheable Nodes
+
+TODO!
