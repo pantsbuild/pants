@@ -55,7 +55,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 # -----------------------------------------------------------------------------------------------
 
 
-_P = TypeVar("_P")
+_O = TypeVar("_O")
 
 
 @dataclass(frozen=True)
@@ -140,11 +140,11 @@ class RuleRunner:
     def target_types(self) -> FrozenOrderedSet[Type[Target]]:
         return self.build_config.target_types
 
-    def request_product(self, product_type: Type[_P], subjects: Iterable[Any]) -> _P:
+    def request(self, output_type: Type[_O], inputs: Iterable[Any]) -> _O:
         result = assert_single_element(
-            self.scheduler.product_request(product_type, [Params(*subjects)])
+            self.scheduler.product_request(output_type, [Params(*inputs)])
         )
-        return cast(_P, result)
+        return cast(_O, result)
 
     def run_goal_rule(
         self,
@@ -271,7 +271,7 @@ class RuleRunner:
         This requires that the target actually exists, i.e. that you called
         `rule_runner.add_to_build_file()`.
         """
-        return self.request_product(
+        return self.request(
             WrappedTarget, [address, options_bootstrapper or create_options_bootstrapper()]
         ).target
 
@@ -282,11 +282,11 @@ class RuleRunner:
 
 
 # TODO(#6742): Improve the type signature by using generics and type vars. `mock` should be
-#  `Callable[[SubjectType], ProductType]`.
+#  `Callable[[InputType], OutputType]`.
 @dataclass(frozen=True)
 class MockGet:
-    product_type: Type
-    subject_type: Type
+    output_type: Type
+    input_type: Type
     mock: Callable[[Any], Any]
 
 
@@ -321,8 +321,8 @@ def run_rule_with_mocks(
       rule_args=[arg1],
       mock_gets=[
         MockGet(
-          product_type=Listing,
-          subject_type=Dir,
+          output_type=Listing,
+          input_type=Dir,
           mock=lambda dir_subject: Listing(..),
         ),
       ],
@@ -360,12 +360,12 @@ def run_rule_with_mocks(
             (
                 mock_get.mock
                 for mock_get in mock_gets
-                if mock_get.product_type == product
+                if mock_get.output_type == product
                 and (
-                    mock_get.subject_type == type(subject)
+                    mock_get.input_type == type(subject)
                     or (
                         union_membership
-                        and union_membership.is_member(mock_get.subject_type, subject)
+                        and union_membership.is_member(mock_get.input_type, subject)
                     )
                 )
             ),
@@ -383,9 +383,9 @@ def run_rule_with_mocks(
         try:
             res = rule_coroutine.send(rule_input)
             if isinstance(res, Get):
-                rule_input = get(res.product_type, res.subject)
+                rule_input = get(res.output_type, res.input)
             elif type(res) in (tuple, list):
-                rule_input = [get(g.product_type, g.subject) for g in res]
+                rule_input = [get(g.output_type, g.input) for g in res]
             else:
                 return res
         except StopIteration as e:

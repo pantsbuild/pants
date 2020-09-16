@@ -127,7 +127,7 @@ def run_mypy(
         args.append("--mypy-skip")
     if additional_args:
         args.extend(additional_args)
-    result = rule_runner.request_product(
+    result = rule_runner.request(
         TypecheckResults,
         [
             MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets),

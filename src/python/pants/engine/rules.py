@@ -65,7 +65,7 @@ class _RuleVisitor(ast.NodeVisitor):
     def visit_Call(self, call_node: ast.Call) -> None:
         get_args = self.maybe_extract_get_args(call_node)
         if get_args is not None:
-            product_str, subject_str = GetConstraints.parse_product_and_subject_types(
+            product_str, subject_str = GetConstraints.parse_input_and_output_types(
                 get_args, source_file_name=self.source_file_name
             )
             get = GetConstraints(self.resolve_type(product_str), self.resolve_type(subject_str))

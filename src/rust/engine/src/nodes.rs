@@ -834,8 +834,8 @@ impl Task {
         let mut params = params.clone();
         let entry = entry.clone();
         let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
-          product: get.product,
-          subject: *get.subject.type_id(),
+          output: get.output,
+          input: *get.input.type_id(),
         });
         let entry_res = context
           .core
@@ -846,20 +846,20 @@ impl Task {
             edges
               .entry_for(&dependency_key)
               .cloned()
-              .ok_or_else(|| match get.declared_subject {
+              .ok_or_else(|| match get.input_type {
                 Some(ty) if externs::is_union(ty) => {
                   let value = externs::type_for_type_id(ty).into_object().into();
                   match externs::call_method(
                     &value,
                     "non_member_error_message",
-                    &[externs::val_for(&get.subject)],
+                    &[externs::val_for(&get.input)],
                   ) {
                     Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
                     // If the non_member_error_message() call failed for any reason,
                     // fall back to a generic message.
                     Err(_e) => throw(&format!(
                       "Type {} is not a member of the {} @union",
-                      get.subject.type_id(),
+                      get.input.type_id(),
                       ty
                     )),
                   }
@@ -872,10 +872,10 @@ impl Task {
           });
         // The subject of the get is a new parameter that replaces an existing param of the same
         // type.
-        params.put(get.subject);
+        params.put(get.input);
         async move {
           let entry = entry_res?;
-          Select::new(params, get.product, entry, get.weak)
+          Select::new(params, get.output, entry, get.weak)
             .run_wrapped_node(context.clone())
             .await
         }

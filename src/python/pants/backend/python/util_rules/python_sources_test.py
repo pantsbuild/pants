@@ -63,7 +63,7 @@ class PythonSourceFilesTest(ExternalToolTestBase):
         source_roots: Optional[List[str]] = None,
         extra_args: Optional[List[str]] = None,
     ) -> StrippedPythonSourceFiles:
-        return self.request_product(
+        return self.request(
             StrippedPythonSourceFiles,
             [
                 PythonSourceFilesRequest(
@@ -88,7 +88,7 @@ class PythonSourceFilesTest(ExternalToolTestBase):
         source_roots: Optional[List[str]] = None,
         extra_args: Optional[List[str]] = None,
     ) -> PythonSourceFiles:
-        return self.request_product(
+        return self.request(
             PythonSourceFiles,
             [
                 PythonSourceFilesRequest(

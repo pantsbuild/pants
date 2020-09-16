@@ -43,10 +43,10 @@ def assert_injected(
         rule_runner.make_snapshot({fp: "# declared" for fp in original_declared_files}),
     )
     bootstrapper = create_options_bootstrapper(args=[f"--source-root-patterns={source_roots}"])
-    result = rule_runner.request_product(AncestorFiles, [request, bootstrapper]).snapshot
+    result = rule_runner.request(AncestorFiles, [request, bootstrapper]).snapshot
     assert list(result.files) == sorted(expected_discovered)
 
-    materialized_result = rule_runner.request_product(DigestContents, [result.digest])
+    materialized_result = rule_runner.request(DigestContents, [result.digest])
     for file_content in materialized_result:
         path = file_content.path
         if not path.endswith("__init__.py"):

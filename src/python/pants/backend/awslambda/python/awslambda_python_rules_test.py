@@ -44,10 +44,10 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, by
         ]
     )
     target = rule_runner.get_target(Address.parse(addr), bootstrapper)
-    created_awslambda = rule_runner.request_product(
+    created_awslambda = rule_runner.request(
         CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target), bootstrapper, PantsEnvironment()]
     )
-    created_awslambda_digest_contents = rule_runner.request_product(
+    created_awslambda_digest_contents = rule_runner.request(
         DigestContents, [created_awslambda.digest]
     )
     assert len(created_awslambda_digest_contents) == 1

@@ -509,20 +509,20 @@ py_class!(pub class PyGeneratorResponseGetMulti |py| {
 
 #[derive(Debug)]
 pub struct Get {
-  pub product: TypeId,
-  pub subject: Key,
-  pub declared_subject: Option<TypeId>,
+  pub output: TypeId,
+  pub input: Key,
+  pub input_type: Option<TypeId>,
   pub weak: bool,
 }
 
 impl Get {
   fn new(py: Python, interns: &mut Interns, get: &PyGeneratorResponseGet) -> Result<Get, Failure> {
     Ok(Get {
-      product: interns.type_insert(py, get.product(py).clone_ref(py)),
-      subject: interns
+      output: interns.type_insert(py, get.product(py).clone_ref(py)),
+      input: interns
         .key_insert(py, get.subject(py).clone_ref(py).into())
         .map_err(|e| Failure::from_py_err(py, e))?,
-      declared_subject: Some(interns.type_insert(py, get.declared_subject(py).clone_ref(py))),
+      input_type: Some(interns.type_insert(py, get.declared_subject(py).clone_ref(py))),
       weak: get.weak(py).is_true(),
     })
   }
@@ -533,8 +533,8 @@ impl fmt::Display for Get {
     write!(
       f,
       "Get({}, {})",
-      type_to_str(self.product),
-      key_to_str(&self.subject)
+      type_to_str(self.output),
+      key_to_str(&self.input)
     )
   }
 }

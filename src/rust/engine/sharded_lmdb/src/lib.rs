@@ -242,6 +242,31 @@ impl ShardedLmdb {
     self.lmdbs.values().cloned().collect()
   }
 
+  pub async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    let store = self.clone();
+    self
+      .executor
+      .spawn_blocking(move || {
+        let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+        let (env, db, _lease_database) = store.get(&fingerprint);
+        let del_res = env.begin_rw_txn().and_then(|mut txn| {
+          txn.del(db, &effective_key, None)?;
+          txn.commit()
+        });
+
+        match del_res {
+          Ok(()) => Ok(true),
+          Err(lmdb::Error::NotFound) => Ok(false),
+          Err(err) => Err(format!(
+            "Error removing versioned key {:?}: {}",
+            effective_key.to_hex(),
+            err
+          )),
+        }
+      })
+      .await
+  }
+
   pub async fn exists(&self, fingerprint: Fingerprint) -> Result<bool, String> {
     let store = self.clone();
     let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());

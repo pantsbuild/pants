@@ -49,7 +49,7 @@ def test_filter_field_sets(rule_runner: RuleRunner) -> None:
         empty_addr, Sources(None, address=empty_addr), Tags(None, address=empty_addr)
     )
 
-    result = rule_runner.request_product(
+    result = rule_runner.request(
         FieldSetsWithSources,
         [
             FieldSetsWithSourcesRequest([valid_field_set, empty_field_set]),
@@ -73,7 +73,7 @@ def test_filter_targets(rule_runner: RuleRunner) -> None:
     empty_tgt = MockTarget({}, address=Address("", target_name="empty"))
     invalid_tgt = MockTargetWithNoSourcesField({}, address=Address("", target_name="invalid"))
 
-    result = rule_runner.request_product(
+    result = rule_runner.request(
         TargetsWithSources,
         [
             TargetsWithSourcesRequest([valid_tgt, empty_tgt, invalid_tgt]),

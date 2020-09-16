@@ -32,8 +32,8 @@ def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
         )
 
     mock_gets = [
-        MockGet(product_type=DigestContents, subject_type=PathGlobs, mock=mock_read_config),
-        MockGet(product_type=Digest, subject_type=CreateDigest, mock=mock_handle_config),
+        MockGet(output_type=DigestContents, input_type=PathGlobs, mock=mock_read_config),
+        MockGet(output_type=Digest, input_type=CreateDigest, mock=mock_handle_config),
     ]
 
     result = run_rule_with_mocks(create_coverage_config, rule_args=[coverage], mock_gets=mock_gets)

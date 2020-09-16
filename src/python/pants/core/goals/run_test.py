@@ -29,7 +29,7 @@ def rule_runner() -> RuleRunner:
 
 
 def create_mock_run_request(rule_runner: RuleRunner, program_text: bytes) -> RunRequest:
-    digest = rule_runner.request_product(
+    digest = rule_runner.request(
         Digest,
         [CreateDigest([FileContent(path="program.py", content=program_text, is_executable=True)])],
     )
@@ -72,13 +72,13 @@ def single_target_run(
         ],
         mock_gets=[
             MockGet(
-                product_type=TargetRootsToFieldSets,
-                subject_type=TargetRootsToFieldSetsRequest,
+                output_type=TargetRootsToFieldSets,
+                input_type=TargetRootsToFieldSetsRequest,
                 mock=lambda _: TargetRootsToFieldSets({target_with_origin: [field_set]}),
             ),
             MockGet(
-                product_type=RunRequest,
-                subject_type=TestRunFieldSet,
+                output_type=RunRequest,
+                input_type=TestRunFieldSet,
                 mock=lambda _: create_mock_run_request(rule_runner, program_text),
             ),
         ],

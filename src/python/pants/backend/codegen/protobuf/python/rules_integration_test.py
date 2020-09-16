@@ -52,11 +52,11 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
                 f"--source-root-patterns={repr(source_roots)}",
             ]
         )
-        tgt = self.request_product(WrappedTarget, [Address.parse(spec), bootstrapper]).target
-        protocol_sources = self.request_product(
+        tgt = self.request(WrappedTarget, [Address.parse(spec), bootstrapper]).target
+        protocol_sources = self.request(
             HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSources]), bootstrapper]
         )
-        generated_sources = self.request_product(
+        generated_sources = self.request(
             GeneratedSources,
             [GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt), bootstrapper],
         )

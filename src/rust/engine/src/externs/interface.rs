@@ -197,7 +197,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "garbage_collect_store",
-    py_fn!(py, garbage_collect_store(a: PyScheduler)),
+    py_fn!(py, garbage_collect_store(a: PyScheduler, b: usize)),
   )?;
   m.add(
     py,
@@ -1075,19 +1075,19 @@ fn tasks_task_begin(
   })
 }
 
-fn tasks_add_get(py: Python, tasks_ptr: PyTasks, product: PyType, subject: PyType) -> PyUnitResult {
+fn tasks_add_get(py: Python, tasks_ptr: PyTasks, output: PyType, input: PyType) -> PyUnitResult {
   with_tasks(py, tasks_ptr, |tasks| {
-    let product = externs::type_for(product);
-    let subject = externs::type_for(subject);
-    tasks.add_get(product, subject);
+    let output = externs::type_for(output);
+    let input = externs::type_for(input);
+    tasks.add_get(output, input);
     Ok(None)
   })
 }
 
-fn tasks_add_select(py: Python, tasks_ptr: PyTasks, product: PyType) -> PyUnitResult {
+fn tasks_add_select(py: Python, tasks_ptr: PyTasks, selector: PyType) -> PyUnitResult {
   with_tasks(py, tasks_ptr, |tasks| {
-    let product = externs::type_for(product);
-    tasks.add_select(product);
+    let selector = externs::type_for(selector);
+    tasks.add_select(selector);
     Ok(None)
   })
 }
@@ -1282,13 +1282,17 @@ fn set_panic_handler(_: Python) -> PyUnitResult {
   Ok(None)
 }
 
-fn garbage_collect_store(py: Python, scheduler_ptr: PyScheduler) -> PyUnitResult {
+fn garbage_collect_store(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  target_size_bytes: usize,
+) -> PyUnitResult {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     py.allow_threads(|| {
-      scheduler.core.store().garbage_collect(
-        store::DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
-        store::ShrinkBehavior::Fast,
-      )
+      scheduler
+        .core
+        .store()
+        .garbage_collect(target_size_bytes, store::ShrinkBehavior::Fast)
     })
     .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
     .map(|()| None)

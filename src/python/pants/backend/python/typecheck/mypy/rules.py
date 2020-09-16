@@ -215,7 +215,7 @@ async def mypy_typecheck(
                 "--pex-path",
                 ":".join(
                     (
-                        tool_pex_request.subject.output_filename,
+                        tool_pex_request.input.output_filename,
                         # requirements_pex_request.subject.output_filename,
                     )
                 ),

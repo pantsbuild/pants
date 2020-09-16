@@ -92,7 +92,7 @@ def test_infer_python_imports() -> None:
             args.append("--python-infer-string-imports")
         options_bootstrapper = create_options_bootstrapper(args=args)
         target = rule_runner.get_target(address, options_bootstrapper)
-        return rule_runner.request_product(
+        return rule_runner.request(
             InferredDependencies,
             [InferPythonDependencies(target[PythonSources]), options_bootstrapper],
         )
@@ -153,7 +153,7 @@ def test_infer_python_inits() -> None:
 
     def run_dep_inference(address: Address) -> InferredDependencies:
         target = rule_runner.get_target(address, options_bootstrapper)
-        return rule_runner.request_product(
+        return rule_runner.request(
             InferredDependencies,
             [InferInitDependencies(target[PythonSources]), options_bootstrapper],
         )
@@ -196,7 +196,7 @@ def test_infer_python_conftests() -> None:
 
     def run_dep_inference(address: Address) -> InferredDependencies:
         target = rule_runner.get_target(address, options_bootstrapper)
-        return rule_runner.request_product(
+        return rule_runner.request(
             InferredDependencies,
             [InferConftestDependencies(target[PythonSources]), options_bootstrapper],
         )

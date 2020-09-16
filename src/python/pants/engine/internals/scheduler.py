@@ -221,14 +221,14 @@ class Scheduler:
             self._native.lib.tasks_add_get(tasks, product, subject)
 
         for the_get in rule.input_gets:
-            if union.is_instance(the_get.subject_declared_type):
+            if union.is_instance(the_get.input_type):
                 # If the registered subject type is a union, add Get edges to all registered
                 # union members.
-                for union_member in union_membership.get(the_get.subject_declared_type):
-                    add_get_edge(the_get.product_type, union_member)
+                for union_member in union_membership.get(the_get.input_type):
+                    add_get_edge(the_get.output_type, union_member)
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                add_get_edge(the_get.product_type, the_get.subject_declared_type)
+                add_get_edge(the_get.output_type, the_get.input_type)
 
         self._native.lib.tasks_task_end(tasks)
 
@@ -346,8 +346,8 @@ class Scheduler:
     def lease_files_in_graph(self, session):
         self._native.lib.lease_files_in_graph(self._scheduler, session)
 
-    def garbage_collect_store(self):
-        self._native.lib.garbage_collect_store(self._scheduler)
+    def garbage_collect_store(self, target_size_bytes: int) -> None:
+        self._native.lib.garbage_collect_store(self._scheduler, target_size_bytes)
 
     def new_session(
         self,
@@ -659,5 +659,5 @@ class SchedulerSession:
     def lease_files_in_graph(self):
         self._scheduler.lease_files_in_graph(self._session)
 
-    def garbage_collect_store(self):
-        self._scheduler.garbage_collect_store()
+    def garbage_collect_store(self, target_size_bytes: int) -> None:
+        self._scheduler.garbage_collect_store(target_size_bytes)

@@ -615,16 +615,16 @@ class MoreComplicatedEngineAware(TestBase):
                     FileContent(path="b.txt", content=b"beta"),
                 )
             )
-            digest_1 = self.request_product(Digest, [input_1])
-            snapshot_1 = self.request_product(Snapshot, [digest_1])
+            digest_1 = self.request(Digest, [input_1])
+            snapshot_1 = self.request(Snapshot, [digest_1])
 
             input_2 = CreateDigest((FileContent(path="g.txt", content=b"gamma"),))
-            digest_2 = self.request_product(Digest, [input_2])
-            snapshot_2 = self.request_product(Snapshot, [digest_2])
+            digest_2 = self.request(Digest, [input_2])
+            snapshot_2 = self.request(Snapshot, [digest_2])
 
             input = ComplicatedInput(snapshot_1=snapshot_1, snapshot_2=snapshot_2)
 
-            self.request_product(Output, [input])
+            self.request(Output, [input])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
@@ -678,7 +678,7 @@ class StreamingWorkunitProcessTests(TestBase):
         )
 
         with handler.session():
-            result = self.request_product(ProcessResult, [stdout_process])
+            result = self.request(ProcessResult, [stdout_process])
 
         assert tracker.finished
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -707,7 +707,7 @@ class StreamingWorkunitProcessTests(TestBase):
         )
 
         with handler.session():
-            result = self.request_product(ProcessResult, [stderr_process])
+            result = self.request(ProcessResult, [stderr_process])
 
         assert tracker.finished
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -760,4 +760,4 @@ class StreamingWorkunitProcessTests(TestBase):
         )
 
         with handler.session():
-            self.request_product(ProcessResult, [stdout_process])
+            self.request(ProcessResult, [stdout_process])
