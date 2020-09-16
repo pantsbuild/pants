@@ -525,7 +525,7 @@ impl WrappedNode for Paths {
   type Item = Arc<Vec<PathStat>>;
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<Vec<PathStat>>> {
-    let path_globs = Snapshot::lift_path_globs(&externs::val_for(&self.0))
+    let path_globs = Snapshot::lift_prepared_path_globs(&externs::val_for(&self.0))
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let path_stats = Self::create(context, path_globs).await?;
     Ok(Arc::new(path_stats))
@@ -578,7 +578,7 @@ impl Snapshot {
       .await
   }
 
-  pub fn lift_path_globs(item: &Value) -> Result<PreparedPathGlobs, String> {
+  pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
     let globs = externs::project_multi_strs(item, "globs");
 
     let description_of_origin_field = externs::project_str(item, "description_of_origin");
@@ -597,10 +597,14 @@ impl Snapshot {
     let conjunction_obj = externs::project_ignoring_type(item, "conjunction");
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
+    Ok(PathGlobs::new(globs.clone(), strict_glob_matching, conjunction))
+  }
 
-    PathGlobs::new(globs.clone(), strict_glob_matching, conjunction)
+  pub fn lift_prepared_path_globs(item: &Value) -> Result<PreparedPathGlobs, String> {
+    let path_globs = Snapshot::lift_path_globs(item)?;
+    path_globs
       .parse()
-      .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", globs, e))
+      .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
   }
 
   pub fn store_directory_digest(core: &Arc<Core>, item: &hashing::Digest) -> Value {
@@ -672,7 +676,7 @@ impl WrappedNode for Snapshot {
   type Item = Digest;
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Digest> {
-    let path_globs = Self::lift_path_globs(&externs::val_for(&self.0))
+    let path_globs = Self::lift_prepared_path_globs(&externs::val_for(&self.0))
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let snapshot = Self::create(context, path_globs).await?;
     Ok(snapshot.digest)

@@ -381,7 +381,7 @@ fn digest_subset_to_digest(
   let store = context.core.store();
 
   async move {
-    let path_globs = Snapshot::lift_path_globs(&globs).map_err(|e| throw(&e))?;
+    let path_globs = Snapshot::lift_prepared_path_globs(&globs).map_err(|e| throw(&e))?;
     let original_digest =
       lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
     let subset_params = SubsetParams { globs: path_globs };
