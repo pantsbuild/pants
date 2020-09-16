@@ -24,9 +24,9 @@
 )]
 // Default isn't as big a deal as people seem to think it is.
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
+// Arc<Mutex> can be clearer than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "1881004"]
+#![type_length_limit = "1881024"]
 
 use std::convert::TryInto;
 use std::io::{self, Write};

@@ -424,7 +424,7 @@ class FSTest(FSTestBase):
 
         # Illegal.
         with self.assertRaisesRegex(
-            Exception, r"Cannot add component .*ParentDir.* of path prefix `../something`."
+            Exception, r"The `prefix` must be relative."
         ):
             self.request_product(Digest, [AddPrefix(digest, "../something")])
 
