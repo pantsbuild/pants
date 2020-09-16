@@ -90,8 +90,11 @@ class PexRuntimeEnvironment(Subsystem):
         return level
 
 
-class PythonExecutable(BinaryPath):
+class PythonExecutable(BinaryPath, EngineAwareReturnType):
     """The BinaryPath of a Python executable."""
+
+    def message(self) -> str:
+        return f"Selected {self.path} to run PEXes with."
 
 
 @dataclass(frozen=True)
@@ -129,7 +132,7 @@ class PexEnvironment(EngineAwareReturnType):
                 "`interpreter_search_paths` in the `[python-setup]` scope. Will attempt to run "
                 "PEXes directly."
             )
-        return f"Selected {self.bootstrap_python} to bootstrap PEXes with."
+        return f"Selected {self.bootstrap_python.path} to bootstrap PEXes with."
 
 
 @rule(desc="Find PEX Python", level=LogLevel.DEBUG)
