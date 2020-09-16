@@ -41,8 +41,8 @@ def run_goal(
         ],
         mock_gets=[
             MockGet(
-                product_type=UnexpandedTargets,
-                subject_type=Addresses,
+                output_type=UnexpandedTargets,
+                input_type=Addresses,
                 mock=lambda _: UnexpandedTargets(targets),
             )
         ],

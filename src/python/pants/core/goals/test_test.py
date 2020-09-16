@@ -142,7 +142,7 @@ def run_test_rule(
         )
 
     def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
-        digest = rule_runner.request_product(
+        digest = rule_runner.request(
             Digest, [CreateDigest((FileContent(path="program.py", content=b"def test(): pass"),))]
         )
         process = InteractiveProcess(["/usr/bin/python", "program.py"], input_digest=digest)
@@ -168,39 +168,39 @@ def run_test_rule(
         ],
         mock_gets=[
             MockGet(
-                product_type=TargetRootsToFieldSets,
-                subject_type=TargetRootsToFieldSetsRequest,
+                output_type=TargetRootsToFieldSets,
+                input_type=TargetRootsToFieldSetsRequest,
                 mock=mock_find_valid_field_sets,
             ),
             MockGet(
-                product_type=EnrichedTestResult,
-                subject_type=TestFieldSet,
+                output_type=EnrichedTestResult,
+                input_type=TestFieldSet,
                 mock=lambda fs: fs.test_result,
             ),
             MockGet(
-                product_type=TestDebugRequest,
-                subject_type=TestFieldSet,
+                output_type=TestDebugRequest,
+                input_type=TestFieldSet,
                 mock=mock_debug_request,
             ),
             MockGet(
-                product_type=FieldSetsWithSources,
-                subject_type=FieldSetsWithSourcesRequest,
+                output_type=FieldSetsWithSources,
+                input_type=FieldSetsWithSourcesRequest,
                 mock=lambda field_sets: FieldSetsWithSources(field_sets if include_sources else ()),
             ),
             # Merge XML results.
             MockGet(
-                product_type=Digest,
-                subject_type=MergeDigests,
+                output_type=Digest,
+                input_type=MergeDigests,
                 mock=lambda _: EMPTY_DIGEST,
             ),
             MockGet(
-                product_type=CoverageReports,
-                subject_type=CoverageDataCollection,
+                output_type=CoverageReports,
+                input_type=CoverageDataCollection,
                 mock=mock_coverage_report_generation,
             ),
             MockGet(
-                product_type=OpenFiles,
-                subject_type=OpenFilesRequest,
+                output_type=OpenFiles,
+                input_type=OpenFilesRequest,
                 mock=lambda _: OpenFiles(()),
             ),
         ],

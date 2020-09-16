@@ -33,11 +33,11 @@ def test_extract_zip(rule_runner: RuleRunner, compression: int) -> None:
             zf.writestr(name, content)
     io.flush()
     input_snapshot = rule_runner.make_snapshot({"test.zip": io.getvalue()})
-    extracted_digest = rule_runner.request_product(
+    extracted_digest = rule_runner.request(
         ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
     )
 
-    digest_contents = rule_runner.request_product(DigestContents, [extracted_digest.digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_digest.digest])
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
 
@@ -52,19 +52,19 @@ def test_extract_tar(rule_runner: RuleRunner, compression: str) -> None:
             tf.addfile(tarinfo, BytesIO(content))
     ext = f"tar.{compression}" if compression else "tar"
     input_snapshot = rule_runner.make_snapshot({f"test.{ext}": io.getvalue()})
-    extracted_digest = rule_runner.request_product(
+    extracted_digest = rule_runner.request(
         ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
     )
 
-    digest_contents = rule_runner.request_product(DigestContents, [extracted_digest.digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_digest.digest])
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
 
 def test_non_archive(rule_runner: RuleRunner) -> None:
     input_snapshot = rule_runner.make_snapshot({"test.sh": b"# A shell script"})
-    extracted_digest = rule_runner.request_product(
+    extracted_digest = rule_runner.request(
         ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
     )
 
-    digest_contents = rule_runner.request_product(DigestContents, [extracted_digest.digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_digest.digest])
     assert DigestContents([FileContent("test.sh", b"# A shell script")]) == digest_contents

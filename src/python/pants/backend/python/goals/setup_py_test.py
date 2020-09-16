@@ -105,14 +105,14 @@ def assert_chroot(
     rule_runner: RuleRunner, expected_files, expected_setup_kwargs, addr: str
 ) -> None:
     tgt = rule_runner.get_target(Address.parse(addr))
-    chroot = rule_runner.request_product(
+    chroot = rule_runner.request(
         SetupPyChroot,
         [
             SetupPyChrootRequest(ExportedTarget(tgt), py2=False),
             create_options_bootstrapper(),
         ],
     )
-    snapshot = rule_runner.request_product(Snapshot, [chroot.digest])
+    snapshot = rule_runner.request(Snapshot, [chroot.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
     assert expected_setup_kwargs == chroot.setup_kwargs.kwargs
 
@@ -120,7 +120,7 @@ def assert_chroot(
 def assert_chroot_error(rule_runner: RuleRunner, addr: str, exc_cls: Type[Exception]) -> None:
     tgt = rule_runner.get_target(Address.parse(addr))
     with pytest.raises(ExecutionError) as excinfo:
-        rule_runner.request_product(
+        rule_runner.request(
             SetupPyChroot,
             [
                 SetupPyChrootRequest(ExportedTarget(tgt), py2=False),
@@ -292,11 +292,11 @@ def test_get_sources() -> None:
         addrs,
     ):
         targets = Targets(rule_runner.get_target(Address.parse(addr)) for addr in addrs)
-        srcs = rule_runner.request_product(
+        srcs = rule_runner.request(
             SetupPySources,
             [SetupPySourcesRequest(targets, py2=False), create_options_bootstrapper()],
         )
-        chroot_snapshot = rule_runner.request_product(Snapshot, [srcs.digest])
+        chroot_snapshot = rule_runner.request(Snapshot, [srcs.digest])
 
         assert sorted(expected_files) == sorted(chroot_snapshot.files)
         assert sorted(expected_packages) == sorted(srcs.packages)
@@ -439,7 +439,7 @@ def test_get_requirements() -> None:
 
     def assert_requirements(expected_req_strs, addr):
         tgt = rule_runner.get_target(Address.parse(addr))
-        reqs = rule_runner.request_product(
+        reqs = rule_runner.request(
             ExportedTargetRequirements,
             [DependencyOwner(ExportedTarget(tgt)), create_options_bootstrapper()],
         )
@@ -513,7 +513,7 @@ def test_owned_dependencies() -> None:
         tgt = rule_runner.get_target(Address.parse(exported))
         assert sorted(owned) == sorted(
             od.target.address.spec
-            for od in rule_runner.request_product(
+            for od in rule_runner.request(
                 OwnedDependencies,
                 [
                     DependencyOwner(ExportedTarget(tgt)),
@@ -552,7 +552,7 @@ def assert_is_owner(rule_runner: RuleRunner, owner: str, owned: str):
     tgt = rule_runner.get_target(Address.parse(owned))
     assert (
         owner
-        == rule_runner.request_product(
+        == rule_runner.request(
             ExportedTarget,
             [OwnedDependency(tgt), create_options_bootstrapper()],
         ).target.address.spec
@@ -562,7 +562,7 @@ def assert_is_owner(rule_runner: RuleRunner, owner: str, owned: str):
 def assert_owner_error(rule_runner, owned: str, exc_cls: Type[Exception]):
     tgt = rule_runner.get_target(Address.parse(owned))
     with pytest.raises(ExecutionError) as excinfo:
-        rule_runner.request_product(
+        rule_runner.request(
             ExportedTarget,
             [OwnedDependency(tgt), create_options_bootstrapper()],
         )

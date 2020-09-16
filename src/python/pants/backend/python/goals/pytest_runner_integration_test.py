@@ -173,8 +173,8 @@ def run_pytest(
         pants_environment,
         create_options_bootstrapper(args=args),
     ]
-    test_result = rule_runner.request_product(TestResult, subjects)
-    debug_request = rule_runner.request_product(TestDebugRequest, subjects)
+    test_result = rule_runner.request(TestResult, subjects)
+    debug_request = rule_runner.request(TestDebugRequest, subjects)
     if debug_request.process is not None:
         debug_result = InteractiveRunner(rule_runner.scheduler).run(debug_request.process)
         assert test_result.exit_code == debug_result.exit_code
@@ -371,7 +371,7 @@ def test_junit(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
     assert f"{PACKAGE}/test_good.py ." in result.stdout
     assert result.xml_results is not None
-    digest_contents = rule_runner.request_product(DigestContents, [result.xml_results.digest])
+    digest_contents = rule_runner.request(DigestContents, [result.xml_results.digest])
     file = digest_contents[0]
     assert file.path.startswith("dist/test-results")
     assert b"pants_test.test_good" in file.content

@@ -59,7 +59,7 @@ class OptionableFactory(ABC):
             output_type=cls.optionable_cls,
             input_selectors=(),
             func=partial_construct_optionable,
-            input_gets=(GetConstraints(product_type=ScopedOptions, subject_declared_type=Scope),),
+            input_gets=(GetConstraints(output_type=ScopedOptions, input_type=Scope),),
             canonical_name=name,
         )
 

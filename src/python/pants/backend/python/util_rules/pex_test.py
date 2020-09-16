@@ -350,7 +350,7 @@ def create_pex_and_get_all_data(
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
     )
-    pex = rule_runner.request_product(
+    pex = rule_runner.request(
         Pex,
         [
             request,
@@ -403,7 +403,7 @@ def create_pex_and_get_pex_info(
 
 
 def test_pex_execution(rule_runner: RuleRunner) -> None:
-    sources = rule_runner.request_product(
+    sources = rule_runner.request(
         Digest,
         [
             CreateDigest(
@@ -430,12 +430,12 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
         input_digest=pex_output["pex"].digest,
         description="Run the pex and make sure it works",
     )
-    result = rule_runner.request_product(ProcessResult, [process])
+    result = rule_runner.request(ProcessResult, [process])
     assert result.stdout == b"from main\n"
 
 
 def test_pex_environment(rule_runner: RuleRunner) -> None:
-    sources = rule_runner.request_product(
+    sources = rule_runner.request(
         Digest,
         [
             CreateDigest(
@@ -456,7 +456,7 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
     )
     pex_output = create_pex_and_get_all_data(rule_runner, entry_point="main", sources=sources)
 
-    process = rule_runner.request_product(
+    process = rule_runner.request(
         Process,
         [
             PexProcess(
@@ -475,7 +475,7 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    result = rule_runner.request_product(ProcessResult, [process])
+    result = rule_runner.request(ProcessResult, [process])
     assert b"LANG=es_PY.UTF-8" in result.stdout
     assert b"ftp_proxy=dummyproxy" in result.stdout
 
@@ -556,7 +556,7 @@ def test_additional_inputs(rule_runner: RuleRunner) -> None:
     # This verifies that the file was indeed provided as additional input to the pex call.
     preamble_file = "custom_preamble.txt"
     preamble = "#!CUSTOM PREAMBLE\n"
-    additional_inputs = rule_runner.request_product(
+    additional_inputs = rule_runner.request(
         Digest, [CreateDigest([FileContent(path=preamble_file, content=preamble.encode())])]
     )
     additional_pex_args = (f"--preamble-file={preamble_file}",)

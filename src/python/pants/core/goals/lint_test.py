@@ -134,16 +134,16 @@ def run_lint_rule(
         ],
         mock_gets=[
             MockGet(
-                product_type=LintResults,
-                subject_type=LintRequest,
+                output_type=LintResults,
+                input_type=LintRequest,
                 mock=lambda field_set_collection: field_set_collection.lint_results,
             ),
             MockGet(
-                product_type=FieldSetsWithSources,
-                subject_type=FieldSetsWithSourcesRequest,
+                output_type=FieldSetsWithSources,
+                input_type=FieldSetsWithSourcesRequest,
                 mock=lambda field_sets: FieldSetsWithSources(field_sets if include_sources else ()),
             ),
-            MockGet(product_type=Digest, subject_type=MergeDigests, mock=lambda _: EMPTY_DIGEST),
+            MockGet(output_type=Digest, input_type=MergeDigests, mock=lambda _: EMPTY_DIGEST),
         ],
         union_membership=union_membership,
     )

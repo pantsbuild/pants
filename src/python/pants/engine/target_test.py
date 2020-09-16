@@ -234,8 +234,8 @@ def test_async_field() -> None:
             rule_args=[FortranSourcesRequest(sources_field)],
             mock_gets=[
                 MockGet(
-                    product_type=Snapshot,
-                    subject_type=PathGlobs,
+                    output_type=Snapshot,
+                    input_type=PathGlobs,
                     mock=lambda _: Snapshot(EMPTY_DIGEST, files=hydrated_source_files, dirs=()),
                 )
             ],

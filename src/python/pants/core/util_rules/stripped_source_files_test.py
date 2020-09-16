@@ -43,7 +43,7 @@ def get_stripped_files(
     if not has_source_root_patterns:
         source_root_patterns = ["src/python", "src/java", "tests/python"]
         args.append(f"--source-root-patterns={json.dumps(source_root_patterns)}")
-    result = rule_runner.request_product(
+    result = rule_runner.request(
         StrippedSourceFiles,
         [request, create_options_bootstrapper(args=args)],
     )

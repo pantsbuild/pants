@@ -55,8 +55,8 @@ def test_parse_address_family_empty() -> None:
         ],
         mock_gets=[
             MockGet(
-                product_type=DigestContents,
-                subject_type=PathGlobs,
+                output_type=DigestContents,
+                input_type=PathGlobs,
                 mock=lambda _: DigestContents([FileContent(path="/dev/null/BUILD", content=b"")]),
             ),
         ],
@@ -70,8 +70,8 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
         rule_args=[create_subsystem(GlobalOptions, build_file_prelude_globs=["prelude"])],
         mock_gets=[
             MockGet(
-                product_type=DigestContents,
-                subject_type=PathGlobs,
+                output_type=DigestContents,
+                input_type=PathGlobs,
                 mock=lambda _: DigestContents(
                     [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
                 ),
@@ -126,7 +126,7 @@ def test_resolve_address() -> None:
     rule_runner = RuleRunner(rules=[QueryRule(Address, (AddressInput,))])
 
     def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
-        assert rule_runner.request_product(Address, [address_input]) == expected
+        assert rule_runner.request(Address, [address_input]) == expected
 
     rule_runner.create_file("a/b/c.txt")
     assert_is_expected(
@@ -151,7 +151,7 @@ def test_resolve_address() -> None:
     assert_is_expected(AddressInput("", target_component="t"), Address("", target_name="t"))
 
     with pytest.raises(ExecutionError) as exc:
-        rule_runner.request_product(Address, [AddressInput("a/b/fake")])
+        rule_runner.request(Address, [AddressInput("a/b/fake")])
     assert "'a/b/fake' does not exist on disk" in str(exc.value)
 
 
@@ -182,7 +182,7 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
         ),
     )
     addr = Address("helloworld")
-    target_adaptor = target_adaptor_rule_runner.request_product(
+    target_adaptor = target_adaptor_rule_runner.request(
         TargetAdaptor, [addr, create_options_bootstrapper()]
     )
     assert target_adaptor.name == "helloworld"
@@ -201,9 +201,7 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
     bootstrapper = create_options_bootstrapper()
     with pytest.raises(ExecutionError) as exc:
-        target_adaptor_rule_runner.request_product(
-            TargetAdaptor, [Address("helloworld"), bootstrapper]
-        )
+        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld"), bootstrapper])
     assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
 
     target_adaptor_rule_runner.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
@@ -211,9 +209,7 @@ def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> Non
         "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
     )
     with pytest.raises(ExecutionError, match=expected_rx_str):
-        target_adaptor_rule_runner.request_product(
-            TargetAdaptor, [Address("helloworld"), bootstrapper]
-        )
+        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld"), bootstrapper])
 
 
 def test_build_file_address() -> None:
@@ -225,7 +221,7 @@ def test_build_file_address() -> None:
 
     def assert_bfa_resolved(address: Address) -> None:
         expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=address)
-        bfa = rule_runner.request_product(BuildFileAddress, [address, bootstrapper])
+        bfa = rule_runner.request(BuildFileAddress, [address, bootstrapper])
         assert bfa == expected_bfa
 
     assert_bfa_resolved(Address("helloworld"))
@@ -246,7 +242,7 @@ def resolve_address_specs(
     specs: Iterable[AddressSpec],
     bootstrapper: Optional[OptionsBootstrapper] = None,
 ) -> Set[AddressWithOrigin]:
-    result = rule_runner.request_product(
+    result = rule_runner.request(
         AddressesWithOrigins,
         [
             AddressSpecs(specs, filter_by_global_options=True),

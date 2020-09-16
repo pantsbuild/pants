@@ -156,8 +156,8 @@ async def setup_pytest_for_target(
                 # `pytest:main` or the tests themselves break between the two versions.
                 ":".join(
                     (
-                        pytest_pex_request.subject.output_filename,
-                        requirements_pex_request.subject.output_filename,
+                        pytest_pex_request.input.output_filename,
+                        requirements_pex_request.input.output_filename,
                     )
                 ),
             ),

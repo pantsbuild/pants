@@ -113,8 +113,8 @@ class RuleVisitorTest(unittest.TestCase):
             A=str,
             B=int,
         )
-        assert get.product_type == str
-        assert get.subject_declared_type == int
+        assert get.output_type == str
+        assert get.input_type == int
 
     def test_multiple_gets(self) -> None:
         gets = self._parse_rule_gets(
@@ -134,11 +134,11 @@ class RuleVisitorTest(unittest.TestCase):
         assert len(gets) == 2
         get_a, get_c = gets
 
-        assert get_a.product_type == str
-        assert get_a.subject_declared_type == int
+        assert get_a.output_type == str
+        assert get_a.input_type == int
 
-        assert get_c.product_type == bool
-        assert get_c.subject_declared_type == str
+        assert get_c.output_type == bool
+        assert get_c.input_type == str
 
     def test_multiget_homogeneous(self) -> None:
         get = self._parse_single_get(
@@ -151,8 +151,8 @@ class RuleVisitorTest(unittest.TestCase):
             A=str,
             B=int,
         )
-        assert get.product_type == str
-        assert get.subject_declared_type == int
+        assert get.output_type == str
+        assert get.input_type == int
 
     def test_multiget_heterogeneous(self) -> None:
         gets = self._parse_rule_gets(
@@ -169,11 +169,11 @@ class RuleVisitorTest(unittest.TestCase):
         assert len(gets) == 2
         get_a, get_b = gets
 
-        assert get_a.product_type == str
-        assert get_a.subject_declared_type == int
+        assert get_a.output_type == str
+        assert get_a.input_type == int
 
-        assert get_b.product_type == int
-        assert get_b.subject_declared_type == str
+        assert get_b.output_type == int
+        assert get_b.input_type == str
 
     def test_get_no_index_call_no_subject_call_allowed(self) -> None:
         gets = self._parse_rule_gets("get_type: type = Get")
@@ -397,7 +397,7 @@ class RuleTest(TestBase):
         res = run_rule_with_mocks(
             a_goal_rule_generator,
             rule_args=[Console()],
-            mock_gets=[MockGet(product_type=A, subject_type=str, mock=lambda _: A())],
+            mock_gets=[MockGet(output_type=A, input_type=str, mock=lambda _: A())],
         )
         self.assertEqual(res, Example(0))
 

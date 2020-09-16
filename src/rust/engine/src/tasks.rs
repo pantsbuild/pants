@@ -239,22 +239,22 @@ impl Tasks {
     });
   }
 
-  pub fn add_get(&mut self, product: TypeId, subject: TypeId) {
+  pub fn add_get(&mut self, output: TypeId, input: TypeId) {
     self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding gets!")
       .gets
-      .push(Get { product, subject });
+      .push(Get { output, input });
   }
 
-  pub fn add_select(&mut self, product: TypeId) {
+  pub fn add_select(&mut self, selector: TypeId) {
     self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding clauses!")
       .clause
-      .push(product);
+      .push(selector);
   }
 
   pub fn task_end(&mut self) {

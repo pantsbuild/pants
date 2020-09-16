@@ -69,7 +69,7 @@ def run_bandit(
         args.append("--bandit-skip")
     if additional_args:
         args.extend(additional_args)
-    results = rule_runner.request_product(
+    results = rule_runner.request(
         LintResults,
         [
             BanditRequest(BanditFieldSet.create(tgt) for tgt in targets),
@@ -202,7 +202,7 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     assert result[0].exit_code == 1
     assert result[0].stdout.strip() == ""
     assert result[0].report is not None
-    report_files = rule_runner.request_product(DigestContents, [result[0].report.digest])
+    report_files = rule_runner.request(DigestContents, [result[0].report.digest])
     assert len(report_files) == 1
     assert (
         "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in report_files[0].content.decode()

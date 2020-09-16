@@ -162,20 +162,20 @@ class FmtTest(TestBase):
             ],
             mock_gets=[
                 MockGet(
-                    product_type=LanguageFmtResults,
-                    subject_type=LanguageFmtTargets,
+                    output_type=LanguageFmtResults,
+                    input_type=LanguageFmtTargets,
                     mock=lambda language_targets_collection: language_targets_collection.language_fmt_results(
                         result_digest
                     ),
                 ),
                 MockGet(
-                    product_type=TargetsWithSources,
-                    subject_type=TargetsWithSourcesRequest,
+                    output_type=TargetsWithSources,
+                    input_type=TargetsWithSourcesRequest,
                     mock=lambda tgts: TargetsWithSources(tgts if include_sources else ()),
                 ),
                 MockGet(
-                    product_type=Digest,
-                    subject_type=MergeDigests,
+                    output_type=Digest,
+                    input_type=MergeDigests,
                     mock=lambda _: result_digest,
                 ),
             ],

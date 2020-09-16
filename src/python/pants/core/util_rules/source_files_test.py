@@ -65,7 +65,7 @@ def assert_sources_resolved(
     expected: Iterable[TargetSources],
     expected_unrooted: Iterable[str] = (),
 ) -> None:
-    result = rule_runner.request_product(
+    result = rule_runner.request(
         SourceFiles,
         [SourceFilesRequest(sources_fields), create_options_bootstrapper()],
     )

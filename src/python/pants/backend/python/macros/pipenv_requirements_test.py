@@ -39,7 +39,7 @@ def assert_pipenv_requirements(
 ) -> None:
     rule_runner.add_to_build_file("", f"{build_file_entry}\n")
     rule_runner.create_file(pipfile_lock_relpath, dumps(pipfile_lock))
-    targets = rule_runner.request_product(
+    targets = rule_runner.request(
         Targets,
         [
             Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([])),
