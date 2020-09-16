@@ -10,7 +10,7 @@ from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine import process
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.process import BinaryPathRequest, BinaryPaths
+from pants.engine.process import BinaryPath, BinaryPathRequest, BinaryPaths, BinaryPathTest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
@@ -90,17 +90,25 @@ class PexRuntimeEnvironment(Subsystem):
         return level
 
 
+class PythonExecutable(BinaryPath, EngineAwareReturnType):
+    """The BinaryPath of a Python executable."""
+
+    def message(self) -> str:
+        return f"Selected {self.path} to run PEXes with."
+
+
 @dataclass(frozen=True)
 class PexEnvironment(EngineAwareReturnType):
     path: Tuple[str, ...]
     interpreter_search_paths: Tuple[str, ...]
     subprocess_environment_dict: FrozenDict[str, str]
-    bootstrap_python: Optional[str] = None
+    bootstrap_python: Optional[PythonExecutable] = None
 
     def create_argv(
-        self, pex_path: str, *args: str, always_use_shebang: bool = False
+        self, pex_path: str, *args: str, python: Optional[PythonExecutable] = None
     ) -> Iterable[str]:
-        argv = [self.bootstrap_python] if self.bootstrap_python and not always_use_shebang else []
+        python = python or self.bootstrap_python
+        argv = [python.path] if python else []
         argv.extend((pex_path, *args))
         return argv
 
@@ -124,7 +132,7 @@ class PexEnvironment(EngineAwareReturnType):
                 "`interpreter_search_paths` in the `[python-setup]` scope. Will attempt to run "
                 "PEXes directly."
             )
-        return f"Selected {self.bootstrap_python} to bootstrap PEXes with."
+        return f"Selected {self.bootstrap_python.path} to bootstrap PEXes with."
 
 
 @rule(desc="Find PEX Python", level=LogLevel.DEBUG)
@@ -138,13 +146,13 @@ async def find_pex_python(
     # interpreter. As such, we look for many Pythons usable by the PEX bootstrap code here for
     # maximum flexibility.
     all_python_binary_paths = await MultiGet(
-        [
-            Get(
-                BinaryPaths,
-                BinaryPathRequest(
-                    search_path=python_setup.interpreter_search_paths,
-                    binary_name=binary_name,
-                    test_args=[
+        Get(
+            BinaryPaths,
+            BinaryPathRequest(
+                search_path=python_setup.interpreter_search_paths,
+                binary_name=binary_name,
+                test=BinaryPathTest(
+                    args=[
                         "-c",
                         # N.B.: The following code snippet must be compatible with Python 2.7 and
                         # Python 3.5+.
@@ -175,16 +183,20 @@ async def find_pex_python(
                             """
                         ),
                     ],
+                    fingerprint_stdout=False,  # We already emit a usable fingerprint to stdout.
                 ),
-            )
-            for binary_name in pex_runtime_env.bootstrap_interpreter_names
-        ]
+            ),
+        )
+        for binary_name in pex_runtime_env.bootstrap_interpreter_names
     )
 
-    def first_python_binary() -> Optional[str]:
+    def first_python_binary() -> Optional[PythonExecutable]:
         for binary_paths in all_python_binary_paths:
             if binary_paths.first_path:
-                return binary_paths.first_path.path
+                return PythonExecutable(
+                    path=binary_paths.first_path.path,
+                    fingerprint=binary_paths.first_path.fingerprint,
+                )
         return None
 
     return PexEnvironment(

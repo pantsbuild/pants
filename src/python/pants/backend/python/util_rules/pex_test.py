@@ -539,6 +539,7 @@ def test_platforms(rule_runner: RuleRunner) -> None:
         requirements=PexRequirements(["cryptography==2.9"]),
         platforms=platforms,
         interpreter_constraints=constraints,
+        internal_only=False,  # Internal only PEXes do not support (foreign) platforms.
     )
     assert any(
         "cryptography-2.9-cp27-cp27mu-manylinux2010_x86_64.whl" in fp for fp in pex_output["files"]
