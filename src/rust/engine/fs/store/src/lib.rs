@@ -553,8 +553,8 @@ impl Store {
   }
 
   ///
-  /// Download a directory from Remote ByteStore recursively to the local one. Called only with the
-  /// Digest of a Directory.
+  /// Ensure that a directory is locally loadable, which will download it from the Remote store as
+  /// a sideeffect (if one is configured). Called only with the Digest of a Directory.
   ///
   pub fn ensure_local_has_recursive_directory(&self, dir_digest: Digest) -> BoxFuture<(), String> {
     let loaded_directory = {
@@ -578,13 +578,9 @@ impl Store {
           .map(|file_node| {
             let file_digest = try_future!(file_node.get_digest().try_into());
             let store = store.clone();
-            Box::pin(async move {
-              store
-                .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
-                .await
-            })
-            .compat()
-            .to_boxed()
+            Box::pin(async move { store.ensure_local_has_file(file_digest).await })
+              .compat()
+              .to_boxed()
           })
           .collect::<Vec<_>>();
 
@@ -602,6 +598,24 @@ impl Store {
           .map(|_| ())
       })
       .to_boxed()
+  }
+
+  ///
+  /// Ensure that a file is locally loadable, which will download it from the Remote store as
+  /// a sideeffect (if one is configured). Called only with the Digest of a File.
+  ///
+  pub async fn ensure_local_has_file(&self, file_digest: Digest) -> Result<(), String> {
+    let result = self
+      .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
+      .await?;
+    if result.is_some() {
+      Ok(())
+    } else {
+      Err(format!(
+        "File {:?} did not exist in the store.",
+        file_digest
+      ))
+    }
   }
 
   /// Load a REv2 Tree from a remote CAS and cache the embedded Directory protos in the
