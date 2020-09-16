@@ -417,6 +417,12 @@ impl PathGlobs {
   }
 }
 
+impl fmt::Display for PathGlobs {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.globs.join(", "))
+  }
+}
+
 ///
 /// All Stats consumed or returned by this type are relative to the root.
 ///

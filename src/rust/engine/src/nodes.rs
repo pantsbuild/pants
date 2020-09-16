@@ -560,9 +560,12 @@ impl From<SessionValues> for NodeKey {
 /// A Node that captures an store::Snapshot for a PathGlobs subject.
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Snapshot(pub Key);
+pub struct Snapshot(Key);
 
 impl Snapshot {
+  pub fn from_key(key: Key) -> Snapshot {
+    Snapshot(key)
+  }
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<store::Snapshot> {
     // We rely on Context::expand_globs tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.

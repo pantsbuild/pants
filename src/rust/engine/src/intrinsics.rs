@@ -305,7 +305,7 @@ fn path_globs_to_digest(
   let core = context.core.clone();
   async move {
     let key = externs::acquire_key_for(args.pop().unwrap())?;
-    let digest = context.get(Snapshot(key)).await?;
+    let digest = context.get(Snapshot::from_key(key)).await?;
     Ok(Snapshot::store_directory_digest(&core, &digest))
   }
   .boxed()
