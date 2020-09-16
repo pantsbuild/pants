@@ -1363,8 +1363,10 @@ fn capture_snapshots(
     .iter()
     .map(|value| {
       let root = PathBuf::from(externs::project_str(&value, "root"));
-      let path_globs =
-        nodes::Snapshot::lift_prepared_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
+      let path_globs = nodes::Snapshot::lift_prepared_path_globs(&externs::project_ignoring_type(
+        &value,
+        "path_globs",
+      ));
       let digest_hint = {
         let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
         if maybe_digest == Value::from(externs::none()) {

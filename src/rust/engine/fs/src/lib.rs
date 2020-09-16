@@ -322,7 +322,7 @@ impl GitignoreStyleExcludes {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum StrictGlobMatching {
   // NB: the Error and Warn variants store a description of the origin of the PathGlob
   // request so that we can make the error message more helpful to users when globs fail to match.
@@ -366,7 +366,7 @@ impl StrictGlobMatching {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum GlobExpansionConjunction {
   AllMatch,
   AnyMatch,
@@ -388,7 +388,7 @@ pub enum SymlinkBehavior {
   Oblivious,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PathGlobs {
   globs: Vec<String>,
   strict_match_behavior: StrictGlobMatching,

@@ -559,12 +559,14 @@ impl From<SessionValues> for NodeKey {
 ///
 /// A Node that captures an store::Snapshot for a PathGlobs subject.
 ///
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Snapshot(Key);
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Snapshot {
+  path_globs: PathGlobs,
+}
 
 impl Snapshot {
-  pub fn from_key(key: Key) -> Snapshot {
-    Snapshot(key)
+  pub fn from_path_globs(path_globs: PathGlobs) -> Snapshot {
+    Snapshot { path_globs }
   }
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<store::Snapshot> {
     // We rely on Context::expand_globs tracking dependencies for scandirs,
@@ -597,7 +599,7 @@ impl Snapshot {
     let conjunction_obj = externs::project_ignoring_type(item, "conjunction");
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
-    Ok(PathGlobs::new(globs.clone(), strict_glob_matching, conjunction))
+    Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
   }
 
   pub fn lift_prepared_path_globs(item: &Value) -> Result<PreparedPathGlobs, String> {
@@ -676,8 +678,7 @@ impl WrappedNode for Snapshot {
   type Item = Digest;
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Digest> {
-    let path_globs = Self::lift_prepared_path_globs(&externs::val_for(&self.0))
-      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
+    let path_globs = self.path_globs.parse().map_err(|e| throw(&e))?;
     let snapshot = Self::create(context, path_globs).await?;
     Ok(snapshot.digest)
   }
@@ -1138,7 +1139,7 @@ impl NodeKey {
   fn user_facing_name(&self) -> Option<String> {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
-      NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.0)),
+      NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
       NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.0)),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => Some(mp_epr.process.user_facing_name()),
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
@@ -1354,7 +1355,7 @@ impl Display for NodeKey {
         // could get gigantic.
         write!(f, "@rule({})", task.task.display_info.name)
       }
-      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.0),
+      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.path_globs),
       &NodeKey::SessionValues(_) => write!(f, "SessionValues"),
       &NodeKey::Paths(ref s) => write!(f, "Paths({})", s.0),
     }

@@ -304,8 +304,10 @@ fn path_globs_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
-    let key = externs::acquire_key_for(args.pop().unwrap())?;
-    let digest = context.get(Snapshot::from_key(key)).await?;
+    let val = args.pop().unwrap();
+    let path_globs = Snapshot::lift_path_globs(&val)
+      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
+    let digest = context.get(Snapshot::from_path_globs(path_globs)).await?;
     Ok(Snapshot::store_directory_digest(&core, &digest))
   }
   .boxed()
