@@ -20,6 +20,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.meta import classproperty, frozen_after_init
 
 
@@ -61,6 +62,7 @@ class PexCliProcess:
     output_files: Optional[Tuple[str, ...]]
     output_directories: Optional[Tuple[str, ...]]
     python: Optional[PythonExecutable]
+    level: LogLevel
 
     def __init__(
         self,
@@ -72,6 +74,7 @@ class PexCliProcess:
         output_files: Optional[Iterable[str]] = None,
         output_directories: Optional[Iterable[str]] = None,
         python: Optional[PythonExecutable] = None,
+        level: LogLevel = LogLevel.INFO,
     ) -> None:
         self.argv = tuple(argv)
         self.description = description
@@ -80,6 +83,7 @@ class PexCliProcess:
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
         self.python = python
+        self.level = level
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -131,6 +135,7 @@ async def setup_pex_cli_process(
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches={"pex_root": pex_root_path},
+        level=request.level,
     )
 
 

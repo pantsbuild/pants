@@ -139,7 +139,6 @@ def test_transitive_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
 
 
-@pytest.mark.skip(reason="#10683")
 def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: RuleRunner) -> None:
     transitive_targets_rule_runner.add_to_build_file(
         "",

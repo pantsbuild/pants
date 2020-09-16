@@ -5,6 +5,15 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.1rc2 (9/14/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix `DictStringToStringField` not working with default values (Cherry-pick of #10776) (#10777)
+  `PR #10777 <https://github.com/pantsbuild/pants/pull/10777>`_
+
 1.30.1rc1 (9/11/2020)
 ---------------------
 

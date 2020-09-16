@@ -310,8 +310,8 @@ class InteractiveRunner:
     _scheduler: "SchedulerSession"
 
     def run(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        ExceptionSink.toggle_ignoring_sigint(True)
-        return self._scheduler.run_local_interactive_process(request)
+        with ExceptionSink.ignoring_sigint():
+            return self._scheduler.run_local_interactive_process(request)
 
 
 @frozen_after_init
@@ -508,9 +508,11 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     return dataclasses.replace(
         binary_paths,
         paths=[
-            BinaryPath.fingerprinted(path, result.stdout)
-            if request.test.fingerprint_stdout
-            else BinaryPath(path, result.stdout.decode())
+            (
+                BinaryPath.fingerprinted(path, result.stdout)
+                if request.test.fingerprint_stdout
+                else BinaryPath(path, result.stdout.decode())
+            )
             for path, result in zip(found_paths, results)
             if result.exit_code == 0
         ],

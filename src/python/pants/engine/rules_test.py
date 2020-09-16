@@ -580,11 +580,16 @@ class RuleGraphTest(TestBase):
         with self.assertRaises(Exception) as cm:
             create_scheduler(rules)
         assert (
-            "No installed rules return the type B: Is the rule that you're expecting to run "
-            "registered?\nIf rather than being computed by a rule, that type should be provided "
-            "from outside the rule graph, consider adding it as an input for the relevant "
-            "QueryRule."
-        ) == str(cm.exception)
+            "No installed rules return the type B, and it was not provided by potential "
+            "callers of "
+        ) in str(cm.exception)
+        assert (
+            "If that type should be computed by a rule, ensure that that rule is installed."
+        ) in str(cm.exception)
+        assert (
+            "If it should be provided by a caller, ensure that it is included in any relevant "
+            "Query or Get."
+        ) in str(cm.exception)
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
     def test_not_fulfillable_duplicated_dependency(self):

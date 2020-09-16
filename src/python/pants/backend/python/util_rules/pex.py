@@ -396,7 +396,7 @@ class TwoStepPex:
 logger = logging.getLogger(__name__)
 
 
-@rule
+@rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
 async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -> PythonExecutable:
     process = await Get(
         Process,
@@ -432,6 +432,7 @@ async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -
                     """
                 ),
             ),
+            level=LogLevel.DEBUG,
         ),
     )
     result = await Get(
@@ -474,13 +475,16 @@ async def create_pex(
         #  constraints.
         argv.extend(request.platforms.generate_pex_arg_list())
     else:
-        argv.extend(request.interpreter_constraints.generate_pex_arg_list())
-        # N.B: An internal-only PexRequest is validated to never have platforms set so we only need
-        # perform interpreter lookup in this branch.
+        # NB: If it's an internal_only PEX, we do our own lookup of the interpreter based on the
+        # interpreter constraints, and then will run the PEX with that specific interpreter. We
+        # will have already validated that there were no platforms. Otherwise, we let Pex resolve
+        # the constraints.
         if request.internal_only:
             python = await Get(
                 PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints
             )
+        else:
+            argv.extend(request.interpreter_constraints.generate_pex_arg_list())
 
     argv.append("--no-emit-warnings")
     verbosity = pex_runtime_environment.verbosity

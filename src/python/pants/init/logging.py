@@ -65,8 +65,12 @@ class NativeHandler(StreamHandler):
 class ExceptionFormatter(Formatter):
     """Uses the `--print-exception-stacktrace` option to decide whether to render stacktraces."""
 
+    def __init__(self, print_stacktrace: bool):
+        super().__init__(None)
+        self.print_stacktrace = print_stacktrace
+
     def formatException(self, exc_info):
-        if ExceptionSink.should_print_exception_stacktrace:
+        if self.print_stacktrace:
             return super().formatException(exc_info)
         return "\n(Use --print-exception-stacktrace to see more error details.)"
 
@@ -129,7 +133,10 @@ def setup_logging(global_bootstrap_options):
     init_rust_logger(
         global_level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
     )
-    setup_logging_to_stderr(global_level)
+
+    print_exception_stacktrace = global_bootstrap_options.print_exception_stacktrace
+    setup_logging_to_stderr(global_level, print_exception_stacktrace)
+
     if log_dir:
         setup_logging_to_file(global_level, log_dir=log_dir)
 
@@ -151,7 +158,7 @@ def get_log_levels_by_target(global_bootstrap_options: OptionValueContainer) -> 
     return levels
 
 
-def setup_logging_to_stderr(level: LogLevel) -> None:
+def setup_logging_to_stderr(level: LogLevel, print_stacktrace: bool) -> None:
     """Sets up Python logging to stderr, proxied to Rust via a NativeHandler.
 
     We deliberately set the most verbose logging possible (i.e. the TRACE log level), here, and let
@@ -161,7 +168,7 @@ def setup_logging_to_stderr(level: LogLevel) -> None:
 
     python_logger = logging.getLogger(None)
     handler = NativeHandler(level)
-    handler.setFormatter(ExceptionFormatter())
+    handler.setFormatter(ExceptionFormatter(print_stacktrace))
     python_logger.addHandler(handler)
     LogLevel.TRACE.set_level_for(python_logger)
 

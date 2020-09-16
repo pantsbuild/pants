@@ -235,8 +235,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         with self.assertRaises(ValueError) as cm:
             self.scheduler(rules, include_trace_on_error=False)
         assert (
-            "No installed rules return the type A: Is the rule that you're expecting to run "
-            "registered?"
+            "No installed rules return the type A, and it was not provided by potential callers of "
         ) in str(cm.exception)
 
     def test_missing_query_rule(self) -> None:

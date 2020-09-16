@@ -281,9 +281,6 @@ class PantsDaemon(PantsDaemonProcessManager):
 
             # Reset the log location and the backtrace preference from the global bootstrap options.
             global_bootstrap_options = self._bootstrap_options.for_global_scope()
-            ExceptionSink.reset_should_print_backtrace_to_terminal(
-                global_bootstrap_options.print_exception_stacktrace
-            )
             ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
 
             self._native.set_panic_handler()
