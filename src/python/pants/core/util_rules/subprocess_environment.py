@@ -94,7 +94,7 @@ class SubprocessEnvironment(Subsystem):
                     f"[{self.options_scope}].{env_var_name.lower()}. If you wish to continue to "
                     f"set this option, do so by adding '{env_var_name}=value' (or '{env_var_name}' "
                     f"to take the value from Pants's environment) to the "
-                    f"[{self.options_scope}].env_var option."
+                    f"[{self.options_scope}].env_vars option."
                 )
 
         handle_deprecated("LANG")
