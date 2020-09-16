@@ -6,7 +6,7 @@ import os
 import sys
 import time
 from contextlib import contextmanager
-from typing import IO, Any, Iterator
+from typing import Any, Iterator
 
 from setproctitle import setproctitle as set_process_title
 
@@ -189,7 +189,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             os.close(file_no)
 
     @contextmanager
-    def _pantsd_logging(self) -> Iterator[IO[str]]:
+    def _pantsd_logging(self) -> Iterator[None]:
         """A context manager that runs with pantsd logging.
 
         Asserts that stdio (represented by file handles 0, 1, 2) is closed to ensure that we can
@@ -235,7 +235,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, log_handler)  # type: ignore[assignment]
 
             self._logger.debug("Logging reinitialized in pantsd context")
-            yield log_handler.stream
+            yield
 
     def _write_nailgun_port(self):
         """Write the nailgun port to a well known file."""
@@ -262,22 +262,9 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         # Switch log output to the daemon's log stream from here forward.
         self._close_stdio()
-        with self._pantsd_logging() as log_stream:
+        with self._pantsd_logging():
 
             ExceptionSink.reset_signal_handler(SignalHandler(pantsd_instance=True))
-
-            # We don't have any stdio streams to log to anymore, so we log to a file.
-            # We don't override the faulthandler destination because the stream we get will proxy things
-            # via the rust logging code, and faulthandler needs to be writing directly to a real file
-            # descriptor. When pantsd logging was originally initialised, we already set up faulthandler
-            # to log to the correct file descriptor, so don't override it.
-            #
-            # We can get tracebacks of the pantsd process by tailing the pantsd log and sending it
-            # SIGUSR2.
-            ExceptionSink.reset_interactive_output_stream(
-                log_stream,
-                override_faulthandler_destination=False,
-            )
 
             # Reset the log location and the backtrace preference from the global bootstrap options.
             global_bootstrap_options = self._bootstrap_options.for_global_scope()

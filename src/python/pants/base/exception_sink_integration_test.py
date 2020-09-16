@@ -194,16 +194,3 @@ Thread [^\n]+ \\(most recent call first\\):
 
             # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
             self.assertEqual("", read_file(shared_log_file))
-
-    def test_prints_traceback_on_sigusr2(self):
-        with self.pantsd_successful_run_context() as ctx:
-            ctx.runner(["help"])
-            pid = ctx.checker.assert_started()
-            os.kill(pid, signal.SIGUSR2)
-
-            time.sleep(5)
-
-            ctx.checker.assert_running()
-            regex_str = r"Current thread [^\n]+ \(most recent call first\):"
-            file_contents = read_file(os.path.join(ctx.workdir, "pantsd", "pantsd.log"))
-            assert re.search(regex_str, file_contents)
