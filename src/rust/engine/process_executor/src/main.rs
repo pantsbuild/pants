@@ -367,6 +367,7 @@ async fn main() {
     target_platform: target_platform,
     is_nailgunnable,
     execution_slot_variable: None,
+    cache_failures: false,
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
