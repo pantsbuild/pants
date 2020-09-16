@@ -338,6 +338,8 @@ def test_address_parse_method() -> None:
         assert spec_path == address.spec_path
         assert target_name == address.target_name
 
+    assert 1 == 4
+
     assert_parsed("a/b", "target", Address.parse("a/b:target"))
     assert_parsed("a/b", "target", Address.parse("//a/b:target"))
     assert_parsed("a/b", "b", Address.parse("a/b"))
