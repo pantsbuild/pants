@@ -30,9 +30,16 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   async fn run(self, context: Self::Context) -> Result<Self::Item, Self::Error>;
 
   ///
-  /// If the node result is cacheable, return true.
+  /// If a node's output is cacheable based solely on properties of the node, and not the output,
+  /// return true.
   ///
   fn cacheable(&self) -> bool;
+
+  /// A Node may want to compute cacheability differently based on properties of the Node's item.
+  /// The output of this method will be and'd with `cacheable` to compute overall cacheability.
+  fn cacheable_item(&self, _item: &Self::Item) -> bool {
+    self.cacheable()
+  }
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send {
