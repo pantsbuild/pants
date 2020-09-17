@@ -9,7 +9,7 @@ use testutil::data::TestDirectory;
 use testutil::make_file;
 use tokio::runtime::Handle;
 
-use crate::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store};
+use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store};
 use fs::{
   Dir, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStat,
   PosixFS, StrictGlobMatching,
@@ -369,7 +369,8 @@ async fn strip_empty_prefix() {
     .await
     .expect("Error storing directory");
 
-  let result = store.strip_prefix(dir.digest(), PathBuf::from("")).await;
+  let prefix = RelativePath::new(PathBuf::from("")).unwrap();
+  let result = store.strip_prefix(dir.digest(), prefix).await;
   assert_eq!(result, Ok(dir.digest()));
 }
 
@@ -387,9 +388,8 @@ async fn strip_non_empty_prefix() {
     .await
     .expect("Error storing directory");
 
-  let result = store
-    .strip_prefix(dir.digest(), PathBuf::from("cats"))
-    .await;
+  let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
+  let result = store.strip_prefix(dir.digest(), prefix).await;
   assert_eq!(result, Ok(TestDirectory::containing_roland().digest()));
 }
 
@@ -403,9 +403,8 @@ async fn strip_prefix_empty_subdir() {
     .await
     .expect("Error storing directory");
 
-  let result = store
-    .strip_prefix(dir.digest(), PathBuf::from("falcons/peregrine"))
-    .await;
+  let prefix = RelativePath::new(PathBuf::from("falcons/peregrine")).unwrap();
+  let result = store.strip_prefix(dir.digest(), prefix).await;
   assert_eq!(result, Ok(TestDirectory::empty().digest()));
 }
 
@@ -413,7 +412,8 @@ async fn strip_prefix_empty_subdir() {
 async fn strip_dir_not_in_store() {
   let (store, _, _, _) = setup();
   let digest = TestDirectory::nested().digest();
-  let result = store.strip_prefix(digest, PathBuf::from("cats")).await;
+  let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
+  let result = store.strip_prefix(digest, prefix).await;
   assert_eq!(result, Err(format!("{:?} was not known", digest).into()));
 }
 
@@ -425,9 +425,8 @@ async fn strip_subdir_not_in_store() {
     .record_directory(&dir.directory(), false)
     .await
     .expect("Error storing directory");
-  let result = store
-    .strip_prefix(dir.digest(), PathBuf::from("cats"))
-    .await;
+  let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
+  let result = store.strip_prefix(dir.digest(), prefix).await;
   assert_eq!(
     result,
     Err(
@@ -453,9 +452,8 @@ async fn strip_prefix_non_matching_file() {
     .record_directory(&child_dir.directory(), false)
     .await
     .expect("Error storing directory");
-  let result = store
-    .strip_prefix(dir.digest(), PathBuf::from("cats"))
-    .await;
+  let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
+  let result = store.strip_prefix(dir.digest(), prefix).await;
 
   assert_eq!(result, Err(format!("Cannot strip prefix cats from root directory {:?} - root directory contained non-matching file named: treats", dir.digest()).into()));
 }
@@ -473,9 +471,8 @@ async fn strip_prefix_non_matching_dir() {
     .record_directory(&child_dir.directory(), false)
     .await
     .expect("Error storing directory");
-  let result = store
-    .strip_prefix(dir.digest(), PathBuf::from("animals/cats"))
-    .await;
+  let prefix = RelativePath::new(PathBuf::from("animals/cats")).unwrap();
+  let result = store.strip_prefix(dir.digest(), prefix).await;
 
   assert_eq!(result, Err(format!("Cannot strip prefix animals/cats from root directory {:?} - subdirectory animals contained non-matching directory named: birds", dir.digest()).into()));
 }
@@ -492,9 +489,8 @@ async fn strip_subdir_not_in_dir() {
     .record_directory(&TestDirectory::containing_roland().directory(), false)
     .await
     .expect("Error storing directory");
-  let result = store
-    .strip_prefix(dir.digest(), PathBuf::from("cats/ugly"))
-    .await;
+  let prefix = RelativePath::new(PathBuf::from("cats/ugly")).unwrap();
+  let result = store.strip_prefix(dir.digest(), prefix).await;
   assert_eq!(result, Err(format!("Cannot strip prefix cats/ugly from root directory {:?} - subdirectory cats didn't contain a directory named ugly but did contain file named: roland", dir.digest()).into()));
 }
 

@@ -26,7 +26,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "1881004"]
+#![type_length_limit = "1881024"]
 
 use std::convert::TryInto;
 use std::io::{self, Write};
@@ -38,7 +38,7 @@ use std::time::Duration;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
-use fs::GlobMatching;
+use fs::{GlobMatching, RelativePath};
 use futures::compat::Future01CompatExt;
 use futures::future::TryFutureExt;
 use futures01::{future, Future};
@@ -491,7 +491,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
 
         if let Some(prefix_to_strip) = args.value_of("child-dir") {
           digest = store
-            .strip_prefix(digest, PathBuf::from(prefix_to_strip))
+            .strip_prefix(digest, RelativePath::new(PathBuf::from(prefix_to_strip))?)
             .await
             .map_err(|err| match err {
               SnapshotOpsError::String(string)

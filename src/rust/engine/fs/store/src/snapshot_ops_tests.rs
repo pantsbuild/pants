@@ -5,7 +5,7 @@ use testutil::make_file;
 use crate::{
   snapshot_ops::StoreWrapper,
   snapshot_tests::{expand_all_sorted, setup, STR, STR2},
-  OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams,
+  OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, SubsetParams,
 };
 use bazel_protos::remote_execution as remexec;
 use fs::{GlobExpansionConjunction, PosixFS, PreparedPathGlobs, StrictGlobMatching};
@@ -187,8 +187,9 @@ async fn subset_tracking_load_counts() {
   )
   .await;
 
+  let prefix = RelativePath::new(PathBuf::from("subdir")).unwrap();
   let subdir_digest = load_tracking_store
-    .strip_prefix(merged_digest, PathBuf::from("subdir"))
+    .strip_prefix(merged_digest, prefix)
     .await
     .unwrap();
 

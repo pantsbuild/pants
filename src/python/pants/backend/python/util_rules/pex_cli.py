@@ -14,7 +14,7 @@ from pants.core.util_rules.external_tool import (
     ExternalTool,
     ExternalToolRequest,
 )
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process
@@ -101,9 +101,7 @@ async def setup_pex_cli_process(
     tmpdir = ".tmp"
     downloaded_pex_bin, tmp_dir_digest = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, pex_binary.get_request(Platform.current)),
-        # TODO(John Sirois): Use a Directory instead of this FileContent hack when a fix for
-        #  https://github.com/pantsbuild/pants/issues/9650 lands.
-        Get(Digest, CreateDigest([FileContent(f"{tmpdir}/.reserve", b"")])),
+        Get(Digest, CreateDigest([Directory(f"{tmpdir}/.reserve")])),
     )
 
     digests_to_merge = [downloaded_pex_bin.digest, tmp_dir_digest]

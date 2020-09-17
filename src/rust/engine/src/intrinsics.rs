@@ -224,8 +224,10 @@ fn remove_prefix_request_to_digest(
     let input_digest =
       lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
     let prefix = externs::project_str(&args[0], "prefix");
+    let prefix = RelativePath::new(PathBuf::from(prefix))
+      .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
-      .strip_prefix(input_digest, PathBuf::from(prefix))
+      .strip_prefix(input_digest, prefix)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     Ok(Snapshot::store_directory_digest(&core, &digest))
@@ -243,8 +245,10 @@ fn add_prefix_request_to_digest(
     let input_digest =
       lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
     let prefix = externs::project_str(&args[0], "prefix");
+    let prefix = RelativePath::new(PathBuf::from(prefix))
+      .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
-      .add_prefix(input_digest, PathBuf::from(prefix))
+      .add_prefix(input_digest, prefix)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     Ok(Snapshot::store_directory_digest(&core, &digest))
@@ -327,29 +331,40 @@ fn create_digest_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let file_values = externs::project_iterable(&args[0]);
-  let digests: Vec<_> = file_values
-    .iter()
-    .map(|file| {
-      let filename = externs::project_str(&file, "path");
-      let bytes = bytes::Bytes::from(externs::project_bytes(&file, "content"));
-      let is_executable = externs::project_bool(&file, "is_executable");
-
+  let file_contents_and_directories = externs::project_iterable(&args[0]);
+  let digests: Vec<_> = file_contents_and_directories
+    .into_iter()
+    .map(|file_content_or_directory| {
+      let path = externs::project_str(&file_content_or_directory, "path");
       let store = context.core.store();
       async move {
-        let path = RelativePath::new(PathBuf::from(filename))
-          .map_err(|e| format!("The file `path` must be relative: {:?}", e))?;
-        let digest = store.store_file_bytes(bytes, true).await?;
-        let snapshot = store
-          .snapshot_of_one_file(path, digest, is_executable)
-          .await?;
-        let res: Result<_, String> = Ok(snapshot.digest);
-        res
+        let path = RelativePath::new(PathBuf::from(path))
+          .map_err(|e| format!("The `path` must be relative: {:?}", e))?;
+
+        if externs::hasattr(&file_content_or_directory, "content") {
+          let bytes = bytes::Bytes::from(externs::project_bytes(
+            &file_content_or_directory,
+            "content",
+          ));
+          let is_executable = externs::project_bool(&file_content_or_directory, "is_executable");
+
+          let digest = store.store_file_bytes(bytes, true).await?;
+          let snapshot = store
+            .snapshot_of_one_file(path, digest, is_executable)
+            .await?;
+          let res: Result<_, String> = Ok(snapshot.digest);
+          res
+        } else {
+          store
+            .create_empty_dir(path)
+            .await
+            .map_err(|e| format!("{:?}", e))
+        }
       }
     })
     .collect();
-  let store = context.core.store();
 
+  let store = context.core.store();
   async move {
     let digests = future::try_join_all(digests).await.map_err(|e| throw(&e))?;
     let digest = store

@@ -10,7 +10,15 @@ from pants.core.util_rules.external_tool import DownloadedExternalTool, External
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.fs import (
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    Directory,
+    MergeDigests,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -34,16 +42,7 @@ async def generate_python_from_protobuf(
     )
 
     output_dir = "_generated_files"
-    # TODO(#9650): replace this with a proper intrinsic to create empty directories.
-    create_output_dir_request = Get(
-        ProcessResult,
-        Process(
-            ("/bin/mkdir", output_dir),
-            description=f"Create the directory {output_dir}",
-            level=LogLevel.TRACE,
-            output_directories=(output_dir,),
-        ),
-    )
+    create_output_dir_request = Get(Digest, CreateDigest([Directory(output_dir)]))
 
     # Protoc needs all transitive dependencies on `protobuf_libraries` to work properly. It won't
     # actually generate those dependencies; it only needs to look at their .proto files to work
@@ -64,7 +63,7 @@ async def generate_python_from_protobuf(
 
     (
         downloaded_protoc_binary,
-        create_output_dir_result,
+        empty_output_dir,
         all_sources_stripped,
         target_sources_stripped,
     ) = await MultiGet(
@@ -80,7 +79,7 @@ async def generate_python_from_protobuf(
             (
                 all_sources_stripped.snapshot.digest,
                 downloaded_protoc_binary.digest,
-                create_output_dir_result.output_digest,
+                empty_output_dir,
             )
         ),
     )
