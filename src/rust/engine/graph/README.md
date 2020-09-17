@@ -40,7 +40,7 @@ When a `Node` _does_ need to re-run for some reason (either due to having been c
 
 ### Uncacheable Nodes
 
-`Node`s can be marked "uncacheable" ([via](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/node.rs#L32-L35)), which causes them to re-run once per "session" (controlled by a [SessionId](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/node.rs#L97-L101) on the Context), regardless of whether any of their inputs have changed.
+`Node`s can be marked "uncacheable" ([via](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/node.rs#L32-L35)), which causes them to re-run once per "session" (controlled by a [SessionId](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/node.rs#L97-L101) on the Context), regardless of whether any of their inputs have changed. In production usage, a session always corresponds to a single run of Pants (or each iteration of a `--loop`), regardless of whether `pantsd` is in use.
 
 A `Node` that is uncacheable is given an [`Uncacheable` `EntryState`](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/entry.rs#L70-L72), which records which `SessionId` it is valid for. When the value of an uncacheable `Node` is requested, the current `SessionId` is compared to the `SessionId` on the `Node`'s `EntryState`, and the `Node` re-runs if it mismatches.
 
