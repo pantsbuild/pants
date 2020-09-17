@@ -14,6 +14,8 @@ The `Node` trait requires both `Eq` and `Hash`, so a `Node` is its own memoizati
 
 For example: the [`Node` implementation for a `@rule`](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/src/nodes.rs#L936-L996) (called "Task" for historical reasons) holds information that uniquely identifies that instance of the `@rule`: the `Task` struct differentiates it from other `@rule` definitions, and the `Params` (the inputs that will be used to compute its positional arguments and `Get`s) differentiate it from other instances of the same `@rule` definition.
 
+It's important to differentiate the "identity" of a node from its current value, because the `Graph` has optimizations for the case of re-running an existing node with potentially changed inputs. Requesting a brand new `Node` (perhaps with changed `Params`, as in the example above) will always run the logic in that `Node`. On the other hand, re-requesting an existing `Node` might be able to skip re-running the `Node`'s logic if its inputs have not changed. See the "Dirtying and Cleaning" section for more information on those optimizations.
+
 ### Execution
 
 When a external caller requests the output for a `Node` (via [get](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/lib.rs#L689-L704)), the `Graph` does a `HashMap` lookup for the `Node` to locate an `Entry` object for that node. The `Entry` object stores the current state of the node, including whether it is [`NotStarted`, `Running`, or `Completed`](https://github.com/pantsbuild/pants/blob/01372719f7e6f2a3aa0b9f3ce6909991388071ca/src/rust/engine/graph/src/entry.rs#L153-L191).
