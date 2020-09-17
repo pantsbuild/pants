@@ -863,7 +863,7 @@ impl<N: Node> Graph<N> {
             // This is to allow for the behaviour that an uncacheable Node should always have "dirty"
             // (marked as UncacheableDependencies) dependents, transitively.
             let entry = inner.entry_for_id(edge_ref.target()).unwrap();
-            if !entry.node().cacheable() || entry.has_uncacheable_deps() {
+            if entry.has_uncacheable_deps() {
               has_uncacheable_deps = true;
             }
 
