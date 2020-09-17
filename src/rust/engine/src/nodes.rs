@@ -1127,7 +1127,6 @@ impl NodeKey {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.0)),
       NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.0)),
-      //NodeKey::MultiPlatformExecuteProcess(mp_epr) => Some(mp_epr.0.user_facing_name()),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => Some(mp_epr.process.user_facing_name()),
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))

@@ -231,11 +231,13 @@ impl<N: Node> Entry<N> {
   }
 
   pub(crate) fn cacheable_with_output(&self, output: Option<&N::Item>) -> bool {
-    (if let Some(item) = output {
+    let output_cacheable = if let Some(item) = output {
       self.node.cacheable_item(item)
     } else {
       false
-    }) && self.node.cacheable()
+    };
+
+    output_cacheable && self.node.cacheable()
   }
 
   ///
