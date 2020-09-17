@@ -1,18 +1,14 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 import os
 from dataclasses import dataclass
-from typing import List
+from typing import Tuple
 
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.rules import _uncacheable_rule, collect_rules
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
-
-logger = logging.getLogger(__name__)
-
 
 # Names of env vars that can be set on all subprocesses via config.
 SETTABLE_ENV_VARS = (
@@ -67,7 +63,7 @@ class SubprocessEnvironment(Subsystem):
             "--env-vars",
             type=list,
             member_type=str,
-            default=[],
+            default=["LANG", "LC_CTYPE", "LC_ALL"],
             advanced=True,
             help=(
                 "Environment variables to set for process invocations. "
@@ -80,27 +76,38 @@ class SubprocessEnvironment(Subsystem):
         )
 
     @property
-    def env_vars_to_pass_to_subprocesses(self) -> List[str]:
-        ret: List[str] = list(self.options.env_vars)
+    def env_vars_to_pass_to_subprocesses(self) -> Tuple[str, ...]:
+        ret = set(self.options.env_vars)
 
-        # Inject values from the old --lang, --lc-all options if set.
+        # Inject values from the old --lang, --lc-all options if explicitly set, rather than the
+        # default.
         env_var_names = {env_var.split("=", 1)[0] for env_var in self.options.env_vars}
 
         def handle_deprecated(env_var_name: str):
-            val = self.options[env_var_name.lower()]
-            if env_var_name not in env_var_names and val:
-                logger.warning(
-                    f"Setting {env_var_name}={val} on subprocesses due to use of deprecated option "
-                    f"[{self.options_scope}].{env_var_name.lower()}. If you wish to continue to "
-                    f"set this option, do so by adding '{env_var_name}=value' (or '{env_var_name}' "
-                    f"to take the value from Pants's environment) to the "
-                    f"[{self.options_scope}].env_var option."
+            old_configured = not self.options.is_default(env_var_name.lower())
+            new_configured = env_var_name in env_var_names and not self.options.is_default(
+                "env_vars"
+            )
+            if old_configured and new_configured:
+                raise ValueError(
+                    "Conflicting options used. You used the new, preferred "
+                    f"[{self.options_scope}].env_vars option, but also used the deprecated "
+                    f"[{self.options_scope}].{env_var_name.lower()}.\n\nPlease use only one of "
+                    "these."
                 )
+            if old_configured:
+                val = self.options[env_var_name.lower()]
+                # NB: We will have already validated that the user did not override `env_vars`,
+                # which means that they will be using the default values where we only use the env
+                # var name, and not a value, e.g. `LANG`.
+                if env_var_name in env_var_names:
+                    ret.discard(env_var_name)
+                ret.add(f"{env_var_name}={val}")
 
         handle_deprecated("LANG")
         handle_deprecated("LC_ALL")
 
-        return ret
+        return tuple(sorted(ret))
 
 
 @dataclass(frozen=True)

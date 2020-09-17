@@ -398,10 +398,11 @@ logger = logging.getLogger(__name__)
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
 async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -> PythonExecutable:
+    formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
     process = await Get(
         Process,
         PexCliProcess(
-            description=f"Find interpreter for constraints: {interpreter_constraints}",
+            description=f"Find interpreter for constraints: {formatted_constraints}",
             # Here we run the Pex CLI with no requirements which just selects an interpreter and
             # normally starts an isolated repl. By passing `--` we force the repl to instead act as
             # an interpreter (the selected one) and tell us about itself. The upshot is we run the
