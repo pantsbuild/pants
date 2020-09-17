@@ -13,7 +13,6 @@ from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, Protobu
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import QueryRule
 from pants.engine.target import (
     GeneratedSources,
     HydratedSources,
@@ -24,6 +23,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import NoSourceRootError
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.rule_runner import QueryRule
 
 
 class ProtobufPythonIntegrationTest(ExternalToolTestBase):

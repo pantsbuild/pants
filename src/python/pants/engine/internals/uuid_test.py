@@ -7,8 +7,7 @@ import pytest
 
 from pants.engine.internals.uuid import UUIDRequest, UUIDScope
 from pants.engine.internals.uuid import rules as uuid_rules
-from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture

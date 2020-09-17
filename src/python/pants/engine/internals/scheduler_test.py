@@ -12,8 +12,9 @@ from pants.engine.internals.engine_testutil import (
     remove_locations_from_traceback,
 )
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, QueryRule, rule
+from pants.engine.rules import Get, rule
 from pants.engine.unions import UnionRule, union
+from pants.testutil.rule_runner import QueryRule
 from pants.testutil.test_base import TestBase
 
 

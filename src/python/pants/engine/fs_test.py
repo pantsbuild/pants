@@ -39,7 +39,7 @@ from pants.engine.fs import (
 from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
-from pants.engine.rules import QueryRule
+from pants.testutil.rule_runner import QueryRule
 from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir

@@ -36,7 +36,8 @@ from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Get, Params
 from pants.engine.process import InteractiveRunner
-from pants.engine.rules import QueryRule, Rule
+from pants.engine.rules import QueryRule as QueryRule
+from pants.engine.rules import Rule
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer

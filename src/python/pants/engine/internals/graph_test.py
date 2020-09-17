@@ -45,7 +45,7 @@ from pants.engine.internals.graph import (
     parse_dependencies_field,
 )
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, MultiGet, QueryRule, rule
+from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -72,7 +72,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import FrozenOrderedSet
 
