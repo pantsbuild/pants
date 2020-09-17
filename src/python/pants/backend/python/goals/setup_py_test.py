@@ -44,12 +44,12 @@ from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import QueryRule, rule
+from pants.engine.rules import rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 

@@ -13,11 +13,10 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.core.util_rules.filter_empty_sources import rules as filter_empty_sources_rules
 from pants.engine.addresses import Address
-from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet, Sources, Tags, Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture

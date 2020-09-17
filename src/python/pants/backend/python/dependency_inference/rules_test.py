@@ -22,11 +22,11 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import ancestor_files
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.engine.rules import QueryRule, SubsystemRule
+from pants.engine.rules import SubsystemRule
 from pants.engine.target import InferredDependencies
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 def test_infer_python_imports() -> None:

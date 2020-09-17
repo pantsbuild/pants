@@ -12,9 +12,8 @@ from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.process import Process
-from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture

@@ -14,11 +14,10 @@ from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture

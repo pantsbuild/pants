@@ -12,11 +12,10 @@ from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
 from pants.backend.python.target_types import PythonRequirementLibrary, PythonRequirementsFile
 from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.engine.addresses import Address
-from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture
