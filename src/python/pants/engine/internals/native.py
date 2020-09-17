@@ -73,7 +73,6 @@ class Externs:
                     res.output_type,
                     res.input_type,
                     res.input,
-                    res.weak,
                 )
             elif type(res) in (tuple, list):
                 # GetMulti.
@@ -83,7 +82,6 @@ class Externs:
                             get.output_type,
                             get.input_type,
                             get.input,
-                            get.weak,
                         )
                         for get in res
                     )
