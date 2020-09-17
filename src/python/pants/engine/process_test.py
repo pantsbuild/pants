@@ -16,7 +16,7 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResult,
 )
-from pants.engine.rules import Get, QueryRule, rule
+from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
