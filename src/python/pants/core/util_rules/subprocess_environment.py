@@ -10,7 +10,6 @@ from pants.engine.rules import _uncacheable_rule, collect_rules
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 
-
 # Names of env vars that can be set on all subprocesses via config.
 SETTABLE_ENV_VARS = (
     # Customarily used to control i18n settings.

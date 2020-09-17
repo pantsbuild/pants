@@ -398,7 +398,7 @@ logger = logging.getLogger(__name__)
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
 async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -> PythonExecutable:
-    formatted_constraints = ' OR '.join(str(constraint) for constraint in interpreter_constraints)
+    formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
     process = await Get(
         Process,
         PexCliProcess(
