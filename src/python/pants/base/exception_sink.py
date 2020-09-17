@@ -182,34 +182,6 @@ class ExceptionSink:
         cls._shared_error_fileobj = shared_error_stream
 
     @classmethod
-    def reset_interactive_output_stream(
-        cls, interactive_output_stream, override_faulthandler_destination=True
-    ):
-        """Class state:
-
-        - Overwrites `cls._interactive_output_stream`.
-        OS state:
-        - Overwrites the SIGUSR2 handler.
-
-        This method registers a SIGUSR2 handler, which permits a non-fatal `kill -31 <pants pid>` for
-        stacktrace retrieval. This is also where the the error message on fatal exit will be printed to.
-        """
-        try:
-            # NB: mutate process-global state!
-            # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
-            if override_faulthandler_destination:
-                faulthandler.register(
-                    signal.SIGUSR2, interactive_output_stream, all_threads=True, chain=False
-                )
-            # NB: mutate the class variables!
-            cls._interactive_output_stream = interactive_output_stream
-        except ValueError:
-            # Warn about "ValueError: IO on closed file" when the stream is closed.
-            cls._log_exception(
-                "Cannot reset interactive_output_stream -- stream (probably stderr) is closed"
-            )
-
-    @classmethod
     def exceptions_log_path(cls, for_pid=None, in_dir=None):
         """Get the path to either the shared or pid-specific fatal errors log file."""
         if for_pid is None:
@@ -431,9 +403,6 @@ ExceptionSink.reset_log_location(os.getcwd())
 
 # NB: Mutate process-global state!
 sys.excepthook = ExceptionSink.log_exception
-
-# Sets a SIGUSR2 handler.
-ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer)
 
 # Setup a default signal handler.
 ExceptionSink.reset_signal_handler(SignalHandler(pantsd_instance=False))

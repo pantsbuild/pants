@@ -9,7 +9,6 @@ from logging import Formatter, Handler, LogRecord, StreamHandler
 from typing import Dict, Iterable, Optional, Tuple
 
 import pants.util.logging as pants_logging
-from pants.base.exception_sink import ExceptionSink
 from pants.engine.internals.native import Native
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir
@@ -187,8 +186,7 @@ def setup_logging_to_file(
     safe_mkdir(log_dir)
     log_path = os.path.join(log_dir, log_filename)
 
-    fd = native.setup_pantsd_logger(log_path)
-    ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
+    native.setup_pantsd_logger(log_path)
     handler = NativeHandler(level, native_filename=log_path)
 
     logger.addHandler(handler)
