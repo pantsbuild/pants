@@ -51,7 +51,7 @@ use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 use tokio::time::delay_for;
 
-pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer};
+pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer, Stats};
 
 type FNV = BuildHasherDefault<FnvHasher>;
 

@@ -4,6 +4,7 @@
 use std::fmt::{Debug, Display};
 use std::future::Future;
 use std::hash::Hash;
+use std::ops::DerefMut;
 
 use async_trait::async_trait;
 
@@ -87,6 +88,16 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   type RunId: Clone + Debug + Eq + Send;
 
   ///
+  /// Return a reference to a Stats instance that the Graph will use to record relevant statistics
+  /// about a run.
+  ///
+  /// TODO: This API is awkward because it assumes that you need a lock inside your NodeContext
+  /// implementation. We should likely make NodeContext a concrete struct with a type parameter
+  /// for other user specific context rather than having such a large trait.
+  ///
+  fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = Stats> + 'a>;
+
+  ///
   /// Creates a clone of this NodeContext to be used for a different Node.
   ///
   /// To clone a Context for use for the same Node, `Clone` is used directly.
@@ -113,4 +124,11 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   fn spawn<F>(&self, future: F)
   where
     F: Future<Output = ()> + Send + 'static;
+}
+
+#[derive(Default)]
+pub struct Stats {
+  pub ran: usize,
+  pub cleaning_succeeded: usize,
+  pub cleaning_failed: usize,
 }

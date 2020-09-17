@@ -2,6 +2,7 @@ use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::hash::{Hash, Hasher};
+use std::ops::DerefMut;
 use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -11,7 +12,7 @@ use parking_lot::Mutex;
 use rand::{self, Rng};
 use tokio::time::{delay_for, timeout, Elapsed};
 
-use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
+use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError, Stats};
 
 #[tokio::test]
 async fn create() {
@@ -311,7 +312,7 @@ async fn dirty_dependents_of_uncacheable_node() {
 }
 
 #[tokio::test]
-async fn uncachable_node_only_runs_once() {
+async fn uncacheable_node_only_runs_once() {
   let _logger = env_logger::try_init();
   let graph = Arc::new(Graph::new());
 
@@ -354,7 +355,7 @@ async fn uncachable_node_only_runs_once() {
 }
 
 #[tokio::test]
-async fn uncachable_deps_node_only_runs_once_per_session() {
+async fn uncacheable_deps_node_only_runs_once_per_session() {
   let _logger = env_logger::try_init();
   let graph = Arc::new(Graph::new());
 
@@ -740,10 +741,15 @@ struct TContext {
   aborts: Arc<Mutex<Vec<TNode>>>,
   runs: Arc<Mutex<Vec<TNode>>>,
   entry_id: Option<EntryId>,
+  stats: Arc<Mutex<Stats>>,
 }
 impl NodeContext for TContext {
   type Node = TNode;
   type RunId = usize;
+
+  fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = Stats> + 'a> {
+    Box::new(self.stats.lock())
+  }
 
   fn clone_for(&self, entry_id: EntryId) -> TContext {
     TContext {
@@ -756,6 +762,7 @@ impl NodeContext for TContext {
       aborts: self.aborts.clone(),
       runs: self.runs.clone(),
       entry_id: Some(entry_id),
+      stats: self.stats.clone(),
     }
   }
 
@@ -785,9 +792,10 @@ impl TContext {
       delays: Arc::default(),
       uncacheable: Arc::default(),
       graph,
-      aborts: Arc::new(Mutex::new(Vec::new())),
-      runs: Arc::new(Mutex::new(Vec::new())),
+      aborts: Arc::default(),
+      runs: Arc::default(),
       entry_id: None,
+      stats: Arc::default(),
     }
   }
 

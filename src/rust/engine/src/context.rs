@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
 use std::future::Future;
 use std::io::Read;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,8 +18,9 @@ use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
-use graph::{EntryId, Graph, InvalidationResult, NodeContext};
+use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
+use parking_lot::Mutex;
 use process_execution::{
   self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, CommandRunner, NamedCaches,
   Platform, ProcessMetadata,
@@ -377,6 +378,7 @@ pub struct Context {
   pub core: Arc<Core>,
   pub session: Session,
   run_id: Uuid,
+  stats: Arc<Mutex<graph::Stats>>,
 }
 
 impl Context {
@@ -387,6 +389,7 @@ impl Context {
       core,
       session,
       run_id,
+      stats: Arc::default(),
     }
   }
 
@@ -411,6 +414,10 @@ impl NodeContext for Context {
   type Node = NodeKey;
   type RunId = Uuid;
 
+  fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = graph::Stats> + 'a> {
+    Box::new(self.stats.lock())
+  }
+
   ///
   /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
   /// is a shallow clone.
@@ -421,6 +428,7 @@ impl NodeContext for Context {
       core: self.core.clone(),
       session: self.session.clone(),
       run_id: self.run_id,
+      stats: self.stats.clone(),
     }
   }
 

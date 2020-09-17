@@ -309,12 +309,20 @@ impl<N: Node> Entry<N> {
         match context.graph().dep_generations(entry_id, &context).await {
           Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
             // Dependencies have not changed: Node is clean.
+            context.stats().cleaning_succeeded += 1;
             true
           }
-          _ => {
+          x => {
             // If dependency generations mismatched or failed to fetch, clear its
             // dependencies and indicate that it should re-run.
             context.graph().clear_deps(entry_id, run_token);
+            context.stats().cleaning_failed += 1;
+            log::trace!(
+              "Failed to clean {}: {:?} vs {:?}",
+              node,
+              x,
+              previous_dep_generations
+            );
             false
           }
         }
@@ -337,6 +345,7 @@ impl<N: Node> Entry<N> {
           Err(Aborted) => Err(N::Error::invalidated()),
         };
 
+        context.stats().ran += 1;
         context
           .graph()
           .complete(&context, entry_id, run_token, Some(res));
