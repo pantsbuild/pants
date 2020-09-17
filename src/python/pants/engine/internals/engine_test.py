@@ -25,11 +25,12 @@ from pants.engine.internals.engine_testutil import (
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, QueryRule, rule
+from pants.engine.rules import Get, MultiGet, rule
 from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
 )
+from pants.testutil.rule_runner import QueryRule
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 

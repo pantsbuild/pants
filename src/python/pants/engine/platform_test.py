@@ -3,8 +3,7 @@
 
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResultWithPlatform, Process
-from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 def test_platform_on_local_epr_result() -> None:

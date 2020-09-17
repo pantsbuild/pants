@@ -19,7 +19,6 @@ from pants.core.util_rules import archive, external_tool
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import QueryRule
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
@@ -29,6 +28,7 @@ from pants.testutil.python_interpreter_selection import (
     python_interpreter_path,
     skip_unless_python36_and_python37_present,
 )
+from pants.testutil.rule_runner import QueryRule
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree, touch

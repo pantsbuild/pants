@@ -10,8 +10,7 @@ import pytest
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.fs import DigestContents, FileContent
-from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture

@@ -11,7 +11,7 @@ use parking_lot::Mutex;
 use rand::{self, Rng};
 use tokio::time::{delay_for, timeout, Elapsed};
 
-use crate::{EdgeType, EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError, RunToken};
+use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
 
 #[tokio::test]
 async fn create() {
@@ -84,7 +84,7 @@ async fn invalidate_and_rerun() {
 
   // Request with a different salt, which will cause both the middle and upper nodes to rerun since
   // their input values have changed.
-  let context = context.new_session(1).with_salt(1);
+  let context = context.new_run(1).with_salt(1);
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 1), T(2, 1)])
@@ -136,8 +136,8 @@ async fn invalidate_randomly() {
   let graph = Arc::new(Graph::new());
 
   let invalidations = 10;
-  let sleep_per_invalidation = Duration::from_millis(500);
-  let range = 1000;
+  let sleep_per_invalidation = Duration::from_millis(100);
+  let range = 100;
 
   // Spawn a background thread to randomly invalidate in the relevant range. Hold its handle so
   // it doesn't detach.
@@ -236,6 +236,7 @@ async fn poll_cacheable() {
 
 #[tokio::test]
 async fn poll_uncacheable() {
+  let _logger = env_logger::try_init();
   let graph = Arc::new(Graph::new());
   // Create a context where the middle node is uncacheable.
   let context = {
@@ -289,7 +290,7 @@ async fn dirty_dependents_of_uncacheable_node() {
   );
 
   // Re-request the root in a new session and confirm that only the bottom node re-runs.
-  let context = context.new_session(1);
+  let context = context.new_run(1);
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
@@ -298,7 +299,7 @@ async fn dirty_dependents_of_uncacheable_node() {
 
   // Re-request with a new session and different salt, and confirm that everything re-runs bottom
   // up (the order of node cleaning).
-  let context = context.new_session(2).with_salt(1);
+  let context = context.new_run(2).with_salt(1);
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 1), T(1, 1), T(2, 1)])
@@ -338,13 +339,17 @@ async fn uncachable_node_only_runs_once() {
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
+  // TNode(0) and TNode(2) are cleared and dirtied (respectively) before completing, and
+  // so run twice each. But the uncacheable node runs once.
   assert_eq!(
-    context
-      .runs()
-      .into_iter()
-      .filter(|n| *n == TNode::new(1))
-      .count(),
-    1,
+    context.runs(),
+    vec![
+      TNode::new(2),
+      TNode::new(1),
+      TNode::new(0),
+      TNode::new(2),
+      TNode::new(0),
+    ]
   );
 }
 
@@ -458,6 +463,22 @@ async fn canceled_immediately() {
 }
 
 #[tokio::test]
+async fn cyclic_failure() {
+  // Confirms that an attempt to create a cycle fails.
+  let graph = Arc::new(Graph::new());
+  let top = TNode::new(2);
+  let context = TContext::new(graph.clone()).with_dependencies(
+    // Request creation of a cycle by sending the bottom most node to the top.
+    vec![(TNode::new(0), Some(top))].into_iter().collect(),
+  );
+
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Err(TError::Cyclic)
+  );
+}
+
+#[tokio::test]
 async fn cyclic_dirtying() {
   // Confirms that a dirtied path between two nodes is able to reverse direction while being
   // cleaned.
@@ -488,82 +509,6 @@ async fn cyclic_dirtying() {
   let res = graph.create(initial_top, &context_up).await;
 
   assert_eq!(res, Ok(vec![T(1, 1), T(2, 1)]));
-}
-
-#[tokio::test]
-async fn cyclic_strong_strong() {
-  // A cycle between two nodes with strong edges.
-  let (graph, context) = cyclic_references(vec![]);
-  assert_eq!(
-    graph.create(TNode::new(1), &context).await,
-    Err(TError::Cyclic)
-  );
-  assert_eq!(
-    graph.create(TNode::new(0), &context).await,
-    Err(TError::Cyclic)
-  );
-}
-
-#[tokio::test]
-async fn cyclic_strong_weak_with_strong_first() {
-  // A cycle between two nodes with a strong dep from top to bottom and a weak dep from bottom
-  // to top, where we enter from the top first.
-  let _logger = env_logger::try_init();
-
-  let (graph, context) = cyclic_references(vec![TNode::new(1)]);
-  assert_eq!(
-    graph.create(TNode::new(1), &context).await,
-    Ok(vec![T(0, 0), T(1, 0)])
-  );
-  assert_eq!(
-    graph.create(TNode::new(0), &context).await,
-    Ok(vec![T(0, 0), T(1, 0), T(0, 0)])
-  );
-}
-
-///
-/// TODO: Ignored due to https://github.com/pantsbuild/pants/issues/10229.
-///
-#[tokio::test]
-#[ignore]
-async fn cyclic_strong_weak_with_weak_first() {
-  // A cycle between two nodes with a strong dep from top to bottom and a weak dep from bottom
-  // to top, where we enter from the bottom first.
-  let (graph, context) = cyclic_references(vec![TNode::new(1)]);
-  assert_eq!(
-    graph.create(TNode::new(0), &context).await,
-    Ok(vec![T(0, 0), T(1, 0), T(0, 0)])
-  );
-  assert_eq!(
-    graph.create(TNode::new(1), &context).await,
-    Ok(vec![T(0, 0), T(1, 0)])
-  );
-}
-
-#[tokio::test]
-async fn cyclic_weak_weak() {
-  // A cycle between two nodes, both with weak edges.
-  let (graph, context) = cyclic_references(vec![TNode::new(0), TNode::new(1)]);
-  assert_eq!(
-    graph.create(TNode::new(1), &context).await,
-    Ok(vec![T(0, 0), T(1, 0)])
-  );
-  assert_eq!(
-    graph.create(TNode::new(0), &context).await,
-    Ok(vec![T(1, 0), T(0, 0)])
-  );
-}
-
-fn cyclic_references(weak: Vec<TNode>) -> (Arc<Graph<TNode>>, TContext) {
-  let graph = Arc::new(Graph::new());
-  let top = TNode::new(1);
-  let context = TContext::new(graph.clone())
-    .with_dependencies(
-      // Request creation of a cycle by sending the bottom most node to the top.
-      vec![(TNode::new(0), Some(top))].into_iter().collect(),
-    )
-    .with_weak(weak.into_iter().collect());
-  (graph, context)
 }
 
 #[tokio::test]
@@ -622,9 +567,7 @@ async fn critical_path() {
     for (src, dst) in &deps {
       let src = inner.nodes[&node_key(src)];
       let dst = inner.nodes[&node_key(dst)];
-      inner
-        .pg
-        .add_edge(src, dst, (EdgeType::Strong, RunToken::initial()));
+      inner.pg.add_edge(src, dst, 1.0);
     }
   }
 
@@ -781,13 +724,11 @@ impl TNode {
 ///
 #[derive(Clone)]
 struct TContext {
-  session_id: usize,
+  run_id: usize,
   // A value that is included in every value computed by this context. Stands in for "the state of the
   // outside world". A test that wants to "change the outside world" and observe its effect on the
   // graph should change the salt to do so.
   salt: usize,
-  // When dependencies on these nodes are requested, those dependencies will be weak.
-  weak: Arc<HashSet<TNode>>,
   // A mapping from source to optional destination that drives what values each TNode depends on.
   // If there is no entry in this map for a node, then TNode::run will default to requesting
   // the next smallest node. Finally, if a None entry is present, a node will have no
@@ -798,37 +739,32 @@ struct TContext {
   graph: Arc<Graph<TNode>>,
   aborts: Arc<Mutex<Vec<TNode>>>,
   runs: Arc<Mutex<Vec<TNode>>>,
-  entry_id_and_run_token: Option<(EntryId, RunToken)>,
+  entry_id: Option<EntryId>,
 }
 impl NodeContext for TContext {
   type Node = TNode;
-  type SessionId = usize;
+  type RunId = usize;
 
-  fn clone_for(&self, entry_id: EntryId, run_token: RunToken) -> TContext {
+  fn clone_for(&self, entry_id: EntryId) -> TContext {
     TContext {
-      session_id: self.session_id,
+      run_id: self.run_id,
       salt: self.salt,
-      weak: self.weak.clone(),
       edges: self.edges.clone(),
       delays: self.delays.clone(),
       uncacheable: self.uncacheable.clone(),
       graph: self.graph.clone(),
       aborts: self.aborts.clone(),
       runs: self.runs.clone(),
-      entry_id_and_run_token: Some((entry_id, run_token)),
+      entry_id: Some(entry_id),
     }
   }
 
-  fn session_id(&self) -> &usize {
-    &self.session_id
+  fn run_id(&self) -> &usize {
+    &self.run_id
   }
 
   fn graph(&self) -> &Graph<TNode> {
     &self.graph
-  }
-
-  fn entry_id_and_run_token(&self) -> Option<(EntryId, RunToken)> {
-    self.entry_id_and_run_token
   }
 
   fn spawn<F>(&self, future: F)
@@ -843,22 +779,16 @@ impl NodeContext for TContext {
 impl TContext {
   fn new(graph: Arc<Graph<TNode>>) -> TContext {
     TContext {
-      session_id: 0,
+      run_id: 0,
       salt: 0,
-      weak: Arc::default(),
       edges: Arc::default(),
       delays: Arc::default(),
       uncacheable: Arc::default(),
       graph,
-      aborts: Arc::default(),
-      runs: Arc::default(),
-      entry_id_and_run_token: None,
+      aborts: Arc::new(Mutex::new(Vec::new())),
+      runs: Arc::new(Mutex::new(Vec::new())),
+      entry_id: None,
     }
-  }
-
-  fn with_weak(mut self, weak: HashSet<TNode>) -> TContext {
-    self.weak = Arc::new(weak);
-    self
   }
 
   fn with_dependencies(mut self, edges: HashMap<TNode, Option<TNode>>) -> TContext {
@@ -881,8 +811,8 @@ impl TContext {
     self
   }
 
-  fn new_session(mut self, new_session_id: usize) -> TContext {
-    self.session_id = new_session_id;
+  fn new_run(mut self, new_run_id: usize) -> TContext {
+    self.run_id = new_run_id;
     {
       let mut runs = self.runs.lock();
       runs.clear();
@@ -895,17 +825,7 @@ impl TContext {
   }
 
   async fn get(&self, dst: TNode) -> Result<Vec<T>, TError> {
-    if self.weak.contains(&dst) {
-      Ok(
-        self
-          .graph
-          .get_weak(self, dst)
-          .await?
-          .unwrap_or_else(Vec::new),
-      )
-    } else {
-      self.graph.get(self, dst).await
-    }
+    self.graph.get(self.entry_id, self, dst).await
   }
 
   fn abort_guard(&self, node: TNode) -> AbortGuard {

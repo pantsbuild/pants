@@ -122,10 +122,6 @@ class Get(GetConstraints, Generic[_Output, _Input]):
     infer from the input variable [1]. Likewise, the short form must use inline construction of the
     input in order to convey the input type to the engine.
 
-    The `weak` parameter is an experimental extension: a "weak" Get will return None rather than the
-    requested value iff the dependency caused by the Get would create a cycle in the dependency
-    graph.
-
     [1] The engine needs to determine all rule and Get input and output types statically before
     executing any rules. Since Gets are declared inside function bodies, the only way to extract this
     information is through a parse of the rule function. The parse analysis is rudimentary and cannot
@@ -135,9 +131,7 @@ class Get(GetConstraints, Generic[_Output, _Input]):
     """
 
     @overload
-    def __init__(
-        self, output_type: Type[_Output], input_arg0: _Input, *, weak: bool = False
-    ) -> None:
+    def __init__(self, output_type: Type[_Output], input_arg0: _Input) -> None:
         ...
 
     @overload
@@ -146,8 +140,6 @@ class Get(GetConstraints, Generic[_Output, _Input]):
         output_type: Type[_Output],
         input_arg0: Type[_Input],
         input_arg1: _Input,
-        *,
-        weak: bool = False,
     ) -> None:
         ...
 
@@ -156,15 +148,12 @@ class Get(GetConstraints, Generic[_Output, _Input]):
         output_type: Type[_Output],
         input_arg0: Union[Type[_Input], _Input],
         input_arg1: Optional[_Input] = None,
-        *,
-        weak: bool = False,
     ) -> None:
         self.output_type = output_type
         self.input_type = self._validate_input_type(
             input_arg0 if input_arg1 is not None else type(input_arg0)
         )
         self.input = self._validate_input(input_arg1 if input_arg1 is not None else input_arg0)
-        self.weak = weak
 
         self._validate_output_type()
 

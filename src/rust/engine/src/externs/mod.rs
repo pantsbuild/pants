@@ -494,9 +494,8 @@ py_class!(pub class PyGeneratorResponseGet |py| {
     data product: PyType;
     data declared_subject: PyType;
     data subject: PyObject;
-    data weak: PyBool;
-    def __new__(_cls, product: PyType, declared_subject: PyType, subject: PyObject, weak: PyBool) -> CPyResult<Self> {
-      Self::create_instance(py, product, declared_subject, subject, weak)
+    def __new__(_cls, product: PyType, declared_subject: PyType, subject: PyObject) -> CPyResult<Self> {
+      Self::create_instance(py, product, declared_subject, subject)
     }
 });
 
@@ -512,7 +511,6 @@ pub struct Get {
   pub output: TypeId,
   pub input: Key,
   pub input_type: Option<TypeId>,
-  pub weak: bool,
 }
 
 impl Get {
@@ -523,7 +521,6 @@ impl Get {
         .key_insert(py, get.subject(py).clone_ref(py).into())
         .map_err(|e| Failure::from_py_err(py, e))?,
       input_type: Some(interns.type_insert(py, get.declared_subject(py).clone_ref(py))),
-      weak: get.weak(py).is_true(),
     })
   }
 }

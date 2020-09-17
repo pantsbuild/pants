@@ -5,15 +5,16 @@ import re
 from contextlib import contextmanager
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, FrozenSet
+from typing import Any
 
 from pants.engine.internals.engine_testutil import (
     assert_equal_with_printing,
     remove_locations_from_traceback,
 )
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, QueryRule, rule
+from pants.engine.rules import Get, rule
 from pants.engine.unions import UnionRule, union
+from pants.testutil.rule_runner import QueryRule
 from pants.testutil.test_base import TestBase
 
 
@@ -121,20 +122,6 @@ async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
     raise AssertionError("The statement above this one should have failed!")
 
 
-class BooleanDeps(FrozenSet[bool]):
-    pass
-
-
-@rule
-async def boolean_cycle(key: bool) -> BooleanDeps:
-    """A rule with exactly two instances (bool == two keys), which depend on one another weakly."""
-    deps = {key}
-    dep = await Get(BooleanDeps, bool, not key, weak=True)
-    if dep is not None:
-        deps.update(dep)
-    return BooleanDeps(deps)
-
-
 class TypeCheckFailWrapper:
     """This object wraps another object which will be used to demonstrate a type check failure when
     the engine processes an `await Get(...)` statement."""
@@ -198,8 +185,6 @@ class SchedulerTest(TestBase):
             QueryRule(A, (UnionWrapper,)),
             error_msg_test_rule,
             QueryRule(UnionX, (UnionWrapper,)),
-            boolean_cycle,
-            QueryRule(BooleanDeps, (bool,)),
             boolean_and_int,
             QueryRule(A, (int, bool)),
         )
@@ -244,10 +229,6 @@ class SchedulerTest(TestBase):
         # to the same value, triggering an error. Instead, the engine additionally includes the
         # type of a value in equality.
         assert A() == self.request(A, [1, True])
-
-    def test_weak_gets(self):
-        assert {True, False} == set(self.request(BooleanDeps, [True]))
-        assert {True, False} == set(self.request(BooleanDeps, [False]))
 
     @contextmanager
     def _assert_execution_error(self, expected_msg):

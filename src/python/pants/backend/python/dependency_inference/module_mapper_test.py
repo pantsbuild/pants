@@ -17,10 +17,9 @@ from pants.backend.python.dependency_inference.module_mapper import rules as mod
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 
 

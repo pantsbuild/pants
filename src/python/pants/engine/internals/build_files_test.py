@@ -34,12 +34,11 @@ from pants.engine.internals.build_files import (
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import QueryRule
 from pants.engine.target import Dependencies, Sources, Tags, Target
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
 

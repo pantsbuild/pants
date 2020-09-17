@@ -15,11 +15,11 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
-from pants.engine.rules import QueryRule
 from pants.engine.target import Sources, Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.rule_runner import QueryRule
 
 
 class PythonTarget(Target):
