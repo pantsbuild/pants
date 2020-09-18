@@ -58,7 +58,6 @@ resolve_all_constraints = "nondeployables"
 
 [black]
 config = "pyproject.toml"
-extra_requirements = ["regex>=2020.7.14"]
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
