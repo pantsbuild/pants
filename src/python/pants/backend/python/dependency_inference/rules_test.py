@@ -138,6 +138,7 @@ def test_infer_python_inits() -> None:
     options_bootstrapper = create_options_bootstrapper(
         args=[
             "--backend-packages=pants.backend.python",
+            "--python-infer-inits",
             "--source-root-patterns=src/python",
         ]
     )
