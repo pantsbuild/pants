@@ -199,7 +199,6 @@ def test_skip(rule_runner: RuleRunner) -> None:
     assert not result
 
 
-@pytest.mark.xfail(reason="Temporarily disabled 3rd-party support")
 def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file(
         "",
@@ -229,7 +228,6 @@ def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/itertools.py:3" in result[0].stdout
 
 
-@pytest.mark.xfail(reason="Temporarily disabled 3rd-party support")
 def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file(
         "",
@@ -371,7 +369,6 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert "Success: no issues found" in result[0].stdout.strip()
 
 
-@pytest.mark.xfail(reason="Temporarily disabled 3rd-party support, and this plugin uses that")
 def test_source_plugin(rule_runner: RuleRunner) -> None:
     # NB: We make this source plugin fairly complex by having it use transitive dependencies.
     # This is to ensure that we can correctly support plugins with dependencies.
