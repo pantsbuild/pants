@@ -365,21 +365,28 @@ async fn uncacheable_deps_node_only_runs_once_per_session() {
     TContext::new(graph.clone()).with_uncacheable(uncacheable)
   };
 
+  // Request twice in a row in the same session, and confirm that nothing re-runs or is cleaned
+  // on the second attempt.
+  let assert_no_change_within_session = |context: &TContext| {
+    assert_eq!(
+      context.runs(),
+      vec![TNode::new(2), TNode::new(1), TNode::new(0)]
+    );
+    assert_eq!(context.stats().cleaning_succeeded, 0);
+    assert_eq!(context.stats().cleaning_failed, 0);
+  };
+
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
-
-  let expected_node_runs = vec![TNode::new(2), TNode::new(1), TNode::new(0)];
-
-  assert_eq!(context.runs(), expected_node_runs);
+  assert_no_change_within_session(&context);
 
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
-
-  assert_eq!(context.runs(), expected_node_runs);
+  assert_no_change_within_session(&context);
 }
 
 #[tokio::test]
