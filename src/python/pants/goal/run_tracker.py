@@ -244,8 +244,6 @@ class RunTracker(Subsystem):
         self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
         self.run_info.add_basic_info(self.run_id, self._run_timestamp)
         self.run_info.add_info("cmd_line", self._cmd_line)
-        if self.options.parent_build_id:
-            self.run_info.add_info("parent_build_id", self.options.parent_build_id)
 
         # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
         link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")

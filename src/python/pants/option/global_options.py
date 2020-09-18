@@ -528,19 +528,6 @@ class GlobalOptions(Subsystem):
             "Enabling this option requires parallel Pants invocations to block on the first",
         )
 
-        # Calling pants command (inner run) from other pants command is unusual behaviour,
-        # and most users should never set this flag.
-        # It is automatically set by pants when an inner run is detected.
-        # Currently, pants commands with this option set don't use pantsd,
-        # but this effect should not be relied upon.
-        # This option allows us to know who was the parent of pants inner runs for informational purposes.
-        register(
-            "--parent-build-id",
-            advanced=True,
-            default=None,
-            help="The build ID of the other Pants run which spawned this one, if any.",
-        )
-
         # NB: We really don't want this option to invalidate the daemon, because different clients might have
         # different needs. For instance, an IDE might have a very long timeout because it only wants to refresh
         # a project in the background, while a user might want a shorter timeout for interactivity.

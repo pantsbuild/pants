@@ -33,11 +33,6 @@ class PantsRunner:
         return not frozenset(self.args).isdisjoint(_DAEMON_KILLING_GOALS)
 
     def _should_run_with_pantsd(self, global_bootstrap_options: OptionValueContainer) -> bool:
-        # The parent_build_id option is set only for pants commands (inner runs)
-        # that were called by other pants command.
-        # Inner runs should never be run with pantsd.
-        # See https://github.com/pantsbuild/pants/issues/7881 for context.
-        is_inner_run = global_bootstrap_options.parent_build_id is not None
         terminate_pantsd = self.will_terminate_pantsd()
 
         if terminate_pantsd:
@@ -48,7 +43,6 @@ class PantsRunner:
             global_bootstrap_options.pantsd
             and not terminate_pantsd
             and not global_bootstrap_options.concurrent
-            and not is_inner_run
         )
 
     @staticmethod
