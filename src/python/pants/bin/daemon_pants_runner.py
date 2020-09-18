@@ -107,13 +107,13 @@ class DaemonPantsRunner(RawFdRunner):
         try:
             clear_logging_handlers()
             Native().override_thread_logging_destination_to_just_stderr()
-            setup_logging(global_bootstrap_options)
+            setup_logging(global_bootstrap_options, stderr_logging=True)
             yield
         finally:
             Native().override_thread_logging_destination_to_just_pantsd()
             set_logging_handlers(handlers)
 
-    def _run(self, working_dir: str) -> ExitCode:
+    def single_daemonized_run(self, working_dir: str) -> ExitCode:
         """Run a single daemonized run of Pants.
 
         All aspects of the `sys` global should already have been replaced in `__call__`, so this
@@ -172,6 +172,6 @@ class DaemonPantsRunner(RawFdRunner):
             # this function, where they will be logged to the pantsd.log by the server.
             logger.info(f"handling request: `{' '.join(args)}`")
             try:
-                return self._run(working_directory.decode())
+                return self.single_daemonized_run(working_directory.decode())
             finally:
                 logger.info(f"request completed: `{' '.join(args)}`")

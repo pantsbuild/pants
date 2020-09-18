@@ -15,12 +15,7 @@ from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
 from pants.init.engine_initializer import GraphScheduler
-from pants.init.logging import (
-    clear_logging_handlers,
-    init_rust_logger,
-    setup_logging_to_file,
-    setup_warning_filtering,
-)
+from pants.init.logging import setup_logging, setup_logging_to_file, setup_warning_filtering
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
@@ -33,49 +28,6 @@ from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.util.contextutil import stdio_as
 from pants.util.logging import LogLevel
 from pants.util.strutil import ensure_text
-
-
-class _LoggerStream(object):
-    """A sys.std{out,err} replacement that pipes output to a logger.
-
-    N.B. `logging.Logger` expects unicode. However, most of our outstream logic, such as in
-    `exiter.py`, will use `sys.std{out,err}.buffer` and thus a bytes interface. So, we must provide
-    a `buffer` property, and change the semantics of the buffer to always convert the message to
-    unicode. This is an unfortunate code smell, as `logging` does not expose a bytes interface so
-    this is the best solution we could think of.
-    """
-
-    def __init__(self, logger, log_level, handler):
-        """
-        :param logging.Logger logger: The logger instance to emit writes to.
-        :param int log_level: The log level to use for the given logger.
-        :param Handler handler: The underlying log handler, for determining the fileno
-                                to support faulthandler logging.
-        """
-        self._logger = logger
-        self._log_level = log_level
-        self._handler = handler
-
-    def write(self, msg):
-        msg = ensure_text(msg)
-        for line in msg.rstrip().splitlines():
-            # The log only accepts text, and will raise a decoding error if the default encoding is ascii
-            # if provided a bytes input for unicode text.
-            line = ensure_text(line)
-            self._logger.log(self._log_level, line.rstrip())
-
-    def flush(self):
-        return
-
-    def isatty(self):
-        return False
-
-    def fileno(self):
-        return self._handler.stream.fileno()
-
-    @property
-    def buffer(self):
-        return self
 
 
 class PantsDaemon(PantsDaemonProcessManager):
@@ -209,30 +161,12 @@ class PantsDaemon(PantsDaemonProcessManager):
         with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
             # Reinitialize logging for the daemon context.
             global_options = self._bootstrap_options.for_global_scope()
-            log_level = global_options.level
-            use_color = global_options.colors
-            show_target = global_options.show_log_target
-            show_rust_3rdparty = global_options.log_show_rust_3rdparty
-            init_rust_logger(
-                log_level,
-                log_show_rust_3rdparty=show_rust_3rdparty,
-                use_color=use_color,
-                show_target=show_target,
-            )
 
-            clear_logging_handlers()
+            setup_logging(global_options, stderr_logging=False)
+
             log_dir = os.path.join(self._work_dir, self.name)
-            log_handler = setup_logging_to_file(
-                log_level, log_dir=log_dir, log_filename=self.LOG_NAME
-            )
-
-            self._native.override_thread_logging_destination_to_just_pantsd()
-
-            # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
-            # TODO: Consider giving these pipes/actual fds, in order to make them "deep" replacements
-            # for `1,2`, and allow them to be used via `stdio_as`.
-            sys.stdout = _LoggerStream(logging.getLogger(), logging.INFO, log_handler)  # type: ignore[assignment]
-            sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, log_handler)  # type: ignore[assignment]
+            log_level = global_options.level
+            setup_logging_to_file(log_level, log_dir=log_dir, log_filename=self.LOG_NAME)
 
             self._logger.debug("Logging reinitialized in pantsd context")
             yield
@@ -287,9 +221,9 @@ class PantsDaemon(PantsDaemonProcessManager):
                 time.sleep(self.JOIN_TIMEOUT_SECONDS)
 
             # We're exiting: join the server to avoid interrupting ongoing runs.
-            self._logger.info("waiting for ongoing runs to complete before exiting...")
+            self._logger.info("Waiting for ongoing runs to complete before exiting...")
             self._native.nailgun_server_await_shutdown(self._server)
-            self._logger.info("exiting.")
+            self._logger.info("Exiting pantsd")
 
 
 def launch_new_pantsd_instance():
