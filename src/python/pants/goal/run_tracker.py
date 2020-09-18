@@ -615,7 +615,9 @@ class RunTracker(Subsystem):
             scopes = self._all_options.known_scope_to_info.keys()
         for scope in scopes:
             scope_and_maybe_option = scope.split("^")
-            recorded_options[scope or "GLOBAL"] = self._get_option_to_record(*scope_and_maybe_option)
+            recorded_options[scope or "GLOBAL"] = self._get_option_to_record(
+                *scope_and_maybe_option
+            )
         return recorded_options
 
     def _get_option_to_record(self, scope, option=None):
