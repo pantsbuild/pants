@@ -4,7 +4,7 @@
 from typing import Iterable, Mapping, Optional, Type, TypeVar, Union, cast
 
 from pants.engine.goal import GoalSubsystem
-from pants.option.option_value_container import OptionValueContainer
+from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.ranked_value import Rank, RankedValue, Value
 from pants.option.subsystem import Subsystem
@@ -25,7 +25,7 @@ def create_options_bootstrapper(
 def _create_scoped_options(
     default_rank: Rank, **options: Union[RankedValue, Value]
 ) -> OptionValueContainer:
-    scoped_options = OptionValueContainer()
+    scoped_options = OptionValueContainerBuilder().build()
     for key, value in options.items():
         if not isinstance(value, RankedValue):
             value = RankedValue(default_rank, value)

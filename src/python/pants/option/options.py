@@ -10,7 +10,7 @@ from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
 from pants.option.option_util import is_list_option
-from pants.option.option_value_container import OptionValueContainer
+from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser, ScopedFlagNameForFuzzyMatching
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
@@ -411,7 +411,7 @@ class Options:
         return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
 
     def _make_parse_args_request(
-        self, flags_in_scope, namespace: OptionValueContainer
+        self, flags_in_scope, namespace: OptionValueContainerBuilder
     ) -> Parser.ParseArgsRequest:
         return Parser.ParseArgsRequest(
             flags_in_scope=flags_in_scope,
@@ -437,14 +437,14 @@ class Options:
 
         # First get enclosing scope's option values, if any.
         if scope == GLOBAL_SCOPE or not inherit_from_enclosing_scope:
-            values = OptionValueContainer()
+            values_builder = OptionValueContainerBuilder()
         else:
-            values = copy.copy(self.for_scope(enclosing_scope(scope)))
+            values_builder = self.for_scope(enclosing_scope(scope)).to_builder()
 
         # Now add our values.
         flags_in_scope = self._scope_to_flags.get(scope, [])
-        parse_args_request = self._make_parse_args_request(flags_in_scope, values)
-        self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
+        parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
+        values = self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if inherit_from_enclosing_scope:

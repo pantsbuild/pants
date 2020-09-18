@@ -67,7 +67,7 @@ from pants.option.errors import (
     Shadowing,
 )
 from pants.option.option_util import flatten_shlexed_list, is_dict_option, is_list_option
-from pants.option.option_value_container import OptionValueContainer
+from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.meta import frozen_after_init
@@ -223,14 +223,14 @@ class Parser:
                 ...
 
         flag_value_map: Dict[str, List[Any]]
-        namespace: OptionValueContainer
+        namespace: OptionValueContainerBuilder
         get_all_scoped_flag_names: FlagNameProvider
         passthrough_args: List[str]
 
         def __init__(
             self,
             flags_in_scope: Iterable[str],
-            namespace: OptionValueContainer,
+            namespace: OptionValueContainerBuilder,
             get_all_scoped_flag_names: FlagNameProvider,
             passthrough_args: List[str],
         ) -> None:
@@ -368,7 +368,7 @@ class Parser:
                 max_edit_distance=2,
             )
 
-        return namespace
+        return namespace.build()
 
     def _raise_error_for_invalid_flag_names(
         self,
