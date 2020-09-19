@@ -403,10 +403,11 @@ async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -
         Process,
         PexCliProcess(
             description=f"Find interpreter for constraints: {formatted_constraints}",
-            # Here we run the Pex CLI with no requirements which just selects an interpreter and
-            # normally starts an isolated repl. By passing `--` we force the repl to instead act as
-            # an interpreter (the selected one) and tell us about itself. The upshot is we run the
-            # Pex interpreter selection logic unperturbed but without resolving any distributions.
+            # Here, we run the Pex CLI with no requirements, which just selects an interpreter.
+            # Normally, this would start an isolated repl. By passing `--`, we force the repl to
+            # instead act as an interpreter (the selected one) and tell us about itself. The upshot
+            # is we run the Pex interpreter selection logic unperturbed but without resolving any
+            # distributions.
             argv=(
                 *interpreter_constraints.generate_pex_arg_list(),
                 "--",
@@ -478,8 +479,8 @@ async def create_pex(
     else:
         # NB: If it's an internal_only PEX, we do our own lookup of the interpreter based on the
         # interpreter constraints, and then will run the PEX with that specific interpreter. We
-        # will have already validated that there were no platforms. Otherwise, we let Pex resolve
-        # the constraints.
+        # will have already validated that there were no platforms.
+        # Otherwise, we let Pex resolve the constraints.
         if request.internal_only:
             python = await Get(
                 PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints
@@ -672,7 +673,10 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         *request.argv,
         python=request.pex.python,
     )
-    env = {**pex_environment.environment_dict, **(request.extra_env or {})}
+    env = {
+        **pex_environment.environment_dict(python_configured=request.pex.python is not None),
+        **(request.extra_env or {}),
+    }
     process = Process(
         argv,
         description=request.description,
