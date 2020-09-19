@@ -155,7 +155,13 @@ async def mypy_typecheck(
     #     so it's fine to use the Py35 parser. We want the loosest constraints possible to make it
     #     more flexible to install MyPy.
     #  * We must resolve third-party dependencies. This should use whatever the actual code's
-    #     constraints are. The constraints for the tool can be different than for the requirements.
+    #     constraints are. However, PEX will error if they are not compatible
+    #     with the interpreter being used to run MyPy. So, we need to ensure that the tool PEX uses
+    #     the same interpreter as the requirements.
+    #
+    #     However, because MyPy requires >=3.5, if there is Python 2, the best that we can do is
+    #     resolve with Python 2 and set `PEX_IGNORE_ERRORS`, which will fix the error. PEX will
+    #     only load wheels that are also compatible with Python 3, but this is better than nothing.
     #  * The runner Pex should use the same constraints as the tool Pex.
     all_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
@@ -277,13 +283,17 @@ async def mypy_typecheck(
     all_used_source_roots = sorted(
         set(itertools.chain(plugin_sources.source_roots, typechecked_sources.source_roots))
     )
+    extra_env = {"PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots)}
+    if all_interpreter_constraints.includes_python2():
+        extra_env["PEX_IGNORE_ERRORS"] = "true"
+
     result = await Get(
         FallibleProcessResult,
         PexProcess(
             runner_pex,
             argv=generate_args(mypy, file_list_path=file_list_path),
             input_digest=merged_input_files,
-            extra_env={"PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots)},
+            extra_env=extra_env,
             description=f"Run MyPy on {pluralize(len(typechecked_srcs_snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),

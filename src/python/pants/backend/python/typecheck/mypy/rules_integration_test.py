@@ -20,7 +20,10 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.python_interpreter_selection import skip_unless_python38_present
+from pants.testutil.python_interpreter_selection import (
+    skip_unless_python27_present,
+    skip_unless_python38_present,
+)
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -345,6 +348,59 @@ def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/math/add.py:5" in result[0].stdout
+
+
+@skip_unless_python27_present
+def test_works_with_python27(rule_runner: RuleRunner) -> None:
+    """A regression test that we can properly handle Python 2-only third-party dependencies.
+
+    There was a bug that this would cause the runner PEX to fail to execute because it did not have
+    Python 3 distributions of the requirements.
+
+    This support is not as robust as we'd like. We'll only use third-party distributions if its
+    wheel is also compatible with the Python 3 interpreter being used to run MyPy.
+    https://github.com/pantsbuild/pants/issues/10819 tracks improving this, which might not even be
+    possible.
+    """
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            # Both requirements are a) typed and b) compatible with Py2 and Py3. However, `x690`
+            # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We only
+            # expect libumi to be usable by MyPy.
+
+            python_requirement_library(
+                name="libumi",
+                requirements=["libumi==0.0.2"],
+            )
+
+            python_requirement_library(
+                name="x690",
+                requirements=["x690==0.2.0"],
+            )
+            """
+        ),
+    )
+    source_file = FileContent(
+        f"{PACKAGE}/py2.py",
+        dedent(
+            """\
+            from libumi import hello_world
+            from x690 import types
+
+            print "Blast from the past!"
+            print hello_world() - 21  # This should fail. You can't subtract an `int` from `bytes`.
+            """
+        ).encode(),
+    )
+    target = make_target(rule_runner, [source_file], interpreter_constraints="==2.7.*")
+    result = run_mypy(rule_runner, [target], passthrough_args="--py2")
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert "Failed to execute PEX file" not in result[0].stderr
+    assert "Cannot find implementation or library stub for module named 'x690'" in result[0].stdout
+    assert f"{PACKAGE}/py2.py:5: error: Unsupported operand types" in result[0].stdout
 
 
 @skip_unless_python38_present
