@@ -374,6 +374,7 @@ async def run_tests(
             debug_result = interactive_runner.run(debug_request.process)
             if debug_result.exit_code != 0:
                 exit_code = debug_result.exit_code
+                break
         return Test(exit_code)
 
     targets_to_valid_field_sets = await Get(
