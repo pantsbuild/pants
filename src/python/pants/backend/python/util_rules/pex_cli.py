@@ -122,7 +122,7 @@ async def setup_pex_cli_process(
         # a remoting implementation has to allow for processes producing large binaries in a
         # sandbox to support reasonable workloads.
         "TMPDIR": tmpdir,
-        **pex_env.environment_dict,
+        **pex_env.environment_dict(python_configured=request.python is not None),
         **python_native_code.environment_dict,
         **(request.extra_env or {}),
     }

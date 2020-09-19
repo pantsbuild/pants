@@ -92,18 +92,18 @@ async def create_python_binary_run_request(
     def in_chroot(relpath: str) -> str:
         return os.path.join("{chroot}", relpath)
 
+    args = pex_env.create_argv(
+        in_chroot(runner_pex.name), "-m", entry_point, python=runner_pex.python
+    )
+
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
-        **pex_env.environment_dict,
+        **pex_env.environment_dict(python_configured=runner_pex.python is not None),
         "PEX_PATH": in_chroot(requirements_pex_request.output_filename),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }
 
-    return RunRequest(
-        digest=merged_digest,
-        args=(in_chroot(runner_pex.name), "-m", entry_point),
-        extra_env=extra_env,
-    )
+    return RunRequest(digest=merged_digest, args=args, extra_env=extra_env)
 
 
 def rules():
