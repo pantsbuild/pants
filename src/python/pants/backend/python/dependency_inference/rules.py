@@ -57,14 +57,16 @@ class PythonInference(Subsystem):
         )
         register(
             "--inits",
-            default=True,
+            default=False,
             type=bool,
             help=(
                 "Infer a target's dependencies on any __init__.py files existing for the packages "
-                "it is located in (recursively upward in the directory structure). Regardless of "
-                "whether inference is disabled, empty ancestor __init__.py files will still be "
-                "included even without an explicit dependency, but ones containing any code (even "
-                "just comments) will not, and must be brought in via an explicit dependency."
+                "it is located in (recursively upward in the directory structure). Even if this is "
+                "disabled, Pants will still include any ancestor __init__.py files, only they will "
+                "not be 'proper' dependencies, e.g. they will not show up in "
+                "`./pants dependencies` and their own dependencies will not be used. If you have "
+                "empty `__init__.py` files, it's safe to leave this option off; otherwise, you "
+                "should enable this option."
             ),
         )
         register(
