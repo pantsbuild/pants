@@ -478,7 +478,7 @@ class RunTracker(Subsystem):
             "run_info": self.run_information(),
             "pantsd_stats": self.pantsd_stats.get_all(),
             "cumulative_timings": self.cumulative_timings.get_all(),
-            "recorded_options": self._get_options_to_record(),
+            "recorded_options": self.get_options_to_record(),
         }
         if self._stats_version == 2:
             stats["workunits"] = self.json_reporter.results
@@ -606,7 +606,7 @@ class RunTracker(Subsystem):
         """
         SubprocPool.shutdown(self._aborted)
 
-    def _get_options_to_record(self) -> dict:
+    def get_options_to_record(self) -> dict:
         recorded_options = {}
         scopes = self.options.stats_option_scopes_to_record
         if "*" in scopes:
