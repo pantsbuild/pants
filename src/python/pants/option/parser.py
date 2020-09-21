@@ -226,6 +226,7 @@ class Parser:
         namespace: OptionValueContainerBuilder
         get_all_scoped_flag_names: FlagNameProvider
         passthrough_args: List[str]
+        suppress_warnings: bool
 
         def __init__(
             self,
@@ -233,6 +234,7 @@ class Parser:
             namespace: OptionValueContainerBuilder,
             get_all_scoped_flag_names: FlagNameProvider,
             passthrough_args: List[str],
+            suppress_warnings: bool = False,
         ) -> None:
             """
             :param flags_in_scope: Iterable of arg strings to parse into flag values.
@@ -246,6 +248,7 @@ class Parser:
             self.namespace = namespace
             self.get_all_scoped_flag_names = get_all_scoped_flag_names
             self.passthrough_args = passthrough_args
+            self.suppress_warnings = suppress_warnings
 
         @staticmethod
         def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, List[Optional[str]]]:
@@ -344,7 +347,8 @@ class Parser:
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
             if val.rank > Rank.HARDCODED:
-                self._check_deprecated(dest, kwargs)
+                print_warning = not parse_args_request.suppress_warnings
+                self._check_deprecated(dest, kwargs, print_warning=print_warning)
 
                 mutex_dest = kwargs.get("mutually_exclusive_group")
                 if mutex_dest:

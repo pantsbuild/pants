@@ -11,6 +11,7 @@ from typing import Dict, Iterable, Optional, Tuple
 import pants.util.logging as pants_logging
 from pants.engine.internals.native import Native
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.options import Options
 from pants.util.dirutil import safe_mkdir
 from pants.util.logging import LogLevel
 
@@ -35,8 +36,11 @@ def init_rust_logger(
 
 def setup_warning_filtering(warnings_filter_regexes: Iterable[str]) -> None:
     """Sets up regex-based ignores for messages using the Python warnings system."""
+    warnings.resetwarnings()
     for message_regexp in warnings_filter_regexes or ():
         warnings.filterwarnings(action="ignore", message=message_regexp)
+
+    Options.toggle_option_warning_suppression(False)
 
 
 class NativeHandler(StreamHandler):

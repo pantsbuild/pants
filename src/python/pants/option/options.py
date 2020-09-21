@@ -65,6 +65,15 @@ class Options:
       - None.
     """
 
+    # This is a class-wide toggle for whether Python warnings (using the warnings module) should
+    # be emitted during the options-parsing process. We want to initially set this to `True` and
+    # then set it to `False` after we have done the initial options parsing.
+    suppress_warnings = True
+
+    @classmethod
+    def toggle_option_warning_suppression(cls, toggle: bool) -> None:
+        cls.suppress_warnings = toggle
+
     class FrozenOptionsError(Exception):
         """Options are frozen and can't be mutated."""
 
@@ -410,16 +419,6 @@ class Options:
         self.walk_parsers(register_all_scoped_names)
         return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
 
-    def _make_parse_args_request(
-        self, flags_in_scope, namespace: OptionValueContainerBuilder
-    ) -> Parser.ParseArgsRequest:
-        return Parser.ParseArgsRequest(
-            flags_in_scope=flags_in_scope,
-            namespace=namespace,
-            get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
-            passthrough_args=self._passthru,
-        )
-
     # TODO: Eagerly precompute backing data for this?
     @memoized_method
     def for_scope(
@@ -443,7 +442,15 @@ class Options:
 
         # Now add our values.
         flags_in_scope = self._scope_to_flags.get(scope, [])
-        parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
+
+        parse_args_request = Parser.ParseArgsRequest(
+            flags_in_scope=flags_in_scope,
+            namespace=values_builder,
+            get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
+            passthrough_args=self._passthru,
+            suppress_warnings=self.suppress_warnings,
+        )
+
         values = self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
