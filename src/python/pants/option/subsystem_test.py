@@ -69,8 +69,11 @@ def test_invalid_subsystem_class():
         pass
 
     NoScopeSubsystem._options = DummyOptions()
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(TypeError) as exc:
         NoScopeSubsystem.global_instance()
+    assert str(exc.value) == (
+        "Can't instantiate abstract class NoScopeSubsystem with abstract methods options_scope"
+    )
 
 
 def test_scoping_simple() -> None:

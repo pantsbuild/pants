@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
 from dataclasses import dataclass
 from typing import Mapping, Optional, Tuple
 
@@ -146,9 +145,6 @@ class LocalPantsRunner:
         )
 
     def _set_start_time(self, start_time: float) -> None:
-        # Propagates parent_build_id to pants runs that may be called from this pants run.
-        os.environ["PANTS_PARENT_BUILD_ID"] = self._run_tracker.run_id
-
         self._run_tracker.start(self.options, run_start_time=start_time)
 
         spec_parser = SpecsParser(get_buildroot())
