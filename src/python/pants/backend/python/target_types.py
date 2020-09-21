@@ -4,7 +4,7 @@
 import collections.abc
 import os.path
 from textwrap import dedent
-from typing import Iterable, Optional, Sequence, Tuple, Union, cast
+from typing import Iterable, Optional, Tuple, Union, cast
 
 from pkg_resources import Requirement
 
@@ -110,11 +110,8 @@ class PythonBinarySources(PythonSources):
     expected_num_files = range(0, 2)
 
     @staticmethod
-    def translate_source_file_to_entry_point(stripped_sources: Sequence[str]) -> Optional[str]:
-        # We assume we have 0-1 sources, which is enforced by PythonBinarySources.
-        if len(stripped_sources) != 1:
-            return None
-        module_base, _ = os.path.splitext(stripped_sources[0])
+    def translate_source_file_to_entry_point(stripped_source_path: str) -> str:
+        module_base, _ = os.path.splitext(stripped_source_path)
         return module_base.replace(os.path.sep, ".")
 
 

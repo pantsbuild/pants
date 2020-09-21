@@ -25,12 +25,12 @@ from pants.backend.python.util_rules.pex_from_targets import (
 )
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.goals.run import RunFieldSet
-from pants.core.util_rules.source_files import SourceFiles
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.engine.target import InvalidFieldException
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import FilesNotFoundBehavior, GlobalOptions
+from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -78,14 +78,23 @@ async def create_python_binary(
 ) -> CreatedBinary:
     entry_point = field_set.entry_point.value
     if entry_point is None:
-        # TODO: This is overkill? We don't need to hydrate the sources and strip snapshots,
-        #  we only need the path relative to the source root.
-        binary_sources = await Get(HydratedSources, HydrateSourcesRequest(field_set.sources))
-        stripped_binary_sources = await Get(
-            StrippedSourceFiles, SourceFiles(binary_sources.snapshot, ())
+        binary_source_paths = await Get(
+            Paths, PathGlobs, field_set.sources.path_globs(FilesNotFoundBehavior.error)
+        )
+        if len(binary_source_paths.files) != 1:
+            raise InvalidFieldException(
+                "No `entry_point` was set for the target "
+                f"{repr(field_set.address)}, so it must have exactly one source, but it has "
+                f"{len(binary_source_paths.files)}"
+            )
+        entry_point_path = binary_source_paths.files[0]
+        source_root = await Get(
+            SourceRoot,
+            SourceRootRequest,
+            SourceRootRequest.for_file(entry_point_path),
         )
         entry_point = PythonBinarySources.translate_source_file_to_entry_point(
-            stripped_binary_sources.snapshot.files
+            os.path.relpath(entry_point_path, source_root.path)
         )
 
     disambiguated_output_filename = os.path.join(

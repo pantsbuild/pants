@@ -54,16 +54,13 @@ def test_timeout_calculation() -> None:
 
 def test_translate_source_file_to_entry_point() -> None:
     assert (
-        PythonBinarySources.translate_source_file_to_entry_point(["example/app.py"])
-        == "example.app"
+        PythonBinarySources.translate_source_file_to_entry_point("example/app.py") == "example.app"
     )
     # NB: the onus is on the call site to strip the source roots before calling this method.
     assert (
-        PythonBinarySources.translate_source_file_to_entry_point(["src/python/app.py"])
+        PythonBinarySources.translate_source_file_to_entry_point("src/python/app.py")
         == "src.python.app"
     )
-    assert PythonBinarySources.translate_source_file_to_entry_point([]) is None
-    assert PythonBinarySources.translate_source_file_to_entry_point(["f1.py", "f2.py"]) is None
 
 
 def test_requirements_field() -> None:
