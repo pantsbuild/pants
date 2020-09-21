@@ -25,12 +25,12 @@ def create_options_bootstrapper(
 def _create_scoped_options(
     default_rank: Rank, **options: Union[RankedValue, Value]
 ) -> OptionValueContainer:
-    scoped_options = OptionValueContainerBuilder().build()
+    scoped_options = OptionValueContainerBuilder()
     for key, value in options.items():
         if not isinstance(value, RankedValue):
             value = RankedValue(default_rank, value)
         setattr(scoped_options, key, value)
-    return scoped_options
+    return scoped_options.build()
 
 
 _GS = TypeVar("_GS", bound=GoalSubsystem)

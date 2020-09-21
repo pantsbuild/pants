@@ -448,7 +448,9 @@ class Options:
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if inherit_from_enclosing_scope:
-            self._check_and_apply_deprecations(scope, values)
+            values_builder = values.to_builder()
+            self._check_and_apply_deprecations(scope, values_builder)
+            values = values_builder.build()
 
         return values
 

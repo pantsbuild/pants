@@ -71,7 +71,6 @@ class SubsystemDependency(OptionableFactory):
 _S = TypeVar("_S", bound="Subsystem")
 
 
-@dataclass(frozen=True)
 class Subsystem(Optionable):
     """A separable piece of functionality that may be reused across multiple tasks or other code.
 
@@ -193,12 +192,10 @@ class Subsystem(Optionable):
             cls._options = None
         cls._scoped_instances = {}
 
-    # It's safe to override the signature from Optionable because we validate
-    # that every Optionable has `options_scope` defined as a `str` in the __init__. This code is
-    # complex, though, and may be worth refactoring.
-    @property
-    def options_scope(self) -> str:  # type: ignore[override]
-        return self.scope
+    def __init__(self, scope: str, options: OptionValueContainer) -> None:
+        super().__init__()
+        self.scope = scope
+        self.options = options
 
     @deprecated(
         removal_version="2.1.0.dev0", hint_message="Use the property `self.options` instead."
@@ -383,3 +380,8 @@ class Subsystem(Optionable):
 
         collect_scope_infos(cls, GLOBAL_SCOPE)
         return known_scope_infos
+
+    def __eq__(self, other: Any) -> bool:
+        if type(self) != type(other):
+            return False
+        return bool(self.scope == other.scope and self.options == other.options)
