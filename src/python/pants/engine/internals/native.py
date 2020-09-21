@@ -10,7 +10,7 @@ from typing_extensions import Protocol
 from pants.base.exiter import ExitCode
 from pants.engine.fs import PathGlobs
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import (
+from pants.engine.internals.native_engine import (  # type: ignore[import]
     PyExecutionRequest,
     PyExecutionStrategyOptions,
     PyExecutor,

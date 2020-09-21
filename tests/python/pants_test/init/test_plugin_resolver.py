@@ -240,7 +240,7 @@ class PluginResolverTest(TestBase):
 
             # But for a compatible interpreter the exact resolve results should be re-used and load
             # directly from the still in-tact cache.
-            with self.plugin_resolution(
+            with self.plugin_resolution(  # type: ignore[unreachable]
                 interpreter=python36, chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
             ) as results2:
 
