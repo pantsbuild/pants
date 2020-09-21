@@ -186,12 +186,8 @@ class Scheduler:
 
         tasks = self._native.new_tasks()
 
-        for output_type, rules in rule_index.rules.items():
-            for rule in rules:
-                if isinstance(rule, TaskRule):
-                    self._register_task(tasks, output_type, rule, union_membership)
-                else:
-                    raise ValueError(f"Unexpected Rule type: {rule}")
+        for rule in rule_index.rules:
+            self._register_task(tasks, rule, union_membership)
         for query in rule_index.queries:
             self._native.lib.tasks_query_add(
                 tasks,
@@ -200,15 +196,13 @@ class Scheduler:
             )
         return tasks
 
-    def _register_task(
-        self, tasks, output_type: Type, rule: TaskRule, union_membership: UnionMembership
-    ) -> None:
+    def _register_task(self, tasks, rule: TaskRule, union_membership: UnionMembership) -> None:
         """Register the given TaskRule with the native scheduler."""
         self._native.lib.tasks_task_begin(
             tasks,
             rule.func,
-            output_type,
-            issubclass(output_type, EngineAwareReturnType),
+            rule.output_type,
+            issubclass(rule.output_type, EngineAwareReturnType),
             rule.cacheable,
             rule.canonical_name,
             rule.desc or "",
