@@ -2,6 +2,7 @@ use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::hash::{Hash, Hasher};
+use std::ops::DerefMut;
 use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -11,7 +12,7 @@ use parking_lot::Mutex;
 use rand::{self, Rng};
 use tokio::time::{delay_for, timeout, Elapsed};
 
-use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
+use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError, Stats};
 
 #[tokio::test]
 async fn create() {
@@ -269,7 +270,7 @@ async fn poll_uncacheable() {
 }
 
 #[tokio::test]
-async fn dirty_dependents_of_uncacheable_node() {
+async fn uncacheable_dependents_of_uncacheable_node() {
   let graph = Arc::new(Graph::new());
 
   // Create a context for which the bottommost Node is not cacheable.
@@ -311,7 +312,7 @@ async fn dirty_dependents_of_uncacheable_node() {
 }
 
 #[tokio::test]
-async fn uncachable_node_only_runs_once() {
+async fn uncacheable_node_only_runs_once() {
   let _logger = env_logger::try_init();
   let graph = Arc::new(Graph::new());
 
@@ -354,7 +355,7 @@ async fn uncachable_node_only_runs_once() {
 }
 
 #[tokio::test]
-async fn uncachable_deps_node_only_runs_once_per_session() {
+async fn uncacheable_deps_is_cleaned_for_the_session() {
   let _logger = env_logger::try_init();
   let graph = Arc::new(Graph::new());
 
@@ -364,21 +365,88 @@ async fn uncachable_deps_node_only_runs_once_per_session() {
     TContext::new(graph.clone()).with_uncacheable(uncacheable)
   };
 
+  // Request twice in a row in the same session, and confirm that nothing re-runs or is cleaned
+  // on the second attempt.
+  let assert_no_change_within_session = |context: &TContext| {
+    assert_eq!(
+      context.runs(),
+      vec![TNode::new(2), TNode::new(1), TNode::new(0)]
+    );
+    assert_eq!(context.stats().cleaning_succeeded, 0);
+    assert_eq!(context.stats().cleaning_failed, 0);
+  };
+
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
-
-  let expected_node_runs = vec![TNode::new(2), TNode::new(1), TNode::new(0)];
-
-  assert_eq!(context.runs(), expected_node_runs);
+  assert_no_change_within_session(&context);
 
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
+  assert_no_change_within_session(&context);
+}
 
-  assert_eq!(context.runs(), expected_node_runs);
+#[tokio::test]
+async fn dirtied_uncacheable_deps_node_re_runs() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new());
+
+  let context = {
+    let mut uncacheable = HashSet::new();
+    uncacheable.insert(TNode::new(0));
+    TContext::new(graph.clone()).with_uncacheable(uncacheable)
+  };
+
+  // Request two nodes above an uncacheable node.
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  assert_eq!(
+    context.runs(),
+    vec![TNode::new(2), TNode::new(1), TNode::new(0)]
+  );
+  assert_eq!(context.stats().cleaning_succeeded, 0);
+  assert_eq!(context.stats().cleaning_failed, 0);
+
+  let assert_stable_after_cleaning = |context: &TContext| {
+    assert_eq!(
+      context.runs(),
+      vec![TNode::new(2), TNode::new(1), TNode::new(0), TNode::new(1)]
+    );
+    assert_eq!(context.stats().cleaning_succeeded, 1);
+    assert_eq!(context.stats().cleaning_failed, 0);
+  };
+
+  // Clear the middle node, which will dirty the top node, and then clean both of them.
+  graph.invalidate_from_roots(|&TNode(n, _)| n == 1);
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  assert_stable_after_cleaning(&context);
+
+  // We expect that the two upper nodes went to the UncacheableDependencies state for the session:
+  // re-requesting should be a noop.
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  assert_stable_after_cleaning(&context);
+
+  // Finally, confirm that in a new session/run the UncacheableDependencies nodes trigger detection
+  // of the Uncacheable node (which runs), and are then cleaned themselves.
+  let context = context.new_run(1);
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  assert_eq!(context.runs(), vec![TNode::new(0)]);
+  assert_eq!(context.stats().cleaning_succeeded, 2);
+  assert_eq!(context.stats().cleaning_failed, 0);
 }
 
 #[tokio::test]
@@ -740,10 +808,15 @@ struct TContext {
   aborts: Arc<Mutex<Vec<TNode>>>,
   runs: Arc<Mutex<Vec<TNode>>>,
   entry_id: Option<EntryId>,
+  stats: Arc<Mutex<Stats>>,
 }
 impl NodeContext for TContext {
   type Node = TNode;
   type RunId = usize;
+
+  fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = Stats> + 'a> {
+    Box::new(self.stats.lock())
+  }
 
   fn clone_for(&self, entry_id: EntryId) -> TContext {
     TContext {
@@ -756,6 +829,7 @@ impl NodeContext for TContext {
       aborts: self.aborts.clone(),
       runs: self.runs.clone(),
       entry_id: Some(entry_id),
+      stats: self.stats.clone(),
     }
   }
 
@@ -785,9 +859,10 @@ impl TContext {
       delays: Arc::default(),
       uncacheable: Arc::default(),
       graph,
-      aborts: Arc::new(Mutex::new(Vec::new())),
-      runs: Arc::new(Mutex::new(Vec::new())),
+      aborts: Arc::default(),
+      runs: Arc::default(),
       entry_id: None,
+      stats: Arc::default(),
     }
   }
 
@@ -813,10 +888,8 @@ impl TContext {
 
   fn new_run(mut self, new_run_id: usize) -> TContext {
     self.run_id = new_run_id;
-    {
-      let mut runs = self.runs.lock();
-      runs.clear();
-    }
+    self.runs.lock().clear();
+    *self.stats.lock() = Stats::default();
     self
   }
 
