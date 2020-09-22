@@ -44,8 +44,8 @@ class PluginResolverTest(TestBase):
             *pex.rules(),
             *external_tool.rules(),
             *archive.rules(),
-            QueryRule(Pex, (PexRequest, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(Process, (PexProcess, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(Pex, (PexRequest, PantsEnvironment)),
+            QueryRule(Process, (PexProcess, PantsEnvironment)),
             QueryRule(ProcessResult, (Process,)),
         )
 

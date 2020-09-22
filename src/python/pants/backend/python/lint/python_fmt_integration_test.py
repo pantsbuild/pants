@@ -14,7 +14,6 @@ from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Targets
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -26,9 +25,7 @@ def rule_runner() -> RuleRunner:
             format_python_target,
             *black_rules(),
             *isort_rules(),
-            QueryRule(
-                LanguageFmtResults, (PythonFmtTargets, OptionsBootstrapper, PantsEnvironment)
-            ),
+            QueryRule(LanguageFmtResults, (PythonFmtTargets, PantsEnvironment)),
         ]
     )
 

@@ -12,7 +12,6 @@ from pants.backend.python.util_rules.ancestor_files import (
     identify_missing_ancestor_files,
 )
 from pants.engine.fs import DigestContents
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -22,7 +21,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *ancestor_files.rules(),
-            QueryRule(AncestorFiles, (AncestorFilesRequest, OptionsBootstrapper)),
+            QueryRule(AncestorFiles, (AncestorFilesRequest,)),
         ]
     )
 

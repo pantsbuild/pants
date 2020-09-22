@@ -9,7 +9,6 @@ import pytest
 
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import QueryRule
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import (
     OptionalSourceRoot,
     SourceRoot,
@@ -286,7 +285,7 @@ def test_source_roots_request() -> None:
     rule_runner = RuleRunner(
         rules=[
             *source_root_rules(),
-            QueryRule(SourceRootsResult, (SourceRootsRequest, OptionsBootstrapper)),
+            QueryRule(SourceRootsResult, (SourceRootsRequest,)),
         ]
     )
     req = SourceRootsRequest(

@@ -18,7 +18,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.rule_runner import RuleRunner
@@ -30,7 +29,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *mypy_rules(),
             *dependency_inference_rules.rules(),  # Used for import inference.
-            QueryRule(TypecheckResults, (MyPyRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(TypecheckResults, (MyPyRequest, PantsEnvironment)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary, MyPySourcePlugin],
     )

@@ -13,7 +13,6 @@ from pants.backend.python.target_types import PythonRequirementLibrary, PythonRe
 from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.engine.addresses import Address
 from pants.engine.target import Targets
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -21,7 +20,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(Targets, (OptionsBootstrapper, Specs))],
+        rules=[QueryRule(Targets, (Specs,))],
         target_types=[PythonRequirementLibrary, PythonRequirementsFile],
         context_aware_object_factories={"pipenv_requirements": PipenvRequirements},
     )

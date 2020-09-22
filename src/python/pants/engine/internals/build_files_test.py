@@ -156,9 +156,7 @@ def test_resolve_address() -> None:
 
 @pytest.fixture
 def target_adaptor_rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[QueryRule(TargetAdaptor, (Address, OptionsBootstrapper))], target_types=[MockTgt]
-    )
+    return RuleRunner(rules=[QueryRule(TargetAdaptor, (Address,))], target_types=[MockTgt])
 
 
 def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -213,7 +211,7 @@ def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> Non
 
 def test_build_file_address() -> None:
     rule_runner = RuleRunner(
-        rules=[QueryRule(BuildFileAddress, (Address, OptionsBootstrapper))], target_types=[MockTgt]
+        rules=[QueryRule(BuildFileAddress, (Address,))], target_types=[MockTgt]
     )
     rule_runner.create_file("helloworld/BUILD.ext", "mock_tgt()")
     bootstrapper = create_options_bootstrapper()
@@ -231,7 +229,7 @@ def test_build_file_address() -> None:
 @pytest.fixture
 def address_specs_rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(AddressesWithOrigins, (AddressSpecs, OptionsBootstrapper))],
+        rules=[QueryRule(AddressesWithOrigins, (AddressSpecs,))],
         target_types=[MockTgt],
     )
 

@@ -64,6 +64,8 @@ struct InnerSession {
   workunit_store: WorkunitStore,
   // The unique id for this Session: used for metrics gathering purposes.
   build_id: String,
+  // Per-Session values that have been set for this session.
+  session_values: Mutex<Value>,
   // An id used to control the visibility of uncacheable rules. Generally this is identical for an
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
@@ -84,6 +86,7 @@ impl Session {
     should_render_ui: bool,
     build_id: String,
     should_report_workunits: bool,
+    session_values: Value,
   ) -> Session {
     let workunit_store = WorkunitStore::new(should_render_ui);
     let display = if should_render_ui {
@@ -101,6 +104,7 @@ impl Session {
       display,
       workunit_store,
       build_id,
+      session_values: Mutex::new(session_values),
       run_id: Mutex::new(Uuid::new_v4()),
       should_report_workunits,
     };
@@ -126,6 +130,10 @@ impl Session {
   fn root_nodes(&self) -> Vec<NodeKey> {
     let roots = self.0.roots.lock();
     roots.keys().map(|r| r.clone().into()).collect()
+  }
+
+  pub fn session_values(&self) -> Value {
+    self.0.session_values.lock().clone()
   }
 
   pub fn preceding_graph_size(&self) -> usize {
