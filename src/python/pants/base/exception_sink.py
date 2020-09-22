@@ -12,6 +12,7 @@ import traceback
 from contextlib import contextmanager
 from typing import Callable, Dict, Iterator, Optional
 
+import psutil
 import setproctitle
 
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -59,6 +60,12 @@ class SignalHandler:
                 self._ignoring_sigint = toggle
 
     def handle_sigint(self, signum: int, _frame):
+        self_process = psutil.Process()
+        children = self_process.children()
+        logger.debug(f"Sending SIGINT to child processes: {children}")
+        for child_process in children:
+            child_process.send_signal(signal.SIGINT)
+
         ExceptionSink._signal_sent = signum
         raise KeyboardInterrupt("User interrupted execution with control-c!")
 
