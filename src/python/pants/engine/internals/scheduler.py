@@ -29,7 +29,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.native_engine import PyTypes
+from pants.engine.internals.native_engine import PyTypes  # type: ignore[import]
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
