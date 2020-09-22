@@ -131,7 +131,6 @@ def test_python_distribution_dependency_injection() -> None:
         target_types=[PythonDistribution, PythonBinary],
         objects={"setup_py": PythonArtifact},
     )
-    # Note that injected deps can be any target type for `--protobuf-runtime-targets`.
     rule_runner.add_to_build_file(
         "project",
         dedent(
