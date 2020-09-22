@@ -5,7 +5,6 @@ from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import QueryRule, collect_rules, goal_rule
-from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 class ListAndDieForTestingSubsystem(GoalSubsystem):
@@ -29,5 +28,5 @@ def rules():
     return [
         *collect_rules(),
         # NB: Would be unused otherwise.
-        QueryRule(ListAndDieForTestingSubsystem, [OptionsBootstrapper]),
+        QueryRule(ListAndDieForTestingSubsystem, []),
     ]

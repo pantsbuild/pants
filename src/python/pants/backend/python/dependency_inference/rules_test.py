@@ -24,7 +24,6 @@ from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import SubsystemRule
 from pants.engine.target import InferredDependencies
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -36,7 +35,7 @@ def test_infer_python_imports() -> None:
             *module_mapper.rules(),
             infer_python_dependencies,
             SubsystemRule(PythonInference),
-            QueryRule(InferredDependencies, (InferPythonDependencies, OptionsBootstrapper)),
+            QueryRule(InferredDependencies, (InferPythonDependencies,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )
@@ -131,7 +130,7 @@ def test_infer_python_inits() -> None:
             *ancestor_files.rules(),
             infer_python_init_dependencies,
             SubsystemRule(PythonInference),
-            QueryRule(InferredDependencies, (InferInitDependencies, OptionsBootstrapper)),
+            QueryRule(InferredDependencies, (InferInitDependencies,)),
         ],
         target_types=[PythonLibrary],
     )
@@ -174,7 +173,7 @@ def test_infer_python_conftests() -> None:
             *ancestor_files.rules(),
             infer_python_conftest_dependencies,
             SubsystemRule(PythonInference),
-            QueryRule(InferredDependencies, (InferConftestDependencies, OptionsBootstrapper)),
+            QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
         target_types=[PythonTests],
     )

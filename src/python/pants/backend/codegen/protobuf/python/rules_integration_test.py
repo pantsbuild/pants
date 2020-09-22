@@ -19,7 +19,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     WrappedTarget,
 )
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import NoSourceRootError
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
@@ -39,8 +38,8 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
             *additional_fields.rules(),
             *source_files.rules(),
             *stripped_source_files.rules(),
-            QueryRule(HydratedSources, (HydrateSourcesRequest, OptionsBootstrapper)),
-            QueryRule(GeneratedSources, (GeneratePythonFromProtobufRequest, OptionsBootstrapper)),
+            QueryRule(HydratedSources, (HydrateSourcesRequest,)),
+            QueryRule(GeneratedSources, (GeneratePythonFromProtobufRequest,)),
         )
 
     def assert_files_generated(

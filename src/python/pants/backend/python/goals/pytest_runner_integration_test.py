@@ -27,7 +27,6 @@ from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -45,10 +44,8 @@ def rule_runner() -> RuleRunner:
             *binary.rules(),
             *create_python_binary.rules(),
             get_filtered_environment,
-            QueryRule(TestResult, (PythonTestFieldSet, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(
-                TestDebugRequest, (PythonTestFieldSet, OptionsBootstrapper, PantsEnvironment)
-            ),
+            QueryRule(TestResult, (PythonTestFieldSet, PantsEnvironment)),
+            QueryRule(TestDebugRequest, (PythonTestFieldSet, PantsEnvironment)),
         ],
         target_types=[PythonBinary, PythonLibrary, PythonTests, PythonRequirementLibrary],
     )
