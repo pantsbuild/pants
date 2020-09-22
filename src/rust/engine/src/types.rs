@@ -20,6 +20,7 @@ pub struct Types {
   pub multi_platform_process: TypeId,
   pub process_result: TypeId,
   pub coroutine: TypeId,
+  pub session_values: TypeId,
   pub interactive_process_result: TypeId,
   pub engine_aware_parameter: TypeId,
 }

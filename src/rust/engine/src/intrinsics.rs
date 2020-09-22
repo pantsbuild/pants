@@ -2,7 +2,7 @@ use crate::context::Context;
 use crate::core::{throw, Value};
 use crate::externs;
 use crate::nodes::MultiPlatformExecuteProcess;
-use crate::nodes::{lift_digest, DownloadedFile, NodeResult, Paths, Snapshot};
+use crate::nodes::{lift_digest, DownloadedFile, NodeResult, Paths, SessionValues, Snapshot};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 
@@ -100,6 +100,13 @@ impl Intrinsics {
         inputs: vec![types.digest_subset],
       },
       Box::new(digest_subset_to_digest),
+    );
+    intrinsics.insert(
+      Intrinsic {
+        product: types.session_values,
+        inputs: vec![],
+      },
+      Box::new(session_values),
     );
     Intrinsics { intrinsics }
   }
@@ -385,4 +392,8 @@ fn digest_subset_to_digest(
     Ok(Snapshot::store_directory_digest(&context.core, &digest))
   }
   .boxed()
+}
+
+fn session_values(context: Context, _args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
+  async move { context.get(SessionValues).await }.boxed()
 }

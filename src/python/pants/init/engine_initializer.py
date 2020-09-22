@@ -24,6 +24,7 @@ from pants.engine.internals.selectors import Params
 from pants.engine.platform import create_platform_rules
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule, collect_rules, rule
+from pants.engine.session import SessionValues
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
@@ -50,8 +51,11 @@ class GraphScheduler:
         dynamic_ui: bool = False,
         use_colors=True,
         should_report_workunits=False,
+        session_values: Optional[SessionValues] = None,
     ) -> "GraphSession":
-        session = self.scheduler.new_session(build_id, dynamic_ui, should_report_workunits)
+        session = self.scheduler.new_session(
+            build_id, dynamic_ui, should_report_workunits, session_values=session_values
+        )
         console = Console(use_colors=use_colors, session=session if dynamic_ui else None)
         return GraphSession(session, console, self.goal_map)
 

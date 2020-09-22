@@ -40,6 +40,7 @@ from pants.engine.process import (
     MultiPlatformProcess,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
+from pants.engine.session import SessionValues
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
@@ -144,6 +145,7 @@ class Scheduler:
             multi_platform_process=MultiPlatformProcess,
             process_result=FallibleProcessResultWithPlatform,
             coroutine=CoroutineType,
+            session_values=SessionValues,
             interactive_process_result=InteractiveProcessResult,
             engine_aware_parameter=EngineAwareParameter,
         )
@@ -348,6 +350,7 @@ class Scheduler:
         build_id,
         dynamic_ui: bool = False,
         should_report_workunits: bool = False,
+        session_values: Optional[SessionValues] = None,
     ) -> "SchedulerSession":
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
@@ -357,6 +360,7 @@ class Scheduler:
                 dynamic_ui,
                 build_id,
                 should_report_workunits,
+                session_values or SessionValues(),
             ),
         )
 
@@ -394,6 +398,15 @@ class SchedulerSession:
         return self._scheduler.graph_len()
 
     def new_run_id(self):
+        """Assigns a new "run id" to this Session, without creating a new Session.
+
+        Usually each Session corresponds to one end user "run", but there are exceptions: notably,
+        the `--loop` feature uses one Session, but would like to observe new values for uncacheable
+        nodes in each iteration of its loop.
+        """
+        self._scheduler._native.lib.session_new_run_id(self._session)
+
+    def set_per_session(self):
         """Assigns a new "run id" to this Session, without creating a new Session.
 
         Usually each Session corresponds to one end user "run", but there are exceptions: notably,
