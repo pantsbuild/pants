@@ -73,7 +73,6 @@ class GraphSession:
         Specs,
         Console,
         InteractiveRunner,
-        OptionsBootstrapper,
         Workspace,
         PantsEnvironment,
     )
