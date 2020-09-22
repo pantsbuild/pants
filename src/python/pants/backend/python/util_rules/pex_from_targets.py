@@ -59,6 +59,7 @@ class PexFromTargetsRequest:
     include_source_files: bool
     additional_sources: Optional[Digest]
     additional_inputs: Optional[Digest]
+    hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints]
     direct_deps_only: bool
     # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
     # the result.
@@ -77,6 +78,7 @@ class PexFromTargetsRequest:
         include_source_files: bool = True,
         additional_sources: Optional[Digest] = None,
         additional_inputs: Optional[Digest] = None,
+        hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints] = None,
         direct_deps_only: bool = False,
         description: Optional[str] = None,
     ) -> None:
@@ -105,6 +107,8 @@ class PexFromTargetsRequest:
         :param additional_sources: Any additional source files to include in the built Pex.
         :param additional_inputs: Any inputs that are not source files and should not be included
             directly in the Pex, but should be present in the environment when building the Pex.
+        :param hardcoded_interpreter_constraints: Use these constraints rather than resolving the
+            constraints from the input.
         :param direct_deps_only: Only consider the input addresses and their direct dependencies,
             rather than the transitive closure.
         :param description: A human-readable description to render in the dynamic UI when building
@@ -120,6 +124,7 @@ class PexFromTargetsRequest:
         self.include_source_files = include_source_files
         self.additional_sources = additional_sources
         self.additional_inputs = additional_inputs
+        self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
         self.direct_deps_only = direct_deps_only
         self.description = description
 
@@ -129,6 +134,7 @@ class PexFromTargetsRequest:
         addresses: Iterable[Address],
         *,
         internal_only: bool,
+        hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints] = None,
         zip_safe: bool = False,
         direct_deps_only: bool = False,
     ) -> "PexFromTargetsRequest":
@@ -148,6 +154,7 @@ class PexFromTargetsRequest:
             output_filename="requirements.pex",
             include_source_files=False,
             additional_args=() if zip_safe else ("--not-zip-safe",),
+            hardcoded_interpreter_constraints=hardcoded_interpreter_constraints,
             internal_only=internal_only,
             direct_deps_only=direct_deps_only,
         )
@@ -190,13 +197,17 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         input_digests.append(prepared_sources.stripped_source_files.snapshot.digest)
     merged_input_digest = await Get(Digest, MergeDigests(input_digests))
 
-    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (
-            tgt[PythonInterpreterCompatibility]
-            for tgt in all_targets
-            if tgt.has_field(PythonInterpreterCompatibility)
-        ),
-        python_setup,
+    interpreter_constraints = (
+        request.hardcoded_interpreter_constraints
+        if request.hardcoded_interpreter_constraints
+        else PexInterpreterConstraints.create_from_compatibility_fields(
+            (
+                tgt[PythonInterpreterCompatibility]
+                for tgt in all_targets
+                if tgt.has_field(PythonInterpreterCompatibility)
+            ),
+            python_setup,
+        )
     )
 
     exact_reqs = PexRequirements.create_from_requirement_fields(
