@@ -154,11 +154,11 @@ async def mypy_typecheck(
     #     with the interpreter being used to run MyPy. So, we should generally align the tool PEX
     #     constraints with the requirements constraints.
     #
-    #     However, it's possible for the requirements constraints to be different, e.g. if there is
-    #     Python 2 code. If any of the requirements only have Python 2 wheels and they are not
-    #     compatible with Python 3, then Pex will error about missing wheels. So, in this case, we
-    #     set `PEX_IGNORE_ERRORS`, which will avoid erroring, but may result in MyPy complaining
-    #     that it cannot find certain distributions.
+    #     However, it's possible for the requirements' constraints to include Python 2 and not be
+    #     compatible with MyPy's >=3.5 requirement. If any of the requirements only have
+    #     Python 2 wheels and they are not compatible with Python 3, then Pex will error about
+    #     missing wheels. So, in this case, we set `PEX_IGNORE_ERRORS`, which will avoid erroring,
+    #     but may result in MyPy complaining that it cannot find certain distributions.
     #
     #  * The runner Pex should use the same constraints as the tool Pex.
     code_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
@@ -169,13 +169,12 @@ async def mypy_typecheck(
         ),
         python_setup,
     )
+    use_subsystem_constraints = (
+        not mypy.options.is_default("interpreter_constraints")
+        or code_interpreter_constraints.includes_python2()
+    )
     tool_interpreter_constraints = (
-        code_interpreter_constraints
-        if (
-            mypy.options.is_default("interpreter_constraints")
-            and code_interpreter_constraints.includes_python2() is False
-        )
-        else mypy.interpreter_constraints
+        mypy.interpreter_constraints if use_subsystem_constraints else code_interpreter_constraints
     )
 
     plugin_sources_request = Get(

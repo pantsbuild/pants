@@ -357,10 +357,10 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
     There was a bug that this would cause the runner PEX to fail to execute because it did not have
     Python 3 distributions of the requirements.
 
-    This support is not as robust as we'd like. We'll only use third-party distributions if its
-    wheel is also compatible with the Python 3 interpreter being used to run MyPy.
-    https://github.com/pantsbuild/pants/issues/10819 tracks improving this, which might not even be
-    possible.
+    TODO(#10819): This support is not as robust as we'd like. We'll only use third-party
+    distributions if its wheel is also compatible with the Python 3 interpreter being used to run
+    MyPy. Is it possible to fix this to always include the Python 2 wheels and have MyPy respect
+    them?
     """
     rule_runner.add_to_build_file(
         "",
@@ -390,7 +390,7 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
             from x690 import types
 
             print "Blast from the past!"
-            print hello_world() - 21  # This should fail. You can't subtract an `int` from `bytes`.
+            print hello_world() - 21  # MyPy should fail. You can't subtract an `int` from `bytes`.
             """
         ).encode(),
     )

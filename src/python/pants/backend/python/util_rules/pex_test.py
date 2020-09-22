@@ -160,6 +160,39 @@ def test_interpreter_constraints_do_not_include_python2(constraints):
     assert PexInterpreterConstraints(constraints).includes_python2() is False
 
 
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        ["CPython==3.8.*"],
+        ["CPython==3.8.1"],
+        ["CPython==3.9.1"],
+        ["CPython>=3.8"],
+        ["CPython>=3.9"],
+        ["CPython==3.8.*", "CPython==3.9.*"],
+        ["PyPy>=3.8"],
+    ],
+)
+def test_interpreter_constraints_require_python38(constraints) -> None:
+    assert PexInterpreterConstraints(constraints).requires_python38_or_newer() is True
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        ["CPython==3.5.*"],
+        ["CPython==3.6.*"],
+        ["CPython==3.7.*"],
+        ["CPython==3.7.3"],
+        ["CPython>=3.7"],
+        ["CPython==3.7.*", "CPython==3.8.*"],
+        ["CPython==3.5.3", "CPython==3.8.3"],
+        ["PyPy>=3.7"],
+    ],
+)
+def test_interpreter_constraints_do_not_require_python38(constraints):
+    assert PexInterpreterConstraints(constraints).requires_python38_or_newer() is False
+
+
 @dataclass(frozen=True)
 class MockFieldSet(FieldSet):
     compatibility: PythonInterpreterCompatibility
