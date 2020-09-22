@@ -345,9 +345,10 @@ class Parser:
                     f"Error computing value for {args_str} in {self._scope_str()} (may also be from PANTS_* environment variables).\nCaused by:\n{traceback.format_exc()}"
                 )
 
-            # If the option is explicitly given, check deprecation and mutual exclusion.
+            # If the option is explicitly given, check deprecation (unless suppressed) and mutual exclusion.
+
+            print_warning = parse_args_request.suppress_warnings is False
             if val.rank > Rank.HARDCODED:
-                print_warning = not parse_args_request.suppress_warnings
                 self._check_deprecated(dest, kwargs, print_warning=print_warning)
 
                 mutex_dest = kwargs.get("mutually_exclusive_group")

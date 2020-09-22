@@ -68,11 +68,11 @@ class Options:
     # This is a class-wide toggle for whether Python warnings (using the warnings module) should
     # be emitted during the options-parsing process. We want to initially set this to `True` and
     # then set it to `False` after we have done the initial options parsing.
-    suppress_warnings = True
+    _suppress_warnings = True
 
     @classmethod
     def toggle_option_warning_suppression(cls, toggle: bool) -> None:
-        cls.suppress_warnings = toggle
+        cls._suppress_warnings = toggle
 
     class FrozenOptionsError(Exception):
         """Options are frozen and can't be mutated."""
@@ -448,7 +448,7 @@ class Options:
             namespace=values_builder,
             get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
             passthrough_args=self._passthru,
-            suppress_warnings=self.suppress_warnings,
+            suppress_warnings=self._suppress_warnings,
         )
 
         values = self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)

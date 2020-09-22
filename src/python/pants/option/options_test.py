@@ -1138,6 +1138,7 @@ class OptionsTest(unittest.TestCase):
             env: Optional[Dict[str, str]] = None,
             config: Optional[Dict[str, Dict[str, str]]] = None,
         ) -> None:
+            Options.toggle_option_warning_suppression(False)
             warnings.simplefilter("always")
             with pytest.warns(DeprecationWarning) as record:
                 options = self._parse(flags=flags, env=env, config=config)
@@ -1211,6 +1212,7 @@ class OptionsTest(unittest.TestCase):
 
     @unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
     def test_delayed_deprecated_option(self) -> None:
+        Options.toggle_option_warning_suppression(False)
         warnings.simplefilter("always")
         with pytest.warns(None) as record:
             delayed_deprecation_option_value = (
