@@ -174,7 +174,9 @@ async def mypy_typecheck(
         or code_interpreter_constraints.includes_python2()
     )
     tool_interpreter_constraints = (
-        mypy.interpreter_constraints if use_subsystem_constraints else code_interpreter_constraints
+        PexInterpreterConstraints(mypy.interpreter_constraints)
+        if use_subsystem_constraints
+        else code_interpreter_constraints
     )
 
     plugin_sources_request = Get(
@@ -192,7 +194,7 @@ async def mypy_typecheck(
             requirements=PexRequirements(
                 itertools.chain(mypy.all_requirements, plugin_requirements)
             ),
-            interpreter_constraints=PexInterpreterConstraints(tool_interpreter_constraints),
+            interpreter_constraints=tool_interpreter_constraints,
             entry_point=mypy.entry_point,
         ),
     )
@@ -211,7 +213,7 @@ async def mypy_typecheck(
             output_filename="mypy_runner.pex",
             internal_only=True,
             sources=launcher_script,
-            interpreter_constraints=PexInterpreterConstraints(tool_interpreter_constraints),
+            interpreter_constraints=tool_interpreter_constraints,
             entry_point=PurePath(LAUNCHER_FILE.path).stem,
             additional_args=(
                 "--pex-path",
