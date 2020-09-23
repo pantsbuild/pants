@@ -170,9 +170,9 @@ async def map_module_to_address(
     third_party_resolved_with_first_party_ambiguity = third_party_address and first_party_addresses
 
     if third_party_resolved_only:
-        return PythonModuleOwners([third_party_address])
+        return PythonModuleOwners([third_party_address])  # type: ignore[list-item]
     elif third_party_resolved_with_type_stub:
-        return PythonModuleOwners([third_party_address, first_party_addresses[0]])
+        return PythonModuleOwners([third_party_address, first_party_addresses[0]])  # type: ignore[list-item]
     elif third_party_resolved_with_first_party_ambiguity:
         return PythonModuleOwners()
     elif first_party_addresses:

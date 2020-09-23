@@ -117,7 +117,7 @@ release_notes = """
 """
 
 [pytest]
-args = ["--no-header"]
+args = ["--no-header", "-v"]
 pytest_plugins.add = [
   "ipdb",
   "pytest-icdiff",
