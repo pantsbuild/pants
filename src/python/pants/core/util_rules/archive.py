@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -100,7 +101,7 @@ async def maybe_extract(
     elif fp.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")):
         argv = tar_binary.extract_argv(archive_path=fp, output_dir=output_dir)
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
-        env = {"PATH": SEARCH_PATHS}
+        env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
     else:
         return ExtractedDigest(extractable_digest)
 
