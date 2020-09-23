@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import os
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Optional, Tuple
+from pathlib import Path
+from typing import Iterable, List, Mapping, Optional, Tuple
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.util_rules import pex_environment
@@ -14,11 +16,12 @@ from pants.core.util_rules.external_tool import (
     ExternalTool,
     ExternalToolRequest,
 )
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, rule
+from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty, frozen_after_init
@@ -97,21 +100,43 @@ async def setup_pex_cli_process(
     pex_binary: PexBinary,
     pex_env: PexEnvironment,
     python_native_code: PythonNativeCode,
+    global_options: GlobalOptions,
 ) -> Process:
     tmpdir = ".tmp"
-    downloaded_pex_bin, tmp_dir_digest = await MultiGet(
+    gets: List[Get] = [
         Get(DownloadedExternalTool, ExternalToolRequest, pex_binary.get_request(Platform.current)),
         Get(Digest, CreateDigest([Directory(f"{tmpdir}/.reserve")])),
-    )
+    ]
+    cert_args = []
 
-    digests_to_merge = [downloaded_pex_bin.digest, tmp_dir_digest]
+    # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
+    # Instead we manually create a FileContent for it.
+    if global_options.options.ca_certs_path:
+        ca_certs_content = Path(global_options.options.ca_certs_path).read_bytes()
+        chrooted_ca_certs_path = os.path.basename(global_options.options.ca_certs_path)
+
+        gets.append(
+            Get(
+                Digest,
+                CreateDigest((FileContent(chrooted_ca_certs_path, ca_certs_content),)),
+            )
+        )
+        cert_args = ["--cert", chrooted_ca_certs_path]
+
+    downloaded_pex_bin, *digests_to_merge = await MultiGet(gets)
+    digests_to_merge.append(downloaded_pex_bin.digest)
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
     pex_root_path = ".cache/pex_root"
     argv = pex_env.create_argv(
-        downloaded_pex_bin.exe, *request.argv, "--pex-root", pex_root_path, python=request.python
+        downloaded_pex_bin.exe,
+        *request.argv,
+        *cert_args,
+        "--pex-root",
+        pex_root_path,
+        python=request.python,
     )
     env = {
         # Ensure Pex and its subprocesses create temporary files in the the process execution
