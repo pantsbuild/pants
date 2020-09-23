@@ -43,7 +43,10 @@ if [[ "${py_major_minor}" != "3.6"  && "${py_major_minor}" != "3.7" && "${py_maj
   die "Invalid interpreter. The release script requires Python 3.6, 3.7, or 3.8 (you are using ${py_major_minor})."
 fi
 
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
+# This influences what setuptools is run with, which determines the interpreter used for building
+# `pantsbuild.pants`.
+# TODO(#10840): Automate this somehow.
+export PANTS_SETUPTOOLS_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
 
 function run_local_pants() {
   "${ROOT}/pants" "$@"
