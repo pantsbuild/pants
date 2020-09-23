@@ -3,6 +3,7 @@
 
 import logging
 import os
+import warnings
 from dataclasses import dataclass
 from typing import List, Mapping
 
@@ -62,8 +63,9 @@ class PantsRunner:
         options_bootstrapper = OptionsBootstrapper.create(
             env=self.env, args=self.args, allow_pantsrc=True
         )
-        bootstrap_options = options_bootstrapper.bootstrap_options
-        global_bootstrap_options = bootstrap_options.for_global_scope()
+        with warnings.catch_warnings(record=True):
+            bootstrap_options = options_bootstrapper.bootstrap_options
+            global_bootstrap_options = bootstrap_options.for_global_scope()
 
         # Initialize the workdir early enough to ensure that logging has a destination.
         workdir_src = init_workdir(global_bootstrap_options)
