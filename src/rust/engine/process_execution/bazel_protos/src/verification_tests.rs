@@ -101,6 +101,28 @@ fn unknown_field_in_file_node() {
 }
 
 #[test]
+fn empty_child_name() {
+  let mut directory = Directory::new();
+  directory.mut_directories().push({
+    let mut dir = DirectoryNode::new();
+    dir.set_name("".to_owned());
+    dir.set_digest({
+      let mut digest = Digest::new();
+      digest.set_size_bytes(DIRECTORY_SIZE);
+      digest.set_hash(DIRECTORY_HASH.to_owned());
+      digest
+    });
+    dir
+  });
+
+  let error = verify_directory_canonical(&directory).expect_err("Want error");
+  assert!(
+    error.contains("A child name must not be empty"),
+    format!("Bad error message: {}", error)
+  );
+}
+
+#[test]
 fn multiple_path_segments_in_directory() {
   let mut directory = Directory::new();
   directory.mut_directories().push({

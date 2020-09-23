@@ -401,8 +401,8 @@ impl Store {
       .load_bytes_with(
         EntryType::Directory,
         digest,
-        // Trust that locally stored values were canonical when they were written into the CAS,
-        // don't bother to check this, as it's slightly expensive.
+        // Trust that locally stored values were canonical when they were written into the CAS
+        // and only verify in debug mode, as it's slightly expensive.
         move |bytes: &[u8]| {
           let mut directory = remexec::Directory::new();
           directory.merge_from_bytes(&bytes).map_err(|e| {
@@ -411,6 +411,9 @@ impl Store {
               digest, e
             )
           })?;
+          if cfg!(debug_assertions) {
+            bazel_protos::verify_directory_canonical(digest, &directory).unwrap();
+          }
           Ok(directory)
         },
         // Eagerly verify that CAS-returned Directories are canonical, so that we don't write them
@@ -423,7 +426,7 @@ impl Store {
               digest, e
             )
           })?;
-          bazel_protos::verify_directory_canonical(&directory)?;
+          bazel_protos::verify_directory_canonical(digest, &directory)?;
           Ok(directory)
         },
       )
