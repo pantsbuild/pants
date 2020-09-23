@@ -224,8 +224,7 @@ class PythonBinary(Target):
     """A Python target that can be converted into an executable PEX file.
 
     PEX files are self-contained executable files that contain a complete Python environment capable
-    of running the target. For more information about PEX files, see
-    https://www.pantsbuild.org/docs/pex-files.
+    of running the target. For more information, see https://www.pantsbuild.org/docs/pex-files.
     """
 
     alias = "python_binary"

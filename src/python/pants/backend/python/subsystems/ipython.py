@@ -1,8 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List
-
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 
 
@@ -11,9 +9,7 @@ class IPython(PythonToolBase):
 
     options_scope = "ipython"
     default_version = "ipython==7.16.1"  # The last version to support Python 3.6.
-    default_extra_requirements: List[str] = []
     default_entry_point = "IPython:start_ipython"
-    default_interpreter_constraints = ["CPython>=3.6"]
 
     @classmethod
     def register_options(cls, register):
