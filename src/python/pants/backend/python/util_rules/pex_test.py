@@ -162,6 +162,72 @@ def test_interpreter_constraints_do_not_include_python2(constraints):
 @pytest.mark.parametrize(
     "constraints",
     [
+        ["CPython==3.6.*"],
+        ["CPython==3.6.1"],
+        ["CPython==3.7.1"],
+        ["CPython==3.8.2"],
+        ["CPython==3.9.1"],
+        ["CPython>=3.6"],
+        ["CPython>=3.7"],
+        ["CPython==3.6.*", "CPython==3.7.*"],
+        ["PyPy>=3.6"],
+    ],
+)
+def test_interpreter_constraints_require_python36(constraints) -> None:
+    assert PexInterpreterConstraints(constraints).requires_python36_or_newer() is True
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        ["CPython==3.5.*"],
+        ["CPython==3.5.3"],
+        ["CPython>=3.5"],
+        ["CPython==3.5.*", "CPython==3.6.*"],
+        ["CPython==3.5.3", "CPython==3.6.3"],
+        ["PyPy>=3.5"],
+    ],
+)
+def test_interpreter_constraints_do_not_require_python36(constraints):
+    assert PexInterpreterConstraints(constraints).requires_python36_or_newer() is False
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        ["CPython==3.7.*"],
+        ["CPython==3.7.1"],
+        ["CPython==3.8.1"],
+        ["CPython==3.9.1"],
+        ["CPython>=3.7"],
+        ["CPython>=3.8"],
+        ["CPython==3.7.*", "CPython==3.8.*"],
+        ["PyPy>=3.7"],
+    ],
+)
+def test_interpreter_constraints_require_python37(constraints) -> None:
+    assert PexInterpreterConstraints(constraints).requires_python37_or_newer() is True
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        ["CPython==3.5.*"],
+        ["CPython==3.6.*"],
+        ["CPython==3.6.3"],
+        ["CPython>=3.6"],
+        ["CPython==3.6.*", "CPython==3.7.*"],
+        ["CPython==3.6.3", "CPython==3.7.3"],
+        ["PyPy>=3.6"],
+    ],
+)
+def test_interpreter_constraints_do_not_require_python37(constraints):
+    assert PexInterpreterConstraints(constraints).requires_python37_or_newer() is False
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
         ["CPython==3.8.*"],
         ["CPython==3.8.1"],
         ["CPython==3.9.1"],
