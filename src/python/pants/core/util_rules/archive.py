@@ -85,7 +85,7 @@ async def maybe_extract(
 ) -> ExtractedDigest:
     """If digest contains a single archive file, extract it, otherwise return the input digest."""
     extractable_digest = extractable.digest
-    output_dir = "out/"
+    output_dir = "out"
     snapshot, output_dir_digest = await MultiGet(
         Get(Snapshot, Digest, extractable_digest),
         Get(Digest, CreateDigest([Directory(output_dir)])),
