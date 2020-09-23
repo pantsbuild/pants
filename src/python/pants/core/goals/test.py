@@ -14,6 +14,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine import desktop
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
@@ -31,6 +32,7 @@ from pants.engine.target import (
     TargetsToValidFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.util.frozendict import FrozenDict
 
 # TODO: Until we have templating of rule names (#7907) or some other way to affect the level
 # of a workunit for a failed test, we should continue to log tests completing.
@@ -227,6 +229,19 @@ class TestOptions(GoalSubsystem):
                 "system supports this."
             ),
         )
+        register(
+            "--extra-env-vars",
+            type=list,
+            member_type=str,
+            default=[],
+            help=(
+                "Additional environment variables to include in test processes. "
+                "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
+                "`ENV_VAR` to copy the value of a variable in Pants's own environment. `value` may "
+                "be a string with spaces in it such as `ENV_VAR=has some spaces`. `ENV_VAR=` sets "
+                "a variable to be the empty string."
+            ),
+        )
 
 
 class Test(Goal):
@@ -351,5 +366,22 @@ async def coordinator_of_tests(wrapped_field_set: WrappedTestFieldSet) -> Addres
     return AddressAndTestResult(field_set.address, result)
 
 
+@dataclass(frozen=True)
+class TestExtraEnv:
+    env: FrozenDict[str, str]
+
+
+@rule
+def get_filtered_environment(
+    test_options: TestOptions, pants_env: PantsEnvironment
+) -> TestExtraEnv:
+    env = (
+        pants_env.get_subset(test_options.values.extra_env_vars)
+        if test_options.values.extra_env_vars
+        else FrozenDict({})
+    )
+    return TestExtraEnv(env)
+
+
 def rules():
-    return [coordinator_of_tests, run_tests]
+    return [coordinator_of_tests, run_tests, get_filtered_environment]
