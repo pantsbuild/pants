@@ -35,6 +35,8 @@ def init_rust_logger(
 
 def setup_warning_filtering(warnings_filter_regexes: Iterable[str]) -> None:
     """Sets up regex-based ignores for messages using the Python warnings system."""
+
+    warnings.resetwarnings()
     for message_regexp in warnings_filter_regexes or ():
         warnings.filterwarnings(action="ignore", message=message_regexp)
 
