@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
 from dataclasses import dataclass
 from typing import Mapping, Optional, Tuple
 
@@ -15,6 +14,7 @@ from pants.base.workunit import WorkUnit
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_info_extracter import HelpInfoExtracter
@@ -85,6 +85,7 @@ class LocalPantsRunner:
             dynamic_ui=dynamic_ui,
             use_colors=use_colors,
             should_report_workunits=stream_workunits,
+            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
         )
 
     @classmethod
@@ -146,9 +147,6 @@ class LocalPantsRunner:
         )
 
     def _set_start_time(self, start_time: float) -> None:
-        # Propagates parent_build_id to pants runs that may be called from this pants run.
-        os.environ["PANTS_PARENT_BUILD_ID"] = self._run_tracker.run_id
-
         self._run_tracker.start(self.options, run_start_time=start_time)
 
         spec_parser = SpecsParser(get_buildroot())

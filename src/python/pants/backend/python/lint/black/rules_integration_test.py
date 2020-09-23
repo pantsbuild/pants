@@ -16,7 +16,6 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Target
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -27,9 +26,9 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *black_rules(),
-            QueryRule(LintResults, (BlackRequest, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(FmtResult, (BlackRequest, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(LintResults, (BlackRequest, PantsEnvironment)),
+            QueryRule(FmtResult, (BlackRequest, PantsEnvironment)),
+            QueryRule(SourceFiles, (SourceFilesRequest, PantsEnvironment)),
         ],
         target_types=[PythonLibrary],
     )

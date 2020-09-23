@@ -34,7 +34,7 @@ class OptionableFactory(ABC):
 
     @property
     @abstractmethod
-    def options_scope(self):
+    def options_scope(self) -> str:
         """The scope from which the ScopedOptions for the target Optionable will be parsed."""
 
     @classmethod
@@ -66,9 +66,6 @@ class OptionableFactory(ABC):
 
 class Optionable(OptionableFactory, metaclass=ABCMeta):
     """A mixin for classes that can register options on some scope."""
-
-    # Subclasses must override.
-    options_scope: Optional[str] = None
 
     # Subclasses may override these to specify a deprecated former name for this Optionable's scope.
     # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
@@ -145,16 +142,3 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
         Subclasses should not generally need to override this method.
         """
         cls.register_options(options.registration_function_for_optionable(cls))
-
-    def __init__(self) -> None:
-        # Check that the instance's class defines options_scope.
-        # Note: It is a bit odd to validate a class when instantiating an object of it. but checking
-        # the class itself (e.g., via metaclass magic) turns out to be complicated, because
-        # non-instantiable subclasses (such as TaskBase, Task, Subsystem and other domain-specific
-        # intermediate classes) don't define options_scope, so we can only apply this check to
-        # instantiable classes. And the easiest way to know if a class is instantiable is to hook into
-        # its __init__, as we do here. We usually only create a single instance of an Optionable
-        # subclass anyway.
-        cls = type(self)
-        if not isinstance(cls.options_scope, str):
-            raise NotImplementedError(f"{cls} must set an options_scope class-level property.")

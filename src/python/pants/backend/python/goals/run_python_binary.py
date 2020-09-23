@@ -13,18 +13,13 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.run import RunFieldSet, RunRequest
-from pants.core.util_rules.source_files import SourceFiles
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import Digest, MergeDigests, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    HydratedSources,
-    HydrateSourcesRequest,
-    InvalidFieldException,
-    TransitiveTargets,
-)
+from pants.engine.target import InvalidFieldException, TransitiveTargets
 from pants.engine.unions import UnionRule
+from pants.option.global_options import FilesNotFoundBehavior
+from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
 
@@ -36,21 +31,24 @@ async def create_python_binary_run_request(
 ) -> RunRequest:
     entry_point = field_set.entry_point.value
     if entry_point is None:
-        # TODO: This is overkill? We don't need to hydrate the sources and strip snapshots,
-        #  we only need the path relative to the source root.
-        binary_sources = await Get(HydratedSources, HydrateSourcesRequest(field_set.sources))
-        stripped_binary_sources = await Get(
-            StrippedSourceFiles, SourceFiles(binary_sources.snapshot, ())
+        binary_source_paths = await Get(
+            Paths, PathGlobs, field_set.sources.path_globs(FilesNotFoundBehavior.error)
+        )
+        if len(binary_source_paths.files) != 1:
+            raise InvalidFieldException(
+                "No `entry_point` was set for the target "
+                f"{repr(field_set.address)}, so it must have exactly one source, but it has "
+                f"{len(binary_source_paths.files)}"
+            )
+        entry_point_path = binary_source_paths.files[0]
+        source_root = await Get(
+            SourceRoot,
+            SourceRootRequest,
+            SourceRootRequest.for_file(entry_point_path),
         )
         entry_point = PythonBinarySources.translate_source_file_to_entry_point(
-            stripped_binary_sources.snapshot.files
+            os.path.relpath(entry_point_path, source_root.path)
         )
-    if entry_point is None:
-        raise InvalidFieldException(
-            "You must either specify `sources` or `entry_point` for the target "
-            f"{repr(field_set.address)} in order to run it, but both fields were undefined."
-        )
-
     transitive_targets = await Get(TransitiveTargets, Addresses([field_set.address]))
 
     # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
@@ -75,6 +73,9 @@ async def create_python_binary_run_request(
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
             additional_args=field_set.generate_additional_args(python_binary_defaults),
             internal_only=True,
+            # Note that the entry point file is not in the Pex itself, but on the
+            # PEX_PATH. This works fine!
+            entry_point=entry_point,
         ),
     )
 
@@ -92,18 +93,16 @@ async def create_python_binary_run_request(
     def in_chroot(relpath: str) -> str:
         return os.path.join("{chroot}", relpath)
 
+    args = pex_env.create_argv(in_chroot(runner_pex.name), python=runner_pex.python)
+
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
-        **pex_env.environment_dict,
+        **pex_env.environment_dict(python_configured=runner_pex.python is not None),
         "PEX_PATH": in_chroot(requirements_pex_request.output_filename),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }
 
-    return RunRequest(
-        digest=merged_digest,
-        args=(in_chroot(runner_pex.name), "-m", entry_point),
-        extra_env=extra_env,
-    )
+    return RunRequest(digest=merged_digest, args=args, extra_env=extra_env)
 
 
 def rules():

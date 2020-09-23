@@ -11,20 +11,9 @@ class OptionableTest(unittest.TestCase):
         class NoScope(Optionable):
             pass
 
-        with self.assertRaises(NotImplementedError):
-            NoScope()
-
-        class NoneScope(Optionable):
-            options_scope = None
-
-        with self.assertRaises(NotImplementedError):
-            NoneScope()
-
-        class NonStringScope(Optionable):
-            options_scope = 42  # type: ignore[assignment]
-
-        with self.assertRaises(NotImplementedError):
-            NonStringScope()
+        with self.assertRaises(TypeError) as cm:
+            NoScope()  # type: ignore[abstract]
+        assert ("with abstract methods options_scope") in str(cm.exception)
 
         class StringScope(Optionable):
             options_scope = "good"

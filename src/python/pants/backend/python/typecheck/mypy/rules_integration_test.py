@@ -18,9 +18,11 @@ from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.python_interpreter_selection import skip_unless_python38_present
+from pants.testutil.python_interpreter_selection import (
+    skip_unless_python27_present,
+    skip_unless_python38_present,
+)
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -30,7 +32,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *mypy_rules(),
             *dependency_inference_rules.rules(),  # Used for import inference.
-            QueryRule(TypecheckResults, (MyPyRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(TypecheckResults, (MyPyRequest, PantsEnvironment)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary, MyPySourcePlugin],
     )
@@ -199,7 +201,6 @@ def test_skip(rule_runner: RuleRunner) -> None:
     assert not result
 
 
-@pytest.mark.xfail(reason="Temporarily disabled 3rd-party support")
 def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file(
         "",
@@ -229,7 +230,6 @@ def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/itertools.py:3" in result[0].stdout
 
 
-@pytest.mark.xfail(reason="Temporarily disabled 3rd-party support")
 def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file(
         "",
@@ -349,6 +349,59 @@ def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/math/add.py:5" in result[0].stdout
 
 
+@skip_unless_python27_present
+def test_works_with_python27(rule_runner: RuleRunner) -> None:
+    """A regression test that we can properly handle Python 2-only third-party dependencies.
+
+    There was a bug that this would cause the runner PEX to fail to execute because it did not have
+    Python 3 distributions of the requirements.
+
+    TODO(#10819): This support is not as robust as we'd like. We'll only use third-party
+    distributions if its wheel is also compatible with the Python 3 interpreter being used to run
+    MyPy. Is it possible to fix this to always include the Python 2 wheels and have MyPy respect
+    them?
+    """
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            # Both requirements are a) typed and b) compatible with Py2 and Py3. However, `x690`
+            # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We only
+            # expect libumi to be usable by MyPy.
+
+            python_requirement_library(
+                name="libumi",
+                requirements=["libumi==0.0.2"],
+            )
+
+            python_requirement_library(
+                name="x690",
+                requirements=["x690==0.2.0"],
+            )
+            """
+        ),
+    )
+    source_file = FileContent(
+        f"{PACKAGE}/py2.py",
+        dedent(
+            """\
+            from libumi import hello_world
+            from x690 import types
+
+            print "Blast from the past!"
+            print hello_world() - 21  # MyPy should fail. You can't subtract an `int` from `bytes`.
+            """
+        ).encode(),
+    )
+    target = make_target(rule_runner, [source_file], interpreter_constraints="==2.7.*")
+    result = run_mypy(rule_runner, [target], passthrough_args="--py2")
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert "Failed to execute PEX file" not in result[0].stderr
+    assert "Cannot find implementation or library stub for module named 'x690'" in result[0].stdout
+    assert f"{PACKAGE}/py2.py:5: error: Unsupported operand types" in result[0].stdout
+
+
 @skip_unless_python38_present
 def test_works_with_python38(rule_runner: RuleRunner) -> None:
     """MyPy's typed-ast dependency does not understand Python 3.8, so we must instead run MyPy with
@@ -371,7 +424,6 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert "Success: no issues found" in result[0].stdout.strip()
 
 
-@pytest.mark.xfail(reason="Temporarily disabled 3rd-party support, and this plugin uses that")
 def test_source_plugin(rule_runner: RuleRunner) -> None:
     # NB: We make this source plugin fairly complex by having it use transitive dependencies.
     # This is to ensure that we can correctly support plugins with dependencies.

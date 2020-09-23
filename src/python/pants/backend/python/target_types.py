@@ -4,19 +4,22 @@
 import collections.abc
 import os.path
 from textwrap import dedent
-from typing import Iterable, Optional, Sequence, Tuple, Union, cast
+from typing import Iterable, Optional, Tuple, Union, cast
 
 from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.base.deprecated import warn_or_error
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, AddressInput
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
     DictStringToStringSequenceField,
+    InjectDependenciesRequest,
+    InjectedDependencies,
     IntField,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -28,6 +31,7 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
+    WrappedTarget,
 )
 from pants.option.subsystem import Subsystem
 from pants.python.python_requirement import PythonRequirement
@@ -110,11 +114,8 @@ class PythonBinarySources(PythonSources):
     expected_num_files = range(0, 2)
 
     @staticmethod
-    def translate_source_file_to_entry_point(stripped_sources: Sequence[str]) -> Optional[str]:
-        # We assume we have 0-1 sources, which is enforced by PythonBinarySources.
-        if len(stripped_sources) != 1:
-            return None
-        module_base, _ = os.path.splitext(stripped_sources[0])
+    def translate_source_file_to_entry_point(stripped_source_path: str) -> str:
+        module_base, _ = os.path.splitext(stripped_source_path)
         return module_base.replace(os.path.sep, ".")
 
 
@@ -223,8 +224,7 @@ class PythonBinary(Target):
     """A Python target that can be converted into an executable PEX file.
 
     PEX files are self-contained executable files that contain a complete Python environment capable
-    of running the target. For more information about PEX files, see
-    https://www.pantsbuild.org/docs/pex-files.
+    of running the target. For more information, see https://www.pantsbuild.org/docs/pex-files.
     """
 
     alias = "python_binary"
@@ -511,3 +511,34 @@ class PythonDistribution(Target):
 
     alias = "python_distribution"
     core_fields = (*COMMON_TARGET_FIELDS, PythonDistributionDependencies, PythonProvidesField)
+
+
+class InjectPythonDistributionDependencies(InjectDependenciesRequest):
+    inject_for = PythonDistributionDependencies
+
+
+@rule
+async def inject_dependencies(
+    request: InjectPythonDistributionDependencies,
+) -> InjectedDependencies:
+    """Inject any `.with_binaries()` values, as it would be redundant to have to include in the
+    `dependencies` field."""
+    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    with_binaries = original_tgt.target[PythonProvidesField].value.binaries
+    if not with_binaries:
+        return InjectedDependencies()
+    # Note that we don't validate that these are all `python_binary` targets; we don't care about
+    # that here. `setup_py.py` will do that validation.
+    addresses = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(addr, relative_to=request.dependencies_field.address.spec_path),
+        )
+        for addr in with_binaries.values()
+    )
+    return InjectedDependencies(addresses)
+
+
+def rules():
+    return collect_rules()

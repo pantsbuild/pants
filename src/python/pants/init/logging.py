@@ -111,7 +111,7 @@ def _common_logging_setup(level: LogLevel) -> None:
         requests_logger.propagate = True
 
 
-def setup_logging(global_bootstrap_options):
+def setup_logging(global_bootstrap_options: OptionValueContainer, stderr_logging: bool) -> None:
     """Sets up logging for a Pants run.
 
     This is called in two contexts: 1) PantsRunner, 2) DaemonPantsRunner. In the latter case, the
@@ -134,7 +134,8 @@ def setup_logging(global_bootstrap_options):
     )
 
     print_exception_stacktrace = global_bootstrap_options.print_exception_stacktrace
-    setup_logging_to_stderr(global_level, print_exception_stacktrace)
+    if stderr_logging:
+        setup_logging_to_stderr(global_level, print_exception_stacktrace)
 
     if log_dir:
         setup_logging_to_file(global_level, log_dir=log_dir)

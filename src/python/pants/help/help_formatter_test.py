@@ -8,7 +8,7 @@ from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
-from pants.option.option_value_container import OptionValueContainer
+from pants.option.option_value_container import OptionValueContainerBuilder
 from pants.option.parser import OptionValueHistory, Parser
 from pants.option.ranked_value import Rank, RankedValue
 
@@ -64,7 +64,9 @@ class OptionHelpFormatterTest(unittest.TestCase):
         )
         parser.register(*args, **kwargs)
         # Force a parse to generate the derivation history.
-        parser.parse_args(Parser.ParseArgsRequest((), OptionValueContainer(), lambda: [], []))
+        parser.parse_args(
+            Parser.ParseArgsRequest((), OptionValueContainerBuilder(), lambda: [], [])
+        )
         oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False)
         return HelpFormatter(
             show_advanced=show_advanced, show_deprecated=show_deprecated, color=False

@@ -10,7 +10,7 @@ from typing_extensions import Protocol
 from pants.base.exiter import ExitCode
 from pants.engine.fs import PathGlobs
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import (
+from pants.engine.internals.native_engine import (  # type: ignore[import]
     PyExecutionRequest,
     PyExecutionStrategyOptions,
     PyExecutor,
@@ -25,6 +25,7 @@ from pants.engine.internals.native_engine import (
     PyTypes,
 )
 from pants.engine.rules import Get
+from pants.engine.session import SessionValues
 from pants.engine.unions import union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -207,12 +208,14 @@ class Native(metaclass=SingletonMetaclass):
         dynamic_ui: bool,
         build_id,
         should_report_workunits: bool,
+        session_values: SessionValues,
     ) -> PySession:
         return PySession(
             scheduler,
             dynamic_ui,
             build_id,
             should_report_workunits,
+            session_values,
         )
 
     def new_scheduler(

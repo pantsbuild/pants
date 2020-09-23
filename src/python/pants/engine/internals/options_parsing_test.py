@@ -4,7 +4,6 @@
 import pytest
 
 from pants.engine.rules import SubsystemRule
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
 from pants.python.python_setup import PythonSetup
 from pants.testutil.option_util import create_options_bootstrapper
@@ -14,9 +13,7 @@ from pants.util.logging import LogLevel
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[SubsystemRule(PythonSetup), QueryRule(ScopedOptions, (Scope, OptionsBootstrapper))]
-    )
+    return RuleRunner(rules=[SubsystemRule(PythonSetup), QueryRule(ScopedOptions, (Scope,))])
 
 
 def test_options_parse_scoped(rule_runner: RuleRunner) -> None:

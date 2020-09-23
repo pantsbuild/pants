@@ -266,6 +266,7 @@ class InteractiveProcess:
     input_digest: Digest
     run_in_workspace: bool
     hermetic_env: bool
+    forward_signals_to_process: bool
 
     def __init__(
         self,
@@ -275,6 +276,7 @@ class InteractiveProcess:
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
         hermetic_env: bool = True,
+        forward_signals_to_process: bool = True,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -282,12 +284,17 @@ class InteractiveProcess:
 
         To run the process, request `InteractiveRunner` in a `@goal_rule`, then use
         `interactive_runner.run()`.
+
+        `forward_signals_to_process` controls whether pants will allow a SIGINT signal
+        sent to a process by hitting Ctrl-C in the terminal to actually reach the process,
+        or capture that signal itself, blocking it from the process.
         """
         self.argv = tuple(argv)
         self.env = FrozenDict(env or {})
         self.input_digest = input_digest
         self.run_in_workspace = run_in_workspace
         self.hermetic_env = hermetic_env
+        self.forward_signals_to_process = forward_signals_to_process
         self.__post_init__()
 
     def __post_init__(self):
@@ -298,12 +305,15 @@ class InteractiveProcess:
             )
 
     @classmethod
-    def from_process(cls, process: Process, *, hermetic_env: bool = True) -> "InteractiveProcess":
+    def from_process(
+        cls, process: Process, *, hermetic_env: bool = True, forward_signals_to_process: bool = True
+    ) -> "InteractiveProcess":
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
             input_digest=process.input_digest,
             hermetic_env=hermetic_env,
+            forward_signals_to_process=forward_signals_to_process,
         )
 
 
@@ -313,8 +323,11 @@ class InteractiveRunner:
     _scheduler: "SchedulerSession"
 
     def run(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        with ExceptionSink.ignoring_sigint():
-            return self._scheduler.run_local_interactive_process(request)
+        if request.forward_signals_to_process:
+            with ExceptionSink.ignoring_sigint():
+                return self._scheduler.run_local_interactive_process(request)
+
+        return self._scheduler.run_local_interactive_process(request)
 
 
 @frozen_after_init
@@ -439,6 +452,32 @@ async def make_process_uncacheable(uncacheable_process: UncacheableProcess) -> P
     env["__PANTS_FORCE_PROCESS_RUN__"] = str(uuid)
 
     return dataclasses.replace(process, env=FrozenDict(env))
+
+
+class BinaryNotFoundError(EnvironmentError):
+    def __init__(
+        self,
+        request: BinaryPathRequest,
+        *,
+        rationale: Optional[str] = None,
+        alternative_solution: Optional[str] = None,
+    ) -> None:
+        """When no binary is found via `BinaryPaths`, and it is not recoverable.
+
+        :param rationale: A short description of why this binary is needed, e.g.
+            "download the tools Pants needs" or "run Python programs".
+        :param alternative_solution: A description of what else users can do to fix the issue,
+            beyond installing the program. For example, "Alternatively, you can set the option
+            `--python-setup-interpreter-search-path` to change the paths searched."
+        """
+        msg = (
+            f"Cannot find `{request.binary_name}` on `{sorted(request.search_path)}`. Please "
+            "ensure that it is installed"
+        )
+        msg += f" so that Pants can {rationale}." if rationale else "."
+        if alternative_solution:
+            msg += f"\n\n{alternative_solution}"
+        super().__init__(msg)
 
 
 @rule(desc="Find binary path", level=LogLevel.DEBUG)

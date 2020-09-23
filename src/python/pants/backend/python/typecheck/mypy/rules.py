@@ -3,6 +3,7 @@
 
 import itertools
 from dataclasses import dataclass
+from pathlib import PurePath
 from textwrap import dedent
 from typing import Tuple
 
@@ -20,6 +21,7 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
     PexRequirements,
 )
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -147,34 +149,35 @@ async def mypy_typecheck(
     #     `python_version`. We don't want to make the user set this up. (If they do, MyPy will use
     #     `python_version`, rather than defaulting to the executing interpreter).
     #
-    #     We only apply these optimizations if the user did not configure
-    #     `--mypy-interpreter-constraints`, and if we know that there are no Py35 or Py27
-    #     constraints. If they use Py27 or Py35, this implies that they're not using Py36+ syntax,
-    #     so it's fine to use the Py35 parser. We want the loosest constraints possible to make it
-    #     more flexible to install MyPy.
     #  * We must resolve third-party dependencies. This should use whatever the actual code's
-    #     constraints are. The constraints for the tool can be different than for the requirements.
+    #     constraints are. However, PEX will error if they are not compatible
+    #     with the interpreter being used to run MyPy. So, we should generally align the tool PEX
+    #     constraints with the requirements constraints.
+    #
+    #     However, it's possible for the requirements' constraints to include Python 2 and not be
+    #     compatible with MyPy's >=3.5 requirement. If any of the requirements only have
+    #     Python 2 wheels and they are not compatible with Python 3, then Pex will error about
+    #     missing wheels. So, in this case, we set `PEX_IGNORE_ERRORS`, which will avoid erroring,
+    #     but may result in MyPy complaining that it cannot find certain distributions.
+    #
     #  * The runner Pex should use the same constraints as the tool Pex.
-    all_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+    code_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
             tgt[PythonInterpreterCompatibility]
-            for tgt in itertools.chain(
-                typechecked_transitive_targets.closure, plugin_transitive_targets.closure
-            )
+            for tgt in typechecked_transitive_targets.closure
             if tgt.has_field(PythonInterpreterCompatibility)
         ),
         python_setup,
     )
-    if not mypy.options.is_default("interpreter_constraints"):
-        tool_interpreter_constraints = mypy.interpreter_constraints
-    elif all_interpreter_constraints.requires_python38_or_newer():
-        tool_interpreter_constraints = ("CPython>=3.8",)
-    elif all_interpreter_constraints.requires_python37_or_newer():
-        tool_interpreter_constraints = ("CPython>=3.7",)
-    elif all_interpreter_constraints.requires_python36_or_newer():
-        tool_interpreter_constraints = ("CPython>=3.6",)
-    else:
-        tool_interpreter_constraints = mypy.interpreter_constraints
+    use_subsystem_constraints = (
+        not mypy.options.is_default("interpreter_constraints")
+        or code_interpreter_constraints.includes_python2()
+    )
+    tool_interpreter_constraints = (
+        PexInterpreterConstraints(mypy.interpreter_constraints)
+        if use_subsystem_constraints
+        else code_interpreter_constraints
+    )
 
     plugin_sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(plugin_transitive_targets.closure)
@@ -191,32 +194,33 @@ async def mypy_typecheck(
             requirements=PexRequirements(
                 itertools.chain(mypy.all_requirements, plugin_requirements)
             ),
-            interpreter_constraints=PexInterpreterConstraints(tool_interpreter_constraints),
+            interpreter_constraints=tool_interpreter_constraints,
             entry_point=mypy.entry_point,
         ),
     )
-    # requirements_pex_request = Get(
-    #     Pex,
-    #     PexFromTargetsRequest,
-    #     PexFromTargetsRequest.for_requirements(
-    #         (field_set.address for field_set in request.field_sets), internal_only=True
-    #     ),
-    # )
+    requirements_pex_request = Get(
+        Pex,
+        PexFromTargetsRequest,
+        PexFromTargetsRequest.for_requirements(
+            (field_set.address for field_set in request.field_sets),
+            hardcoded_interpreter_constraints=code_interpreter_constraints,
+            internal_only=True,
+        ),
+    )
     runner_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="mypy_runner.pex",
             internal_only=True,
             sources=launcher_script,
-            interpreter_constraints=PexInterpreterConstraints(tool_interpreter_constraints),
-            # entry_point=PurePath(LAUNCHER_FILE.path).stem,
-            entry_point=mypy.entry_point,
+            interpreter_constraints=tool_interpreter_constraints,
+            entry_point=PurePath(LAUNCHER_FILE.path).stem,
             additional_args=(
                 "--pex-path",
                 ":".join(
                     (
                         tool_pex_request.input.output_filename,
-                        # requirements_pex_request.subject.output_filename,
+                        requirements_pex_request.input.output_filename,
                     )
                 ),
             ),
@@ -236,14 +240,14 @@ async def mypy_typecheck(
         plugin_sources,
         typechecked_sources,
         tool_pex,
-        # requirements_pex,
+        requirements_pex,
         runner_pex,
         config_digest,
     ) = await MultiGet(
         plugin_sources_request,
         typechecked_sources_request,
         tool_pex_request,
-        # requirements_pex_request,
+        requirements_pex_request,
         runner_pex_request,
         config_digest_request,
     )
@@ -266,7 +270,7 @@ async def mypy_typecheck(
                 plugin_sources.source_files.snapshot.digest,
                 typechecked_srcs_snapshot.digest,
                 tool_pex.digest,
-                # requirements_pex.digest,
+                requirements_pex.digest,
                 runner_pex.digest,
                 config_digest,
             ]
@@ -276,13 +280,19 @@ async def mypy_typecheck(
     all_used_source_roots = sorted(
         set(itertools.chain(plugin_sources.source_roots, typechecked_sources.source_roots))
     )
+    extra_env = {"PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots)}
+    # If the constraints are different for the tool than for the requirements, we must tell Pex to
+    # ignore errors. Otherwise, we risk runtime errors about missing dependencies.
+    if code_interpreter_constraints != tool_interpreter_constraints:
+        extra_env["PEX_IGNORE_ERRORS"] = "true"
+
     result = await Get(
         FallibleProcessResult,
         PexProcess(
             runner_pex,
             argv=generate_args(mypy, file_list_path=file_list_path),
             input_digest=merged_input_files,
-            extra_env={"PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots)},
+            extra_env=extra_env,
             description=f"Run MyPy on {pluralize(len(typechecked_srcs_snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),

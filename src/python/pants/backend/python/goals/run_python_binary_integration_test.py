@@ -3,10 +3,20 @@
 
 from textwrap import dedent
 
+import pytest
+
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
 
-def test_run_sample_script() -> None:
+@pytest.mark.parametrize(
+    "tgt_content",
+    [
+        "python_binary(sources=['app.py'])",
+        "python_binary(sources=['app.py'], entry_point='project.app')",
+        "python_binary(sources=['app.py'], entry_point='project.app:main')",
+    ],
+)
+def test_run_sample_script(tgt_content: str) -> None:
     """Test that we properly run a `python_binary` target.
 
     This checks a few things:
@@ -21,13 +31,16 @@ def test_run_sample_script() -> None:
             from utils.strutil import upper_case
 
 
-            if __name__ == "__main__":
+            def main():
                 print(upper_case("Hello world."))
                 print("Hola, mundo.", file=sys.stderr)
                 sys.exit(23)
+
+            if __name__ == "__main__":
+              main()
             """
         ),
-        "src_root1/project/BUILD": "python_binary(sources=['app.py'])",
+        "src_root1/project/BUILD": tgt_content,
         "src_root2/utils/strutil.py": dedent(
             """\
             def upper_case(s):

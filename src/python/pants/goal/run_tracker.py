@@ -244,8 +244,6 @@ class RunTracker(Subsystem):
         self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
         self.run_info.add_basic_info(self.run_id, self._run_timestamp)
         self.run_info.add_info("cmd_line", self._cmd_line)
-        if self.options.parent_build_id:
-            self.run_info.add_info("parent_build_id", self.options.parent_build_id)
 
         # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
         link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")
@@ -480,7 +478,7 @@ class RunTracker(Subsystem):
             "run_info": self.run_information(),
             "pantsd_stats": self.pantsd_stats.get_all(),
             "cumulative_timings": self.cumulative_timings.get_all(),
-            "recorded_options": self._get_options_to_record(),
+            "recorded_options": self.get_options_to_record(),
         }
         if self._stats_version == 2:
             stats["workunits"] = self.json_reporter.results
@@ -608,7 +606,7 @@ class RunTracker(Subsystem):
         """
         SubprocPool.shutdown(self._aborted)
 
-    def _get_options_to_record(self) -> dict:
+    def get_options_to_record(self) -> dict:
         recorded_options = {}
         scopes = self.options.stats_option_scopes_to_record
         if "*" in scopes:

@@ -24,6 +24,9 @@ class PyTest(Subsystem):
         )
         register(
             "--version",
+            # This should be kept in sync with `requirements.txt`.
+            # TODO: To fix this, we should allow using a `target_option` referring to a
+            #  `python_requirement_library` to override the version.
             default="pytest>=6.0.1,<6.1",
             advanced=True,
             help="Requirement string for Pytest.",

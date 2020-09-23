@@ -15,7 +15,6 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Target
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -25,9 +24,9 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *isort_rules(),
-            QueryRule(LintResults, (IsortRequest, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(FmtResult, (IsortRequest, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(LintResults, (IsortRequest, PantsEnvironment)),
+            QueryRule(FmtResult, (IsortRequest, PantsEnvironment)),
+            QueryRule(SourceFiles, (SourceFilesRequest, PantsEnvironment)),
         ]
     )
 

@@ -83,5 +83,5 @@ def calculate_specs(
 
 def rules():
     return [
-        QueryRule(ChangedAddresses, [ChangedRequest, OptionsBootstrapper]),
+        QueryRule(ChangedAddresses, [ChangedRequest]),
     ]

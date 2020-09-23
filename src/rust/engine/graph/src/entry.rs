@@ -52,26 +52,20 @@ impl Generation {
 ///
 /// A result from running a Node.
 ///
-/// If the value is Dirty, the consumer should check whether the dependencies of the Node have the
-/// same values as they did when this Node was last run; if so, the value can be re-used
-/// (and should be marked "Clean").
-///
-/// If the value is Uncacheable it may only be consumed in the same Run that produced it, and should
-/// be recomputed in a new Run.
-///
-/// A value of type UncacheableDependencies has Uncacheable dependencies, and is treated as
-/// equivalent to Dirty in all cases except when `poll`d: since `poll` requests are waiting for
-/// meaningful work to do, they need to differentiate between a truly invalidated/changed (Dirty)
-/// Node and a Node that would be re-cleaned once per session.
-///
-/// If the value is Clean, the consumer can simply use the value as-is.
-///
 #[derive(Clone, Debug)]
 pub enum EntryResult<N: Node> {
+  /// A value that is immediately readable by any consumer, with no constraints.
   Clean(N::Item),
-  UncacheableDependencies(N::Item),
+  /// A consumer should check whether the dependencies of the Node have the same values as they
+  /// did when this Node was last run; if so, the value can be re-used (and can move to "Clean").
   Dirty(N::Item),
+  /// Similar to Clean, but the value may only be consumed in the same Run that produced it, and
+  /// _must_ (unlike UncacheableDependencies) be recomputed in a new Run.
   Uncacheable(N::Item, <<N as Node>::Context as NodeContext>::RunId),
+  /// A value that was computed from an Uncacheable node, and is thus Run-specific. If the Run id
+  /// of a consumer matches, the value can be considered to be Clean: otherwise, is considered to
+  /// be Dirty.
+  UncacheableDependencies(N::Item, <<N as Node>::Context as NodeContext>::RunId),
 }
 
 impl<N: Node> EntryResult<N> {
@@ -79,14 +73,14 @@ impl<N: Node> EntryResult<N> {
     match self {
       EntryResult::Clean(..) => true,
       EntryResult::Uncacheable(_, run_id) => context.run_id() == run_id,
+      EntryResult::UncacheableDependencies(.., run_id) => context.run_id() == run_id,
       EntryResult::Dirty(..) => false,
-      EntryResult::UncacheableDependencies(..) => false,
     }
   }
 
   fn has_uncacheable_deps(&self) -> bool {
     match self {
-      EntryResult::Uncacheable(_, _) | EntryResult::UncacheableDependencies(_) => true,
+      EntryResult::Uncacheable(_, _) | EntryResult::UncacheableDependencies(_, _) => true,
       EntryResult::Clean(..) | EntryResult::Dirty(..) => false,
     }
   }
@@ -97,7 +91,7 @@ impl<N: Node> EntryResult<N> {
     match self {
       EntryResult::Uncacheable(_, run_id) => context.run_id() == run_id,
       EntryResult::Dirty(..) => false,
-      EntryResult::UncacheableDependencies(_) | EntryResult::Clean(..) => true,
+      EntryResult::Clean(..) | EntryResult::UncacheableDependencies(_, _) => true,
     }
   }
 
@@ -112,24 +106,25 @@ impl<N: Node> EntryResult<N> {
   /// If the value is in a Clean state, mark it Dirty.
   fn dirty(&mut self) {
     match self {
-      EntryResult::Clean(v) | EntryResult::UncacheableDependencies(v) => {
+      EntryResult::Clean(v) | EntryResult::UncacheableDependencies(v, _) => {
         *self = EntryResult::Dirty(v.clone());
       }
       EntryResult::Dirty(_) | EntryResult::Uncacheable(_, _) => {}
     }
   }
 
-  /// If the value is Dirty, mark it Clean.
-  fn clean(&mut self) {
-    if let EntryResult::Dirty(value) = self {
-      *self = EntryResult::Clean(value.clone())
-    }
-  }
+  /// Assert that the value is in "a dirty state", and move it to a clean state.
+  fn clean(&mut self, context: &N::Context, has_uncacheable_deps: bool) {
+    let value = match self {
+      EntryResult::Dirty(value) => value.clone(),
+      EntryResult::UncacheableDependencies(value, _) => value.clone(),
+      x => unreachable!("A node in state {:?} should not have been cleaned.", x),
+    };
 
-  /// If the value is Dirty, mark it UncacheableDependencies.
-  fn uncacheable_deps(&mut self) {
-    if let EntryResult::Dirty(value) = self {
-      *self = EntryResult::UncacheableDependencies(value.clone())
+    if has_uncacheable_deps {
+      *self = EntryResult::UncacheableDependencies(value, context.run_id().clone())
+    } else {
+      *self = EntryResult::Clean(value)
     }
   }
 }
@@ -140,7 +135,7 @@ impl<N: Node> AsRef<N::Item> for EntryResult<N> {
       EntryResult::Clean(v) => v,
       EntryResult::Dirty(v) => v,
       EntryResult::Uncacheable(v, _) => v,
-      EntryResult::UncacheableDependencies(v) => v,
+      EntryResult::UncacheableDependencies(v, _) => v,
     }
   }
 }
@@ -309,12 +304,20 @@ impl<N: Node> Entry<N> {
         match context.graph().dep_generations(entry_id, &context).await {
           Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
             // Dependencies have not changed: Node is clean.
+            context.stats().cleaning_succeeded += 1;
             true
           }
-          _ => {
+          x => {
             // If dependency generations mismatched or failed to fetch, clear its
             // dependencies and indicate that it should re-run.
             context.graph().clear_deps(entry_id, run_token);
+            context.stats().cleaning_failed += 1;
+            log::trace!(
+              "Failed to clean {}: {:?} vs {:?}",
+              node,
+              x,
+              previous_dep_generations
+            );
             false
           }
         }
@@ -337,6 +340,7 @@ impl<N: Node> Entry<N> {
           Err(Aborted) => Err(N::Error::invalidated()),
         };
 
+        context.stats().ran += 1;
         context
           .graph()
           .complete(&context, entry_id, run_token, Some(res));
@@ -515,7 +519,7 @@ impl<N: Node> Entry<N> {
             let next_result: EntryResult<N> = if !self.cacheable_with_output(Some(&result)) {
               EntryResult::Uncacheable(result, context.run_id().clone())
             } else if has_uncacheable_deps {
-              EntryResult::UncacheableDependencies(result)
+              EntryResult::UncacheableDependencies(result, context.run_id().clone())
             } else {
               EntryResult::Clean(result)
             };
@@ -537,11 +541,7 @@ impl<N: Node> Entry<N> {
             // NB: The `expect` here avoids a clone and a comparison: see the method docs.
             let mut result =
               previous_result.expect("A Node cannot be marked clean without a previous result.");
-            if has_uncacheable_deps {
-              result.uncacheable_deps();
-            } else {
-              result.clean();
-            }
+            result.clean(context, has_uncacheable_deps);
             self.notify_waiters(waiters, Ok((result.as_ref().clone(), generation)));
             EntryState::Completed {
               result,

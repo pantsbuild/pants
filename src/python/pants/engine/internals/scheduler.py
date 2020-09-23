@@ -29,7 +29,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.native_engine import PyTypes
+from pants.engine.internals.native_engine import PyTypes  # type: ignore[import]
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
@@ -40,6 +40,7 @@ from pants.engine.process import (
     MultiPlatformProcess,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
+from pants.engine.session import SessionValues
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
@@ -144,6 +145,7 @@ class Scheduler:
             multi_platform_process=MultiPlatformProcess,
             process_result=FallibleProcessResultWithPlatform,
             coroutine=CoroutineType,
+            session_values=SessionValues,
             interactive_process_result=InteractiveProcessResult,
             engine_aware_parameter=EngineAwareParameter,
         )
@@ -186,12 +188,8 @@ class Scheduler:
 
         tasks = self._native.new_tasks()
 
-        for output_type, rules in rule_index.rules.items():
-            for rule in rules:
-                if isinstance(rule, TaskRule):
-                    self._register_task(tasks, output_type, rule, union_membership)
-                else:
-                    raise ValueError(f"Unexpected Rule type: {rule}")
+        for rule in rule_index.rules:
+            self._register_task(tasks, rule, union_membership)
         for query in rule_index.queries:
             self._native.lib.tasks_query_add(
                 tasks,
@@ -200,15 +198,13 @@ class Scheduler:
             )
         return tasks
 
-    def _register_task(
-        self, tasks, output_type: Type, rule: TaskRule, union_membership: UnionMembership
-    ) -> None:
+    def _register_task(self, tasks, rule: TaskRule, union_membership: UnionMembership) -> None:
         """Register the given TaskRule with the native scheduler."""
         self._native.lib.tasks_task_begin(
             tasks,
             rule.func,
-            output_type,
-            issubclass(output_type, EngineAwareReturnType),
+            rule.output_type,
+            issubclass(rule.output_type, EngineAwareReturnType),
             rule.cacheable,
             rule.canonical_name,
             rule.desc or "",
@@ -354,6 +350,7 @@ class Scheduler:
         build_id,
         dynamic_ui: bool = False,
         should_report_workunits: bool = False,
+        session_values: Optional[SessionValues] = None,
     ) -> "SchedulerSession":
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
@@ -363,6 +360,7 @@ class Scheduler:
                 dynamic_ui,
                 build_id,
                 should_report_workunits,
+                session_values or SessionValues(),
             ),
         )
 
@@ -400,6 +398,15 @@ class SchedulerSession:
         return self._scheduler.graph_len()
 
     def new_run_id(self):
+        """Assigns a new "run id" to this Session, without creating a new Session.
+
+        Usually each Session corresponds to one end user "run", but there are exceptions: notably,
+        the `--loop` feature uses one Session, but would like to observe new values for uncacheable
+        nodes in each iteration of its loop.
+        """
+        self._scheduler._native.lib.session_new_run_id(self._session)
+
+    def set_per_session(self):
         """Assigns a new "run id" to this Session, without creating a new Session.
 
         Usually each Session corresponds to one end user "run", but there are exceptions: notably,

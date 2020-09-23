@@ -4,7 +4,7 @@
 import os
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Iterable, Mapping, Optional, Tuple, cast
+from typing import Mapping, Optional, Tuple, cast
 
 from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
@@ -106,21 +106,29 @@ class PexEnvironment(EngineAwareReturnType):
 
     def create_argv(
         self, pex_path: str, *args: str, python: Optional[PythonExecutable] = None
-    ) -> Iterable[str]:
+    ) -> Tuple[str, ...]:
         python = python or self.bootstrap_python
         argv = [python.path] if python else []
         argv.extend((pex_path, *args))
-        return argv
+        return tuple(argv)
 
-    @property
-    def environment_dict(self) -> Mapping[str, str]:
-        return dict(
+    def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
+        """The environment to use for running anything with PEX.
+
+        If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
+        to avoid PEX from trying to find a new interpreter.
+        """
+        d = dict(
             PATH=create_path_env_var(self.path),
-            PEX_PYTHON_PATH=create_path_env_var(self.interpreter_search_paths),
             PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
             **self.subprocess_environment_dict,
         )
+        # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
+        # pre-selected by Pants. Otherwise, Pex may try to find another interpreter.
+        if not python_configured:
+            d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)
+        return d
 
     def level(self) -> LogLevel:
         return LogLevel.DEBUG if self.bootstrap_python else LogLevel.WARN

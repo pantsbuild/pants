@@ -98,6 +98,7 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     default_version = "coverage>=5.0.3,<5.1"
     default_entry_point = "coverage"
+    register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
 
     @classmethod

@@ -538,6 +538,24 @@ impl From<Paths> for NodeKey {
   }
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct SessionValues;
+
+#[async_trait]
+impl WrappedNode for SessionValues {
+  type Item = Value;
+
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Value> {
+    Ok(context.session.session_values())
+  }
+}
+
+impl From<SessionValues> for NodeKey {
+  fn from(n: SessionValues) -> Self {
+    NodeKey::SessionValues(n)
+  }
+}
+
 ///
 /// A Node that captures an store::Snapshot for a PathGlobs subject.
 ///
@@ -1036,6 +1054,7 @@ pub enum NodeKey {
   Select(Box<Select>),
   Snapshot(Snapshot),
   Paths(Paths),
+  SessionValues(SessionValues),
   Task(Box<Task>),
 }
 
@@ -1045,6 +1064,7 @@ impl NodeKey {
       &NodeKey::MultiPlatformExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
       &NodeKey::Select(ref s) => format!("{}", s.product),
+      &NodeKey::SessionValues(_) => "SessionValues".to_string(),
       &NodeKey::Task(ref s) => format!("{}", s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
       &NodeKey::Paths(..) => "Paths".to_string(),
@@ -1066,6 +1086,7 @@ impl NodeKey {
       // above list or the below list.
       &NodeKey::MultiPlatformExecuteProcess { .. }
       | &NodeKey::Select { .. }
+      | &NodeKey::SessionValues { .. }
       | &NodeKey::Snapshot { .. }
       | &NodeKey::Paths { .. }
       | &NodeKey::Task { .. }
@@ -1094,8 +1115,9 @@ impl NodeKey {
       NodeKey::DigestFile(..) => "digest_file".to_string(),
       NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
       NodeKey::ReadLink(..) => "read_link".to_string(),
-      NodeKey::Scandir(_) => "scandir".to_string(),
+      NodeKey::Scandir(..) => "scandir".to_string(),
       NodeKey::Select(..) => "select".to_string(),
+      NodeKey::SessionValues(..) => "session_values".to_string(),
     }
   }
 
@@ -1121,6 +1143,7 @@ impl NodeKey {
         Some(format!("Reading directory: {}", path.display()))
       }
       NodeKey::Select(..) => None,
+      NodeKey::SessionValues(..) => None,
     }
   }
 }
@@ -1234,6 +1257,7 @@ impl Node for NodeKey {
         NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
         NodeKey::Snapshot(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::Paths(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Paths).await,
+        NodeKey::SessionValues(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
         NodeKey::Task(n) => {
           n.run_wrapped_node(context)
             .map_ok(|python_rule_output| {
@@ -1282,6 +1306,7 @@ impl Node for NodeKey {
   fn cacheable(&self) -> bool {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
+      &NodeKey::SessionValues(_) => false,
       _ => true,
     }
   }
@@ -1323,6 +1348,7 @@ impl Display for NodeKey {
         write!(f, "@rule({})", task.task.display_info.name)
       }
       &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.0),
+      &NodeKey::SessionValues(_) => write!(f, "SessionValues"),
       &NodeKey::Paths(ref s) => write!(f, "Paths({})", s.0),
     }
   }

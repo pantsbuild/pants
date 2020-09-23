@@ -131,6 +131,10 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements(
             (field_set.address for field_set in partition.field_sets),
+            # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
+            # a different version for the requirements than the other two PEXes, which can result
+            # in a PEX runtime error about missing dependencies.
+            hardcoded_interpreter_constraints=partition.interpreter_constraints,
             internal_only=True,
             direct_deps_only=True,
         ),
@@ -267,20 +271,23 @@ async def pylint_lint(
 
     # We batch targets by their interpreter constraints to ensure, for example, that all Python 2
     # targets run together and all Python 3 targets run together.
+    # Note that Pylint uses the AST of the interpreter that runs it. So, we include any plugin
+    # targets in this interpreter constraints calculation.
     interpreter_constraints_to_target_setup = defaultdict(set)
     for field_set, tgt, dependencies in zip(
         request.field_sets, linted_targets, per_target_dependencies
     ):
         target_setup = PylintTargetSetup(field_set, Targets([tgt, *dependencies]))
-        interpreter_constraints = (
-            PexInterpreterConstraints.create_from_compatibility_fields(
-                (
-                    *(tgt.get(PythonInterpreterCompatibility) for tgt in [tgt, *dependencies]),
-                    *plugin_targets_compatibility_fields,
+        interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+            (
+                *(
+                    tgt[PythonInterpreterCompatibility]
+                    for tgt in [tgt, *dependencies]
+                    if tgt.has_field(PythonInterpreterCompatibility)
                 ),
-                python_setup,
-            )
-            or PexInterpreterConstraints(pylint.interpreter_constraints)
+                *plugin_targets_compatibility_fields,
+            ),
+            python_setup,
         )
         interpreter_constraints_to_target_setup[interpreter_constraints].add(target_setup)
 
