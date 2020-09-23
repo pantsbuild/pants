@@ -113,15 +113,12 @@ async def setup_pex_cli_process(
     # Instead we manually create a FileContent for it.
     if global_options.options.ca_certs_path:
         ca_certs_content = Path(global_options.options.ca_certs_path).read_bytes()
-        chrooted_ca_certs_path = os.path.join(
-            os.path.basename(global_options.options.ca_certs_path)
-        )
+        chrooted_ca_certs_path = os.path.basename(global_options.options.ca_certs_path)
+
         gets.append(
             Get(
                 Digest,
-                CreateDigest(
-                    (FileContent(chrooted_ca_certs_path, ca_certs_content, is_executable=False),)
-                ),
+                CreateDigest((FileContent(chrooted_ca_certs_path, ca_certs_content),)),
             )
         )
         cert_args = ["--cert", chrooted_ca_certs_path]
