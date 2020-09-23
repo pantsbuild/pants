@@ -32,12 +32,18 @@ use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
+use fs::RelativePath;
+
 pub mod data;
 pub mod file;
 pub mod path;
 
 pub fn owned_string_vec(args: &[&str]) -> Vec<String> {
   args.iter().map(<&str>::to_string).collect()
+}
+
+pub fn relative_paths<'a>(paths: &'a [&str]) -> impl Iterator<Item = RelativePath> + 'a {
+  paths.iter().map(|p| RelativePath::new(p).unwrap())
 }
 
 pub fn as_byte_owned_vec(str: &str) -> Vec<u8> {

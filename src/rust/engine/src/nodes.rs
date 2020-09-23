@@ -243,13 +243,13 @@ impl MultiPlatformExecuteProcess {
 
     let output_files = externs::project_multi_strs(&value, "output_files")
       .into_iter()
-      .map(PathBuf::from)
-      .collect();
+      .map(RelativePath::new)
+      .collect::<Result<_, _>>()?;
 
     let output_directories = externs::project_multi_strs(&value, "output_directories")
       .into_iter()
-      .map(PathBuf::from)
-      .collect();
+      .map(RelativePath::new)
+      .collect::<Result<_, _>>()?;
 
     let timeout_in_seconds = externs::project_f64(&value, "timeout_seconds");
 
