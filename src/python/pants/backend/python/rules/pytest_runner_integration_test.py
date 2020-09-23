@@ -27,8 +27,15 @@ from pants.backend.python.targets.python_requirement_library import (
 from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.goals.test import Status, TestDebugRequest, TestOptions, TestResult
-from pants.core.util_rules import determine_source_files, strip_source_roots
+from pants.core.goals.test import (
+    Status,
+    TestDebugRequest,
+    TestOptions,
+    TestResult,
+    get_filtered_environment,
+)
+from pants.core.util_rules import determine_source_files, pants_environment, strip_source_roots
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent, FilesContent
 from pants.engine.interactive_process import InteractiveRunner
@@ -126,11 +133,13 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *download_pex_bin.rules(),
             *determine_source_files.rules(),
             *importable_python_sources.rules(),
+            *pants_environment.rules(),
             *pex.rules(),
             *pex_from_targets.rules(),
             *python_native_code.rules(),
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
+            get_filtered_environment,
             SubsystemRule(TestOptions),
             RootRule(PythonTestFieldSet),
         )
@@ -142,6 +151,8 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         origin: Optional[OriginSpec] = None,
         junit_xml_dir: Optional[str] = None,
         use_coverage: bool = False,
+        extra_env_vars: Optional[str] = None,
+        pants_environment: PantsEnvironment = PantsEnvironment(),
     ) -> TestResult:
         args = [
             "--backend-packages2=pants.backend.python",
@@ -152,6 +163,8 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         ]
         if passthrough_args:
             args.append(f"--pytest-args='{passthrough_args}'")
+        if extra_env_vars:
+            args.append(f"--test-extra-env-vars={extra_env_vars}")
         if junit_xml_dir:
             args.append(f"--pytest-junit-xml-dir={junit_xml_dir}")
         if use_coverage:
@@ -162,7 +175,9 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             origin = SingleAddress(directory=address.spec_path, name=address.target_name)
         tgt = PythonTests({}, address=address)
         params = Params(
-            PythonTestFieldSet.create(TargetWithOrigin(tgt, origin)), options_bootstrapper
+            PythonTestFieldSet.create(TargetWithOrigin(tgt, origin)),
+            pants_environment,
+            options_bootstrapper,
         )
         test_result = self.request_single_product(TestResult, params)
         debug_request = self.request_single_product(TestDebugRequest, params)
@@ -381,3 +396,21 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert result.status == Status.SUCCESS
         assert "test_good.py ." in result.stdout
         assert result.coverage_data is not None
+
+    def test_extra_env_vars(self) -> None:
+        source = FileContent(
+            path="test_extra_env_vars.py",
+            content=dedent(
+                """\
+                import os
+                def test_args():
+                    assert os.getenv("SOME_VAR") == "some_value"
+                    assert os.getenv("OTHER_VAR") == "other_value"
+                """
+            ).encode(),
+        )
+        self.create_python_test_target([source])
+        mock_env = PantsEnvironment({"OTHER_VAR": "other_value"})
+        extra_env_vars = '["SOME_VAR=some_value", "OTHER_VAR"]'
+        result = self.run_pytest(extra_env_vars=extra_env_vars, pants_environment=mock_env)
+        assert result.status == Status.SUCCESS

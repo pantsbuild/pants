@@ -30,7 +30,13 @@ from pants.backend.python.target_types import (
     PythonTestsSources,
     PythonTestsTimeout,
 )
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestOptions, TestResult
+from pants.core.goals.test import (
+    TestDebugRequest,
+    TestExtraEnv,
+    TestFieldSet,
+    TestOptions,
+    TestResult,
+)
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
@@ -220,6 +226,7 @@ async def run_python_test(
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     global_options: GlobalOptions,
     test_options: TestOptions,
+    test_extra_env: TestExtraEnv,
 ) -> TestResult:
     """Runs pytest for one target."""
     output_files = []
@@ -240,7 +247,7 @@ async def run_python_test(
     if use_coverage:
         output_files.append(".coverage")
 
-    env = {"PYTEST_ADDOPTS": " ".join(add_opts)}
+    env = {"PYTEST_ADDOPTS": " ".join(add_opts), **test_extra_env.env}
 
     process = test_setup.test_runner_pex.create_process(
         python_setup=python_setup,
@@ -284,9 +291,12 @@ async def run_python_test(
 
 
 @rule(desc="Run pytest in an interactive process")
-async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
+async def debug_python_test(
+    test_setup: TestTargetSetup, test_extra_env: TestExtraEnv
+) -> TestDebugRequest:
     process = InteractiveProcess(
         argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),
+        env=test_extra_env.env,
         input_digest=test_setup.input_digest,
     )
     return TestDebugRequest(process)

@@ -22,6 +22,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target as TargetV1
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine import interactive_process, process, target
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
@@ -231,6 +232,7 @@ class LegacyGraphSession:
 
         workspace = Workspace(self.scheduler_session)
         interactive_runner = InteractiveRunner(self.scheduler_session)
+        pants_environment = PantsEnvironment()
 
         for goal in goals:
             goal_product = self.goal_map[goal]
@@ -249,6 +251,7 @@ class LegacyGraphSession:
                 self.console,
                 workspace,
                 interactive_runner,
+                pants_environment,
             )
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
