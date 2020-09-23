@@ -96,8 +96,11 @@ async def maybe_extract(
     fp = snapshot.files[0]
     if fp.endswith(".zip"):
         argv = unzip_binary.extract_argv(archive_path=fp, output_dir=output_dir)
+        env = {}
     elif fp.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")):
         argv = tar_binary.extract_argv(archive_path=fp, output_dir=output_dir)
+        # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
+        env = {"PATH": SEARCH_PATHS}
     else:
         return ExtractedDigest(extractable_digest)
 
@@ -105,6 +108,7 @@ async def maybe_extract(
         ProcessResult,
         Process(
             argv=argv,
+            env=env,
             input_digest=input_digest,
             description=f"Extract {fp}",
             level=LogLevel.DEBUG,
