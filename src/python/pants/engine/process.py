@@ -441,6 +441,32 @@ async def make_process_uncacheable(uncacheable_process: UncacheableProcess) -> P
     return dataclasses.replace(process, env=FrozenDict(env))
 
 
+class BinaryNotFoundError(EnvironmentError):
+    def __init__(
+        self,
+        request: BinaryPathRequest,
+        *,
+        rationale: Optional[str] = None,
+        alternative_solution: Optional[str] = None,
+    ) -> None:
+        """When no binary is found via `BinaryPaths`, and it is not recoverable.
+
+        :param rationale: A short description of why this binary is needed, e.g.
+            "download the tools Pants needs" or "run Python programs".
+        :param alternative_solution: A description of what else users can do to fix the issue,
+            beyond installing the program. For example, "Alternatively, you can set the option
+            `--python-setup-interpreter-search-path` to change the paths searched."
+        """
+        msg = (
+            f"Cannot find `{request.binary_name}` on `{sorted(request.search_path)}`. Please "
+            "ensure that it is installed"
+        )
+        msg += f" so that Pants can {rationale}." if rationale else "."
+        if alternative_solution:
+            msg += f"\n\n{alternative_solution}"
+        super().__init__(msg)
+
+
 @rule(desc="Find binary path", level=LogLevel.DEBUG)
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # TODO(John Sirois): Replace this script with a statically linked native binary so we don't
