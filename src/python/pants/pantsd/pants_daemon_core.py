@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.init.logging import setup_warning_filtering
 import logging
 import threading
 from typing import Optional
@@ -9,6 +8,7 @@ from typing import Optional
 from typing_extensions import Protocol
 
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
+from pants.init.logging import setup_warning_filtering
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
