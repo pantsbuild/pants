@@ -14,7 +14,6 @@ class Flake8(PythonToolBase):
     default_version = "flake8>=3.7.9,<3.9"
     default_extra_requirements = ["setuptools<45"]  # NB: `<45` is for Python 2 support
     default_entry_point = "flake8"
-    register_interpreter_constraints = False
 
     @classmethod
     def register_options(cls, register):

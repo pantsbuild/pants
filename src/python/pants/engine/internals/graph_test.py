@@ -90,8 +90,8 @@ class MockTarget(Target):
 def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            QueryRule(Targets, (DependenciesRequest, OptionsBootstrapper)),
-            QueryRule(TransitiveTargets, (Addresses, OptionsBootstrapper)),
+            QueryRule(Targets, (DependenciesRequest,)),
+            QueryRule(TransitiveTargets, (Addresses,)),
         ],
         target_types=[MockTarget],
     )
@@ -338,7 +338,7 @@ def test_resolve_sources_snapshot() -> None:
       so that the file only shows up once.
     """
     rule_runner = RuleRunner(
-        rules=[QueryRule(SourcesSnapshot, (Specs, OptionsBootstrapper))], target_types=[MockTarget]
+        rules=[QueryRule(SourcesSnapshot, (Specs,))], target_types=[MockTarget]
     )
     rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
     rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
@@ -351,9 +351,7 @@ def test_resolve_sources_snapshot() -> None:
 
 @pytest.fixture
 def owners_rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[QueryRule(Owners, (OwnersRequest, OptionsBootstrapper))], target_types=[MockTarget]
-    )
+    return RuleRunner(rules=[QueryRule(Owners, (OwnersRequest,))], target_types=[MockTarget])
 
 
 def assert_owners(
@@ -449,7 +447,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
 @pytest.fixture
 def specs_rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(AddressesWithOrigins, (FilesystemSpecs, OptionsBootstrapper))],
+        rules=[QueryRule(AddressesWithOrigins, (FilesystemSpecs,))],
         target_types=[MockTarget],
     )
 
@@ -532,7 +530,7 @@ def test_filesystem_specs_no_owner(specs_rule_runner: RuleRunner) -> None:
 def test_resolve_addresses_from_specs() -> None:
     """This tests that we correctly handle resolving from both address and filesystem specs."""
     rule_runner = RuleRunner(
-        rules=[QueryRule(AddressesWithOrigins, (Specs, OptionsBootstrapper))],
+        rules=[QueryRule(AddressesWithOrigins, (Specs,))],
         target_types=[MockTarget],
     )
     rule_runner.create_file("fs_spec/f.txt")
@@ -687,9 +685,7 @@ def test_find_valid_field_sets() -> None:
 
 @pytest.fixture
 def sources_rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[QueryRule(HydratedSources, (HydrateSourcesRequest, OptionsBootstrapper))]
-    )
+    return RuleRunner(rules=[QueryRule(HydratedSources, (HydrateSourcesRequest,))])
 
 
 def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
@@ -881,8 +877,8 @@ class TestCodegen(TestBase):
             *super().rules(),
             generate_smalltalk_from_avro,
             QueryRule(UnionMembership, ()),
-            QueryRule(HydratedSources, (HydrateSourcesRequest, OptionsBootstrapper)),
-            QueryRule(GeneratedSources, (GenerateSmalltalkFromAvroRequest, OptionsBootstrapper)),
+            QueryRule(HydratedSources, (HydrateSourcesRequest,)),
+            QueryRule(GeneratedSources, (GenerateSmalltalkFromAvroRequest,)),
             UnionRule(GenerateSourcesRequest, GenerateSmalltalkFromAvroRequest),
         )
 
@@ -1123,7 +1119,7 @@ def dependencies_rule_runner() -> RuleRunner:
             inject_smalltalk_deps,
             inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
-            QueryRule(Addresses, (DependenciesRequest, OptionsBootstrapper)),
+            QueryRule(Addresses, (DependenciesRequest,)),
             UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),

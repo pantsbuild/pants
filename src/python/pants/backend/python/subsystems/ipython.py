@@ -10,7 +10,6 @@ class IPython(PythonToolBase):
     options_scope = "ipython"
     default_version = "ipython==7.16.1"  # The last version to support Python 3.6.
     default_entry_point = "IPython:start_ipython"
-    register_interpreter_constraints = False
 
     @classmethod
     def register_options(cls, register):

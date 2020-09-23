@@ -14,7 +14,6 @@ from pants.core.util_rules.filter_empty_sources import (
 from pants.core.util_rules.filter_empty_sources import rules as filter_empty_sources_rules
 from pants.engine.addresses import Address
 from pants.engine.target import FieldSet, Sources, Tags, Target
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -24,8 +23,8 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *filter_empty_sources_rules(),
-            QueryRule(FieldSetsWithSources, (FieldSetsWithSourcesRequest, OptionsBootstrapper)),
-            QueryRule(TargetsWithSources, (TargetsWithSourcesRequest, OptionsBootstrapper)),
+            QueryRule(FieldSetsWithSources, (FieldSetsWithSourcesRequest,)),
+            QueryRule(TargetsWithSources, (TargetsWithSourcesRequest,)),
         ]
     )
 

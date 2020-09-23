@@ -12,7 +12,6 @@ from pants.backend.python.util_rules.pex import PexRequest, PexRequirements
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.python.python_setup import ResolveAllConstraintsOption
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -23,7 +22,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_from_targets.rules(),
-            QueryRule(PexRequest, (PexFromTargetsRequest, OptionsBootstrapper)),
+            QueryRule(PexRequest, (PexFromTargetsRequest,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )

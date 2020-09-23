@@ -14,6 +14,7 @@ class Black(PythonToolBase):
     default_version = "black==20.8b1"
     default_extra_requirements = ["setuptools"]
     default_entry_point = "black:patched_main"
+    register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
 
     @classmethod

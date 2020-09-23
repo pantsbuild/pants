@@ -13,6 +13,7 @@ class Docformatter(PythonToolBase):
     options_scope = "docformatter"
     default_version = "docformatter>=1.3.1,<1.4"
     default_entry_point = "docformatter:main"
+    register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython==2.7.*", "CPython>=3.4,<3.9"]
 
     @classmethod

@@ -2,34 +2,56 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.rules import collect_rules, rule
+from pants.engine.session import SessionValues
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import GlobalOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import Scope, ScopedOptions
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
 
 
 @dataclass(frozen=True)
 class _Options:
-    """A wrapper around bootstrapped options values: not for direct consumption."""
+    """A wrapper around bootstrapped options values: not for direct consumption.
 
-    options: Options
+    TODO: This odd indirection exists because the `Options` type does not have useful `eq`, but
+    OptionsBootstrapper and BuildConfiguration both do.
+    """
+
+    options_bootstrapper: OptionsBootstrapper
+    build_config: BuildConfiguration
+
+    def __post_init__(self) -> None:
+        # Touch the options property to ensure that it is eagerly initialized at construction time,
+        # rather than potentially much later in the presence of concurrency.
+        assert self.options is not None
+
+    @memoized_property
+    def options(self) -> Options:
+        return cast(
+            Options,
+            OptionsInitializer.create(
+                self.options_bootstrapper, self.build_config, init_subsystems=False
+            ),
+        )
 
 
 @rule
-def parse_options(
-    options_bootstrapper: OptionsBootstrapper, build_config: BuildConfiguration
-) -> _Options:
-    # TODO: Because _OptionsBootstapper is currently provided as a Param, this @rule relies on options
-    # remaining relatively stable in order to be efficient. See #6845 for a discussion of how to make
-    # minimize the size of that value.
-    return _Options(
-        OptionsInitializer.create(options_bootstrapper, build_config, init_subsystems=False)
-    )
+def parse_options(build_config: BuildConfiguration, session_values: SessionValues) -> _Options:
+    # TODO: Once the OptionsBootstrapper has been removed from all relevant QueryRules, this lookup
+    # should be extracted into a separate @rule.
+    maybe_options_bootstrapper = session_values.values.get(OptionsBootstrapper)
+    if maybe_options_bootstrapper is None:
+        raise ValueError("Expected an OptionsBootstrapper to be provided via SessionValues.")
+    options_bootstrapper = cast(OptionsBootstrapper, maybe_options_bootstrapper)
+
+    return _Options(options_bootstrapper, build_config)
 
 
 @rule

@@ -17,7 +17,6 @@ from pants.backend.python.dependency_inference.module_mapper import rules as mod
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
@@ -75,9 +74,9 @@ def rule_runner() -> RuleRunner:
         rules=[
             *stripped_source_files.rules(),
             *module_mapper_rules(),
-            QueryRule(FirstPartyModuleToAddressMapping, (OptionsBootstrapper,)),
-            QueryRule(ThirdPartyModuleToAddressMapping, (OptionsBootstrapper,)),
-            QueryRule(PythonModuleOwner, (PythonModule, OptionsBootstrapper)),
+            QueryRule(FirstPartyModuleToAddressMapping, ()),
+            QueryRule(ThirdPartyModuleToAddressMapping, ()),
+            QueryRule(PythonModuleOwner, (PythonModule,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )

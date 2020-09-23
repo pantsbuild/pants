@@ -1,21 +1,34 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from textwrap import dedent
 from typing import Optional
 
 import pytest
 from pkg_resources import Requirement
 
+from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
+    InjectPythonDistributionDependencies,
+    PythonBinary,
     PythonBinarySources,
+    PythonDistribution,
+    PythonDistributionDependencies,
     PythonRequirementsField,
     PythonTestsTimeout,
 )
+from pants.backend.python.target_types import rules as target_type_rules
 from pants.engine.addresses import Address
-from pants.engine.target import InvalidFieldException, InvalidFieldTypeException
+from pants.engine.target import (
+    InjectedDependencies,
+    InvalidFieldException,
+    InvalidFieldTypeException,
+)
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.python.python_requirement import PythonRequirement
-from pants.testutil.option_util import create_subsystem
+from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 def test_timeout_validation() -> None:
@@ -104,3 +117,40 @@ def test_requirements_field() -> None:
         ).value
         == parsed_value
     )
+
+
+def test_python_distribution_dependency_injection() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *target_type_rules(),
+            QueryRule(
+                InjectedDependencies,
+                (InjectPythonDistributionDependencies, OptionsBootstrapper),
+            ),
+        ],
+        target_types=[PythonDistribution, PythonBinary],
+        objects={"setup_py": PythonArtifact},
+    )
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            python_binary(name="my_binary")
+            python_distribution(
+                name="dist",
+                provides=setup_py(
+                    name='my-dist'
+                ).with_binaries({"my_cmd": ":my_binary"})
+            )
+            """
+        ),
+    )
+    tgt = rule_runner.get_target(Address("project", target_name="dist"))
+    injected = rule_runner.request(
+        InjectedDependencies,
+        [
+            InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies]),
+            create_options_bootstrapper(),
+        ],
+    )
+    assert injected == InjectedDependencies([Address("project", target_name="my_binary")])

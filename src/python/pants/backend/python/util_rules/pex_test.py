@@ -26,7 +26,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.target import FieldSet
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.python.python_setup import PythonSetup
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -252,8 +251,8 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_rules(),
-            QueryRule(Pex, (PexRequest, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(Process, (PexProcess, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(Pex, (PexRequest, PantsEnvironment)),
+            QueryRule(Process, (PexProcess, PantsEnvironment)),
             QueryRule(ProcessResult, (Process,)),
         ]
     )

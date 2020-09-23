@@ -47,7 +47,6 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionRule
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -96,7 +95,7 @@ def chroot_rule_runner() -> RuleRunner:
             *python_sources.rules(),
             setup_kwargs_plugin,
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
-            QueryRule(SetupPyChroot, (SetupPyChrootRequest, OptionsBootstrapper)),
+            QueryRule(SetupPyChroot, (SetupPyChrootRequest,)),
         ]
     )
 
@@ -261,7 +260,7 @@ def test_get_sources() -> None:
         rules=[
             get_sources,
             *python_sources.rules(),
-            QueryRule(SetupPySources, (SetupPySourcesRequest, OptionsBootstrapper)),
+            QueryRule(SetupPySources, (SetupPySourcesRequest,)),
         ]
     )
 
@@ -371,7 +370,7 @@ def test_get_requirements() -> None:
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
-            QueryRule(ExportedTargetRequirements, (DependencyOwner, OptionsBootstrapper)),
+            QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
         ]
     )
     rule_runner.add_to_build_file(
@@ -454,7 +453,7 @@ def test_owned_dependencies() -> None:
         rules=[
             get_owned_dependencies,
             get_exporting_owner,
-            QueryRule(OwnedDependencies, (DependencyOwner, OptionsBootstrapper)),
+            QueryRule(OwnedDependencies, (DependencyOwner,)),
         ]
     )
     rule_runner.add_to_build_file(
@@ -543,7 +542,7 @@ def exporting_owner_rule_runner() -> RuleRunner:
     return create_setup_py_rule_runner(
         rules=[
             get_exporting_owner,
-            QueryRule(ExportedTarget, (OwnedDependency, OptionsBootstrapper)),
+            QueryRule(ExportedTarget, (OwnedDependency,)),
         ]
     )
 

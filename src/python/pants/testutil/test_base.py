@@ -38,6 +38,7 @@ from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule
+from pants.engine.session import SessionValues
 from pants.engine.target import Target, WrappedTarget
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
@@ -104,9 +105,17 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     _O = TypeVar("_O")
 
     def request(self, output_type: Type["TestBase._O"], inputs: Iterable[Any]) -> "TestBase._O":
-        result = assert_single_element(
-            self.scheduler.product_request(output_type, [Params(*inputs)])
-        )
+        # TODO: Update all callsites to pass this explicitly via session values.
+        session = self.scheduler
+        for value in inputs:
+            if type(value) == OptionsBootstrapper:
+                session = self.scheduler.scheduler.new_session(
+                    build_id="buildid_for_test",
+                    should_report_workunits=True,
+                    session_values=SessionValues({OptionsBootstrapper: value}),
+                )
+
+        result = assert_single_element(session.product_request(output_type, [Params(*inputs)]))
         return cast(TestBase._O, result)
 
     def run_goal_rule(
@@ -130,12 +139,17 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         stdout, stderr = StringIO(), StringIO()
         console = Console(stdout=stdout, stderr=stderr)
 
-        exit_code = self.scheduler.run_goal_rule(
+        session = self.scheduler.scheduler.new_session(
+            build_id="buildid_for_test",
+            should_report_workunits=True,
+            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
+        )
+
+        exit_code = session.run_goal_rule(
             goal,
             Params(
                 specs,
                 console,
-                options_bootstrapper,
                 Workspace(self.scheduler),
                 InteractiveRunner(self.scheduler),
                 PantsEnvironment(),
@@ -218,7 +232,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def rules(cls):
         return [
             *source_root.rules(),
-            QueryRule(WrappedTarget, (Address, OptionsBootstrapper)),
+            QueryRule(WrappedTarget, (Address,)),
         ]
 
     @classmethod

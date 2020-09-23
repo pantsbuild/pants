@@ -28,6 +28,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsFile,
     PythonTests,
 )
+from pants.backend.python.target_types import rules as target_type_rules
 from pants.backend.python.util_rules import (
     ancestor_files,
     pex,
@@ -70,6 +71,7 @@ def rules():
         *python_native_code.rules(),
         *repl.rules(),
         *run_python_binary.rules(),
+        *target_type_rules(),
         *setup_py.rules(),
     )
 

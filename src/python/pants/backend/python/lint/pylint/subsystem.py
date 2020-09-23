@@ -14,7 +14,6 @@ class Pylint(PythonToolBase):
     options_scope = "pylint"
     default_version = "pylint>=2.4.4,<2.5"
     default_entry_point = "pylint"
-    register_interpreter_constraints = False
 
     @classmethod
     def register_options(cls, register):

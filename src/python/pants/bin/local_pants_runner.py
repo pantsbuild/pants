@@ -14,6 +14,7 @@ from pants.base.workunit import WorkUnit
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_info_extracter import HelpInfoExtracter
@@ -84,6 +85,7 @@ class LocalPantsRunner:
             dynamic_ui=dynamic_ui,
             use_colors=use_colors,
             should_report_workunits=stream_workunits,
+            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
         )
 
     @classmethod

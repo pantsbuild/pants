@@ -15,7 +15,6 @@ class Bandit(PythonToolBase):
     # `setuptools<45` is for Python 2 support. `stevedore` is because the 3.0 release breaks Bandit.
     default_extra_requirements = ["setuptools<45", "stevedore<3"]
     default_entry_point = "bandit"
-    register_interpreter_constraints = False
 
     @classmethod
     def register_options(cls, register):

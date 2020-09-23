@@ -13,6 +13,7 @@ class Isort(PythonToolBase):
     options_scope = "isort"
     default_version = "isort[pyproject]>=5.5.1,<5.6"
     default_extra_requirements = ["setuptools"]
+    register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
     default_entry_point = "isort.main"
 

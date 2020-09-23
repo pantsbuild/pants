@@ -15,7 +15,7 @@ class PythonToolBase(Subsystem):
     # Subclasses do not need to override.
     default_extra_requirements: ClassVar[Sequence[str]] = []
     default_interpreter_constraints: ClassVar[Sequence[str]] = []
-    register_interpreter_constraints: ClassVar[bool] = True
+    register_interpreter_constraints: ClassVar[bool] = False
 
     @classmethod
     def register_options(cls, register):
@@ -47,6 +47,13 @@ class PythonToolBase(Subsystem):
             "library, invoked by a wrapper script.",
         )
 
+        if cls.default_interpreter_constraints and not cls.register_interpreter_constraints:
+            raise ValueError(
+                f"`default_interpreter_constraints` are configured for `{cls.options_scope}`, but "
+                "`register_interpreter_constraints` is not set to `True`, so the "
+                "`--interpreter-constraints` option will not be registered. Did you mean to set "
+                "this?"
+            )
         interpreter_constraints_help = (
             "Python interpreter constraints for this tool. An empty list uses the default "
             "interpreter constraints for the repo."
