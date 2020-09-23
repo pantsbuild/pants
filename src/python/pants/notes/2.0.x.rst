@@ -92,14 +92,17 @@ Refactoring, Improvements, and Tooling
 * Use "output" and "input" instead of "product" and "subject" (#10790)
   `PR #10790 <https://github.com/pantsbuild/pants/pull/10790>`_
 
+* Add graph test for UncacheableDeps nodes only running once (#10795)
+  `PR #10795 <https://github.com/pantsbuild/pants/pull/10795>`_
+
+* Fix our release script to use the correct Python (#10841)
+  `PR #10841 <https://github.com/pantsbuild/pants/pull/10841>`_
+
 Testing
 ~~~~~~~
 
 * Re-export `QueryRule` from `pants.testutil.rule_runner` (#10806)
   `PR #10806 <https://github.com/pantsbuild/pants/pull/10806>`_
-
-* Add graph test for UncacheableDeps nodes only running once (#10795)
-  `PR #10795 <https://github.com/pantsbuild/pants/pull/10795>`_
 
 Documentation
 ~~~~~~~~~~~~~
