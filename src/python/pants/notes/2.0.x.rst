@@ -107,6 +107,9 @@ Refactoring, Improvements, and Tooling
 * Refactor `core/util_rules/archive.py` to use `BinaryPaths` (#10836)
   `PR #10836 <https://github.com/pantsbuild/pants/pull/10836>`_
 
+* Work around trailing slash issue with protobuf codegen (#10849)
+  `PR #10849 <https://github.com/pantsbuild/pants/pull/10849>`_
+
 Testing
 ~~~~~~~
 
