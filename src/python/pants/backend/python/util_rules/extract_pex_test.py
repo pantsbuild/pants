@@ -54,6 +54,9 @@ def get_distributions(
 
 
 def test_extract_distributions(rule_runner: RuleRunner) -> None:
+    # We use these requirements because all of their wheels are prebuilt (faster test) and they all
+    # work with any Python 3 interpreter, rather than something interpreter-specific like `cp36`
+    # (deterministic test).
     constraints = ["six==1.15.0", "t61codec==1.0.1", "x690==0.2.0"]
     result = get_distributions(
         rule_runner,
