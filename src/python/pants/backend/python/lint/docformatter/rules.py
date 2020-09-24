@@ -59,7 +59,7 @@ def generate_args(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
-    requirements_pex_request = Get(
+    docformatter_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="docformatter.pex",
@@ -75,7 +75,7 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
 
-    source_files, requirements_pex = await MultiGet(source_files_request, requirements_pex_request)
+    source_files, docformatter_pex = await MultiGet(source_files_request, docformatter_pex_request)
 
     source_files_snapshot = (
         source_files.snapshot
@@ -84,13 +84,13 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
     )
 
     input_digest = await Get(
-        Digest, MergeDigests((source_files_snapshot.digest, requirements_pex.digest))
+        Digest, MergeDigests((source_files_snapshot.digest, docformatter_pex.digest))
     )
 
     process = await Get(
         Process,
         PexProcess(
-            requirements_pex,
+            docformatter_pex,
             argv=generate_args(
                 source_files=source_files,
                 docformatter=docformatter,

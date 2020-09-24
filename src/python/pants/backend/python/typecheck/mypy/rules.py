@@ -186,18 +186,6 @@ async def mypy_typecheck(
         PythonSourceFiles, PythonSourceFilesRequest(typechecked_transitive_targets.closure)
     )
 
-    tool_pex_request = Get(
-        Pex,
-        PexRequest(
-            output_filename="mypy.pex",
-            internal_only=True,
-            requirements=PexRequirements(
-                itertools.chain(mypy.all_requirements, plugin_requirements)
-            ),
-            interpreter_constraints=tool_interpreter_constraints,
-            entry_point=mypy.entry_point,
-        ),
-    )
     requirements_pex_request = Get(
         Pex,
         PexFromTargetsRequest,
@@ -207,23 +195,18 @@ async def mypy_typecheck(
             internal_only=True,
         ),
     )
-    runner_pex_request = Get(
+    mypy_pex_request = Get(
         Pex,
         PexRequest(
-            output_filename="mypy_runner.pex",
+            output_filename="mypy.pex",
             internal_only=True,
             sources=launcher_script,
+            requirements=PexRequirements(
+                itertools.chain(mypy.all_requirements, plugin_requirements)
+            ),
             interpreter_constraints=tool_interpreter_constraints,
             entry_point=PurePath(LAUNCHER_FILE.path).stem,
-            additional_args=(
-                "--pex-path",
-                ":".join(
-                    (
-                        tool_pex_request.input.output_filename,
-                        requirements_pex_request.input.output_filename,
-                    )
-                ),
-            ),
+            additional_args=("--pex-path", requirements_pex_request.input.output_filename),
         ),
     )
 
@@ -239,16 +222,14 @@ async def mypy_typecheck(
     (
         plugin_sources,
         typechecked_sources,
-        tool_pex,
+        mypy_pex,
         requirements_pex,
-        runner_pex,
         config_digest,
     ) = await MultiGet(
         plugin_sources_request,
         typechecked_sources_request,
-        tool_pex_request,
+        mypy_pex_request,
         requirements_pex_request,
-        runner_pex_request,
         config_digest_request,
     )
 
@@ -269,9 +250,8 @@ async def mypy_typecheck(
                 file_list_digest,
                 plugin_sources.source_files.snapshot.digest,
                 typechecked_srcs_snapshot.digest,
-                tool_pex.digest,
+                mypy_pex.digest,
                 requirements_pex.digest,
-                runner_pex.digest,
                 config_digest,
             ]
         ),
@@ -289,7 +269,7 @@ async def mypy_typecheck(
     result = await Get(
         FallibleProcessResult,
         PexProcess(
-            runner_pex,
+            mypy_pex,
             argv=generate_args(mypy, file_list_path=file_list_path),
             input_digest=merged_input_files,
             extra_env=extra_env,

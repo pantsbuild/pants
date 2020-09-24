@@ -115,25 +115,6 @@ async def setup_pytest_for_target(
         python_setup,
     )
 
-    # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
-    # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
-    # from zip files. `zipp` has pathologically bad behavior with large zipfiles.
-    # TODO: this does have a performance cost as the pex must now be expanded to disk. Long term,
-    # it would be better to fix Zipp (whose fix would then need to be used by importlib_metadata
-    # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
-    additional_args_for_pytest = ("--not-zip-safe",)
-
-    pytest_pex_request = Get(
-        Pex,
-        PexRequest(
-            output_filename="pytest.pex",
-            requirements=PexRequirements(pytest.get_requirement_strings()),
-            interpreter_constraints=interpreter_constraints,
-            additional_args=additional_args_for_pytest,
-            internal_only=True,
-        ),
-    )
-
     # Defaults to zip_safe=False.
     requirements_pex_request = Get(
         Pex,
@@ -141,27 +122,27 @@ async def setup_pytest_for_target(
         PexFromTargetsRequest.for_requirements(test_addresses, internal_only=True),
     )
 
-    test_runner_pex_request = Get(
+    pytest_pex_request = Get(
         Pex,
         PexRequest(
+            output_filename="pytest.pex",
+            requirements=PexRequirements(pytest.get_requirement_strings()),
             interpreter_constraints=interpreter_constraints,
-            output_filename="test_runner.pex",
             entry_point="pytest:main",
-            additional_args=(
-                "--pex-path",
-                # TODO(John Sirois): Support shading python binaries:
-                #   https://github.com/pantsbuild/pants/issues/9206
-                # Right now any pytest transitive requirements will shadow corresponding user
-                # requirements which will lead to problems when APIs that are used by either
-                # `pytest:main` or the tests themselves break between the two versions.
-                ":".join(
-                    (
-                        pytest_pex_request.input.output_filename,
-                        requirements_pex_request.input.output_filename,
-                    )
-                ),
-            ),
             internal_only=True,
+            additional_args=(
+                # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
+                # `importlib_metadata` and thus `zipp`, does not play nicely when doing import
+                # magic directly from zip files. `zipp` has pathologically bad behavior with large
+                # zipfiles.
+                # TODO: this does have a performance cost as the pex must now be expanded to disk.
+                # Long term, it would be better to fix Zipp (whose fix would then need to be used
+                # by importlib_metadata and then by Pytest). See
+                # https://github.com/jaraco/zipp/pull/26.
+                "--not-zip-safe",
+                "--pex-path",
+                requirements_pex_request.input.output_filename,
+            ),
         ),
     )
 
@@ -196,16 +177,9 @@ async def setup_pytest_for_target(
         SourceFiles, SourceFilesRequest([request.field_set.sources])
     )
 
-    (
-        pytest_pex,
-        requirements_pex,
-        test_runner_pex,
-        prepared_sources,
-        field_set_source_files,
-    ) = await MultiGet(
+    pytest_pex, requirements_pex, prepared_sources, field_set_source_files = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
-        test_runner_pex_request,
         prepared_sources_request,
         field_set_source_files_request,
     )
@@ -218,7 +192,6 @@ async def setup_pytest_for_target(
                 prepared_sources.source_files.snapshot.digest,
                 requirements_pex.digest,
                 pytest_pex.digest,
-                test_runner_pex.digest,
                 *(binary.digest for binary in binaries),
             )
         ),
@@ -254,7 +227,7 @@ async def setup_pytest_for_target(
     process = await Get(
         Process,
         PexProcess(
-            test_runner_pex,
+            pytest_pex,
             argv=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
             extra_env=extra_env,
             input_digest=input_digest,
