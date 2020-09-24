@@ -75,18 +75,22 @@ impl CommandRunner {
   fn construct_output_snapshot(
     store: Store,
     posix_fs: Arc<fs::PosixFS>,
-    output_file_paths: BTreeSet<PathBuf>,
-    output_dir_paths: BTreeSet<PathBuf>,
+    output_file_paths: BTreeSet<RelativePath>,
+    output_dir_paths: BTreeSet<RelativePath>,
   ) -> BoxFuture<Snapshot, String> {
     let output_paths: Result<Vec<String>, String> = output_dir_paths
       .into_iter()
       .flat_map(|p| {
-        let mut dir_glob = p.into_os_string();
+        let mut dir_glob = PathBuf::from(p).into_os_string();
         let dir = dir_glob.clone();
         dir_glob.push("/**");
         vec![dir, dir_glob]
       })
-      .chain(output_file_paths.into_iter().map(PathBuf::into_os_string))
+      .chain(
+        output_file_paths
+          .into_iter()
+          .map(|p| PathBuf::from(p).into_os_string()),
+      )
       .map(|s| {
         s.into_string()
           .map_err(|e| format!("Error stringifying output paths: {:?}", e))
@@ -451,7 +455,8 @@ pub trait CapturedWorkdir {
         let parent_paths_to_create: HashSet<_> = output_file_paths
           .iter()
           .chain(output_dir_paths.iter())
-          .chain(named_cache_symlinks.iter().map(|s| &s.dst))
+          .map(|relative_path| relative_path.as_ref())
+          .chain(named_cache_symlinks.iter().map(|s| s.dst.as_path()))
           .filter_map(|rel_path| rel_path.parent())
           .map(|parent_relpath| workdir_path2.join(parent_relpath))
           .collect();

@@ -276,12 +276,18 @@ async fn main() {
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let output_files = if let Some(values) = args.values_of("output-file-path") {
-    values.map(PathBuf::from).collect()
+    values
+      .map(RelativePath::new)
+      .collect::<Result<BTreeSet<_>, _>>()
+      .unwrap()
   } else {
     BTreeSet::new()
   };
   let output_directories = if let Some(values) = args.values_of("output-directory-path") {
-    values.map(PathBuf::from).collect()
+    values
+      .map(RelativePath::new)
+      .collect::<Result<BTreeSet<_>, _>>()
+      .unwrap()
   } else {
     BTreeSet::new()
   };

@@ -20,7 +20,7 @@ use spectral::{assert_that, string::StrAssertions};
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
-use testutil::owned_string_vec;
+use testutil::{owned_string_vec, relative_paths};
 use tokio::runtime::Handle;
 use workunit_store::{Level, SpanId, Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
@@ -74,14 +74,8 @@ async fn make_execute_request() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: vec!["path/to/file", "other/file"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    output_directories: vec!["directory/name"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
+    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: None,
     description: "some description".to_owned(),
     level: log::Level::Info,
@@ -161,14 +155,8 @@ async fn make_execute_request_with_instance_name() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: vec!["path/to/file", "other/file"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    output_directories: vec!["directory/name"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
+    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: None,
     description: "some description".to_owned(),
     level: log::Level::Info,
@@ -261,14 +249,8 @@ async fn make_execute_request_with_cache_key_gen_version() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: vec!["path/to/file", "other/file"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    output_directories: vec!["directory/name"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
+    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: None,
     description: "some description".to_owned(),
     level: log::Level::Info,
@@ -510,14 +492,8 @@ async fn make_execute_request_with_timeout() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: vec!["path/to/file", "other/file"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    output_directories: vec!["directory/name"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
+    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
     level: log::Level::Info,
