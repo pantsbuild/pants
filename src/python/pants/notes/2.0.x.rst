@@ -113,6 +113,9 @@ Refactoring, Improvements, and Tooling
 * Work around trailing slash issue with protobuf codegen (#10849)
   `PR #10849 <https://github.com/pantsbuild/pants/pull/10849>`_
 
+* Consolidate "runner" PEXes into "tool" PEXes (#10852)
+  `PR #10852 <https://github.com/pantsbuild/pants/pull/10852>`_
+
 Testing
 ~~~~~~~
 
