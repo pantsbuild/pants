@@ -25,6 +25,7 @@ from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
 from pants.option.options_fingerprinter import CoercingOptionEncoder
+from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.subsystem import Subsystem
 from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
@@ -613,6 +614,8 @@ class RunTracker(Subsystem):
             scopes = self._all_options.known_scope_to_info.keys()
         for scope in scopes:
             scope_and_maybe_option = scope.split("^")
+            if scope == GLOBAL_SCOPE:
+                scope = GLOBAL_SCOPE_CONFIG_SECTION
             recorded_options[scope] = self._get_option_to_record(*scope_and_maybe_option)
         return recorded_options
 
@@ -622,7 +625,7 @@ class RunTracker(Subsystem):
         Returns a dict of of all options in the scope, if option is None. Returns the specific
         option if option is not None. Raises ValueError if scope or option could not be found.
         """
-        scope_to_look_up = scope if scope != "GLOBAL" else ""
+        scope_to_look_up = scope if scope != GLOBAL_SCOPE_CONFIG_SECTION else ""
         try:
             value = self._all_options.for_scope(
                 scope_to_look_up, inherit_from_enclosing_scope=False
