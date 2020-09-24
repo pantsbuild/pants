@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import List, Optional, Sequence
 
@@ -76,7 +76,7 @@ NEEDS_CONFIG_SOURCE = FileContent(
 GLOBAL_ARGS = (
     "--backend-packages=pants.backend.python",
     "--backend-packages=pants.backend.python.typecheck.mypy",
-    "--source-root-patterns=['src/python', 'tests/python']",
+    "--source-root-patterns=['/', 'src/python', 'tests/python']",
 )
 
 
@@ -297,6 +297,33 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     assert result[0].exit_code == 1
     assert "src/python/project/app.py:4" in result[0].stdout
 
+    # We also test that loading a plugin by using a 3rd-party requirement still works.
+    Path(rule_runner.build_root, PACKAGE, "BUILD").unlink()
+    rule_runner.add_to_build_file(
+        PACKAGE,
+        dedent(
+            """\
+            python_requirement_library(
+                name="django-stubs",
+                requirements=["django-stubs==1.5.0"],
+            )
+
+            # The `./settings.py` dependency ensures that it will always be loaded.
+            python_library(dependencies=[":django-stubs", "./settings.py"])
+            """
+        ),
+    )
+    app_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
+    result = run_mypy(
+        rule_runner,
+        [app_tgt],
+        config=config_content,
+        additional_args=["--mypy-version=mypy==0.770"],
+    )
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert "src/python/project/app.py:4" in result[0].stdout
+
 
 def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.create_file(f"{PACKAGE}/util/__init__.py")
@@ -355,19 +382,14 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
 
     There was a bug that this would cause the runner PEX to fail to execute because it did not have
     Python 3 distributions of the requirements.
-
-    TODO(#10819): This support is not as robust as we'd like. We'll only use third-party
-    distributions if its wheel is also compatible with the Python 3 interpreter being used to run
-    MyPy. Is it possible to fix this to always include the Python 2 wheels and have MyPy respect
-    them?
     """
     rule_runner.add_to_build_file(
         "",
         dedent(
             """\
             # Both requirements are a) typed and b) compatible with Py2 and Py3. However, `x690`
-            # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We only
-            # expect libumi to be usable by MyPy.
+            # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We expect 
+            # both to be usable, even though libumi is not compatible with Py3. 
 
             python_requirement_library(
                 name="libumi",
@@ -398,7 +420,13 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert "Failed to execute PEX file" not in result[0].stderr
-    assert "Cannot find implementation or library stub for module named 'x690'" in result[0].stdout
+    assert (
+        "Cannot find implementation or library stub for module named 'x690'" not in result[0].stdout
+    )
+    assert (
+        "Cannot find implementation or library stub for module named 'libumi'"
+        not in result[0].stdout
+    )
     assert f"{PACKAGE}/py2.py:5: error: Unsupported operand types" in result[0].stdout
 
 
@@ -422,6 +450,33 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "Success: no issues found" in result[0].stdout.strip()
+
+
+def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
+    """Test the behavior of a MyPy requirement shadowing a user's requirement.
+
+    The way we load requirements is complex. We want to ensure that things still work properly in
+    this edge case.
+    """
+    rule_runner.create_file("app.py", "import typed_ast\n")
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            python_requirement_library(
+                name='typed-ast',
+                requirements=['typed-ast==1.4.1'],
+            )
+
+            python_library(name="lib")
+            """
+        ),
+    )
+    tgt = rule_runner.get_target(Address("", target_name="lib"))
+    result = run_mypy(rule_runner, [tgt], additional_args=["--mypy-version=mypy==0.782"])
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert "Success: no issues found" in result[0].stdout
 
 
 def test_source_plugin(rule_runner: RuleRunner) -> None:
