@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import time
+import warnings
 from contextlib import contextmanager
 from typing import Any, Iterator
 
@@ -45,8 +46,9 @@ class PantsDaemon(PantsDaemonProcessManager):
     @classmethod
     def create(cls, options_bootstrapper: OptionsBootstrapper) -> "PantsDaemon":
 
-        bootstrap_options = options_bootstrapper.bootstrap_options
-        bootstrap_options_values = bootstrap_options.for_global_scope()
+        with warnings.catch_warnings(record=True):
+            bootstrap_options = options_bootstrapper.bootstrap_options
+            bootstrap_options_values = bootstrap_options.for_global_scope()
 
         setup_warning_filtering(bootstrap_options_values.ignore_pants_warnings or [])
 

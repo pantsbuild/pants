@@ -3,6 +3,7 @@
 
 import itertools
 import os
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Sequence, Set, Tuple, Type
@@ -108,77 +109,81 @@ class OptionsBootstrapper:
           absolute paths. Production usecases should pass True to allow options values to make the
           decision of whether to respect pantsrc files.
         """
-        env = {k: v for k, v in env.items() if k.startswith("PANTS_")}
-        args = tuple(args)
+        with warnings.catch_warnings(record=True):
+            env = {k: v for k, v in env.items() if k.startswith("PANTS_")}
+            args = tuple(args)
 
-        flags = set()
-        short_flags = set()
+            flags = set()
+            short_flags = set()
 
-        # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
-        @dataclass(frozen=True)
-        class FileContent:
-            path: str
-            content: bytes
+            # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
+            @dataclass(frozen=True)
+            class FileContent:
+                path: str
+                content: bytes
 
-        def filecontent_for(path: str) -> FileContent:
-            return FileContent(
-                ensure_text(path),
-                read_file(path, binary_mode=True),
+            def filecontent_for(path: str) -> FileContent:
+                return FileContent(
+                    ensure_text(path),
+                    read_file(path, binary_mode=True),
+                )
+
+            def capture_the_flags(*args: str, **kwargs) -> None:
+                for arg in args:
+                    flags.add(arg)
+                    if len(arg) == 2:
+                        short_flags.add(arg)
+                    elif kwargs.get("type") == bool:
+                        flags.add(f"--no-{arg[2:]}")
+
+            GlobalOptions.register_bootstrap_options(capture_the_flags)
+
+            def is_bootstrap_option(arg: str) -> bool:
+                components = arg.split("=", 1)
+                if components[0] in flags:
+                    return True
+                for flag in short_flags:
+                    if arg.startswith(flag):
+                        return True
+                return False
+
+            # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
+            # Stop before '--' since args after that are pass-through and may have duplicate names to our
+            # bootstrap options.
+            bargs = ("./pants",) + tuple(
+                filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
             )
 
-        def capture_the_flags(*args: str, **kwargs) -> None:
-            for arg in args:
-                flags.add(arg)
-                if len(arg) == 2:
-                    short_flags.add(arg)
-                elif kwargs.get("type") == bool:
-                    flags.add(f"--no-{arg[2:]}")
+            config_file_paths = cls.get_config_file_paths(env=env, args=args)
+            config_files_products = [filecontent_for(p) for p in config_file_paths]
+            pre_bootstrap_config = Config.load_file_contents(config_files_products)
 
-        GlobalOptions.register_bootstrap_options(capture_the_flags)
+            initial_bootstrap_options = cls.parse_bootstrap_options(
+                env, bargs, pre_bootstrap_config
+            )
+            bootstrap_option_values = initial_bootstrap_options.for_global_scope()
 
-        def is_bootstrap_option(arg: str) -> bool:
-            components = arg.split("=", 1)
-            if components[0] in flags:
-                return True
-            for flag in short_flags:
-                if arg.startswith(flag):
-                    return True
-            return False
+            # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
+            # from (typically pants.toml), then config override, then rcfiles.
+            full_config_paths = pre_bootstrap_config.sources()
+            if allow_pantsrc and bootstrap_option_values.pantsrc:
+                rcfiles = [
+                    os.path.expanduser(str(rcfile))
+                    for rcfile in bootstrap_option_values.pantsrc_files
+                ]
+                existing_rcfiles = list(filter(os.path.exists, rcfiles))
+                full_config_paths.extend(existing_rcfiles)
 
-        # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
-        # Stop before '--' since args after that are pass-through and may have duplicate names to our
-        # bootstrap options.
-        bargs = ("./pants",) + tuple(
-            filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
-        )
+            full_config_files_products = [filecontent_for(p) for p in full_config_paths]
+            post_bootstrap_config = Config.load_file_contents(
+                full_config_files_products,
+                seed_values=bootstrap_option_values.as_dict(),
+            )
 
-        config_file_paths = cls.get_config_file_paths(env=env, args=args)
-        config_files_products = [filecontent_for(p) for p in config_file_paths]
-        pre_bootstrap_config = Config.load_file_contents(config_files_products)
-
-        initial_bootstrap_options = cls.parse_bootstrap_options(env, bargs, pre_bootstrap_config)
-        bootstrap_option_values = initial_bootstrap_options.for_global_scope()
-
-        # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
-        # from (typically pants.toml), then config override, then rcfiles.
-        full_config_paths = pre_bootstrap_config.sources()
-        if allow_pantsrc and bootstrap_option_values.pantsrc:
-            rcfiles = [
-                os.path.expanduser(str(rcfile)) for rcfile in bootstrap_option_values.pantsrc_files
-            ]
-            existing_rcfiles = list(filter(os.path.exists, rcfiles))
-            full_config_paths.extend(existing_rcfiles)
-
-        full_config_files_products = [filecontent_for(p) for p in full_config_paths]
-        post_bootstrap_config = Config.load_file_contents(
-            full_config_files_products,
-            seed_values=bootstrap_option_values.as_dict(),
-        )
-
-        env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
-        return cls(
-            env_tuples=env_tuples, bootstrap_args=bargs, args=args, config=post_bootstrap_config
-        )
+            env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
+            return cls(
+                env_tuples=env_tuples, bootstrap_args=bargs, args=args, config=post_bootstrap_config
+            )
 
     @memoized_property
     def env(self) -> Dict[str, str]:
