@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-import sys
 import warnings
 from functools import wraps
 from typing import Any, Callable, Optional
@@ -119,7 +118,6 @@ def warn_or_error(
     deprecation_start_version: Optional[str] = None,
     stacklevel: int = 3,
     frame_info: Optional[inspect.FrameInfo] = None,
-    ensure_stderr: bool = False,
     print_warning: bool = True,
 ) -> None:
     """Check the removal_version against the current pants version.
@@ -138,8 +136,6 @@ def warn_or_error(
     :param stacklevel: The stacklevel to pass to warnings.warn, which determines the file name and
                        line number of the error message.
     :param frame_info: If provided, use this frame info instead of getting one from `stacklevel`.
-    :param ensure_stderr: Whether use warnings.warn, or use warnings.showwarning to print
-                          directly to stderr.
     :param print_warning: Whether to print a warning for deprecations *before* their removal.
                           If this flag is off, an exception will still be raised for options
                           past their deprecation date.
@@ -173,16 +169,7 @@ def warn_or_error(
     _, filename, line_number, _, _, _ = frame_info
 
     if removal_semver > PANTS_SEMVER:
-        if ensure_stderr:
-            # No warning filters can stop us from printing this message directly to stderr.
-            warning_msg = warnings.formatwarning(
-                msg,
-                DeprecationWarning,
-                filename,
-                line_number,
-            )
-            print(warning_msg, file=sys.stderr)
-        elif print_warning:
+        if print_warning:
             # This output is filtered by warning filters.
             warnings.warn_explicit(
                 message=msg,
@@ -230,7 +217,6 @@ def deprecated(
     removal_version: str,
     hint_message: Optional[str] = None,
     subject: Optional[str] = None,
-    ensure_stderr: bool = False,
 ):
     """Marks a function or method as deprecated.
 
@@ -249,7 +235,6 @@ def deprecated(
     :param hint_message: An optional hint pointing to alternatives to the deprecation.
     :param subject: The name of the subject that has been deprecated for logging clarity. Defaults
                         to the name of the decorated function/method.
-    :param ensure_stderr: Forwarded to `ensure_stderr` in warn_or_error().
     :raises DeprecationApplicationError if the @deprecation is applied improperly.
     """
     validate_deprecation_semver(removal_version, "removal version")
@@ -268,7 +253,6 @@ def deprecated(
                 removal_version,
                 subject or func_full_name,
                 hint_message,
-                ensure_stderr=ensure_stderr,
             )
             return func(*args, **kwargs)
 
