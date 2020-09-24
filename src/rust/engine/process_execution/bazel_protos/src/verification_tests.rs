@@ -1,5 +1,7 @@
 use crate::remote_execution::{Digest, Directory, DirectoryNode, FileNode};
 use crate::verify_directory_canonical;
+
+use hashing::EMPTY_DIGEST;
 use protobuf::Message;
 
 const HASH: &str = "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d";
@@ -12,7 +14,10 @@ const OTHER_DIRECTORY_SIZE: i64 = 0;
 
 #[test]
 fn empty_directory() {
-  assert_eq!(Ok(()), verify_directory_canonical(&Directory::new()));
+  assert_eq!(
+    Ok(()),
+    verify_directory_canonical(EMPTY_DIGEST, &Directory::new())
+  );
 }
 
 #[test]
@@ -62,14 +67,14 @@ fn canonical_directory() {
     });
     dir
   });
-  assert_eq!(Ok(()), verify_directory_canonical(&directory));
+  assert_eq!(Ok(()), verify_directory_canonical(EMPTY_DIGEST, &directory));
 }
 
 #[test]
 fn unknown_field() {
   let mut directory = Directory::new();
   directory.mut_unknown_fields().add_fixed32(42, 42);
-  let error = verify_directory_canonical(&directory).expect_err("Want error");
+  let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
   assert!(
     error.contains("unknown"),
     format!("Bad error message: {}", error)
@@ -93,7 +98,7 @@ fn unknown_field_in_file_node() {
     file
   });
 
-  let error = verify_directory_canonical(&directory).expect_err("Want error");
+  let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
   assert!(
     error.contains("unknown"),
     format!("Bad error message: {}", error)
@@ -115,7 +120,7 @@ fn empty_child_name() {
     dir
   });
 
-  let error = verify_directory_canonical(&directory).expect_err("Want error");
+  let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
   assert!(
     error.contains("A child name must not be empty"),
     format!("Bad error message: {}", error)
@@ -137,7 +142,7 @@ fn multiple_path_segments_in_directory() {
     dir
   });
 
-  let error = verify_directory_canonical(&directory).expect_err("Want error");
+  let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
   assert!(
     error.contains("pets/cats"),
     format!("Bad error message: {}", error)
@@ -159,7 +164,7 @@ fn multiple_path_segments_in_file() {
     file
   });
 
-  let error = verify_directory_canonical(&directory).expect_err("Want error");
+  let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
   assert!(
     error.contains("cats/roland"),
     format!("Bad error message: {}", error)
@@ -192,7 +197,7 @@ fn duplicate_path_in_directory() {
     dir
   });
 
-  let error = verify_directory_canonical(&directory).expect_err("Want error");
+  let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
   assert!(
     error.contains("cats"),
     format!("Bad error message: {}", error)
@@ -225,7 +230,7 @@ fn duplicate_path_in_file() {
     file
   });
 
-  let error = verify_directory_canonical(&directory).expect_err("Want error");
+  let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
   assert!(
     error.contains("roland"),
     format!("Bad error message: {}", error)
@@ -258,7 +263,7 @@ fn duplicate_path_in_file_and_directory() {
     dir
   });
 
-  verify_directory_canonical(&directory).expect_err("Want error");
+  verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
 }
 
 #[test]
