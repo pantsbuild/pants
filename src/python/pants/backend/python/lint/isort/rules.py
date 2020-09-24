@@ -70,7 +70,7 @@ def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool) 
 
 @rule(level=LogLevel.DEBUG)
 async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
-    requirements_pex_request = Get(
+    isort_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="isort.pex",
@@ -96,8 +96,8 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
 
-    source_files, requirements_pex, config_digest = await MultiGet(
-        source_files_request, requirements_pex_request, config_digest_request
+    source_files, isort_pex, config_digest = await MultiGet(
+        source_files_request, isort_pex_request, config_digest_request
     )
     source_files_snapshot = (
         source_files.snapshot
@@ -107,13 +107,13 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
 
     input_digest = await Get(
         Digest,
-        MergeDigests((source_files_snapshot.digest, requirements_pex.digest, config_digest)),
+        MergeDigests((source_files_snapshot.digest, isort_pex.digest, config_digest)),
     )
 
     process = await Get(
         Process,
         PexProcess(
-            requirements_pex,
+            isort_pex,
             argv=generate_args(
                 source_files=source_files, isort=isort, check_only=setup_request.check_only
             ),
