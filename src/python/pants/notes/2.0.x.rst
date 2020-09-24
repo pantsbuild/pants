@@ -53,8 +53,14 @@ Bugfixes
 * Better Ctrl-C handling in the `test --debug` case (#10835)
   `PR #10835 <https://github.com/pantsbuild/pants/pull/10835>`_
 
+* Fix --pants-ignore-warnings behavior (#10845)
+  `PR #10845 <https://github.com/pantsbuild/pants/pull/10845>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+*  Change Display impl of Key  (#10848)
+  `PR #10848 <https://github.com/pantsbuild/pants/pull/10848>`_
 
 * OptionsBootstrapper is provided via a new SessionValues facility rather than a Param (#10827)
   `PR #10827 <https://github.com/pantsbuild/pants/pull/10827>`_
@@ -98,6 +104,9 @@ Refactoring, Improvements, and Tooling
 * Fix our release script to use the correct Python (#10841)
   `PR #10841 <https://github.com/pantsbuild/pants/pull/10841>`_
 
+* Refactor `core/util_rules/archive.py` to use `BinaryPaths` (#10836)
+  `PR #10836 <https://github.com/pantsbuild/pants/pull/10836>`_
+
 Testing
 ~~~~~~~
 
@@ -109,6 +118,12 @@ Documentation
 
 * Add documentation for the `graph` crate. (#10793)
   `PR #10793 <https://github.com/pantsbuild/pants/pull/10793>`_
+
+* Prepare 1.30.1 (#10843)
+  `PR #10843 <https://github.com/pantsbuild/pants/pull/10843>`_
+
+* Prepare 1.30.2rc0 (#10846)
+  `PR #10846 <https://github.com/pantsbuild/pants/pull/10846>`_
 
 2.0.0b0 (9/15/2020)
 -------------------
