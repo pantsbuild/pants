@@ -31,6 +31,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types import rules as target_type_rules
 from pants.backend.python.util_rules import (
     ancestor_files,
+    extract_pex,
     pex,
     pex_cli,
     pex_environment,
@@ -60,6 +61,7 @@ def rules():
     return (
         *coverage_py.rules(),
         *ancestor_files.rules(),
+        *extract_pex.rules(),
         *python_sources.rules(),
         *dependency_inference_rules.rules(),
         *pex.rules(),

@@ -13,7 +13,8 @@ from pants.backend.python.target_types import (
     PythonSources,
 )
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
-from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules import extract_pex, pex_from_targets
+from pants.backend.python.util_rules.extract_pex import ExtractedPexDistributions
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -70,14 +71,22 @@ def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
 # a sibling `<package>-stubs` package as per PEP-0561. Going further than that PEP, MyPy restricts
 # its search to `site-packages`. Since PEX deliberately isolates itself from `site-packages` as
 # part of its raison d'être, we monkey-patch `site.getsitepackages` to look inside the scrubbed
-# PEX sys.path before handing off to `mypy`.
+# PEX sys.path before handing off to `mypy`. This will find dependencies installed in the
+# `mypy.pex`, such as MyPy itself and any third-party plugins installed via
+# `--mypy-extra-requirements`.
 #
-# As a complication, MyPy does its own validation to ensure packages aren't both available in
-# site-packages and on the PYTHONPATH. As such, we elide all PYTHONPATH entries from artificial
-# site-packages we set up since MyPy will manually scan PYTHONPATH outside this PEX to find
-# packages. We also elide the values of PEX_EXTRA_SYS_PATH, which will be relative paths unlike
-# every other entry of sys.path. (We can't directly look for PEX_EXTRA_SYS_PATH because Pex scrubs
-# it.)
+# We also include the values from our custom env var `EXTRACTED_WHEELS` in this monkey-patch. For
+# user's third-party requirements, we don't include them in the `mypy.pex`, as the interpreter
+# constraints for their own code may be different than what's used to run MyPy, and this would
+# cause issues with Pex. Instead, we extract out the `.deps` folder from `requirements.pex`, and
+# set the env var `EXTRACTED_WHEELS` to point to each entry. This allows MyPy to know about user's
+# third-party requirements without having to set them on PYTHONPATH.
+#
+# Finally, we elide the values of PEX_EXTRA_SYS_PATH, which will point to user's first-party code's
+# source roots. MyPy validates that the same paths are not available both in site-packages and
+# PYTHONPATH, so we must not add this first-party code to site-packages. We use a heuristic of
+# looking for relative paths, as all other entries will be absolute paths. (We can't directly look
+# for PEX_EXTRA_SYS_PATH because Pex scrubs it.)
 #
 # See:
 #   https://mypy.readthedocs.io/en/stable/installed_packages.html#installed-packages
@@ -92,13 +101,9 @@ LAUNCHER_FILE = FileContent(
         import site
         import sys
 
-        PYTHONPATH = frozenset(
-            os.path.realpath(p)
-            for p in os.environ.get('PYTHONPATH', '').split(os.pathsep)
-        )
         site.getsitepackages = lambda: [
-            p for p in sys.path
-            if os.path.realpath(p) not in PYTHONPATH and os.path.isabs(p)
+            *(p for p in sys.path if os.path.isabs(p)),
+            *os.environ.get('EXTRACTED_WHEELS').split(os.pathsep),
         ]
         site.getusersitepackages = lambda: ''  # i.e, the CWD.
 
@@ -149,16 +154,14 @@ async def mypy_typecheck(
     #     `python_version`. We don't want to make the user set this up. (If they do, MyPy will use
     #     `python_version`, rather than defaulting to the executing interpreter).
     #
-    #  * We must resolve third-party dependencies. This should use whatever the actual code's
-    #     constraints are. However, PEX will error if they are not compatible
-    #     with the interpreter being used to run MyPy. So, we should generally align the tool PEX
-    #     constraints with the requirements constraints.
+    #  * When resolving third-party requirements, we should use the actual requirements. Normally,
+    #     we would merge the requirements.pex with mypy.pex via `--pex-path`. However, this will
+    #     cause a runtime error if the interpreter constraints are different between the PEXes and
+    #     they have incompatible wheels.
     #
-    #     However, it's possible for the requirements' constraints to include Python 2 and not be
-    #     compatible with MyPy's >=3.5 requirement. If any of the requirements only have
-    #     Python 2 wheels and they are not compatible with Python 3, then Pex will error about
-    #     missing wheels. So, in this case, we set `PEX_IGNORE_ERRORS`, which will avoid erroring,
-    #     but may result in MyPy complaining that it cannot find certain distributions.
+    #     Instead, we teach MyPy about the requirements by extracting the distributions from
+    #     requirements.pex and setting EXTRACTED_WHEELS, which our custom launcher script then
+    #     looks for.
     code_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
             tgt[PythonInterpreterCompatibility]
@@ -167,15 +170,17 @@ async def mypy_typecheck(
         ),
         python_setup,
     )
-    use_subsystem_constraints = (
-        not mypy.options.is_default("interpreter_constraints")
-        or code_interpreter_constraints.includes_python2()
-    )
-    tool_interpreter_constraints = (
-        PexInterpreterConstraints(mypy.interpreter_constraints)
-        if use_subsystem_constraints
-        else code_interpreter_constraints
-    )
+
+    if not mypy.options.is_default("interpreter_constraints"):
+        tool_interpreter_constraints = mypy.interpreter_constraints
+    elif code_interpreter_constraints.requires_python38_or_newer():
+        tool_interpreter_constraints = ("CPython>=3.8",)
+    elif code_interpreter_constraints.requires_python37_or_newer():
+        tool_interpreter_constraints = ("CPython>=3.7",)
+    elif code_interpreter_constraints.requires_python36_or_newer():
+        tool_interpreter_constraints = ("CPython>=3.6",)
+    else:
+        tool_interpreter_constraints = mypy.interpreter_constraints
 
     plugin_sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(plugin_transitive_targets.closure)
@@ -202,9 +207,8 @@ async def mypy_typecheck(
             requirements=PexRequirements(
                 itertools.chain(mypy.all_requirements, plugin_requirements)
             ),
-            interpreter_constraints=tool_interpreter_constraints,
+            interpreter_constraints=PexInterpreterConstraints(tool_interpreter_constraints),
             entry_point=PurePath(LAUNCHER_FILE.path).stem,
-            additional_args=("--pex-path", requirements_pex_request.input.output_filename),
         ),
     )
 
@@ -236,9 +240,13 @@ async def mypy_typecheck(
     python_files = "\n".join(
         f for f in typechecked_sources.source_files.snapshot.files if f.endswith(".py")
     )
-    file_list_digest = await Get(
+    create_file_list_request = Get(
         Digest,
         CreateDigest([FileContent(file_list_path, python_files.encode())]),
+    )
+
+    file_list_digest, extracted_pex_distributions = await MultiGet(
+        create_file_list_request, Get(ExtractedPexDistributions, Pex, requirements_pex)
     )
 
     merged_input_files = await Get(
@@ -249,7 +257,7 @@ async def mypy_typecheck(
                 plugin_sources.source_files.snapshot.digest,
                 typechecked_srcs_snapshot.digest,
                 mypy_pex.digest,
-                requirements_pex.digest,
+                extracted_pex_distributions.digest,
                 config_digest,
             ]
         ),
@@ -258,11 +266,10 @@ async def mypy_typecheck(
     all_used_source_roots = sorted(
         set(itertools.chain(plugin_sources.source_roots, typechecked_sources.source_roots))
     )
-    extra_env = {"PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots)}
-    # If the constraints are different for the tool than for the requirements, we must tell Pex to
-    # ignore errors. Otherwise, we risk runtime errors about missing dependencies.
-    if code_interpreter_constraints != tool_interpreter_constraints:
-        extra_env["PEX_IGNORE_ERRORS"] = "true"
+    env = {
+        "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
+        "EXTRACTED_WHEELS": ":".join(extracted_pex_distributions.wheel_directory_paths),
+    }
 
     result = await Get(
         FallibleProcessResult,
@@ -270,7 +277,7 @@ async def mypy_typecheck(
             mypy_pex,
             argv=generate_args(mypy, file_list_path=file_list_path),
             input_digest=merged_input_files,
-            extra_env=extra_env,
+            extra_env=env,
             description=f"Run MyPy on {pluralize(len(typechecked_srcs_snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
@@ -284,6 +291,7 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(TypecheckRequest, MyPyRequest),
+        *extract_pex.rules(),
         *pants_bin.rules(),
         *pex_from_targets.rules(),
     ]
