@@ -108,10 +108,6 @@ def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ..
 
 @rule(level=LogLevel.DEBUG)
 async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> LintResult:
-    # We build one PEX with Pylint requirements (including any first-party plugins), and another
-    # with all direct 3rd-party dependencies. Splitting this into two PEXes gives us finer-grained
-    # caching. We then merge via `--pex-path`. We use `PexFromTargetsRequest.for_requirements()`
-    # to get cache hits with other goals like `test` and `repl`.
     requirements_pex_request = Get(
         Pex,
         PexFromTargetsRequest,
@@ -141,6 +137,8 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
             requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
             entry_point=pylint.entry_point,
             interpreter_constraints=partition.interpreter_constraints,
+            # TODO(John Sirois): Support shading python binaries:
+            #   https://github.com/pantsbuild/pants/issues/9206
             additional_args=("--pex-path", requirements_pex_request.input.output_filename),
         ),
     )

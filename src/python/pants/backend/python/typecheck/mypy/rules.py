@@ -159,8 +159,6 @@ async def mypy_typecheck(
     #     Python 2 wheels and they are not compatible with Python 3, then Pex will error about
     #     missing wheels. So, in this case, we set `PEX_IGNORE_ERRORS`, which will avoid erroring,
     #     but may result in MyPy complaining that it cannot find certain distributions.
-    #
-    #  * The runner Pex should use the same constraints as the tool Pex.
     code_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
             tgt[PythonInterpreterCompatibility]

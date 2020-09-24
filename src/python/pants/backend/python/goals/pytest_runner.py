@@ -140,6 +140,8 @@ async def setup_pytest_for_target(
                 # by importlib_metadata and then by Pytest). See
                 # https://github.com/jaraco/zipp/pull/26.
                 "--not-zip-safe",
+                # TODO(John Sirois): Support shading python binaries:
+                #   https://github.com/pantsbuild/pants/issues/9206
                 "--pex-path",
                 requirements_pex_request.input.output_filename,
             ),
