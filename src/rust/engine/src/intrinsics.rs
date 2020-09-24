@@ -319,8 +319,10 @@ fn path_globs_to_paths(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
-    let key = externs::acquire_key_for(args.pop().unwrap())?;
-    let paths = context.get(Paths(key)).await?;
+    let val = args.pop().unwrap();
+    let path_globs = Snapshot::lift_path_globs(&val)
+      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
+    let paths = context.get(Paths::from_path_globs(path_globs)).await?;
     Paths::store_paths(&core, &paths).map_err(|e: String| throw(&e))
   }
   .boxed()
