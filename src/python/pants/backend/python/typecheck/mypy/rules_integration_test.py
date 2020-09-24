@@ -361,8 +361,8 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
         dedent(
             """\
             # Both requirements are a) typed and b) compatible with Py2 and Py3. However, `x690`
-            # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We expect 
-            # both to be usable, even though libumi is not compatible with Py3. 
+            # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We expect
+            # both to be usable, even though libumi is not compatible with Py3.
 
             python_requirement_library(
                 name="libumi",
