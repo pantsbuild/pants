@@ -56,6 +56,9 @@ Bugfixes
 * Fix --pants-ignore-warnings behavior (#10845)
   `PR #10845 <https://github.com/pantsbuild/pants/pull/10845>`_
 
+* Fix display of "Snapshotting" in dynamic UI (#10797)
+  `PR #10797 <https://github.com/pantsbuild/pants/pull/10797>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
