@@ -62,7 +62,7 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-*  Change Display impl of Key  (#10848)
+* Change Display impl of Key  (#10848)
   `PR #10848 <https://github.com/pantsbuild/pants/pull/10848>`_
 
 * OptionsBootstrapper is provided via a new SessionValues facility rather than a Param (#10827)
