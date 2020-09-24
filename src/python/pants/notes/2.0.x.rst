@@ -5,6 +5,135 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0b1 (9/23/2020)
+-------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Default to setting `LC_ALL` and `LANG` in subprocesses again (#10800)
+  `PR #10800 <https://github.com/pantsbuild/pants/pull/10800>`_
+
+* Default to `[python-infer].inits = false` (#10813)
+  `PR #10813 <https://github.com/pantsbuild/pants/pull/10813>`_
+
+* Deprecate `--interpreter-constraints` option where it no-ops (#10833)
+  `PR #10833 <https://github.com/pantsbuild/pants/pull/10833>`_
+
+* Upgrade setuptools from 49.6.0 to 50.3.0 and wheel from 0.31.1 to 0.35.1 (#10803)
+  `PR #10803 <https://github.com/pantsbuild/pants/pull/10803>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Restore support for third-party requirements with MyPy (#10811)
+  `PR #10811 <https://github.com/pantsbuild/pants/pull/10811>`_
+
+Bugfixes
+~~~~~~~~
+
+* Plumb the custom certs file through to Pip (via Pex) (#10837)
+  `PR #10837 <https://github.com/pantsbuild/pants/pull/10837>`_
+
+* Fix MyPy with Python 2-only third-party requirements (#10820)
+  `PR #10820 <https://github.com/pantsbuild/pants/pull/10820>`_
+
+* Fix `setup_py.with_binaries()` to automatically inject `dependencies` (#10829)
+  `PR #10829 <https://github.com/pantsbuild/pants/pull/10829>`_
+
+* Fix run not working with foo:main entry point. (#10821)
+  `PR #10821 <https://github.com/pantsbuild/pants/pull/10821>`_
+
+* Fix `internal_only` PEXes runtime interpreter diverging from buildtime (#10818)
+  `PR #10818 <https://github.com/pantsbuild/pants/pull/10818>`_
+
+* Local process cache validates that digests exist locally before hitting (#10789)
+  `PR #10789 <https://github.com/pantsbuild/pants/pull/10789>`_
+
+* Better Ctrl-C handling in the `test --debug` case (#10835)
+  `PR #10835 <https://github.com/pantsbuild/pants/pull/10835>`_
+
+* Fix --pants-ignore-warnings behavior (#10845)
+  `PR #10845 <https://github.com/pantsbuild/pants/pull/10845>`_
+
+* Fix display of "Snapshotting" in dynamic UI (#10797)
+  `PR #10797 <https://github.com/pantsbuild/pants/pull/10797>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Change Display impl of Key  (#10848)
+  `PR #10848 <https://github.com/pantsbuild/pants/pull/10848>`_
+
+* OptionsBootstrapper is provided via a new SessionValues facility rather than a Param (#10827)
+  `PR #10827 <https://github.com/pantsbuild/pants/pull/10827>`_
+
+* Internally stop ignoring missing imports with MyPy (#10828)
+  `PR #10828 <https://github.com/pantsbuild/pants/pull/10828>`_
+
+* Make `get_options_to_record` a 'public' api. (#10808)
+  `PR #10808 <https://github.com/pantsbuild/pants/pull/10808>`_
+
+* Useful equality for relevant options types (#10815)
+  `PR #10815 <https://github.com/pantsbuild/pants/pull/10815>`_
+
+* Clean nodes with uncacheable dependencies once per session (#10814)
+  `PR #10814 <https://github.com/pantsbuild/pants/pull/10814>`_
+
+* Disable pantsd when piping output for internal script (#10810)
+  `PR #10810 <https://github.com/pantsbuild/pants/pull/10810>`_
+
+* Simplify logging initialization (#10812)
+  `PR #10812 <https://github.com/pantsbuild/pants/pull/10812>`_
+
+* Remove support for "weak" Gets (#10805)
+  `PR #10805 <https://github.com/pantsbuild/pants/pull/10805>`_
+
+* Un-revert Add cache_failures option to Process type (#10796)
+  `PR #10796 <https://github.com/pantsbuild/pants/pull/10796>`_
+
+* Remove reset_interactive_output_stream (#10791)
+  `PR #10791 <https://github.com/pantsbuild/pants/pull/10791>`_
+
+* Allow creating empty directories with the engine (#10760)
+  `PR #10760 <https://github.com/pantsbuild/pants/pull/10760>`_
+
+* Use "output" and "input" instead of "product" and "subject" (#10790)
+  `PR #10790 <https://github.com/pantsbuild/pants/pull/10790>`_
+
+* Add graph test for UncacheableDeps nodes only running once (#10795)
+  `PR #10795 <https://github.com/pantsbuild/pants/pull/10795>`_
+
+* Fix our release script to use the correct Python (#10841)
+  `PR #10841 <https://github.com/pantsbuild/pants/pull/10841>`_
+
+* Refactor `core/util_rules/archive.py` to use `BinaryPaths` (#10836)
+  `PR #10836 <https://github.com/pantsbuild/pants/pull/10836>`_
+
+* Work around trailing slash issue with protobuf codegen (#10849)
+  `PR #10849 <https://github.com/pantsbuild/pants/pull/10849>`_
+
+* Consolidate "runner" PEXes into "tool" PEXes (#10852)
+  `PR #10852 <https://github.com/pantsbuild/pants/pull/10852>`_
+
+Testing
+~~~~~~~
+
+* Re-export `QueryRule` from `pants.testutil.rule_runner` (#10806)
+  `PR #10806 <https://github.com/pantsbuild/pants/pull/10806>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Add documentation for the `graph` crate. (#10793)
+  `PR #10793 <https://github.com/pantsbuild/pants/pull/10793>`_
+
+* Prepare 1.30.1 (#10843)
+  `PR #10843 <https://github.com/pantsbuild/pants/pull/10843>`_
+
+* Prepare 1.30.2rc0 (#10846)
+  `PR #10846 <https://github.com/pantsbuild/pants/pull/10846>`_
+
 2.0.0b0 (9/15/2020)
 -------------------
 
