@@ -5,6 +5,15 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.2rc0 (9/23/2020)
+---------------------
+
+New features
+~~~~~~~~~~~~
+
+* Backport `--test-extra-env-vars` feature (from #10715) (#10844)
+  `PR #10844 <https://github.com/pantsbuild/pants/pull/10844>`_
+
 1.30.1 (9/23/2020)
 ------------------
 
