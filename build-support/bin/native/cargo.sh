@@ -2,7 +2,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-set -e
+set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)
 
@@ -33,7 +33,7 @@ source "${REPO_ROOT}/build-support/bin/download_native_build_binaries.sh"
 
 cargo_bin="${CARGO_HOME}/bin/cargo"
 
-if [[ -n "${CARGO_WRAPPER_DEBUG}" ]]; then
+if [[ -n "${CARGO_WRAPPER_DEBUG-}" ]]; then
   cat << DEBUG >&2
 >>> Executing ${cargo_bin} $@
 >>> In ENV:
