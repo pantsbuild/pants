@@ -71,16 +71,22 @@ def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
 # a sibling `<package>-stubs` package as per PEP-0561. Going further than that PEP, MyPy restricts
 # its search to `site-packages`. Since PEX deliberately isolates itself from `site-packages` as
 # part of its raison d'être, we monkey-patch `site.getsitepackages` to look inside the scrubbed
-# PEX sys.path before handing off to `mypy`. This will find dependencies installed via `mypy.pex`,
-# along with the wheels we've extracted from `requirements.pex` and prefixed with the `.deps/`
-# folder. Note that these extracted wheels
+# PEX sys.path before handing off to `mypy`. This will find dependencies installed in the
+# `mypy.pex`, such as MyPy itself and any third-party plugins installed via
+# `--mypy-extra-requirements`.
 #
-# As a complication, MyPy does its own validation to ensure packages aren't both available in
-# site-packages and on the PYTHONPATH. As such, we elide all PYTHONPATH entries from artificial
-# site-packages we set up since MyPy will manually scan PYTHONPATH outside this PEX to find
-# packages. We also elide the values of PEX_EXTRA_SYS_PATH, which will be relative paths unlike
-# every other entry of sys.path. (We can't directly look for PEX_EXTRA_SYS_PATH because Pex scrubs
-# it.)
+# We also include the values from our custom env var `EXTRACTED_WHEELS` in this monkey-patch. For
+# user's third-party requirements, we don't include them in the `mypy.pex`, as the interpreter
+# constraints for their own code may be different than what's used to run MyPy, and this would
+# cause issues with Pex. Instead, we extract out the `.deps` folder from `requirements.pex`, and
+# set the env var `EXTRACTED_WHEELS` to point to each entry. This allows MyPy to know about user's
+# third-party requirements without having to set them on PYTHONPATH.
+#
+# Finally, we elide the values of PEX_EXTRA_SYS_PATH, which will point to user's first-party code's
+# source roots. MyPy validates that the same paths are not available both in site-packages and
+# PYTHONPATH, so we must not add this first-party code to site-packages. We use a heuristic of
+# looking for relative paths, as all other entries will be absolute paths. (We can't directly look
+# for PEX_EXTRA_SYS_PATH because Pex scrubs it.)
 #
 # See:
 #   https://mypy.readthedocs.io/en/stable/installed_packages.html#installed-packages
@@ -95,15 +101,9 @@ LAUNCHER_FILE = FileContent(
         import site
         import sys
 
-        PYTHONPATH = frozenset(
-            os.path.realpath(p)
-            for p in os.environ.get('PYTHONPATH', '').split(os.pathsep)
-        )
         site.getsitepackages = lambda: [
-            p for p in sys.path
-            if p.startswith(".deps") or (
-                os.path.realpath(p) not in PYTHONPATH and os.path.isabs(p)
-            )
+            *(p for p in sys.path if os.path.isabs(p)),
+            *os.environ.get('EXTRACTED_WHEELS').split(os.pathsep),
         ]
         site.getusersitepackages = lambda: ''  # i.e, the CWD.
 
@@ -154,16 +154,14 @@ async def mypy_typecheck(
     #     `python_version`. We don't want to make the user set this up. (If they do, MyPy will use
     #     `python_version`, rather than defaulting to the executing interpreter).
     #
-    #  * We must resolve third-party dependencies. This should use whatever the actual code's
-    #     constraints are. However, PEX will error if they are not compatible
-    #     with the interpreter being used to run MyPy. So, we should generally align the tool PEX
-    #     constraints with the requirements constraints.
+    #  * When resolving third-party requirements, we should use the actual requirements. Normally,
+    #     we would merge the requirements.pex with mypy.pex via `--pex-path`. However, this will
+    #     cause a runtime error if the interpreter constraints are different between the PEXes and
+    #     they have incompatible wheels.
     #
-    #     However, it's possible for the requirements' constraints to include Python 2 and not be
-    #     compatible with MyPy's >=3.5 requirement. If any of the requirements only have
-    #     Python 2 wheels and they are not compatible with Python 3, then Pex will error about
-    #     missing wheels. So, in this case, we set `PEX_IGNORE_ERRORS`, which will avoid erroring,
-    #     but may result in MyPy complaining that it cannot find certain distributions.
+    #     Instead, we teach MyPy about the requirements by extracting the distributions from
+    #     requirements.pex and setting EXTRACTED_WHEELS, which our custom launcher script then
+    #     looks for.
     code_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
             tgt[PythonInterpreterCompatibility]
@@ -269,11 +267,8 @@ async def mypy_typecheck(
         set(itertools.chain(plugin_sources.source_roots, typechecked_sources.source_roots))
     )
     env = {
-        "PEX_EXTRA_SYS_PATH": ":".join(
-            itertools.chain(
-                all_used_source_roots, extracted_pex_distributions.wheel_directory_paths
-            )
-        )
+        "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
+        "EXTRACTED_WHEELS": ":".join(extracted_pex_distributions.wheel_directory_paths),
     }
 
     result = await Get(

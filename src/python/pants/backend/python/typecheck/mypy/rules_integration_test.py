@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import Path, PurePath
+from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional, Sequence
 
@@ -292,33 +292,6 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
             "--mypy-version=mypy==0.770",
             f"--mypy-source-plugins={PACKAGE}/settings.py",
         ],
-    )
-    assert len(result) == 1
-    assert result[0].exit_code == 1
-    assert "src/python/project/app.py:4" in result[0].stdout
-
-    # We also test that loading a plugin by using a 3rd-party requirement still works.
-    Path(rule_runner.build_root, PACKAGE, "BUILD").unlink()
-    rule_runner.add_to_build_file(
-        PACKAGE,
-        dedent(
-            """\
-            python_requirement_library(
-                name="django-stubs",
-                requirements=["django-stubs==1.5.0"],
-            )
-
-            # The `./settings.py` dependency ensures that it will always be loaded.
-            python_library(dependencies=[":django-stubs", "./settings.py"])
-            """
-        ),
-    )
-    app_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
-    result = run_mypy(
-        rule_runner,
-        [app_tgt],
-        config=config_content,
-        additional_args=["--mypy-version=mypy==0.770"],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
