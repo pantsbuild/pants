@@ -5,7 +5,7 @@ import os
 import re
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional
+from typing import List, Mapping, Optional
 
 import pytest
 
@@ -23,7 +23,6 @@ from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals import binary
 from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
 from pants.core.util_rules import distdir
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
@@ -43,8 +42,8 @@ def rule_runner() -> RuleRunner:
             *binary.rules(),
             *create_python_binary.rules(),
             get_filtered_environment,
-            QueryRule(TestResult, (PythonTestFieldSet, PantsEnvironment)),
-            QueryRule(TestDebugRequest, (PythonTestFieldSet, PantsEnvironment)),
+            QueryRule(TestResult, (PythonTestFieldSet,)),
+            QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
         ],
         target_types=[PythonBinary, PythonLibrary, PythonTests, PythonRequirementLibrary],
     )
@@ -144,7 +143,7 @@ def run_pytest(
     use_coverage: bool = False,
     execution_slot_var: Optional[str] = None,
     extra_env_vars: Optional[str] = None,
-    pants_environment: PantsEnvironment = PantsEnvironment(),
+    env: Optional[Mapping[str, str]] = None,
 ) -> TestResult:
     args = [
         "--backend-packages=pants.backend.python",
@@ -163,9 +162,9 @@ def run_pytest(
         args.append("--test-use-coverage")
     if execution_slot_var:
         args.append(f"--pytest-execution-slot-var={execution_slot_var}")
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env=env)
 
-    inputs = [PythonTestFieldSet.create(test_target), pants_environment]
+    inputs = [PythonTestFieldSet.create(test_target)]
     test_result = rule_runner.request(TestResult, inputs)
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:
@@ -433,9 +432,12 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
         ).encode(),
     )
     tgt = create_test_target(rule_runner, [source])
-    mock_env = PantsEnvironment({"OTHER_VAR": "other_value"})
-    extra_env_vars = '["SOME_VAR=some_value", "OTHER_VAR"]'
-    result = run_pytest(rule_runner, tgt, extra_env_vars=extra_env_vars, pants_environment=mock_env)
+    result = run_pytest(
+        rule_runner,
+        tgt,
+        extra_env_vars='["SOME_VAR=some_value", "OTHER_VAR"]',
+        env={"OTHER_VAR": "other_value"},
+    )
     assert result.exit_code == 0
 
 

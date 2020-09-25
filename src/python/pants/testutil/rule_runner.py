@@ -35,10 +35,10 @@ from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Get, Params
+from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import Rule
-from pants.engine.session import SessionValues
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
@@ -126,7 +126,9 @@ class RuleRunner:
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
         ).new_session(
             build_id="buildid_for_test",
-            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
+            session_values=SessionValues(
+                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment()}
+            ),
             should_report_workunits=True,
         )
         self.scheduler = graph_session.scheduler_session
@@ -179,7 +181,6 @@ class RuleRunner:
                 console,
                 Workspace(self.scheduler),
                 InteractiveRunner(self.scheduler),
-                PantsEnvironment(),
             ),
         )
 
@@ -187,7 +188,12 @@ class RuleRunner:
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
 
     def set_options(self, args: Iterable[str], *, env: Optional[Mapping[str, str]] = None) -> None:
-        """Update the engine session with new options.
+        """Update the engine session with new options and/or environment variables.
+
+        The environment variables will be used to set the `PantsEnvironment`, which is the
+        environment variables captured by the parent Pants process. Some rules use this to be able
+        to read arbitrary env vars. Any options that start with `PANTS_` will also be used to set
+        options.
 
         This will override any previously configured values.
         """
@@ -195,7 +201,9 @@ class RuleRunner:
         self.scheduler = self.scheduler.scheduler.new_session(
             build_id="buildid_for_test",
             should_report_workunits=True,
-            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
+            session_values=SessionValues(
+                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment(env)}
+            ),
         )
 
     def _invalidate_for(self, *relpaths):

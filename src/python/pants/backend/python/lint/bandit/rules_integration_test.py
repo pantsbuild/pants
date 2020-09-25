@@ -9,7 +9,6 @@ from pants.backend.python.lint.bandit.rules import BanditFieldSet, BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.target import Target
@@ -22,7 +21,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *bandit_rules(),
-            QueryRule(LintResults, (BanditRequest, PantsEnvironment)),
+            QueryRule(LintResults, (BanditRequest,)),
         ],
     )
 
@@ -69,7 +68,7 @@ def run_bandit(
     rule_runner.set_options(args)
     results = rule_runner.request(
         LintResults,
-        [BanditRequest(BanditFieldSet.create(tgt) for tgt in targets), PantsEnvironment()],
+        [BanditRequest(BanditFieldSet.create(tgt) for tgt in targets)],
     )
     return results.results
 

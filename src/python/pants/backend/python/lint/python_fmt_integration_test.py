@@ -10,7 +10,6 @@ from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import LanguageFmtResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Targets
@@ -24,7 +23,7 @@ def rule_runner() -> RuleRunner:
             format_python_target,
             *black_rules(),
             *isort_rules(),
-            QueryRule(LanguageFmtResults, (PythonFmtTargets, PantsEnvironment)),
+            QueryRule(LanguageFmtResults, (PythonFmtTargets,)),
         ]
     )
 
@@ -45,7 +44,7 @@ def run_black_and_isort(
             *(extra_args or []),
         ]
     )
-    results = rule_runner.request(LanguageFmtResults, [targets, PantsEnvironment()])
+    results = rule_runner.request(LanguageFmtResults, [targets])
     return results
 
 

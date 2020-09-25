@@ -11,7 +11,6 @@ from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -25,9 +24,9 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *black_rules(),
-            QueryRule(LintResults, (BlackRequest, PantsEnvironment)),
-            QueryRule(FmtResult, (BlackRequest, PantsEnvironment)),
-            QueryRule(SourceFiles, (SourceFilesRequest, PantsEnvironment)),
+            QueryRule(LintResults, (BlackRequest,)),
+            QueryRule(FmtResult, (BlackRequest,)),
+            QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonLibrary],
     )
@@ -74,20 +73,17 @@ def run_black(
         args.append("--black-skip")
     rule_runner.set_options(args)
     field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
-    pants_env = PantsEnvironment()
-    lint_results = rule_runner.request(LintResults, [BlackRequest(field_sets), pants_env])
+    lint_results = rule_runner.request(LintResults, [BlackRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
         [
             SourceFilesRequest(field_set.sources for field_set in field_sets),
-            pants_env,
         ],
     )
     fmt_result = rule_runner.request(
         FmtResult,
         [
             BlackRequest(field_sets, prior_formatter_result=input_sources.snapshot),
-            pants_env,
         ],
     )
     return lint_results.results, fmt_result

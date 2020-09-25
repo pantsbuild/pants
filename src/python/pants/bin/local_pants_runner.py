@@ -12,9 +12,10 @@ from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.base.workunit import WorkUnit
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.session import SessionValues
+from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_info_extracter import HelpInfoExtracter
@@ -37,7 +38,6 @@ class LocalPantsRunner:
 
     build_root: The build root for this run.
     options: The parsed options for this run.
-    options_bootstrapper: The OptionsBootstrapper instance to use.
     build_config: The parsed build configuration for this run.
     specs: The specs for this run, i.e. either the address or filesystem specs.
     graph_session: A LegacyGraphSession instance for graph reuse.
@@ -46,7 +46,6 @@ class LocalPantsRunner:
 
     build_root: str
     options: Options
-    options_bootstrapper: OptionsBootstrapper
     build_config: BuildConfiguration
     specs: Specs
     graph_session: GraphSession
@@ -85,7 +84,9 @@ class LocalPantsRunner:
             dynamic_ui=dynamic_ui,
             use_colors=use_colors,
             should_report_workunits=stream_workunits,
-            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
+            session_values=SessionValues(
+                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment()}
+            ),
         )
 
     @classmethod
@@ -137,7 +138,6 @@ class LocalPantsRunner:
         return cls(
             build_root=build_root,
             options=options,
-            options_bootstrapper=options_bootstrapper,
             build_config=build_config,
             specs=specs,
             graph_session=graph_session,
@@ -179,7 +179,6 @@ class LocalPantsRunner:
 
     def _maybe_run_v2_body(self, goals, poll: bool) -> ExitCode:
         return self.graph_session.run_goal_rules(
-            options_bootstrapper=self.options_bootstrapper,
             union_membership=self.union_membership,
             goals=goals,
             specs=self.specs,

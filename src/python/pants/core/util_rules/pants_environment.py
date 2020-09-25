@@ -7,7 +7,8 @@ import re
 from dataclasses import dataclass
 from typing import Dict, Mapping, Optional, Sequence
 
-from pants.engine.rules import side_effecting
+from pants.engine.internals.session import SessionValues
+from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
@@ -17,7 +18,6 @@ name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
 shorthand_re = re.compile(r"([A-Za-z_]\w*)")
 
 
-@side_effecting
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PantsEnvironment:
@@ -80,3 +80,12 @@ class PantsEnvironment:
                 )
 
         return FrozenDict(env_var_subset)
+
+
+@rule
+async def pants_environment(session_values: SessionValues) -> PantsEnvironment:
+    return session_values[PantsEnvironment]
+
+
+def rules():
+    return collect_rules()
