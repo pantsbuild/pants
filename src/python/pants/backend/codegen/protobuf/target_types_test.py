@@ -12,7 +12,6 @@ from pants.backend.codegen.protobuf.target_types import rules as target_type_rul
 from pants.core.target_types import Files
 from pants.engine.addresses import Address
 from pants.engine.target import InjectedDependencies
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -20,7 +19,7 @@ def test_inject_dependencies() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_type_rules(),
-            QueryRule(InjectedDependencies, (InjectProtobufDependencies, OptionsBootstrapper)),
+            QueryRule(InjectedDependencies, (InjectProtobufDependencies,)),
         ],
         target_types=[ProtobufLibrary, Files],
     )

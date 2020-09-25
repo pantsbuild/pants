@@ -425,12 +425,6 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
 
 
 def test_pex_environment(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(
-        [
-            "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
-            "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
-        ]
-    )
     sources = rule_runner.request(
         Digest,
         [
@@ -450,7 +444,15 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
             ),
         ],
     )
-    pex_output = create_pex_and_get_all_data(rule_runner, entry_point="main", sources=sources)
+    pex_output = create_pex_and_get_all_data(
+        rule_runner,
+        entry_point="main",
+        sources=sources,
+        additional_pants_args=(
+            "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
+            "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
+        ),
+    )
 
     process = rule_runner.request(
         Process,

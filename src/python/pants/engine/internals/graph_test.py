@@ -70,6 +70,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import FrozenOrderedSet
@@ -854,21 +855,23 @@ class TestCodegen(TestBase):
         self.union_membership = self.request(UnionMembership, [])
 
     def test_generate_sources(self) -> None:
+        bootstrapper = create_options_bootstrapper()
         protocol_sources = AvroSources(["*.avro"], address=self.address)
         assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
 
         # First, get the original protocol sources.
         hydrated_protocol_sources = self.request(
-            HydratedSources, [HydrateSourcesRequest(protocol_sources)]
+            HydratedSources, [HydrateSourcesRequest(protocol_sources), bootstrapper]
         )
         assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
 
         # Test directly feeding the protocol sources into the codegen rule.
-        tgt = self.request(WrappedTarget, [self.address]).target
+        tgt = self.request(WrappedTarget, [self.address, bootstrapper]).target
         generated_sources = self.request(
             GeneratedSources,
             [
                 GenerateSmalltalkFromAvroRequest(hydrated_protocol_sources.snapshot, tgt),
+                bootstrapper,
             ],
         )
         assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
@@ -880,6 +883,7 @@ class TestCodegen(TestBase):
                 HydrateSourcesRequest(
                     protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
                 ),
+                bootstrapper,
             ],
         )
         assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
@@ -897,6 +901,7 @@ class TestCodegen(TestBase):
                 HydrateSourcesRequest(
                     protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
                 ),
+                create_options_bootstrapper(),
             ],
         )
         assert generated.snapshot.files == ("src/smalltalk/f.st",)
@@ -913,6 +918,7 @@ class TestCodegen(TestBase):
                 HydrateSourcesRequest(
                     protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
                 ),
+                create_options_bootstrapper(),
             ],
         )
         assert generated.snapshot.files == ()
