@@ -931,7 +931,7 @@ class GlobalOptions(Subsystem):
             "--build-ignore",
             advanced=True,
             type=list,
-            default=[".*/", "bower_components/", "node_modules/", "*.egg-info/"],
+            default=["bower_components/", "node_modules/", "*.egg-info/"],
             help=(
                 "Paths to ignore when identifying BUILD files. This does not affect any other "
                 "filesystem operations; use `--pants-ignore` for that instead. Patterns use the "
