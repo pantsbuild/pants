@@ -30,6 +30,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+BASH_SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
+
+
 @dataclass(frozen=True)
 class ProductDescription:
     value: str
@@ -482,15 +485,26 @@ class BinaryNotFoundError(EnvironmentError):
 
 @rule(desc="Find binary path", level=LogLevel.DEBUG)
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
-    # TODO(John Sirois): Replace this script with a statically linked native binary so we don't
+    # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
+    # our shebang. This avoids mixing locations that we would search for bash into the search paths
+    # of the request we are servicing.
+    # TODO(#10769): Replace this script with a statically linked native binary so we don't
     #  depend on either /bin/bash being available on the Process host.
+    if request.binary_name == "bash":
+        shebang = "#!/usr/bin/env bash"
+    else:
+        bash_request = BinaryPathRequest(binary_name="bash", search_path=BASH_SEARCH_PATHS)
+        bash_paths = await Get(BinaryPaths, BinaryPathRequest, bash_request)
+        if not bash_paths.first_path:
+            raise BinaryNotFoundError(bash_request, rationale="use it to locate other executables")
+        shebang = f"#!{bash_paths.first_path.path}"
 
     # Note: the backslash after the """ marker ensures that the shebang is at the start of the
     # script file. Many OSs will not see the shebang if there is intervening whitespace.
     script_path = "./script.sh"
     script_content = dedent(
-        """\
-        #!/usr/bin/env bash
+        f"""\
+        {shebang}
 
         set -euo pipefail
 
@@ -508,7 +522,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
 
     search_path = create_path_env_var(request.search_path)
     result = await Get(
-        FallibleProcessResult,
+        ProcessResult,
         # We use a volatile process to force re-run since any binary found on the host system today
         # could be gone tomorrow. Ideally we'd only do this for local processes since all known
         # remoting configurations include a static container image as part of their cache key which
@@ -526,9 +540,6 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     )
 
     binary_paths = BinaryPaths(binary_name=request.binary_name)
-    if result.exit_code != 0:
-        return binary_paths
-
     found_paths = result.stdout.decode().splitlines()
     if not request.test:
         return dataclasses.replace(binary_paths, paths=[BinaryPath(path) for path in found_paths])
