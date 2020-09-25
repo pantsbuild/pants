@@ -35,7 +35,7 @@ class ParsedPythonImports:
         return FrozenOrderedSet(sorted([*self.explicit_imports, *self.inferred_imports]))
 
 
-def parse_file(source_code: str) -> Optional[Tuple]:
+def parse_file(*, filename: str, content: str) -> Optional[Tuple]:
     try:
         # NB: The Python 3 ast is generally backwards-compatible with earlier versions. The only
         # breaking change is `async` `await` becoming reserved keywords in Python 3.7 (deprecated
@@ -45,18 +45,19 @@ def parse_file(source_code: str) -> Optional[Tuple]:
         # We will also fail to parse Python 3.8 syntax if Pants is run with Python 3.6 or 3.7.
         # There is no known workaround for this, beyond users changing their `./pants` script to
         # always use >= 3.8.
-        tree = ast3.parse(source_code)
+        tree = ast3.parse(content, filename=filename)
         visitor_cls = _Py3AstVisitor if sys.version_info[:2] < (3, 8) else _Py38AstVisitor
         return tree, visitor_cls
     except SyntaxError:
         try:
-            return ast27.parse(source_code), _Py27AstVisitor
+            py27_tree = ast27.parse(content, filename=filename)
+            return py27_tree, _Py27AstVisitor
         except SyntaxError:
             return None
 
 
-def find_python_imports(source_code: str, *, module_name: str) -> ParsedPythonImports:
-    parse_result = parse_file(source_code)
+def find_python_imports(*, filename: str, content: str, module_name: str) -> ParsedPythonImports:
+    parse_result = parse_file(filename=filename, content=content)
     # If there were syntax errors, gracefully early return. This is more user friendly than
     # propagating the exception. Dependency inference simply won't be used for that file, and
     # it'll be up to the tool actually being run (e.g. Pytest or Flake8) to error.

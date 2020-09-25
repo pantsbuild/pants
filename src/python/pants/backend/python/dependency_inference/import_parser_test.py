@@ -11,7 +11,8 @@ from pants.backend.python.dependency_inference.import_parser import find_python_
 
 def test_normal_imports() -> None:
     imports = find_python_imports(
-        dedent(
+        filename="foo.py",
+        content=dedent(
             """\
             from __future__ import print_function
 
@@ -54,7 +55,8 @@ def test_normal_imports() -> None:
 
 def test_relative_imports() -> None:
     imports = find_python_imports(
-        dedent(
+        filename="foo.py",
+        content=dedent(
             """\
             from . import sibling
             from .subdir.child import Child
@@ -73,7 +75,8 @@ def test_relative_imports() -> None:
 
 def test_imports_from_strings() -> None:
     imports = find_python_imports(
-        dedent(
+        filename="foo.py",
+        content=dedent(
             """\
             modules = [
                 # Valid strings
@@ -118,14 +121,15 @@ def test_imports_from_strings() -> None:
 
 
 def test_gracefully_handle_syntax_errors() -> None:
-    imports = find_python_imports("x =", module_name="project.app")
+    imports = find_python_imports(filename="foo.py", content="x =", module_name="project.app")
     assert not imports.explicit_imports
     assert not imports.inferred_imports
 
 
 def test_works_with_python2() -> None:
     imports = find_python_imports(
-        dedent(
+        filename="foo.py",
+        content=dedent(
             """\
             print "Python 2 lives on."
 
@@ -148,7 +152,8 @@ def test_works_with_python2() -> None:
 )
 def test_works_with_python38() -> None:
     imports = find_python_imports(
-        dedent(
+        filename="foo.py",
+        content=dedent(
             """\
             is_py38 = True
             if walrus := is_py38:
