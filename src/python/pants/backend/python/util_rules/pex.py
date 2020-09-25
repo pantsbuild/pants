@@ -257,26 +257,6 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
                 return False
         return True
 
-    def requires_python36_or_newer(self) -> bool:
-        """Checks if the constraints are all for Python 3.6+.
-
-        This will return False if Python 3.6 is allowed, but prior versions like 3.5 are also
-        allowed.
-        """
-        return self._requires_python3_version_or_newer(
-            allowed_versions=["3.6", "3.7", "3.8", "3.9"], prior_version="3.5"
-        )
-
-    def requires_python37_or_newer(self) -> bool:
-        """Checks if the constraints are all for Python 3.7+.
-
-        This will return False if Python 3.7 is allowed, but prior versions like 3.6 are also
-        allowed.
-        """
-        return self._requires_python3_version_or_newer(
-            allowed_versions=["3.7", "3.8", "3.9"], prior_version="3.6"
-        )
-
     def requires_python38_or_newer(self) -> bool:
         """Checks if the constraints are all for Python 3.8+.
 
