@@ -49,7 +49,6 @@ from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import recursive_dirname, safe_file_dump, safe_mkdir, safe_open
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 # -----------------------------------------------------------------------------------------------
@@ -71,8 +70,8 @@ class GoalRuleResult:
         return GoalRuleResult(0, stdout="", stderr="")
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+# This is not frozen because we need to update the `scheduler` when setting options.
+@dataclass
 class RuleRunner:
     build_root: str
     build_config: BuildConfiguration
@@ -108,9 +107,7 @@ class RuleRunner:
         build_config_builder.register_target_types(target_types or ())
         self.build_config = build_config_builder.create()
 
-        options_bootstrapper = OptionsBootstrapper.create(
-            env={}, args=["--pants-config-files=[]"], allow_pantsrc=False
-        )
+        options_bootstrapper = create_options_bootstrapper()
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         local_store_dir = global_options.local_store_dir
         local_execution_root_dir = global_options.local_execution_root_dir
@@ -127,8 +124,15 @@ class RuleRunner:
             build_root=self.build_root,
             build_configuration=self.build_config,
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
-        ).new_session(build_id="buildid_for_test", should_report_workunits=True)
+        ).new_session(
+            build_id="buildid_for_test",
+            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
+            should_report_workunits=True,
+        )
         self.scheduler = graph_session.scheduler_session
+
+    def __repr__(self) -> str:
+        return f"RuleRunner(build_root={self.build_root})"
 
     @property
     def pants_workdir(self) -> str:
@@ -143,17 +147,9 @@ class RuleRunner:
         return self.build_config.target_types
 
     def request(self, output_type: Type[_O], inputs: Iterable[Any]) -> _O:
-        # TODO: Update all callsites to pass this explicitly via session values.
-        session = self.scheduler
-        for value in inputs:
-            if type(value) == OptionsBootstrapper:
-                session = self.scheduler.scheduler.new_session(
-                    build_id="buildid_for_test",
-                    should_report_workunits=True,
-                    session_values=SessionValues({OptionsBootstrapper: value}),
-                )
-
-        result = assert_single_element(session.product_request(output_type, [Params(*inputs)]))
+        result = assert_single_element(
+            self.scheduler.product_request(output_type, [Params(*inputs)])
+        )
         return cast(_O, result)
 
     def run_goal_rule(
@@ -164,10 +160,9 @@ class RuleRunner:
         args: Optional[Iterable[str]] = None,
         env: Optional[Mapping[str, str]] = None,
     ) -> GoalRuleResult:
-        options_bootstrapper = create_options_bootstrapper(
-            args=(*(global_args or []), goal.name, *(args or [])),
-            env=env,
-        )
+        merged_args = (*(global_args or []), goal.name, *(args or []))
+        self.set_options(merged_args, env=env)
+        options_bootstrapper = create_options_bootstrapper(args=merged_args, env=env)
 
         raw_specs = options_bootstrapper.get_full_options(
             [*GlobalOptions.known_scope_infos(), *goal.subsystem_cls.known_scope_infos()]
@@ -177,13 +172,7 @@ class RuleRunner:
         stdout, stderr = StringIO(), StringIO()
         console = Console(stdout=stdout, stderr=stderr)
 
-        session = self.scheduler.scheduler.new_session(
-            build_id="buildid_for_test",
-            should_report_workunits=True,
-            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
-        )
-
-        exit_code = session.run_goal_rule(
+        exit_code = self.scheduler.run_goal_rule(
             goal,
             Params(
                 specs,
@@ -196,6 +185,18 @@ class RuleRunner:
 
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
+
+    def set_options(self, args: Iterable[str], *, env: Optional[Mapping[str, str]] = None) -> None:
+        """Update the engine session with new options.
+
+        This will override any previously configured values.
+        """
+        options_bootstrapper = create_options_bootstrapper(args=args, env=env)
+        self.scheduler = self.scheduler.scheduler.new_session(
+            build_id="buildid_for_test",
+            should_report_workunits=True,
+            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
+        )
 
     def _invalidate_for(self, *relpaths):
         """Invalidates all files from the relpath, recursively up to the root.
@@ -278,17 +279,13 @@ class RuleRunner:
         """
         return self.make_snapshot({fp: "" for fp in files})
 
-    def get_target(
-        self, address: Address, options_bootstrapper: Optional[OptionsBootstrapper] = None
-    ) -> Target:
+    def get_target(self, address: Address) -> Target:
         """Find the target for a given address.
 
         This requires that the target actually exists, i.e. that you called
         `rule_runner.add_to_build_file()`.
         """
-        return self.request(
-            WrappedTarget, [address, options_bootstrapper or create_options_bootstrapper()]
-        ).target
+        return self.request(WrappedTarget, [address]).target
 
 
 # -----------------------------------------------------------------------------------------------

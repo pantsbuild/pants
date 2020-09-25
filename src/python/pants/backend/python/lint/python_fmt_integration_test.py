@@ -14,7 +14,6 @@ from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Targets
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -40,13 +39,13 @@ def run_black_and_isort(
     for source_file in source_files:
         rule_runner.create_file(source_file.path, source_file.content.decode())
     targets = PythonFmtTargets(Targets([PythonLibrary({}, address=Address.parse(f"test:{name}"))]))
-    args = [
-        "--backend-packages=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
-        *(extra_args or []),
-    ]
-    results = rule_runner.request(
-        LanguageFmtResults, [targets, create_options_bootstrapper(args=args), PantsEnvironment()]
+    rule_runner.set_options(
+        [
+            "--backend-packages=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
+            *(extra_args or []),
+        ]
     )
+    results = rule_runner.request(LanguageFmtResults, [targets, PantsEnvironment()])
     return results
 
 

@@ -27,7 +27,7 @@ from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
-from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -348,16 +348,8 @@ def create_pex_and_get_all_data(
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
     )
-    pex = rule_runner.request(
-        Pex,
-        [
-            request,
-            create_options_bootstrapper(
-                args=["--backend-packages=pants.backend.python", *additional_pants_args]
-            ),
-            PantsEnvironment(),
-        ],
-    )
+    rule_runner.set_options(["--backend-packages=pants.backend.python", *additional_pants_args])
+    pex = rule_runner.request(Pex, [request, PantsEnvironment()])
     rule_runner.scheduler.write_digest(pex.digest)
     pex_path = os.path.join(rule_runner.build_root, "test.pex")
     with zipfile.ZipFile(pex_path, "r") as zipfp:
@@ -452,7 +444,15 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
             ),
         ],
     )
-    pex_output = create_pex_and_get_all_data(rule_runner, entry_point="main", sources=sources)
+    pex_output = create_pex_and_get_all_data(
+        rule_runner,
+        entry_point="main",
+        sources=sources,
+        additional_pants_args=(
+            "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
+            "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
+        ),
+    )
 
     process = rule_runner.request(
         Process,
@@ -462,12 +462,6 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
                 argv=["python", "test.pex"],
                 input_digest=pex_output["pex"].digest,
                 description="Run the pex and check its reported environment",
-            ),
-            create_options_bootstrapper(
-                args=[
-                    "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
-                    "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
-                ]
             ),
             PantsEnvironment({"LANG": "es_PY.UTF-8"}),
         ],

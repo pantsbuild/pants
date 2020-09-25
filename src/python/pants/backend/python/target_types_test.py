@@ -25,9 +25,8 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidFieldTypeException,
 )
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.python.python_requirement import PythonRequirement
-from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -125,7 +124,7 @@ def test_python_distribution_dependency_injection() -> None:
             *target_type_rules(),
             QueryRule(
                 InjectedDependencies,
-                (InjectPythonDistributionDependencies, OptionsBootstrapper),
+                (InjectPythonDistributionDependencies,),
             ),
         ],
         target_types=[PythonDistribution, PythonBinary],
@@ -148,9 +147,6 @@ def test_python_distribution_dependency_injection() -> None:
     tgt = rule_runner.get_target(Address("project", target_name="dist"))
     injected = rule_runner.request(
         InjectedDependencies,
-        [
-            InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies]),
-            create_options_bootstrapper(),
-        ],
+        [InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies])],
     )
     assert injected == InjectedDependencies([Address("project", target_name="my_binary")])

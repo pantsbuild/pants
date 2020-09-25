@@ -13,7 +13,6 @@ from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsReque
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.python.python_setup import ResolveAllConstraintsOption
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -80,7 +79,8 @@ def test_constraints_validation(rule_runner: RuleRunner) -> None:
             args.append(f"--python-setup-resolve-all-constraints={resolve_all.value}")
         if constraints_file:
             args.append(f"--python-setup-requirement-constraints={constraints_file}")
-        return rule_runner.request(PexRequest, [request, create_options_bootstrapper(args=args)])
+        rule_runner.set_options(args)
+        return rule_runner.request(PexRequest, [request])
 
     pex_req1 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.NEVER)
     assert pex_req1.requirements == PexRequirements(["foo-bar>=0.1.2", "bar==5.5.5", "baz"])

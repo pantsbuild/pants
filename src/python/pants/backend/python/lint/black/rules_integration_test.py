@@ -16,7 +16,6 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Target
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -73,17 +72,14 @@ def run_black(
         args.append(f"--black-args='{passthrough_args}'")
     if skip:
         args.append("--black-skip")
-    options_bootstrapper = create_options_bootstrapper(args=args)
+    rule_runner.set_options(args)
     field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
     pants_env = PantsEnvironment()
-    lint_results = rule_runner.request(
-        LintResults, [BlackRequest(field_sets), options_bootstrapper, pants_env]
-    )
+    lint_results = rule_runner.request(LintResults, [BlackRequest(field_sets), pants_env])
     input_sources = rule_runner.request(
         SourceFiles,
         [
             SourceFilesRequest(field_set.sources for field_set in field_sets),
-            options_bootstrapper,
             pants_env,
         ],
     )
@@ -91,7 +87,6 @@ def run_black(
         FmtResult,
         [
             BlackRequest(field_sets, prior_formatter_result=input_sources.snapshot),
-            options_bootstrapper,
             pants_env,
         ],
     )

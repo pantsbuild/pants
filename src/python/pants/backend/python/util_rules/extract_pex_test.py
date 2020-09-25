@@ -15,7 +15,6 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.fs import EMPTY_DIGEST, Snapshot
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -35,6 +34,12 @@ def get_distributions(
     rule_runner: RuleRunner, *, requirements: Iterable[str], constraints: Iterable[str]
 ) -> ExtractedPexDistributions:
     # NB: The constraints are important for determinism.
+    rule_runner.set_options(
+        [
+            "--backend-packages=pants.backend.python",
+            "--python-setup-requirement-constraints=constraints.txt",
+        ]
+    )
     rule_runner.create_file("constraints.txt", "\n".join(constraints))
 
     pex_request = PexRequest(
@@ -43,13 +48,7 @@ def get_distributions(
         interpreter_constraints=PexInterpreterConstraints([">=3.6"]),
         internal_only=True,
     )
-    options_bootstrapper = create_options_bootstrapper(
-        args=[
-            "--backend-packages=pants.backend.python",
-            "--python-setup-requirement-constraints=constraints.txt",
-        ]
-    )
-    built_pex = rule_runner.request(Pex, [pex_request, options_bootstrapper, PantsEnvironment()])
+    built_pex = rule_runner.request(Pex, [pex_request, PantsEnvironment()])
     return rule_runner.request(ExtractedPexDistributions, [built_pex])
 
 
