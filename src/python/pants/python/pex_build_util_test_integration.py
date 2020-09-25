@@ -48,3 +48,20 @@ class PexBuildUtilIntegrationTest(PantsRunIntegrationTest):
                 info = json.loads(zf.read("PEX-INFO"))
                 constraint = assert_single_element(info["interpreter_constraints"])
                 assert constraint == imprecise_constraint
+
+    def test_eepython_shebang(self) -> None:
+        with temporary_dir() as tmp_dir:
+            self.do_command(
+                "--binary-py-generate-ipex",
+                "binary",
+                self.binary_target_address,
+                config={
+                    "GLOBAL": {"pants_distdir": tmp_dir},
+                },
+            )
+
+            pex_path = os.path.join(tmp_dir, "test.ipex")
+            assert os.path.isfile(pex_path)
+
+            with open(pex_path, 'rb') as f:
+                assert f.readline() == b'#!/opt/ee/python/3.6/bin/python3.6\n'

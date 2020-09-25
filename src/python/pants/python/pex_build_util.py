@@ -141,7 +141,7 @@ class PexBuilderWrapper:
             )
 
         @classmethod
-        def create(cls, builder, log=None, generate_ipex=False):
+        def create(cls, builder, log=None, generate_ipex=False, ipex_shebang=None):
             options = cls.global_instance().get_options()
             setuptools_requirement = f"setuptools=={options.setuptools_version}"
             pex_requirement = f"pex=={options.pex_version}"
@@ -156,6 +156,7 @@ class PexBuilderWrapper:
                 pex_requirement=PythonRequirement(pex_requirement),
                 log=log,
                 generate_ipex=generate_ipex,
+                ipex_shebang=ipex_shebang,
             )
 
     def __init__(
@@ -167,6 +168,7 @@ class PexBuilderWrapper:
         pex_requirement: PythonRequirement,
         log,
         generate_ipex: bool = False,
+        ipex_shebang: Optional[str] = None,
     ):
         assert log is not None
 
@@ -181,6 +183,7 @@ class PexBuilderWrapper:
         self._frozen = False
 
         self._generate_ipex = generate_ipex
+        self._ipex_shebang = ipex_shebang
         # If we generate a .ipex, we need to ensure all the code we copy into the underlying PEXBuilder
         # is also added to the new PEXBuilder created in `._shuffle_original_build_info_into_ipex()`.
         self._all_added_sources_resources: List[Path] = []
@@ -448,6 +451,10 @@ class PexBuilderWrapper:
         self._builder.info = self._set_major_minor_interpreter_constraint_for_ipex(
             self._builder.info, self._builder.interpreter.identity
         )
+        # NB: This line is crucial to maintain any custom shebang overrides within the ipex.
+        if self._ipex_shebang:
+            self._log.info(f'Setting custom ipex shebang line: {self._ipex_shebang}')
+            self.set_shebang(self._ipex_shebang)
 
         self._distributions = {}
 

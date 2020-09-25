@@ -3,6 +3,7 @@
 
 python_binary(
   name='test',
+  shebang='/opt/ee/python/3.6/bin/python3.6',
   source='test_binary.py',
   dependencies=[':test_library']
 )

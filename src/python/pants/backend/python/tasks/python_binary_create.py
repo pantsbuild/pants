@@ -176,6 +176,12 @@ class PythonBinaryCreate(Task):
                 ),
                 log=self.context.log,
                 generate_ipex=self._generate_ipex,
+                # NB: Because the ipex creation process (which creates a new PEXBuilder instance)
+                # takes place entirely within the PexBuilderWrapper.freeze() call, we need to
+                # provide the shebang line as state to the PexBuilderWrapper instance, so it can be
+                # applied *after* swapping out the PEXBuilder, but *before* it calls the inner
+                # PEXBuilder.freeze().
+                ipex_shebang=binary_tgt.shebang,
             )
 
             if binary_tgt.shebang:
