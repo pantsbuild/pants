@@ -120,7 +120,9 @@ def get_subprocess_environment(
     subproc_env: SubprocessEnvironment, pants_env: PantsEnvironment
 ) -> SubprocessEnvironmentVars:
     return SubprocessEnvironmentVars(
-        pants_env.get_subset(subproc_env.env_vars_to_pass_to_subprocesses, SETTABLE_ENV_VARS)
+        pants_env.get_subset(
+            subproc_env.env_vars_to_pass_to_subprocesses, allowed=SETTABLE_ENV_VARS
+        )
     )
 
 

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Mapping, Optional, Tuple
 
@@ -85,7 +86,10 @@ class LocalPantsRunner:
             use_colors=use_colors,
             should_report_workunits=stream_workunits,
             session_values=SessionValues(
-                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment()}
+                {
+                    OptionsBootstrapper: options_bootstrapper,
+                    PantsEnvironment: PantsEnvironment(os.environ),
+                }
             ),
         )
 
