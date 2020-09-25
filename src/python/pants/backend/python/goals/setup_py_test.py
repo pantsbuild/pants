@@ -47,7 +47,6 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionRule
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
@@ -106,10 +105,7 @@ def assert_chroot(
     tgt = rule_runner.get_target(Address.parse(addr))
     chroot = rule_runner.request(
         SetupPyChroot,
-        [
-            SetupPyChrootRequest(ExportedTarget(tgt), py2=False),
-            create_options_bootstrapper(),
-        ],
+        [SetupPyChrootRequest(ExportedTarget(tgt), py2=False)],
     )
     snapshot = rule_runner.request(Snapshot, [chroot.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
@@ -121,10 +117,7 @@ def assert_chroot_error(rule_runner: RuleRunner, addr: str, exc_cls: Type[Except
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
             SetupPyChroot,
-            [
-                SetupPyChrootRequest(ExportedTarget(tgt), py2=False),
-                create_options_bootstrapper(),
-            ],
+            [SetupPyChrootRequest(ExportedTarget(tgt), py2=False)],
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
@@ -293,7 +286,7 @@ def test_get_sources() -> None:
         targets = Targets(rule_runner.get_target(Address.parse(addr)) for addr in addrs)
         srcs = rule_runner.request(
             SetupPySources,
-            [SetupPySourcesRequest(targets, py2=False), create_options_bootstrapper()],
+            [SetupPySourcesRequest(targets, py2=False)],
         )
         chroot_snapshot = rule_runner.request(Snapshot, [srcs.digest])
 
@@ -440,7 +433,7 @@ def test_get_requirements() -> None:
         tgt = rule_runner.get_target(Address.parse(addr))
         reqs = rule_runner.request(
             ExportedTargetRequirements,
-            [DependencyOwner(ExportedTarget(tgt)), create_options_bootstrapper()],
+            [DependencyOwner(ExportedTarget(tgt))],
         )
         assert sorted(expected_req_strs) == list(reqs)
 
@@ -514,10 +507,7 @@ def test_owned_dependencies() -> None:
             od.target.address.spec
             for od in rule_runner.request(
                 OwnedDependencies,
-                [
-                    DependencyOwner(ExportedTarget(tgt)),
-                    create_options_bootstrapper(),
-                ],
+                [DependencyOwner(ExportedTarget(tgt))],
             )
         )
 
@@ -553,7 +543,7 @@ def assert_is_owner(rule_runner: RuleRunner, owner: str, owned: str):
         owner
         == rule_runner.request(
             ExportedTarget,
-            [OwnedDependency(tgt), create_options_bootstrapper()],
+            [OwnedDependency(tgt)],
         ).target.address.spec
     )
 
@@ -563,7 +553,7 @@ def assert_owner_error(rule_runner, owned: str, exc_cls: Type[Exception]):
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
             ExportedTarget,
-            [OwnedDependency(tgt), create_options_bootstrapper()],
+            [OwnedDependency(tgt)],
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1

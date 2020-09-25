@@ -13,7 +13,6 @@ from pants.core.target_types import Files
 from pants.engine.addresses import Address
 from pants.engine.target import InjectedDependencies
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -24,6 +23,12 @@ def test_inject_dependencies() -> None:
             QueryRule(InjectedDependencies, (InjectProtobufDependencies, OptionsBootstrapper)),
         ],
         target_types=[ProtobufLibrary, Files],
+    )
+    rule_runner.set_options(
+        [
+            "--backend-packages=pants.backend.codegen.protobuf.python",
+            "--protoc-runtime-targets=protos:injected_dep",
+        ]
     )
     # Note that injected deps can be any target type for `--protobuf-runtime-targets`.
     rule_runner.add_to_build_file(
@@ -37,15 +42,6 @@ def test_inject_dependencies() -> None:
     )
     tgt = rule_runner.get_target(Address("protos"))
     injected = rule_runner.request(
-        InjectedDependencies,
-        [
-            InjectProtobufDependencies(tgt[ProtobufDependencies]),
-            create_options_bootstrapper(
-                args=[
-                    "--backend-packages=pants.backend.codegen.protobuf.python",
-                    "--protoc-runtime-targets=protos:injected_dep",
-                ]
-            ),
-        ],
+        InjectedDependencies, [InjectProtobufDependencies(tgt[ProtobufDependencies])]
     )
     assert injected == InjectedDependencies([Address("protos", target_name="injected_dep")])

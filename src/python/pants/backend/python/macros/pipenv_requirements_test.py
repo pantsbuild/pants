@@ -13,7 +13,6 @@ from pants.backend.python.target_types import PythonRequirementLibrary, PythonRe
 from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.engine.addresses import Address
 from pants.engine.target import Targets
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -39,10 +38,7 @@ def assert_pipenv_requirements(
     rule_runner.create_file(pipfile_lock_relpath, dumps(pipfile_lock))
     targets = rule_runner.request(
         Targets,
-        [
-            Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([])),
-            create_options_bootstrapper(),
-        ],
+        [Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([]))],
     )
 
     assert {expected_file_dep, *expected_targets} == set(targets)

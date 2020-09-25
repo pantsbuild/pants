@@ -16,7 +16,6 @@ from pants.backend.python.target_types import PythonLibrary
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -32,16 +31,16 @@ def rule_runner() -> RuleRunner:
 
 
 def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, bytes]:
-    bootstrapper = create_options_bootstrapper(
-        args=[
+    rule_runner.set_options(
+        [
             "--backend-packages=pants.backend.awslambda.python",
             "--source-root-patterns=src/python",
             "--pants-distdir-legacy-paths=false",
         ]
     )
-    target = rule_runner.get_target(Address.parse(addr), bootstrapper)
+    target = rule_runner.get_target(Address.parse(addr))
     created_awslambda = rule_runner.request(
-        CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target), bootstrapper, PantsEnvironment()]
+        CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target), PantsEnvironment()]
     )
     created_awslambda_digest_contents = rule_runner.request(
         DigestContents, [created_awslambda.digest]

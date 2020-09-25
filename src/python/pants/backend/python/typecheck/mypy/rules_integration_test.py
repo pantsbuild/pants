@@ -18,7 +18,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import (
     skip_unless_python27_present,
     skip_unless_python38_present,
@@ -105,9 +104,8 @@ def make_target(
             """
         ),
     )
-    return rule_runner.get_target(
-        Address(package, target_name=name), create_options_bootstrapper(args=GLOBAL_ARGS)
-    )
+    rule_runner.set_options(GLOBAL_ARGS)
+    return rule_runner.get_target(Address(package, target_name=name))
 
 
 def run_mypy(
@@ -129,13 +127,10 @@ def run_mypy(
         args.append("--mypy-skip")
     if additional_args:
         args.extend(additional_args)
+    rule_runner.set_options(args)
     result = rule_runner.request(
         TypecheckResults,
-        [
-            MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets),
-            create_options_bootstrapper(args=args),
-            PantsEnvironment(),
-        ],
+        [MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets), PantsEnvironment()],
     )
     return result.results
 
