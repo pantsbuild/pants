@@ -19,13 +19,14 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, rule
-from pants.testutil.pants_integration_test import setup_tmpdir
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir, touch
 
 
-def process_rule_runner() -> RuleRunner:
+@pytest.fixture
+def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(BinaryPaths, [BinaryPathRequest]),
@@ -455,16 +456,30 @@ def test_running_interactive_process_in_workspace_cannot_have_input_files() -> N
         InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)
 
 
-def test_find_binary_on_path_without_bash() -> None:
+def test_find_binary_non_existent(rule_runner: RuleRunner) -> None:
+    with temporary_dir() as tmpdir:
+        search_path = [tmpdir]
+        binary_paths = rule_runner.request(
+            BinaryPaths, [BinaryPathRequest(binary_name="anybin", search_path=search_path)]
+        )
+        assert binary_paths.first_path is None
+
+
+def test_find_binary_on_path_without_bash(rule_runner: RuleRunner) -> None:
     # Test that locating a binary on a PATH which does not include bash works (by recursing to
     # locate bash first).
     binary_name = "mybin"
     binary_dir = "bin"
-    with setup_tmpdir({f"{binary_dir}/{binary_name}": "this just needs to exist"}) as tmpdir:
-        binary_dir_abs = os.path.join(os.getcwd(), tmpdir, binary_dir)
+    with temporary_dir() as tmpdir:
+        binary_dir_abs = os.path.join(tmpdir, binary_dir)
+        binary_path_abs = os.path.join(binary_dir_abs, binary_name)
+        safe_mkdir(binary_dir_abs)
+        touch(binary_path_abs)
+
         search_path = [binary_dir_abs]
-        binary_paths = process_rule_runner().request(
+        binary_paths = rule_runner.request(
             BinaryPaths, [BinaryPathRequest(binary_name=binary_name, search_path=search_path)]
         )
+        assert os.path.exists(os.path.join(binary_dir_abs, binary_name))
         assert binary_paths.first_path is not None
-        assert binary_paths.first_path.path == os.path.join(binary_dir_abs, binary_name)
+        assert binary_paths.first_path.path == binary_path_abs

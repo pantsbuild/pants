@@ -501,17 +501,17 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
 
     # Note: the backslash after the """ marker ensures that the shebang is at the start of the
     # script file. Many OSs will not see the shebang if there is intervening whitespace.
-    script_path = "./script.sh"
+    script_path = "./find_binary.sh"
     script_content = dedent(
         f"""\
         {shebang}
 
-        set -euo pipefail
+        set -euox pipefail
 
         if command -v which > /dev/null; then
-            command which -a $1
+            command which -a $1 || true
         else
-            command -v $1
+            command -v $1 || true
         fi
         """
     )
