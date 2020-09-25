@@ -8,11 +8,12 @@ This script will "hydrate" a normal .pex file in the same directory, then execut
 
 import json
 import os
+import shutil
 import sys
 import tempfile
 
 from pex import resolver
-from pex.common import open_zip, safe_copy
+from pex.common import open_zip
 from pex.fetcher import Fetcher, PyPIFetcher
 from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
@@ -90,7 +91,7 @@ def _hydrate_pex_file(self, hydrated_pex_dir):
     # modules we just added to the chroot.
     # NB: Bytecode compilation can take an extremely long time for large 3rdparty modules.
     bootstrap_builder.freeze(bytecode_compile=False)
-    safe_copy(source=bootstrap_builder.path(), dest=hydrated_pex_dir)
+    shutil.copytree(bootstrap_builder.path(), hydrated_pex_dir, symlinks=True)
 
 
 def main(self):
