@@ -160,6 +160,27 @@ def test_interpreter_constraints_do_not_include_python2(constraints):
 
 
 @pytest.mark.parametrize(
+    "constraints,expected",
+    [
+        (["CPython>=2.7"], "2.7"),
+        (["CPython>=3.5"], "3.5"),
+        (["CPython>=3.6"], "3.6"),
+        (["CPython>=3.7"], "3.7"),
+        (["CPython>=3.8"], "3.8"),
+        (["CPython>=3.9"], "3.9"),
+        (["CPython>=3.10"], "3.10"),
+        (["CPython==2.7.10"], "2.7"),
+        (["CPython==3.5.*", "CPython>=3.6"], "3.5"),
+        (["CPython==2.6.*"], None),
+    ],
+)
+def test_interpreter_constraints_minimum_python_version(
+    constraints: List[str], expected: str
+) -> None:
+    assert PexInterpreterConstraints(constraints).minimum_python_version() == expected
+
+
+@pytest.mark.parametrize(
     "constraints",
     [
         ["CPython==3.6.*"],
