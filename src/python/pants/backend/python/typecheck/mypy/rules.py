@@ -2,10 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Tuple
+from typing import Optional, Tuple
 
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
@@ -33,6 +35,7 @@ from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import (
     CreateDigest,
     Digest,
+    DigestContents,
     FileContent,
     GlobMatchErrorBehavior,
     MergeDigests,
@@ -40,11 +43,14 @@ from pants.engine.fs import (
 )
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet, TransitiveTargets
+from pants.engine.target import FieldSet, Target, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -54,17 +60,63 @@ class MyPyFieldSet(FieldSet):
     sources: PythonSources
 
 
+@dataclass(frozen=True)
+class MyPyPartition:
+    field_set_addresses: FrozenOrderedSet[Address]
+    closure: FrozenOrderedSet[Target]
+    interpreter_constraints: PexInterpreterConstraints
+    python_version_already_configured: bool
+
+
 class MyPyRequest(TypecheckRequest):
     field_set_type = MyPyFieldSet
 
 
-def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
+def generate_argv(
+    mypy: MyPy, *, file_list_path: str, python_version: Optional[str]
+) -> Tuple[str, ...]:
     args = []
     if mypy.config:
         args.append(f"--config-file={mypy.config}")
+    if python_version:
+        args.append(f"--python-version={python_version}")
     args.extend(mypy.args)
     args.append(f"@{file_list_path}")
     return tuple(args)
+
+
+def check_and_warn_if_python_version_configured(
+    *, config: Optional[FileContent], args: Tuple[str, ...]
+) -> bool:
+    configured = []
+    if config and b"python_version" in config.content:
+        configured.append(
+            f"`python_version` in {config.path} (which is used because of the "
+            "`[mypy].config` option)"
+        )
+    if "--py2" in args:
+        configured.append("`--py2` in the `--mypy-args` option")
+    if any(arg.startswith("--python-version") for arg in args):
+        configured.append("`--python-version` in the `--mypy-args` option")
+    if configured:
+        formatted_configured = " and you set ".join(configured)
+        logger.warning(
+            f"You set {formatted_configured}. Normally, Pants would automatically set this for you "
+            "based on your code's interpreter constraints "
+            "(https://www.pantsbuild.org/docs/python-interpreter-compatibility). Instead, it will "
+            "use what you set.\n\n(Automatically setting the option allows Pants to partition your "
+            "targets by their constraints, so that, for example, you can run MyPy on Python 2-only "
+            "code and Python 3-only code at the same time. This feature may no longer work.)"
+        )
+    return bool(configured)
+
+
+def config_path_globs(mypy: MyPy) -> PathGlobs:
+    return PathGlobs(
+        globs=[mypy.config] if mypy.config else [],
+        glob_match_error_behavior=GlobMatchErrorBehavior.error,
+        description_of_origin="the option `--mypy-config`",
+    )
 
 
 # MyPy searches for types for a package in packages containing a `py.types` marker file or else in
@@ -113,27 +165,15 @@ LAUNCHER_FILE = FileContent(
 )
 
 
-# TODO(#10131): Improve performance, e.g. by leveraging the MyPy cache.
-# TODO(#10131): Support .pyi files.
-@rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
-async def mypy_typecheck(
-    request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
-) -> TypecheckResults:
-    if mypy.skip:
-        return TypecheckResults([], typechecker_name="MyPy")
-
+@rule
+async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> TypecheckResult:
     plugin_target_addresses = await MultiGet(
         Get(Address, AddressInput, plugin_addr) for plugin_addr in mypy.source_plugins
     )
 
     plugin_transitive_targets_request = Get(TransitiveTargets, Addresses(plugin_target_addresses))
-    typechecked_transitive_targets_request = Get(
-        TransitiveTargets, Addresses(fs.address for fs in request.field_sets)
-    )
-    plugin_transitive_targets, typechecked_transitive_targets, launcher_script = await MultiGet(
-        plugin_transitive_targets_request,
-        typechecked_transitive_targets_request,
-        Get(Digest, CreateDigest([LAUNCHER_FILE])),
+    plugin_transitive_targets, launcher_script = await MultiGet(
+        plugin_transitive_targets_request, Get(Digest, CreateDigest([LAUNCHER_FILE]))
     )
 
     plugin_requirements = PexRequirements.create_from_requirement_fields(
@@ -142,59 +182,51 @@ async def mypy_typecheck(
         if plugin_tgt.has_field(PythonRequirementsField)
     )
 
-    # Interpreter constraints are tricky with MyPy:
-    #  * MyPy requires running with Python 3.5+. If run with Python 3.5-3.7, MyPy can understand
-    #     Python 2.7 and 3.4-3.7 thanks to the typed-ast library, but it can't understand 3.8+ If
-    #     run with Python 3.8, it can understand 2.7 and 3.4-3.8. So, we need to check if the user
-    #     has code that requires Python 3.8+, and if so, use a tighter requirement.
-    #
-    #     On top of this, MyPy parses the AST using the value from `python_version` from mypy.ini.
-    #     If this is not configured, it defaults to the interpreter being used. This means that
-    #     running MyPy with Py35 would choke on f-strings in Python 3.6, unless the user set
-    #     `python_version`. We don't want to make the user set this up. (If they do, MyPy will use
-    #     `python_version`, rather than defaulting to the executing interpreter).
-    #
-    #  * When resolving third-party requirements, we should use the actual requirements. Normally,
-    #     we would merge the requirements.pex with mypy.pex via `--pex-path`. However, this will
-    #     cause a runtime error if the interpreter constraints are different between the PEXes and
-    #     they have incompatible wheels.
-    #
-    #     Instead, we teach MyPy about the requirements by extracting the distributions from
-    #     requirements.pex and setting EXTRACTED_WHEELS, which our custom launcher script then
-    #     looks for.
-    code_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (
-            tgt[PythonInterpreterCompatibility]
-            for tgt in typechecked_transitive_targets.closure
-            if tgt.has_field(PythonInterpreterCompatibility)
-        ),
-        python_setup,
+    # If the user did not set `--python-version` already, we set it ourselves based on their code's
+    # interpreter constraints. This determines what AST is used by MyPy.
+    python_version = (
+        None
+        if partition.python_version_already_configured
+        else partition.interpreter_constraints.minimum_python_version()
     )
 
-    if not mypy.options.is_default("interpreter_constraints"):
-        tool_interpreter_constraints = mypy.interpreter_constraints
-    elif code_interpreter_constraints.requires_python38_or_newer():
-        tool_interpreter_constraints = ("CPython>=3.8",)
-    elif code_interpreter_constraints.requires_python37_or_newer():
-        tool_interpreter_constraints = ("CPython>=3.7",)
-    elif code_interpreter_constraints.requires_python36_or_newer():
-        tool_interpreter_constraints = ("CPython>=3.6",)
-    else:
-        tool_interpreter_constraints = mypy.interpreter_constraints
+    # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
+    # and 3.7. However, typed-ast does not understand 3.8, so instead we must run MyPy with
+    # Python 3.8 when relevant. We only do this if <3.8 can't be used, as we don't want a
+    # loose requirement like `>=3.6` to result in requiring Python 3.8, which would error if
+    # 3.8 is not installed on the machine.
+    tool_interpreter_constraints = PexInterpreterConstraints(
+        ("CPython>=3.8",)
+        if (
+            mypy.options.is_default("interpreter_constraints")
+            and partition.interpreter_constraints.requires_python38_or_newer()
+        )
+        else mypy.interpreter_constraints
+    )
 
     plugin_sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(plugin_transitive_targets.closure)
     )
     typechecked_sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(typechecked_transitive_targets.closure)
+        PythonSourceFiles, PythonSourceFilesRequest(partition.closure)
     )
 
+    # Normally, this `requirements.pex` would be merged with mypy.pex via `--pex-path`. However,
+    # this will cause a runtime error if the interpreter constraints are different between the
+    # PEXes and they have incompatible wheels.
+    #
+    # Instead, we teach MyPy about the requirements by extracting the distributions from
+    # requirements.pex and setting EXTRACTED_WHEELS, which our custom launcher script then
+    # looks for.
+    #
+    # Conventionally, MyPy users might instead set `MYPYPATH` for this. However, doing this
+    # results in type checking the requirements themselves.
     requirements_pex_request = Get(
         Pex,
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements(
-            (field_set.address for field_set in request.field_sets),
-            hardcoded_interpreter_constraints=code_interpreter_constraints,
+            (addr for addr in partition.field_set_addresses),
+            hardcoded_interpreter_constraints=partition.interpreter_constraints,
             internal_only=True,
         ),
     )
@@ -207,19 +239,12 @@ async def mypy_typecheck(
             requirements=PexRequirements(
                 itertools.chain(mypy.all_requirements, plugin_requirements)
             ),
-            interpreter_constraints=PexInterpreterConstraints(tool_interpreter_constraints),
+            interpreter_constraints=tool_interpreter_constraints,
             entry_point=PurePath(LAUNCHER_FILE.path).stem,
         ),
     )
 
-    config_digest_request = Get(
-        Digest,
-        PathGlobs(
-            globs=[mypy.config] if mypy.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--mypy-config`",
-        ),
-    )
+    config_digest_request = Get(Digest, PathGlobs, config_path_globs(mypy))
 
     (
         plugin_sources,
@@ -275,16 +300,81 @@ async def mypy_typecheck(
         FallibleProcessResult,
         PexProcess(
             mypy_pex,
-            argv=generate_args(mypy, file_list_path=file_list_path),
+            argv=generate_argv(mypy, file_list_path=file_list_path, python_version=python_version),
             input_digest=merged_input_files,
             extra_env=env,
             description=f"Run MyPy on {pluralize(len(typechecked_srcs_snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    return TypecheckResults(
-        [TypecheckResult.from_fallible_process_result(result)], typechecker_name="MyPy"
+    return TypecheckResult.from_fallible_process_result(
+        result, partition_description=str(sorted(str(c) for c in partition.interpreter_constraints))
     )
+
+
+# TODO(#10131): Improve performance, e.g. by leveraging the MyPy cache.
+# TODO(#10131): Support .pyi files.
+@rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
+async def mypy_typecheck(
+    request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
+) -> TypecheckResults:
+    if mypy.skip:
+        return TypecheckResults([], typechecker_name="MyPy")
+
+    # We batch targets by their interpreter constraints to ensure, for example, that all Python 2
+    # targets run together and all Python 3 targets run together. We can only do this by setting
+    # the `--python-version` option, but we allow the user to set it as a safety valve. We warn if
+    # they've set the option.
+    config_content = await Get(DigestContents, PathGlobs, config_path_globs(mypy))
+    python_version_configured = check_and_warn_if_python_version_configured(
+        config=next(iter(config_content), None), args=mypy.args
+    )
+
+    # When determining how to batch by interpreter constraints, we must consider the entire
+    # transitive closure to get the final resulting constraints.
+    transitive_targets_per_field_set = await MultiGet(
+        Get(TransitiveTargets, Addresses([field_set.address])) for field_set in request.field_sets
+    )
+
+    interpreter_constraints_to_transitive_targets = defaultdict(set)
+    for transitive_targets in transitive_targets_per_field_set:
+        interpreter_constraints = (
+            PexInterpreterConstraints.create_from_compatibility_fields(
+                (
+                    tgt[PythonInterpreterCompatibility]
+                    for tgt in transitive_targets.closure
+                    if tgt.has_field(PythonInterpreterCompatibility)
+                ),
+                python_setup,
+            )
+            or PexInterpreterConstraints(mypy.interpreter_constraints)
+        )
+        interpreter_constraints_to_transitive_targets[interpreter_constraints].add(
+            transitive_targets
+        )
+
+    partitions = []
+    for interpreter_constraints, all_transitive_targets in sorted(
+        interpreter_constraints_to_transitive_targets.items()
+    ):
+        combined_roots: OrderedSet[Address] = OrderedSet()
+        combined_closure: OrderedSet[Target] = OrderedSet()
+        for transitive_targets in all_transitive_targets:
+            combined_roots.update(tgt.address for tgt in transitive_targets.roots)
+            combined_closure.update(transitive_targets.closure)
+        partitions.append(
+            MyPyPartition(
+                FrozenOrderedSet(combined_roots),
+                FrozenOrderedSet(combined_closure),
+                interpreter_constraints,
+                python_version_already_configured=python_version_configured,
+            )
+        )
+
+    partitioned_results = await MultiGet(
+        Get(TypecheckResult, MyPyPartition, partition) for partition in partitions
+    )
+    return TypecheckResults(partitioned_results, typechecker_name="MyPy")
 
 
 def rules():

@@ -96,7 +96,7 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
     def __init__(self, constraints: Iterable[Union[str, Requirement]] = ()) -> None:
         super().__init__(
             v if isinstance(v, Requirement) else self.parse_constraint(v)
-            for v in sorted(constraints)
+            for v in sorted(constraints, key=lambda c: str(c))
         )
 
     @staticmethod
@@ -201,21 +201,37 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
             args.extend(["--interpreter-constraint", str(constraint)])
         return args
 
+    def _includes_version(self, major_minor: str, last_patch: int) -> bool:
+        patch_versions = list(reversed(range(0, last_patch + 1)))
+        for req in self:
+            if any(
+                req.specifier.contains(f"{major_minor}.{p}") for p in patch_versions  # type: ignore[attr-defined]
+            ):
+                return True
+        return False
+
     def includes_python2(self) -> bool:
         """Checks if any of the constraints include Python 2.
 
         This will return True even if the code works with Python 3 too, so long as at least one of
         the constraints works with Python 2.
         """
-        py27_patch_versions = list(
-            reversed(range(0, 18))
-        )  # The last python 2.7 version was 2.7.18.
-        for req in self:
-            if any(
-                req.specifier.contains(f"2.7.{p}") for p in py27_patch_versions  # type: ignore[attr-defined]
-            ):
-                return True
-        return False
+        last_py27_patch_version = 18
+        return self._includes_version("2.7", last_patch=last_py27_patch_version)
+
+    def minimum_python_version(self) -> Optional[str]:
+        """Find the lowest major.minor Python version that will work with these constraints.
+
+        The constraints may also be compatible with later versions; this is the lowest version that
+        still works.
+        """
+        if self.includes_python2():
+            return "2.7"
+        max_expected_py3_patch_version = 12  # The current max is 9.
+        for major_minor in ("3.5", "3.6", "3.7", "3.8", "3.9", "3.10"):
+            if self._includes_version(major_minor, last_patch=max_expected_py3_patch_version):
+                return major_minor
+        return None
 
     def _requires_python3_version_or_newer(
         self, *, allowed_versions: Iterable[str], prior_version: str
@@ -241,26 +257,6 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
             ):
                 return False
         return True
-
-    def requires_python36_or_newer(self) -> bool:
-        """Checks if the constraints are all for Python 3.6+.
-
-        This will return False if Python 3.6 is allowed, but prior versions like 3.5 are also
-        allowed.
-        """
-        return self._requires_python3_version_or_newer(
-            allowed_versions=["3.6", "3.7", "3.8", "3.9"], prior_version="3.5"
-        )
-
-    def requires_python37_or_newer(self) -> bool:
-        """Checks if the constraints are all for Python 3.7+.
-
-        This will return False if Python 3.7 is allowed, but prior versions like 3.6 are also
-        allowed.
-        """
-        return self._requires_python3_version_or_newer(
-            allowed_versions=["3.7", "3.8", "3.9"], prior_version="3.6"
-        )
 
     def requires_python38_or_newer(self) -> bool:
         """Checks if the constraints are all for Python 3.8+.
