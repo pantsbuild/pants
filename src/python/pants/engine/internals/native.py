@@ -24,8 +24,8 @@ from pants.engine.internals.native_engine import (  # type: ignore[import]
     PyTasks,
     PyTypes,
 )
+from pants.engine.internals.session import SessionValues
 from pants.engine.rules import Get
-from pants.engine.session import SessionValues
 from pants.engine.unions import union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property

@@ -13,7 +13,6 @@ from pants.backend.python.typecheck.mypy.plugin_target_type import MyPySourcePlu
 from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
@@ -31,7 +30,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *mypy_rules(),
             *dependency_inference_rules.rules(),  # Used for import inference.
-            QueryRule(TypecheckResults, (MyPyRequest, PantsEnvironment)),
+            QueryRule(TypecheckResults, (MyPyRequest,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary, MyPySourcePlugin],
     )
@@ -130,7 +129,7 @@ def run_mypy(
     rule_runner.set_options(args)
     result = rule_runner.request(
         TypecheckResults,
-        [MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets), PantsEnvironment()],
+        [MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets)],
     )
     return result.results
 

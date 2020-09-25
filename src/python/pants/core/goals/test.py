@@ -22,7 +22,7 @@ from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnTyp
 from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     Sources,
@@ -450,7 +450,7 @@ async def run_tests(
     return Test(exit_code)
 
 
-@_uncacheable_rule
+@rule
 def get_filtered_environment(
     test_subsystem: TestSubsystem, pants_env: PantsEnvironment
 ) -> TestExtraEnv:

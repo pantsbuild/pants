@@ -28,6 +28,7 @@ from pants.base.deprecated import warn_or_error
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.util_rules import pants_environment
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.console import Console
@@ -36,9 +37,9 @@ from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
+from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule
-from pants.engine.session import SessionValues
 from pants.engine.target import Target, WrappedTarget
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
@@ -112,7 +113,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
                 session = self.scheduler.scheduler.new_session(
                     build_id="buildid_for_test",
                     should_report_workunits=True,
-                    session_values=SessionValues({OptionsBootstrapper: value}),
+                    session_values=SessionValues(
+                        {OptionsBootstrapper: value, PantsEnvironment: PantsEnvironment()}
+                    ),
                 )
 
         result = assert_single_element(session.product_request(output_type, [Params(*inputs)]))
@@ -142,7 +145,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         session = self.scheduler.scheduler.new_session(
             build_id="buildid_for_test",
             should_report_workunits=True,
-            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
+            session_values=SessionValues(
+                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment(env)}
+            ),
         )
 
         exit_code = session.run_goal_rule(
@@ -152,7 +157,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
                 console,
                 Workspace(self.scheduler),
                 InteractiveRunner(self.scheduler),
-                PantsEnvironment(),
             ),
         )
 
@@ -232,6 +236,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def rules(cls):
         return [
             *source_root.rules(),
+            *pants_environment.rules(),
             QueryRule(WrappedTarget, (Address,)),
         ]
 

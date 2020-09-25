@@ -6,7 +6,7 @@ import os.path
 import textwrap
 import zipfile
 from dataclasses import dataclass
-from typing import Dict, Iterable, Iterator, List, Optional, Tuple, cast
+from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, cast
 
 import pytest
 from pkg_resources import Requirement
@@ -21,7 +21,6 @@ from pants.backend.python.util_rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
@@ -317,8 +316,8 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_rules(),
-            QueryRule(Pex, (PexRequest, PantsEnvironment)),
-            QueryRule(Process, (PexProcess, PantsEnvironment)),
+            QueryRule(Pex, (PexRequest,)),
+            QueryRule(Process, (PexProcess,)),
             QueryRule(ProcessResult, (Process,)),
         ]
     )
@@ -335,6 +334,7 @@ def create_pex_and_get_all_data(
     additional_inputs: Optional[Digest] = None,
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
+    env: Optional[Mapping[str, str]] = None,
     internal_only: bool = True,
 ) -> Dict:
     request = PexRequest(
@@ -348,8 +348,10 @@ def create_pex_and_get_all_data(
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
     )
-    rule_runner.set_options(["--backend-packages=pants.backend.python", *additional_pants_args])
-    pex = rule_runner.request(Pex, [request, PantsEnvironment()])
+    rule_runner.set_options(
+        ["--backend-packages=pants.backend.python", *additional_pants_args], env=env
+    )
+    pex = rule_runner.request(Pex, [request])
     rule_runner.scheduler.write_digest(pex.digest)
     pex_path = os.path.join(rule_runner.build_root, "test.pex")
     with zipfile.ZipFile(pex_path, "r") as zipfp:
@@ -452,6 +454,7 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
             "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
             "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
         ),
+        env={"LANG": "es_PY.UTF-8"},
     )
 
     process = rule_runner.request(
@@ -463,7 +466,6 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
                 input_digest=pex_output["pex"].digest,
                 description="Run the pex and check its reported environment",
             ),
-            PantsEnvironment({"LANG": "es_PY.UTF-8"}),
         ],
     )
 

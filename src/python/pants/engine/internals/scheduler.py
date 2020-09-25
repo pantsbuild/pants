@@ -32,6 +32,7 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import PyTypes  # type: ignore[import]
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
+from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import (
     FallibleProcessResultWithPlatform,
@@ -40,7 +41,6 @@ from pants.engine.process import (
     MultiPlatformProcess,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
-from pants.engine.session import SessionValues
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path

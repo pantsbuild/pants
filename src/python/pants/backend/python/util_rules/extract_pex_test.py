@@ -13,7 +13,6 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.fs import EMPTY_DIGEST, Snapshot
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -24,7 +23,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *extract_pex.rules(),
             *pex.rules(),
-            QueryRule(Pex, [PexRequest, PantsEnvironment]),
+            QueryRule(Pex, [PexRequest]),
             QueryRule(ExtractedPexDistributions, [Pex]),
         ]
     )
@@ -48,7 +47,7 @@ def get_distributions(
         interpreter_constraints=PexInterpreterConstraints([">=3.6"]),
         internal_only=True,
     )
-    built_pex = rule_runner.request(Pex, [pex_request, PantsEnvironment()])
+    built_pex = rule_runner.request(Pex, [pex_request])
     return rule_runner.request(ExtractedPexDistributions, [built_pex])
 
 
