@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 from pex import resolver
-from pex.common import open_zip
+from pex.common import open_zip, safe_copy
 from pex.fetcher import Fetcher, PyPIFetcher
 from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
@@ -90,7 +90,7 @@ def _hydrate_pex_file(self, hydrated_pex_dir):
     # modules we just added to the chroot.
     # NB: Bytecode compilation can take an extremely long time for large 3rdparty modules.
     bootstrap_builder.freeze(bytecode_compile=False)
-    os.rename(src=bootstrap_builder.path(), dst=hydrated_pex_dir)
+    safe_copy(source=bootstrap_builder.path(), dest=hydrated_pex_dir)
 
 
 def main(self):
