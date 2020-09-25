@@ -50,8 +50,8 @@ def parse_file(*, filename: str, content: str) -> Optional[Tuple]:
         return tree, visitor_cls
     except SyntaxError:
         try:
-            tree = ast27.parse(content, filename=filename)
-            return tree, _Py27AstVisitor
+            py27_tree = ast27.parse(content, filename=filename)
+            return py27_tree, _Py27AstVisitor
         except SyntaxError:
             return None
 
