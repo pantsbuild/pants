@@ -30,7 +30,7 @@ esac
 cmake_bin_dir="${cmake_cache}/cmake-${cmake_rev}-${arch}-x86_64/${cmake_bin_reldir}"
 if [[ ! -f "${cmake_bin_dir}/cmake" ]]; then
   echo "Downloading cmake ${cmake_rev} ..." 1>&2
-  curl -L -o "${cmake_archive}" "https://cmake.org/files/v3.9/cmake-${cmake_rev}-${arch}-x86_64.tar.gz"
+  curl --fail -L -o "${cmake_archive}" "https://cmake.org/files/v3.9/cmake-${cmake_rev}-${arch}-x86_64.tar.gz"
   tar xzf "${cmake_archive}" -C "${cmake_cache}"
   rm -f "${cmake_archive}"
 fi
@@ -46,7 +46,7 @@ mkdir -p "${go_cache}"
 go_bin_dir="${go_cache}/go/bin"
 if [[ ! -f "${go_bin_dir}/go" ]]; then
   echo "Downloading go ${go_rev}..." 1>&2
-  curl -L -o "${go_archive}" "https://storage.googleapis.com/golang/go1.7.3.${arch_lower}-amd64.tar.gz"
+  curl --fail -L -o "${go_archive}" "https://storage.googleapis.com/golang/go1.7.3.${arch_lower}-amd64.tar.gz"
   tar xzf "${go_archive}" -C "${go_cache}"
   rm -f "${go_archive}"
 fi
@@ -67,7 +67,7 @@ if [[ ! -f "${protoc_bin_dir}/protoc" ]]; then
     "Linux") arch_str="linux" ;;
   esac
   echo "Downloading protoc ${protoc_rev}..." 1>&2
-  curl -L -o "${protoc_archive}" "https://github.com/protocolbuffers/protobuf/releases/download/v${protoc_rev}/protoc-${protoc_rev}-${arch_str}-x86_64.zip"
+  curl --fail -L -o "${protoc_archive}" "https://github.com/protocolbuffers/protobuf/releases/download/v${protoc_rev}/protoc-${protoc_rev}-${arch_str}-x86_64.zip"
   unzip -qq "${protoc_archive}" -d "${protoc_cache}"
   rm -f "${protoc_archive}"
 fi
@@ -98,7 +98,7 @@ case "${arch}" in
     binutils_bin_dir="${binutils_cache}/bin"
     if [[ ! -f "${binutils_bin_dir}/ar" ]]; then
       echo "Downloading binutils ${binutils_rev}..." 1>&2
-      curl -L -o "${binutils_archive}" "https://binaries.pantsbuild.org/bin/binutils/linux/x86_64/${binutils_rev}/binutils.tar.gz"
+      curl --fail -L -o "${binutils_archive}" "https://binaries.pantsbuild.org/bin/binutils/linux/x86_64/${binutils_rev}/binutils.tar.gz"
       tar xzf "${binutils_archive}" -C "${binutils_cache}"
       rm -f "${binutils_archive}"
     fi
