@@ -3,7 +3,7 @@
 
 import re
 from textwrap import dedent
-from typing import Iterable, Optional, Set, cast
+from typing import Iterable, Set, cast
 
 import pytest
 

@@ -6,7 +6,6 @@ import pytest
 from pants.engine.rules import SubsystemRule
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
 from pants.python.python_setup import PythonSetup
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.logging import LogLevel
 

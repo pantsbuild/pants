@@ -5,7 +5,7 @@ import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Optional, Set, Tuple, Type
+from typing import Iterable, List, Set, Tuple, Type
 
 import pytest
 

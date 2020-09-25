@@ -107,9 +107,7 @@ class RuleRunner:
         build_config_builder.register_target_types(target_types or ())
         self.build_config = build_config_builder.create()
 
-        options_bootstrapper = OptionsBootstrapper.create(
-            env={}, args=["--pants-config-files=[]"], allow_pantsrc=False
-        )
+        options_bootstrapper = create_options_bootstrapper()
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         local_store_dir = global_options.local_store_dir
         local_execution_root_dir = global_options.local_execution_root_dir
@@ -126,7 +124,11 @@ class RuleRunner:
             build_root=self.build_root,
             build_configuration=self.build_config,
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
-        ).new_session(build_id="buildid_for_test", should_report_workunits=True)
+        ).new_session(
+            build_id="buildid_for_test",
+            session_values=SessionValues({OptionsBootstrapper: options_bootstrapper}),
+            should_report_workunits=True,
+        )
         self.scheduler = graph_session.scheduler_session
 
     def __repr__(self) -> str:
