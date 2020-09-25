@@ -29,6 +29,7 @@ bootstrap_rust >&2
 activate_pants_venv
 
 # Exports PATH, GOROOT, PROTOC, AR.
+# shellcheck source=build-support/bin/download_native_build_binaries.sh
 source "${REPO_ROOT}/build-support/bin/download_native_build_binaries.sh"
 
 cargo_bin="${CARGO_HOME}/bin/cargo"
