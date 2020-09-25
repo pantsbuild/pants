@@ -680,3 +680,12 @@ def test_warn_if_python_version_configured(caplog) -> None:
         args=["--python-version=3.6"],
         warning="You set `--python-version` in the `--mypy-args` option",
     )
+    assert_is_configured(
+        has_config=True,
+        args=["--py2", "--python-version=3.6"],
+        warning=(
+            "You set `python_version` in mypy.ini (which is used because of the `[mypy].config` "
+            "option) and you set `--py2` in the `--mypy-args` option and you set "
+            "`--python-version` in the `--mypy-args` option."
+        ),
+    )

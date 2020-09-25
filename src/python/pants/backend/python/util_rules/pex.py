@@ -216,7 +216,8 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
         This will return True even if the code works with Python 3 too, so long as at least one of
         the constraints works with Python 2.
         """
-        return self._includes_version("2.7", last_patch=18)
+        last_py27_patch_version = 18
+        return self._includes_version("2.7", last_patch=last_py27_patch_version)
 
     def minimum_python_version(self) -> Optional[str]:
         """Find the lowest major.minor Python version that will work with these constraints.
@@ -226,9 +227,9 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
         """
         if self.includes_python2():
             return "2.7"
+        max_expected_py3_patch_version = 12  # The current max is 9.
         for major_minor in ("3.5", "3.6", "3.7", "3.8", "3.9", "3.10"):
-            # Assume any 3.x release has no patch after 12. The max is currently 9.
-            if self._includes_version(major_minor, last_patch=12):
+            if self._includes_version(major_minor, last_patch=max_expected_py3_patch_version):
                 return major_minor
         return None
 

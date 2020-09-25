@@ -88,27 +88,27 @@ def generate_argv(
 def check_and_warn_if_python_version_configured(
     *, config: Optional[FileContent], args: Tuple[str, ...]
 ) -> bool:
-    ending = (
-        "Normally, Pants would automatically set this for you based on your code's interpreter "
-        "constraints (https://www.pantsbuild.org/docs/python-interpreter-compatibility).\n\n(This "
-        "allows Pants to partition your targets by their constraints, so that, for example, "
-        "you can run MyPy on Python 2-only code and Python 3-only code at the same time. This "
-        "feature may no longer work.)"
-    )
-    configured = False
+    configured = []
     if config and b"python_version" in config.content:
-        logger.warning(
-            f"You set `python_version` in {config.path}, which is used because of the "
-            f"`[mypy].config` option. {ending}"
+        configured.append(
+            f"`python_version` in {config.path} (which is used because of the "
+            "`[mypy].config` option)"
         )
-        configured = True
     if "--py2" in args:
-        logger.warning(f"You set `--py2` in the `--mypy-args` option. {ending}")
-        configured = True
+        configured.append("`--py2` in the `--mypy-args` option")
     if any(arg.startswith("--python-version") for arg in args):
-        logger.warning(f"You set `--python-version` in the `--mypy-args` option. {ending}")
-        configured = True
-    return configured
+        configured.append("`--python-version` in the `--mypy-args` option")
+    if configured:
+        formatted_configured = " and you set ".join(configured)
+        logger.warning(
+            f"You set {formatted_configured}. Normally, Pants would automatically set this for you "
+            "based on your code's interpreter constraints "
+            "(https://www.pantsbuild.org/docs/python-interpreter-compatibility). Instead, it will "
+            "use what you set.\n\n(Automatically setting the option allows Pants to partition your "
+            "targets by their constraints, so that, for example, you can run MyPy on Python 2-only "
+            "code and Python 3-only code at the same time. This feature may no longer work.)"
+        )
+    return bool(configured)
 
 
 def config_path_globs(mypy: MyPy) -> PathGlobs:
@@ -192,7 +192,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
 
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8, so instead we must run MyPy with
-    # Python 3.8 when relevant. We only do this if if <3.8 can't be used, as we don't want a
+    # Python 3.8 when relevant. We only do this if <3.8 can't be used, as we don't want a
     # loose requirement like `>=3.6` to result in requiring Python 3.8, which would error if
     # 3.8 is not installed on the machine.
     tool_interpreter_constraints = PexInterpreterConstraints(
@@ -218,6 +218,9 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
     # Instead, we teach MyPy about the requirements by extracting the distributions from
     # requirements.pex and setting EXTRACTED_WHEELS, which our custom launcher script then
     # looks for.
+    #
+    # Conventionally, MyPy users might instead set `MYPYPATH` for this. However, doing this
+    # results in type checking the requirements themselves.
     requirements_pex_request = Get(
         Pex,
         PexFromTargetsRequest,
