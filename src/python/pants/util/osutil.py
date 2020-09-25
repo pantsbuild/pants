@@ -6,7 +6,7 @@ import logging
 import os
 import posix
 from functools import reduce
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -48,10 +48,6 @@ def get_normalized_os_name() -> str:
     return normalize_os_name(get_os_name())
 
 
-def all_normalized_os_names() -> List[str]:
-    return list(OS_ALIASES.keys())
-
-
 def known_os_names() -> Set[str]:
     return reduce(set.union, OS_ALIASES.values())
 
@@ -78,42 +74,3 @@ def safe_kill(pid: Pid, signum: int) -> None:
             raise ValueError(f"Invalid signal number {signum}: {e}", e)
         else:
             raise
-
-
-# TODO: use this as the default value for the global --binaries-path-by-id option!
-# pantsd testing fails saying no run trackers were created when I tried to do this.
-SUPPORTED_PLATFORM_NORMALIZED_NAMES = {
-    ("linux", "x86_64"): ("linux", "x86_64"),
-    ("linux", "amd64"): ("linux", "x86_64"),
-    ("linux", "i386"): ("linux", "i386"),
-    ("linux", "i686"): ("linux", "i386"),
-    ("darwin", "9"): ("mac", "10.5"),
-    ("darwin", "10"): ("mac", "10.6"),
-    ("darwin", "11"): ("mac", "10.7"),
-    ("darwin", "12"): ("mac", "10.8"),
-    ("darwin", "13"): ("mac", "10.9"),
-    ("darwin", "14"): ("mac", "10.10"),
-    ("darwin", "15"): ("mac", "10.11"),
-    ("darwin", "16"): ("mac", "10.12"),
-    ("darwin", "17"): ("mac", "10.13"),
-}
-
-
-def get_closest_mac_host_platform_pair(
-    darwin_version_upper_bound: Optional[str] = None,
-    platform_name_map: Dict[Tuple[str, str], Tuple[str, str]] = SUPPORTED_PLATFORM_NORMALIZED_NAMES,
-) -> Tuple[Optional[str], Optional[str]]:
-    """Return the (host, platform) pair for the highest known darwin version less than the bound."""
-    darwin_versions = [int(x[1]) for x in platform_name_map if x[0] == "darwin"]
-
-    if darwin_version_upper_bound is not None:
-        bounded_darwin_versions = [
-            v for v in darwin_versions if v <= int(darwin_version_upper_bound)
-        ]
-    else:
-        bounded_darwin_versions = darwin_versions
-
-    if not bounded_darwin_versions:
-        return None, None
-    max_darwin_version = str(max(bounded_darwin_versions))
-    return platform_name_map[("darwin", max_darwin_version)]
