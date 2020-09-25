@@ -27,6 +27,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.util_rules import pants_environment
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.console import Console
@@ -95,6 +96,7 @@ class RuleRunner:
         all_rules = (
             *(rules or ()),
             *source_root.rules(),
+            *pants_environment.rules(),
             QueryRule(WrappedTarget, (Address,)),
         )
         build_config_builder = BuildConfiguration.Builder()

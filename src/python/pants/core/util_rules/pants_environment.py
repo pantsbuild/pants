@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
 import re
 from dataclasses import dataclass
 from typing import Dict, Mapping, Optional, Sequence
@@ -32,7 +31,7 @@ class PantsEnvironment:
         Explicitly specify the env argument to create a mock environment for testing.
         """
 
-        self.env = FrozenDict(env)
+        self.env = FrozenDict(env or {})
 
     def get_subset(
         self, requested: Sequence[str], *, allowed: Optional[Sequence[str]] = None
