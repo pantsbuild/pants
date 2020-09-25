@@ -33,7 +33,7 @@ source "${REPO_ROOT}/build-support/bin/download_native_build_binaries.sh"
 
 cargo_bin="${CARGO_HOME}/bin/cargo"
 
-if [[ -n "${CARGO_WRAPPER_DEBUG-}" ]]; then
+if [[ -n "${CARGO_WRAPPER_DEBUG:-}" ]]; then
   cat << DEBUG >&2
 >>> Executing ${cargo_bin} $@
 >>> In ENV:
