@@ -5,6 +5,55 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0b2 (9/25/2020)
+-------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Remove .*/ from --build-ignore defaults (#10856)
+  `PR #10856 <https://github.com/pantsbuild/pants/pull/10856>`_
+
+New Features
+~~~~~~~~~~~~
+* Partition MyPy based on interpreter constraints (#10817)
+  `PR #10817 <https://github.com/pantsbuild/pants/pull/10817>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix dependency inference AST parsing to include file names (#10857)
+  `PR #10857 <https://github.com/pantsbuild/pants/pull/10857>`_
+
+* Validate the names of directory children, and normalize output directory/file names (#10850)
+  `PR #10850 <https://github.com/pantsbuild/pants/pull/10850>`_
+
+* Fix empty key for global options in run tracker (#10807)
+  `PR #10807 <https://github.com/pantsbuild/pants/pull/10807>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Move `PantsEnvironment` into `SessionValues` (#10862)
+  `PR #10862 <https://github.com/pantsbuild/pants/pull/10862>`_
+
+* Delete binaries/ and net/. (#10861)
+  `PR #10861 <https://github.com/pantsbuild/pants/pull/10861>`_
+
+* Add `RuleRunner.set_options()` (#10859)
+  `PR #10859 <https://github.com/pantsbuild/pants/pull/10859>`_
+
+* Improve support of MyPy requirements when Python 2 used (#10853)
+  `PR #10853 <https://github.com/pantsbuild/pants/pull/10853>`_
+
+Testing
+~~~~~~~
+
+* A script to download rust build helper binaries. (#10851)
+  `PR #10851 <https://github.com/pantsbuild/pants/pull/10851>`_
+
+* Locate bash before using it to locate BinaryPaths for other tools (#10858)
+  `PR #10858 <https://github.com/pantsbuild/pants/pull/10858>`_
+
 2.0.0b1 (9/23/2020)
 -------------------
 
