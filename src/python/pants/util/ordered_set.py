@@ -17,18 +17,18 @@ from typing import (
     AbstractSet,
     Any,
     Dict,
+    Hashable,
     Iterable,
     Iterator,
     MutableSet,
     Optional,
     Set,
     TypeVar,
-    Union,
-    cast, Hashable,
+    cast,
 )
 
-T = TypeVar("T", bound=Hashable)
-T_co = TypeVar("T_co", bound=Hashable, covariant=True)
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 _TAbstractOrderedSet = TypeVar("_TAbstractOrderedSet", bound="_AbstractOrderedSet")
 
 
@@ -137,7 +137,9 @@ class _AbstractOrderedSet(AbstractSet[T]):
     def __xor__(self: _TAbstractOrderedSet, other: Iterable[T]) -> _TAbstractOrderedSet:  # type: ignore[override]
         return self.symmetric_difference(other)
 
-    def symmetric_difference(self: _TAbstractOrderedSet, other: Iterable[T]) -> _TAbstractOrderedSet:
+    def symmetric_difference(
+        self: _TAbstractOrderedSet, other: Iterable[T]
+    ) -> _TAbstractOrderedSet:
         """Return the symmetric difference of this OrderedSet and another set as a new OrderedSet.
         That is, the new set will contain all elements that are in exactly one of the sets.
 
@@ -200,7 +202,7 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
             self._items[item] = None
 
 
-class FrozenOrderedSet(_AbstractOrderedSet[T_co]):
+class FrozenOrderedSet(_AbstractOrderedSet[T_co], Hashable):
     """A frozen (i.e. immutable) set that retains its order.
 
     This is safe to use with the V2 engine.
@@ -208,7 +210,7 @@ class FrozenOrderedSet(_AbstractOrderedSet[T_co]):
 
     def __init__(self, iterable: Optional[Iterable[T_co]] = None) -> None:
         super().__init__(iterable)
-        self._hash: Union[int, None] = None
+        self._hash: Optional[int] = None
 
     def __hash__(self) -> int:
         if self._hash is None:
