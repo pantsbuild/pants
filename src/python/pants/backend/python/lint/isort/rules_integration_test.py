@@ -1,10 +1,9 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from dataclasses import dataclass
+
 from typing import List, Optional, Sequence, Tuple
 
 import pytest
-from typing_extensions import Literal
 
 from pants.backend.python.lint.isort.rules import IsortFieldSet, IsortRequest
 from pants.backend.python.lint.isort.rules import rules as isort_rules
@@ -33,30 +32,18 @@ def rule_runner() -> RuleRunner:
     )
 
 
-@dataclass(frozen=True)
-class LabelledFileContent(FileContent):
-    label: Literal['good', 'bad', 'fixed', 'needs_config'] = 'good'
-
-
-GOOD_PY_SOURCE = LabelledFileContent(path="good.py", content=b"from animals import cat, dog\n")
-BAD_PY_SOURCE = LabelledFileContent(path="bad.py", content=b"from colors import green, blue\n", label='bad')
-FIXED_BAD_PY_SOURCE = LabelledFileContent(path="bad.py", content=b"from colors import blue, green\n", label='fixed')
-
-GOOD_PYI_SOURCE = LabelledFileContent(path="good.pyi", content=b"from animals import cat, dog\n")
-BAD_PYI_SOURCE = LabelledFileContent(path="bad.pyi", content=b"from colors import green, blue\n", label='bad')
-FIXED_BAD_PYI_SOURCE = LabelledFileContent(path="bad.pyi", content=b"from colors import blue, green\n", label='fixed')
-
+GOOD_SOURCE = FileContent(path="good.py", content=b"from animals import cat, dog\n")
+BAD_SOURCE = FileContent(path="bad.py", content=b"from colors import green, blue\n")
+FIXED_BAD_SOURCE = FileContent(path="bad.py", content=b"from colors import blue, green\n")
 # Note the as import. Isort by default keeps as imports on a new line, so this wouldn't be
 # reformatted by default. If we set the config/CLI args correctly, isort will combine the two
 # imports into one line.
-NEEDS_CONFIG_SOURCE = LabelledFileContent(
+NEEDS_CONFIG_SOURCE = FileContent(
     path="needs_config.py",
     content=b"from colors import blue\nfrom colors import green as verde\n",
-    label='needs_config',
 )
-FIXED_NEEDS_CONFIG_SOURCE = LabelledFileContent(
-    path="needs_config.py", content=b"from colors import blue, green as verde\n",
-    label='needs_config',
+FIXED_NEEDS_CONFIG_SOURCE = FileContent(
+    path="needs_config.py", content=b"from colors import blue, green as verde\n"
 )
 
 
@@ -111,67 +98,44 @@ def get_digest(rule_runner: RuleRunner, source_files: List[FileContent]) -> Dige
     return rule_runner.request(Digest, [CreateDigest(source_files)])
 
 
-_GOOD_FILES = (GOOD_PY_SOURCE, GOOD_PYI_SOURCE)
-
-
-@pytest.mark.parametrize('good_file', _GOOD_FILES)
-def test_passing_source(rule_runner: RuleRunner, good_file: FileContent) -> None:
-    target = make_target_with_origin(rule_runner, [good_file])
+def test_passing_source(rule_runner: RuleRunner) -> None:
+    target = make_target_with_origin(rule_runner, [GOOD_SOURCE])
     lint_results, fmt_result = run_isort(rule_runner, [target])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
     assert lint_results[0].stderr == ""
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_digest(rule_runner, [good_file])
+    assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE])
     assert fmt_result.did_change is False
 
 
-_BAD_TO_FIXED_FILES = ((BAD_PY_SOURCE, FIXED_BAD_PY_SOURCE), (BAD_PYI_SOURCE, FIXED_BAD_PYI_SOURCE))
-
-
-@pytest.mark.parametrize(('bad_file', 'fixed_file'), _BAD_TO_FIXED_FILES)
-def test_failing_source(rule_runner: RuleRunner, bad_file: FileContent, fixed_file: FileContent) -> None:
-    target = make_target_with_origin(rule_runner, [bad_file])
+def test_failing_source(rule_runner: RuleRunner) -> None:
+    target = make_target_with_origin(rule_runner, [BAD_SOURCE])
     lint_results, fmt_result = run_isort(rule_runner, [target])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert f"{bad_file.path} Imports are incorrectly sorted" in lint_results[0].stderr
-    assert fmt_result.stdout == f"Fixing {bad_file.path}\n"
-    assert fmt_result.output == get_digest(rule_runner, [fixed_file])
+    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stderr
+    assert fmt_result.stdout == "Fixing bad.py\n"
+    assert fmt_result.output == get_digest(rule_runner, [FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
 
-_MIXED_SOURCES = (
-    ([GOOD_PY_SOURCE, BAD_PY_SOURCE],
-     [GOOD_PY_SOURCE, FIXED_BAD_PY_SOURCE]),
-    ([GOOD_PYI_SOURCE, BAD_PYI_SOURCE],
-     [GOOD_PYI_SOURCE, FIXED_BAD_PYI_SOURCE]),
-    ([GOOD_PY_SOURCE, GOOD_PYI_SOURCE, BAD_PY_SOURCE, BAD_PYI_SOURCE],
-     [GOOD_PY_SOURCE, GOOD_PYI_SOURCE, FIXED_BAD_PY_SOURCE, FIXED_BAD_PYI_SOURCE]),
-)
-
-
-@pytest.mark.parametrize(('input_files', 'fixed_files'), _MIXED_SOURCES)
-def test_mixed_sources(
-        rule_runner: RuleRunner, input_files: List[LabelledFileContent], fixed_files: List[LabelledFileContent]
-) -> None:
-    bad_input_files = [file for file in input_files if file.label == 'bad']
-    target = make_target_with_origin(rule_runner, input_files)
+def test_mixed_sources(rule_runner: RuleRunner) -> None:
+    target = make_target_with_origin(rule_runner, [GOOD_SOURCE, BAD_SOURCE])
     lint_results, fmt_result = run_isort(rule_runner, [target])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    for bad_file in bad_input_files:
-        assert f"{bad_file.path} Imports are incorrectly sorted" in lint_results[0].stderr
+    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stderr
     assert "good.py" not in lint_results[0].stderr
-    assert fmt_result.stdout == "".join(f"Fixing {bad_file.path}\n" for bad_file in bad_input_files)
-    assert fmt_result.output == get_digest(rule_runner, fixed_files)
+    assert fmt_result.stdout == "Fixing bad.py\n"
+    assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     targets = [
-        make_target_with_origin(rule_runner, [GOOD_PY_SOURCE]),
-        make_target_with_origin(rule_runner, [BAD_PY_SOURCE]),
+        make_target_with_origin(rule_runner, [GOOD_SOURCE]),
+        make_target_with_origin(rule_runner, [BAD_SOURCE]),
     ]
     lint_results, fmt_result = run_isort(rule_runner, targets)
     assert len(lint_results) == 1
@@ -179,7 +143,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert "bad.py Imports are incorrectly sorted" in lint_results[0].stderr
     assert "good.py" not in lint_results[0].stderr
     assert "Fixing bad.py\n" == fmt_result.stdout
-    assert fmt_result.output == get_digest(rule_runner, [GOOD_PY_SOURCE, FIXED_BAD_PY_SOURCE])
+    assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
 
@@ -208,8 +172,45 @@ def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    target = make_target_with_origin(rule_runner, [BAD_PY_SOURCE])
+    target = make_target_with_origin(rule_runner, [BAD_SOURCE])
     lint_results, fmt_result = run_isort(rule_runner, [target], skip=True)
     assert not lint_results
     assert fmt_result.skipped is True
     assert fmt_result.did_change is False
+
+
+def test_stub_files(rule_runner: RuleRunner) -> None:
+    good_stub = FileContent(path="good.pyi", content=b"from animals import cat, dog\n")
+    bad_stub = FileContent(path="bad.pyi", content=b"from colors import green, blue\n")
+    fixed_bad_stub = FileContent(path="bad.pyi", content=b"from colors import blue, green\n")
+    needs_config_stub = FileContent(
+        path="needs_config.pyi",
+        content=b"from colors import blue\nfrom colors import green as verde\n",
+    )
+    fixed_needs_config_stub = FileContent(
+        path="needs_config.pyi", content=b"from colors import blue, green as verde\n"
+    )
+
+    # Passing
+    target = make_target_with_origin(rule_runner, [good_stub, GOOD_SOURCE])
+    lint_results, fmt_result = run_isort(rule_runner, [target])
+
+    assert len(lint_results) == 1 and lint_results[0].exit_code == 0
+    assert lint_results[0].stderr == "" and fmt_result.stdout == ""
+    assert fmt_result.output == get_digest(rule_runner, [good_stub, GOOD_SOURCE])
+    assert not fmt_result.did_change
+
+    # Failing
+    target = make_target_with_origin(rule_runner, [bad_stub, GOOD_SOURCE])
+    lint_results, fmt_result = run_isort(rule_runner, [target])
+    print(lint_results)
+    print(fmt_result)
+
+    assert "bad.pyi Imports are incorrectly sorted" in lint_results[0].stderr
+    assert fmt_result.stdout == "Fixing bad.pyi\n"
+    assert fmt_result.output == get_digest(rule_runner, [FIXED_BAD_SOURCE])
+    assert fmt_result.did_change is True
+
+    # Mixed
+
+    # Needs config
