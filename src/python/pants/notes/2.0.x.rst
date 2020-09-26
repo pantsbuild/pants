@@ -33,6 +33,7 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 * Move `PantsEnvironment` into `SessionValues` (#10862)
   `PR #10862 <https://github.com/pantsbuild/pants/pull/10862>`_
 
