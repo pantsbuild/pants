@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import replace
 from typing import List, Optional, Sequence, Tuple
 
 import pytest
@@ -144,7 +145,7 @@ def test_respects_config_file(rule_runner: RuleRunner) -> None:
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "config.py Imports are incorrectly sorted" in lint_results[0].stderr
+    assert "needs_config.py Imports are incorrectly sorted" in lint_results[0].stderr
     assert fmt_result.stdout == "Fixing needs_config.py\n"
     assert fmt_result.output == get_digest(rule_runner, [FIXED_NEEDS_CONFIG_SOURCE])
     assert fmt_result.did_change is True
@@ -155,7 +156,7 @@ def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_isort(rule_runner, [target], passthrough_args="--combine-as")
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "config.py Imports are incorrectly sorted" in lint_results[0].stderr
+    assert "needs_config.py Imports are incorrectly sorted" in lint_results[0].stderr
     assert fmt_result.stdout == "Fixing needs_config.py\n"
     assert fmt_result.output == get_digest(rule_runner, [FIXED_NEEDS_CONFIG_SOURCE])
     assert fmt_result.did_change is True
@@ -170,37 +171,48 @@ def test_skip(rule_runner: RuleRunner) -> None:
 
 
 def test_stub_files(rule_runner: RuleRunner) -> None:
-    good_stub = FileContent(path="good.pyi", content=b"from animals import cat, dog\n")
-    bad_stub = FileContent(path="bad.pyi", content=b"from colors import green, blue\n")
-    fixed_bad_stub = FileContent(path="bad.pyi", content=b"from colors import blue, green\n")
-    needs_config_stub = FileContent(
-        path="needs_config.pyi",
-        content=b"from colors import blue\nfrom colors import green as verde\n",
-    )
-    fixed_needs_config_stub = FileContent(
-        path="needs_config.pyi", content=b"from colors import blue, green as verde\n"
-    )
+    good_stub = replace(GOOD_SOURCE, path="good.pyi")
+    bad_stub = replace(BAD_SOURCE, path="bad.pyi")
+    fixed_bad_stub = replace(FIXED_BAD_SOURCE, path="bad.pyi")
+    needs_config_stub = replace(NEEDS_CONFIG_SOURCE, path="needs_config.pyi")
+    fixed_needs_config_stub = replace(FIXED_NEEDS_CONFIG_SOURCE, path="needs_config.pyi")
 
     # Passing
-    target = make_target_with_origin(rule_runner, [good_stub, GOOD_SOURCE])
+    good_files = [GOOD_SOURCE, good_stub]
+    target = make_target_with_origin(rule_runner, good_files)
     lint_results, fmt_result = run_isort(rule_runner, [target])
-
     assert len(lint_results) == 1 and lint_results[0].exit_code == 0
     assert lint_results[0].stderr == "" and fmt_result.stdout == ""
-    assert fmt_result.output == get_digest(rule_runner, [good_stub, GOOD_SOURCE])
+    assert fmt_result.output == get_digest(rule_runner, good_files)
     assert not fmt_result.did_change
 
     # Failing
-    target = make_target_with_origin(rule_runner, [bad_stub, GOOD_SOURCE])
+    target = make_target_with_origin(rule_runner, [BAD_SOURCE, bad_stub])
     lint_results, fmt_result = run_isort(rule_runner, [target])
-    print(lint_results)
-    print(fmt_result)
-
     assert "bad.pyi Imports are incorrectly sorted" in lint_results[0].stderr
-    assert fmt_result.stdout == "Fixing bad.pyi\n"
-    assert fmt_result.output == get_digest(rule_runner, [FIXED_BAD_SOURCE])
-    assert fmt_result.did_change is True
+    assert fmt_result.stdout == "Fixing bad.py\nFixing bad.pyi\n"
+    fixed_bad_files = [FIXED_BAD_SOURCE, fixed_bad_stub]
+    assert fmt_result.output == get_digest(rule_runner, [*fixed_bad_files, *good_files])
+    assert fmt_result.did_change
 
-    # Mixed
-
-    # Needs config
+    # Mixed targets + Multiple targets + Needs config
+    targets = [
+        make_target_with_origin(rule_runner, [NEEDS_CONFIG_SOURCE, needs_config_stub]),
+        make_target_with_origin(rule_runner, [GOOD_SOURCE, BAD_SOURCE, good_stub, bad_stub]),
+    ]
+    lint_results, fmt_result = run_isort(
+        rule_runner, targets, config="[settings]\ncombine_as_imports=True\n"
+    )
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 1
+    for bad_file in (BAD_SOURCE, bad_stub, NEEDS_CONFIG_SOURCE, needs_config_stub):
+        assert (
+            f"ERROR: {bad_file.path} Imports are incorrectly sorted and/or formatted.\n"
+            in lint_results[0].stderr
+        )
+        assert f"Fixing {bad_file.path}\n" in fmt_result.stdout
+    fixed_config_files = [FIXED_NEEDS_CONFIG_SOURCE, fixed_needs_config_stub]
+    assert fmt_result.output == get_digest(
+        rule_runner, [*fixed_config_files, *fixed_bad_files, *good_files]
+    )
+    assert fmt_result.did_change
