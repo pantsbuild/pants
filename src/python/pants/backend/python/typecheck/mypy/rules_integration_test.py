@@ -467,14 +467,8 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
         f"{PACKAGE}/uses_py3.py", "from project.py3.lib import add\nassert add(2, 2) == 4\n"
     )
     rule_runner.add_to_build_file(PACKAGE, "python_library(compatibility=['==2.7.*', '>=3.6'])")
-    py2_target = rule_runner.get_target(
-        Address(PACKAGE, relative_file_path="uses_py2.py"),
-        create_options_bootstrapper(args=GLOBAL_ARGS),
-    )
-    py3_target = rule_runner.get_target(
-        Address(PACKAGE, relative_file_path="uses_py3.py"),
-        create_options_bootstrapper(args=GLOBAL_ARGS),
-    )
+    py2_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
+    py3_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py3.py"))
 
     result = run_mypy(rule_runner, [py2_target, py3_target])
     assert len(result) == 2

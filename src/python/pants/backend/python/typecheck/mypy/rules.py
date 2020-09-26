@@ -312,7 +312,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
     )
 
 
-# TODO(#10131): Improve performance, e.g. by leveraging the MyPy cache.
+# TODO(#10864): Improve performance, e.g. by leveraging the MyPy cache.
 # TODO(#10131): Support .pyi files.
 @rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
 async def mypy_typecheck(
@@ -332,6 +332,7 @@ async def mypy_typecheck(
 
     # When determining how to batch by interpreter constraints, we must consider the entire
     # transitive closure to get the final resulting constraints.
+    # TODO(#10863): Improve the performance of this.
     transitive_targets_per_field_set = await MultiGet(
         Get(TransitiveTargets, Addresses([field_set.address])) for field_set in request.field_sets
     )
