@@ -17,8 +17,6 @@ from pants.backend.python.dependency_inference.module_mapper import rules as mod
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -75,17 +73,17 @@ def rule_runner() -> RuleRunner:
         rules=[
             *stripped_source_files.rules(),
             *module_mapper_rules(),
-            QueryRule(FirstPartyModuleToAddressMapping, (OptionsBootstrapper,)),
-            QueryRule(ThirdPartyModuleToAddressMapping, (OptionsBootstrapper,)),
-            QueryRule(PythonModuleOwners, (PythonModule, OptionsBootstrapper)),
+            QueryRule(FirstPartyModuleToAddressMapping, ()),
+            QueryRule(ThirdPartyModuleToAddressMapping, ()),
+            QueryRule(PythonModuleOwners, (PythonModule,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )
 
 
 def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
-    options_bootstrapper = create_options_bootstrapper(
-        args=["--source-root-patterns=['src/python', 'tests/python', 'build-support']"]
+    rule_runner.set_options(
+        ["--source-root-patterns=['src/python', 'tests/python', 'build-support']"]
     )
     # Two modules belonging to the same target. We should generate subtargets for each file.
     rule_runner.create_files("src/python/project/util", ["dirutil.py", "tarutil.py"])
@@ -103,7 +101,7 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     rule_runner.create_files("src/python/stubs", ["stub.py", "stub.pyi"])
     rule_runner.add_to_build_file("src/python/stubs", "python_library()")
 
-    result = rule_runner.request(FirstPartyModuleToAddressMapping, [options_bootstrapper])
+    result = rule_runner.request(FirstPartyModuleToAddressMapping, [])
     assert result.mapping == FrozenDict(
         {
             "project.util.dirutil": (
@@ -153,7 +151,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    result = rule_runner.request(ThirdPartyModuleToAddressMapping, [create_options_bootstrapper()])
+    result = rule_runner.request(ThirdPartyModuleToAddressMapping, [])
     assert result.mapping == FrozenDict(
         {
             "colors": Address("3rdparty/python", target_name="ansicolors"),
@@ -166,14 +164,10 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
 
 
 def test_map_module_to_address(rule_runner: RuleRunner) -> None:
-    options_bootstrapper = create_options_bootstrapper(
-        args=["--source-root-patterns=['source_root1', 'source_root2', '/']"]
-    )
+    rule_runner.set_options(["--source-root-patterns=['source_root1', 'source_root2', '/']"])
 
     def get_owners(module: str) -> List[Address]:
-        return list(
-            rule_runner.request(PythonModuleOwners, [PythonModule(module), options_bootstrapper])
-        )
+        return list(rule_runner.request(PythonModuleOwners, [PythonModule(module)]))
 
     # First check that we can map 3rd-party modules.
     rule_runner.add_to_build_file(

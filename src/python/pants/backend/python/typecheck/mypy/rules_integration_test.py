@@ -10,17 +10,23 @@ import pytest
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.typecheck.mypy.plugin_target_type import MyPySourcePlugin
-from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
+from pants.backend.python.typecheck.mypy.rules import (
+    MyPyFieldSet,
+    MyPyRequest,
+    check_and_warn_if_python_version_configured,
+    determine_python_files,
+)
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
-from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.python_interpreter_selection import skip_unless_python38_present
+from pants.testutil.python_interpreter_selection import (
+    skip_unless_python27_and_python3_present,
+    skip_unless_python27_present,
+    skip_unless_python38_present,
+)
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -30,7 +36,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *mypy_rules(),
             *dependency_inference_rules.rules(),  # Used for import inference.
-            QueryRule(TypecheckResults, (MyPyRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(TypecheckResults, (MyPyRequest,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary, MyPySourcePlugin],
     )
@@ -74,7 +80,7 @@ NEEDS_CONFIG_SOURCE = FileContent(
 GLOBAL_ARGS = (
     "--backend-packages=pants.backend.python",
     "--backend-packages=pants.backend.python.typecheck.mypy",
-    "--source-root-patterns=['src/python', 'tests/python']",
+    "--source-root-patterns=['/', 'src/python', 'tests/python']",
 )
 
 
@@ -103,9 +109,8 @@ def make_target(
             """
         ),
     )
-    return rule_runner.get_target(
-        Address(package, target_name=name), create_options_bootstrapper(args=GLOBAL_ARGS)
-    )
+    rule_runner.set_options(GLOBAL_ARGS)
+    return rule_runner.get_target(Address(package, target_name=name))
 
 
 def run_mypy(
@@ -127,13 +132,10 @@ def run_mypy(
         args.append("--mypy-skip")
     if additional_args:
         args.extend(additional_args)
+    rule_runner.set_options(args)
     result = rule_runner.request(
         TypecheckResults,
-        [
-            MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets),
-            create_options_bootstrapper(args=args),
-            PantsEnvironment(),
-        ],
+        [MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets)],
     )
     return result.results
 
@@ -347,6 +349,60 @@ def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/math/add.py:5" in result[0].stdout
 
 
+@skip_unless_python27_present
+def test_works_with_python27(rule_runner: RuleRunner) -> None:
+    """A regression test that we can properly handle Python 2-only third-party dependencies.
+
+    There was a bug that this would cause the runner PEX to fail to execute because it did not have
+    Python 3 distributions of the requirements.
+    """
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            # Both requirements are a) typed and b) compatible with Py2 and Py3. However, `x690`
+            # has a distinct wheel for Py2 vs. Py3, whereas libumi has a universal wheel. We expect
+            # both to be usable, even though libumi is not compatible with Py3.
+
+            python_requirement_library(
+                name="libumi",
+                requirements=["libumi==0.0.2"],
+            )
+
+            python_requirement_library(
+                name="x690",
+                requirements=["x690==0.2.0"],
+            )
+            """
+        ),
+    )
+    source_file = FileContent(
+        f"{PACKAGE}/py2.py",
+        dedent(
+            """\
+            from libumi import hello_world
+            from x690 import types
+
+            print "Blast from the past!"
+            print hello_world() - 21  # MyPy should fail. You can't subtract an `int` from `bytes`.
+            """
+        ).encode(),
+    )
+    target = make_target(rule_runner, [source_file], interpreter_constraints="==2.7.*")
+    result = run_mypy(rule_runner, [target], passthrough_args="--py2")
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert "Failed to execute PEX file" not in result[0].stderr
+    assert (
+        "Cannot find implementation or library stub for module named 'x690'" not in result[0].stdout
+    )
+    assert (
+        "Cannot find implementation or library stub for module named 'libumi'"
+        not in result[0].stdout
+    )
+    assert f"{PACKAGE}/py2.py:5: error: Unsupported operand types" in result[0].stdout
+
+
 @skip_unless_python38_present
 def test_works_with_python38(rule_runner: RuleRunner) -> None:
     """MyPy's typed-ast dependency does not understand Python 3.8, so we must instead run MyPy with
@@ -367,6 +423,65 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "Success: no issues found" in result[0].stdout.strip()
+
+
+@skip_unless_python27_and_python3_present
+def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
+    """We set `--python-version` automatically for the user, and also batch based on interpreter
+    constraints.
+
+    This batching must consider transitive dependencies, so we use a more complex setup where the
+    dependencies are what have specific constraints that influence the batching.
+    """
+    rule_runner.create_file(f"{PACKAGE}/py2/__init__.py")
+    rule_runner.create_file(
+        f"{PACKAGE}/py2/lib.py",
+        dedent(
+            """\
+            def add(x, y):
+                # type: (int, int) -> int
+                print "old school"
+                return x + y
+            """
+        ),
+    )
+    rule_runner.add_to_build_file(f"{PACKAGE}/py2", "python_library(compatibility='==2.7.*')")
+
+    rule_runner.create_file(f"{PACKAGE}/py3/__init__.py")
+    rule_runner.create_file(
+        f"{PACKAGE}/py3/lib.py",
+        dedent(
+            """\
+            def add(x: int, y: int) -> int:
+                return x + y
+            """
+        ),
+    )
+    rule_runner.add_to_build_file(f"{PACKAGE}/py3", "python_library(compatibility='>=3.6')")
+
+    # Our input files belong to the same target, which is compatible with both Py2 and Py3.
+    rule_runner.create_file(f"{PACKAGE}/__init__.py")
+    rule_runner.create_file(
+        f"{PACKAGE}/uses_py2.py", "from project.py2.lib import add\nassert add(2, 2) == 4\n"
+    )
+    rule_runner.create_file(
+        f"{PACKAGE}/uses_py3.py", "from project.py3.lib import add\nassert add(2, 2) == 4\n"
+    )
+    rule_runner.add_to_build_file(PACKAGE, "python_library(compatibility=['==2.7.*', '>=3.6'])")
+    py2_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
+    py3_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py3.py"))
+
+    result = run_mypy(rule_runner, [py2_target, py3_target])
+    assert len(result) == 2
+    py2_result, py3_result = sorted(result, key=lambda res: res.partition_description)
+
+    assert py2_result.exit_code == 0
+    assert py2_result.partition_description == "['CPython==2.7.*', 'CPython==2.7.*,>=3.6']"
+    assert "Success: no issues found" in py3_result.stdout
+
+    assert py3_result.exit_code == 0
+    assert py3_result.partition_description == "['CPython==2.7.*,>=3.6', 'CPython>=3.6']"
+    assert "Success: no issues found" in py3_result.stdout.strip()
 
 
 def test_type_stubs(rule_runner: RuleRunner) -> None:
@@ -392,8 +507,9 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
             def red(s: str) -> str:
                 ...
             """
-        )
+        ),
     )
+    rule_runner.add_to_build_file("mypy_stubs", "python_library()")
 
     rule_runner.create_file(f"{PACKAGE}/util/__init__.py")
     rule_runner.create_file(
@@ -403,7 +519,7 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
             def add(x, y):
                 return x + y
             """
-        )
+        ),
     )
     rule_runner.create_file(
         f"{PACKAGE}/util/untyped.pyi",
@@ -412,7 +528,7 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
             def add(x: int, y: int) -> int:
                 ...
             """
-        )
+        ),
     )
     rule_runner.add_to_build_file(f"{PACKAGE}/util", "python_library()")
 
@@ -427,17 +543,44 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
             z = add(2, 2.0)
             print(red(z))
             """
-        )
+        ),
     )
     rule_runner.add_to_build_file(PACKAGE, "python_library()")
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
     result = run_mypy(
-        rule_runner,
-        [tgt],
-        additional_args=["--source-root-patterns=['mypy_stubs', 'src/python']"]
+        rule_runner, [tgt], additional_args=["--source-root-patterns=['mypy_stubs', 'src/python']"]
     )
     assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert f"{PACKAGE}/app.py:4: error: Argument 2 to" in result[0].stdout
+    assert f"{PACKAGE}/app.py:5: error: Argument 1 to" in result[0].stdout
+
+
+def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
+    """Test the behavior of a MyPy requirement shadowing a user's requirement.
+
+    The way we load requirements is complex. We want to ensure that things still work properly in
+    this edge case.
+    """
+    rule_runner.create_file("app.py", "import typed_ast\n")
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            python_requirement_library(
+                name='typed-ast',
+                requirements=['typed-ast==1.4.1'],
+            )
+
+            python_library(name="lib")
+            """
+        ),
+    )
+    tgt = rule_runner.get_target(Address("", target_name="lib"))
+    result = run_mypy(rule_runner, [tgt], additional_args=["--mypy-version=mypy==0.782"])
+    assert len(result) == 1
     assert result[0].exit_code == 0
+    assert "Success: no issues found" in result[0].stdout
 
 
 def test_source_plugin(rule_runner: RuleRunner) -> None:
@@ -578,3 +721,41 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     result = run_mypy_with_plugin(plugin_tgt)
     assert result.exit_code == 0
     assert "Success: no issues found in 7 source files" in result.stdout
+
+
+def test_determine_python_files() -> None:
+    assert determine_python_files([]) == ()
+    assert determine_python_files(["foo.py"]) == ("foo.py",)
+    assert determine_python_files(["foo.pyi"]) == ("foo.pyi",)
+    assert determine_python_files(["foo.py", "foo.pyi"]) == ("foo.pyi",)
+    assert determine_python_files(["foo.pyi", "foo.py"]) == ("foo.pyi",)
+    assert determine_python_files(["foo.json"]) == ()
+
+
+def test_warn_if_python_version_configured(caplog) -> None:
+    def assert_is_configured(*, has_config: bool, args: List[str], warning: str) -> None:
+        config = FileContent("mypy.ini", b"[mypy]\npython_version = 3.6") if has_config else None
+        is_configured = check_and_warn_if_python_version_configured(config=config, args=tuple(args))
+        assert is_configured
+        assert len(caplog.records) == 1
+        assert warning in caplog.text
+        caplog.clear()
+
+    assert_is_configured(has_config=True, args=[], warning="You set `python_version` in mypy.ini")
+    assert_is_configured(
+        has_config=False, args=["--py2"], warning="You set `--py2` in the `--mypy-args` option"
+    )
+    assert_is_configured(
+        has_config=False,
+        args=["--python-version=3.6"],
+        warning="You set `--python-version` in the `--mypy-args` option",
+    )
+    assert_is_configured(
+        has_config=True,
+        args=["--py2", "--python-version=3.6"],
+        warning=(
+            "You set `python_version` in mypy.ini (which is used because of the `[mypy].config` "
+            "option) and you set `--py2` in the `--mypy-args` option and you set "
+            "`--python-version` in the `--mypy-args` option."
+        ),
+    )

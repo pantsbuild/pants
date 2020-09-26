@@ -10,13 +10,10 @@ from pants.backend.python.lint.docformatter.rules import rules as docformatter_r
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Target
-from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -25,9 +22,9 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *docformatter_rules(),
-            QueryRule(LintResults, (DocformatterRequest, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(FmtResult, (DocformatterRequest, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(LintResults, (DocformatterRequest,)),
+            QueryRule(FmtResult, (DocformatterRequest,)),
+            QueryRule(SourceFiles, (SourceFilesRequest,)),
         ]
     )
 
@@ -55,26 +52,19 @@ def run_docformatter(
         args.append(f"--docformatter-args='{passthrough_args}'")
     if skip:
         args.append("--docformatter-skip")
-    options_bootstrapper = create_options_bootstrapper(args=args)
+    rule_runner.set_options(args)
     field_sets = [DocformatterFieldSet.create(tgt) for tgt in targets]
-    pants_env = PantsEnvironment()
-    lint_results = rule_runner.request(
-        LintResults, [DocformatterRequest(field_sets), options_bootstrapper, pants_env]
-    )
+    lint_results = rule_runner.request(LintResults, [DocformatterRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
         [
             SourceFilesRequest(field_set.sources for field_set in field_sets),
-            options_bootstrapper,
-            pants_env,
         ],
     )
     fmt_result = rule_runner.request(
         FmtResult,
         [
             DocformatterRequest(field_sets, prior_formatter_result=input_sources.snapshot),
-            options_bootstrapper,
-            pants_env,
         ],
     )
     return lint_results.results, fmt_result

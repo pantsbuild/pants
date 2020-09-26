@@ -62,16 +62,13 @@ def generate_args(
 async def bandit_lint_partition(
     partition: BanditPartition, bandit: Bandit, lint_subsystem: LintSubsystem
 ) -> LintResult:
-    requirements_pex_request = Get(
+    bandit_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="bandit.pex",
             internal_only=True,
             requirements=PexRequirements(bandit.all_requirements),
-            interpreter_constraints=(
-                partition.interpreter_constraints
-                or PexInterpreterConstraints(bandit.interpreter_constraints)
-            ),
+            interpreter_constraints=partition.interpreter_constraints,
             entry_point=bandit.entry_point,
         ),
     )
@@ -89,12 +86,12 @@ async def bandit_lint_partition(
         SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
 
-    requirements_pex, config_digest, source_files = await MultiGet(
-        requirements_pex_request, config_digest_request, source_files_request
+    bandit_pex, config_digest, source_files = await MultiGet(
+        bandit_pex_request, config_digest_request, source_files_request
     )
 
     input_digest = await Get(
-        Digest, MergeDigests((source_files.snapshot.digest, requirements_pex.digest, config_digest))
+        Digest, MergeDigests((source_files.snapshot.digest, bandit_pex.digest, config_digest))
     )
 
     report_file_name = "bandit_report.txt" if lint_subsystem.reports_dir else None
@@ -102,7 +99,7 @@ async def bandit_lint_partition(
     result = await Get(
         FallibleProcessResult,
         PexProcess(
-            requirements_pex,
+            bandit_pex,
             argv=generate_args(
                 source_files=source_files, bandit=bandit, report_file_name=report_file_name
             ),

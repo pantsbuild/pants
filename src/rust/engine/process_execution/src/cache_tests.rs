@@ -12,6 +12,7 @@ use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
+use testutil::relative_paths;
 use tokio::runtime::Handle;
 
 struct RoundtripResults {
@@ -85,7 +86,7 @@ fn create_script(script_exit_code: i8) -> (Process, PathBuf, TempDir) {
     testutil::path::find_bash(),
     format!("{}", script_path.display()),
   ])
-  .output_files(vec![PathBuf::from("roland")].into_iter().collect());
+  .output_files(relative_paths(&["roland"]).collect());
 
   (process, script_path, script_dir)
 }

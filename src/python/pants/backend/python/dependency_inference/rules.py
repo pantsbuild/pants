@@ -116,7 +116,9 @@ async def infer_python_dependencies(
     owners_requests: List[Get[PythonModuleOwners, PythonModule]] = []
     for file_content, module in zip(digest_contents, modules):
         file_imports_obj = find_python_imports(
-            file_content.content.decode(), module_name=module.module
+            filename=file_content.path,
+            content=file_content.content.decode(),
+            module_name=module.module,
         )
         detected_imports = (
             file_imports_obj.all_imports

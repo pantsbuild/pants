@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.core.util_rules.pants_environment import PantsEnvironment
-from pants.engine.rules import _uncacheable_rule, collect_rules
+from pants.engine.rules import collect_rules, rule
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 
@@ -115,12 +115,14 @@ class SubprocessEnvironmentVars:
     vars: FrozenDict[str, str]
 
 
-@_uncacheable_rule
+@rule
 def get_subprocess_environment(
     subproc_env: SubprocessEnvironment, pants_env: PantsEnvironment
 ) -> SubprocessEnvironmentVars:
     return SubprocessEnvironmentVars(
-        pants_env.get_subset(subproc_env.env_vars_to_pass_to_subprocesses, SETTABLE_ENV_VARS)
+        pants_env.get_subset(
+            subproc_env.env_vars_to_pass_to_subprocesses, allowed=SETTABLE_ENV_VARS
+        )
     )
 
 

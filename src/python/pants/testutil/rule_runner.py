@@ -27,6 +27,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.util_rules import pants_environment
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.console import Console
@@ -35,6 +36,7 @@ from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Get, Params
+from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import Rule
@@ -48,7 +50,6 @@ from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import recursive_dirname, safe_file_dump, safe_mkdir, safe_open
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 # -----------------------------------------------------------------------------------------------
@@ -70,8 +71,8 @@ class GoalRuleResult:
         return GoalRuleResult(0, stdout="", stderr="")
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+# This is not frozen because we need to update the `scheduler` when setting options.
+@dataclass
 class RuleRunner:
     build_root: str
     build_config: BuildConfiguration
@@ -95,7 +96,8 @@ class RuleRunner:
         all_rules = (
             *(rules or ()),
             *source_root.rules(),
-            QueryRule(WrappedTarget, (Address, OptionsBootstrapper)),
+            *pants_environment.rules(),
+            QueryRule(WrappedTarget, (Address,)),
         )
         build_config_builder = BuildConfiguration.Builder()
         build_config_builder.register_aliases(
@@ -107,9 +109,7 @@ class RuleRunner:
         build_config_builder.register_target_types(target_types or ())
         self.build_config = build_config_builder.create()
 
-        options_bootstrapper = OptionsBootstrapper.create(
-            env={}, args=["--pants-config-files=[]"], allow_pantsrc=False
-        )
+        options_bootstrapper = create_options_bootstrapper()
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         local_store_dir = global_options.local_store_dir
         local_execution_root_dir = global_options.local_execution_root_dir
@@ -126,8 +126,17 @@ class RuleRunner:
             build_root=self.build_root,
             build_configuration=self.build_config,
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
-        ).new_session(build_id="buildid_for_test", should_report_workunits=True)
+        ).new_session(
+            build_id="buildid_for_test",
+            session_values=SessionValues(
+                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment()}
+            ),
+            should_report_workunits=True,
+        )
         self.scheduler = graph_session.scheduler_session
+
+    def __repr__(self) -> str:
+        return f"RuleRunner(build_root={self.build_root})"
 
     @property
     def pants_workdir(self) -> str:
@@ -155,10 +164,9 @@ class RuleRunner:
         args: Optional[Iterable[str]] = None,
         env: Optional[Mapping[str, str]] = None,
     ) -> GoalRuleResult:
-        options_bootstrapper = create_options_bootstrapper(
-            args=(*(global_args or []), goal.name, *(args or [])),
-            env=env,
-        )
+        merged_args = (*(global_args or []), goal.name, *(args or []))
+        self.set_options(merged_args, env=env)
+        options_bootstrapper = create_options_bootstrapper(args=merged_args, env=env)
 
         raw_specs = options_bootstrapper.get_full_options(
             [*GlobalOptions.known_scope_infos(), *goal.subsystem_cls.known_scope_infos()]
@@ -173,15 +181,32 @@ class RuleRunner:
             Params(
                 specs,
                 console,
-                options_bootstrapper,
                 Workspace(self.scheduler),
                 InteractiveRunner(self.scheduler),
-                PantsEnvironment(),
             ),
         )
 
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
+
+    def set_options(self, args: Iterable[str], *, env: Optional[Mapping[str, str]] = None) -> None:
+        """Update the engine session with new options and/or environment variables.
+
+        The environment variables will be used to set the `PantsEnvironment`, which is the
+        environment variables captured by the parent Pants process. Some rules use this to be able
+        to read arbitrary env vars. Any options that start with `PANTS_` will also be used to set
+        options.
+
+        This will override any previously configured values.
+        """
+        options_bootstrapper = create_options_bootstrapper(args=args, env=env)
+        self.scheduler = self.scheduler.scheduler.new_session(
+            build_id="buildid_for_test",
+            should_report_workunits=True,
+            session_values=SessionValues(
+                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment(env)}
+            ),
+        )
 
     def _invalidate_for(self, *relpaths):
         """Invalidates all files from the relpath, recursively up to the root.
@@ -264,17 +289,13 @@ class RuleRunner:
         """
         return self.make_snapshot({fp: "" for fp in files})
 
-    def get_target(
-        self, address: Address, options_bootstrapper: Optional[OptionsBootstrapper] = None
-    ) -> Target:
+    def get_target(self, address: Address) -> Target:
         """Find the target for a given address.
 
         This requires that the target actually exists, i.e. that you called
         `rule_runner.add_to_build_file()`.
         """
-        return self.request(
-            WrappedTarget, [address, options_bootstrapper or create_options_bootstrapper()]
-        ).target
+        return self.request(WrappedTarget, [address]).target
 
 
 # -----------------------------------------------------------------------------------------------

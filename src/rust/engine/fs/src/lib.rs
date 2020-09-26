@@ -33,9 +33,6 @@ mod glob_matching_tests;
 #[cfg(test)]
 mod posixfs_tests;
 
-#[macro_use]
-extern crate derivative;
-
 pub use crate::glob_matching::{
   ExpandablePathGlobs, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
   SINGLE_STAR_GLOB,
@@ -43,6 +40,7 @@ pub use crate::glob_matching::{
 
 use std::cmp::min;
 use std::io::{self, Read};
+use std::ops::Deref;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -89,8 +87,7 @@ pub fn default_config_path() -> PathBuf {
   config_path.join("pants")
 }
 
-#[derive(Derivative, Clone, Debug, Eq)]
-#[derivative(PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct RelativePath(PathBuf);
 
 impl RelativePath {
@@ -133,15 +130,23 @@ impl RelativePath {
   }
 }
 
+impl Deref for RelativePath {
+  type Target = PathBuf;
+
+  fn deref(&self) -> &PathBuf {
+    &self.0
+  }
+}
+
 impl AsRef<Path> for RelativePath {
   fn as_ref(&self) -> &Path {
     self.0.as_path()
   }
 }
 
-impl Into<PathBuf> for RelativePath {
-  fn into(self) -> PathBuf {
-    self.0
+impl From<RelativePath> for PathBuf {
+  fn from(p: RelativePath) -> Self {
+    p.0
   }
 }
 
@@ -322,7 +327,7 @@ impl GitignoreStyleExcludes {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum StrictGlobMatching {
   // NB: the Error and Warn variants store a description of the origin of the PathGlob
   // request so that we can make the error message more helpful to users when globs fail to match.
@@ -366,7 +371,7 @@ impl StrictGlobMatching {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum GlobExpansionConjunction {
   AllMatch,
   AnyMatch,
@@ -388,7 +393,7 @@ pub enum SymlinkBehavior {
   Oblivious,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PathGlobs {
   globs: Vec<String>,
   strict_match_behavior: StrictGlobMatching,
@@ -414,6 +419,12 @@ impl PathGlobs {
       self.strict_match_behavior,
       self.conjunction,
     )
+  }
+}
+
+impl fmt::Display for PathGlobs {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.globs.join(", "))
   }
 }
 

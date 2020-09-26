@@ -7,7 +7,7 @@ from pathlib import Path
 from pants.base.build_root import BuildRoot
 from pants.engine.rules import collect_rules, rule
 from pants.fs.fs import is_child_of
-from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.global_options import GlobalOptions
 
 
 class InvalidDistDir(Exception):
@@ -22,9 +22,8 @@ class DistDir:
 
 
 @rule
-async def get_distdir(options_bootstrapper: OptionsBootstrapper, buildroot: BuildRoot) -> DistDir:
-    global_options = options_bootstrapper.bootstrap_options.for_global_scope()
-    return validate_distdir(Path(global_options.pants_distdir), buildroot.pathlib_path)
+async def get_distdir(global_options: GlobalOptions, buildroot: BuildRoot) -> DistDir:
+    return validate_distdir(Path(global_options.options.pants_distdir), buildroot.pathlib_path)
 
 
 def validate_distdir(distdir: Path, buildroot: Path) -> DistDir:

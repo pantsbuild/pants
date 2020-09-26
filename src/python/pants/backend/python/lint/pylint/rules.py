@@ -108,46 +108,38 @@ def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ..
 
 @rule(level=LogLevel.DEBUG)
 async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> LintResult:
-    # We build one PEX with Pylint requirements (including any first-party plugins), and another
-    # with all direct 3rd-party dependencies. Splitting this into two PEXes gives us finer-grained
-    # caching. We then merge via `--pex-path`. We use `PexFromTargetsRequest.for_requirements()`
-    # to get cache hits with other goals like `test` and `repl`.
+    requirements_pex_request = Get(
+        Pex,
+        PexFromTargetsRequest,
+        PexFromTargetsRequest.for_requirements(
+            (field_set.address for field_set in partition.field_sets),
+            # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
+            # a different version for the requirements than the other two PEXes, which can result
+            # in a PEX runtime error about missing dependencies.
+            hardcoded_interpreter_constraints=partition.interpreter_constraints,
+            internal_only=True,
+            direct_deps_only=True,
+        ),
+    )
+
     plugin_requirements = PexRequirements.create_from_requirement_fields(
         plugin_tgt[PythonRequirementsField]
         for plugin_tgt in partition.plugin_targets
         if plugin_tgt.has_field(PythonRequirementsField)
     )
+    # Right now any Pylint transitive requirements will shadow corresponding user
+    # requirements, which could lead to problems.
     pylint_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="pylint.pex",
             internal_only=True,
             requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
-            interpreter_constraints=partition.interpreter_constraints,
-        ),
-    )
-    requirements_pex_request = Get(
-        Pex,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(
-            (field_set.address for field_set in partition.field_sets),
-            internal_only=True,
-            direct_deps_only=True,
-        ),
-    )
-    # TODO(John Sirois): Support shading python binaries:
-    #   https://github.com/pantsbuild/pants/issues/9206
-    # Right now any Pylint transitive requirements will shadow corresponding user
-    # requirements, which could lead to problems.
-    pylint_runner_pex_args = ["--pex-path", ":".join(["pylint.pex", "requirements.pex"])]
-    pylint_runner_pex_request = Get(
-        Pex,
-        PexRequest(
-            output_filename="pylint_runner.pex",
-            internal_only=True,
             entry_point=pylint.entry_point,
             interpreter_constraints=partition.interpreter_constraints,
-            additional_args=pylint_runner_pex_args,
+            # TODO(John Sirois): Support shading python binaries:
+            #   https://github.com/pantsbuild/pants/issues/9206
+            additional_args=("--pex-path", requirements_pex_request.input.output_filename),
         ),
     )
 
@@ -173,7 +165,6 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     (
         pylint_pex,
         requirements_pex,
-        pylint_runner_pex,
         config_digest,
         prepared_plugin_sources,
         prepared_python_sources,
@@ -181,7 +172,6 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     ) = await MultiGet(
         pylint_pex_request,
         requirements_pex_request,
-        pylint_runner_pex_request,
         config_digest_request,
         prepare_plugin_sources_request,
         prepare_python_sources_request,
@@ -212,7 +202,6 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
             (
                 pylint_pex.digest,
                 requirements_pex.digest,
-                pylint_runner_pex.digest,
                 config_digest,
                 prefixed_plugin_sources,
                 prepared_python_sources.source_files.snapshot.digest,
@@ -223,7 +212,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     result = await Get(
         FallibleProcessResult,
         PexProcess(
-            pylint_runner_pex,
+            pylint_pex,
             argv=generate_args(source_files=field_set_sources, pylint=pylint),
             input_digest=input_digest,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
@@ -267,20 +256,23 @@ async def pylint_lint(
 
     # We batch targets by their interpreter constraints to ensure, for example, that all Python 2
     # targets run together and all Python 3 targets run together.
+    # Note that Pylint uses the AST of the interpreter that runs it. So, we include any plugin
+    # targets in this interpreter constraints calculation.
     interpreter_constraints_to_target_setup = defaultdict(set)
     for field_set, tgt, dependencies in zip(
         request.field_sets, linted_targets, per_target_dependencies
     ):
         target_setup = PylintTargetSetup(field_set, Targets([tgt, *dependencies]))
-        interpreter_constraints = (
-            PexInterpreterConstraints.create_from_compatibility_fields(
-                (
-                    *(tgt.get(PythonInterpreterCompatibility) for tgt in [tgt, *dependencies]),
-                    *plugin_targets_compatibility_fields,
+        interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+            (
+                *(
+                    tgt[PythonInterpreterCompatibility]
+                    for tgt in [tgt, *dependencies]
+                    if tgt.has_field(PythonInterpreterCompatibility)
                 ),
-                python_setup,
-            )
-            or PexInterpreterConstraints(pylint.interpreter_constraints)
+                *plugin_targets_compatibility_fields,
+            ),
+            python_setup,
         )
         interpreter_constraints_to_target_setup[interpreter_constraints].add(target_setup)
 

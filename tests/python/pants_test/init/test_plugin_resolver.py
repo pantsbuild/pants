@@ -16,7 +16,6 @@ from pkg_resources import Requirement, WorkingSet
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, PexRequirements
 from pants.core.util_rules import archive, external_tool
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.init.plugin_resolver import PluginResolver
@@ -44,8 +43,8 @@ class PluginResolverTest(TestBase):
             *pex.rules(),
             *external_tool.rules(),
             *archive.rules(),
-            QueryRule(Pex, (PexRequest, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(Process, (PexProcess, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(Pex, (PexRequest,)),
+            QueryRule(Process, (PexProcess,)),
             QueryRule(ProcessResult, (Process,)),
         )
 
@@ -59,7 +58,6 @@ class PluginResolverTest(TestBase):
                     requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"]),
                 ),
                 create_options_bootstrapper(args=["--backend-packages=pants.backend.python"]),
-                PantsEnvironment(),
             ],
         )
 

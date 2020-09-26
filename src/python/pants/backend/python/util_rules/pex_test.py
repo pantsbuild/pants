@@ -6,7 +6,7 @@ import os.path
 import textwrap
 import zipfile
 from dataclasses import dataclass
-from typing import Dict, Iterable, Iterator, List, Optional, Tuple, cast
+from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, cast
 
 import pytest
 from pkg_resources import Requirement
@@ -21,14 +21,12 @@ from pants.backend.python.util_rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.target import FieldSet
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.python.python_setup import PythonSetup
-from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -161,69 +159,24 @@ def test_interpreter_constraints_do_not_include_python2(constraints):
 
 
 @pytest.mark.parametrize(
-    "constraints",
+    "constraints,expected",
     [
-        ["CPython==3.6.*"],
-        ["CPython==3.6.1"],
-        ["CPython==3.7.1"],
-        ["CPython==3.8.2"],
-        ["CPython==3.9.1"],
-        ["CPython>=3.6"],
-        ["CPython>=3.7"],
-        ["CPython==3.6.*", "CPython==3.7.*"],
-        ["PyPy>=3.6"],
+        (["CPython>=2.7"], "2.7"),
+        (["CPython>=3.5"], "3.5"),
+        (["CPython>=3.6"], "3.6"),
+        (["CPython>=3.7"], "3.7"),
+        (["CPython>=3.8"], "3.8"),
+        (["CPython>=3.9"], "3.9"),
+        (["CPython>=3.10"], "3.10"),
+        (["CPython==2.7.10"], "2.7"),
+        (["CPython==3.5.*", "CPython>=3.6"], "3.5"),
+        (["CPython==2.6.*"], None),
     ],
 )
-def test_interpreter_constraints_require_python36(constraints) -> None:
-    assert PexInterpreterConstraints(constraints).requires_python36_or_newer() is True
-
-
-@pytest.mark.parametrize(
-    "constraints",
-    [
-        ["CPython==3.5.*"],
-        ["CPython==3.5.3"],
-        ["CPython>=3.5"],
-        ["CPython==3.5.*", "CPython==3.6.*"],
-        ["CPython==3.5.3", "CPython==3.6.3"],
-        ["PyPy>=3.5"],
-    ],
-)
-def test_interpreter_constraints_do_not_require_python36(constraints):
-    assert PexInterpreterConstraints(constraints).requires_python36_or_newer() is False
-
-
-@pytest.mark.parametrize(
-    "constraints",
-    [
-        ["CPython==3.7.*"],
-        ["CPython==3.7.1"],
-        ["CPython==3.8.1"],
-        ["CPython==3.9.1"],
-        ["CPython>=3.7"],
-        ["CPython>=3.8"],
-        ["CPython==3.7.*", "CPython==3.8.*"],
-        ["PyPy>=3.7"],
-    ],
-)
-def test_interpreter_constraints_require_python37(constraints) -> None:
-    assert PexInterpreterConstraints(constraints).requires_python37_or_newer() is True
-
-
-@pytest.mark.parametrize(
-    "constraints",
-    [
-        ["CPython==3.5.*"],
-        ["CPython==3.6.*"],
-        ["CPython==3.6.3"],
-        ["CPython>=3.6"],
-        ["CPython==3.6.*", "CPython==3.7.*"],
-        ["CPython==3.6.3", "CPython==3.7.3"],
-        ["PyPy>=3.6"],
-    ],
-)
-def test_interpreter_constraints_do_not_require_python37(constraints):
-    assert PexInterpreterConstraints(constraints).requires_python37_or_newer() is False
+def test_interpreter_constraints_minimum_python_version(
+    constraints: List[str], expected: str
+) -> None:
+    assert PexInterpreterConstraints(constraints).minimum_python_version() == expected
 
 
 @pytest.mark.parametrize(
@@ -318,8 +271,8 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_rules(),
-            QueryRule(Pex, (PexRequest, OptionsBootstrapper, PantsEnvironment)),
-            QueryRule(Process, (PexProcess, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(Pex, (PexRequest,)),
+            QueryRule(Process, (PexProcess,)),
             QueryRule(ProcessResult, (Process,)),
         ]
     )
@@ -336,6 +289,7 @@ def create_pex_and_get_all_data(
     additional_inputs: Optional[Digest] = None,
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
+    env: Optional[Mapping[str, str]] = None,
     internal_only: bool = True,
 ) -> Dict:
     request = PexRequest(
@@ -349,16 +303,10 @@ def create_pex_and_get_all_data(
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
     )
-    pex = rule_runner.request(
-        Pex,
-        [
-            request,
-            create_options_bootstrapper(
-                args=["--backend-packages=pants.backend.python", *additional_pants_args]
-            ),
-            PantsEnvironment(),
-        ],
+    rule_runner.set_options(
+        ["--backend-packages=pants.backend.python", *additional_pants_args], env=env
     )
+    pex = rule_runner.request(Pex, [request])
     rule_runner.scheduler.write_digest(pex.digest)
     pex_path = os.path.join(rule_runner.build_root, "test.pex")
     with zipfile.ZipFile(pex_path, "r") as zipfp:
@@ -407,8 +355,8 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
         [
             CreateDigest(
                 (
-                    FileContent(path="main.py", content=b'print("from main")'),
-                    FileContent(path="subdir/sub.py", content=b'print("from sub")'),
+                    FileContent("main.py", b'print("from main")'),
+                    FileContent("subdir/sub.py", b'print("from sub")'),
                 )
             ),
         ],
@@ -453,7 +401,16 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
             ),
         ],
     )
-    pex_output = create_pex_and_get_all_data(rule_runner, entry_point="main", sources=sources)
+    pex_output = create_pex_and_get_all_data(
+        rule_runner,
+        entry_point="main",
+        sources=sources,
+        additional_pants_args=(
+            "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
+            "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
+        ),
+        env={"LANG": "es_PY.UTF-8"},
+    )
 
     process = rule_runner.request(
         Process,
@@ -464,13 +421,6 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
                 input_digest=pex_output["pex"].digest,
                 description="Run the pex and check its reported environment",
             ),
-            create_options_bootstrapper(
-                args=[
-                    "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
-                    "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
-                ]
-            ),
-            PantsEnvironment({"LANG": "es_PY.UTF-8"}),
         ],
     )
 

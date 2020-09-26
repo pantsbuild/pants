@@ -4,7 +4,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Dict, List, Optional, Set, Tuple
+from typing import DefaultDict, Dict, List, Optional, Set, Tuple, cast
 
 from pants.backend.python.target_types import (
     ModuleMappingField,
@@ -170,9 +170,9 @@ async def map_module_to_address(
     third_party_resolved_with_first_party_ambiguity = third_party_address and first_party_addresses
 
     if third_party_resolved_only:
-        return PythonModuleOwners([third_party_address])  # type: ignore[list-item]
+        return PythonModuleOwners([cast(Address, third_party_address)])
     elif third_party_resolved_with_type_stub:
-        return PythonModuleOwners([third_party_address, first_party_addresses[0]])  # type: ignore[list-item]
+        return PythonModuleOwners([cast(Address, third_party_address), first_party_addresses[0]])
     elif third_party_resolved_with_first_party_ambiguity:
         return PythonModuleOwners()
     elif first_party_addresses:

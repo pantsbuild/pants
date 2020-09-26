@@ -9,7 +9,6 @@ import pytest
 
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import QueryRule
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import (
     OptionalSourceRoot,
     SourceRoot,
@@ -21,7 +20,7 @@ from pants.source.source_root import (
     get_optional_source_root,
 )
 from pants.source.source_root import rules as source_root_rules
-from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 
 
@@ -286,22 +285,15 @@ def test_source_roots_request() -> None:
     rule_runner = RuleRunner(
         rules=[
             *source_root_rules(),
-            QueryRule(SourceRootsResult, (SourceRootsRequest, OptionsBootstrapper)),
+            QueryRule(SourceRootsResult, (SourceRootsRequest,)),
         ]
     )
+    rule_runner.set_options(["--source-root-patterns=['src/python','tests/python']"])
     req = SourceRootsRequest(
         files=(PurePath("src/python/foo/bar.py"), PurePath("tests/python/foo/bar_test.py")),
         dirs=(PurePath("src/python/foo"), PurePath("src/python/baz/qux")),
     )
-    res = rule_runner.request(
-        SourceRootsResult,
-        [
-            req,
-            create_options_bootstrapper(
-                args=["--source-root-patterns=['src/python','tests/python']"]
-            ),
-        ],
-    )
+    res = rule_runner.request(SourceRootsResult, [req])
     assert {
         PurePath("src/python/foo/bar.py"): SourceRoot("src/python"),
         PurePath("tests/python/foo/bar_test.py"): SourceRoot("tests/python"),

@@ -2,7 +2,7 @@ use crate::context::Context;
 use crate::core::{throw, Value};
 use crate::externs;
 use crate::nodes::MultiPlatformExecuteProcess;
-use crate::nodes::{lift_digest, DownloadedFile, NodeResult, Paths, Snapshot};
+use crate::nodes::{lift_digest, DownloadedFile, NodeResult, Paths, SessionValues, Snapshot};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 
@@ -100,6 +100,13 @@ impl Intrinsics {
         inputs: vec![types.digest_subset],
       },
       Box::new(digest_subset_to_digest),
+    );
+    intrinsics.insert(
+      Intrinsic {
+        product: types.session_values,
+        inputs: vec![],
+      },
+      Box::new(session_values),
     );
     Intrinsics { intrinsics }
   }
@@ -297,8 +304,10 @@ fn path_globs_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
-    let key = externs::acquire_key_for(args.pop().unwrap())?;
-    let digest = context.get(Snapshot(key)).await?;
+    let val = args.pop().unwrap();
+    let path_globs = Snapshot::lift_path_globs(&val)
+      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
+    let digest = context.get(Snapshot::from_path_globs(path_globs)).await?;
     Ok(Snapshot::store_directory_digest(&core, &digest))
   }
   .boxed()
@@ -310,8 +319,10 @@ fn path_globs_to_paths(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
-    let key = externs::acquire_key_for(args.pop().unwrap())?;
-    let paths = context.get(Paths(key)).await?;
+    let val = args.pop().unwrap();
+    let path_globs = Snapshot::lift_path_globs(&val)
+      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
+    let paths = context.get(Paths::from_path_globs(path_globs)).await?;
     Paths::store_paths(&core, &paths).map_err(|e: String| throw(&e))
   }
   .boxed()
@@ -374,7 +385,7 @@ fn digest_subset_to_digest(
   let store = context.core.store();
 
   async move {
-    let path_globs = Snapshot::lift_path_globs(&globs).map_err(|e| throw(&e))?;
+    let path_globs = Snapshot::lift_prepared_path_globs(&globs).map_err(|e| throw(&e))?;
     let original_digest =
       lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
     let subset_params = SubsetParams { globs: path_globs };
@@ -385,4 +396,8 @@ fn digest_subset_to_digest(
     Ok(Snapshot::store_directory_digest(&context.core, &digest))
   }
   .boxed()
+}
+
+fn session_values(context: Context, _args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
+  async move { context.get(SessionValues).await }.boxed()
 }

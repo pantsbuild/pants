@@ -14,8 +14,11 @@ class MyPy(PythonToolBase):
     options_scope = "mypy"
     default_version = "mypy==0.782"
     default_entry_point = "mypy"
-    # See `mypy/rules.py`. We only use these default constraints in some situations.
-    default_interpreter_constraints = ["CPython>=3.5"]
+    # See `mypy/rules.py`. We only use these default constraints in some situations. Technically,
+    # MyPy only requires 3.5+, but some popular plugins like `django-stubs` require 3.6+. Because
+    # 3.5 is EOL, and users can tweak this back, this seems like a more sensible default.
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.6"]
 
     @classmethod
     def register_options(cls, register):

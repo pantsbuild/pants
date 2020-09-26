@@ -129,9 +129,10 @@ class BuildConfiguration:
                 raise TypeError("The rules must be an iterable, given {!r}".format(rules))
 
             # "Index" the rules to normalize them and expand their dependencies.
-            rules, union_rules = RuleIndex.create(rules).normalized_rules()
-            self._rules.update(rules)
-            self._union_rules.update(union_rules)
+            rule_index = RuleIndex.create(rules)
+            self._rules.update(rule_index.rules)
+            self._rules.update(rule_index.queries)
+            self._union_rules.update(rule_index.union_rules)
             self.register_optionables(
                 rule.output_type for rule in self._rules if issubclass(rule.output_type, Optionable)
             )

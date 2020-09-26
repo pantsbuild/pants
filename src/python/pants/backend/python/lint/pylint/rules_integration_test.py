@@ -12,12 +12,9 @@ from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.target import Target
-from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -27,7 +24,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pylint_rules(),
-            QueryRule(LintResults, (PylintRequest, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(LintResults, (PylintRequest,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary, PylintSourcePlugin],
     )
@@ -74,9 +71,8 @@ def make_target(
             """
         ),
     )
-    return rule_runner.get_target(
-        Address(package, target_name=name), create_options_bootstrapper(args=GLOBAL_ARGS)
-    )
+    rule_runner.set_options(GLOBAL_ARGS)
+    return rule_runner.get_target(Address(package, target_name=name))
 
 
 def run_pylint(
@@ -98,13 +94,10 @@ def run_pylint(
         args.append("--pylint-skip")
     if additional_args:
         args.extend(additional_args)
+    rule_runner.set_options(args)
     results = rule_runner.request(
         LintResults,
-        [
-            PylintRequest(PylintFieldSet.create(tgt) for tgt in targets),
-            create_options_bootstrapper(args=args),
-            PantsEnvironment(),
-        ],
+        [PylintRequest(PylintFieldSet.create(tgt) for tgt in targets)],
     )
     return results.results
 

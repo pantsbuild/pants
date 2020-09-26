@@ -209,7 +209,7 @@ impl hash::Hash for Key {
 
 impl fmt::Display for Key {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::type_to_str(self.type_id))
+    write!(f, "{}", externs::key_to_str(self))
   }
 }
 

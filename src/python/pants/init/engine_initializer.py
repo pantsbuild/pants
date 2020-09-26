@@ -11,7 +11,6 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine import desktop, fs, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
@@ -21,6 +20,7 @@ from pants.engine.internals.native import Native
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
+from pants.engine.internals.session import SessionValues
 from pants.engine.platform import create_platform_rules
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule, collect_rules, rule
@@ -50,8 +50,11 @@ class GraphScheduler:
         dynamic_ui: bool = False,
         use_colors=True,
         should_report_workunits=False,
+        session_values: Optional[SessionValues] = None,
     ) -> "GraphSession":
-        session = self.scheduler.new_session(build_id, dynamic_ui, should_report_workunits)
+        session = self.scheduler.new_session(
+            build_id, dynamic_ui, should_report_workunits, session_values=session_values
+        )
         console = Console(use_colors=use_colors, session=session if dynamic_ui else None)
         return GraphSession(session, console, self.goal_map)
 
@@ -65,14 +68,7 @@ class GraphSession:
     goal_map: Any
 
     # NB: Keep this in sync with the method `run_goal_rules`.
-    goal_param_types: ClassVar[Tuple[Type, ...]] = (
-        Specs,
-        Console,
-        InteractiveRunner,
-        OptionsBootstrapper,
-        Workspace,
-        PantsEnvironment,
-    )
+    goal_param_types: ClassVar[Tuple[Type, ...]] = (Specs, Console, InteractiveRunner, Workspace)
 
     def goal_consumed_subsystem_scopes(self, goal_name: str) -> Tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
@@ -95,7 +91,6 @@ class GraphSession:
     def run_goal_rules(
         self,
         *,
-        options_bootstrapper: OptionsBootstrapper,
         union_membership: UnionMembership,
         goals: Iterable[str],
         specs: Specs,
@@ -112,7 +107,6 @@ class GraphSession:
 
         workspace = Workspace(self.scheduler_session)
         interactive_runner = InteractiveRunner(self.scheduler_session)
-        pants_environment = PantsEnvironment()
 
         for goal in goals:
             goal_product = self.goal_map[goal]
@@ -125,14 +119,7 @@ class GraphSession:
             if not is_implemented:
                 continue
             # NB: Keep this in sync with the property `goal_param_types`.
-            params = Params(
-                specs,
-                options_bootstrapper,
-                self.console,
-                workspace,
-                interactive_runner,
-                pants_environment,
-            )
+            params = Params(specs, self.console, workspace, interactive_runner)
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
                 exit_code = self.scheduler_session.run_goal_rule(

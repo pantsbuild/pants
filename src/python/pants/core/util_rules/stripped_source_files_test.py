@@ -11,8 +11,6 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.scheduler import ExecutionError
-from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -21,8 +19,8 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *stripped_source_files.rules(),
-            QueryRule(SourceFiles, (SourceFilesRequest, OptionsBootstrapper)),
-            QueryRule(StrippedSourceFiles, (SourceFiles, OptionsBootstrapper)),
+            QueryRule(SourceFiles, (SourceFilesRequest,)),
+            QueryRule(StrippedSourceFiles, (SourceFiles,)),
         ]
     )
 
@@ -42,10 +40,8 @@ def get_stripped_files(
     if not has_source_root_patterns:
         source_root_patterns = ["src/python", "src/java", "tests/python"]
         args.append(f"--source-root-patterns={json.dumps(source_root_patterns)}")
-    result = rule_runner.request(
-        StrippedSourceFiles,
-        [request, create_options_bootstrapper(args=args)],
-    )
+    rule_runner.set_options(args)
+    result = rule_runner.request(StrippedSourceFiles, [request])
     return list(result.snapshot.files)
 
 

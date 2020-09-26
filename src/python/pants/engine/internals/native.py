@@ -24,6 +24,7 @@ from pants.engine.internals.native_engine import (  # type: ignore[import]
     PyTasks,
     PyTypes,
 )
+from pants.engine.internals.session import SessionValues
 from pants.engine.rules import Get
 from pants.engine.unions import union
 from pants.util.logging import LogLevel
@@ -207,12 +208,14 @@ class Native(metaclass=SingletonMetaclass):
         dynamic_ui: bool,
         build_id,
         should_report_workunits: bool,
+        session_values: SessionValues,
     ) -> PySession:
         return PySession(
             scheduler,
             dynamic_ui,
             build_id,
             should_report_workunits,
+            session_values,
         )
 
     def new_scheduler(

@@ -56,7 +56,7 @@ MESSAGE
 
 function activate_pants_venv() {
   # Allow for multiple calls to `activate_pants_venv`.
-  if [ -n "$VENV_ACTIVATED_FOR_PANTS" ]; then
+  if [[ -n "${VENV_ACTIVATED_FOR_PANTS:-}" ]]; then
     return
   else
     export VENV_ACTIVATED_FOR_PANTS="true"

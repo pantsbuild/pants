@@ -180,9 +180,9 @@ pub struct Process {
 
   pub input_files: hashing::Digest,
 
-  pub output_files: BTreeSet<PathBuf>,
+  pub output_files: BTreeSet<RelativePath>,
 
-  pub output_directories: BTreeSet<PathBuf>,
+  pub output_directories: BTreeSet<RelativePath>,
 
   pub timeout: Option<std::time::Duration>,
 
@@ -267,7 +267,7 @@ impl Process {
   ///
   /// Replaces the output files for this process.
   ///
-  pub fn output_files(mut self, output_files: BTreeSet<PathBuf>) -> Process {
+  pub fn output_files(mut self, output_files: BTreeSet<RelativePath>) -> Process {
     self.output_files = output_files;
     self
   }
@@ -275,7 +275,7 @@ impl Process {
   ///
   /// Replaces the output directories for this process.
   ///
-  pub fn output_directories(mut self, output_directories: BTreeSet<PathBuf>) -> Process {
+  pub fn output_directories(mut self, output_directories: BTreeSet<RelativePath>) -> Process {
     self.output_directories = output_directories;
     self
   }

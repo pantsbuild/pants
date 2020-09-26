@@ -575,8 +575,6 @@ class GlobalOptions(Subsystem):
         )
 
         # BinaryUtil options.
-        # TODO: Nuke these once we get rid of src/python/pants/binaries/binary_util.py
-        #  (see there for what that will take).
         register(
             "--binaries-baseurls",
             type=list,
@@ -584,6 +582,8 @@ class GlobalOptions(Subsystem):
             default=["https://binaries.pantsbuild.org"],
             help="List of URLs from which binary tools are downloaded. URLs are "
             "searched in order until the requested path is found.",
+            removal_version="2.1.0.dev0",
+            removal_hint="This option has no effect",
         )
         register(
             "--binaries-fetch-timeout-secs",
@@ -592,6 +592,8 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help="Timeout in seconds for URL reads when fetching binary tools from the "
             "repos specified by --baseurls.",
+            removal_version="2.1.0.dev0",
+            removal_hint="This option has no effect",
         )
         register(
             "--binaries-path-by-id",
@@ -602,6 +604,8 @@ class GlobalOptions(Subsystem):
                 "(sysname, id) -> (os, arch), e.g. {('darwin', '15'): ('mac', '10.11'), "
                 "('linux', 'arm32'): ('linux', 'arm32')}."
             ),
+            removal_version="2.1.0.dev0",
+            removal_hint="This option has no effect",
         )
         register(
             "--allow-external-binary-tool-downloads",
@@ -612,6 +616,8 @@ class GlobalOptions(Subsystem):
             "generated from --binaries-baseurls, even if the tool has an external url "
             "generator. This can be necessary if using Pants in an environment which cannot "
             "contact the wider Internet.",
+            removal_version="2.1.0.dev0",
+            removal_hint="This option has no effect",
         )
 
         # Pants Daemon options.
@@ -931,7 +937,7 @@ class GlobalOptions(Subsystem):
             "--build-ignore",
             advanced=True,
             type=list,
-            default=[".*/", "bower_components/", "node_modules/", "*.egg-info/"],
+            default=[],
             help=(
                 "Paths to ignore when identifying BUILD files. This does not affect any other "
                 "filesystem operations; use `--pants-ignore` for that instead. Patterns use the "

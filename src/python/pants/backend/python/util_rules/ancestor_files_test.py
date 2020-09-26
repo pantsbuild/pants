@@ -12,8 +12,6 @@ from pants.backend.python.util_rules.ancestor_files import (
     identify_missing_ancestor_files,
 )
 from pants.engine.fs import DigestContents
-from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -22,7 +20,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *ancestor_files.rules(),
-            QueryRule(AncestorFiles, (AncestorFilesRequest, OptionsBootstrapper)),
+            QueryRule(AncestorFiles, (AncestorFilesRequest,)),
         ]
     )
 
@@ -35,14 +33,14 @@ def assert_injected(
     original_undeclared_files: List[str],
     expected_discovered: List[str],
 ) -> None:
+    rule_runner.set_options([f"--source-root-patterns={source_roots}"])
     for f in original_undeclared_files:
         rule_runner.create_file(f, "# undeclared")
     request = AncestorFilesRequest(
         "__init__.py",
         rule_runner.make_snapshot({fp: "# declared" for fp in original_declared_files}),
     )
-    bootstrapper = create_options_bootstrapper(args=[f"--source-root-patterns={source_roots}"])
-    result = rule_runner.request(AncestorFiles, [request, bootstrapper]).snapshot
+    result = rule_runner.request(AncestorFiles, [request]).snapshot
     assert list(result.files) == sorted(expected_discovered)
 
     materialized_result = rule_runner.request(DigestContents, [result.digest])

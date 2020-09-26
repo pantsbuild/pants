@@ -412,6 +412,7 @@ py_class!(class PyTypes |py| {
       multi_platform_process: PyType,
       process_result: PyType,
       coroutine: PyType,
+      session_values: PyType,
       interactive_process_result: PyType,
       engine_aware_parameter: PyType
   ) -> CPyResult<Self> {
@@ -434,6 +435,7 @@ py_class!(class PyTypes |py| {
         multi_platform_process: externs::type_for(multi_platform_process),
         process_result: externs::type_for(process_result),
         coroutine: externs::type_for(coroutine),
+        session_values: externs::type_for(session_values),
         interactive_process_result: externs::type_for(interactive_process_result),
         engine_aware_parameter: externs::type_for(engine_aware_parameter),
     })),
@@ -538,13 +540,15 @@ py_class!(class PySession |py| {
           scheduler_ptr: PyScheduler,
           should_render_ui: bool,
           build_id: String,
-          should_report_workunits: bool
+          should_report_workunits: bool,
+          session_values: PyObject
     ) -> CPyResult<Self> {
       Self::create_instance(py, Session::new(
           scheduler_ptr.scheduler(py),
           should_render_ui,
           build_id,
           should_report_workunits,
+          session_values.into(),
         )
       )
     }
@@ -1326,7 +1330,7 @@ fn match_path_globs(
 ) -> CPyResult<Vec<String>> {
   let matches = py
     .allow_threads(|| {
-      let path_globs = nodes::Snapshot::lift_path_globs(&path_globs.into())?;
+      let path_globs = nodes::Snapshot::lift_prepared_path_globs(&path_globs.into())?;
 
       Ok(
         paths
@@ -1359,8 +1363,10 @@ fn capture_snapshots(
     .iter()
     .map(|value| {
       let root = PathBuf::from(externs::project_str(&value, "root"));
-      let path_globs =
-        nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
+      let path_globs = nodes::Snapshot::lift_prepared_path_globs(&externs::project_ignoring_type(
+        &value,
+        "path_globs",
+      ));
       let digest_hint = {
         let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
         if maybe_digest == Value::from(externs::none()) {

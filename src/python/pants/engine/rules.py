@@ -12,7 +12,6 @@ from types import FrameType, ModuleType
 from typing import (
     Any,
     Callable,
-    Dict,
     Iterable,
     List,
     Mapping,
@@ -464,36 +463,29 @@ class QueryRule(Rule):
 class RuleIndex:
     """Holds a normalized index of Rules used to instantiate Nodes."""
 
-    rules: Dict[Type, OrderedSet[Rule]]
+    rules: FrozenOrderedSet[TaskRule]
     queries: FrozenOrderedSet[QueryRule]
     union_rules: FrozenOrderedSet[UnionRule]
 
     @classmethod
     def create(cls, rule_entries) -> "RuleIndex":
         """Creates a RuleIndex with tasks indexed by their output type."""
-        serializable_rules: Dict[Type, OrderedSet[Rule]] = {}
+        rules: OrderedSet[TaskRule] = OrderedSet()
         queries: OrderedSet[QueryRule] = OrderedSet()
         union_rules: OrderedSet[UnionRule] = OrderedSet()
 
-        def add_rule(rule: Rule) -> None:
-            if isinstance(rule, QueryRule):
-                queries.add(rule)
-            else:
-                output_type = rule.output_type
-                if output_type not in serializable_rules:
-                    serializable_rules[output_type] = OrderedSet()
-                serializable_rules[output_type].add(rule)
-
         for entry in rule_entries:
-            if isinstance(entry, Rule):
-                add_rule(entry)
+            if isinstance(entry, TaskRule):
+                rules.add(entry)
             elif isinstance(entry, UnionRule):
                 union_rules.add(entry)
+            elif isinstance(entry, QueryRule):
+                queries.add(entry)
             elif hasattr(entry, "__call__"):
                 rule = getattr(entry, "rule", None)
                 if rule is None:
                     raise TypeError(f"Expected function {entry} to be decorated with @rule.")
-                add_rule(rule)
+                rules.add(rule)
             else:
                 raise TypeError(
                     f"Rule entry {entry} had an unexpected type: {type(entry)}. Rules either "
@@ -501,16 +493,7 @@ class RuleIndex:
                 )
 
         return RuleIndex(
-            rules=serializable_rules,
+            rules=FrozenOrderedSet(rules),
             queries=FrozenOrderedSet(queries),
             union_rules=FrozenOrderedSet(union_rules),
         )
-
-    def normalized_rules(self) -> Tuple[FrozenOrderedSet[Rule], FrozenOrderedSet[UnionRule]]:
-        rules = FrozenOrderedSet(
-            (
-                *itertools.chain.from_iterable(ruleset for ruleset in self.rules.values()),
-                *self.queries,
-            )
-        )
-        return rules, self.union_rules

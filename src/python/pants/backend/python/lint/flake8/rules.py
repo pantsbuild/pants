@@ -62,16 +62,13 @@ def generate_args(
 async def flake8_lint_partition(
     partition: Flake8Partition, flake8: Flake8, lint_subsystem: LintSubsystem
 ) -> LintResult:
-    requirements_pex_request = Get(
+    flake8_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="flake8.pex",
             internal_only=True,
             requirements=PexRequirements(flake8.all_requirements),
-            interpreter_constraints=(
-                partition.interpreter_constraints
-                or PexInterpreterConstraints(flake8.interpreter_constraints)
-            ),
+            interpreter_constraints=partition.interpreter_constraints,
             entry_point=flake8.entry_point,
         ),
     )
@@ -89,13 +86,13 @@ async def flake8_lint_partition(
         SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
 
-    requirements_pex, config_digest, source_files = await MultiGet(
-        requirements_pex_request, config_digest_request, source_files_request
+    flake8_pex, config_digest, source_files = await MultiGet(
+        flake8_pex_request, config_digest_request, source_files_request
     )
 
     input_digest = await Get(
         Digest,
-        MergeDigests((source_files.snapshot.digest, requirements_pex.digest, config_digest)),
+        MergeDigests((source_files.snapshot.digest, flake8_pex.digest, config_digest)),
     )
 
     report_file_name = "flake8_report.txt" if lint_subsystem.reports_dir else None
@@ -103,7 +100,7 @@ async def flake8_lint_partition(
     result = await Get(
         FallibleProcessResult,
         PexProcess(
-            requirements_pex,
+            flake8_pex,
             argv=generate_args(
                 source_files=source_files, flake8=flake8, report_file_name=report_file_name
             ),

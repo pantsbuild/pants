@@ -3,7 +3,7 @@
 
 import re
 from textwrap import dedent
-from typing import Iterable, Optional, Set, cast
+from typing import Iterable, Set, cast
 
 import pytest
 
@@ -36,8 +36,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import Dependencies, Sources, Tags, Target
 from pants.option.global_options import GlobalOptions
-from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
@@ -156,9 +155,7 @@ def test_resolve_address() -> None:
 
 @pytest.fixture
 def target_adaptor_rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[QueryRule(TargetAdaptor, (Address, OptionsBootstrapper))], target_types=[MockTgt]
-    )
+    return RuleRunner(rules=[QueryRule(TargetAdaptor, (Address,))], target_types=[MockTgt])
 
 
 def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -181,9 +178,7 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
         ),
     )
     addr = Address("helloworld")
-    target_adaptor = target_adaptor_rule_runner.request(
-        TargetAdaptor, [addr, create_options_bootstrapper()]
-    )
+    target_adaptor = target_adaptor_rule_runner.request(TargetAdaptor, [addr])
     assert target_adaptor.name == "helloworld"
     assert target_adaptor.type_alias == "mock_tgt"
     assert target_adaptor.kwargs["dependencies"] == [
@@ -198,9 +193,8 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
-    bootstrapper = create_options_bootstrapper()
     with pytest.raises(ExecutionError) as exc:
-        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld"), bootstrapper])
+        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld")])
     assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
 
     target_adaptor_rule_runner.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
@@ -208,19 +202,18 @@ def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> Non
         "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
     )
     with pytest.raises(ExecutionError, match=expected_rx_str):
-        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld"), bootstrapper])
+        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld")])
 
 
 def test_build_file_address() -> None:
     rule_runner = RuleRunner(
-        rules=[QueryRule(BuildFileAddress, (Address, OptionsBootstrapper))], target_types=[MockTgt]
+        rules=[QueryRule(BuildFileAddress, (Address,))], target_types=[MockTgt]
     )
     rule_runner.create_file("helloworld/BUILD.ext", "mock_tgt()")
-    bootstrapper = create_options_bootstrapper()
 
     def assert_bfa_resolved(address: Address) -> None:
         expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=address)
-        bfa = rule_runner.request(BuildFileAddress, [address, bootstrapper])
+        bfa = rule_runner.request(BuildFileAddress, [address])
         assert bfa == expected_bfa
 
     assert_bfa_resolved(Address("helloworld"))
@@ -231,7 +224,7 @@ def test_build_file_address() -> None:
 @pytest.fixture
 def address_specs_rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(AddressesWithOrigins, (AddressSpecs, OptionsBootstrapper))],
+        rules=[QueryRule(AddressesWithOrigins, (AddressSpecs,))],
         target_types=[MockTgt],
     )
 
@@ -239,13 +232,11 @@ def address_specs_rule_runner() -> RuleRunner:
 def resolve_address_specs(
     rule_runner: RuleRunner,
     specs: Iterable[AddressSpec],
-    bootstrapper: Optional[OptionsBootstrapper] = None,
 ) -> Set[AddressWithOrigin]:
     result = rule_runner.request(
         AddressesWithOrigins,
         [
             AddressSpecs(specs, filter_by_global_options=True),
-            bootstrapper or create_options_bootstrapper(),
         ],
     )
     return set(result)
@@ -278,6 +269,7 @@ def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> N
 
 
 def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> None:
+    address_specs_rule_runner.set_options(["--tag=+integration"])
     address_specs_rule_runner.create_file("demo/f.txt")
     address_specs_rule_runner.add_to_build_file(
         "demo",
@@ -289,11 +281,9 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
             """
         ),
     )
-    bootstrapper = create_options_bootstrapper(args=["--tag=+integration"])
-
-    assert resolve_address_specs(
-        address_specs_rule_runner, [SiblingAddresses("demo")], bootstrapper=bootstrapper
-    ) == {AddressWithOrigin(Address("demo", target_name="b"), SiblingAddresses("demo"))}
+    assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
+        AddressWithOrigin(Address("demo", target_name="b"), SiblingAddresses("demo"))
+    }
 
     # The same filtering should work when given literal addresses, including file addresses.
     # For file addresses, we look up the `tags` field of the original base target.
@@ -307,7 +297,6 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
             AddressLiteralSpec("demo/f.txt", "b"),
             AddressLiteralSpec("demo/f.txt", "c"),
         ],
-        bootstrapper=bootstrapper,
     )
     assert literals_result == {
         AddressWithOrigin(
@@ -319,6 +308,7 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
 
 
 def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: RuleRunner) -> None:
+    address_specs_rule_runner.set_options(["--exclude-target-regexp=exclude_me.*"])
     address_specs_rule_runner.create_file("demo/f.txt")
     address_specs_rule_runner.add_to_build_file(
         "demo",
@@ -329,11 +319,10 @@ def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: Rule
             """
         ),
     )
-    bootstrapper = create_options_bootstrapper(args=["--exclude-target-regexp=exclude_me.*"])
 
-    assert resolve_address_specs(
-        address_specs_rule_runner, [SiblingAddresses("demo")], bootstrapper=bootstrapper
-    ) == {AddressWithOrigin(Address("demo", target_name="not_me"), SiblingAddresses("demo"))}
+    assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
+        AddressWithOrigin(Address("demo", target_name="not_me"), SiblingAddresses("demo"))
+    }
 
     # The same filtering should work when given literal addresses, including file addresses.
     # The filtering will operate against the normalized Address.spec.
@@ -345,7 +334,6 @@ def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: Rule
             AddressLiteralSpec("demo/f.txt", "exclude_me"),
             AddressLiteralSpec("demo/f.txt", "not_me"),
         ],
-        bootstrapper=bootstrapper,
     )
 
     assert literals_result == {

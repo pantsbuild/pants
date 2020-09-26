@@ -9,12 +9,9 @@ from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.target import Target
-from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -24,7 +21,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *flake8_rules(),
-            QueryRule(LintResults, (Flake8Request, OptionsBootstrapper, PantsEnvironment)),
+            QueryRule(LintResults, (Flake8Request,)),
         ]
     )
 
@@ -67,12 +64,11 @@ def run_flake8(
         args.append("--flake8-skip")
     if additional_args:
         args.extend(additional_args)
+    rule_runner.set_options(args)
     results = rule_runner.request(
         LintResults,
         [
             Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
-            create_options_bootstrapper(args=args),
-            PantsEnvironment(),
         ],
     )
     return results.results
