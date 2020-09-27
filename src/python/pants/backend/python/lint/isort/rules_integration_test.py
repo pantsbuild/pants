@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from dataclasses import replace
+import dataclasses
 from typing import List, Optional, Sequence, Tuple
 
 import pytest
@@ -171,11 +171,9 @@ def test_skip(rule_runner: RuleRunner) -> None:
 
 
 def test_stub_files(rule_runner: RuleRunner) -> None:
-    good_stub = replace(GOOD_SOURCE, path="good.pyi")
-    bad_stub = replace(BAD_SOURCE, path="bad.pyi")
-    fixed_bad_stub = replace(FIXED_BAD_SOURCE, path="bad.pyi")
-    needs_config_stub = replace(NEEDS_CONFIG_SOURCE, path="needs_config.pyi")
-    fixed_needs_config_stub = replace(FIXED_NEEDS_CONFIG_SOURCE, path="needs_config.pyi")
+    good_stub = dataclasses.replace(GOOD_SOURCE, path="good.pyi")
+    bad_stub = dataclasses.replace(BAD_SOURCE, path="bad.pyi")
+    fixed_bad_stub = dataclasses.replace(FIXED_BAD_SOURCE, path="bad.pyi")
 
     # Passing
     good_files = [GOOD_SOURCE, good_stub]
@@ -194,25 +192,4 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     assert fmt_result.stdout == "Fixing bad.py\nFixing bad.pyi\n"
     fixed_bad_files = [FIXED_BAD_SOURCE, fixed_bad_stub]
     assert fmt_result.output == get_digest(rule_runner, [*fixed_bad_files, *good_files])
-    assert fmt_result.did_change
-
-    # Mixed targets + Multiple targets + Needs config
-    targets = [
-        make_target_with_origin(rule_runner, [NEEDS_CONFIG_SOURCE, needs_config_stub]),
-        make_target_with_origin(rule_runner, [GOOD_SOURCE, BAD_SOURCE, good_stub, bad_stub]),
-    ]
-    lint_results, fmt_result = run_isort(
-        rule_runner, targets, config="[settings]\ncombine_as_imports=True\n"
-    )
-    assert len(lint_results) == 1 and lint_results[0].exit_code == 1
-    for bad_file in (BAD_SOURCE, bad_stub, NEEDS_CONFIG_SOURCE, needs_config_stub):
-        assert (
-            f"ERROR: {bad_file.path} Imports are incorrectly sorted and/or formatted.\n"
-            in lint_results[0].stderr
-        )
-        assert f"Fixing {bad_file.path}\n" in fmt_result.stdout
-    fixed_config_files = [FIXED_NEEDS_CONFIG_SOURCE, fixed_needs_config_stub]
-    assert fmt_result.output == get_digest(
-        rule_runner, [*fixed_config_files, *fixed_bad_files, *good_files]
-    )
     assert fmt_result.did_change
