@@ -107,7 +107,7 @@ class UnionMembership:
         - this is only a convention and is not actually enforced. So, you may have inaccurate type
         hints.
         """
-        return self.union_rules.get(union_type, FrozenOrderedSet())  # type: ignore[arg-type]
+        return self.union_rules.get(union_type, FrozenOrderedSet())
 
     def is_member(self, union_type: Type, putative_member: Type) -> bool:
         members = self.union_rules.get(union_type)

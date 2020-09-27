@@ -17,17 +17,19 @@ from typing import (
     AbstractSet,
     Any,
     Dict,
+    Hashable,
     Iterable,
     Iterator,
     MutableSet,
     Optional,
     Set,
     TypeVar,
-    Union,
     cast,
 )
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+_TAbstractOrderedSet = TypeVar("_TAbstractOrderedSet", bound="_AbstractOrderedSet")
 
 
 class _AbstractOrderedSet(AbstractSet[T]):
@@ -46,7 +48,7 @@ class _AbstractOrderedSet(AbstractSet[T]):
         """Returns the number of unique elements in the set."""
         return len(self._items)
 
-    def __copy__(self) -> "_AbstractOrderedSet[T]":
+    def __copy__(self: _TAbstractOrderedSet) -> _TAbstractOrderedSet:
         """Return a shallow copy of this object."""
         return self.__class__(self)
 
@@ -72,19 +74,28 @@ class _AbstractOrderedSet(AbstractSet[T]):
             return NotImplemented
         return all(x == y for x, y in itertools.zip_longest(self._items, other._items))
 
-    def union(self, *others: Iterable[T]) -> "_AbstractOrderedSet[T]":
+    def __or__(self: _TAbstractOrderedSet, other: Iterable[T]) -> _TAbstractOrderedSet:  # type: ignore[override]
+        return self.union(other)
+
+    def union(self: _TAbstractOrderedSet, *others: Iterable[T]) -> _TAbstractOrderedSet:
         """Combines all unique items.
 
         Each item's order is defined by its first appearance.
         """
-        merged_iterables = itertools.chain([self], others)
+        # Differences with AbstractSet: our set union forces "other" to have the same type. That is, while
+        # AbstractSet allows {1, 2, 3} | {(True, False)} resulting in Set[Union[int, Tuple[bool, bool]]], the analogous
+        # for descendants  of _TAbstractOrderedSet is not allowed.
+        # GOTCHA: given _TAbstractOrderedSet[S]:
+        #   if T is a subclass of S => _TAbstractOrderedSet[S] => *appears* to perform unification but it doesn't
+        #   if S is a subclass of T => type error (while AbstractSet would resolve to AbstractSet[T])
+        merged_iterables = itertools.chain([cast(Iterable[T], self)], others)
         return self.__class__(itertools.chain.from_iterable(merged_iterables))
 
-    def __and__(self, other: Iterable[T]) -> "_AbstractOrderedSet[T]":
+    def __and__(self: _TAbstractOrderedSet, other: Iterable[T]) -> _TAbstractOrderedSet:
         # The parent class's implementation of this is backwards.
         return self.intersection(other)
 
-    def intersection(self, *others: Iterable[T]) -> "_AbstractOrderedSet[T]":
+    def intersection(self: _TAbstractOrderedSet, *others: Iterable[T]) -> _TAbstractOrderedSet:
         """Returns elements in common between all sets.
 
         Order is defined only by the first set.
@@ -95,7 +106,7 @@ class _AbstractOrderedSet(AbstractSet[T]):
         common = set.intersection(*(set(other) for other in others))
         return cls(item for item in self if item in common)
 
-    def difference(self, *others: Iterable[T]) -> "_AbstractOrderedSet[T]":
+    def difference(self: _TAbstractOrderedSet, *others: Iterable[T]) -> _TAbstractOrderedSet:
         """Returns all elements that are in this set but not the others."""
         cls = self.__class__
         if not others:
@@ -123,7 +134,12 @@ class _AbstractOrderedSet(AbstractSet[T]):
             pass
         return all(item in self for item in other)
 
-    def symmetric_difference(self, other: Iterable[T]) -> "_AbstractOrderedSet[T]":
+    def __xor__(self: _TAbstractOrderedSet, other: Iterable[T]) -> _TAbstractOrderedSet:  # type: ignore[override]
+        return self.symmetric_difference(other)
+
+    def symmetric_difference(
+        self: _TAbstractOrderedSet, other: Iterable[T]
+    ) -> _TAbstractOrderedSet:
         """Return the symmetric difference of this OrderedSet and another set as a new OrderedSet.
         That is, the new set will contain all elements that are in exactly one of the sets.
 
@@ -140,24 +156,6 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
 
     This is not safe to use with the V2 engine.
     """
-
-    def __copy__(self) -> "OrderedSet[T]":
-        return cast(OrderedSet[T], super().__copy__())
-
-    def union(self, *others: Iterable[T]) -> "OrderedSet[T]":
-        return cast(OrderedSet[T], super().union(*others))
-
-    def __and__(self, other: Iterable[T]) -> "OrderedSet[T]":
-        return cast(OrderedSet[T], super().__and__(other))
-
-    def intersection(self, *others: Iterable[T]) -> "OrderedSet[T]":
-        return cast(OrderedSet[T], super().intersection(*others))
-
-    def difference(self, *others: Iterable[T]) -> "OrderedSet[T]":
-        return cast(OrderedSet[T], super().difference(*others))
-
-    def symmetric_difference(self, *others: Iterable[T]) -> "OrderedSet[T]":
-        return cast(OrderedSet[T], super().symmetric_difference(*others))
 
     def add(self, key: T) -> None:
         """Add `key` as an item to this OrderedSet."""
@@ -204,33 +202,15 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
             self._items[item] = None
 
 
-class FrozenOrderedSet(_AbstractOrderedSet[T]):
+class FrozenOrderedSet(_AbstractOrderedSet[T_co], Hashable):
     """A frozen (i.e. immutable) set that retains its order.
 
     This is safe to use with the V2 engine.
     """
 
-    def __init__(self, iterable: Optional[Iterable[T]] = None) -> None:
+    def __init__(self, iterable: Optional[Iterable[T_co]] = None) -> None:
         super().__init__(iterable)
-        self._hash: Union[int, None] = None
-
-    def __copy__(self) -> "FrozenOrderedSet[T]":
-        return cast(FrozenOrderedSet[T], super().__copy__())
-
-    def union(self, *others: Iterable[T]) -> "FrozenOrderedSet[T]":
-        return cast(FrozenOrderedSet[T], super().union(*others))
-
-    def __and__(self, other: Iterable[T]) -> "FrozenOrderedSet[T]":
-        return cast(FrozenOrderedSet[T], super().__and__(other))
-
-    def intersection(self, *others: Iterable[T]) -> "FrozenOrderedSet[T]":
-        return cast(FrozenOrderedSet[T], super().intersection(*others))
-
-    def difference(self, *others: Iterable[T]) -> "FrozenOrderedSet[T]":
-        return cast(FrozenOrderedSet[T], super().difference(*others))
-
-    def symmetric_difference(self, *others: Iterable[T]) -> "FrozenOrderedSet[T]":
-        return cast(FrozenOrderedSet[T], super().symmetric_difference(*others))
+        self._hash: Optional[int] = None
 
     def __hash__(self) -> int:
         if self._hash is None:
