@@ -215,7 +215,10 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, good_files)
     lint_results, fmt_result = run_black(rule_runner, [target])
     assert len(lint_results) == 1 and lint_results[0].exit_code == 0
-    assert "2 files would be left unchanged" in lint_results[0].stderr and "2 files left unchanged" in fmt_result.stderr
+    assert (
+        "2 files would be left unchanged" in lint_results[0].stderr
+        and "2 files left unchanged" in fmt_result.stderr
+    )
     assert fmt_result.output == get_digest(rule_runner, good_files)
     assert not fmt_result.did_change
 
@@ -223,7 +226,10 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE, bad_stub], name="failing_target")
     lint_results, fmt_result = run_black(rule_runner, [target])
     assert len(lint_results) == 1 and lint_results[0].exit_code == 1
-    assert "2 files would be reformatted" in lint_results[0].stderr and "2 files reformatted" in fmt_result.stderr
+    assert (
+        "2 files would be reformatted" in lint_results[0].stderr
+        and "2 files reformatted" in fmt_result.stderr
+    )
     fixed_bad_files = [FIXED_BAD_SOURCE, fixed_bad_stub]
     assert fmt_result.output == get_digest(rule_runner, [*fixed_bad_files, *good_files])
     assert fmt_result.did_change
@@ -231,15 +237,25 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     # Mixed targets + Multiple targets + Needs config
     targets = [
         make_target(rule_runner, [NEEDS_CONFIG_SOURCE, needs_config_stub], name="needs_config"),
-        make_target(rule_runner, [GOOD_SOURCE, BAD_SOURCE, good_stub, bad_stub], name="mixed_target"),
+        make_target(
+            rule_runner, [GOOD_SOURCE, BAD_SOURCE, good_stub, bad_stub], name="mixed_target"
+        ),
     ]
     lint_results, fmt_result = run_black(
         rule_runner, targets, config="[tool.black]\nskip-string-normalization = 'true'\n"
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "2 files would be reformatted" in lint_results[0].stderr and "2 files reformatted" in fmt_result.stderr
-    assert "4 files would be left unchanged" in lint_results[0].stderr and "4 files left unchanged" in fmt_result.stderr
+    assert (
+        "2 files would be reformatted" in lint_results[0].stderr
+        and "2 files reformatted" in fmt_result.stderr
+    )
+    assert (
+        "4 files would be left unchanged" in lint_results[0].stderr
+        and "4 files left unchanged" in fmt_result.stderr
+    )
     needs_config_files = [NEEDS_CONFIG_SOURCE, needs_config_stub]
-    assert fmt_result.output == get_digest(rule_runner, [*needs_config_files, *fixed_bad_files, *good_files])
+    assert fmt_result.output == get_digest(
+        rule_runner, [*needs_config_files, *fixed_bad_files, *good_files]
+    )
     assert fmt_result.did_change
