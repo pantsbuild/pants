@@ -75,12 +75,6 @@ class _AbstractOrderedSet(AbstractSet[T]):
         return all(x == y for x, y in itertools.zip_longest(self._items, other._items))
 
     def __or__(self: _TAbstractOrderedSet, other: Iterable[T]) -> _TAbstractOrderedSet:  # type: ignore[override]
-        # Differences with AbstractSet: our set union forces "other" to have the same type. That is, while
-        # AbstractSet allows {1, 2, 3} | {(True, False)} resulting in Set[Union[int, Tuple[bool, bool]]], the analogous
-        # for descendants  of _TAbstractOrderedSet is not allowed.
-        # GOTCHA: given higher kinded type _TAbstractOrderedSet[S]:
-        #   if T <: S => _TAbstractOrderedSet[S] => *appears* to perform unification but it doesn't
-        #   if S <: T => type error with this implementation (while AbstractSet would resolve to AbstractSet[T])
         return self.union(other)
 
     def union(self: _TAbstractOrderedSet, *others: Iterable[T]) -> _TAbstractOrderedSet:
@@ -88,7 +82,13 @@ class _AbstractOrderedSet(AbstractSet[T]):
 
         Each item's order is defined by its first appearance.
         """
-        merged_iterables: Iterable[Iterable] = itertools.chain([self], others)
+        # Differences with AbstractSet: our set union forces "other" to have the same type. That is, while
+        # AbstractSet allows {1, 2, 3} | {(True, False)} resulting in Set[Union[int, Tuple[bool, bool]]], the analogous
+        # for descendants  of _TAbstractOrderedSet is not allowed.
+        # GOTCHA: given _TAbstractOrderedSet[S]:
+        #   if T is a subclass of S => _TAbstractOrderedSet[S] => *appears* to perform unification but it doesn't
+        #   if S is a subclass of T => type error (while AbstractSet would resolve to AbstractSet[T])
+        merged_iterables = itertools.chain([cast(Iterable[T], self)], others)
         return self.__class__(itertools.chain.from_iterable(merged_iterables))
 
     def __and__(self: _TAbstractOrderedSet, other: Iterable[T]) -> _TAbstractOrderedSet:
