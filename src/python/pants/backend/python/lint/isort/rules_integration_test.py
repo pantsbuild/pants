@@ -189,6 +189,7 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     # Failing
     target = make_target_with_origin(rule_runner, [BAD_SOURCE, bad_stub])
     lint_results, fmt_result = run_isort(rule_runner, [target])
+    assert len(lint_results) == 1 and lint_results[0].exit_code == 1
     assert "bad.pyi Imports are incorrectly sorted" in lint_results[0].stderr
     assert fmt_result.stdout == "Fixing bad.py\nFixing bad.pyi\n"
     fixed_bad_files = [FIXED_BAD_SOURCE, fixed_bad_stub]
@@ -203,8 +204,7 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_isort(
         rule_runner, targets, config="[settings]\ncombine_as_imports=True\n"
     )
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
+    assert len(lint_results) == 1 and lint_results[0].exit_code == 1
     for bad_file in (BAD_SOURCE, bad_stub, NEEDS_CONFIG_SOURCE, needs_config_stub):
         assert (
             f"ERROR: {bad_file.path} Imports are incorrectly sorted and/or formatted.\n"
