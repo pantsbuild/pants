@@ -22,7 +22,8 @@ class RegistrationError(OptionsError):
         scope_str = "global scope" if scope == GLOBAL_SCOPE else f"scope {scope}"
         if self.__doc__ is None:
             raise ValueError(
-                "Invalid RegistrationError definition. Please specify the error message in the docstring."
+                "Invalid RegistrationError definition. "
+                "Please specify the error message in the docstring."
             )
         docstring = self.__doc__.format(**msg_format_args)
         super().__init__(f"{docstring} [option {option} in {scope_str}].")
@@ -104,7 +105,7 @@ class FromfileError(ParseError):
 
 
 class MutuallyExclusiveOptionError(ParseError):
-    """Indicates that two options in the same mutually exclusive group werre specified."""
+    """Indicates that two options in the same mutually exclusive group were specified."""
 
 
 class UnknownFlagsError(ParseError):

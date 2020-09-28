@@ -5,6 +5,8 @@ from colors import cyan, green, magenta, red
 
 
 class MaybeColor:
+    """A mixin to allow classes to optionally colorize their output."""
+
     def __init__(self, color: bool) -> None:
         self._color = color
         noop = lambda x: x

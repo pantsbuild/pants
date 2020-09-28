@@ -19,7 +19,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
-from pants.help.flag_help_printer import FlagErrorHelpPrinter
+from pants.help.flag_error_help_printer import FlagErrorHelpPrinter
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
