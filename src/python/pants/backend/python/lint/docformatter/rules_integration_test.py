@@ -157,9 +157,9 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
 
     target = make_target(rule_runner, [BAD_SOURCE, bad_stub])
     lint_results, fmt_result = run_docformatter(rule_runner, [target])
-    assert len(lint_results) == 1 and lint_results[0].exit_code == 1
-    assert "bad.pyi Imports are incorrectly sorted" in lint_results[0].stderr
-    assert fmt_result.stdout == "Fixing bad.py\nFixing bad.pyi\n"
+    assert len(lint_results) == 1 and lint_results[0].exit_code == 3
+    assert bad_stub.path in lint_results[0].stderr
+    assert BAD_SOURCE.path in lint_results[0].stderr
     fixed_bad_files = [FIXED_BAD_SOURCE, fixed_bad_stub]
     assert fmt_result.output == get_digest(rule_runner, [*fixed_bad_files, *good_files])
     assert fmt_result.did_change
