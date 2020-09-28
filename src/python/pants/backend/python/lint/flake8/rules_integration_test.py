@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Sequence
+from typing import Any, List, Optional, Sequence
 
 import pytest
 
@@ -74,13 +74,17 @@ def run_flake8(
     return results.results
 
 
-def test_passing_source(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [GOOD_SOURCE])
-    result = run_flake8(rule_runner, [target])
+def assert_success(rule_runner: RuleRunner, target: Target, **kwargs: Any) -> None:
+    result = run_flake8(rule_runner, [target], **kwargs)
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert result[0].stdout.strip() == ""
     assert result[0].report is None
+
+
+def test_passing_source(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [GOOD_SOURCE])
+    assert_success(rule_runner, target)
 
 
 def test_failing_source(rule_runner: RuleRunner) -> None:
@@ -147,18 +151,12 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
 
 def test_respects_config_file(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    result = run_flake8(rule_runner, [target], config="[flake8]\nignore = F401\n")
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert result[0].stdout.strip() == ""
+    assert_success(rule_runner, target, config="[flake8]\nignore = F401\n")
 
 
 def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    result = run_flake8(rule_runner, [target], passthrough_args="--ignore=F401")
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert result[0].stdout.strip() == ""
+    assert_success(rule_runner, target, passthrough_args="--ignore=F401")
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
@@ -189,3 +187,14 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     report_files = rule_runner.request(DigestContents, [result[0].report.digest])
     assert len(report_files) == 1
     assert "bad.py:1:1: F401" in report_files[0].content.decode()
+
+
+def test_type_stubs(rule_runner: RuleRunner) -> None:
+    """Ensure that running over a type stub file doesn't cause issues."""
+    type_stub = FileContent("good.pyi", b"def add(x: int, y: int) -> int:\n    return x + y\n")
+    # First check when the stub has no sibling `.py` file.
+    target = make_target(rule_runner, [type_stub])
+    assert_success(rule_runner, target)
+    # Then check with a sibling `.py`.
+    target = make_target(rule_runner, [GOOD_SOURCE, type_stub])
+    assert_success(rule_runner, target)
