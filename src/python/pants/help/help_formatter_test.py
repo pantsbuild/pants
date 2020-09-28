@@ -65,7 +65,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
         parser.register(*args, **kwargs)
         # Force a parse to generate the derivation history.
         parser.parse_args(
-            Parser.ParseArgsRequest((), OptionValueContainerBuilder(), lambda: [], [])
+            Parser.ParseArgsRequest((), OptionValueContainerBuilder(), [])
         )
         oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False)
         return HelpFormatter(
