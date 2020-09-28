@@ -43,10 +43,8 @@ class ArgSplitterTest(unittest.TestCase):
         expected_is_help: bool = False,
         expected_help_advanced: bool = False,
         expected_help_all: bool = False,
-        expected_unknown_scopes: Optional[List[str]] = None
     ) -> None:
         expected_passthru = expected_passthru or []
-        expected_unknown_scopes = expected_unknown_scopes or []
         splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
         args = shlex.split(args_str)
         split_args = splitter.split_args(args)
@@ -59,15 +57,13 @@ class ArgSplitterTest(unittest.TestCase):
             isinstance(splitter.help_request, OptionsHelp) and splitter.help_request.advanced
         )
         assert expected_help_all == isinstance(splitter.help_request, AllHelp)
-        assert expected_unknown_scopes == split_args.unknown_scopes
 
     @staticmethod
     def assert_unknown_goal(args_str: str, unknown_goals: List[str]) -> None:
         splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
-        result = splitter.split_args(shlex.split(args_str))
+        splitter.split_args(shlex.split(args_str))
         assert isinstance(splitter.help_request, UnknownGoalHelp)
         assert set(unknown_goals) == set(splitter.help_request.unknown_goals)
-        assert result.unknown_scopes == unknown_goals
 
     def test_is_spec(self) -> None:
         unambiguous_specs = [

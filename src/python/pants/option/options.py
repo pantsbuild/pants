@@ -11,10 +11,10 @@ from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
-from pants.option.parser import Parser, ScopedFlagNameForFuzzyMatching
+from pants.option.parser import Parser
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -170,7 +170,6 @@ class Options:
             parser_hierarchy=parser_hierarchy,
             bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
-            unknown_scopes=split_args.unknown_scopes,
         )
 
     def __init__(
@@ -183,7 +182,6 @@ class Options:
         parser_hierarchy: ParserHierarchy,
         bootstrap_option_values: Optional[OptionValueContainer],
         known_scope_to_info: Dict[str, ScopeInfo],
-        unknown_scopes: List[str],
     ) -> None:
         """The low-level constructor for an Options instance.
 
@@ -198,7 +196,6 @@ class Options:
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
         self._frozen = False
-        self._unknown_scopes = unknown_scopes
 
     # TODO: Eliminate this in favor of a builder/factory.
     @property
@@ -290,7 +287,6 @@ class Options:
             parser_hierarchy=self._parser_hierarchy,
             bootstrap_option_values=self._bootstrap_option_values,
             known_scope_to_info=self._known_scope_to_info,
-            unknown_scopes=self._unknown_scopes,
         )
 
     def is_known_scope(self, scope: str) -> bool:
@@ -388,35 +384,12 @@ class Options:
                     hint=f"Use scope {scope} instead (options: {', '.join(explicit_keys)})",
                 )
 
-    @memoized_property
-    def _all_scoped_flag_names_for_fuzzy_matching(self) -> Iterable[ScopedFlagNameForFuzzyMatching]:
-        """A list of all registered flags in all their registered scopes.
-
-        This list is used for fuzzy matching against unrecognized option names across registered
-        scopes on the command line.
-        """
-        all_scoped_flag_names = []
-
-        def register_all_scoped_names(parser):
-            scope = parser.scope
-            known_args = parser.known_args
-            for arg in known_args:
-                scoped_flag = ScopedFlagNameForFuzzyMatching(
-                    scope=scope,
-                    arg=arg,
-                )
-                all_scoped_flag_names.append(scoped_flag)
-
-        self.walk_parsers(register_all_scoped_names)
-        return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
-
     def _make_parse_args_request(
         self, flags_in_scope, namespace: OptionValueContainerBuilder
     ) -> Parser.ParseArgsRequest:
         return Parser.ParseArgsRequest(
             flags_in_scope=flags_in_scope,
             namespace=namespace,
-            get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
             passthrough_args=self._passthru,
         )
 

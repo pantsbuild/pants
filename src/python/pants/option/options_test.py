@@ -4,7 +4,6 @@
 import json
 import os
 import shlex
-import unittest
 import unittest.mock
 import warnings
 from collections import defaultdict
@@ -1608,8 +1607,6 @@ class OptionsTest(unittest.TestCase):
             bootstrap_options = create_options(
                 {
                     GLOBAL_SCOPE: {
-                        # Set the Levenshtein edit distance to search for misspelled options.
-                        "option_name_check_distance": 2,
                         # If bootstrap option values are provided, this option is accessed and must be provided.
                         "spec_files": [],
                         "spec_file": RankedValue(Rank.HARDCODED, []),

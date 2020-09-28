@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Tuple
+
 from pants.option.scope import GLOBAL_SCOPE
 
 
@@ -102,5 +104,15 @@ class FromfileError(ParseError):
 
 
 class MutuallyExclusiveOptionError(ParseError):
-    """Raised when more than one option belonging to the same mutually exclusive group is
-    specified."""
+    """Indicates that two options in the same mutually exclusive group werre specified."""
+
+
+class UnknownFlagsError(ParseError):
+    """Indicates that unknown command-line flags were encountered in some scope."""
+
+    def __init__(self, flags: Tuple[str, ...], arg_scope: str):
+        self.flags = flags
+        self.arg_scope = arg_scope
+        scope = f"scope {self.arg_scope}" if self.arg_scope else "global scope"
+        msg = f"Unknown flags {', '.join(self.flags)} on {scope}"
+        super().__init__(msg)

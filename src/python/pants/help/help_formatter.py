@@ -5,32 +5,16 @@ import json
 from textwrap import wrap
 from typing import List, Optional
 
-from colors import cyan, green, magenta, red
-
 from pants.help.help_info_extracter import OptionHelpInfo, OptionScopeHelpInfo, to_help_str
+from pants.help.maybe_color import MaybeColor
 from pants.option.ranked_value import Rank, RankedValue
 
 
-class HelpFormatter:
+class HelpFormatter(MaybeColor):
     def __init__(self, *, show_advanced: bool, show_deprecated: bool, color: bool) -> None:
+        super().__init__(color=color)
         self._show_advanced = show_advanced
         self._show_deprecated = show_deprecated
-        self._color = color
-
-    def _maybe_cyan(self, s):
-        return self._maybe_color(cyan, s)
-
-    def _maybe_green(self, s):
-        return self._maybe_color(green, s)
-
-    def _maybe_red(self, s):
-        return self._maybe_color(red, s)
-
-    def _maybe_magenta(self, s):
-        return self._maybe_color(magenta, s)
-
-    def _maybe_color(self, color, s):
-        return color(s) if self._color else s
 
     def format_options(self, oshi: OptionScopeHelpInfo):
         """Return a help message for the specified options."""
@@ -42,17 +26,17 @@ class HelpFormatter:
             display_scope = f"`{oshi.scope}` {goal_or_subsystem}" if oshi.scope else "Global"
             if category:
                 title = f"{display_scope} {category} options"
-                lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
+                lines.append(self.maybe_green(f"{title}\n{'-' * len(title)}"))
             else:
                 # The basic options section gets the description and options scope info.
                 # No need to repeat those in the advanced section.
                 title = f"{display_scope} options"
-                lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
+                lines.append(self.maybe_green(f"{title}\n{'-' * len(title)}"))
                 if oshi.description:
                     lines.append(f"\n{oshi.description}")
                 lines.append(" ")
                 config_section = f"[{oshi.scope or 'GLOBAL'}]"
-                lines.append(f"Config section: {self._maybe_magenta(config_section)}")
+                lines.append(f"Config section: {self.maybe_magenta(config_section)}")
             lines.append(" ")
             if not ohis:
                 lines.append("None available.")
@@ -84,16 +68,16 @@ class HelpFormatter:
                 val_lines = [to_help_str(val.value)]
             val_lines[0] = f"{prefix}{val_lines[0]}"
             val_lines[-1] = f"{val_lines[-1]}{maybe_parens(val.details)}"
-            val_lines = [self._maybe_cyan(f"{left_padding}{line}") for line in val_lines]
+            val_lines = [self.maybe_cyan(f"{left_padding}{line}") for line in val_lines]
             return val_lines
 
         indent = "      "
-        arg_lines = [f"  {self._maybe_magenta(args)}" for args in ohi.display_args]
-        arg_lines.append(self._maybe_magenta(f"  {ohi.env_var}"))
-        arg_lines.append(self._maybe_magenta(f"  {ohi.config_key}"))
+        arg_lines = [f"  {self.maybe_magenta(args)}" for args in ohi.display_args]
+        arg_lines.append(self.maybe_magenta(f"  {ohi.env_var}"))
+        arg_lines.append(self.maybe_magenta(f"  {ohi.config_key}"))
         choices = "" if ohi.choices is None else f"one of: [{', '.join(ohi.choices)}]"
         choices_lines = [
-            f"{indent}{'  ' if i != 0 else ''}{self._maybe_cyan(s)}"
+            f"{indent}{'  ' if i != 0 else ''}{self.maybe_cyan(s)}"
             for i, s in enumerate(wrap(f"{choices}", 96))
         ]
         default_lines = format_value(RankedValue(Rank.HARDCODED, ohi.default), "default: ", indent)
@@ -127,7 +111,7 @@ class HelpFormatter:
             *description_lines,
         ]
         if ohi.deprecated_message:
-            lines.append(self._maybe_red(f"{indent}{ohi.deprecated_message}."))
+            lines.append(self.maybe_red(f"{indent}{ohi.deprecated_message}."))
             if ohi.removal_hint:
-                lines.append(self._maybe_red(f"{indent}{ohi.removal_hint}"))
+                lines.append(self.maybe_red(f"{indent}{ohi.removal_hint}"))
         return lines

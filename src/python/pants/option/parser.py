@@ -3,11 +3,9 @@
 
 import copy
 import inspect
-import itertools
 import json
 import os
 import re
-import textwrap
 import traceback
 from collections import defaultdict
 from dataclasses import dataclass
@@ -21,18 +19,14 @@ from typing import (
     Iterable,
     List,
     Mapping,
-    NoReturn,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Type,
     Union,
 )
 
-import Levenshtein
 import yaml
-from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
@@ -65,6 +59,7 @@ from pants.option.errors import (
     RecursiveSubsystemOption,
     RegistrationError,
     Shadowing,
+    UnknownFlagsError,
 )
 from pants.option.option_util import flatten_shlexed_list, is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
@@ -80,40 +75,6 @@ class OptionValueHistory:
     @property
     def final_value(self) -> RankedValue:
         return self.ranked_values[-1]
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class ScopedFlagNameForFuzzyMatching:
-    """Specify how a registered option would look like on the command line.
-
-    This information enables fuzzy matching to suggest correct option names when a user specifies an
-    unregistered option on the command line.
-
-    scope: the 'scope' component of a command-line flag.
-    arg: the unscoped flag name as it would appear on the command line.
-    normalized_arg: the fully-scoped option name, without any leading dashes.
-    scoped_arg: the fully-scoped option as it would appear on the command line.
-    """
-
-    scope: str
-    arg: str
-    normalized_arg: str
-    scoped_arg: str
-
-    def __init__(self, scope: str, arg: str) -> None:
-        self.scope = scope
-        self.arg = arg
-        self.normalized_arg = re.sub("^-+", "", arg)
-        if scope == GLOBAL_SCOPE:
-            self.scoped_arg = arg
-        else:
-            dashed_scope = scope.replace(".", "-")
-            self.scoped_arg = f"--{dashed_scope}-{self.normalized_arg}"
-
-    @property
-    def normalized_scoped_arg(self):
-        return re.sub(r"^-+", "", self.scoped_arg)
 
 
 class Parser:
@@ -216,35 +177,22 @@ class Parser:
     @frozen_after_init
     @dataclass(unsafe_hash=True)
     class ParseArgsRequest:
-        # N.B.: We use this callable protocol instead of Callable directly to work around the
-        # dataclass-specific issue described here: https://github.com/python/mypy/issues/6910
-        class FlagNameProvider(Protocol):
-            def __call__(self) -> Iterable[ScopedFlagNameForFuzzyMatching]:
-                ...
-
         flag_value_map: Dict[str, List[Any]]
         namespace: OptionValueContainerBuilder
-        get_all_scoped_flag_names: FlagNameProvider
         passthrough_args: List[str]
 
         def __init__(
             self,
             flags_in_scope: Iterable[str],
             namespace: OptionValueContainerBuilder,
-            get_all_scoped_flag_names: FlagNameProvider,
             passthrough_args: List[str],
         ) -> None:
             """
             :param flags_in_scope: Iterable of arg strings to parse into flag values.
             :param namespace: The object to register the flag values on
-            :param get_all_scoped_flag_names: A 0-argument function which returns an iterable of
-                                              all registered option names in all their scopes. This
-                                              is used to create an error message with suggestions
-                                              when raising a `ParseError`.
             """
             self.flag_value_map = self._create_flag_value_map(flags_in_scope)
             self.namespace = namespace
-            self.get_all_scoped_flag_names = get_all_scoped_flag_names
             self.passthrough_args = passthrough_args
 
         @staticmethod
@@ -279,7 +227,6 @@ class Parser:
 
         flag_value_map = parse_args_request.flag_value_map
         namespace = parse_args_request.namespace
-        get_all_scoped_flag_names = parse_args_request.get_all_scoped_flag_names
 
         mutex_map: DefaultDict[str, List[str]] = defaultdict(list)
         for args, kwargs in self._unnormalized_option_registrations_iter():
@@ -360,111 +307,10 @@ class Parser:
 
             setattr(namespace, dest, val)
 
-        # See if there are any unconsumed flags remaining, and if so, raise a ParseError.
         if flag_value_map:
-            self._raise_error_for_invalid_flag_names(
-                tuple(flag_value_map.keys()),
-                all_scoped_flag_names=get_all_scoped_flag_names(),
-                max_edit_distance=2,
-            )
-
+            # There were unconsumed flags.
+            raise UnknownFlagsError(tuple(flag_value_map.keys()), self.scope)
         return namespace.build()
-
-    def _raise_error_for_invalid_flag_names(
-        self,
-        flags: Sequence[str],
-        all_scoped_flag_names: Iterable[ScopedFlagNameForFuzzyMatching],
-        max_edit_distance: int,
-    ) -> NoReturn:
-        """Identify similar option names to unconsumed flags and raise a ParseError with those
-        names."""
-        matching_flags: Dict[str, List[str]] = {}
-        for flag in flags:
-            # We will be matching option names without their leading hyphens, in order to capture
-            # both short and long-form options.
-            flag_normalized_unscoped_name = re.sub(r"^-+", "", flag)
-            flag_normalized_scoped_name = (
-                f"{self.scope.replace('.', '-')}-{flag_normalized_unscoped_name}"
-                if self.scope != GLOBAL_SCOPE
-                else flag_normalized_unscoped_name
-            )
-
-            substring_matching_flags: List[str] = []
-            edit_distance_to_matching_flags: DefaultDict[int, List[str]] = defaultdict(list)
-            for other_scoped_flag in all_scoped_flag_names:
-                other_complete_flag_name = other_scoped_flag.scoped_arg
-                other_normalized_scoped_name = other_scoped_flag.normalized_scoped_arg
-                other_normalized_unscoped_name = other_scoped_flag.normalized_arg
-                if flag_normalized_unscoped_name == other_normalized_unscoped_name:
-                    # If the unscoped option name itself matches, but the scope doesn't, display it.
-                    substring_matching_flags.append(other_complete_flag_name)
-                elif other_normalized_scoped_name.startswith(flag_normalized_scoped_name):
-                    # If the invalid scoped option name is the beginning of another scoped option
-                    # name, display it. This will also suggest long-form options such as --verbose
-                    # for an attempted -v (if -v isn't defined as an option).
-                    substring_matching_flags.append(other_complete_flag_name)
-                else:
-                    # If an unscoped option name is similar to the unscoped option from the command
-                    # line according to --option-name-check-distance, display the matching scoped
-                    # option name. This covers misspellings.
-                    unscoped_option_edit_distance: int = Levenshtein.distance(
-                        flag_normalized_unscoped_name, other_normalized_unscoped_name
-                    )
-                    if unscoped_option_edit_distance <= max_edit_distance:
-                        # NB: We order the matched flags by Levenshtein distance compared to the
-                        # entire option string.
-                        fully_scoped_edit_distance: int = Levenshtein.distance(
-                            flag_normalized_scoped_name, other_normalized_scoped_name
-                        )
-                        edit_distance_to_matching_flags[fully_scoped_edit_distance].append(
-                            other_complete_flag_name
-                        )
-
-            # If any option name matched or started with the invalid flag in any scope, put that
-            # first. Then, display the option names matching in order of overall edit distance.
-            # Flags with the same distance will be sorted alphabetically.
-            all_matching_scoped_flags = [
-                *substring_matching_flags,
-                *itertools.chain.from_iterable(
-                    matched_flags
-                    for _, matched_flags in sorted(edit_distance_to_matching_flags.items())
-                ),
-            ]
-            if all_matching_scoped_flags:
-                matching_flags[flag] = all_matching_scoped_flags
-
-        scope = self._scope_str()
-        help_instructions_scope = f" {self.scope}" if self.scope != GLOBAL_SCOPE else ""
-        help_instructions = (
-            f"(Run `./pants help-advanced{help_instructions_scope}` for all available options.)"
-        )
-
-        if len(flags) == 1:
-            matches = list(matching_flags.values())[0] if matching_flags else []
-            message = textwrap.fill(
-                (
-                    f"Unrecognized command line flag {repr(flags[0])} on {scope}."
-                    f"{' Suggestions:' if matching_flags else ''}\n"
-                ),
-                80,
-            )
-            if matching_flags:
-                message += f"\n{', '.join(matches)}"
-            raise ParseError(f"{message}\n\n{help_instructions}")
-        message = textwrap.fill(
-            (
-                f"Unrecognized command line flags on {scope}: {', '.join(flags)}."
-                f"{' Suggestions:' if matching_flags else ''}\n"
-            ),
-            80,
-        )
-        if matching_flags:
-            suggestions = "\n".join(
-                f"{flag_name}: [{', '.join(matches)}]"
-                for flag_name, matches in matching_flags.items()
-            )
-            message += f"\n{suggestions}"
-        raise ParseError(f"{message}\n\n{help_instructions}")
 
     def option_registrations_iter(self):
         """Returns an iterator over the normalized registration arguments of each option in this
