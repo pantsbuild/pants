@@ -42,8 +42,8 @@ class FlagErrorHelpPrinter(MaybeColor):
             if err.arg_scope != GLOBAL_SCOPE and flag in global_flags:
                 # It's a common error to use a global flag in a goal scope, so we special-case it.
                 print(
-                    f"Did you mean to use the global {self.maybe_cyan(flag)}? "
-                    f"Global options must come before any goals, or after any file/target specs."
+                    f"Did you mean to use the global {self.maybe_cyan(flag)}? Global options must "
+                    f"come before any goals, or after any file/target arguments."
                 )
             elif did_you_mean:
                 print(f"Did you mean {', '.join(self.maybe_cyan(g) for g in did_you_mean)}?")
