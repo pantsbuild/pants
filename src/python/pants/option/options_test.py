@@ -48,7 +48,6 @@ from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
-from pants.util.strutil import safe_shlex_join
 
 _FAKE_CUR_VERSION = "1.0.0.dev0"
 
