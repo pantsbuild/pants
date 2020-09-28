@@ -207,11 +207,10 @@ class FilesystemCoverageReport(CoverageReport):
     report_type: str
 
     def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
-        workspace.write_digest(
-            self.result_snapshot.digest, path_prefix=str(self.directory_to_materialize_to)
-        )
+        digest = self.result_snapshot.digest
+        workspace.write_digest(digest, path_prefix=str(self.directory_to_materialize_to))
         console.print_stderr(
-            f"\nWrote {self.report_type} coverage report to `{self.directory_to_materialize_to}`"
+            f"\nWrote {self.report_type} coverage report to `{self.directory_to_materialize_to}` ({digest.serialized_bytes_length:,} bytes)"
         )
         return self.report_file
 
