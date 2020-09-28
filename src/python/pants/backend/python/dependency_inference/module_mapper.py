@@ -42,8 +42,9 @@ class FirstPartyModuleToAddressMapping:
     will own no more than one single source file. Its metadata will be copied from the original
     base target.
 
-    If there are >1 original owning targets for a module, no targets will be recorded for that
-    module, unless the other owning target is a type stub (.pyi file).
+    If there are >1 original owning targets that refer to the same module—such as `//:a` and `//:b` both owning module
+    `foo`—then we will not add any of the targets to the mapping because there is ambiguity. (We make an exception if
+    one target is an implementation (.py file) and the other is a type stub (.pyi file).
     """
 
     # The mapping should either have 1 or 2 addresses per module, depending on if there is a type
@@ -56,8 +57,10 @@ class FirstPartyModuleToAddressMapping:
             return targets
         # If the module is not found, try the parent, if any. This is to accommodate `from`
         # imports, where we don't care about the specific symbol, but only the module. For example,
-        # with `from typing import List`, we only care about `typing`.
-        # Unlike with third party modules, we do not look past the direct parent.
+        # with `from my_project.app import App`, we only care about the `my_project.app` part.
+        #
+        # We do not look past the direct parent, as this could cause multiple ambiguous owners to be resolved. This
+        # contrasts with the third-party module mapping, which will try every ancestor.
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
@@ -79,11 +82,13 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
         for stripped_f in stripped_sources.snapshot.files:
             module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
             if module in modules_to_addresses:
-                either_are_type_stubs = len(modules_to_addresses[module]) == 1 and (
+                # We check if one of the targets is an implementation (.py file) and the other is a type stub (.pyi
+                # file), which we allow. Otherwise, we have ambiguity.
+                either_targets_are_type_stubs = len(modules_to_addresses[module]) == 1 and (
                     tgt.address.filename.endswith(".pyi")
                     or modules_to_addresses[module][0].filename.endswith(".pyi")
                 )
-                if either_are_type_stubs:
+                if either_targets_are_type_stubs:
                     modules_to_addresses[module].append(tgt.address)
                 else:
                     modules_with_multiple_implementations.add(module)
@@ -111,7 +116,7 @@ class ThirdPartyModuleToAddressMapping:
         target = self.mapping.get(module)
         if target is not None:
             return target
-        # If the module is not found, try the parent module, if any. For example,
+        # If the module is not found, recursively try the ancestor modules, if any. For example,
         # pants.task.task.Task -> pants.task.task -> pants.task -> pants
         if "." not in module:
             return None
@@ -161,24 +166,28 @@ async def map_module_to_address(
     third_party_address = third_party_mapping.address_for_module(module.module)
     first_party_addresses = first_party_mapping.addresses_for_module(module.module)
 
+    # It's possible for a user to write type stubs (`.pyi` files) for their third-party dependencies. We check if that
+    # happened, but we're strict in validating that there is only a single third party address and a single first-party
+    # address referring to a `.pyi` file; otherwise, we have ambiguous implementations, so no-op.
     third_party_resolved_only = third_party_address and not first_party_addresses
     third_party_resolved_with_type_stub = (
         third_party_address
         and len(first_party_addresses) == 1
         and first_party_addresses[0].filename.endswith(".pyi")
     )
-    third_party_resolved_with_first_party_ambiguity = third_party_address and first_party_addresses
 
     if third_party_resolved_only:
         return PythonModuleOwners([cast(Address, third_party_address)])
-    elif third_party_resolved_with_type_stub:
+    if third_party_resolved_with_type_stub:
         return PythonModuleOwners([cast(Address, third_party_address), first_party_addresses[0]])
-    elif third_party_resolved_with_first_party_ambiguity:
+    # Else, we have ambiguity between the third-party and first-party addresses.
+    if third_party_address and first_party_addresses:
         return PythonModuleOwners()
-    elif first_party_addresses:
+
+    # We're done with looking at third-party addresses, and now solely look at first-party.
+    if first_party_addresses:
         return PythonModuleOwners(first_party_addresses)
-    else:
-        return PythonModuleOwners()
+    return PythonModuleOwners()
 
 
 def rules():

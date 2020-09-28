@@ -137,7 +137,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
                     version='1.1.1'
                 )
             )
-    
+
             python_library()
             """
         ),

@@ -485,7 +485,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
 
 
 def test_type_stubs(rule_runner: RuleRunner) -> None:
-    """Test both that type stubs for our own code work, and also for third party code."""
+    """Test that type stubs work for both first-party and third-party code."""
     rule_runner.add_to_build_file(
         "",
         dedent(

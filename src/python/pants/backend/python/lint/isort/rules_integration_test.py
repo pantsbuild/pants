@@ -175,7 +175,6 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     bad_stub = dataclasses.replace(BAD_SOURCE, path="bad.pyi")
     fixed_bad_stub = dataclasses.replace(FIXED_BAD_SOURCE, path="bad.pyi")
 
-    # Passing
     good_files = [GOOD_SOURCE, good_stub]
     target = make_target_with_origin(rule_runner, good_files)
     lint_results, fmt_result = run_isort(rule_runner, [target])
@@ -184,7 +183,6 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     assert fmt_result.output == get_digest(rule_runner, good_files)
     assert not fmt_result.did_change
 
-    # Failing
     target = make_target_with_origin(rule_runner, [BAD_SOURCE, bad_stub])
     lint_results, fmt_result = run_isort(rule_runner, [target])
     assert len(lint_results) == 1 and lint_results[0].exit_code == 1

@@ -188,7 +188,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     # requirement. Note that `colors.pyi` is at the top-level of the source root so that it strips
     # to the module `colors`.
     rule_runner.create_file("source_root1/colors.pyi")
-    rule_runner.add_to_build_file("source_root1", "python_library()\n")
+    rule_runner.add_to_build_file("source_root1", "python_library()")
     assert get_owners("colors.red") == [
         Address("3rdparty/python", target_name="ansicolors"),
         Address("source_root1", relative_file_path="colors.pyi"),

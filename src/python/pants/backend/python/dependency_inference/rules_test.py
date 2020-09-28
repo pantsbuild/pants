@@ -50,6 +50,7 @@ def test_infer_python_imports() -> None:
         ),
     )
 
+    # If there's a `.py` and `.pyi` file for the same module, we should infer a dependency on both.
     rule_runner.create_file("src/python/str_import/subdir/f.py")
     rule_runner.create_file("src/python/str_import/subdir/f.pyi")
     rule_runner.add_to_build_file("src/python/str_import/subdir", "python_library()")

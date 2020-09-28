@@ -128,7 +128,7 @@ def determine_python_files(files: Iterable[str]) -> Tuple[str, ...]:
     result: OrderedSet[str] = OrderedSet()
     for f in files:
         if f.endswith(".pyi"):
-            py_file = f[:-1]
+            py_file = f[:-1]  # That is, strip the `.pyi` suffix to be `.py`.
             result.discard(py_file)
             result.add(f)
         elif f.endswith(".py"):
