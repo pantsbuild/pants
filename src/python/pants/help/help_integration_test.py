@@ -36,3 +36,31 @@ def test_help_all() -> None:
     assert "" in all_help["scope_to_help_info"]
     assert "pytest" in all_help["scope_to_help_info"]
     assert len(all_help["scope_to_help_info"]["pytest"]["basic"]) > 0
+
+
+def test_unknown_goal() -> None:
+    pants_run = run_pants(["testx"],)
+    pants_run.assert_failure()
+    assert "Unknown goal: testx" in pants_run.stdout_data
+    assert "Did you mean: test" in pants_run.stdout_data
+
+
+def test_unknown_global_flags() -> None:
+    pants_run = run_pants(["--pants-workdirx", "goals"],)
+    pants_run.assert_failure()
+    assert "Unknown flag --pants-workdirx on global scope" in pants_run.stdout_data
+    assert "Did you mean --pants-workdir" in pants_run.stdout_data
+
+
+def test_unknown_scoped_flags() -> None:
+    pants_run = run_pants(["test", "--forcex"],)
+    pants_run.assert_failure()
+    assert "Unknown flag --forcex on test scope" in pants_run.stdout_data
+    assert "Did you mean --force" in pants_run.stdout_data
+
+
+def test_global_flag_in_scoped_position() -> None:
+    pants_run = run_pants(["test", "--pants-distdir=dist/"],)
+    pants_run.assert_failure()
+    assert "Unknown flag --pants-distdir on test scope" in pants_run.stdout_data
+    assert "Did you mean to use the global --pants-distdir?" in pants_run.stdout_data
