@@ -24,6 +24,14 @@ SOURCES = {
             return x * y
         """
     ),
+    # Include a type stub to ensure that we can handle it. We expect it to be ignored because the
+    # test run does not use the file.
+    "src/python/project/lib.pyi": dedent(
+        """\
+        def add(x: int, y: int) -> None:
+            return x + y
+        """
+    ),
     "src/python/project/random.py": dedent(
         """\
         def capitalize(s):

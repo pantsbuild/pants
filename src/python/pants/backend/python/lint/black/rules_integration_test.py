@@ -1,6 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import dataclasses
 from textwrap import dedent
 from typing import List, Optional, Sequence, Tuple
 
@@ -202,3 +202,31 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == get_digest(rule_runner, [py38_sources])
     assert fmt_result.did_change is False
+
+
+def test_stub_files(rule_runner: RuleRunner) -> None:
+    good_stub = dataclasses.replace(GOOD_SOURCE, path="good.pyi")
+    bad_stub = dataclasses.replace(BAD_SOURCE, path="bad.pyi")
+    fixed_bad_stub = dataclasses.replace(FIXED_BAD_SOURCE, path="bad.pyi")
+
+    good_files = [GOOD_SOURCE, good_stub]
+    target = make_target(rule_runner, good_files)
+    lint_results, fmt_result = run_black(rule_runner, [target])
+    assert len(lint_results) == 1 and lint_results[0].exit_code == 0
+    assert (
+        "2 files would be left unchanged" in lint_results[0].stderr
+        and "2 files left unchanged" in fmt_result.stderr
+    )
+    assert fmt_result.output == get_digest(rule_runner, good_files)
+    assert not fmt_result.did_change
+
+    target = make_target(rule_runner, [BAD_SOURCE, bad_stub], name="failing_target")
+    lint_results, fmt_result = run_black(rule_runner, [target])
+    assert len(lint_results) == 1 and lint_results[0].exit_code == 1
+    assert (
+        "2 files would be reformatted" in lint_results[0].stderr
+        and "2 files reformatted" in fmt_result.stderr
+    )
+    fixed_bad_files = [FIXED_BAD_SOURCE, fixed_bad_stub]
+    assert fmt_result.output == get_digest(rule_runner, [*fixed_bad_files, *good_files])
+    assert fmt_result.did_change

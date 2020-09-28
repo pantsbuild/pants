@@ -14,6 +14,7 @@ from pants.backend.python.typecheck.mypy.rules import (
     MyPyFieldSet,
     MyPyRequest,
     check_and_warn_if_python_version_configured,
+    determine_python_files,
 )
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
@@ -483,6 +484,78 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert "Success: no issues found" in py3_result.stdout.strip()
 
 
+def test_type_stubs(rule_runner: RuleRunner) -> None:
+    """Test that type stubs work for both first-party and third-party code."""
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            python_requirement_library(
+                name="ansicolors",
+                requirements=["ansicolors"],
+                module_mapping={'ansicolors': ['colors']},
+            )
+            """
+        ),
+    )
+
+    rule_runner.create_file("mypy_stubs/__init__.py")
+    rule_runner.create_file(
+        "mypy_stubs/colors.pyi",
+        dedent(
+            """\
+            def red(s: str) -> str:
+                ...
+            """
+        ),
+    )
+    rule_runner.add_to_build_file("mypy_stubs", "python_library()")
+
+    rule_runner.create_file(f"{PACKAGE}/util/__init__.py")
+    rule_runner.create_file(
+        f"{PACKAGE}/util/untyped.py",
+        dedent(
+            """\
+            def add(x, y):
+                return x + y
+            """
+        ),
+    )
+    rule_runner.create_file(
+        f"{PACKAGE}/util/untyped.pyi",
+        dedent(
+            """\
+            def add(x: int, y: int) -> int:
+                ...
+            """
+        ),
+    )
+    rule_runner.add_to_build_file(f"{PACKAGE}/util", "python_library()")
+
+    rule_runner.create_file(f"{PACKAGE}/__init__.py")
+    rule_runner.create_file(
+        f"{PACKAGE}/app.py",
+        dedent(
+            """\
+            from colors import red
+            from project.util.untyped import add
+
+            z = add(2, 2.0)
+            print(red(z))
+            """
+        ),
+    )
+    rule_runner.add_to_build_file(PACKAGE, "python_library()")
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
+    result = run_mypy(
+        rule_runner, [tgt], additional_args=["--source-root-patterns=['mypy_stubs', 'src/python']"]
+    )
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert f"{PACKAGE}/app.py:4: error: Argument 2 to" in result[0].stdout
+    assert f"{PACKAGE}/app.py:5: error: Argument 1 to" in result[0].stdout
+
+
 def test_mypy_shadows_requirements(rule_runner: RuleRunner) -> None:
     """Test the behavior of a MyPy requirement shadowing a user's requirement.
 
@@ -648,6 +721,15 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     result = run_mypy_with_plugin(plugin_tgt)
     assert result.exit_code == 0
     assert "Success: no issues found in 7 source files" in result.stdout
+
+
+def test_determine_python_files() -> None:
+    assert determine_python_files([]) == ()
+    assert determine_python_files(["foo.py"]) == ("foo.py",)
+    assert determine_python_files(["foo.pyi"]) == ("foo.pyi",)
+    assert determine_python_files(["foo.py", "foo.pyi"]) == ("foo.pyi",)
+    assert determine_python_files(["foo.pyi", "foo.py"]) == ("foo.pyi",)
+    assert determine_python_files(["foo.json"]) == ()
 
 
 def test_warn_if_python_version_configured(caplog) -> None:
