@@ -35,6 +35,7 @@ from pants.backend.python.util_rules.pex_environment import (
 )
 from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -92,7 +93,7 @@ _FS = TypeVar("_FS", bound=FieldSetWithCompatibility)
 
 
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
-class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
+class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter):
     def __init__(self, constraints: Iterable[Union[str, Requirement]] = ()) -> None:
         super().__init__(
             v if isinstance(v, Requirement) else self.parse_constraint(v)
@@ -268,6 +269,9 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
             allowed_versions=["3.8", "3.9"], prior_version="3.7"
         )
 
+    def debug_hint(self) -> str:
+        return " OR ".join(str(constraint) for constraint in self)
+
 
 class PexPlatforms(DeduplicatedCollection[str]):
     sort_input = True
@@ -285,7 +289,7 @@ class PexPlatforms(DeduplicatedCollection[str]):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class PexRequest:
+class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
     requirements: PexRequirements
@@ -352,6 +356,9 @@ class PexRequest:
                 f"Given platform constraints {self.platforms} for internal only pex request: "
                 f"{self}."
             )
+
+    def debug_hint(self) -> str:
+        return self.output_filename
 
 
 @dataclass(frozen=True)

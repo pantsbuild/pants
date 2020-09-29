@@ -293,7 +293,7 @@ def _detect_cycles(
             )
 
 
-@rule
+@rule(desc="Resolve transitive targets")
 async def transitive_targets(targets: Targets) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots.
 
@@ -358,7 +358,7 @@ class Owners(Collection[Address]):
     pass
 
 
-@rule
+@rule(desc="Find which targets own certain files")
 async def find_owners(owners_request: OwnersRequest) -> Owners:
     # Determine which of the sources are live and which are deleted.
     sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
@@ -598,7 +598,7 @@ class AmbiguousCodegenImplementationsException(Exception):
             )
 
 
-@rule
+@rule(desc="Hydrate the `sources` field")
 async def hydrate_sources(
     request: HydrateSourcesRequest,
     global_options: GlobalOptions,
@@ -740,7 +740,7 @@ def parse_dependencies_field(
     return ParsedDependencies(addresses, ignored_addresses)
 
 
-@rule
+@rule(desc="Resolve direct dependencies")
 async def resolve_dependencies(
     request: DependenciesRequest,
     union_membership: UnionMembership,
