@@ -255,18 +255,22 @@ class RuleRunner:
         for f in files:
             self.create_file(os.path.join(path, f), contents=f)
 
-    def add_to_build_file(self, relpath: Union[str, PurePath], target: str) -> str:
+    def add_to_build_file(
+        self, relpath: Union[str, PurePath], target: str, *, overwrite: bool = False
+    ) -> str:
         """Adds the given target specification to the BUILD file at relpath.
 
         :API: public
 
         relpath: The relative path to the BUILD file from the build root.
         target:  A string containing the target definition as it would appear in a BUILD file.
+        overwrite:  Whether to overwrite vs. append to the BUILD file.
         """
         build_path = (
             relpath if PurePath(relpath).name.startswith("BUILD") else PurePath(relpath, "BUILD")
         )
-        return self.create_file(str(build_path), target, mode="a")
+        mode = "w" if overwrite else "a"
+        return self.create_file(str(build_path), target, mode=mode)
 
     def make_snapshot(self, files: Dict[str, Union[str, bytes]]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content."""
