@@ -18,6 +18,12 @@ from pants.base.specs import (
     FilesystemSpecs,
     Specs,
 )
+from pants.core.target_types import (
+    ApplyPrefixMappingRequest,
+    PrefixMappedSnapshot,
+    SourcesPrefixMapping,
+    apply_prefix_mapping,
+)
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -647,20 +653,31 @@ async def hydrate_sources(
 
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
+    #
+    # Also re-resolve the original target, which we need to use right after. We do it here to use
+    # MultiGet for concurrency.
     path_globs = sources_field.path_globs(global_options.options.files_not_found_behavior)
     if path_globs is None:
         return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=sources_type)
-    snapshot = await Get(Snapshot, PathGlobs, path_globs)
+    snapshot, wrapped_target = await MultiGet(
+        Get(Snapshot, PathGlobs, path_globs), Get(WrappedTarget, Address, sources_field.address)
+    )
     sources_field.validate_resolved_files(snapshot.files)
+
+    if wrapped_target.target.has_field(SourcesPrefixMapping):
+        mapped_snapshot = await Get(
+            PrefixMappedSnapshot,
+            ApplyPrefixMappingRequest(snapshot, wrapped_target.target[SourcesPrefixMapping]),
+        )
+        snapshot = mapped_snapshot.snapshot
 
     # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
     if not request.enable_codegen or generate_request_type is None:
         return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
-    wrapped_protocol_target = await Get(WrappedTarget, Address, sources_field.address)
     generated_sources = await Get(
         GeneratedSources,
         GenerateSourcesRequest,
-        generate_request_type(snapshot, wrapped_protocol_target.target),
+        generate_request_type(snapshot, wrapped_target.target),
     )
     return HydratedSources(
         generated_sources.snapshot, sources_field.filespec, sources_type=sources_type
@@ -958,4 +975,6 @@ def find_valid_field_sets(
 
 
 def rules():
-    return collect_rules()
+    # We need the `apply_prefix_mapping` rule for our hydrate sources rule to work, so we register
+    # it here, even though its defined in `core/`.
+    return (*collect_rules(), apply_prefix_mapping)

@@ -18,6 +18,7 @@ from pants.base.specs import (
     Specs,
 )
 from pants.base.specs_parser import SpecsParser
+from pants.core.target_types import Files
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -661,11 +662,15 @@ def test_find_valid_field_sets() -> None:
 
 @pytest.fixture
 def sources_rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[QueryRule(HydratedSources, (HydrateSourcesRequest,))])
+    return RuleRunner(
+        rules=[QueryRule(HydratedSources, (HydrateSourcesRequest,))],
+        target_types=[MockTarget, Files],
+    )
 
 
 def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
-    addr = Address("src/fortran", target_name=":lib")
+    addr = Address("src/fortran", target_name="lib")
+    sources_rule_runner.add_to_build_file("src/fortran", "target(name='lib')")
     sources_rule_runner.create_files(
         "src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"]
     )
@@ -690,10 +695,11 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     class SourcesSubclass(Sources):
         pass
 
-    addr = Address("", target_name=":lib")
+    addr = Address("", target_name="lib")
+    sources_rule_runner.add_to_build_file("", "target(name='lib')")
     sources_rule_runner.create_files("", files=["f1.f95"])
 
-    valid_sources = SourcesSubclass(["*"], address=addr)
+    valid_sources = SourcesSubclass(["*.f95"], address=addr)
     hydrated_valid_sources = sources_rule_runner.request(
         HydratedSources,
         [HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass])],
@@ -701,7 +707,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
     assert hydrated_valid_sources.sources_type == SourcesSubclass
 
-    invalid_sources = Sources(["*"], address=addr)
+    invalid_sources = Sources(["*.f95"], address=addr)
     hydrated_invalid_sources = sources_rule_runner.request(
         HydratedSources,
         [HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass])],
@@ -712,6 +718,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
 
 def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.set_options(["--files-not-found-behavior=error"])
+    sources_rule_runner.add_to_build_file("", "target(name='lib')")
     sources_rule_runner.create_files("", files=["f1.f95"])
     sources = Sources(["non_existent.f95"], address=Address("", target_name="lib"))
     with pytest.raises(ExecutionError) as exc:
@@ -726,6 +733,7 @@ def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
         default = ("default.f95", "default.f03", "*.f08", "!ignored.f08")
 
     addr = Address("src/fortran", target_name="lib")
+    sources_rule_runner.add_to_build_file("src/fortran", "target(name='lib')")
     # NB: Not all globs will be matched with these files, specifically `default.f03` will not
     # be matched. This is intentional to ensure that we use `any` glob conjunction rather
     # than the normal `all` conjunction.
@@ -744,6 +752,7 @@ def test_sources_expected_file_extensions(sources_rule_runner: RuleRunner) -> No
         expected_file_extensions = (".f95", ".f03")
 
     addr = Address("src/fortran", target_name="lib")
+    sources_rule_runner.add_to_build_file("src/fortran", "target(name='lib')")
     sources_rule_runner.create_files("src/fortran", files=["s.f95", "s.f03", "s.f08"])
     sources = ExpectedExtensionsSources(["s.f*"], address=addr)
     with pytest.raises(ExecutionError) as exc:
@@ -766,16 +775,14 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         # We allow for 1 or 3 files
         expected_num_files = range(1, 4, 2)
 
+    addr = Address("", target_name="example")
+    sources_rule_runner.add_to_build_file("", "target(name='example')")
     sources_rule_runner.create_files("", files=["f1.txt", "f2.txt", "f3.txt", "f4.txt"])
 
     def hydrate(sources_cls: Type[Sources], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(
             HydratedSources,
-            [
-                HydrateSourcesRequest(
-                    sources_cls(sources, address=Address("", target_name=":example"))
-                ),
-            ],
+            [HydrateSourcesRequest(sources_cls(sources, address=addr))],
         )
 
     with pytest.raises(ExecutionError) as exc:
@@ -793,6 +800,20 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         "f2.txt",
         "f3.txt",
     )
+
+
+def test_sources_files_target_prefix_mapping(sources_rule_runner: RuleRunner) -> None:
+    # Smoke test that we correctly wire up to the `sources_prefix_mapping` field.
+    sources_rule_runner.create_file("f.ext")
+    sources_rule_runner.add_to_build_file(
+        "",
+        "files(name='tgt', sources=['f.ext'], sources_prefix_mapping={'': 'new_prefix'})",
+    )
+    tgt = sources_rule_runner.get_target(Address("", target_name="tgt"))
+    hydrated_sources = sources_rule_runner.request(
+        HydratedSources, [HydrateSourcesRequest(tgt[Sources])]
+    )
+    assert hydrated_sources.snapshot.files == ("new_prefix/f.ext",)
 
 
 class SmalltalkSources(Sources):
