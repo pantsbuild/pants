@@ -6,7 +6,7 @@ import inspect
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Tuple, Type, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, cast
 
 from pants.base import deprecated
 from pants.engine.goal import GoalSubsystem
@@ -98,6 +98,20 @@ class OptionScopeHelpInfo:
     basic: Tuple[OptionHelpInfo, ...]
     advanced: Tuple[OptionHelpInfo, ...]
     deprecated: Tuple[OptionHelpInfo, ...]
+
+    def collect_unscoped_flags(self) -> List[str]:
+        flags: List[str] = []
+        for options in (self.basic, self.advanced, self.deprecated):
+            for ohi in options:
+                flags.extend(ohi.unscoped_cmd_line_args)
+        return flags
+
+    def collect_scoped_flags(self) -> List[str]:
+        flags: List[str] = []
+        for options in (self.basic, self.advanced, self.deprecated):
+            for ohi in options:
+                flags.extend(ohi.scoped_cmd_line_args)
+        return flags
 
 
 @dataclass(frozen=True)

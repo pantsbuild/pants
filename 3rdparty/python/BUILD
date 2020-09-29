@@ -6,7 +6,6 @@ python_requirements(
   module_mapping={
     "ansicolors": ["colors"],
     "beautifulsoup4": ["bs4"],
-    "python-Levenshtein": ["Levenshtein"],
     "PyYAML": ["yaml"],
     "setuptools": ["pkg_resources"],
   }

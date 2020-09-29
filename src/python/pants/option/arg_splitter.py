@@ -24,7 +24,6 @@ class SplitArgs:
     scope_to_flags: Dict[str, List[str]]  # Scope name -> list of flags in that scope.
     specs: List[str]  # The specifications for what to run against, e.g. the targets or files
     passthru: List[str]  # Any remaining args specified after a -- separator.
-    unknown_scopes: List[str]
 
 
 class HelpRequest(ABC):
@@ -91,9 +90,6 @@ class ArgSplitter:
     def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
         self._buildroot = Path(buildroot)
         self._known_scope_infos = known_scope_infos
-        # TODO: Get rid of our reliance on known scopes here. We don't really need it now
-        # that we heuristically identify target specs based on it containing /, : or being
-        # a top-level directory.
         self._known_scopes = {si.scope for si in known_scope_infos} | {
             "version",
             "goals",
@@ -101,7 +97,6 @@ class ArgSplitter:
             "help-advanced",
             "help-all",
         }
-        self._unknown_scopes: List[str] = []
         self._unconsumed_args: List[
             str
         ] = []  # In reverse order, for efficient popping off the end.
@@ -162,8 +157,9 @@ class ArgSplitter:
             if s not in scope_to_flags:
                 scope_to_flags[s] = []
 
-        specs = []
-        passthru = []
+        specs: List[str] = []
+        passthru: List[str] = []
+        unknown_scopes: List[str] = []
 
         self._unconsumed_args = list(reversed(args))
         # The first token is the binary name, so skip it.
@@ -198,14 +194,14 @@ class ArgSplitter:
             elif self.likely_a_spec(arg):
                 specs.append(arg)
             elif arg not in self._known_scopes:
-                self._unknown_scopes.append(arg)
+                unknown_scopes.append(arg)
 
         if self._at_double_dash():
             self._unconsumed_args.pop()
             passthru = list(reversed(self._unconsumed_args))
 
-        if self._unknown_scopes:
-            self._help_request = UnknownGoalHelp(tuple(self._unknown_scopes))
+        if unknown_scopes:
+            self._help_request = UnknownGoalHelp(tuple(unknown_scopes))
 
         if not goals and not self._help_request:
             self._help_request = NoGoalHelp()
@@ -217,7 +213,6 @@ class ArgSplitter:
             scope_to_flags=scope_to_flags,
             specs=specs,
             passthru=passthru,
-            unknown_scopes=self._unknown_scopes,
         )
 
     def likely_a_spec(self, arg: str) -> bool:

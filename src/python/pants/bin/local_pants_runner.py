@@ -3,7 +3,7 @@
 
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Mapping, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
@@ -19,11 +19,13 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
+from pants.help.flag_error_help_printer import FlagErrorHelpPrinter
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
+from pants.option.errors import UnknownFlagsError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
@@ -54,16 +56,22 @@ class LocalPantsRunner:
     profile_path: Optional[str]
     _run_tracker: RunTracker
 
-    @staticmethod
+    @classmethod
     def parse_options(
+        cls,
         options_bootstrapper: OptionsBootstrapper,
     ) -> Tuple[Options, BuildConfiguration]:
         build_config = BuildConfigInitializer.get(options_bootstrapper)
-        options = OptionsInitializer.create(options_bootstrapper, build_config)
+        try:
+            options = OptionsInitializer.create(options_bootstrapper, build_config)
+        except UnknownFlagsError as err:
+            cls._handle_unknown_flags(err, options_bootstrapper)
+            raise
         return options, build_config
 
-    @staticmethod
+    @classmethod
     def _init_graph_session(
+        cls,
         options_bootstrapper: OptionsBootstrapper,
         build_config: BuildConfiguration,
         options: Options,
@@ -75,7 +83,11 @@ class LocalPantsRunner:
             options_bootstrapper, build_config
         )
 
-        global_scope = options.for_global_scope()
+        try:
+            global_scope = options.for_global_scope()
+        except UnknownFlagsError as err:
+            cls._handle_unknown_flags(err, options_bootstrapper)
+            raise
         dynamic_ui = global_scope.dynamic_ui if global_scope.v2 else False
         use_colors = global_scope.get("colors", True)
 
@@ -92,6 +104,15 @@ class LocalPantsRunner:
                 }
             ),
         )
+
+    @staticmethod
+    def _handle_unknown_flags(err: UnknownFlagsError, options_bootstrapper: OptionsBootstrapper):
+        build_config = BuildConfigInitializer.get(options_bootstrapper)
+        # We need an options instance in order to get "did you mean" suggestions, but we know
+        # there are bad flags in the args, so we generate options with no flags.
+        no_arg_bootstrapper = replace(options_bootstrapper, args=("dummy_first_arg",))
+        options = OptionsInitializer.create(no_arg_bootstrapper, build_config)
+        FlagErrorHelpPrinter(options).handle_unknown_flags(err)
 
     @classmethod
     def create(
@@ -111,16 +132,7 @@ class LocalPantsRunner:
         """
         build_root = get_buildroot()
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        options, build_config = LocalPantsRunner.parse_options(options_bootstrapper)
-
-        # Option values are usually computed lazily on demand,
-        # but command line options are eagerly computed for validation.
-        for scope in options.scope_to_flags.keys():
-            options.for_scope(scope)
-
-        # Verify configs.
-        if global_bootstrap_options.verify_config:
-            options.verify_configs(options_bootstrapper.config)
+        options, build_config = cls.parse_options(options_bootstrapper)
 
         union_membership = UnionMembership.from_rules(build_config.union_rules)
 
@@ -129,6 +141,19 @@ class LocalPantsRunner:
         graph_session = cls._init_graph_session(
             options_bootstrapper, build_config, options, scheduler
         )
+
+        # Option values are usually computed lazily on demand,
+        # but command line options are eagerly computed for validation.
+        for scope in options.scope_to_flags.keys():
+            try:
+                options.for_scope(scope)
+            except UnknownFlagsError as err:
+                cls._handle_unknown_flags(err, options_bootstrapper)
+                raise
+
+        # Verify configs.
+        if global_bootstrap_options.verify_config:
+            options.verify_configs(options_bootstrapper.config)
 
         specs = calculate_specs(
             options_bootstrapper=options_bootstrapper,
@@ -246,7 +271,7 @@ class LocalPantsRunner:
                     bin_name=global_options.pants_bin_name,
                     help_request=self.options.help_request,
                     all_help_info=all_help_info,
-                    use_color=global_options.colors,
+                    color=global_options.colors,
                 )
                 return help_printer.print_help()
 

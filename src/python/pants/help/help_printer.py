@@ -2,16 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import difflib
 import json
 import textwrap
 from typing import Dict, cast
 
-from colors import cyan, green
 from typing_extensions import Literal
 
 from pants.base.build_environment import pants_version
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import AllHelpInfo, HelpJSONEncoder
+from pants.help.maybe_color import MaybeColor
 from pants.option.arg_splitter import (
     AllHelp,
     GoalsHelp,
@@ -24,8 +25,8 @@ from pants.option.arg_splitter import (
 from pants.option.scope import GLOBAL_SCOPE
 
 
-class HelpPrinter:
-    """Prints help to the console."""
+class HelpPrinter(MaybeColor):
+    """Prints general and goal-related help to the console."""
 
     def __init__(
         self,
@@ -33,19 +34,19 @@ class HelpPrinter:
         bin_name: str,
         help_request: HelpRequest,
         all_help_info: AllHelpInfo,
-        use_color: bool,
+        color: bool,
     ) -> None:
+        super().__init__(color)
         self._bin_name = bin_name
         self._help_request = help_request
         self._all_help_info = all_help_info
-        self._use_color = use_color
 
     def print_help(self) -> Literal[0, 1]:
         """Print help to the console."""
 
         def print_hint() -> None:
-            print(f"Use `{self._bin_name} goals` to list goals.")
-            print(f"Use `{self._bin_name} help` to get help.")
+            print(f"Use `{self.maybe_green(self._bin_name + ' goals')}` to list goals.")
+            print(f"Use `{self.maybe_green(self._bin_name + ' help')}` to get help.")
 
         if isinstance(self._help_request, VersionHelp):
             print(pants_version())
@@ -56,7 +57,17 @@ class HelpPrinter:
         elif isinstance(self._help_request, OptionsHelp):
             self._print_options_help()
         elif isinstance(self._help_request, UnknownGoalHelp):
-            print("Unknown goals: {}".format(", ".join(self._help_request.unknown_goals)))
+            # Only print help and suggestions for the first unknown goal.
+            # It gets confusing to try and show suggestions for multiple cases.
+            unknown_goal = self._help_request.unknown_goals[0]
+            print(f"Unknown goal: {self.maybe_red(unknown_goal)}")
+            did_you_mean = list(
+                difflib.get_close_matches(
+                    unknown_goal, self._all_help_info.name_to_goal_info.keys()
+                )
+            )
+            if did_you_mean:
+                print(f"Did you mean: {', '.join(self.maybe_cyan(g) for g in did_you_mean)}?")
             print_hint()
             return 1
         elif isinstance(self._help_request, NoGoalHelp):
@@ -73,17 +84,13 @@ class HelpPrinter:
                 goal_descriptions[goal_info.name] = goal_info.description
 
         title_text = "Goals"
-        title = f"{title_text}\n{'-' * len(title_text)}"
-        if self._use_color:
-            title = green(title)
+        title = self.maybe_green(f"{title_text}\n{'-' * len(title_text)}")
 
         max_width = max((len(name) for name in goal_descriptions.keys()), default=0)
         chars_before_description = max_width + 2
 
         def format_goal(name: str, descr: str) -> str:
-            name = name.ljust(chars_before_description)
-            if self._use_color:
-                name = cyan(name)
+            name = self.maybe_cyan(name.ljust(chars_before_description))
             description_lines = textwrap.wrap(descr, 80 - chars_before_description)
             if len(description_lines) > 1:
                 description_lines = [
@@ -167,7 +174,7 @@ class HelpPrinter:
         help_formatter = HelpFormatter(
             show_advanced=show_advanced_and_deprecated,
             show_deprecated=show_advanced_and_deprecated,
-            color=self._use_color,
+            color=self.color,
         )
         oshi = self._all_help_info.scope_to_help_info.get(scope)
         if not oshi:
@@ -177,9 +184,7 @@ class HelpPrinter:
         if goal_info:
             related_scopes = sorted(set(goal_info.consumed_scopes) - {GLOBAL_SCOPE, goal_info.name})
             if related_scopes:
-                related_subsystems_label = "Related subsystems:"
-                if self._use_color:
-                    related_subsystems_label = green(related_subsystems_label)
+                related_subsystems_label = self.maybe_green("Related subsystems:")
                 formatted_lines.append(f"{related_subsystems_label} {', '.join(related_scopes)}")
                 formatted_lines.append("")
         return "\n".join(formatted_lines).rstrip()
