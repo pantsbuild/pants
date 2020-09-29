@@ -44,7 +44,7 @@ use std::time::Duration;
 
 use fnv::FnvHasher;
 use futures::future;
-use log::{debug, info, trace, warn};
+use log::{debug, info, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -500,7 +500,7 @@ impl<N: Node> Graph<N> {
         }
 
         // Valid dependency.
-        trace!(
+        test_trace_log!(
           "Adding dependency from {:?} to {:?}",
           inner.entry_for_id(src_id).unwrap().node(),
           inner.entry_for_id(dst_id).unwrap().node()
@@ -514,7 +514,7 @@ impl<N: Node> Graph<N> {
         !inner.entry_for_id(src_id).unwrap().node().cacheable()
       } else {
         // Otherwise, this is an external request: always retry.
-        trace!(
+        test_trace_log!(
           "Requesting node {:?}",
           inner.entry_for_id(dst_id).unwrap().node()
         );
@@ -908,6 +908,19 @@ impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
 
     None
   }
+}
+
+///
+/// Logs at trace level, but only in `cfg(test)`.
+///
+#[macro_export]
+macro_rules! test_trace_log {
+    ($($arg:tt)+) => {
+      #[cfg(test)]
+      {
+        log::trace!($($arg)+)
+      }
+    };
 }
 
 #[cfg(test)]
