@@ -447,8 +447,3 @@ def rm_rf(name: str) -> None:
         elif e.errno != errno.ENOENT:
             # Pass on 'No such file or directory', otherwise re-raise OSError to surface perm issues etc.
             raise
-
-
-def is_readable_dir(path: str) -> bool:
-    """Returns whether a path names an existing directory we can list and read files from."""
-    return os.path.isdir(path) and os.access(path, os.R_OK) and os.access(path, os.X_OK)

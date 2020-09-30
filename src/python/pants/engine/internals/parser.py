@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from io import StringIO
 from typing import Any, Dict, Iterable, List, Tuple, cast
 
-from pants.base.exceptions import UnaddressableObjectError
+from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -21,6 +21,10 @@ class BuildFilePreludeSymbols:
 
 class ParseError(Exception):
     """Indicates an error parsing BUILD configuration."""
+
+
+class UnaddressableObjectError(MappingError):
+    """Indicates an un-addressable object was found at the top level."""
 
 
 class Parser:
