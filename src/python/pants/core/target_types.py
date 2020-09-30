@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.addresses import Address, AddressInput
+from typing import Tuple
+
+from pants.engine.addresses import AddressInput
 from pants.engine.fs import AddPrefix, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -64,6 +66,7 @@ class RelocatedFilesOriginalTargets(StringSequenceField):
 
     alias = "files_targets"
     required = True
+    value: Tuple[str, ...]
 
 
 class RelocatedFilesSrcField(StringField):
