@@ -8,8 +8,7 @@ import unittest
 from collections import OrderedDict
 from enum import Enum
 
-from pants.base.hash_utils import CoercingEncoder, hash_all, hash_file, json_hash
-from pants.util.contextutil import temporary_file
+from pants.base.hash_utils import CoercingEncoder, hash_all, json_hash
 from pants.util.ordered_set import OrderedSet
 
 
@@ -18,16 +17,6 @@ class TestHashUtils(unittest.TestCase):
         expected_hash = hashlib.sha1()
         expected_hash.update(b"jakejones")
         self.assertEqual(expected_hash.hexdigest(), hash_all(["jake", "jones"]))
-
-    def test_hash_file(self):
-        expected_hash = hashlib.sha1()
-        expected_hash.update(b"jake jones")
-
-        with temporary_file() as fd:
-            fd.write(b"jake jones")
-            fd.close()
-
-            self.assertEqual(expected_hash.hexdigest(), hash_file(fd.name))
 
 
 class CoercingJsonEncodingTest(unittest.TestCase):

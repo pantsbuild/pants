@@ -13,12 +13,7 @@ from contextlib import contextmanager
 import psutil
 import pytest
 
-from pants.pantsd.process_manager import (
-    ProcessGroup,
-    ProcessManager,
-    ProcessMetadataManager,
-    swallow_psutil_exceptions,
-)
+from pants.pantsd.process_manager import ProcessManager, ProcessMetadataManager
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdtemp
 
@@ -30,77 +25,6 @@ def fake_process(**kwargs):
     for k, v in kwargs.items():
         setattr(getattr(proc, k), "return_value", v)
     return proc
-
-
-class TestProcessGroup(unittest.TestCase):
-    SUBPROCESS_DIR = safe_mkdtemp()
-
-    def setUp(self):
-        super().setUp()
-        self.pg = ProcessGroup("test", metadata_base_dir=self.SUBPROCESS_DIR)
-
-    def test_swallow_psutil_exceptions(self):
-        with swallow_psutil_exceptions():
-            raise psutil.NoSuchProcess("test")
-
-    def test_iter_processes(self):
-        with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
-            mock_process_iter.return_value = [5, 4, 3, 2, 1]
-            items = [item for item in self.pg.iter_processes()]
-            self.assertEqual(items, [5, 4, 3, 2, 1])
-
-    def test_iter_processes_filter_raises_psutil_exception(self):
-        """If the filter triggers a psutil exception, skip the proc and continue."""
-        with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
-
-            def noop():
-                return True
-
-            def raises():
-                raise psutil.NoSuchProcess("a_test")
-
-            mock_process_iter.return_value = [noop, raises, noop]
-
-            items = [item for item in self.pg.iter_processes(proc_filter=lambda p: p())]
-            self.assertEqual([noop, noop], items)
-
-    def test_iter_processes_process_iter_raises_psutil_exception(self):
-        """If psutil.process_iter raises the exception, silently stop iteration."""
-
-        def id_or_raise(o):
-            if isinstance(o, Exception):
-                raise o
-            else:
-                return o
-
-        with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
-            mock_process_iter.return_value = (
-                id_or_raise(i)
-                for i in ["first", psutil.NoSuchProcess("The Exception"), "never seen"]
-            )
-
-            items = [item for item in self.pg.iter_processes()]
-            self.assertEqual(["first"], items)
-
-    def test_iter_processes_filtered(self):
-        with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
-            mock_process_iter.return_value = [5, 4, 3, 2, 1]
-            items = [item for item in self.pg.iter_processes(lambda x: x != 3)]
-            self.assertEqual(items, [5, 4, 2, 1])
-
-    def test_iter_instances(self):
-        with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
-            mock_process_iter.return_value = [
-                fake_process(name="a_test", pid=3, status=psutil.STATUS_IDLE),
-                fake_process(name="b_test", pid=4, status=psutil.STATUS_IDLE),
-            ]
-
-            items = [item for item in self.pg.iter_instances()]
-            self.assertEqual(len(items), 2)
-
-            for item in items:
-                self.assertIsInstance(item, ProcessManager)
-                self.assertTrue("_test" in item.name)
 
 
 class TestProcessMetadataManager(unittest.TestCase):
