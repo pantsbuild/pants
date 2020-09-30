@@ -240,6 +240,14 @@ impl ByteStore {
     Ok(())
   }
 
+  pub async fn remove(&self, entry_type: EntryType, digest: Digest) -> Result<bool, String> {
+    let dbs = match entry_type {
+      EntryType::Directory => self.inner.directory_dbs.clone(),
+      EntryType::File => self.inner.file_dbs.clone(),
+    };
+    dbs?.remove(digest.0).await
+  }
+
   pub async fn store_bytes(
     &self,
     entry_type: EntryType,
