@@ -6,9 +6,9 @@ import subprocess
 import unittest
 from contextlib import contextmanager
 
-from pants.scm.git import Git
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
+from pants.vcs.git import Git
 
 
 class GitTest(unittest.TestCase):

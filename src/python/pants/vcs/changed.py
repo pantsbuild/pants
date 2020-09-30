@@ -15,7 +15,7 @@ from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
-from pants.scm.scm import Scm
+from pants.vcs.git import Git
 
 
 class DependeesOption(Enum):
@@ -86,15 +86,15 @@ class ChangedOptions:
     def provided(self) -> bool:
         return bool(self.since) or bool(self.diffspec)
 
-    def changed_files(self, *, scm: Scm) -> List[str]:
+    def changed_files(self, git: Git) -> List[str]:
         """Determines the files changed according to SCM/workspace and options."""
         if self.diffspec:
-            return cast(List[str], scm.changes_in(self.diffspec, relative_to=get_buildroot()))
+            return cast(List[str], git.changes_in(self.diffspec, relative_to=get_buildroot()))
 
-        changes_since = self.since or scm.current_rev_identifier
+        changes_since = self.since or git.current_rev_identifier
         return cast(
             List[str],
-            scm.changed_files(
+            git.changed_files(
                 from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
             ),
         )

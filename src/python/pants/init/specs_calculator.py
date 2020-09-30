@@ -4,7 +4,7 @@
 import logging
 from typing import Optional, cast
 
-from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_environment import get_buildroot, get_git
 from pants.base.specs import AddressLiteralSpec, AddressSpecs, FilesystemSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import AddressInput
@@ -13,7 +13,7 @@ from pants.engine.internals.selectors import Params
 from pants.engine.rules import QueryRule
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest
+from pants.vcs.changed import ChangedAddresses, ChangedOptions, ChangedRequest
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +53,13 @@ def calculate_specs(
     if not changed_options.provided:
         return specs
 
-    scm = get_scm()
-    if not scm:
+    git = get_git()
+    if not git:
         raise InvalidSpecConstraint(
-            "The `--changed-*` options are not available without a recognized SCM (usually " "Git)."
+            "The `--changed-*` options are only available if Git is used for the repository."
         )
     changed_request = ChangedRequest(
-        sources=tuple(changed_options.changed_files(scm=scm)),
+        sources=tuple(changed_options.changed_files(git)),
         dependees=changed_options.dependees,
     )
     (changed_addresses,) = session.product_request(

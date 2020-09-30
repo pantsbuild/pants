@@ -11,11 +11,11 @@ from typing import Iterator, List, Optional
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.scm.git import Git
 from pants.testutil.pants_integration_test import PantsIntegrationTest, ensure_daemon
 from pants.testutil.test_base import AbstractTestGenerator
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
+from pants.vcs.git import Git
 
 
 @contextmanager

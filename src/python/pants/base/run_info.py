@@ -8,7 +8,7 @@ import socket
 import time
 from collections import OrderedDict
 
-from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_mkdir_for
 from pants.version import VERSION
 
@@ -92,12 +92,3 @@ class RunInfo:
             ("buildroot", buildroot),
             ("version", VERSION),
         )
-
-    def add_scm_info(self):
-        """Adds SCM-related info."""
-        scm = get_scm()
-        if not scm:
-            return
-        revision = scm.commit_id
-        branch = scm.branch_name or revision
-        self.add_infos(("revision", revision), ("branch", branch))

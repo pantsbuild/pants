@@ -6,7 +6,7 @@ import os
 from typing import Optional
 
 from pants.base.build_root import BuildRoot
-from pants.scm.scm import Scm
+from pants.vcs.git import Git, GitException
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
@@ -52,37 +52,22 @@ def get_default_pants_config_file() -> str:
     return os.path.join(get_buildroot(), "pants.toml")
 
 
-_SCM: Optional[Scm] = None
+_Git: Optional[Git] = None
 
 
-def get_scm() -> Optional[Scm]:
-    """Returns the pants Scm if any.
+def get_git() -> Optional[Git]:
+    """Returns Git, if available."""
+    global _Git
+    if _Git:
+        return _Git
 
-    :API: public
-    """
-    # TODO(John Sirois): Extract a module/class to carry the bootstrap logic.
-    global _SCM
-    if _SCM:
-        return _SCM
-    from pants.scm.git import Git
-
-    # We know about git, so attempt an auto-configure
+    # We know about Git, so attempt an auto-configure
     worktree = Git.detect_worktree()
     if worktree and os.path.isdir(worktree):
         git = Git(worktree=worktree)
         try:
             logger.debug(f"Detected git repository at {worktree} on branch {git.branch_name}")
-            set_scm(git)
-        except git.LocalException as e:
+            _Git = git
+        except GitException as e:
             logger.info(f"Failed to load git repository at {worktree}: {e!r}")
-    return _SCM
-
-
-def set_scm(scm: Optional[Scm]) -> None:
-    """Sets the pants Scm."""
-    if scm is None:
-        return
-    if not isinstance(scm, Scm):
-        raise ValueError(f"The scm must be an instance of Scm, given {scm}")
-    global _SCM
-    _SCM = scm
+    return _Git
