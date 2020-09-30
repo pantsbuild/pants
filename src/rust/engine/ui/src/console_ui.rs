@@ -38,7 +38,7 @@ use uuid::Uuid;
 
 use logging::logger::{StdioHandler, PANTS_LOGGER};
 use task_executor::Executor;
-use workunit_store::WorkunitStore;
+use workunit_store::{format_workunit_duration, WorkunitStore};
 
 pub struct ConsoleUI {
   workunit_store: WorkunitStore,
@@ -118,10 +118,7 @@ impl ConsoleUI {
       .map(|(label, maybe_duration)| {
         let duration_label = match maybe_duration {
           None => "(Waiting) ".to_string(),
-          Some(duration) => {
-            let duration_secs: f64 = (duration.as_millis() as f64) / 1000.0;
-            format!("{:.2}s ", duration_secs)
-          }
+          Some(duration) => format_workunit_duration(*duration),
         };
         format!("{}{}", duration_label, label)
       })
