@@ -5,7 +5,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.base.exceptions import DuplicateNameError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.mapper import (
@@ -13,6 +12,7 @@ from pants.engine.internals.mapper import (
     AddressMap,
     AddressSpecsFilter,
     DifferingFamiliesError,
+    DuplicateNameError,
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor

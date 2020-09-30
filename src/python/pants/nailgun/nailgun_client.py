@@ -10,8 +10,8 @@ import time
 from typing import Dict, List, Optional, cast
 
 from pants.base.exiter import ExitCode
-from pants.java.nailgun_io import NailgunStreamWriter
-from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
+from pants.nailgun.nailgun_io import NailgunStreamWriter
+from pants.nailgun.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
 from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
 from pants.util.strutil import ensure_binary

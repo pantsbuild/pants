@@ -7,7 +7,7 @@ import select
 import threading
 from contextlib import contextmanager
 
-from pants.java.nailgun_protocol import NailgunProtocol
+from pants.nailgun.nailgun_protocol import NailgunProtocol
 
 
 class _StoppableDaemonThread(threading.Thread):
@@ -16,7 +16,7 @@ class _StoppableDaemonThread(threading.Thread):
     JOIN_TIMEOUT = 3
 
     def __init__(self, *args, **kwargs):
-        super(_StoppableDaemonThread, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.daemon = True
         # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
         self._stopped = threading.Event()
@@ -32,7 +32,7 @@ class _StoppableDaemonThread(threading.Thread):
 
     def join(self, timeout=None):
         """Joins with a default timeout exposed on the class."""
-        return super(_StoppableDaemonThread, self).join(timeout or self.JOIN_TIMEOUT)
+        return super().join(timeout or self.JOIN_TIMEOUT)
 
     @contextmanager
     def running(self):
@@ -42,10 +42,6 @@ class _StoppableDaemonThread(threading.Thread):
         finally:
             self.stop()
             self.join()
-
-
-class NailgunStreamWriterError(Exception):
-    pass
 
 
 class NailgunStreamWriter(_StoppableDaemonThread):

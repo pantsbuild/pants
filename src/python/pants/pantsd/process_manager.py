@@ -19,7 +19,6 @@ from pants.option.options import Options
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
 from pants.process.lock import OwnerPrintingInterProcessFileLock
-from pants.process.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 from pants.util.memo import memoized_property
 
@@ -37,42 +36,6 @@ def swallow_psutil_exceptions():
         pass
 
 
-class ProcessGroup:
-    """Wraps a logical group of processes and provides convenient access to ProcessManager
-    objects."""
-
-    def __init__(self, name, metadata_base_dir=None):
-        self._name = name
-        self._metadata_base_dir = metadata_base_dir
-
-    def _instance_from_process(self, process):
-        """Default converter from psutil.Process to process instance classes for subclassing."""
-        return ProcessManager(
-            name=process.name(),
-            pid=process.pid,
-            process_name=process.name(),
-            metadata_base_dir=self._metadata_base_dir,
-        )
-
-    def iter_processes(self, proc_filter=None):
-        """Yields processes from psutil.process_iter with an optional filter and swallows psutil
-        errors.
-
-        If a psutil exception is raised during execution of the filter, that process will not be
-        yielded but subsequent processes will. On the other hand, if psutil.process_iter raises an
-        exception, no more processes will be yielded.
-        """
-        with swallow_psutil_exceptions():  # process_iter may raise
-            for proc in psutil.process_iter():
-                with swallow_psutil_exceptions():  # proc_filter may raise
-                    if (proc_filter is None) or proc_filter(proc):
-                        yield proc
-
-    def iter_instances(self, *args, **kwargs):
-        for item in self.iter_processes(*args, **kwargs):
-            yield self._instance_from_process(item)
-
-
 class ProcessMetadataManager:
     """"Manages contextual, on-disk process metadata."""
 
@@ -86,15 +49,9 @@ class ProcessMetadataManager:
     INFO_INTERVAL_SEC = 5
     WAIT_INTERVAL_SEC = 0.1
 
-    def __init__(self, metadata_base_dir=None):
-        """
-        :param str metadata_base_dir: The base directory for process metadata.
-        """
+    def __init__(self, metadata_base_dir: str) -> None:
         super().__init__()
-
-        self._metadata_base_dir = (
-            metadata_base_dir or Subprocess.Factory.global_instance().create().get_subprocess_dir()
-        )
+        self._metadata_base_dir = metadata_base_dir
 
     @staticmethod
     def _maybe_cast(item, caster):
@@ -273,7 +230,7 @@ class ProcessManager(ProcessMetadataManager):
 
     class ExecutionError(Exception):
         def __init__(self, message, output=None):
-            super(ProcessManager.ExecutionError, self).__init__(message)
+            super().__init__(message)
             self.message = message
             self.output = output
 
@@ -288,10 +245,10 @@ class ProcessManager(ProcessMetadataManager):
     def __init__(
         self,
         name,
+        metadata_base_dir: str,
         pid=None,
         socket=None,
         process_name=None,
-        metadata_base_dir=None,
     ):
         """
         :param string name: The process identity/name (e.g. 'pantsd' or 'ng_Zinc').
