@@ -7,6 +7,7 @@ from pathlib import PurePath
 from typing import Optional, Sequence
 
 from pants.base.deprecated import deprecated
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
@@ -197,7 +198,7 @@ class AddressInput:
         return Address(spec_path=self.path_component, target_name=self.target_component)
 
 
-class Address:
+class Address(EngineAwareParameter):
     """A target address.
 
     An address is a unique name for a `pants.engine.target.Target`, and optionally a particular file
@@ -378,6 +379,9 @@ class Address:
             (other._relative_file_path or ""),
             (other._target_name or ""),
         )
+
+    def debug_hint(self) -> str:
+        return self.spec
 
 
 @dataclass(frozen=True)

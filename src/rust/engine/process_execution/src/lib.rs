@@ -488,7 +488,12 @@ impl CommandRunner for BoundedCommandRunner {
     let name = format!("{}-waiting", req.workunit_name());
     let desc = req.user_facing_name();
     let mut outer_metadata = WorkunitMetadata::with_level(Level::Debug);
-    outer_metadata.desc = Some(desc.clone());
+
+    outer_metadata.desc = Some(format!("(Waiting) {}", desc));
+    // We don't want to display the workunit associated with processes waiting on a
+    // BoundedCommandRunner to show in the dynamic UI, so set the `blocked` flag
+    // on the workunit metadata in order to prevent this.
+    outer_metadata.blocked = true;
     let bounded_fut = {
       let inner = self.inner.clone();
       let semaphore = self.inner.1.clone();

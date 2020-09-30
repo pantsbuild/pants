@@ -15,6 +15,7 @@ from pants.engine.addresses import (
     AddressWithOrigin,
     BuildFileAddress,
 )
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
@@ -26,7 +27,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
 
-@rule
+@rule(desc="Expand macros")
 async def evaluate_preludes(global_options: GlobalOptions) -> BuildFilePreludeSymbols:
     prelude_digest_contents = await Get(
         DigestContents,
@@ -76,7 +77,7 @@ async def resolve_address(address_input: AddressInput) -> Address:
 
 
 @dataclass(frozen=True)
-class AddressFamilyDir:
+class AddressFamilyDir(EngineAwareParameter):
     """The directory to find addresses for.
 
     This does _not_ recurse into subdirectories.
@@ -84,8 +85,11 @@ class AddressFamilyDir:
 
     path: str
 
+    def debug_hint(self) -> str:
+        return self.path
 
-@rule
+
+@rule(desc="Search for addresses in BUILD files.")
 async def parse_address_family(
     parser: Parser,
     global_options: GlobalOptions,

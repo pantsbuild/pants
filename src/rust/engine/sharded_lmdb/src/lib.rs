@@ -139,7 +139,6 @@ impl ShardedLmdb {
     let mut lmdbs = HashMap::new();
 
     for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path, max_size)? {
-      trace!("Making ShardedLmdb content database for {:?}", dir);
       let content_database = env
         .create_db(Some("content-versioned"), DatabaseFlags::empty())
         .map_err(|e| {
@@ -149,7 +148,6 @@ impl ShardedLmdb {
           )
         })?;
 
-      trace!("Making ShardedLmdb lease database for {:?}", dir);
       let lease_database = env
         .create_db(Some("leases-versioned"), DatabaseFlags::empty())
         .map_err(|e| {

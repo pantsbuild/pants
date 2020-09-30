@@ -48,7 +48,7 @@ class UnzipBinary(BinaryPath):
         return (self.path, "-q", archive_path, "-d", output_dir)
 
 
-@rule(level=LogLevel.DEBUG)
+@rule(desc="Finding the `unzip` binary", level=LogLevel.DEBUG)
 async def find_unzip() -> UnzipBinary:
     request = BinaryPathRequest(
         binary_name="unzip", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
@@ -67,7 +67,7 @@ class TarBinary(BinaryPath):
         return (self.path, "xf", archive_path, "-C", output_dir)
 
 
-@rule(level=LogLevel.DEBUG)
+@rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
 async def find_tar() -> TarBinary:
     request = BinaryPathRequest(
         binary_name="tar", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["--version"])
@@ -79,7 +79,7 @@ async def find_tar() -> TarBinary:
     return TarBinary(first_path.path, first_path.fingerprint)
 
 
-@rule(level=LogLevel.DEBUG)
+@rule(desc="Extracting an archive file", level=LogLevel.DEBUG)
 async def maybe_extract(
     extractable: MaybeExtractable, tar_binary: TarBinary, unzip_binary: UnzipBinary
 ) -> ExtractedDigest:
