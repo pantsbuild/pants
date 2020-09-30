@@ -5,10 +5,7 @@ import logging
 import os
 from dataclasses import dataclass
 
-from pants.backend.awslambda.common.awslambda_common_rules import (
-    AWSLambdaFieldSet,
-    CreatedAWSLambda,
-)
+from pants.backend.awslambda.common.rules import AWSLambdaFieldSet, CreatedAWSLambda
 from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandler,
@@ -28,6 +25,7 @@ from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
+from pants.core.goals.build import BuildFieldSet, BuiltAsset
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
@@ -39,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PythonAwsLambdaFieldSet(AWSLambdaFieldSet):
+class PythonAwsLambdaFieldSet(BuildFieldSet, AWSLambdaFieldSet):
     required_fields = (PythonAwsLambdaHandler, PythonAwsLambdaRuntime)
 
     handler: PythonAwsLambdaHandler
@@ -123,6 +121,16 @@ async def create_python_awslambda(
     )
 
 
+@rule
+async def build_python_awslambda(field_set: PythonAwsLambdaFieldSet) -> BuiltAsset:
+    awslambda = await Get(CreatedAWSLambda, AWSLambdaFieldSet, field_set)
+    return BuiltAsset(
+        awslambda.digest,
+        relpath=awslambda.zip_file_relpath,
+        extra_log_info=f"  Runtime: {awslambda.runtime}\n  Handler: {awslambda.handler}",
+    )
+
+
 @rule(desc="Set up lambdex")
 async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
     requirements_pex = await Get(
@@ -142,5 +150,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(AWSLambdaFieldSet, PythonAwsLambdaFieldSet),
+        UnionRule(BuildFieldSet, PythonAwsLambdaFieldSet),
         *pex_from_targets.rules(),
     ]

@@ -16,6 +16,7 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRuntimeBinaryDependencies,
+    PythonRuntimeBuildDependencies,
     PythonTestsSources,
     PythonTestsTimeout,
 )
@@ -31,7 +32,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
+from pants.core.goals.build import BuildFieldSet, BuiltAsset
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -64,6 +65,7 @@ class PythonTestFieldSet(TestFieldSet):
 
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
+    runtime_build_dependencies: PythonRuntimeBuildDependencies
     runtime_binary_dependencies: PythonRuntimeBinaryDependencies
 
     def is_conftest_or_type_stub(self) -> bool:
@@ -152,24 +154,30 @@ async def setup_pytest_for_target(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
 
-    # Create any binaries that the test depends on through the `runtime_binary_dependencies` field.
-    binaries: Tuple[CreatedBinary, ...] = ()
-    if request.field_set.runtime_binary_dependencies.value:
+    # Create any assets that the test depends on through the `runtime_build_dependencies` field.
+    assets: Tuple[BuiltAsset, ...] = ()
+    if (
+        request.field_set.runtime_build_dependencies.value
+        or request.field_set.runtime_binary_dependencies.value
+    ):
         runtime_binary_addresses = await MultiGet(
             Get(
                 Address,
                 AddressInput,
                 AddressInput.parse(v, relative_to=request.field_set.address.spec_path),
             )
-            for v in request.field_set.runtime_binary_dependencies.value
+            for v in (
+                *(request.field_set.runtime_build_dependencies.value or ()),
+                *(request.field_set.runtime_binary_dependencies.value or ()),
+            )
         )
         runtime_binary_targets = await Get(Targets, Addresses(runtime_binary_addresses))
         field_sets_per_target = await Get(
             FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(BinaryFieldSet, runtime_binary_targets),
+            FieldSetsPerTargetRequest(BuildFieldSet, runtime_binary_targets),
         )
-        binaries = await MultiGet(
-            Get(CreatedBinary, BinaryFieldSet, field_set)
+        assets = await MultiGet(
+            Get(BuiltAsset, BuildFieldSet, field_set)
             for field_set in field_sets_per_target.field_sets
         )
 
@@ -194,7 +202,7 @@ async def setup_pytest_for_target(
                 prepared_sources.source_files.snapshot.digest,
                 requirements_pex.digest,
                 pytest_pex.digest,
-                *(binary.digest for binary in binaries),
+                *(binary.digest for binary in assets),
             )
         ),
     )

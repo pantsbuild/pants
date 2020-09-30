@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections.abc
+import logging
 import os.path
 from textwrap import dedent
 from typing import Iterable, Optional, Tuple, Union, cast
@@ -36,6 +37,8 @@ from pants.engine.target import (
 from pants.option.subsystem import Subsystem
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
@@ -264,14 +267,38 @@ class PythonTestsDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonRuntimeBinaryDependencies(StringSequenceField):
-    """Addresses to binary targets that will be built and included in this target at runtime.
+class PythonRuntimeBuildDependencies(StringSequenceField):
+    """Addresses to targets that can be built with the `./pants build` goal and whose resulting
+    assets should be included in the test run.
 
-    These binary targets do not necessarily need to be `python_binary` targets; they can be any
-    targets accepted by `./pants binary`
+    Pants will build the asset as if it had run `./pants build`, and will include the result in
+    your test environment using the same name it would normally have, but without the `dist/`
+    prefix.
+
+    These targets do not necessarily need to be `python_binary` targets; they can be any
+    targets accepted by `./pants build`, as `python_awslambda` and `archive`.
     """
 
+    alias = "runtime_build_dependencies"
+
+
+class PythonRuntimeBinaryDependencies(StringSequenceField):
+    """Deprecated in favor of the `runtime_build_dependencies` field, which works with more target
+    types like `archive` and `python_awslambda`."""
+
     alias = "runtime_binary_dependencies"
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        if raw_value is not None:
+            logger.warning(
+                f"Using the `runtime_binary_dependencies` field in the target {address}. This "
+                "field is now deprecated in favor of the more flexible "
+                "`runtime_build_dependencies` field, and it will be removed in 2.1.0.dev0."
+            )
+        return super().compute_value(raw_value, address=address)
 
 
 class PythonTestsTimeout(IntField):

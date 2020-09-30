@@ -10,7 +10,7 @@ from typing import List, Mapping, Optional
 import pytest
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import create_python_binary, pytest_runner
+from pants.backend.python.goals import build_python_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_coverage_config
 from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import (
@@ -40,7 +40,7 @@ def rule_runner() -> RuleRunner:
             *dependency_inference_rules.rules(),  # For conftest detection.
             *distdir.rules(),
             *binary.rules(),
-            *create_python_binary.rules(),
+            *build_python_binary.rules(),
             get_filtered_environment,
             QueryRule(TestResult, (PythonTestFieldSet,)),
             QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
@@ -454,7 +454,7 @@ def test_runtime_binary_dependency(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    rule_runner.add_to_build_file(PACKAGE, "python_tests(runtime_binary_dependencies=[':bin'])")
+    rule_runner.add_to_build_file(PACKAGE, "python_tests(runtime_build_dependencies=[':bin'])")
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_binary_call.py"))
     assert isinstance(tgt, PythonTests)
     result = run_pytest(rule_runner, tgt, passthrough_args="-s")
