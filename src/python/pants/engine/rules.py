@@ -273,16 +273,14 @@ def rule_decorator(func, **kwargs) -> Callable:
     is_goal_cls = issubclass(return_type, Goal)
     validate_parameter_types(func_id, parameter_types, cacheable)
 
-    # Set a default canonical name if one is not explicitly provided. For Goal classes
-    # this is the name of the Goal; for other named ruled this is the module and name of the
-    # function that implements it.
-    effective_name = kwargs.get("canonical_name")
-    if effective_name is None:
-        effective_name = return_type.name if is_goal_cls else f"{func.__module__}.{func.__name__}"
+    # Set a default canonical name if one is not explicitly provided to the module and name of the
+    # function that implements it. This is used as the workunit name.
+    effective_name = kwargs.get("canonical_name", f"{func.__module__}.{func.__name__}")
 
+    # Set a default description, which is used in the dynamic UI and stacktraces.
     effective_desc = kwargs.get("desc")
     if effective_desc is None and is_goal_cls:
-        effective_desc = f"`{effective_name}` goal"
+        effective_desc = f"`{return_type.name}` goal"
 
     effective_level = kwargs.get("level", LogLevel.TRACE)
     if not isinstance(effective_level, LogLevel):

@@ -1174,9 +1174,7 @@ impl Node for NodeKey {
     let workunit_name = self.workunit_name();
     let failure_name = match &self {
       NodeKey::Task(ref task) => {
-        let name = user_facing_name
-          .clone()
-          .unwrap_or_else(|| workunit_name.clone());
+        let name = workunit_name.clone();
         let engine_aware_param_ty =
           externs::type_for_type_id(context.core.types.engine_aware_parameter);
         let displayable_param_names: Vec<_> = task
@@ -1211,9 +1209,7 @@ impl Node for NodeKey {
           )
         }
       }
-      _ => user_facing_name
-        .clone()
-        .unwrap_or_else(|| workunit_name.clone()),
+      _ => workunit_name.clone(),
     };
 
     let metadata = WorkunitMetadata {
