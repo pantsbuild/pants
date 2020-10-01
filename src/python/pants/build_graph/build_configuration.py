@@ -18,6 +18,7 @@ from pants.goal.run_tracker import RunTracker
 from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
 from pants.option.scope import normalize_scope
+from pants.reporting.metrics import MetricsReporting
 from pants.reporting.reporting import Reporting
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.vcs.changed import Changed
@@ -32,7 +33,7 @@ _RESERVED_NAMES = {"global", "targets", "goals"}
 
 # Subsystems used outside of any rule.
 _GLOBAL_SUBSYSTEMS: FrozenOrderedSet[Type[Optionable]] = FrozenOrderedSet(
-    {GlobalOptions, Reporting, RunTracker, Changed}
+    {GlobalOptions, Reporting, RunTracker, Changed, MetricsReporting}
 )
 
 

@@ -931,6 +931,23 @@ async fn workunit_to_py_value(
     externs::store_dict(artifact_entries)?,
   ));
 
+  if let Some(counters) = &workunit.counters {
+    let counters_entries = counters
+      .iter()
+      .map(|(counter_name, counter_value)| {
+        (
+          externs::store_utf8(counter_name.as_str()),
+          externs::store_u64(*counter_value),
+        )
+      })
+      .collect();
+
+    dict_entries.push((
+      externs::store_utf8("counters"),
+      externs::store_dict(counters_entries)?,
+    ));
+  }
+
   externs::store_dict(dict_entries)
 }
 

@@ -36,6 +36,7 @@ use crate::{
 };
 
 use bytes::{Bytes, BytesMut};
+use workunit_store::{Metric, MetricsLike};
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
@@ -246,6 +247,10 @@ impl super::CommandRunner for CommandRunner {
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    context
+      .workunit_store
+      .increment_counter(Metric::LocalExecutionRuns, 1);
+
     let req = self.extract_compatible_request(&req).unwrap();
     let req_debug_repr = format!("{:#?}", req);
     self

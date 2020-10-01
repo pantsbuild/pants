@@ -27,6 +27,14 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::cell::RefCell;
+use std::collections::hash_map::Entry;
+use std::collections::{BinaryHeap, HashMap};
+use std::future::Future;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+
 use concrete_time::TimeSpan;
 use log::log;
 pub use log::Level;
@@ -34,14 +42,10 @@ use parking_lot::Mutex;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rand::thread_rng;
 use rand::Rng;
-use std::collections::{BinaryHeap, HashMap};
-use std::sync::mpsc::{channel, Receiver, Sender};
 use tokio::task_local;
 
-use std::cell::RefCell;
-use std::future::Future;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+mod metrics;
+pub use metrics::{Metric, MetricsLike};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct SpanId(u64);
@@ -68,6 +72,7 @@ pub struct Workunit {
   pub parent_id: Option<SpanId>,
   pub state: WorkunitState,
   pub metadata: WorkunitMetadata,
+  pub counters: Option<HashMap<Metric, u64>>,
 }
 
 impl Workunit {
@@ -164,7 +169,12 @@ impl UserMetadataItem {
 
 enum StoreMsg {
   Started(Workunit),
-  Completed(SpanId, Option<WorkunitMetadata>, SystemTime),
+  Completed(
+    SpanId,
+    Option<WorkunitMetadata>,
+    SystemTime,
+    Option<HashMap<Metric, u64>>,
+  ),
   Canceled(SpanId),
 }
 
@@ -173,6 +183,7 @@ pub struct WorkunitStore {
   log_starting_workunits: bool,
   streaming_workunit_data: StreamingWorkunitData,
   heavy_hitters_data: HeavyHittersData,
+  metrics_data: MetricsData,
 }
 
 #[derive(Clone)]
@@ -196,7 +207,6 @@ impl StreamingWorkunitData {
   where
     F: FnOnce(&[Workunit], &[Workunit]) -> T,
   {
-    use std::collections::hash_map::Entry;
     let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
 
     let (started_workunits, completed_workunits) = {
@@ -208,8 +218,8 @@ impl StreamingWorkunitData {
         while let Ok(msg) = receiver.try_recv() {
           match msg {
             StoreMsg::Started(started) => started_messages.push(started),
-            StoreMsg::Completed(span, metadata, time) => {
-              completed_messages.push((span, metadata, time))
+            StoreMsg::Completed(span, metadata, time, new_counters) => {
+              completed_messages.push((span, metadata, time, new_counters))
             }
             StoreMsg::Canceled(..) => (),
           }
@@ -230,7 +240,7 @@ impl StreamingWorkunitData {
       }
 
       let mut completed_workunits: Vec<Workunit> = vec![];
-      for (span_id, new_metadata, end_time) in completed_messages.into_iter() {
+      for (span_id, new_metadata, end_time, new_counters) in completed_messages.into_iter() {
         match workunit_records.entry(span_id) {
           Entry::Vacant(_) => {
             log::warn!("No previously-started workunit found for id: {}", span_id);
@@ -252,6 +262,7 @@ impl StreamingWorkunitData {
             if let Some(metadata) = new_metadata {
               workunit.metadata = metadata;
             }
+            workunit.counters = new_counters;
             workunit_records.insert(span_id, workunit.clone());
 
             if should_emit(&workunit) {
@@ -309,10 +320,9 @@ impl HeavyHittersData {
     span_id: SpanId,
     new_metadata: Option<WorkunitMetadata>,
     end_time: SystemTime,
+    new_counters: Option<HashMap<Metric, u64>>,
     inner_store: &mut HeavyHittersInnerStore,
   ) {
-    use std::collections::hash_map::Entry;
-
     match inner_store.workunit_records.entry(span_id) {
       Entry::Vacant(_) => {
         log::warn!("No previously-started workunit found for id: {}", span_id);
@@ -333,6 +343,7 @@ impl HeavyHittersData {
         if let Some(metadata) = new_metadata {
           workunit.metadata = metadata;
         }
+        workunit.counters = new_counters;
         inner_store.workunit_records.insert(span_id, workunit);
       }
     }
@@ -344,8 +355,14 @@ impl HeavyHittersData {
     while let Ok(msg) = receiver.try_recv() {
       match msg {
         StoreMsg::Started(started) => Self::add_started_workunit_to_store(started, &mut inner),
-        StoreMsg::Completed(span_id, new_metadata, time) => {
-          Self::add_completed_workunit_to_store(span_id, new_metadata, time, &mut inner)
+        StoreMsg::Completed(span_id, new_metadata, time, new_counters) => {
+          Self::add_completed_workunit_to_store(
+            span_id,
+            new_metadata,
+            time,
+            new_counters,
+            &mut inner,
+          )
         }
         StoreMsg::Canceled(span_id) => {
           inner.workunit_records.remove(&span_id);
@@ -489,6 +506,7 @@ impl WorkunitStore {
       // installed.
       streaming_workunit_data: StreamingWorkunitData::new(),
       heavy_hitters_data: HeavyHittersData::new(),
+      metrics_data: MetricsData::default(),
     }
   }
 
@@ -530,6 +548,7 @@ impl WorkunitStore {
         start_time: std::time::SystemTime::now(),
       },
       metadata,
+      counters: None,
     };
 
     self
@@ -570,15 +589,34 @@ impl WorkunitStore {
     let span_id = workunit.span_id;
     let new_metadata = Some(workunit.metadata.clone());
 
+    let workunit_counters = {
+      let mut counters = self.metrics_data.counters.lock();
+      match counters.entry(span_id) {
+        Entry::Vacant(_) => None,
+        Entry::Occupied(entry) => Some(entry.remove()),
+      }
+    };
+    workunit.counters = workunit_counters.clone();
+
     let tx = self.streaming_workunit_data.msg_tx.lock();
-    tx.send(StoreMsg::Completed(span_id, new_metadata.clone(), end_time))
-      .unwrap();
+    tx.send(StoreMsg::Completed(
+      span_id,
+      new_metadata.clone(),
+      end_time,
+      workunit_counters.clone(),
+    ))
+    .unwrap();
 
     self
       .heavy_hitters_data
       .msg_tx
       .lock()
-      .send(StoreMsg::Completed(span_id, new_metadata, end_time))
+      .send(StoreMsg::Completed(
+        span_id,
+        new_metadata,
+        end_time,
+        workunit_counters,
+      ))
       .unwrap();
 
     let start_time = match workunit.state {
@@ -610,6 +648,7 @@ impl WorkunitStore {
       parent_id,
       state: WorkunitState::Started { start_time },
       metadata,
+      counters: None,
     };
 
     self
@@ -734,6 +773,41 @@ impl Drop for CanceledWorkunitGuard {
   fn drop(&mut self) {
     if let Some(workunit) = &self.workunit {
       self.store.cancel_workunit(workunit);
+    }
+  }
+}
+
+#[derive(Clone)]
+struct MetricsData {
+  counters: Arc<Mutex<HashMap<SpanId, HashMap<Metric, u64>>>>,
+}
+
+impl Default for MetricsData {
+  fn default() -> MetricsData {
+    MetricsData {
+      counters: Arc::new(Mutex::new(HashMap::new())),
+    }
+  }
+}
+
+impl MetricsLike for WorkunitStore {
+  fn increment_counter(&self, counter_name: Metric, change: u64) {
+    let workunit_state = expect_workunit_state();
+    if let Some(span_id) = workunit_state.parent_id {
+      let mut counters = self.metrics_data.counters.lock();
+      counters
+        .entry(span_id)
+        .and_modify(|entry_for_map| {
+          entry_for_map
+            .entry(counter_name)
+            .and_modify(|e| *e += change)
+            .or_insert(change);
+        })
+        .or_insert_with(|| {
+          let mut m = HashMap::new();
+          m.insert(counter_name, change);
+          m
+        });
     }
   }
 }

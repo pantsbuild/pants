@@ -27,7 +27,7 @@ use log::{debug, trace, warn, Level};
 use protobuf::{self, Message, ProtobufEnum};
 use rand::{thread_rng, Rng};
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
-use workunit_store::{with_workunit, SpanId, WorkunitMetadata, WorkunitStore};
+use workunit_store::{with_workunit, Metric, MetricsLike, SpanId, WorkunitMetadata, WorkunitStore};
 
 use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
@@ -736,7 +736,14 @@ impl crate::CommandRunner for CommandRunner {
       &build_id, action_digest, cached_response_opt
     );
     if let Some(cached_response) = cached_response_opt {
+      context
+        .workunit_store
+        .increment_counter(Metric::RemoteExecutionActionCacheUncached, 1);
       return Ok(cached_response);
+    } else {
+      context
+        .workunit_store
+        .increment_counter(Metric::RemoteExecutionActionCacheUncached, 1);
     }
 
     // Upload the action (and related data, i.e. the embedded command and input files).

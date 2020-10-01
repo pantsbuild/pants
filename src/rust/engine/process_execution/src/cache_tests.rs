@@ -13,6 +13,7 @@ use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::relative_paths;
+use workunit_store::WorkunitStore;
 
 struct RoundtripResults {
   uncached: Result<FallibleProcessResultWithPlatform, String>,
@@ -118,12 +119,18 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
 
 #[tokio::test]
 async fn cache_success() {
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
+
   let results = run_roundtrip(0).await;
   assert_eq!(results.uncached, results.maybe_cached);
 }
 
 #[tokio::test]
 async fn failures_not_cached() {
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
+
   let results = run_roundtrip(1).await;
   assert_ne!(results.uncached, results.maybe_cached);
   assert_eq!(results.uncached.unwrap().exit_code, 1);
@@ -132,6 +139,9 @@ async fn failures_not_cached() {
 
 #[tokio::test]
 async fn recover_from_missing_store_contents() {
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
+
   let (local, store, _local_runner_dir) = create_local_runner();
   let (caching, _cache_dir) = create_cached_runner(local, store.clone());
   let (process, _script_path, _script_dir) = create_script(0);

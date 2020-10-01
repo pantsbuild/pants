@@ -241,6 +241,8 @@ class LocalPantsRunner:
                 return self._print_help(self.options.help_request)
 
             streaming_handlers = global_options.streaming_workunits_handlers
+            if self.options.for_scope("pants-metrics").report:
+                streaming_handlers.append("pants.reporting.metrics.MetricsReporting")
             callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
             streaming_reporter = StreamingWorkunitHandler(
                 self.graph_session.scheduler_session,
