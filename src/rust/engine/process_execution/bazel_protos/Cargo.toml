@@ -6,25 +6,17 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-bytes = "0.4.5"
+bytes = "0.5"
 futures = "^0.1.16"
-# TODO: This is 0.5.1 + https://github.com/tikv/grpc-rs/pull/457 + a workaround for https://github.com/rust-lang/cargo/issues/8258
-grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "ed3afa3c24ddf1fdd86826e836f57c00757dfc00", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../../hashing" }
-prost = "0.4"
-prost-derive = "0.4"
-prost-types = "0.4"
-protobuf = { version = "2.0.6", features = ["with-bytes"] }
-# Waiting for https://github.com/tower-rs/tower-grpc/pull/108 and a first actual release.
-tower-grpc = { git = "https://github.com/pantsbuild/tower-grpc.git", rev = "ef19f2e1715f415ecb699e8f17f5845ad2b45daf", features = ["prost"] }
+prost = "0.6"
+prost-types = "0.6"
+tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots"] }
 
 [build-dependencies]
 build_utils = { path = "../../build_utils" }
 copy_dir = "0.1.2"
 dir-diff = "0.3.1"
-grpcio-compiler = "0.3"
-protoc-grpcio = "0.2"
 tempfile = "3"
-# Waiting for https://github.com/tower-rs/tower-grpc/pull/108 and a first actual release.
-tower-grpc-build = { git = "https://github.com/pantsbuild/tower-grpc.git", rev = "ef19f2e1715f415ecb699e8f17f5845ad2b45daf" }
+tonic-build = { version = "0.3", features = ["prost"] }
 walkdir = "2"

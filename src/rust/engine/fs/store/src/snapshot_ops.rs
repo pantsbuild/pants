@@ -4,8 +4,8 @@
 use crate::{snapshot::osstring_as_utf8, Snapshot};
 
 use async_trait::async_trait;
-use bazel_protos::remote_execution as remexec;
-use bytes::Bytes;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bytes::BytesMut;
 use fs::{
   ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob, PreparedPathGlobs, RelativePath,
   DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
@@ -18,7 +18,7 @@ use itertools::Itertools;
 use log::log_enabled;
 
 use std::collections::HashSet;
-use std::convert::From;
+use std::convert::{From, TryInto};
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -91,7 +91,7 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
       return Ok(dir_digests.pop().unwrap());
     }
 
-    let mut directories = future03::try_join_all(
+    let directories = future03::try_join_all(
       dir_digests
         .into_iter()
         .map(|digest| {
@@ -108,19 +108,13 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
     )
     .await?;
 
-    let mut out_dir = remexec::Directory::new();
+    let mut out_dir = remexec::Directory::default();
 
     // Merge FileNodes.
-    let file_nodes = Iterator::flatten(
-      directories
-        .iter_mut()
-        .map(|directory| directory.take_files().into_iter()),
-    )
-    .sorted_by(|a, b| a.name.cmp(&b.name));
+    let file_nodes = Iterator::flatten(directories.iter().map(|directory| directory.files.iter()))
+      .sorted_by(|a, b| a.name.cmp(&b.name));
 
-    out_dir.set_files(protobuf::RepeatedField::from_vec(
-      file_nodes.into_iter().dedup().collect(),
-    ));
+    out_dir.files = file_nodes.into_iter().dedup().cloned().collect();
 
     // Group and recurse for DirectoryNodes.
     let child_directory_futures = {
@@ -128,8 +122,8 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
       let parent_path = parent_path.clone();
       let mut directories_to_merge = Iterator::flatten(
         directories
-          .iter_mut()
-          .map(|directory| directory.take_directories().into_iter()),
+          .iter()
+          .map(|directory| directory.directories.iter()),
       )
       .collect::<Vec<_>>();
       directories_to_merge.sort_by(|a, b| a.name.cmp(&b.name));
@@ -140,14 +134,15 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
         .map(move |(child_name, group)| {
           let store = store.clone();
           let digests: Vec<Digest> = group
-            .map(|d| to_pants_digest(d.get_digest().clone()))
+            .map(|d| to_pants_digest_opt(d.digest.clone()))
             .collect();
           let child_path = parent_path.join(&child_name);
           async move {
             let merged_digest = merge_directories_recursive(store, child_path, digests).await?;
-            let mut child_dir = remexec::DirectoryNode::new();
-            child_dir.set_name(child_name);
-            child_dir.set_digest((&merged_digest).into());
+            let child_dir = remexec::DirectoryNode {
+              name: child_name,
+              digest: Some(merged_digest.into()),
+            };
             let res: Result<_, String> = Ok(child_dir);
             res
           }
@@ -157,7 +152,7 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
 
     let child_directories = future03::try_join_all(child_directory_futures).await?;
 
-    out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
+    out_dir.directories = child_directories;
 
     error_for_collisions(&store_wrapper, &parent_path, &out_dir).await?;
     store_wrapper.record_directory(&out_dir).await
@@ -175,37 +170,32 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
 ) -> Result<(), String> {
   // Attempt to cheaply check for collisions to bail out early if there aren't any.
   let unique_count = dir
-    .get_files()
+    .files
     .iter()
-    .map(remexec::FileNode::get_name)
-    .chain(
-      dir
-        .get_directories()
-        .iter()
-        .map(remexec::DirectoryNode::get_name),
-    )
+    .map(|n| n.name.clone())
+    .chain(dir.directories.iter().map(|n| n.name.clone()))
     .collect::<HashSet<_>>()
     .len();
-  if unique_count == (dir.get_files().len() + dir.get_directories().len()) {
+  if unique_count == (dir.files.len() + dir.directories.len()) {
     return Ok(());
   }
 
   let file_details_by_name = dir
-    .get_files()
+    .files
     .iter()
     .map(|file_node| async move {
-      let digest_proto = file_node.get_digest();
-      let header = format!(
-        "file digest={} size={}:\n\n",
-        digest_proto.hash, digest_proto.size_bytes
-      );
+      let digest: Digest = file_node
+        .digest
+        .as_ref()
+        .map(|d| d.try_into())
+        .unwrap_or(Ok(EMPTY_DIGEST))?;
+      let header = format!("file digest={} size={}:\n\n", digest.0, digest.1);
 
-      let digest = to_pants_digest(digest_proto.clone());
       let contents = store_wrapper
         .load_file_bytes_with(digest, |bytes| {
           const MAX_LENGTH: usize = 1024;
           let content_length = bytes.len();
-          let mut bytes = Bytes::from(&bytes[0..std::cmp::min(content_length, MAX_LENGTH)]);
+          let mut bytes = BytesMut::from(&bytes[0..std::cmp::min(content_length, MAX_LENGTH)]);
           if content_length > MAX_LENGTH && !log_enabled!(log::Level::Debug) {
             bytes.extend_from_slice(
               format!(
@@ -221,20 +211,21 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
         .await?
         .unwrap_or_else(|| "<could not load contents>".to_string());
       let detail = format!("{}{}", header, contents);
-      let res: Result<_, String> = Ok((file_node.get_name(), detail));
+      let res: Result<_, String> = Ok((file_node.name.clone(), detail));
       res
     })
     .map(|f| f.boxed());
   let dir_details_by_name = dir
-    .get_directories()
+    .directories
     .iter()
     .map(|dir_node| async move {
-      let digest_proto = dir_node.get_digest();
+      // TODO(tonic): Avoid using .unwrap here!
       let detail = format!(
         "dir digest={} size={}:\n\n",
-        digest_proto.hash, digest_proto.size_bytes
+        dir_node.digest.as_ref().unwrap().hash,
+        dir_node.digest.as_ref().unwrap().size_bytes
       );
-      let res: Result<_, String> = Ok((dir_node.get_name(), detail));
+      let res: Result<_, String> = Ok((dir_node.name.clone(), detail));
       res
     })
     .map(|f| f.boxed());
@@ -318,16 +309,14 @@ impl IntermediateGlobbedFilesAndDirectories {
     prefix: PathBuf,
   ) -> Self {
     let cur_dir_files: IndexMap<PathBuf, remexec::FileNode> = cur_dir
-      .get_files()
-      .to_vec()
+      .files
       .into_iter()
-      .map(|file_node| (PathBuf::from(file_node.get_name()), file_node))
+      .map(|file_node| (PathBuf::from(file_node.name.clone()), file_node))
       .collect();
     let cur_dir_directories: IndexMap<PathBuf, remexec::DirectoryNode> = cur_dir
-      .get_directories()
-      .to_vec()
+      .directories
       .into_iter()
-      .map(|directory_node| (PathBuf::from(directory_node.get_name()), directory_node))
+      .map(|directory_node| (PathBuf::from(directory_node.name.clone()), directory_node))
       .collect();
 
     let globbed_files: IndexMap<PathBuf, remexec::FileNode> = IndexMap::new();
@@ -414,7 +403,7 @@ impl IntermediateGlobbedFilesAndDirectories {
               // directory here. We avoid doing this if we have already globbed a full directory,
               // since we take the union of all matched subglobs.
               let mut empty_node = directory_node.clone();
-              empty_node.set_digest(to_bazel_digest(EMPTY_DIGEST));
+              empty_node.digest = Some(to_bazel_digest(EMPTY_DIGEST));
               globbed_directories.insert(directory_path, empty_node);
             };
           }
@@ -564,9 +553,9 @@ async fn snapshot_glob_match<T: StoreWrapper>(
       let bazel_digest = cur_dir_directories
         .get(&subdir_name)
         .unwrap()
-        .get_digest()
+        .digest
         .clone();
-      let digest = to_pants_digest(bazel_digest);
+      let digest = bazel_digest.map(to_pants_digest).unwrap_or(EMPTY_DIGEST);
       let multiple_globs = MultipleGlobs {
         include: all_path_globs,
         exclude: exclude.clone(),
@@ -617,23 +606,26 @@ async fn snapshot_glob_match<T: StoreWrapper>(
               &dependency, &completed_digests
             )
           })?;
-          let mut fixed_directory_node = remexec::DirectoryNode::new();
           // NB: Get the name *relative* to the current directory.
           let name = dependency.strip_prefix(prefix.clone()).map_err(|e| format!("{:?}", e))?;
-          fixed_directory_node.set_name(format!("{}", name.display()));
-          fixed_directory_node.set_digest(to_bazel_digest(*digest));
+          let fixed_directory_node = remexec::DirectoryNode {
+            name: format!("{}", name.display()),
+            digest: Some(to_bazel_digest(*digest)),
+          };
           Ok(fixed_directory_node)
         })
         .collect::<Result<Vec<remexec::DirectoryNode>, String>>()?;
 
     // Create the new protobuf with the merged nodes.
-    let mut final_directory = remexec::Directory::new();
-    final_directory.set_files(protobuf::RepeatedField::from_vec(files));
     let all_directories: Vec<remexec::DirectoryNode> = known_directories
       .into_iter()
       .chain(completed_nodes.into_iter())
       .collect();
-    final_directory.set_directories(protobuf::RepeatedField::from_vec(all_directories));
+    let final_directory = remexec::Directory {
+      files,
+      directories: all_directories,
+      ..remexec::Directory::default()
+    };
     let digest = store_wrapper.record_directory(&final_directory).await?;
     completed_digests.insert(prefix, digest);
   }
@@ -667,12 +659,15 @@ pub trait SnapshotOps: StoreWrapper + 'static {
     let prefix: PathBuf = prefix.into();
     let mut prefix_iter = prefix.iter();
     while let Some(parent) = prefix_iter.next_back() {
-      let mut dir_node = remexec::DirectoryNode::new();
-      dir_node.set_name(osstring_as_utf8(parent.to_os_string())?);
-      dir_node.set_digest((&digest).into());
+      let dir_node = remexec::DirectoryNode {
+        name: osstring_as_utf8(parent.to_os_string())?,
+        digest: Some((&digest).into()),
+      };
 
-      let mut out_dir = remexec::Directory::new();
-      out_dir.set_directories(protobuf::RepeatedField::from_vec(vec![dir_node]));
+      let out_dir = remexec::Directory {
+        directories: vec![dir_node],
+        ..remexec::Directory::default()
+      };
 
       digest = self.record_directory(&out_dir).await?;
     }
@@ -699,26 +694,22 @@ pub trait SnapshotOps: StoreWrapper + 'static {
 
         let mut saw_matching_dir = false;
         let extra_directories: Vec<_> = dir
-          .get_directories()
+          .directories
           .iter()
           .filter_map(|subdir| {
-            if subdir.get_name() == component_to_strip_str {
+            if subdir.name == component_to_strip_str {
               saw_matching_dir = true;
               None
             } else {
-              Some(subdir.get_name().to_owned())
+              Some(subdir.name.to_owned())
             }
           })
           .collect();
-        let files: Vec<_> = dir
-          .get_files()
-          .iter()
-          .map(|file| file.get_name().to_owned())
-          .collect();
+        let files: Vec<_> = dir.files.iter().map(|file| file.name.to_owned()).collect();
 
         match (saw_matching_dir, extra_directories.is_empty() && files.is_empty()) {
           (false, true) => {
-            dir = remexec::Directory::new();
+            dir = remexec::Directory::default();
             break;
           },
           (false, false) => {
@@ -746,9 +737,12 @@ pub trait SnapshotOps: StoreWrapper + 'static {
           (true, true) => {
             // Must be 0th index, because we've checked that we saw a matching directory, and no
             // others.
+            // TODO(tonic): Match safely to access first directory?
             let digest = to_pants_digest(
-              dir.get_directories()[0]
-                .get_digest()
+              dir.directories[0]
+                .digest
+                .as_ref()
+                .unwrap()
                 .clone());
             already_stripped = already_stripped.join(component_to_strip);
             dir = self.load_directory_or_err(digest).await?;
@@ -808,18 +802,28 @@ impl From<PathGlob> for RestrictedPathGlob {
   }
 }
 
+// TODO(tonic): Replace uses of this method with `.into` or equivalent.
 fn to_bazel_digest(digest: Digest) -> remexec::Digest {
-  let mut bazel_digest = remexec::Digest::new();
-  bazel_digest.set_hash(digest.0.to_hex());
-  bazel_digest.set_size_bytes(digest.1 as i64);
-  bazel_digest
+  remexec::Digest {
+    hash: digest.0.to_hex(),
+    size_bytes: digest.1 as i64,
+  }
 }
 
+// TODO(tonic): Replace uses of this method with `.into` or equivalent.
 fn to_pants_digest(bazel_digest: remexec::Digest) -> Digest {
-  let fp = Fingerprint::from_hex_string(bazel_digest.get_hash())
+  let fp = Fingerprint::from_hex_string(&bazel_digest.hash)
     .expect("failed to coerce bazel to pants digest");
-  let size_bytes = bazel_digest.get_size_bytes() as usize;
+  let size_bytes = bazel_digest.size_bytes as usize;
   Digest(fp, size_bytes)
+}
+
+// TODO(tonic): Replace use of this method with `.into` or equivalent.
+fn to_pants_digest_opt(bazel_digest: Option<remexec::Digest>) -> Digest {
+  match bazel_digest {
+    Some(d) => to_pants_digest(d),
+    None => EMPTY_DIGEST,
+  }
 }
 
 #[derive(Clone)]

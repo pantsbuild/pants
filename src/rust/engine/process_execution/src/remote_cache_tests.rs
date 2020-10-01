@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use fs::RelativePath;
 use hashing::Digest;
 use maplit::hashset;
@@ -216,21 +217,21 @@ async fn make_tree_from_directory() {
   .await
   .unwrap();
 
-  let root_dir = tree.get_root();
-  assert_eq!(root_dir.get_files().len(), 0);
-  assert_eq!(root_dir.get_directories().len(), 1);
-  let dir_node = &root_dir.get_directories()[0];
-  assert_eq!(dir_node.get_name(), "cats");
-  let dir_digest: Digest = dir_node.get_digest().try_into().unwrap();
+  let root_dir = tree.root.unwrap();
+  assert_eq!(root_dir.files.len(), 0);
+  assert_eq!(root_dir.directories.len(), 1);
+  let dir_node = &root_dir.directories[0];
+  assert_eq!(dir_node.name, "cats");
+  let dir_digest: Digest = dir_node.digest.as_ref().unwrap().try_into().unwrap();
   assert_eq!(dir_digest, TestDirectory::containing_roland().digest());
-  let children = tree.get_children();
+  let children = tree.children;
   assert_eq!(children.len(), 1);
   let child_dir = &children[0];
-  assert_eq!(child_dir.get_files().len(), 1);
-  assert_eq!(child_dir.get_directories().len(), 0);
-  let file_node = &child_dir.get_files()[0];
-  assert_eq!(file_node.get_name(), "roland");
-  let file_digest: Digest = file_node.get_digest().try_into().unwrap();
+  assert_eq!(child_dir.files.len(), 1);
+  assert_eq!(child_dir.directories.len(), 0);
+  let file_node = &child_dir.files[0];
+  assert_eq!(file_node.name, "roland");
+  let file_digest: Digest = file_node.digest.as_ref().unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
 
   // Test that extracting a non-existent output directory fails.
@@ -273,8 +274,8 @@ async fn extract_output_file() {
   .await
   .unwrap();
 
-  assert_eq!(file_node.get_name(), "roland");
-  let file_digest: Digest = file_node.get_digest().try_into().unwrap();
+  assert_eq!(file_node.name, "roland");
+  let file_digest: Digest = file_node.digest.unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
 }
 
@@ -353,10 +354,12 @@ async fn make_action_result_basic() {
   )
   .expect("caching command runner");
 
-  let mut command = bazel_protos::remote_execution::Command::new();
-  command.mut_arguments().push("this is a test".into());
-  command.mut_output_files().push("pets/cats/roland".into());
-  command.mut_output_directories().push("pets/cats".into());
+  let command = remexec::Command {
+    arguments: vec!["this is a test".into()],
+    output_files: vec!["pets/cats/roland".into()],
+    output_directories: vec!["pets/cats".into()],
+    ..Default::default()
+  };
 
   let process_result = FallibleProcessResultWithPlatform {
     stdout_digest: TestData::roland().digest(),
@@ -372,12 +375,12 @@ async fn make_action_result_basic() {
     .await
     .unwrap();
 
-  assert_eq!(action_result.get_exit_code(), process_result.exit_code);
+  assert_eq!(action_result.exit_code, process_result.exit_code);
 
-  let stdout_digest: Digest = action_result.get_stdout_digest().try_into().unwrap();
+  let stdout_digest: Digest = action_result.stdout_digest.unwrap().try_into().unwrap();
   assert_eq!(stdout_digest, process_result.stdout_digest);
 
-  let stderr_digest: Digest = action_result.get_stderr_digest().try_into().unwrap();
+  let stderr_digest: Digest = action_result.stderr_digest.unwrap().try_into().unwrap();
   assert_eq!(stderr_digest, process_result.stderr_digest);
 
   let actual_digests_set = digests.into_iter().collect::<HashSet<_>>();

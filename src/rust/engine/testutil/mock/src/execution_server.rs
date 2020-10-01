@@ -1,33 +1,51 @@
-use std::collections::{HashMap, VecDeque};
+use std::any::type_name;
+use std::collections::VecDeque;
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::iter::FromIterator;
+use std::net::SocketAddr;
 use std::ops::Deref;
 use std::sync::Arc;
-use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
 
-use futures::compat::{Future01CompatExt, Sink01CompatExt};
-use futures::future::{FutureExt, TryFutureExt};
-use futures::sink::SinkExt;
-use grpcio::RpcStatus;
-use hashing::Digest;
+use crate::tonic_util::AddrIncomingWithStream;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bazel_protos::gen::build::bazel::semver::SemVer;
+use bazel_protos::gen::google::longrunning::{
+  operations_server::Operations, operations_server::OperationsServer, CancelOperationRequest,
+  DeleteOperationRequest, GetOperationRequest, ListOperationsRequest, ListOperationsResponse,
+  Operation,
+};
+use futures::Stream;
+use hashing::{Digest, EMPTY_DIGEST};
 use parking_lot::Mutex;
+use remexec::{
+  action_cache_server::ActionCache, action_cache_server::ActionCacheServer,
+  capabilities_server::Capabilities, capabilities_server::CapabilitiesServer,
+  execution_server::Execution, execution_server::ExecutionServer, ActionResult, CacheCapabilities,
+  ExecuteRequest, ExecutionCapabilities, GetActionResultRequest, GetCapabilitiesRequest,
+  ServerCapabilities, UpdateActionResultRequest, WaitExecutionRequest,
+};
+use std::pin::Pin;
+use tonic::metadata::MetadataMap;
+use tonic::transport::Server;
+use tonic::{Request, Response, Status};
 
 ///
 /// Represents an expected API call from the REv2 client. The data carried by each enum
 /// variant are the parameters to verify and the results to return to the client.
 ///
 #[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)] // GetActionResult variant is larger than others
 pub enum ExpectedAPICall {
   Execute {
-    execute_request: bazel_protos::remote_execution::ExecuteRequest,
-    stream_responses: Result<Vec<MockOperation>, grpcio::RpcStatus>,
+    execute_request: ExecuteRequest,
+    stream_responses: Result<Vec<MockOperation>, Status>,
   },
   WaitExecution {
     operation_name: String,
-    stream_responses: Result<Vec<MockOperation>, grpcio::RpcStatus>,
+    stream_responses: Result<Vec<MockOperation>, Status>,
   },
   GetOperation {
     operation_name: String,
@@ -35,7 +53,7 @@ pub enum ExpectedAPICall {
   },
   GetActionResult {
     action_digest: Digest,
-    response: Result<bazel_protos::remote_execution::ActionResult, grpcio::RpcStatus>,
+    response: Result<ActionResult, Status>,
   },
 }
 
@@ -48,12 +66,12 @@ pub enum ExpectedAPICall {
 ///
 #[derive(Clone, Debug)]
 pub struct MockOperation {
-  pub op: Result<Option<bazel_protos::operations::Operation>, grpcio::RpcStatus>,
+  pub op: Result<Option<Operation>, Status>,
   pub duration: Option<Duration>,
 }
 
 impl MockOperation {
-  pub fn new(op: bazel_protos::operations::Operation) -> MockOperation {
+  pub fn new(op: Operation) -> MockOperation {
     MockOperation {
       op: Ok(Some(op)),
       duration: None,
@@ -87,7 +105,7 @@ impl MockExecution {
 ///
 pub struct TestServer {
   pub mock_responder: MockResponder,
-  server_transport: grpcio::Server,
+  local_addr: SocketAddr,
 }
 
 impl TestServer {
@@ -104,28 +122,26 @@ impl TestServer {
   pub fn new(mock_execution: MockExecution, port: Option<u16>) -> TestServer {
     let mock_responder = MockResponder::new(mock_execution);
 
-    let env = Arc::new(grpcio::Environment::new(1));
-    let mut server_transport = grpcio::ServerBuilder::new(env)
-      .register_service(bazel_protos::remote_execution_grpc::create_execution(
-        mock_responder.clone(),
-      ))
-      .register_service(bazel_protos::operations_grpc::create_operations(
-        mock_responder.clone(),
-      ))
-      .register_service(bazel_protos::remote_execution_grpc::create_capabilities(
-        mock_responder.clone(),
-      ))
-      .register_service(bazel_protos::remote_execution_grpc::create_action_cache(
-        mock_responder.clone(),
-      ))
-      .bind("localhost", port.unwrap_or(0))
-      .build()
-      .unwrap();
-    server_transport.start();
+    let mut server = Server::builder();
+    let router = server
+      .add_service(ExecutionServer::new(mock_responder.clone()))
+      .add_service(OperationsServer::new(mock_responder.clone()))
+      .add_service(CapabilitiesServer::new(mock_responder.clone()))
+      .add_service(ActionCacheServer::new(mock_responder.clone()));
+
+    let addr = format!("127.0.0.1:{}", port.unwrap_or(0))
+      .parse()
+      .expect("failed to parse IP address");
+    let incoming = hyper::server::conn::AddrIncoming::bind(&addr).expect("failed to bind port");
+    let local_addr = incoming.local_addr();
+    let incoming = AddrIncomingWithStream(incoming);
+
+    let server_fut = Box::pin(router.serve_with_incoming(incoming));
+    tokio::spawn(server_fut);
 
     TestServer {
       mock_responder,
-      server_transport,
+      local_addr,
     }
   }
 
@@ -133,8 +149,7 @@ impl TestServer {
   /// The address on which this server is listening over insecure HTTP transport.
   ///
   pub fn address(&self) -> String {
-    let bind_addr = self.server_transport.bind_addrs().next().unwrap();
-    format!("{}:{}", bind_addr.0, bind_addr.1)
+    format!("{}", self.local_addr)
   }
 }
 
@@ -175,16 +190,16 @@ impl Drop for TestServer {
 #[derive(Debug)]
 pub struct ReceivedMessage {
   pub message_type: String,
-  pub message: Box<dyn protobuf::Message>,
+  pub message: Box<dyn prost::Message>,
   pub received_at: Instant,
-  pub headers: HashMap<String, Vec<u8>>,
+  pub headers: MetadataMap,
 }
 
 #[derive(Clone, Debug)]
 pub struct MockResponder {
   mock_execution: MockExecution,
   pub received_messages: Arc<Mutex<Vec<ReceivedMessage>>>,
-  pub cancelation_requests: Arc<Mutex<Vec<bazel_protos::operations::CancelOperationRequest>>>,
+  pub cancelation_requests: Arc<Mutex<Vec<CancelOperationRequest>>>,
 }
 
 impl MockResponder {
@@ -196,14 +211,13 @@ impl MockResponder {
     }
   }
 
-  fn log<T: protobuf::Message + Sized>(&self, ctx: &grpcio::RpcContext, message: T) {
-    let headers = ctx
-      .request_headers()
-      .iter()
-      .map(|(name, value)| (name.to_string(), value.to_vec()))
-      .collect();
+  fn log<T: prost::Message + Clone + Sized + 'static>(&self, request: &Request<T>) {
+    let headers = request.metadata().clone();
+
+    let message = request.get_ref().clone();
+
     self.received_messages.lock().push(ReceivedMessage {
-      message_type: message.descriptor().name().to_string(),
+      message_type: type_name::<T>().to_string(),
       message: Box::new(message),
       received_at: Instant::now(),
       headers,
@@ -218,370 +232,294 @@ impl MockResponder {
       .concat()
   }
 
-  fn spawn_send_to_operation_stream(
-    &self,
-    ctx: grpcio::RpcContext<'_>,
-    sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
+  fn stream_from_mock_operations(
     operations: Vec<MockOperation>,
-  ) {
-    let mut sink = sink.sink_compat();
-
-    let fut = async move {
-      let mut error_to_send: Option<RpcStatus> = None;
+  ) -> Pin<Box<dyn Stream<Item = Result<Operation, Status>> + Send + Sync>> {
+    let stream = async_stream::stream! {
       for op in operations {
         if let Some(d) = op.duration {
           tokio::time::delay_for(d).await;
         }
 
         if let Ok(Some(op)) = op.op {
-          let _ = sink.send((op, grpcio::WriteFlags::default())).await;
+          yield Ok(op);
         } else if let Err(status) = op.op {
-          error_to_send = Some(status);
+          yield Err(status);
           break;
         }
       }
-
-      let _ = sink.flush().await;
-
-      if let Some(err) = error_to_send {
-        let _ = sink.into_inner().fail(err).compat().await;
-      } else {
-        let _ = sink.close().await;
-      }
-
-      Ok(())
     };
-    ctx.spawn(fut.boxed().compat());
+    Box::pin(stream)
   }
 }
 
-impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
-  fn execute(
+#[tonic::async_trait]
+impl Execution for MockResponder {
+  type ExecuteStream = Pin<Box<dyn Stream<Item = Result<Operation, Status>> + Send + Sync>>;
+
+  async fn execute(
     &self,
-    ctx: grpcio::RpcContext<'_>,
-    req: bazel_protos::remote_execution::ExecuteRequest,
-    sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
-  ) {
-    self.log(&ctx, req.clone());
+    request: Request<ExecuteRequest>,
+  ) -> Result<Response<Self::ExecuteStream>, Status> {
+    self.log(&request);
+    let request = request.into_inner();
 
     let expected_api_call = self.mock_execution.expected_api_calls.lock().pop_front();
-    let error_to_send: Option<RpcStatus>;
     match expected_api_call {
       Some(ExpectedAPICall::Execute {
         execute_request,
         stream_responses,
       }) => {
-        if req == execute_request {
+        if request == execute_request {
           match stream_responses {
             Ok(operations) => {
-              self.spawn_send_to_operation_stream(ctx, sink, operations);
-              return;
+              return Ok(Response::new(Self::stream_from_mock_operations(operations)));
             }
             Err(rpc_status) => {
-              error_to_send = Some(rpc_status);
+              return Err(rpc_status);
             }
           }
         } else {
-          error_to_send = Some(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::INVALID_ARGUMENT,
-            Some(format!(
-              "Did not expect this request. Expected: {:?}, Got: {:?}",
-              execute_request, req
-            )),
-          ));
+          return Err(Status::invalid_argument(format!(
+            "Did not expect this request. Expected: {:?}, Got: {:?}",
+            execute_request, request
+          )));
         }
       }
 
       Some(api_call) => {
-        error_to_send = Some(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::INVALID_ARGUMENT,
-          Some(format!("Execute endpoint called. Expected: {:?}", api_call,)),
-        ));
+        return Err(Status::invalid_argument(format!(
+          "Execute endpoint called. Expected: {:?}",
+          api_call
+        )));
       }
 
       None => {
-        error_to_send = Some(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::INVALID_ARGUMENT,
-          Some("Execute endpoint called. Did not expect this call.".to_owned()),
+        return Err(Status::invalid_argument(
+          "Execute endpoint called. Did not expect this call.".to_owned(),
         ));
       }
     }
-
-    if let Some(status) = error_to_send {
-      let _ = sink.fail(status);
-    }
   }
 
-  fn wait_execution(
+  type WaitExecutionStream = Pin<Box<dyn Stream<Item = Result<Operation, Status>> + Send + Sync>>;
+
+  async fn wait_execution(
     &self,
-    ctx: grpcio::RpcContext<'_>,
-    req: bazel_protos::remote_execution::WaitExecutionRequest,
-    sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
-  ) {
-    self.log(&ctx, req.clone());
+    request: Request<WaitExecutionRequest>,
+  ) -> Result<Response<Self::WaitExecutionStream>, Status> {
+    self.log(&request);
+
+    let request = request.into_inner();
 
     let expected_api_call = self.mock_execution.expected_api_calls.lock().pop_front();
-    let error_to_send: Option<RpcStatus>;
     match expected_api_call {
       Some(ExpectedAPICall::WaitExecution {
         operation_name,
         stream_responses,
       }) => {
-        if req.name == operation_name {
+        if request.name == operation_name {
           match stream_responses {
             Ok(operations) => {
-              self.spawn_send_to_operation_stream(ctx, sink, operations);
-              return;
+              return Ok(Response::new(Self::stream_from_mock_operations(operations)));
             }
             Err(rpc_status) => {
-              error_to_send = Some(rpc_status);
+              return Err(rpc_status);
             }
           }
         } else {
-          error_to_send = Some(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::INVALID_ARGUMENT,
-            Some(format!(
-              "Did not expect WaitExecution for this operation. Expected: {:?}, Got: {:?}",
-              operation_name, req.name
-            )),
-          ));
+          return Err(Status::invalid_argument(format!(
+            "Did not expect WaitExecution for this operation. Expected: {:?}, Got: {:?}",
+            operation_name, request.name
+          )));
         }
       }
 
       Some(api_call) => {
-        error_to_send = Some(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::INVALID_ARGUMENT,
-          Some(format!(
-            "WaitExecution endpoint called. Expected: {:?}",
-            api_call,
-          )),
-        ));
+        return Err(Status::invalid_argument(format!(
+          "WaitExecution endpoint called. Expected: {:?}",
+          api_call,
+        )));
       }
 
       None => {
-        error_to_send = Some(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::INVALID_ARGUMENT,
-          Some("WaitExecution endpoint called. Did not expect this call.".to_owned()),
+        return Err(Status::invalid_argument(
+          "WaitExecution endpoint called. Did not expect this call.".to_owned(),
         ));
       }
-    }
-
-    if let Some(status) = error_to_send {
-      let _ = sink.fail(status);
     }
   }
 }
 
-impl bazel_protos::operations_grpc::Operations for MockResponder {
-  fn get_operation(
+#[tonic::async_trait]
+impl Operations for MockResponder {
+  async fn list_operations(
     &self,
-    ctx: grpcio::RpcContext<'_>,
-    req: bazel_protos::operations::GetOperationRequest,
-    sink: grpcio::UnarySink<bazel_protos::operations::Operation>,
-  ) {
-    self.log(&ctx, req.clone());
+    _: Request<ListOperationsRequest>,
+  ) -> Result<Response<ListOperationsResponse>, Status> {
+    Err(Status::unimplemented("".to_owned()))
+  }
+
+  async fn get_operation(
+    &self,
+    request: Request<GetOperationRequest>,
+  ) -> Result<Response<Operation>, Status> {
+    self.log(&request);
+
+    let request = request.into_inner();
 
     let expected_api_call = self.mock_execution.expected_api_calls.lock().pop_front();
-    let error_to_send: Option<RpcStatus>;
     match expected_api_call {
       Some(ExpectedAPICall::GetOperation {
         operation_name,
         operation,
       }) => {
-        if req.name == operation_name {
+        if request.name == operation_name {
           if let Some(d) = operation.duration {
-            sleep(d);
+            tokio::time::delay_for(d).await;
           }
           if let Ok(Some(op)) = operation.op {
             // Complete the channel with the op.
-            sink.success(op);
+            Ok(Response::new(op))
           } else if let Err(status) = operation.op {
-            sink.fail(status);
+            Err(status)
+          } else {
+            Err(Status::internal(
+              "Test setup did not specify an error or operation".to_owned(),
+            ))
           }
-          return;
         } else {
-          error_to_send = Some(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::INVALID_ARGUMENT,
-            Some(format!(
-              "Did not expect GetOperation for this operation. Expected: {:?}, Got: {:?}",
-              operation_name, req.name
-            )),
-          ));
+          Err(Status::invalid_argument(format!(
+            "Did not expect GetOperation for this operation. Expected: {:?}, Got: {:?}",
+            operation_name, request.name
+          )))
         }
       }
 
-      Some(api_call) => {
-        error_to_send = Some(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::INVALID_ARGUMENT,
-          Some(format!(
-            "GetOperation endpoint called. Expected: {:?}",
-            api_call,
-          )),
-        ));
-      }
+      Some(api_call) => Err(Status::invalid_argument(format!(
+        "GetOperation endpoint called. Expected: {:?}",
+        api_call,
+      ))),
 
-      None => {
-        error_to_send = Some(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::INVALID_ARGUMENT,
-          Some("GetOperation endpoint called. Did not expect this call.".to_owned()),
-        ));
-      }
-    }
-
-    if let Some(status) = error_to_send {
-      let _ = sink.fail(status);
+      None => Err(Status::invalid_argument(
+        "GetOperation endpoint called. Did not expect this call.".to_owned(),
+      )),
     }
   }
 
-  fn list_operations(
+  async fn delete_operation(
     &self,
-    _: grpcio::RpcContext<'_>,
-    _: bazel_protos::operations::ListOperationsRequest,
-    sink: grpcio::UnarySink<bazel_protos::operations::ListOperationsResponse>,
-  ) {
-    sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::UNIMPLEMENTED,
-      None,
-    ));
+    _: Request<DeleteOperationRequest>,
+  ) -> Result<Response<()>, Status> {
+    Err(Status::unimplemented("".to_owned()))
   }
 
-  fn delete_operation(
+  async fn cancel_operation(
     &self,
-    _: grpcio::RpcContext<'_>,
-    _: bazel_protos::operations::DeleteOperationRequest,
-    sink: grpcio::UnarySink<bazel_protos::empty::Empty>,
-  ) {
-    sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::UNIMPLEMENTED,
-      None,
-    ));
-  }
-
-  fn cancel_operation(
-    &self,
-    ctx: grpcio::RpcContext<'_>,
-    req: bazel_protos::operations::CancelOperationRequest,
-    sink: grpcio::UnarySink<bazel_protos::empty::Empty>,
-  ) {
-    self.log(&ctx, req.clone());
-    self.cancelation_requests.lock().push(req);
-    sink.success(bazel_protos::empty::Empty::new());
+    request: Request<CancelOperationRequest>,
+  ) -> Result<Response<()>, Status> {
+    self.log(&request);
+    let request = request.into_inner();
+    self.cancelation_requests.lock().push(request);
+    Ok(Response::new(()))
   }
 }
 
-impl bazel_protos::remote_execution_grpc::ActionCache for MockResponder {
-  fn get_action_result(
+#[tonic::async_trait]
+impl ActionCache for MockResponder {
+  async fn get_action_result(
     &self,
-    ctx: grpcio::RpcContext<'_>,
-    req: bazel_protos::remote_execution::GetActionResultRequest,
-    sink: grpcio::UnarySink<bazel_protos::remote_execution::ActionResult>,
-  ) {
-    self.log(&ctx, req.clone());
+    request: Request<GetActionResultRequest>,
+  ) -> Result<Response<ActionResult>, Status> {
+    self.log(&request);
+
+    let request = request.into_inner();
 
     let expected_api_call = self.mock_execution.expected_api_calls.lock().pop_front();
-    let error_to_send: Option<RpcStatus>;
     match expected_api_call {
       Some(ExpectedAPICall::GetActionResult {
         action_digest,
         response,
       }) => {
-        let action_digest_from_request: Digest = match req.get_action_digest().try_into() {
+        let action_digest_from_request: Digest = match request
+          .action_digest
+          .as_ref()
+          .map(|d| d.try_into())
+          .unwrap_or(Ok(EMPTY_DIGEST))
+        {
           Ok(d) => d,
           Err(e) => {
-            sink.fail(grpcio::RpcStatus::new(
-              grpcio::RpcStatusCode::INVALID_ARGUMENT,
-              Some(format!(
-                "GetActionResult endpoint called with bad digest: {:?}",
-                e,
-              )),
-            ));
-            return;
+            return Err(Status::invalid_argument(format!(
+              "GetActionResult endpoint called with bad digest: {:?}",
+              e,
+            )));
           }
         };
 
         if action_digest_from_request == action_digest {
           match response {
-            Ok(action_result) => sink.success(action_result),
-            Err(status) => sink.fail(status),
-          };
-          return;
+            Ok(action_result) => Ok(Response::new(action_result)),
+            Err(status) => Err(status),
+          }
         } else {
-          error_to_send = Some(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::INVALID_ARGUMENT,
-            Some(format!(
-              "Did not expect request with this action digest. Expected: {:?}, Got: {:?}",
-              action_digest,
-              req.get_action_digest()
-            )),
-          ));
+          Err(Status::invalid_argument(format!(
+            "Did not expect request with this action digest. Expected: {:?}, Got: {:?}",
+            action_digest, request.action_digest
+          )))
         }
       }
 
-      Some(api_call) => {
-        error_to_send = Some(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::INVALID_ARGUMENT,
-          Some(format!(
-            "GetActionResult endpoint called. Expected: {:?}",
-            api_call,
-          )),
-        ));
-      }
+      Some(api_call) => Err(Status::invalid_argument(format!(
+        "GetActionResult endpoint called. Expected: {:?}",
+        api_call,
+      ))),
 
-      None => {
-        error_to_send = Some(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::INVALID_ARGUMENT,
-          Some("GetActionResult endpoint called. Did not expect this call.".to_owned()),
-        ));
-      }
-    }
-
-    if let Some(status) = error_to_send {
-      let _ = sink.fail(status);
+      None => Err(Status::invalid_argument(
+        "GetActionResult endpoint called. Did not expect this call.".to_owned(),
+      )),
     }
   }
 
-  fn update_action_result(
+  async fn update_action_result(
     &self,
-    _: grpcio::RpcContext<'_>,
-    _: bazel_protos::remote_execution::UpdateActionResultRequest,
-    sink: grpcio::UnarySink<bazel_protos::remote_execution::ActionResult>,
-  ) {
-    sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::UNIMPLEMENTED,
-      None,
-    ));
+    _: Request<UpdateActionResultRequest>,
+  ) -> Result<Response<ActionResult>, Status> {
+    Err(Status::unimplemented("".to_owned()))
   }
 }
 
-impl bazel_protos::remote_execution_grpc::Capabilities for MockResponder {
-  fn get_capabilities(
+#[tonic::async_trait]
+impl Capabilities for MockResponder {
+  async fn get_capabilities(
     &self,
-    _: grpcio::RpcContext<'_>,
-    _: bazel_protos::remote_execution::GetCapabilitiesRequest,
-    sink: grpcio::UnarySink<bazel_protos::remote_execution::ServerCapabilities>,
-  ) {
-    let mut cache_capabilities = bazel_protos::remote_execution::CacheCapabilities::new();
-    cache_capabilities.set_digest_function(vec![
-      bazel_protos::remote_execution::DigestFunction_Value::SHA256,
-    ]);
+    _: Request<GetCapabilitiesRequest>,
+  ) -> Result<Response<ServerCapabilities>, Status> {
+    let response = ServerCapabilities {
+      cache_capabilities: Some(CacheCapabilities {
+        digest_function: vec![remexec::digest_function::Value::Sha256 as i32],
+        max_batch_total_size_bytes: 0,
+        ..CacheCapabilities::default()
+      }),
+      execution_capabilities: Some(ExecutionCapabilities {
+        digest_function: remexec::digest_function::Value::Sha256 as i32,
+        exec_enabled: true,
+        ..ExecutionCapabilities::default()
+      }),
+      low_api_version: Some(SemVer {
+        major: 2,
+        minor: 0,
+        patch: 0,
+        ..SemVer::default()
+      }),
+      high_api_version: Some(SemVer {
+        major: 2,
+        minor: 0,
+        patch: 0,
+        ..SemVer::default()
+      }),
+      ..ServerCapabilities::default()
+    };
 
-    let mut execution_capabilities = bazel_protos::remote_execution::ExecutionCapabilities::new();
-    execution_capabilities.set_exec_enabled(true);
-    execution_capabilities
-      .set_digest_function(bazel_protos::remote_execution::DigestFunction_Value::SHA256);
-
-    let mut capabilities = bazel_protos::remote_execution::ServerCapabilities::new();
-    capabilities.set_cache_capabilities(cache_capabilities);
-    capabilities.set_execution_capabilities(execution_capabilities);
-
-    let mut ver_2_0 = bazel_protos::semver::SemVer::new();
-    ver_2_0.set_major(2);
-    ver_2_0.set_minor(0);
-    ver_2_0.set_patch(0);
-
-    capabilities.set_low_api_version(ver_2_0.clone());
-    capabilities.set_high_api_version(ver_2_0);
-
-    sink.success(capabilities);
+    Ok(Response::new(response))
   }
 }

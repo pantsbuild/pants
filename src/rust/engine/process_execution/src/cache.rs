@@ -1,21 +1,22 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bytes::Bytes;
+use futures::compat::Future01CompatExt;
+use futures::{future as future03, FutureExt};
+use hashing::Fingerprint;
+use log::{debug, warn};
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use sharded_lmdb::ShardedLmdb;
+use store::Store;
+use workunit_store::Metric;
+
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessCacheScope, ProcessMetadata,
 };
-use std::sync::Arc;
-
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::compat::Future01CompatExt;
-use futures::{future as future03, FutureExt};
-use log::{debug, warn};
-use protobuf::Message;
-use serde::{Deserialize, Serialize};
-
-use hashing::Fingerprint;
-use sharded_lmdb::ShardedLmdb;
-use store::Store;
-use workunit_store::Metric;
 
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
@@ -120,7 +121,7 @@ impl CommandRunner {
     &self,
     fingerprint: Fingerprint,
   ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
-    use bazel_protos::remote_execution::ExecuteResponse;
+    use remexec::ExecuteResponse;
 
     // See whether there is a cache entry.
     let maybe_execute_response: Option<(ExecuteResponse, Platform)> = self
@@ -131,9 +132,7 @@ impl CommandRunner {
 
         let platform = decoded.platform;
 
-        let mut execute_response = ExecuteResponse::new();
-        execute_response
-          .merge_from_bytes(&decoded.response_bytes)
+        let execute_response = ExecuteResponse::decode(&decoded.response_bytes[..])
           .map_err(|e| format!("Invalid ExecuteResponse: {:?}", e))?;
 
         Ok((execute_response, platform))
@@ -142,15 +141,19 @@ impl CommandRunner {
 
     // Deserialize the cache entry if it existed.
     let result = if let Some((execute_response, platform)) = maybe_execute_response {
-      crate::remote::populate_fallible_execution_result(
-        self.file_store.clone(),
-        execute_response.get_result(),
-        vec![],
-        platform,
-        true,
-      )
-      .compat()
-      .await?
+      if let Some(ref action_result) = execute_response.result {
+        crate::remote::populate_fallible_execution_result(
+          self.file_store.clone(),
+          action_result,
+          vec![],
+          platform,
+          true,
+        )
+        .compat()
+        .await?
+      } else {
+        return Err("action result missing from ExecuteResponse".into());
+      }
     } else {
       return Ok(None);
     };
@@ -181,28 +184,31 @@ impl CommandRunner {
     fingerprint: Fingerprint,
     result: &FallibleProcessResultWithPlatform,
   ) -> Result<(), String> {
-    let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
-    execute_response.set_cached_result(true);
-    let action_result = execute_response.mut_result();
-    action_result.set_exit_code(result.exit_code);
-    action_result.mut_output_directories().push({
-      let mut directory = bazel_protos::remote_execution::OutputDirectory::new();
-      directory.set_path(String::new());
-      directory.set_tree_digest((&result.output_directory).into());
-      directory
-    });
+    let stdout_digest = result.stdout_digest;
+    let stderr_digest = result.stderr_digest;
+
+    let execute_response = remexec::ExecuteResponse {
+      cached_result: true,
+      result: Some(remexec::ActionResult {
+        exit_code: result.exit_code,
+        output_directories: vec![remexec::OutputDirectory {
+          path: String::new(),
+          tree_digest: Some((&result.output_directory).into()),
+        }],
+        stdout_digest: Some((&stdout_digest).into()),
+        stderr_digest: Some((&stderr_digest).into()),
+        ..remexec::ActionResult::default()
+      }),
+      ..remexec::ExecuteResponse::default()
+    };
+
     // TODO: Should probably have a configurable lease time which is larger than default.
     // (This isn't super urgent because we don't ever actually GC this store. So also...)
     // TODO: GC the local process execution cache.
 
-    let stdout_digest = result.stdout_digest;
-    let stderr_digest = result.stderr_digest;
-
-    let action_result = execute_response.mut_result();
-    action_result.set_stdout_digest((&stdout_digest).into());
-    action_result.set_stderr_digest((&stderr_digest).into());
-    let response_bytes = execute_response
-      .write_to_bytes()
+    let mut response_bytes = Vec::with_capacity(execute_response.encoded_len());
+    execute_response
+      .encode(&mut response_bytes)
       .map_err(|err| format!("Error serializing execute process result to cache: {}", err))?;
 
     let bytes_to_store = bincode::serialize(&PlatformAndResponseBytes {

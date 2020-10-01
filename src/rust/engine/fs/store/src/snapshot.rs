@@ -8,7 +8,7 @@ use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::Store;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use boxfuture::{BoxFuture, Boxable};
 use fs::{
   Dir, File, GitignoreStyleExcludes, GlobMatching, PathStat, PosixFS, PreparedPathGlobs,
@@ -19,6 +19,8 @@ use futures::future::{self as future03, FutureExt, TryFutureExt};
 use futures01::future;
 use hashing::{Digest, EMPTY_DIGEST};
 use itertools::Itertools;
+
+use crate::Store;
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Snapshot {
@@ -52,12 +54,12 @@ impl Snapshot {
     let path_stats_per_directory = store
       .walk(digest, |_, path_so_far, _, directory| {
         let mut path_stats = Vec::new();
-        path_stats.extend(directory.get_directories().iter().map(move |dir_node| {
-          let path = path_so_far.join(dir_node.get_name());
+        path_stats.extend(directory.directories.iter().map(move |dir_node| {
+          let path = path_so_far.join(dir_node.name.clone());
           PathStat::dir(path.clone(), Dir(path))
         }));
-        path_stats.extend(directory.get_files().iter().map(move |file_node| {
-          let path = path_so_far.join(file_node.get_name());
+        path_stats.extend(directory.files.iter().map(move |file_node| {
+          let path = path_so_far.join(file_node.name.clone());
           PathStat::file(
             path.clone(),
             File {
@@ -101,9 +103,8 @@ impl Snapshot {
     path_stats: &[PathStat],
   ) -> future03::BoxFuture<Result<Digest, String>> {
     let mut file_futures = Vec::new();
-    let mut dir_futures: Vec<
-      future03::BoxFuture<Result<bazel_protos::remote_execution::DirectoryNode, String>>,
-    > = Vec::new();
+    let mut dir_futures: Vec<future03::BoxFuture<Result<remexec::DirectoryNode, String>>> =
+      Vec::new();
 
     for (first_component, group) in &path_stats
       .iter()
@@ -130,10 +131,12 @@ impl Snapshot {
                 .await
                 .map_err(|e| format!("{:?}", e))?;
 
-              let mut file_node = bazel_protos::remote_execution::FileNode::new();
-              file_node.set_name(osstring_as_utf8(first_component)?);
-              file_node.set_digest((&digest).into());
-              file_node.set_is_executable(is_executable);
+              let file_node = remexec::FileNode {
+                name: osstring_as_utf8(first_component)?,
+                digest: Some((&digest).into()),
+                is_executable,
+                ..remexec::FileNode::default()
+              };
               Ok(file_node)
             });
           }
@@ -142,11 +145,12 @@ impl Snapshot {
             // Because there are no children of this Dir, it must be empty.
             dir_futures.push(Box::pin(async move {
               let digest = store
-                .record_directory(&bazel_protos::remote_execution::Directory::new(), true)
+                .record_directory(&remexec::Directory::default(), true)
                 .await?;
-              let mut directory_node = bazel_protos::remote_execution::DirectoryNode::new();
-              directory_node.set_name(osstring_as_utf8(first_component).unwrap());
-              directory_node.set_digest((&digest).into());
+              let directory_node = remexec::DirectoryNode {
+                name: osstring_as_utf8(first_component).unwrap(),
+                digest: Some((&digest).into()),
+              };
               Ok(directory_node)
             }));
           }
@@ -163,9 +167,10 @@ impl Snapshot {
           )
           .await?;
 
-          let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
-          dir_node.set_name(osstring_as_utf8(first_component)?);
-          dir_node.set_digest((&digest).into());
+          let dir_node = remexec::DirectoryNode {
+            name: osstring_as_utf8(first_component)?,
+            digest: Some(digest.into()),
+          };
           Ok(dir_node)
         }));
       }
@@ -178,9 +183,11 @@ impl Snapshot {
       )
       .await?;
 
-      let mut directory = bazel_protos::remote_execution::Directory::new();
-      directory.set_directories(protobuf::RepeatedField::from_vec(dirs));
-      directory.set_files(protobuf::RepeatedField::from_vec(files));
+      let directory = remexec::Directory {
+        directories: dirs,
+        files,
+        ..remexec::Directory::default()
+      };
       store.record_directory(&directory, true).await
     }
     .boxed()
@@ -218,7 +225,7 @@ impl Snapshot {
   pub async fn get_directory_or_err(
     store: Store,
     digest: Digest,
-  ) -> Result<bazel_protos::remote_execution::Directory, String> {
+  ) -> Result<remexec::Directory, String> {
     let maybe_dir = store.load_directory(digest).await?;
     maybe_dir
       .map(|(dir, _metadata)| dir)

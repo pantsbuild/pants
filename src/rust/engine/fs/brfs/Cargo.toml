@@ -26,6 +26,6 @@ tokio = { version = "0.2.23", features = ["rt-threaded", "macros", "signal", "st
 workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]
-bytes = "0.4.5"
+bytes = "0.5"
 tempfile = "3"
 testutil = { path = "../../testutil" }

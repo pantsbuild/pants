@@ -1,18 +1,3 @@
-use crate::{
-  DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Store, UploadSummary,
-  MEGABYTES,
-};
-
-use bazel_protos;
-use bytes::Bytes;
-use fs::RelativePath;
-use futures::compat::Future01CompatExt;
-use hashing::{Digest, Fingerprint};
-use maplit::btreemap;
-use mock::StubCAS;
-use protobuf::Message;
-use serverset::BackoffConfig;
-use std;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -21,6 +6,21 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
+
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bytes::{Bytes, BytesMut};
+use fs::RelativePath;
+use futures::compat::Future01CompatExt;
+use hashing::{Digest, Fingerprint};
+use maplit::btreemap;
+use mock::StubCAS;
+use prost::Message;
+use serverset::BackoffConfig;
+
+use crate::{
+  DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Store, UploadSummary,
+  MEGABYTES,
+};
 
 impl LoadMetadata {
   fn is_remote(&self) -> bool {
@@ -63,14 +63,16 @@ pub fn extra_big_file_digest() -> Digest {
 }
 
 pub fn extra_big_file_bytes() -> Bytes {
-  let mut bytes = big_file_bytes();
-  bytes.extend(&big_file_bytes());
-  bytes
+  let bfb = big_file_bytes();
+  let mut bytes = BytesMut::with_capacity(2 * bfb.len());
+  bytes.extend_from_slice(&bfb);
+  bytes.extend_from_slice(&bfb);
+  bytes.freeze()
 }
 
 pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
   let option = store
-    .load_file_bytes_with(digest, |bytes| Bytes::from(bytes))
+    .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
     .await?;
   Ok(option.map(|(bytes, _metadata)| bytes))
 }
@@ -360,17 +362,21 @@ async fn malformed_remote_directory_is_error() {
 #[tokio::test]
 async fn non_canonical_remote_directory_is_error() {
   let mut non_canonical_directory = TestDirectory::containing_roland().directory();
-  non_canonical_directory.mut_files().push({
-    let mut file = bazel_protos::remote_execution::FileNode::new();
-    file.set_name("roland".to_string());
-    file.set_digest((&TestData::roland().digest()).into());
+  non_canonical_directory.files.push({
+    let file = remexec::FileNode {
+      name: "roland".to_string(),
+      digest: Some((&TestData::roland().digest()).into()),
+      ..Default::default()
+    };
     file
   });
-  let non_canonical_directory_bytes = Bytes::from(
+  let non_canonical_directory_bytes = {
+    let mut buf = BytesMut::with_capacity(non_canonical_directory.encoded_len());
     non_canonical_directory
-      .write_to_bytes()
-      .expect("Error serializing proto"),
-  );
+      .encode(&mut buf)
+      .expect("Error serializing proto");
+    buf.freeze()
+  };
   let directory_digest = Digest::of_bytes(&non_canonical_directory_bytes);
   let non_canonical_directory_fingerprint = directory_digest.0;
 
@@ -908,7 +914,7 @@ async fn instance_name_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::from(b))
+      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
       .unwrap()
       .unwrap()
@@ -989,7 +995,7 @@ async fn auth_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::from(b))
+      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
       .unwrap()
       .unwrap()
@@ -1523,16 +1529,16 @@ async fn materialize_directory_metadata_mixed() {
 #[tokio::test]
 async fn explicitly_overwrites_already_existing_file() {
   fn test_file_with_arbitrary_content(filename: &str, content: &TestData) -> TestDirectory {
-    use bazel_protos;
     let digest = content.digest();
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name(filename.to_owned());
-      file.set_digest((&digest).into());
-      file.set_is_executable(false);
-      file
-    });
+    let directory = remexec::Directory {
+      files: vec![remexec::FileNode {
+        name: filename.to_owned(),
+        digest: Some((&digest).into()),
+        is_executable: false,
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
     TestDirectory { directory }
   }
 

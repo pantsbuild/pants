@@ -1,34 +1,41 @@
-use protobuf::Message;
 use std::collections::BTreeMap;
 
+use bytes::BytesMut;
+use prost::Message;
+use tonic::metadata::{MetadataMap, MetadataValue};
+
+use crate::gen::build::bazel::remote::execution::v2 as remote_execution;
+
 pub fn call_option(
-  headers: &BTreeMap<String, String>,
+  headers: &'static BTreeMap<String, String>,
   build_id: Option<String>,
-) -> Result<grpcio::CallOption, String> {
-  let mut builder = grpcio::MetadataBuilder::with_capacity(headers.len() + 1);
+) -> Result<MetadataMap, String> {
+  let mut grpc_headers = MetadataMap::with_capacity(headers.len() + 1);
   for (header_name, header_value) in headers {
-    builder
-      .add_str(header_name, header_value)
+    let value = MetadataValue::from_str(header_value.as_str())
       .map_err(|err| format!("Error setting header {}: {}", header_name, err))?;
+    grpc_headers.insert(header_name.as_str(), value);
   }
+
   if let Some(build_id) = build_id {
-    let mut metadata = crate::remote_execution::RequestMetadata::new();
-    metadata.set_tool_details({
-      let mut tool_details = crate::remote_execution::ToolDetails::new();
-      tool_details.set_tool_name(String::from("pants"));
+    let mut metadata = remote_execution::RequestMetadata::default();
+    metadata.tool_details = Some({
+      let mut tool_details = remote_execution::ToolDetails::default();
+      tool_details.tool_name = String::from("pants");
       tool_details
     });
-    metadata.set_tool_invocation_id(build_id);
+    metadata.tool_invocation_id = build_id;
     // TODO: Maybe set action_id too
-    let bytes = metadata
-      .write_to_bytes()
+    let mut bytes = BytesMut::with_capacity(metadata.encoded_len());
+    metadata
+      .encode(&mut bytes)
       .map_err(|err| format!("Error serializing request metadata proto bytes: {}", err))?;
-    builder
-      .add_bytes(
-        "google.devtools.remoteexecution.v1test.requestmetadata-bin",
-        &bytes,
-      )
-      .map_err(|err| format!("Error setting request metadata header: {}", err))?;
+    let value = MetadataValue::from_bytes(bytes.as_ref());
+    grpc_headers.insert_bin(
+      "google.devtools.remoteexecution.v1test.requestmetadata-bin",
+      value,
+    );
   }
-  Ok(grpcio::CallOption::default().headers(builder.build()))
+
+  Ok(grpc_headers)
 }
