@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
-use futures::future;
+use futures::{future, FutureExt};
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
@@ -44,6 +44,24 @@ type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
 // Root requests are limited to Select nodes, which produce (python) Values.
 type Root = Select;
 
+// When enabled, the interval at which all stragglers that have been running for longer than a
+// threshold should be logged. The threshold might become configurable, but this might not need
+// to be.
+const STRAGGLER_LOGGING_INTERVAL: Duration = Duration::from_secs(30);
+
+///
+/// An enum for the two cases of `--[no-]dynamic-ui`.
+///
+enum SessionDisplay {
+  // The dynamic UI is enabled, and the ConsoleUI should interact with a TTY.
+  ConsoleUI(ConsoleUI),
+  // The dynamic UI is disabled, and we should use only logging.
+  Logging {
+    straggler_threshold: Duration,
+    straggler_deadline: Option<Instant>,
+  },
+}
+
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
 /// underlying Scheduler, and is a useful scope for metrics.
@@ -57,9 +75,8 @@ struct InnerSession {
   // The set of roots that have been requested within this session, with associated LastObserved
   // times if they were polled.
   roots: Mutex<HashMap<Root, Option<LastObserved>>>,
-  // If enabled, the display that will render the progress of the V2 engine. This is only
-  // Some(_) if the --dynamic-ui option is enabled.
-  display: Option<Mutex<ConsoleUI>>,
+  // The display mechanism to use in this Session.
+  display: Mutex<SessionDisplay>,
   // A place to store info about workunits in rust part
   workunit_store: WorkunitStore,
   // The unique id for this Session: used for metrics gathering purposes.
@@ -88,15 +105,20 @@ impl Session {
     should_report_workunits: bool,
     session_values: Value,
   ) -> Session {
-    let workunit_store = WorkunitStore::new(should_render_ui);
-    let display = if should_render_ui {
-      Some(Mutex::new(ConsoleUI::new(
+    let workunit_store = WorkunitStore::new(!should_render_ui);
+    let display = Mutex::new(if should_render_ui {
+      SessionDisplay::ConsoleUI(ConsoleUI::new(
         workunit_store.clone(),
         scheduler.core.local_parallelism,
-      )))
+      ))
     } else {
-      None
-    };
+      SessionDisplay::Logging {
+        // TODO: This threshold should likely be configurable, but the interval we render at
+        // probably does not need to be.
+        straggler_threshold: Duration::from_secs(60),
+        straggler_deadline: None,
+      }
+    });
 
     let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
@@ -163,9 +185,8 @@ impl Session {
   }
 
   pub async fn write_stdout(&self, msg: &str) -> Result<(), String> {
-    if let Some(display) = &self.0.display {
-      let mut display = display.lock();
-      display.write_stdout(msg).await
+    if let SessionDisplay::ConsoleUI(ref mut ui) = *self.0.display.lock() {
+      ui.write_stdout(msg).await
     } else {
       print!("{}", msg);
       Ok(())
@@ -173,59 +194,82 @@ impl Session {
   }
 
   pub fn write_stderr(&self, msg: &str) {
-    if let Some(display) = &self.0.display {
-      let display = display.lock();
-      display.write_stderr(msg);
+    if let SessionDisplay::ConsoleUI(ref mut ui) = *self.0.display.lock() {
+      ui.write_stderr(msg);
     } else {
       eprint!("{}", msg);
     }
   }
 
   pub async fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
-    if let Some(display) = &self.0.display {
-      let mut display = display.lock();
-      display.with_console_ui_disabled(f).await
-    } else {
-      f()
+    match *self.0.display.lock() {
+      SessionDisplay::ConsoleUI(ref mut ui) => ui.with_console_ui_disabled(f).await,
+      SessionDisplay::Logging { .. } => f(),
     }
   }
 
   fn maybe_display_initialize(&self, executor: &Executor, sender: &mpsc::Sender<ExecutionEvent>) {
-    if let Some(display) = &self.0.display {
-      let mut display = display.lock();
-      let sender = sender.clone();
-      let res = display.initialize(
-        executor.clone(),
-        Box::new(move |msg: &str| {
-          // If we fail to send, it's because the execute loop has exited: we fail the callback to
-          // have the logging module directly log to stderr at that point.
-          sender
-            .send(ExecutionEvent::Stderr(msg.to_owned()))
-            .map_err(|_| ())
-        }),
-      );
-      if let Err(e) = res {
-        warn!("{}", e);
+    let result = match *self.0.display.lock() {
+      SessionDisplay::ConsoleUI(ref mut ui) => {
+        let sender = sender.clone();
+        ui.initialize(
+          executor.clone(),
+          Box::new(move |msg: &str| {
+            // If we fail to send, it's because the execute loop has exited: we fail the callback to
+            // have the logging module directly log to stderr at that point.
+            sender
+              .send(ExecutionEvent::Stderr(msg.to_owned()))
+              .map_err(|_| ())
+          }),
+        )
       }
+      SessionDisplay::Logging {
+        ref mut straggler_deadline,
+        ..
+      } => {
+        *straggler_deadline = Some(Instant::now() + STRAGGLER_LOGGING_INTERVAL);
+        Ok(())
+      }
+    };
+    if let Err(e) = result {
+      warn!("{}", e);
     }
   }
 
   pub async fn maybe_display_teardown(&self) {
-    if let Some(display) = &self.0.display {
-      let teardown = {
-        let mut display = display.lock();
-        display.teardown()
-      };
-      if let Err(e) = teardown.await {
-        warn!("{}", e);
+    let teardown = match *self.0.display.lock() {
+      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().boxed(),
+      SessionDisplay::Logging {
+        ref mut straggler_deadline,
+        ..
+      } => {
+        *straggler_deadline = None;
+        async { Ok(()) }.boxed()
       }
+    };
+    if let Err(e) = teardown.await {
+      warn!("{}", e);
     }
   }
 
   fn maybe_display_render(&self) {
-    if let Some(display) = &self.0.display {
-      let mut display = display.lock();
-      display.render();
+    match *self.0.display.lock() {
+      SessionDisplay::ConsoleUI(ref mut ui) => ui.render(),
+      SessionDisplay::Logging {
+        straggler_threshold,
+        ref mut straggler_deadline,
+      } => {
+        if straggler_deadline
+          .map(|sd| sd < Instant::now())
+          .unwrap_or(false)
+        {
+          *straggler_deadline = Some(Instant::now() + STRAGGLER_LOGGING_INTERVAL);
+          self
+            .0
+            .workunit_store
+            .log_straggling_workunits(straggler_threshold);
+        }
+      }
     }
   }
 }
