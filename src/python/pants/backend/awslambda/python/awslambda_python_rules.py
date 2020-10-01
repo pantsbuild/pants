@@ -6,14 +6,21 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.awslambda.common.awslambda_common_rules import (
-    AWSLambdaFieldSet,
-    CreatedAWSLambda,
+    AWSLambdaSubsystem,
+    AWSLambdaPythonRequest,
 )
 from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandler,
     PythonAwsLambdaRuntime,
 )
+from pants.backend.python.goals.create_python_binary import (
+    PythonBinaryFieldSet,
+    PythonBinaryImplementation,
+    PythonEntryPointWrapper,
+    ReducedPythonBinaryFieldSet,
+)
+from pants.backend.python.goals.create_python_binary import rules as create_python_binary_rules
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -28,6 +35,7 @@ from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
+from pants.core.goals.binary import CreatedBinary
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
@@ -39,53 +47,55 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PythonAwsLambdaFieldSet(AWSLambdaFieldSet):
-    required_fields = (PythonAwsLambdaHandler, PythonAwsLambdaRuntime)
-
-    handler: PythonAwsLambdaHandler
-    runtime: PythonAwsLambdaRuntime
-
-
-@dataclass(frozen=True)
 class LambdexSetup:
     requirements_pex: Pex
 
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
 async def create_python_awslambda(
-    field_set: PythonAwsLambdaFieldSet, lambdex_setup: LambdexSetup, global_options: GlobalOptions
-) -> CreatedAWSLambda:
+    request: AWSLambdaPythonRequest,
+    lambdex_setup: LambdexSetup,
+    global_options: GlobalOptions,
+    awslambda: AWSLambdaSubsystem,
+) -> CreatedBinary:
+    field_set = request.field_set
+    reduced_field_set = ReducedPythonBinaryFieldSet.from_real_field_set(field_set)
+    handler = (await Get(PythonEntryPointWrapper, ReducedPythonBinaryFieldSet, reduced_field_set)).value
+
     # Lambdas typically use the .zip suffix, so we use that instead of .pex.
-    disambiguated_pex_filename = os.path.join(
+    disambiguated_lambdex_filename = os.path.join(
         field_set.address.spec_path.replace(os.sep, "."), f"{field_set.address.target_name}.zip"
     )
     if global_options.options.pants_distdir_legacy_paths:
-        pex_filename = f"{field_set.address.target_name}.zip"
+        lambdex_filename = f"{field_set.address.target_name}.zip"
         logger.warning(
-            f"Writing to the legacy subpath: {pex_filename}, which may not be unique. An "
+            f"Writing to the legacy subpath: {lambdex_filename}, which may not be unique. An "
             f"upcoming version of Pants will switch to writing to the fully-qualified subpath: "
-            f"{disambiguated_pex_filename}. You can effect that switch now (and silence this "
+            f"{disambiguated_lambdex_filename}. You can effect that switch now (and silence this "
             f"warning) by setting `pants_distdir_legacy_paths = false` in the [GLOBAL] section of "
             f"pants.toml."
         )
     else:
-        pex_filename = disambiguated_pex_filename
+        lambdex_filename = disambiguated_lambdex_filename
     # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.
     # (Running the "hello world" lambda in the example code will report the platform, and can be
     # used to verify correctness of these platform strings.)
-    py_major, py_minor = field_set.runtime.to_interpreter_version()
+    py_major, py_minor = awslambda.python_runtime.to_interpreter_version()
     platform = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
     # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
     if py_major <= 3 and py_minor < 8:
         platform += "m"
-    if (py_major, py_minor) == (2, 7):
-        platform += "u"
+    # FIXME: 2.7 is not an allowed aws lambda python runtime version!
+    # if (py_major, py_minor) == (2, 7):
+    #     platform += "u"
     pex_request = TwoStepPexFromTargetsRequest(
         PexFromTargetsRequest(
             addresses=[field_set.address],
             internal_only=False,
             entry_point=None,
-            output_filename=pex_filename,
+            output_filename=lambdex_filename,
+            # The platform (containing the interpreter version) will be checked for compatibility
+            # with any interpreter constraints declared on the target.
             platforms=PexPlatforms([platform]),
             additional_args=[
                 # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
@@ -107,19 +117,15 @@ async def create_python_awslambda(
         ProcessResult,
         PexProcess(
             lambdex_setup.requirements_pex,
-            argv=("build", "-e", field_set.handler.value, pex_filename),
+            argv=("build", "-e", handler, lambdex_filename),
             input_digest=input_digest,
-            output_files=(pex_filename,),
-            description=f"Setting up handler in {pex_filename}",
+            output_files=(lambdex_filename,),
+            description=f"Setting up handler in {lambdex_filename}",
         ),
     )
-    return CreatedAWSLambda(
+    return CreatedBinary(
         digest=result.output_digest,
-        zip_file_relpath=pex_filename,
-        runtime=field_set.runtime.value,
-        # The AWS-facing handler function is always lambdex_handler.handler, which is the wrapper
-        # injected by lambdex that manages invocation of the actual handler.
-        handler="lambdex_handler.handler",
+        binary_name=lambdex_filename,
     )
 
 
@@ -141,6 +147,6 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
 def rules():
     return [
         *collect_rules(),
-        UnionRule(AWSLambdaFieldSet, PythonAwsLambdaFieldSet),
         *pex_from_targets.rules(),
+        *create_python_binary_rules(),
     ]
