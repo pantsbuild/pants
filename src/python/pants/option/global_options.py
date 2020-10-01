@@ -7,7 +7,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Union, Tuple, List, Callable, Optional
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -82,7 +82,7 @@ class ExecutionOptions:
     remote_instance_name: Any
     remote_ca_certs_path: Any
     remote_execution_extra_platform_properties: Any
-    remote_execution_headers: Any
+    remote_execution_headers: Union[None, List[Tuple[str, str]], Callable[[Optional[str]], dict]]
     remote_execution_overall_deadline_secs: int
     process_execution_local_enable_nailgun: bool
 
@@ -93,6 +93,12 @@ class ExecutionOptions:
             with open(bootstrap_options.remote_oauth_bearer_token_path) as f:
                 token = f.read().strip()
             headers["authorization"] = f"Bearer {token}"
+
+        headers_as_list = [(k, v) for (k, v) in headers.items()]
+
+        def get_headers(build_id: Optional[str]) -> List[Tuple[str, str]]:
+            print(f"get_headers: build_id={build_id}")
+            return headers_as_list
 
         return cls(
             remote_execution=bootstrap_options.remote_execution,
@@ -113,7 +119,7 @@ class ExecutionOptions:
             remote_instance_name=bootstrap_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
-            remote_execution_headers=headers,
+            remote_execution_headers=get_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
         )

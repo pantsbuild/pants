@@ -3,7 +3,7 @@
 
 import logging
 import os
-from typing import Dict, Iterable, List, Mapping, Optional, Tuple, Union, cast
+from typing import Dict, Iterable, List, Mapping, Optional, Tuple, Union, cast, Callable
 
 from typing_extensions import Protocol
 
@@ -228,7 +228,7 @@ class Native(metaclass=SingletonMetaclass):
         ca_certs_path: Optional[str],
         ignore_patterns: List[str],
         use_gitignore: bool,
-        execution_options,
+        execution_options: Union[None, List[Tuple[str, str]], Callable[[Optional[str]], dict]],
         types: PyTypes,
     ) -> PyScheduler:
         """Create and return a native Scheduler."""
@@ -249,9 +249,7 @@ class Native(metaclass=SingletonMetaclass):
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties
             ),
-            execution_headers=tuple(
-                (k, v) for (k, v) in execution_options.remote_execution_headers.items()
-            ),
+            execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
         )
 
