@@ -3,7 +3,7 @@
 
 import os
 
-from pants.backend.python.goals.create_python_binary import PythonBinaryFieldSet
+from pants.backend.python.goals.package_python_binary import PythonBinaryFieldSet
 from pants.backend.python.target_types import PythonBinaryDefaults, PythonBinarySources
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment

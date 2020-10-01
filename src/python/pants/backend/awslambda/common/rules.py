@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from textwrap import dedent
@@ -12,6 +13,8 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import FieldSet, TargetRootsToFieldSets, TargetRootsToFieldSetsRequest
 from pants.engine.unions import union
+
+logger = logging.getLogger(__name__)
 
 
 class AWSLambdaError(Exception):
@@ -32,7 +35,7 @@ class AWSLambdaFieldSet(FieldSet, metaclass=ABCMeta):
 
 
 class AWSLambdaSubsystem(LineOriented, GoalSubsystem):
-    """Generate an AWS Lambda."""
+    """Deprecated in favor of the `build` goal."""
 
     name = "awslambda"
 
@@ -48,6 +51,10 @@ async def create_awslambda(
     distdir: DistDir,
     workspace: Workspace,
 ) -> AWSLambdaGoal:
+    logger.warning(
+        "The `awslambda` goal is deprecated in favor of the `package` goal, which behaves "
+        "identically. `awslambda` will be removed in 2.1.0.dev0."
+    )
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(

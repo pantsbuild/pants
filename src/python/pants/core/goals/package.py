@@ -4,6 +4,7 @@
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
+from typing import Optional
 
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
@@ -16,51 +17,51 @@ logger = logging.getLogger(__name__)
 
 
 @union
-class BinaryFieldSet(FieldSet, metaclass=ABCMeta):
-    """The fields necessary to create a binary from a target."""
+class PackageFieldSet(FieldSet, metaclass=ABCMeta):
+    """The fields necessary to build an asset from a target."""
 
 
 @dataclass(frozen=True)
-class CreatedBinary:
+class BuiltPackage:
     digest: Digest
-    binary_name: str
+    relpath: str
+    extra_log_info: Optional[str] = None
 
 
-class BinarySubsystem(GoalSubsystem):
-    """Deprecated in favor of the `build` goal."""
+class PackageSubsystem(GoalSubsystem):
+    """Package an asset and put in `--distdir`, such as an archive, PEX, wheel, AWS Lambda, etc."""
 
-    name = "binary"
+    name = "package"
 
-    required_union_implementations = (BinaryFieldSet,)
+    required_union_implementations = (PackageFieldSet,)
 
 
-class Binary(Goal):
-    subsystem_cls = BinarySubsystem
+class Package(Goal):
+    subsystem_cls = PackageSubsystem
 
 
 @goal_rule
-async def create_binary(workspace: Workspace, dist_dir: DistDir) -> Binary:
-    logger.warning(
-        "The `binary` goal is deprecated in favor of the `package` goal, which behaves "
-        "identically. `binary` will be removed in 2.1.0.dev0.",
-    )
+async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     target_roots_to_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
-            BinaryFieldSet,
-            goal_description="the `binary` goal",
+            PackageFieldSet,
+            goal_description="the `package` goal",
             error_if_no_applicable_targets=True,
         ),
     )
-    binaries = await MultiGet(
-        Get(CreatedBinary, BinaryFieldSet, field_set)
+    assets = await MultiGet(
+        Get(BuiltPackage, PackageFieldSet, field_set)
         for field_set in target_roots_to_field_sets.field_sets
     )
-    merged_snapshot = await Get(Snapshot, MergeDigests(binary.digest for binary in binaries))
+    merged_snapshot = await Get(Snapshot, MergeDigests(asset.digest for asset in assets))
     workspace.write_digest(merged_snapshot.digest, path_prefix=str(dist_dir.relpath))
-    for path in merged_snapshot.files:
-        logger.info(f"Wrote {dist_dir.relpath / path}")
-    return Binary(exit_code=0)
+    for asset in assets:
+        msg = f"Wrote {dist_dir.relpath / asset.relpath}"
+        if asset.extra_log_info:
+            msg += f"\n{asset.extra_log_info}"
+        logger.info(msg)
+    return Package(exit_code=0)
 
 
 def rules():

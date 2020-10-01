@@ -6,7 +6,7 @@
 These are always activated and cannot be disabled.
 """
 
-from pants.core.goals import binary, fmt, lint, repl, run, test, typecheck
+from pants.core.goals import binary, fmt, lint, package, repl, run, test, typecheck
 from pants.core.target_types import Files, GenericTarget, RelocatedFiles, Resources
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
@@ -29,6 +29,7 @@ def rules():
         *binary.rules(),
         *fmt.rules(),
         *lint.rules(),
+        *package.rules(),
         *repl.rules(),
         *run.rules(),
         *test.rules(),

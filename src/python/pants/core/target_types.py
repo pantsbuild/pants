@@ -55,6 +55,8 @@ class RelocatedFilesSources(Sources):
     expected_num_files = 0
 
 
+# TODO(#10888): Teach project introspection goals that this is a special type of the `Dependencies`
+#  field.
 class RelocatedFilesOriginalTargets(StringSequenceField):
     """Addresses to the original `files()` targets that you want to relocate, such as
     `['//:json_files']`.
