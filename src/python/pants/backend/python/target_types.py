@@ -349,6 +349,7 @@ class PythonTests(Target):
         *COMMON_PYTHON_FIELDS,
         PythonTestsSources,
         PythonTestsDependencies,
+        PythonRuntimePackageDependencies,
         PythonRuntimeBinaryDependencies,
         PythonTestsTimeout,
     )
