@@ -1,21 +1,28 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 import tarfile
 import zipfile
 from io import BytesIO
 
 import pytest
 
-from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
+from pants.core.util_rules.archive import ArchiveFormat, CreateArchive, ExtractedArchive
 from pants.core.util_rules.archive import rules as archive_rules
-from pants.engine.fs import DigestContents, FileContent
+from pants.engine.fs import Digest, DigestContents, FileContent
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[*archive_rules(), QueryRule(ExtractedDigest, (MaybeExtractable,))])
+    return RuleRunner(
+        rules=[
+            *archive_rules(),
+            QueryRule(Digest, [CreateArchive]),
+            QueryRule(ExtractedArchive, [Digest]),
+        ],
+    )
 
 
 FILES = {"foo": b"bar", "hello/world": b"Hello, World!"}
@@ -32,11 +39,9 @@ def test_extract_zip(rule_runner: RuleRunner, compression: int) -> None:
             zf.writestr(name, content)
     io.flush()
     input_snapshot = rule_runner.make_snapshot({"test.zip": io.getvalue()})
-    extracted_digest = rule_runner.request(
-        ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
-    )
 
-    digest_contents = rule_runner.request(DigestContents, [extracted_digest.digest])
+    extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
 
@@ -51,19 +56,65 @@ def test_extract_tar(rule_runner: RuleRunner, compression: str) -> None:
             tf.addfile(tarinfo, BytesIO(content))
     ext = f"tar.{compression}" if compression else "tar"
     input_snapshot = rule_runner.make_snapshot({f"test.{ext}": io.getvalue()})
-    extracted_digest = rule_runner.request(
-        ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
-    )
 
-    digest_contents = rule_runner.request(DigestContents, [extracted_digest.digest])
+    extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
 
-def test_non_archive(rule_runner: RuleRunner) -> None:
+def test_extract_non_archive(rule_runner: RuleRunner) -> None:
     input_snapshot = rule_runner.make_snapshot({"test.sh": b"# A shell script"})
-    extracted_digest = rule_runner.request(
-        ExtractedDigest, [MaybeExtractable(input_snapshot.digest)]
+    extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
+    assert DigestContents([FileContent("test.sh", b"# A shell script")]) == digest_contents
+
+
+def test_create_zip_archive(rule_runner: RuleRunner) -> None:
+    output_filename = "demo/a.zip"
+    input_snapshot = rule_runner.make_snapshot(FILES)
+    created_digest = rule_runner.request(
+        Digest,
+        [CreateArchive(input_snapshot, output_filename=output_filename, format=ArchiveFormat.ZIP)],
     )
 
-    digest_contents = rule_runner.request(DigestContents, [extracted_digest.digest])
-    assert DigestContents([FileContent("test.sh", b"# A shell script")]) == digest_contents
+    digest_contents = rule_runner.request(DigestContents, [created_digest])
+    assert len(digest_contents) == 1
+    io = BytesIO()
+    io.write(digest_contents[0].content)
+    with zipfile.ZipFile(io) as zf:
+        assert set(zf.namelist()) == set(FILES.keys())
+
+    # We also use Pants to extract the created archive, which checks for idempotency.
+    extracted_archive = rule_runner.request(ExtractedArchive, [created_digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
+    assert digest_contents == EXPECTED_DIGEST_CONTENTS
+
+
+@pytest.mark.parametrize(
+    "format", [ArchiveFormat.TAR, ArchiveFormat.TGZ, ArchiveFormat.TXZ, ArchiveFormat.TBZ2]
+)
+def test_create_tar_archive(rule_runner: RuleRunner, format: ArchiveFormat) -> None:
+    output_filename = f"demo/a.{format.value}"
+    input_snapshot = rule_runner.make_snapshot(FILES)
+    created_digest = rule_runner.request(
+        Digest,
+        [CreateArchive(input_snapshot, output_filename=output_filename, format=format)],
+    )
+
+    digest_contents = rule_runner.request(DigestContents, [created_digest])
+    assert len(digest_contents) == 1
+    # For some reason, writing the result to BytesIO, then passing via `fileobj` to
+    # `tarfile.open()` does not work properly, even if calling `.flush()` before. So we write to
+    # disk.
+    rule_runner.create_file(output_filename, digest_contents[0].content, mode="wb")
+    compression = "" if format == ArchiveFormat.TAR else f"{format.value[1:]}"  # Strip the `t`.
+    with tarfile.open(
+        os.path.join(rule_runner.build_root, output_filename), mode=f"r:{compression}"
+    ) as tf:
+        print(tf.getmembers())
+        assert set(tf.getnames()) == set(FILES.keys())
+
+    # We also use Pants to extract the created archive, which checks for idempotency.
+    extracted_archive = rule_runner.request(ExtractedArchive, [created_digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
+    assert digest_contents == EXPECTED_DIGEST_CONTENTS

@@ -35,7 +35,7 @@ class AWSLambdaFieldSet(FieldSet, metaclass=ABCMeta):
 
 
 class AWSLambdaSubsystem(LineOriented, GoalSubsystem):
-    """Deprecated in favor of the `build` goal."""
+    """Deprecated in favor of the `package` goal."""
 
     name = "awslambda"
 

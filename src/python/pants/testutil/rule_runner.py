@@ -229,7 +229,7 @@ class RuleRunner:
         self._invalidate_for(relpath)
         return path
 
-    def create_file(self, relpath: str, contents: str = "", mode: str = "w") -> str:
+    def create_file(self, relpath: str, contents: Union[bytes, str] = "", mode: str = "w") -> str:
         """Writes to a file under the buildroot.
 
         :API: public
@@ -272,7 +272,7 @@ class RuleRunner:
         mode = "w" if overwrite else "a"
         return self.create_file(str(build_path), target, mode=mode)
 
-    def make_snapshot(self, files: Dict[str, Union[str, bytes]]) -> Snapshot:
+    def make_snapshot(self, files: Mapping[str, Union[str, bytes]]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content."""
         with temporary_dir() as temp_dir:
             for file_name, content in files.items():
