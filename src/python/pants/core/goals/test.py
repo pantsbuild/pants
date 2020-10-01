@@ -213,7 +213,7 @@ class FilesystemCoverageReport(CoverageReport):
         return self.report_file
 
     def get_artifact(self) -> Optional[Tuple[str, Snapshot]]:
-        return f"coverage_{self.report_type}" , self.result_snapshot
+        return f"coverage_{self.report_type}", self.result_snapshot
 
 
 @dataclass(frozen=True)
