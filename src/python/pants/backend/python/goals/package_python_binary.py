@@ -72,7 +72,7 @@ class PythonBinaryFieldSet(PackageFieldSet, BinaryFieldSet, RunFieldSet):
 
 
 @rule(level=LogLevel.DEBUG)
-async def build_python_binary(
+async def package_python_binary(
     field_set: PythonBinaryFieldSet,
     python_binary_defaults: PythonBinaryDefaults,
     global_options: GlobalOptions,

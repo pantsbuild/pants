@@ -8,8 +8,8 @@ See https://www.pantsbuild.org/docs/python-backend.
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import (
-    build_python_binary,
     coverage_py,
+    package_python_binary,
     pytest_runner,
     repl,
     run_python_binary,
@@ -69,7 +69,7 @@ def rules():
         *pex_environment.rules(),
         *pex_from_targets.rules(),
         *pytest_runner.rules(),
-        *build_python_binary.rules(),
+        *package_python_binary.rules(),
         *python_native_code.rules(),
         *repl.rules(),
         *run_python_binary.rules(),
