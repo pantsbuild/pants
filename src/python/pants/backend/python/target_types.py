@@ -267,19 +267,19 @@ class PythonTestsDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonRuntimeBuildDependencies(StringSequenceField):
-    """Addresses to targets that can be built with the `./pants build` goal and whose resulting
+class PythonRuntimePackageDependencies(StringSequenceField):
+    """Addresses to targets that can be built with the `./pants package` goal and whose resulting
     assets should be included in the test run.
 
-    Pants will build the asset as if it had run `./pants build`, and will include the result in
+    Pants will build the asset as if it had run `./pants package`, and will include the result in
     your test environment using the same name it would normally have, but without the `dist/`
     prefix.
 
     These targets do not necessarily need to be `python_binary` targets; they can be any
-    targets accepted by `./pants build`, as `python_awslambda` and `archive`.
+    targets accepted by `./pants package`, as `python_awslambda` and `archive`.
     """
 
-    alias = "runtime_build_dependencies"
+    alias = "runtime_package_dependencies"
 
 
 class PythonRuntimeBinaryDependencies(StringSequenceField):
@@ -296,7 +296,7 @@ class PythonRuntimeBinaryDependencies(StringSequenceField):
             logger.warning(
                 f"Using the `runtime_binary_dependencies` field in the target {address}. This "
                 "field is now deprecated in favor of the more flexible "
-                "`runtime_build_dependencies` field, and it will be removed in 2.1.0.dev0."
+                "`runtime_package_dependencies` field, and it will be removed in 2.1.0.dev0."
             )
         return super().compute_value(raw_value, address=address)
 

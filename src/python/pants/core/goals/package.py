@@ -17,41 +17,41 @@ logger = logging.getLogger(__name__)
 
 
 @union
-class BuildFieldSet(FieldSet, metaclass=ABCMeta):
+class PackageFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to build an asset from a target."""
 
 
 @dataclass(frozen=True)
-class BuiltAsset:
+class BuiltPackage:
     digest: Digest
     relpath: str
     extra_log_info: Optional[str] = None
 
 
-class BuildSubsystem(GoalSubsystem):
-    """Build an asset, such as an archive, JAR, PEX, AWS Lambda, etc."""
+class PackageSubsystem(GoalSubsystem):
+    """Package an asset and put in `--distdir`, such as an archive, PEX, wheel, AWS Lambda, etc."""
 
-    name = "build"
+    name = "package"
 
-    required_union_implementations = (BuildFieldSet,)
+    required_union_implementations = (PackageFieldSet,)
 
 
-class Build(Goal):
-    subsystem_cls = BuildSubsystem
+class Package(Goal):
+    subsystem_cls = PackageSubsystem
 
 
 @goal_rule
-async def build_asset(workspace: Workspace, dist_dir: DistDir) -> Build:
+async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     target_roots_to_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
-            BuildFieldSet,
-            goal_description="the `build` goal",
+            PackageFieldSet,
+            goal_description="the `package` goal",
             error_if_no_applicable_targets=True,
         ),
     )
     assets = await MultiGet(
-        Get(BuiltAsset, BuildFieldSet, field_set)
+        Get(BuiltPackage, PackageFieldSet, field_set)
         for field_set in target_roots_to_field_sets.field_sets
     )
     merged_snapshot = await Get(Snapshot, MergeDigests(asset.digest for asset in assets))
@@ -61,7 +61,7 @@ async def build_asset(workspace: Workspace, dist_dir: DistDir) -> Build:
         if asset.extra_log_info:
             msg += f"\n{asset.extra_log_info}"
         logger.info(msg)
-    return Build(exit_code=0)
+    return Package(exit_code=0)
 
 
 def rules():

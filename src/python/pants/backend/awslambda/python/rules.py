@@ -25,7 +25,7 @@ from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
-from pants.core.goals.build import BuildFieldSet, BuiltAsset
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PythonAwsLambdaFieldSet(BuildFieldSet, AWSLambdaFieldSet):
+class PythonAwsLambdaFieldSet(PackageFieldSet, AWSLambdaFieldSet):
     required_fields = (PythonAwsLambdaHandler, PythonAwsLambdaRuntime)
 
     handler: PythonAwsLambdaHandler
@@ -122,9 +122,9 @@ async def create_python_awslambda(
 
 
 @rule
-async def build_python_awslambda(field_set: PythonAwsLambdaFieldSet) -> BuiltAsset:
+async def package_python_awslambda(field_set: PythonAwsLambdaFieldSet) -> BuiltPackage:
     awslambda = await Get(CreatedAWSLambda, AWSLambdaFieldSet, field_set)
-    return BuiltAsset(
+    return BuiltPackage(
         awslambda.digest,
         relpath=awslambda.zip_file_relpath,
         extra_log_info=f"  Runtime: {awslambda.runtime}\n  Handler: {awslambda.handler}",
@@ -150,6 +150,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(AWSLambdaFieldSet, PythonAwsLambdaFieldSet),
-        UnionRule(BuildFieldSet, PythonAwsLambdaFieldSet),
+        UnionRule(PackageFieldSet, PythonAwsLambdaFieldSet),
         *pex_from_targets.rules(),
     ]

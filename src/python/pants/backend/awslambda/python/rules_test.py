@@ -13,7 +13,7 @@ from pants.backend.awslambda.python.rules import PythonAwsLambdaFieldSet
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.python.target_types import PythonLibrary
-from pants.core.goals.build import BuiltAsset
+from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -24,7 +24,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *awslambda_python_rules(),
-            QueryRule(BuiltAsset, (PythonAwsLambdaFieldSet,)),
+            QueryRule(BuiltPackage, (PythonAwsLambdaFieldSet,)),
             QueryRule(CreatedAWSLambda, (PythonAwsLambdaFieldSet,)),
         ],
         target_types=[PythonAWSLambda, PythonLibrary],
@@ -43,7 +43,7 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, by
     created_awslambda = rule_runner.request(
         CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target)]
     )
-    built_asset = rule_runner.request(BuiltAsset, [PythonAwsLambdaFieldSet.create(target)])
+    built_asset = rule_runner.request(BuiltPackage, [PythonAwsLambdaFieldSet.create(target)])
     assert created_awslambda.digest == built_asset.digest
     assert created_awslambda.zip_file_relpath == built_asset.relpath
     created_awslambda_digest_contents = rule_runner.request(

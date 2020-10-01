@@ -24,7 +24,7 @@ from pants.backend.python.util_rules.pex_from_targets import (
     TwoStepPexFromTargetsRequest,
 )
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
-from pants.core.goals.build import BuildFieldSet, BuiltAsset
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, collect_rules, rule
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PythonBinaryFieldSet(BuildFieldSet, BinaryFieldSet, RunFieldSet):
+class PythonBinaryFieldSet(PackageFieldSet, BinaryFieldSet, RunFieldSet):
     required_fields = (PythonEntryPoint, PythonBinarySources)
 
     sources: PythonBinarySources
@@ -76,7 +76,7 @@ async def build_python_binary(
     field_set: PythonBinaryFieldSet,
     python_binary_defaults: PythonBinaryDefaults,
     global_options: GlobalOptions,
-) -> BuiltAsset:
+) -> BuiltPackage:
     entry_point = field_set.entry_point.value
     if entry_point is None:
         binary_source_paths = await Get(
@@ -125,18 +125,18 @@ async def build_python_binary(
             )
         ),
     )
-    return BuiltAsset(two_step_pex.pex.digest, relpath=output_filename)
+    return BuiltPackage(two_step_pex.pex.digest, relpath=output_filename)
 
 
 @rule(level=LogLevel.DEBUG)
 async def create_python_binary(field_set: PythonBinaryFieldSet) -> CreatedBinary:
-    pex = await Get(BuiltAsset, BuildFieldSet, field_set)
+    pex = await Get(BuiltPackage, PackageFieldSet, field_set)
     return CreatedBinary(pex.digest, pex.relpath)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(BuildFieldSet, PythonBinaryFieldSet),
+        UnionRule(PackageFieldSet, PythonBinaryFieldSet),
         UnionRule(BinaryFieldSet, PythonBinaryFieldSet),
     ]

@@ -52,7 +52,7 @@ async def create_awslambda(
     workspace: Workspace,
 ) -> AWSLambdaGoal:
     logger.warning(
-        "The `awslambda` goal is deprecated in favor of the `build` goal, which behaves "
+        "The `awslambda` goal is deprecated in favor of the `package` goal, which behaves "
         "identically. `awslambda` will be removed in 2.1.0.dev0."
     )
     targets_to_valid_field_sets = await Get(

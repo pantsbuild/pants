@@ -41,8 +41,8 @@ class Binary(Goal):
 @goal_rule
 async def create_binary(workspace: Workspace, dist_dir: DistDir) -> Binary:
     logger.warning(
-        "The `binary` goal is deprecated in favor of the `build` goal, which behaves identically. "
-        "`binary` will be removed in 2.1.0.dev0.",
+        "The `binary` goal is deprecated in favor of the `package` goal, which behaves "
+        "identically. `binary` will be removed in 2.1.0.dev0.",
     )
     target_roots_to_field_sets = await Get(
         TargetRootsToFieldSets,

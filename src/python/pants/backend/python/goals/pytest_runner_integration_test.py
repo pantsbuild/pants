@@ -441,7 +441,7 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-def test_runtime_binary_dependency(rule_runner: RuleRunner) -> None:
+def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
     create_python_binary_target(rule_runner, BINARY_SOURCE)
     rule_runner.create_file(
         f"{PACKAGE}/test_binary_call.py",
@@ -454,7 +454,7 @@ def test_runtime_binary_dependency(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    rule_runner.add_to_build_file(PACKAGE, "python_tests(runtime_build_dependencies=[':bin'])")
+    rule_runner.add_to_build_file(PACKAGE, "python_tests(runtime_package_dependencies=[':bin'])")
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_binary_call.py"))
     assert isinstance(tgt, PythonTests)
     result = run_pytest(rule_runner, tgt, passthrough_args="-s")
