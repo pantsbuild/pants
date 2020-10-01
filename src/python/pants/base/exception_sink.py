@@ -59,14 +59,17 @@ class SignalHandler:
             with self._ignore_sigint_lock:
                 self._ignoring_sigint = toggle
 
-    def handle_sigint(self, signum: int, _frame):
+    def _send_signal_to_children(self, _received_signal: int) -> None:
         self_process = psutil.Process()
         children = self_process.children()
-        logger.debug(f"Sending SIGINT to child processes: {children}")
+        logger.warning(f"Sending SIGINT to child processes: {children}")
         for child_process in children:
             child_process.send_signal(signal.SIGINT)
 
+    def handle_sigint(self, signum: int, _frame):
+        logger.warning("Calling handle_sigint in pantsd")
         ExceptionSink._signal_sent = signum
+        self._send_signal_to_children(signum)
         raise KeyboardInterrupt("User interrupted execution with control-c!")
 
     # TODO(#7406): figure out how to let sys.exit work in a signal handler instead of having to raise
@@ -93,10 +96,12 @@ class SignalHandler:
 
     def handle_sigquit(self, signum, _frame):
         ExceptionSink._signal_sent = signum
+        self._send_signal_to_children(signum)
         raise self.SignalHandledNonLocalExit(signum, "SIGQUIT")
 
     def handle_sigterm(self, signum, _frame):
         ExceptionSink._signal_sent = signum
+        self._send_signal_to_children(signum)
         raise self.SignalHandledNonLocalExit(signum, "SIGTERM")
 
 

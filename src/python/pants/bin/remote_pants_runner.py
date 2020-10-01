@@ -6,10 +6,13 @@ import sys
 import termios
 import time
 from contextlib import contextmanager
-from typing import List, Mapping
+from typing import List, Mapping, cast
+
+import psutil
 
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import ExitCode
+from pants.engine.internals.native import Native
 from pants.nailgun.nailgun_client import NailgunClient
 from pants.nailgun.nailgun_protocol import NailgunProtocol
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -53,24 +56,15 @@ class STTYSettings:
 
 
 class PailgunClientSignalHandler(SignalHandler):
-    def __init__(self, pailgun_client: NailgunClient, pid: int, timeout: float = 1):
-        self._pailgun_client = pailgun_client
-        self._timeout = timeout
+    def __init__(self, pid: int):
         self.pid = pid
         super().__init__(pantsd_instance=False)
 
     def _forward_signal_with_timeout(self, signum, signame):
-        # TODO Consider not accessing the private function _maybe_last_pid here, or making it public.
-        logger.info(
-            "Sending {} to pantsd with pid {}, waiting up to {} seconds before sending SIGKILL...".format(
-                signame, self.pid, self._timeout
-            )
-        )
-        self._pailgun_client.set_exit_timeout(
-            timeout=self._timeout,
-            reason=KeyboardInterrupt("Sending user interrupt to pantsd"),
-        )
-        self._pailgun_client.maybe_send_signal(signum)
+        ExceptionSink._signal_sent = signum
+        logger.info(f"Sending {signame} to pantsd with pid {self.pid}")
+        pantsd_process = psutil.Process(pid=self.pid)
+        pantsd_process.send_signal(signum)
 
     def handle_sigint(self, signum, _frame):
         self._forward_signal_with_timeout(signum, "SIGINT")
@@ -159,9 +153,10 @@ class RemotePantsRunner:
                 raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(traceback)
 
     def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
+        native = Native()
+
         port = pantsd_handle.port
         pid = pantsd_handle.pid
-
         global_options = self._bootstrap_options.for_global_scope()
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
@@ -175,22 +170,17 @@ class RemotePantsRunner:
             ),
         }
 
-        # Instantiate a NailgunClient.
-        client = NailgunClient(
-            port=port,
-            remote_pid=pid,
-            ins=sys.stdin,
-            out=sys.stdout.buffer,
-            err=sys.stderr.buffer,
-            exit_on_broken_pipe=True,
-            metadata_base_dir=pantsd_handle.metadata_base_dir,
-        )
+        command = self._args[0]
+        args = self._args[1:]
 
-        timeout = global_options.pantsd_pailgun_quit_timeout
-        pantsd_signal_handler = PailgunClientSignalHandler(client, pid=pid, timeout=timeout)
+        def signal_fn() -> bool:
+            return ExceptionSink.signal_sent() is not None
+
+        rust_nailgun_client = native.new_nailgun_client(port=port)
+        pantsd_signal_handler = PailgunClientSignalHandler(pid=pid)
+
         with ExceptionSink.trapped_signals(pantsd_signal_handler), STTYSettings.preserved():
-            # Execute the command on the pailgun.
-            return client.execute(self._args[0], self._args[1:], modified_env)
+            return cast(int, rust_nailgun_client.execute(signal_fn, command, args, modified_env))
 
     def _extract_remote_exception(self, pantsd_pid, nailgun_error):
         """Given a NailgunError, returns a Terminated exception with additional info (where

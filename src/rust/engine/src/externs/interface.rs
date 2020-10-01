@@ -33,6 +33,8 @@
   clippy::transmute_ptr_to_ptr,
   clippy::zero_ptr
 )]
+#![allow(dead_code)]
+#![allow(unused_variables)]
 
 ///
 /// This crate is a wrapper around the engine crate which exposes a python module via cpython.
@@ -48,14 +50,16 @@ use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Arc;
 use std::time::Duration;
 
 use cpython::{
-  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyDict, PyErr,
+  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyDict, PyErr, PyInt,
   PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
   ToPyObject,
 };
+use futures::channel::oneshot;
 use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
@@ -70,6 +74,7 @@ use task_executor::Executor;
 use tempfile::TempDir;
 use workunit_store::{Workunit, WorkunitState};
 
+use crate::scheduler::maybe_break_execution_loop;
 use crate::{
   externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
   Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
@@ -175,6 +180,12 @@ py_module_initializer!(native_engine, |py, m| {
     py,
     "graph_visualize",
     py_fn!(py, graph_visualize(a: PyScheduler, b: PySession, d: String)),
+  )?;
+
+  m.add(
+    py,
+    "nailgun_client_create",
+    py_fn!(py, nailgun_client_create(a: PyExecutor, b: u16)),
   )?;
 
   m.add(
@@ -370,6 +381,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<PyExecutionStrategyOptions>(py)?;
   m.add_class::<PyExecutor>(py)?;
   m.add_class::<PyNailgunServer>(py)?;
+  m.add_class::<PyNailgunClient>(py)?;
   m.add_class::<PyRemotingOptions>(py)?;
   m.add_class::<PyResult>(py)?;
   m.add_class::<PyScheduler>(py)?;
@@ -569,6 +581,90 @@ py_class!(class PyNailgunServer |py| {
     }
 });
 
+py_class!(class PyNailgunClient |py| {
+  data executor: PyExecutor;
+  data port: u16;
+
+  def execute(&self, py_signal_fn: PyObject, command: PyString, args: PyList, env: PyDict) -> CPyResult<PyInt> {
+
+    let command: String = command.to_string(py)
+      .map(|s| s.into())?;
+
+    let args: Vec<String> = args
+      .iter(py)
+      .map(|arg: PyObject| arg.cast_into::<PyString>(py)
+        .map_err(|err| err.into())
+        .and_then(|s: PyString| s.to_string(py).map(|rust_str| rust_str.into_owned()))
+      )
+      .collect::<Result<Vec<_>, _>>()?;
+
+    let env_list: Vec<(String, String)> = env
+    .items(py)
+    .into_iter()
+    .map(|(k, v): (PyObject, PyObject)| -> Result<(String, String), PyErr> {
+      let k: String = k.extract::<String>(py)?;
+      let v: String = v.extract::<String>(py)?;
+      Ok((k, v))
+    })
+    .collect::<Result<Vec<_>, _>>()?;
+
+    let port = *self.port(py);
+    let executor_ptr = self.executor(py);
+    let python_signal_fn: Value = py_signal_fn.into();
+
+    let (exit_sender, exit_receiver) = oneshot::channel();
+    let nailgun_fut = nailgun::client_execute(
+      port,
+      command,
+      args,
+      env_list,
+      exit_receiver,
+    );
+
+    let exit_code: Result<i32, String> = with_executor(py, executor_ptr, |executor| {
+        let (sender, receiver) = mpsc::channel();
+
+        let _spawned_fut = executor.spawn(async move {
+          let exit_code = nailgun_fut.await;
+          let _ = sender.send(exit_code);
+        });
+
+        let timeout = std::time::Duration::from_millis(50);
+        let output = loop {
+          let event = receiver.recv_timeout(timeout);
+          if let Some(_termination) = maybe_break_execution_loop(&python_signal_fn) {
+            break Err("Quitting becuase of explicit interrupt".to_string());
+          }
+
+          match event {
+            Ok(res) => break res.map_err(|e| format!("Nailgun client error: {:?}", e)),
+            Err(RecvTimeoutError::Timeout) => {
+              continue;
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+              break Err("Disconnected from Nailgun client task".to_string());
+            }
+          }
+        };
+        debug!("Sending message to nailgun client task to exit.");
+        match exit_sender.send(()) {
+          Ok(()) => (),
+          Err(e) => {
+            debug!("Error sending exit message to nailgun client task: {:?}", e);
+          }
+        };
+        output
+    });
+
+    match exit_code {
+      Ok(code) => Ok(code.to_py_object(py)),
+      Err(err_str) => {
+        Err(PyErr::new::<exc::Exception, _>(py, (err_str,)))
+      }
+    }
+  }
+});
+
 py_class!(class PyExecutionRequest |py| {
     data execution_request: RefCell<ExecutionRequest>;
     def __new__(_cls) -> CPyResult<Self> {
@@ -650,13 +746,21 @@ fn externs_set(_: Python, externs: PyObject) -> PyUnitResult {
   Ok(None)
 }
 
+fn nailgun_client_create(
+  py: Python,
+  executor_ptr: PyExecutor,
+  port: u16,
+) -> CPyResult<PyNailgunClient> {
+  PyNailgunClient::create_instance(py, executor_ptr, port)
+}
+
 fn nailgun_server_create(
   py: Python,
   executor_ptr: PyExecutor,
   port: u16,
   runner: PyObject,
 ) -> CPyResult<PyNailgunServer> {
-  with_executor(py, executor_ptr, |executor| {
+  with_executor(py, &executor_ptr, |executor| {
     let server_future = {
       let runner: Value = runner.into();
       let executor = executor.clone();
@@ -718,7 +822,7 @@ fn nailgun_server_await_shutdown(
   executor_ptr: PyExecutor,
   nailgun_server_ptr: PyNailgunServer,
 ) -> PyUnitResult {
-  with_executor(py, executor_ptr, |executor| {
+  with_executor(py, &executor_ptr, |executor| {
     with_nailgun_server(py, nailgun_server_ptr, |nailgun_server| {
       let shutdown_result = if let Some(server) = nailgun_server.borrow_mut().take() {
         py.allow_threads(|| executor.block_on(server.shutdown()))
@@ -756,7 +860,7 @@ fn scheduler_create(
     Ok(msg) => debug!("{}", msg),
     Err(e) => warn!("{}", e),
   }
-  let core: Result<Core, String> = with_executor(py, executor_ptr, |executor| {
+  let core: Result<Core, String> = with_executor(py, &executor_ptr, |executor| {
     let types = types_ptr
       .types(py)
       .borrow_mut()
@@ -1784,7 +1888,7 @@ where
 ///
 /// See `with_scheduler`.
 ///
-fn with_executor<F, T>(py: Python, executor_ptr: PyExecutor, f: F) -> T
+fn with_executor<F, T>(py: Python, executor_ptr: &PyExecutor, f: F) -> T
 where
   F: FnOnce(&Executor) -> T,
 {

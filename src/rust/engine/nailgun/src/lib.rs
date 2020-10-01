@@ -27,6 +27,8 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 #![type_length_limit = "2058438"]
+#![allow(dead_code)]
+#![allow(unused_variables)]
 
 #[cfg(test)]
 mod tests;
@@ -37,19 +39,118 @@ use std::net::Ipv4Addr;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::io::AsyncWriteExt;
 
 use bytes::Bytes;
 use futures::channel::{mpsc, oneshot};
-use futures::{future, sink, stream, FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{future, sink, stream, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
 use log::{debug, error, info};
 pub use nails::execution::ExitCode;
 use nails::execution::{self, sink_for, stream_for, ChildInput, ChildOutput};
-use nails::{Child, Nail};
+use nails::{Child, Config, Nail};
 use tokio::fs::File;
 use tokio::net::TcpListener;
+use tokio::net::TcpStream;
 use tokio::sync::{Notify, RwLock};
 
 use task_executor::Executor;
+
+async fn handle_client_output(
+  mut stdio_read: impl Stream<Item = ChildOutput> + Unpin,
+) -> Result<(), io::Error> {
+  let mut stdout = tokio::io::stdout();
+  let mut stderr = tokio::io::stderr();
+  while let Some(output) = stdio_read.next().await {
+    match output {
+      ChildOutput::Stdout(bytes) => stdout.write_all(&bytes).await?,
+      ChildOutput::Stderr(bytes) => stderr.write_all(&bytes).await?,
+      ChildOutput::Exit(_) => {
+        // NB: We ignore exit here and allow the main thread to handle exiting.
+        break;
+      }
+    }
+  }
+  Ok(())
+}
+
+async fn handle_client_input(mut stdin_write: mpsc::Sender<ChildInput>) -> Result<(), io::Error> {
+  use nails::execution::send_to_io;
+  let mut stdin = stream_for(tokio::io::stdin());
+  while let Some(input_bytes) = stdin.next().await {
+    stdin_write
+      .send(ChildInput::Stdin(input_bytes?))
+      .await
+      .map_err(send_to_io)?;
+  }
+  stdin_write
+    .send(ChildInput::StdinEOF)
+    .await
+    .map_err(send_to_io)?;
+  Ok(())
+}
+
+async fn client_execute_helper(
+  port: u16,
+  command: String,
+  args: Vec<String>,
+  env: Vec<(String, String)>,
+) -> Result<i32, String> {
+  use nails::execution::{child_channel, Command};
+
+  let config = Config::default();
+  let command = Command {
+    command,
+    args,
+    env,
+    working_dir: std::path::PathBuf::from("/dev/null"),
+  };
+
+  let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
+  let (stdin_write, stdin_read) = child_channel::<ChildInput>();
+
+  let output_handler = tokio::spawn(handle_client_output(stdio_read));
+  let _input_handler = tokio::spawn(handle_client_input(stdin_write));
+
+  let localhost = std::net::Ipv4Addr::new(127, 0, 0, 1);
+  let addr = (localhost, port);
+
+  let socket = TcpStream::connect(addr)
+    .await
+    .map_err(|err| format!("Nailgun client error connecting to localhost: {}", err))?;
+  let exit_code: ExitCode =
+    nails::client_handle_connection(config, socket, command, stdio_write, stdin_read)
+      .await
+      .map_err(|err| format!("Nailgun client error: {}", err))?;
+
+  let () = output_handler
+    .await
+    .map_err(|join_error| format!("Error joining nailgun client task: {}", join_error))?
+    .map_err(|err| format!("Nailgun client output error: {}", err))?;
+
+  Ok(exit_code.0)
+}
+
+pub async fn client_execute(
+  port: u16,
+  command: String,
+  args: Vec<String>,
+  env: Vec<(String, String)>,
+  exit_receiver: oneshot::Receiver<()>,
+) -> Result<i32, String> {
+  use future::Either;
+
+  let execution_future = client_execute_helper(port, command, args, env).boxed();
+
+  match future::select(execution_future, exit_receiver).await {
+    Either::Left((execution_result, _exit_receiver_fut)) => {
+      debug!("Nailgun client future finished");
+      execution_result
+    }
+    Either::Right((exited, execution_result_future)) => {
+      Err("Exiting nailgun client future via explicit quit message".to_string())
+    }
+  }
+}
 
 pub struct Server {
   exit_sender: oneshot::Sender<()>,
