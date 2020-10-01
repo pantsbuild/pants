@@ -99,8 +99,6 @@ async def generate_subtargets(address: Address, global_options: GlobalOptions) -
     sources_field_path_globs = sources_field.path_globs(
         global_options.options.files_not_found_behavior
     )
-    if sources_field_path_globs is None:
-        return Subtargets(base_target, ())
 
     # Generate a subtarget per source.
     paths = await Get(Paths, PathGlobs, sources_field_path_globs)
@@ -648,8 +646,6 @@ async def hydrate_sources(
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
     path_globs = sources_field.path_globs(global_options.options.files_not_found_behavior)
-    if path_globs is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=sources_type)
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
     sources_field.validate_resolved_files(snapshot.files)
 

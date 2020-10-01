@@ -1282,11 +1282,8 @@ class Sources(AsyncField):
         return str(PurePath(self.address.spec_path, glob))
 
     @final
-    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> Optional[PathGlobs]:
-        globs = self.sanitized_raw_value
-        if globs is None:
-            return None
-
+    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
+        globs = self.sanitized_raw_value or ()
         error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
         conjunction = (
             GlobExpansionConjunction.all_match
