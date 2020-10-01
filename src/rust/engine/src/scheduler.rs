@@ -47,7 +47,7 @@ type Root = Select;
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need
 // to be.
-const STRAGGLER_INTERVAL: Duration = Duration::from_secs(30);
+const STRAGGLER_LOGGING_INTERVAL: Duration = Duration::from_secs(30);
 
 ///
 /// An enum for the two cases of `--[no-]dynamic-ui`.
@@ -227,7 +227,7 @@ impl Session {
         ref mut straggler_deadline,
         ..
       } => {
-        *straggler_deadline = Some(Instant::now() + STRAGGLER_INTERVAL);
+        *straggler_deadline = Some(Instant::now() + STRAGGLER_LOGGING_INTERVAL);
         Ok(())
       }
     };
@@ -263,7 +263,7 @@ impl Session {
           .map(|sd| sd < Instant::now())
           .unwrap_or(false)
         {
-          *straggler_deadline = Some(Instant::now() + STRAGGLER_INTERVAL);
+          *straggler_deadline = Some(Instant::now() + STRAGGLER_LOGGING_INTERVAL);
           self
             .0
             .workunit_store
