@@ -267,16 +267,15 @@ class PythonTestsDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
+# TODO(#10888): Teach project introspection goals that this is a special type of the `Dependencies`
+#  field.
 class PythonRuntimePackageDependencies(StringSequenceField):
     """Addresses to targets that can be built with the `./pants package` goal and whose resulting
     assets should be included in the test run.
 
     Pants will build the asset as if it had run `./pants package`, and will include the result in
     your test environment using the same name it would normally have, but without the `dist/`
-    prefix.
-
-    These targets do not necessarily need to be `python_binary` targets; they can be any
-    targets accepted by `./pants package`, as `python_awslambda` and `archive`.
+    prefix. For example, you can include a `python_binary`, `python_awslambda`, or `archive`.
     """
 
     alias = "runtime_package_dependencies"
