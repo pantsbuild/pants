@@ -52,7 +52,6 @@ class Files(Target):
 class RelocatedFilesSources(Sources):
     # We solely register this field for codegen to work.
     alias = "_sources"
-    required = False
     expected_num_files = 0
 
 

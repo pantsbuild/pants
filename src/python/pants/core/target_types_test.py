@@ -3,17 +3,30 @@
 
 from textwrap import dedent
 
-from pants.core.target_types import Files, RelocatedFiles, RelocateFilesViaCodegenRequest
+from pants.core.target_types import (
+    Files,
+    FilesSources,
+    RelocatedFiles,
+    RelocateFilesViaCodegenRequest,
+)
 from pants.core.target_types import rules as target_type_rules
-from pants.engine.addresses import Address
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import rules as source_files_rules
+from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import EMPTY_SNAPSHOT
-from pants.engine.target import GeneratedSources
+from pants.engine.target import GeneratedSources, Sources, TransitiveTargets
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-def test_path_prefix_mapping() -> None:
+def test_relocated_files() -> None:
     rule_runner = RuleRunner(
-        rules=[*target_type_rules(), QueryRule(GeneratedSources, [RelocateFilesViaCodegenRequest])],
+        rules=[
+            *target_type_rules(),
+            *source_files_rules(),
+            QueryRule(GeneratedSources, [RelocateFilesViaCodegenRequest]),
+            QueryRule(TransitiveTargets, [Addresses]),
+            QueryRule(SourceFiles, [SourceFilesRequest]),
+        ],
         target_types=[Files, RelocatedFiles],
     )
 
@@ -46,6 +59,23 @@ def test_path_prefix_mapping() -> None:
             GeneratedSources, [RelocateFilesViaCodegenRequest(EMPTY_SNAPSHOT, tgt)]
         )
         assert result.snapshot.files == (expected,)
+
+        # We also ensure that when looking at the transitive dependencies of the `relocated_files`
+        # target and then getting all the code of that closure, we only end up with the relocated
+        # files. If we naively marked the original files targets as a typical `Dependencies` field,
+        # we would hit this issue.
+        transitive_targets = rule_runner.request(TransitiveTargets, [Addresses([tgt.address])])
+        all_sources = rule_runner.request(
+            SourceFiles,
+            [
+                SourceFilesRequest(
+                    (tgt.get(Sources) for tgt in transitive_targets.closure),
+                    enable_codegen=True,
+                    for_sources_types=(FilesSources,),
+                )
+            ],
+        )
+        assert all_sources.snapshot.files == (expected,)
 
     # No-op.
     assert_prefix_mapping(original="old_prefix/f.ext", src="", dest="", expected="old_prefix/f.ext")
