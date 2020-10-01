@@ -9,7 +9,6 @@ from typing import Iterator, Optional
 from pants.util.meta import SingletonMetaclass
 
 
-# TODO: Even this should probably just be a new-style option?
 class BuildRoot(metaclass=SingletonMetaclass):
     """Represents the global workspace build root.
 

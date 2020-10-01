@@ -45,7 +45,7 @@ def attempts(
 
 
 class PantsDaemonMonitor(ProcessManager):
-    def __init__(self, metadata_base_dir=None):
+    def __init__(self, metadata_base_dir: str):
         super().__init__(name="pantsd", metadata_base_dir=metadata_base_dir)
 
     def _log(self):

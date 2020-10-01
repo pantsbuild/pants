@@ -3,19 +3,53 @@
 
 import logging
 import sys
+import termios
 import time
+from contextlib import contextmanager
 from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import ExitCode
-from pants.console.stty_utils import STTYSettings
-from pants.java.nailgun_client import NailgunClient
-from pants.java.nailgun_protocol import NailgunProtocol
+from pants.nailgun.nailgun_client import NailgunClient
+from pants.nailgun.nailgun_protocol import NailgunProtocol
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
 from pants.util.dirutil import maybe_read_file
 
 logger = logging.getLogger(__name__)
+
+
+class STTYSettings:
+    """Saves/restores stty settings."""
+
+    @classmethod
+    @contextmanager
+    def preserved(cls):
+        """Run potentially stty-modifying operations, e.g., REPL execution, in this
+        contextmanager."""
+        inst = cls()
+        inst.save_tty_flags()
+        try:
+            yield
+        finally:
+            inst.restore_tty_flags()
+
+    def __init__(self):
+        self._tty_flags = None
+
+    def save_tty_flags(self):
+        # N.B. `stty(1)` operates against stdin.
+        try:
+            self._tty_flags = termios.tcgetattr(sys.stdin.fileno())
+        except termios.error as e:
+            logger.debug("masking tcgetattr exception: {!r}".format(e))
+
+    def restore_tty_flags(self):
+        if self._tty_flags:
+            try:
+                termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, self._tty_flags)
+            except termios.error as e:
+                logger.debug("masking tcsetattr exception: {!r}".format(e))
 
 
 class PailgunClientSignalHandler(SignalHandler):

@@ -192,7 +192,11 @@ class VerboseTargetInfo:
         output.extend(
             [
                 "Valid fields:\n",
-                *sorted(f"{field.format_for_cli(console)}\n" for field in self.fields),
+                *sorted(
+                    f"{field.format_for_cli(console)}\n"
+                    for field in self.fields
+                    if not field.alias.startswith("_")
+                ),
             ]
         )
         return "\n".join(output).rstrip()

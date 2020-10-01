@@ -18,7 +18,7 @@ from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
-from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
@@ -142,15 +142,12 @@ class TestDebugRequest:
 
 
 @union
-class TestFieldSet(FieldSet, EngineAwareParameter, metaclass=ABCMeta):
+class TestFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
 
     sources: Sources
 
     __test__ = False
-
-    def debug_hint(self):
-        return self.address.spec
 
 
 class CoverageData(ABC):

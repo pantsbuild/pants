@@ -31,6 +31,7 @@ from typing_extensions import final
 from pants.base.specs import Spec
 from pants.engine.addresses import Address, AddressInput, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
@@ -712,7 +713,7 @@ def generate_subtarget(
 
 
 @dataclass(frozen=True)
-class _AbstractFieldSet(ABC):
+class _AbstractFieldSet(EngineAwareParameter, ABC):
     required_fields: ClassVar[Tuple[Type[Field], ...]]
 
     address: Address
@@ -732,6 +733,9 @@ class _AbstractFieldSet(ABC):
             for target_type in target_types
             if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
         )
+
+    def debug_hint(self) -> str:
+        return self.address.spec
 
 
 def _get_field_set_fields_from_target(
@@ -1278,11 +1282,8 @@ class Sources(AsyncField):
         return str(PurePath(self.address.spec_path, glob))
 
     @final
-    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> Optional[PathGlobs]:
-        globs = self.sanitized_raw_value
-        if globs is None:
-            return None
-
+    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
+        globs = self.sanitized_raw_value or ()
         error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
         conjunction = (
             GlobExpansionConjunction.all_match
@@ -1352,7 +1353,7 @@ class Sources(AsyncField):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class HydrateSourcesRequest:
+class HydrateSourcesRequest(EngineAwareParameter):
     field: Sources
     for_sources_types: Tuple[Type[Sources], ...]
     enable_codegen: bool
@@ -1389,6 +1390,9 @@ class HydrateSourcesRequest:
                 "generate Python files."
             )
 
+    def debug_hint(self) -> str:
+        return self.field.address.spec
+
 
 @dataclass(frozen=True)
 class HydratedSources:
@@ -1409,7 +1413,7 @@ class HydratedSources:
 
 @union
 @dataclass(frozen=True)
-class GenerateSourcesRequest:
+class GenerateSourcesRequest(EngineAwareParameter):
     """A request to go from protocol sources -> a particular language.
 
     This should be subclassed for each distinct codegen implementation. The subclasses must define
@@ -1441,6 +1445,9 @@ class GenerateSourcesRequest:
 
     input: ClassVar[Type[Sources]]
     output: ClassVar[Type[Sources]]
+
+    def debug_hint(self) -> str:
+        return "{self.protocol_target.address.spec}"
 
 
 @dataclass(frozen=True)
@@ -1502,13 +1509,16 @@ class Dependencies(AsyncField):
 
 
 @dataclass(frozen=True)
-class DependenciesRequest:
+class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
+
+    def debug_hint(self) -> str:
+        return self.field.address.spec
 
 
 @union
 @dataclass(frozen=True)
-class InjectDependenciesRequest(ABC):
+class InjectDependenciesRequest(EngineAwareParameter, ABC):
     """A request to inject dependencies, in addition to those explicitly provided.
 
     To set up a new injection, subclass this class. Set the class property `inject_for` to the
@@ -1543,6 +1553,9 @@ class InjectDependenciesRequest(ABC):
     dependencies_field: Dependencies
     inject_for: ClassVar[Type[Dependencies]]
 
+    def debug_hint(self) -> str:
+        return self.dependencies_field.address.spec
+
 
 class InjectedDependencies(DeduplicatedCollection[Address]):
     sort_input = True
@@ -1550,7 +1563,7 @@ class InjectedDependencies(DeduplicatedCollection[Address]):
 
 @union
 @dataclass(frozen=True)
-class InferDependenciesRequest:
+class InferDependenciesRequest(EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property
@@ -1582,6 +1595,9 @@ class InferDependenciesRequest:
 
     sources_field: Sources
     infer_from: ClassVar[Type[Sources]]
+
+    def debug_hint(self) -> str:
+        return self.sources_field.address.spec
 
 
 @frozen_after_init

@@ -26,7 +26,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "1881024"]
+#![type_length_limit = "1881109"]
 
 use std::convert::TryInto;
 use std::io::{self, Write};
@@ -38,7 +38,9 @@ use std::time::Duration;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
-use fs::{GlobMatching, RelativePath};
+use fs::{
+  GlobExpansionConjunction, GlobMatching, PreparedPathGlobs, RelativePath, StrictGlobMatching,
+};
 use futures::compat::Future01CompatExt;
 use futures::future::TryFutureExt;
 use futures01::{future, Future};
@@ -47,7 +49,9 @@ use parking_lot::Mutex;
 use protobuf::Message;
 use rand::seq::SliceRandom;
 use serde_derive::Serialize;
-use store::{Snapshot, SnapshotOps, SnapshotOpsError, Store, StoreFileByDigest, UploadSummary};
+use store::{
+  Snapshot, SnapshotOps, SnapshotOpsError, Store, StoreFileByDigest, SubsetParams, UploadSummary,
+};
 use tokio::runtime::Handle;
 
 #[derive(Debug)]
@@ -490,14 +494,29 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let mut digest = Digest(fingerprint, size_bytes);
 
         if let Some(prefix_to_strip) = args.value_of("child-dir") {
-          digest = store
-            .strip_prefix(digest, RelativePath::new(PathBuf::from(prefix_to_strip))?)
-            .await
-            .map_err(|err| match err {
-              SnapshotOpsError::String(string)
-              | SnapshotOpsError::DigestMergeFailure(string)
-              | SnapshotOpsError::GlobMatchError(string) => string,
-            })?;
+          let mut result = store
+            .subset(
+              digest,
+              SubsetParams {
+                globs: PreparedPathGlobs::create(
+                  vec![format!("{}/**", prefix_to_strip)],
+                  StrictGlobMatching::Ignore,
+                  GlobExpansionConjunction::AnyMatch,
+                )?,
+              },
+            )
+            .await;
+          // It's a shame we can't just .and_then here, because we can't use async closures.
+          if let Ok(subset_digest) = result {
+            result = store
+              .strip_prefix(subset_digest, RelativePath::new(prefix_to_strip)?)
+              .await;
+          }
+          digest = result.map_err(|err| match err {
+            SnapshotOpsError::String(string)
+            | SnapshotOpsError::DigestMergeFailure(string)
+            | SnapshotOpsError::GlobMatchError(string) => string,
+          })?
         }
 
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {

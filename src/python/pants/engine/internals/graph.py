@@ -99,8 +99,6 @@ async def generate_subtargets(address: Address, global_options: GlobalOptions) -
     sources_field_path_globs = sources_field.path_globs(
         global_options.options.files_not_found_behavior
     )
-    if sources_field_path_globs is None:
-        return Subtargets(base_target, ())
 
     # Generate a subtarget per source.
     paths = await Get(Paths, PathGlobs, sources_field_path_globs)
@@ -293,7 +291,7 @@ def _detect_cycles(
             )
 
 
-@rule
+@rule(desc="Resolve transitive targets")
 async def transitive_targets(targets: Targets) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots.
 
@@ -358,7 +356,7 @@ class Owners(Collection[Address]):
     pass
 
 
-@rule
+@rule(desc="Find which targets own certain files")
 async def find_owners(owners_request: OwnersRequest) -> Owners:
     # Determine which of the sources are live and which are deleted.
     sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
@@ -598,7 +596,7 @@ class AmbiguousCodegenImplementationsException(Exception):
             )
 
 
-@rule
+@rule(desc="Hydrate the `sources` field")
 async def hydrate_sources(
     request: HydrateSourcesRequest,
     global_options: GlobalOptions,
@@ -648,8 +646,6 @@ async def hydrate_sources(
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
     path_globs = sources_field.path_globs(global_options.options.files_not_found_behavior)
-    if path_globs is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=sources_type)
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
     sources_field.validate_resolved_files(snapshot.files)
 
@@ -740,7 +736,7 @@ def parse_dependencies_field(
     return ParsedDependencies(addresses, ignored_addresses)
 
 
-@rule
+@rule(desc="Resolve direct dependencies")
 async def resolve_dependencies(
     request: DependenciesRequest,
     union_membership: UnionMembership,

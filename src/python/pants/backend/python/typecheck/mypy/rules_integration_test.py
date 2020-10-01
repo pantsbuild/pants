@@ -641,7 +641,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
 
             noop()
 
-            class AutoAddFieldPlugin(Plugin):
+            class ChangeReturnTypePlugin(Plugin):
                 def get_function_hook(
                     self, fullname: str
                 ) -> Optional[Callable[[FunctionContext], MyPyType]]:
@@ -653,7 +653,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
 
 
             def plugin(_version: str) -> Type[Plugin]:
-                return AutoAddFieldPlugin
+                return ChangeReturnTypePlugin
             """
         ),
     )
