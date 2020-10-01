@@ -505,7 +505,6 @@ py_class!(class PyRemotingOptions |py| {
     execution_process_cache_namespace: Option<String>,
     instance_name: Option<String>,
     root_ca_certs_path: Option<String>,
-    oauth_bearer_token_path: Option<String>,
     store_thread_count: u64,
     store_chunk_bytes: u64,
     store_chunk_upload_timeout: u64,

@@ -81,7 +81,6 @@ class ExecutionOptions:
     remote_execution_process_cache_namespace: Any
     remote_instance_name: Any
     remote_ca_certs_path: Any
-    remote_oauth_bearer_token_path: Any
     remote_execution_extra_platform_properties: Any
     remote_execution_headers: Any
     remote_execution_overall_deadline_secs: int
@@ -89,6 +88,12 @@ class ExecutionOptions:
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
+        headers = bootstrap_options.remote_execution_headers
+        if bootstrap_options.remote_oauth_bearer_token_path is not None:
+            with open(bootstrap_options.remote_oauth_bearer_token_path) as f:
+                token = f.read().strip()
+            headers["authorization"] = f"Bearer {token}"
+
         return cls(
             remote_execution=bootstrap_options.remote_execution,
             remote_store_server=bootstrap_options.remote_store_server,
@@ -107,9 +112,8 @@ class ExecutionOptions:
             remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
             remote_instance_name=bootstrap_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
-            remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
-            remote_execution_headers=bootstrap_options.remote_execution_headers,
+            remote_execution_headers=headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
         )
@@ -133,7 +137,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_process_cache_namespace=None,
     remote_instance_name=None,
     remote_ca_certs_path=None,
-    remote_oauth_bearer_token_path=None,
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     remote_execution_overall_deadline_secs=60 * 60,  # one hour

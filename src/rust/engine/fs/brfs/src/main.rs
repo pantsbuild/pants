@@ -29,13 +29,14 @@
 #![type_length_limit = "44109434"]
 
 use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 
+use bazel_protos::RequestHeaders;
 use futures::future::FutureExt;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
@@ -713,10 +714,13 @@ async fn main() {
     None
   };
 
-  let oauth_bearer_token = if let Some(path) = args.value_of("oauth-bearer-token-file") {
-    Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
+  let headers = if let Some(path) = args.value_of("oauth-bearer-token-file") {
+    let mut headers = BTreeMap::new();
+    let token = std::fs::read_to_string(path).expect("Error reading oauth bearer token file");
+    headers.insert("authorization".to_string(), format!("Bearer {}", token));
+    RequestHeaders::Static { headers }
   } else {
-    None
+    RequestHeaders::None
   };
 
   let runtime = task_executor::Executor::new(Handle::current());
@@ -728,7 +732,7 @@ async fn main() {
       vec![address.to_owned()],
       args.value_of("remote-instance-name").map(str::to_owned),
       root_ca_certs,
-      oauth_bearer_token,
+      headers,
       1,
       4 * 1024 * 1024,
       std::time::Duration::from_secs(5 * 60),
