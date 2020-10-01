@@ -42,6 +42,7 @@
 /// how we expose ourselves back to Python.
 use std::any::Any;
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io;
@@ -51,10 +52,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use bazel_protos::RequestHeaders;
 use cpython::{
-  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyDict, PyErr,
-  PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
-  ToPyObject,
+  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, ObjectProtocol, PyClone,
+  PyDict, PyErr, PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python,
+  PythonObject, ToPyObject,
 };
 use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
@@ -64,6 +66,7 @@ use hashing::{Digest, EMPTY_DIGEST};
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
+use parking_lot::Mutex;
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
@@ -509,9 +512,26 @@ py_class!(class PyRemotingOptions |py| {
     store_rpc_retries: u64,
     store_connection_limit: u64,
     execution_extra_platform_properties: Vec<(String, String)>,
-    execution_headers: Vec<(String, String)>,
+    execution_headers: PyObject,
     execution_overall_deadline_secs: u64
   ) -> CPyResult<Self> {
+    let execution_headers_native = {
+      if execution_headers == py.None() {
+        RequestHeaders::None
+      } else if execution_headers.is_callable(py) {
+        RequestHeaders::Dynamic {
+          callback: Arc::new(Mutex::new(execution_headers)),
+        }
+      } else {
+        let key_value_vec = execution_headers.extract::<Vec<(String, String)>>(py)?;
+        let mut headers = BTreeMap::new();
+        for (key, value) in key_value_vec.into_iter() {
+          headers.insert(key, value);
+        }
+        RequestHeaders::Static { headers }
+      }
+    };
+
     Self::create_instance(py,
       RemotingOptions {
         execution_enable,
@@ -520,14 +540,13 @@ py_class!(class PyRemotingOptions |py| {
         execution_process_cache_namespace,
         instance_name,
         root_ca_certs_path: root_ca_certs_path.map(PathBuf::from),
-        oauth_bearer_token_path: oauth_bearer_token_path.map(PathBuf::from),
         store_thread_count: store_thread_count as usize,
         store_chunk_bytes: store_chunk_bytes as usize,
         store_chunk_upload_timeout: Duration::from_secs(store_chunk_upload_timeout),
         store_rpc_retries: store_rpc_retries as usize,
         store_connection_limit: store_connection_limit as usize,
         execution_extra_platform_properties,
-        execution_headers: execution_headers.into_iter().collect(),
+        execution_headers: execution_headers_native,
         execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
       }
     )

@@ -107,11 +107,13 @@ dependencies = [
  "build_utils 0.0.1",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "copy_dir 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cpython 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "dir-diff 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "grpcio 0.5.1 (git+https://github.com/pantsbuild/grpc-rs.git?rev=ed3afa3c24ddf1fdd86826e836f57c00757dfc00)",
  "grpcio-compiler 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
+ "parking_lot 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost-derive 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost-types 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -627,6 +629,7 @@ version = "0.0.1"
 dependencies = [
  "async-trait 0.1.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "async_semaphore 0.0.1",
+ "bazel_protos 0.0.1",
  "boxfuture 0.0.1",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "concrete_time 0.0.1",
@@ -763,6 +766,7 @@ dependencies = [
 name = "fs_util"
 version = "0.0.1"
 dependencies = [
+ "bazel_protos 0.0.1",
  "boxfuture 0.0.1",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1955,6 +1959,7 @@ dependencies = [
 name = "process_executor"
 version = "0.0.1"
 dependencies = [
+ "bazel_protos 0.0.1",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",

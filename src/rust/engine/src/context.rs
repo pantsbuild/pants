@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::convert::{Into, TryInto};
 use std::future::Future;
 use std::io::Read;
@@ -17,6 +17,7 @@ use crate::scheduler::Session;
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
+use bazel_protos::RequestHeaders;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
@@ -76,14 +77,13 @@ pub struct RemotingOptions {
   pub execution_process_cache_namespace: Option<String>,
   pub instance_name: Option<String>,
   pub root_ca_certs_path: Option<PathBuf>,
-  pub oauth_bearer_token_path: Option<PathBuf>,
   pub store_thread_count: usize,
   pub store_chunk_bytes: usize,
   pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
   pub store_connection_limit: usize,
   pub execution_extra_platform_properties: Vec<(String, String)>,
-  pub execution_headers: BTreeMap<String, String>,
+  pub execution_headers: RequestHeaders,
   pub execution_overall_deadline: Duration,
 }
 
@@ -128,38 +128,23 @@ impl Core {
       None
     };
 
-    // We re-use this token for both the execution and store service; they're generally tied together.
-    let oauth_bearer_token = if let Some(ref path) = remoting_opts.oauth_bearer_token_path {
-      Some(
-        std::fs::read_to_string(path)
-          .map_err(|err| format!("Error reading OAuth bearer token file {:?}: {}", path, err))
-          .map(|v| v.trim_matches(|c| c == '\r' || c == '\n').to_owned())
-          .and_then(|v| {
-            if v.find(|c| c == '\r' || c == '\n').is_some() {
-              Err("OAuth bearer token file must not contain multiple lines".to_string())
-            } else {
-              Ok(v)
-            }
-          })?,
-      )
-    } else {
-      None
-    };
-
     let local_store_dir2 = local_store_dir.clone();
+    let local_only_execution = !remoting_opts.execution_enable || remote_store_servers.is_empty();
+    let instance_name = remoting_opts.instance_name.clone();
+    let execution_headers = remoting_opts.execution_headers.clone();
     let store = safe_create_dir_all_ioerror(&local_store_dir)
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
       .and_then(|_| {
-        if !remoting_opts.execution_enable || remote_store_servers.is_empty() {
+        if local_only_execution {
           Store::local_only(executor.clone(), local_store_dir)
         } else {
           Store::with_remote(
             executor.clone(),
             local_store_dir,
             remote_store_servers,
-            remoting_opts.instance_name.clone(),
+            instance_name,
             root_ca_certs.clone(),
-            oauth_bearer_token.clone(),
+            execution_headers,
             remoting_opts.store_thread_count,
             remoting_opts.store_chunk_bytes,
             remoting_opts.store_chunk_upload_timeout,
@@ -205,6 +190,8 @@ impl Core {
         exec_strategy_opts.local_parallelism,
       ));
 
+    let headers = remoting_opts.execution_headers.clone();
+
     if remoting_opts.execution_enable {
       let remote_command_runner: Box<dyn process_execution::CommandRunner> = {
         let command_runner: Box<dyn CommandRunner> = {
@@ -216,8 +203,7 @@ impl Core {
             remoting_opts.store_servers.clone(),
             process_execution_metadata.clone(),
             root_ca_certs,
-            oauth_bearer_token,
-            remoting_opts.execution_headers,
+            headers,
             store.clone(),
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.

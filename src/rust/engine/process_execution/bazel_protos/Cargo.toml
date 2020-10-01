@@ -7,10 +7,12 @@ publish = false
 
 [dependencies]
 bytes = "0.4.5"
+cpython = "0.5"
 futures = "^0.1.16"
 # TODO: This is 0.5.1 + https://github.com/tikv/grpc-rs/pull/457 + a workaround for https://github.com/rust-lang/cargo/issues/8258
 grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "ed3afa3c24ddf1fdd86826e836f57c00757dfc00", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../../hashing" }
+parking_lot = "0.11"
 prost = "0.4"
 prost-derive = "0.4"
 prost-types = "0.4"

@@ -1,11 +1,11 @@
 use std::cmp::min;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
-use bazel_protos::{self, call_option};
+use bazel_protos::{self, call_option, RequestHeaders};
 use bytes::{Bytes, BytesMut};
 use futures::compat::{Future01CompatExt, Sink01CompatExt};
 use futures::future::{FutureExt, TryFutureExt};
@@ -26,7 +26,7 @@ pub struct ByteStore {
   rpc_attempts: usize,
   env: Arc<grpcio::Environment>,
   serverset: Serverset<grpcio::Channel>,
-  headers: BTreeMap<String, String>,
+  headers: RequestHeaders,
 }
 
 impl fmt::Debug for ByteStore {
@@ -40,7 +40,7 @@ impl ByteStore {
     cas_addresses: Vec<String>,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
-    oauth_bearer_token: Option<String>,
+    request_headers: RequestHeaders,
     thread_count: usize,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
@@ -72,15 +72,7 @@ impl ByteStore {
       rpc_attempts: rpc_retries + 1,
       env,
       serverset,
-      headers: oauth_bearer_token
-        .iter()
-        .map(|t| {
-          (
-            String::from("authorization"),
-            format!("Bearer {}", t.trim()),
-          )
-        })
-        .collect(),
+      headers: request_headers,
     })
   }
 

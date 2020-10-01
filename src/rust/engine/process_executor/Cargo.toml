@@ -6,6 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+bazel_protos = { path = "../process_execution/bazel_protos" }
 clap = "2"
 dirs = "1"
 env_logger = "0.5.4"

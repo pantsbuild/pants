@@ -35,6 +35,7 @@ use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
+use bazel_protos::RequestHeaders;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
@@ -49,6 +50,7 @@ use parking_lot::Mutex;
 use protobuf::Message;
 use rand::seq::SliceRandom;
 use serde_derive::Serialize;
+use std::collections::BTreeMap;
 use store::{
   Snapshot, SnapshotOps, SnapshotOpsError, Store, StoreFileByDigest, SubsetParams, UploadSummary,
 };
@@ -306,6 +308,15 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             None
           };
 
+        let headers = match oauth_bearer_token {
+          Some(token) => {
+            let mut headers = BTreeMap::new();
+            headers.insert("authorization".to_string(), format!("Bearer {}", token));
+            RequestHeaders::Static { headers }
+          }
+          None => RequestHeaders::None,
+        };
+
         // Randomize CAS address order to avoid thundering herds from common config.
         let mut cas_addresses = cas_address.map(str::to_owned).collect::<Vec<_>>();
         cas_addresses.shuffle(&mut rand::thread_rng());
@@ -319,7 +330,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .value_of("remote-instance-name")
               .map(str::to_owned),
             root_ca_certs,
-            oauth_bearer_token,
+            headers,
             value_t!(top_match.value_of("thread-count"), usize).expect("Invalid thread count"),
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures

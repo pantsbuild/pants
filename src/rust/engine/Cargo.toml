@@ -95,6 +95,7 @@ default = []
 [dependencies]
 async_semaphore = { path = "async_semaphore" }
 async-trait = "0.1"
+bazel_protos = { path = "process_execution/bazel_protos" }
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }

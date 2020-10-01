@@ -38,7 +38,7 @@ mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SnapshotOpsError, StoreWrapper, SubsetParams};
 
 use async_trait::async_trait;
-use bazel_protos::remote_execution as remexec;
+use bazel_protos::{remote_execution as remexec, RequestHeaders};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use concrete_time::TimeSpan;
@@ -256,7 +256,7 @@ impl Store {
     cas_addresses: Vec<String>,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
-    oauth_bearer_token: Option<String>,
+    request_headers: RequestHeaders,
     thread_count: usize,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
@@ -270,7 +270,7 @@ impl Store {
         cas_addresses,
         instance_name,
         root_ca_certs,
-        oauth_bearer_token,
+        request_headers,
         thread_count,
         chunk_size_bytes,
         upload_timeout,

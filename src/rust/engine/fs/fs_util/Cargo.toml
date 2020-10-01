@@ -6,6 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+bazel_protos = { path = "../../process_execution/bazel_protos" }
 boxfuture = { path = "../../boxfuture" }
 bytes = "0.4.5"
 clap = "2"

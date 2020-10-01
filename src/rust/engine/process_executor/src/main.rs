@@ -35,6 +35,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 
+use bazel_protos::RequestHeaders;
 use clap::{value_t, App, AppSettings, Arg};
 use fs::RelativePath;
 use futures::compat::Future01CompatExt;
@@ -291,7 +292,7 @@ async fn main() {
   } else {
     BTreeSet::new()
   };
-  let headers = args
+  let mut headers = args
     .values_of("headers")
     .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
     .unwrap_or_default();
@@ -310,11 +311,10 @@ async fn main() {
         None
       };
 
-      let oauth_bearer_token = if let Some(path) = args.value_of("cas-oauth-bearer-token-path") {
-        Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
-      } else {
-        None
-      };
+      if let Some(path) = args.value_of("cas-oauth-bearer-token-path") {
+        let token = std::fs::read_to_string(path).expect("Error reading oauth bearer token file");
+        headers.insert("authorization".to_string(), format!("Bearer {}", token));
+      }
 
       Store::with_remote(
         executor.clone(),
@@ -322,7 +322,7 @@ async fn main() {
         vec![cas_server.to_owned()],
         remote_instance_arg.clone(),
         root_ca_certs,
-        oauth_bearer_token,
+        RequestHeaders::Static { headers },
         1,
         chunk_size,
         Duration::from_secs(30),
@@ -391,6 +391,15 @@ async fn main() {
           None
         };
 
+      let headers = match oauth_bearer_token {
+        Some(token) => {
+          let mut headers = BTreeMap::new();
+          headers.insert("authorization".to_string(), format!("Bearer {}", token));
+          RequestHeaders::Static { headers }
+        }
+        None => RequestHeaders::None,
+      };
+
       let command_runner_box: Box<dyn process_execution::CommandRunner> = {
         Box::new(
           process_execution::remote::CommandRunner::new(
@@ -402,7 +411,6 @@ async fn main() {
               platform_properties,
             },
             root_ca_certs,
-            oauth_bearer_token,
             headers,
             store.clone(),
             Platform::Linux,

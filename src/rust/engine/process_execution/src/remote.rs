@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -7,12 +7,12 @@ use std::time::SystemTime;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use bazel_protos::call_option;
 use bazel_protos::error_details::PreconditionFailure;
 use bazel_protos::remote_execution::{
   Action, Command, ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, WaitExecutionRequest,
 };
 use bazel_protos::status::Status;
+use bazel_protos::{call_option, RequestHeaders};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use concrete_time::TimeSpan;
@@ -83,7 +83,7 @@ pub struct CommandRunner {
   metadata: ProcessMetadata,
   platform: Platform,
   store: Store,
-  headers: BTreeMap<String, String>,
+  headers: RequestHeaders,
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
@@ -106,8 +106,7 @@ impl CommandRunner {
     store_servers: Vec<String>,
     metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
-    oauth_bearer_token: Option<String>,
-    headers: BTreeMap<String, String>,
+    headers: RequestHeaders,
     store: Store,
     platform: Platform,
     overall_deadline: Duration,
@@ -146,17 +145,6 @@ impl CommandRunner {
     let action_cache_client = Arc::new(
       bazel_protos::remote_execution_grpc::ActionCacheClient::new(store_channel),
     );
-
-    let mut headers = headers;
-    if let Some(oauth_bearer_token) = oauth_bearer_token {
-      headers.insert(
-        String::from("authorization"),
-        format!("Bearer {}", oauth_bearer_token.trim()),
-      );
-    }
-
-    // Validate any configured static headers.
-    call_option(&headers, None)?;
 
     let capabilities_client =
       Arc::new(bazel_protos::remote_execution_grpc::CapabilitiesClient::new(channel.clone()));

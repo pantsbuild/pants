@@ -17,7 +17,7 @@ mod conversions;
 mod conversions_tests;
 
 mod metadata;
-pub use metadata::call_option;
+pub use metadata::{call_option, RequestHeaders};
 
 mod verification;
 pub use crate::verification::verify_directory_canonical;
