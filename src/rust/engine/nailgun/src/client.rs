@@ -39,6 +39,12 @@ use futures::channel::{mpsc, oneshot};
 use futures::{future, FutureExt, SinkExt, Stream, StreamExt};
 use log::debug;
 
+pub enum NailgunClientError {
+  PreConnect(String),
+  PostConnect(String),
+  ExplicitQuit,
+}
+
 async fn handle_client_output(
   mut stdio_read: impl Stream<Item = ChildOutput> + Unpin,
 ) -> Result<(), io::Error> {
@@ -78,10 +84,11 @@ async fn client_execute_helper(
   command: String,
   args: Vec<String>,
   env: Vec<(String, String)>,
-) -> Result<i32, String> {
+) -> Result<i32, NailgunClientError> {
   use nails::execution::{child_channel, Command};
 
-  let working_dir = std::env::current_dir().map_err(|e| e.to_string())?;
+  let working_dir =
+    std::env::current_dir().map_err(|e| NailgunClientError::PreConnect(e.to_string()))?;
 
   let config = Config::default();
   let command = Command {
@@ -100,18 +107,26 @@ async fn client_execute_helper(
   let localhost = Ipv4Addr::new(127, 0, 0, 1);
   let addr = (localhost, port);
 
-  let socket = TcpStream::connect(addr)
-    .await
-    .map_err(|err| format!("Nailgun client error connecting to localhost: {}", err))?;
+  let socket = TcpStream::connect(addr).await.map_err(|err| {
+    NailgunClientError::PreConnect(format!(
+      "Nailgun client error connecting to localhost: {}",
+      err
+    ))
+  })?;
+
   let exit_code: ExitCode =
     nails::client_handle_connection(config, socket, command, stdio_write, stdin_read)
       .await
-      .map_err(|err| format!("Nailgun client error: {}", err))?;
+      .map_err(|err| NailgunClientError::PostConnect(format!("Nailgun client error: {}", err)))?;
 
   let () = output_handler
     .await
-    .map_err(|join_error| format!("Error joining nailgun client task: {}", join_error))?
-    .map_err(|err| format!("Nailgun client output error: {}", err))?;
+    .map_err(|join_error| {
+      NailgunClientError::PostConnect(format!("Error joining nailgun client task: {}", join_error))
+    })?
+    .map_err(|err| {
+      NailgunClientError::PostConnect(format!("Nailgun client output error: {}", err))
+    })?;
 
   Ok(exit_code.0)
 }
@@ -122,7 +137,7 @@ pub async fn client_execute(
   args: Vec<String>,
   env: Vec<(String, String)>,
   exit_receiver: oneshot::Receiver<()>,
-) -> Result<i32, String> {
+) -> Result<i32, NailgunClientError> {
   use future::Either;
 
   let execution_future = client_execute_helper(port, command, args, env).boxed();
@@ -132,8 +147,6 @@ pub async fn client_execute(
       debug!("Nailgun client future finished");
       execution_result
     }
-    Either::Right((_exited, _execution_result_future)) => {
-      Err("Exiting nailgun client future via explicit quit message".to_string())
-    }
+    Either::Right((_exited, _execution_result_future)) => Err(NailgunClientError::ExplicitQuit),
   }
 }

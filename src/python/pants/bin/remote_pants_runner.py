@@ -107,6 +107,7 @@ class RemotePantsRunner:
 
         pantsd_handle = self._client.maybe_launch()
         logger.debug(f"Connecting to pantsd on port {pantsd_handle.port}")
+
         return self._connect_and_execute(pantsd_handle)
 
     def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
@@ -136,7 +137,23 @@ class RemotePantsRunner:
         rust_nailgun_client = native.new_nailgun_client(port=port)
         pantsd_signal_handler = PailgunClientSignalHandler(pid=pid)
 
-        with ExceptionSink.trapped_signals(pantsd_signal_handler), STTYSettings.preserved():
-            return cast(
-                ExitCode, rust_nailgun_client.execute(signal_fn, command, args, modified_env)
-            )
+        retries = 3
+        attempt = 1
+        while True:
+            logger.debug(f"Connecting to pantsd on port {port} attempt {attempt}/{retries}")
+
+            with ExceptionSink.trapped_signals(pantsd_signal_handler), STTYSettings.preserved():
+                try:
+                    output = rust_nailgun_client.execute(signal_fn, command, args, modified_env)
+                    return cast(ExitCode, output)
+
+                # NailgunConnectionException represents a failure connecting to pantsd, so we retry
+                # up to the retry limit.
+                except native.lib.NailgunConnectionException as e:
+                    if attempt > retries:
+                        raise self.Fallback(e)
+
+                    # Wait one second before retrying
+                    logger.warning(f"Pantsd was unresponsive on port {port}, retrying.")
+                    time.sleep(1)
+                    attempt += 1

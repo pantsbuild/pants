@@ -34,6 +34,6 @@ mod tests;
 mod client;
 mod server;
 
-pub use client::client_execute;
+pub use client::{client_execute, NailgunClientError};
 pub use nails::execution::ExitCode;
 pub use server::{RawFdExecution, Server};

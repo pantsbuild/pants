@@ -79,10 +79,23 @@ use crate::{
 };
 
 py_exception!(native_engine, PollTimeout);
+py_exception!(native_engine, NailgunConnectionException);
+py_exception!(native_engine, NailgunClientException);
 
 py_module_initializer!(native_engine, |py, m| {
   m.add(py, "PollTimeout", py.get_type::<PollTimeout>())
     .unwrap();
+
+  m.add(
+    py,
+    "NailgunClientException",
+    py.get_type::<NailgunClientException>(),
+  )?;
+  m.add(
+    py,
+    "NailgunConnectionException",
+    py.get_type::<NailgunConnectionException>(),
+  )?;
 
   m.add(py, "default_cache_path", py_fn!(py, default_cache_path()))?;
 
@@ -584,6 +597,7 @@ py_class!(class PyNailgunClient |py| {
   data port: u16;
 
   def execute(&self, py_signal_fn: PyObject, command: String, args: Vec<String>, env: PyDict) -> CPyResult<PyInt> {
+    use nailgun::NailgunClientError;
 
     let env_list: Vec<(String, String)> = env
     .items(py)
@@ -608,7 +622,7 @@ py_class!(class PyNailgunClient |py| {
       recv_task_shutdown_request,
     );
 
-    let exit_code: Result<i32, String> = with_executor(py, executor_ptr, |executor| {
+    let exit_code: Result<i32, PyErr> = with_executor(py, executor_ptr, |executor| {
         let (sender, receiver) = mpsc::channel();
 
         let _spawned_fut = executor.spawn(async move {
@@ -620,16 +634,27 @@ py_class!(class PyNailgunClient |py| {
         let output = loop {
           let event = receiver.recv_timeout(timeout);
           if let Some(_termination) = maybe_break_execution_loop(&python_signal_fn) {
-            break Err("Quitting because of explicit interrupt".to_string());
+            let err_str = "Quitting because of explicit user interrupt";
+            break Err(PyErr::new::<NailgunClientException, _>(py, (err_str,)))
           }
 
           match event {
-            Ok(res) => break res.map_err(|e| format!("Nailgun client error: {:?}", e)),
+            Ok(res) => break res.map_err(|e| match e {
+              NailgunClientError::PreConnect(err_str) => PyErr::new::<NailgunConnectionException, _>(py, (err_str,)),
+              NailgunClientError::PostConnect(s) => {
+                let err_str = format!("Nailgun client error: {:?}", s);
+                PyErr::new::<NailgunClientException, _>(py, (err_str,))
+              },
+              NailgunClientError::ExplicitQuit => {
+                PyErr::new::<NailgunClientException, _>(py, ("Explicit quit",))
+              }
+            }),
             Err(RecvTimeoutError::Timeout) => {
               continue;
             }
             Err(RecvTimeoutError::Disconnected) => {
-              break Err("Disconnected from Nailgun client task".to_string());
+              let err_str = "Disconnected from Nailgun client task".to_string();
+              break Err(PyErr::new::<NailgunClientException, _>(py, (err_str,)))
             }
           }
         };
@@ -643,12 +668,7 @@ py_class!(class PyNailgunClient |py| {
         output
     });
 
-    match exit_code {
-      Ok(code) => Ok(code.to_py_object(py)),
-      Err(err_str) => {
-        Err(PyErr::new::<exc::Exception, _>(py, (err_str,)))
-      }
-    }
+    exit_code.map(|code| code.to_py_object(py))
   }
 });
 
