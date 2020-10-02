@@ -226,8 +226,8 @@ class ArchivePackages(StringSequenceField):
     """Addresses to any targets that can be built with `./pants package`.
 
     Pants will build the assets as if you had run `./pants package`. It will include the
-    results in your archive using the same name they would normally have, but without the `dist/`
-    prefix.
+    results in your archive using the same name they would normally have, but without the
+    `--distdir` prefix (e.g. `dist/`).
 
     You can include anything that can be built by `./pants package`, e.g. a `python_binary`,
     `python_awslambda`, or even another `archive`.
@@ -254,10 +254,7 @@ class ArchiveFiles(StringSequenceField):
 
 
 class ArchiveFormatField(StringField):
-    """The type of archive file to be generated.
-
-    Note that `zip` files will not be compressed.
-    """
+    """The type of archive file to be generated."""
 
     alias = "format"
     valid_choices = ArchiveFormat

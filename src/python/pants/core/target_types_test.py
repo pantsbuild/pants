@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os.path
 import tarfile
 import zipfile
 from io import BytesIO
@@ -228,11 +227,10 @@ def test_archive() -> None:
     assert_archive1_is_valid(archive1.content)
 
     archive2 = get_archive("archive2")
-    # For some reason, writing the result to BytesIO, then passing via `fileobj` to
-    # `tarfile.open()` does not work properly, even if calling `.flush()` before. So we write to
-    # disk.
-    rule_runner.create_file(archive2.path, archive2.content, mode="wb")
-    with tarfile.open(os.path.join(rule_runner.build_root, archive2.path), mode="r:") as tf:
+    io = BytesIO()
+    io.write(archive2)
+    io.seek(0)
+    with tarfile.open(fileobj=io, mode="r:") as tf:
         assert set(tf.getnames()) == {"data/d1.json", "data/d2.json", "archive1.zip"}
 
         def get_file(fp: str) -> bytes:

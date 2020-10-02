@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 import tarfile
 import zipfile
 from io import BytesIO
@@ -103,14 +102,11 @@ def test_create_tar_archive(rule_runner: RuleRunner, format: ArchiveFormat) -> N
 
     digest_contents = rule_runner.request(DigestContents, [created_digest])
     assert len(digest_contents) == 1
-    # For some reason, writing the result to BytesIO, then passing via `fileobj` to
-    # `tarfile.open()` does not work properly, even if calling `.flush()` before. So we write to
-    # disk.
-    rule_runner.create_file(output_filename, digest_contents[0].content, mode="wb")
-    compression = "" if format == ArchiveFormat.TAR else f"{format.value[1:]}"  # Strip the `t`.
-    with tarfile.open(
-        os.path.join(rule_runner.build_root, output_filename), mode=f"r:{compression}"
-    ) as tf:
+    io = BytesIO()
+    io.write(digest_contents[0].content)
+    io.seek(0)
+    compression = "" if format == ArchiveFormat.TAR else f"{format.value[4:]}"  # Strip `tar.`.
+    with tarfile.open(fileobj=io, mode=f"r:{compression}") as tf:
         print(tf.getmembers())
         assert set(tf.getnames()) == set(FILES.keys())
 

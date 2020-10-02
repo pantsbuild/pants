@@ -23,9 +23,9 @@ from pants.util.logging import LogLevel
 # Note that updating this will impact the `archive` target defined in `core/target_types.py`.
 class ArchiveFormat(Enum):
     TAR = "tar"
-    TGZ = "tgz"
-    TBZ2 = "tbz2"
-    TXZ = "txz"
+    TGZ = "tar.gz"
+    TBZ2 = "tar.bz2"
+    TXZ = "tar.xz"
     ZIP = "zip"
 
 

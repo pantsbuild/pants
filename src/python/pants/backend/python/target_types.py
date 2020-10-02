@@ -274,8 +274,8 @@ class PythonRuntimePackageDependencies(StringSequenceField):
     assets should be included in the test run.
 
     Pants will build the assets as if you had run `./pants package`. It will include the
-    results in your archive using the same name they would normally have, but without the `dist/`
-    prefix.
+    results in your archive using the same name they would normally have, but without the
+    `--distdir` prefix (e.g. `dist/`).
 
     You can include anything that can be built by `./pants package`, e.g. a `python_binary`,
     `python_awslambda`, or even another `archive`.
