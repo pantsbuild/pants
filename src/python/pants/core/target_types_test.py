@@ -228,7 +228,7 @@ def test_archive() -> None:
 
     archive2 = get_archive("archive2")
     io = BytesIO()
-    io.write(archive2)
+    io.write(archive2.content)
     io.seek(0)
     with tarfile.open(fileobj=io, mode="r:") as tf:
         assert set(tf.getnames()) == {"data/d1.json", "data/d2.json", "archive1.zip"}
