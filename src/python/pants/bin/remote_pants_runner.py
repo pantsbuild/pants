@@ -13,11 +13,9 @@ import psutil
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import ExitCode
 from pants.engine.internals.native import Native
-from pants.nailgun.nailgun_client import NailgunClient
 from pants.nailgun.nailgun_protocol import NailgunProtocol
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
-from pants.util.dirutil import maybe_read_file
 
 logger = logging.getLogger(__name__)
 
@@ -85,11 +83,6 @@ class RemotePantsRunner:
     class Terminated(Exception):
         """Raised when an active run is terminated mid-flight."""
 
-    RECOVERABLE_EXCEPTIONS = (
-        NailgunClient.NailgunConnectionError,
-        NailgunClient.NailgunExecutionError,
-    )
-
     def __init__(
         self,
         args: List[str],
@@ -108,49 +101,12 @@ class RemotePantsRunner:
         self._bootstrap_options = options_bootstrapper.bootstrap_options
         self._client = PantsDaemonClient(self._bootstrap_options)
 
-    @staticmethod
-    def _backoff(attempt):
-        """Minimal backoff strategy for daemon restarts."""
-        time.sleep(attempt + (attempt - 1))
-
     def run(self) -> ExitCode:
         """Runs pants remotely with retry and recovery for nascent executions."""
 
         pantsd_handle = self._client.maybe_launch()
-        retries = 3
-
-        attempt = 1
-        while True:
-            logger.debug(
-                "connecting to pantsd on port {} (attempt {}/{})".format(
-                    pantsd_handle.port, attempt, retries
-                )
-            )
-            try:
-                return self._connect_and_execute(pantsd_handle)
-            except self.RECOVERABLE_EXCEPTIONS as e:
-                if attempt > retries:
-                    raise self.Fallback(e)
-
-                self._backoff(attempt)
-                logger.warning(
-                    "pantsd was unresponsive on port {}, retrying ({}/{})".format(
-                        pantsd_handle.port, attempt, retries
-                    )
-                )
-
-                # One possible cause of the daemon being non-responsive during an attempt might be if a
-                # another lifecycle operation is happening concurrently (incl teardown). To account for
-                # this, we won't begin attempting restarts until at least 1 second has passed (1 attempt).
-                if attempt > 1:
-                    pantsd_handle = self._client.restart()
-                attempt += 1
-            except NailgunClient.NailgunError as e:
-                # Ensure a newline.
-                logger.critical("")
-                logger.critical("lost active connection to pantsd!")
-                traceback = sys.exc_info()[2]
-                raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(traceback)
+        logger.debug(f"Connecting to pantsd on port {pantsd_handle.port}")
+        return self._connect_and_execute(pantsd_handle)
 
     def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
         native = Native()
@@ -181,28 +137,3 @@ class RemotePantsRunner:
 
         with ExceptionSink.trapped_signals(pantsd_signal_handler), STTYSettings.preserved():
             return cast(int, rust_nailgun_client.execute(signal_fn, command, args, modified_env))
-
-    def _extract_remote_exception(self, pantsd_pid, nailgun_error):
-        """Given a NailgunError, returns a Terminated exception with additional info (where
-        possible).
-
-        This method will include the entire exception log for either the `pid` in the NailgunError,
-        or failing that, the `pid` of the pantsd instance.
-        """
-        sources = [pantsd_pid]
-
-        exception_text = None
-        for source in sources:
-            log_path = ExceptionSink.exceptions_log_path(for_pid=source)
-            exception_text = maybe_read_file(log_path)
-            if exception_text:
-                break
-
-        exception_suffix = (
-            "\nRemote exception:\n{}".format(exception_text) if exception_text else ""
-        )
-        return self.Terminated(
-            "abruptly lost active connection to pantsd runner: {!r}{}".format(
-                nailgun_error, exception_suffix
-            )
-        )
