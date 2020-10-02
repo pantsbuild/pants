@@ -1,8 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
-import os
 from dataclasses import dataclass
 
 from pants.backend.awslambda.common.rules import AWSLambdaFieldSet, CreatedAWSLambda
@@ -25,15 +23,13 @@ from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -42,6 +38,7 @@ class PythonAwsLambdaFieldSet(PackageFieldSet, AWSLambdaFieldSet):
 
     handler: PythonAwsLambdaHandler
     runtime: PythonAwsLambdaRuntime
+    output_path: OutputPathField
 
 
 @dataclass(frozen=True)
@@ -53,21 +50,13 @@ class LambdexSetup:
 async def create_python_awslambda(
     field_set: PythonAwsLambdaFieldSet, lambdex_setup: LambdexSetup, global_options: GlobalOptions
 ) -> CreatedAWSLambda:
-    # Lambdas typically use the .zip suffix, so we use that instead of .pex.
-    disambiguated_pex_filename = os.path.join(
-        field_set.address.spec_path.replace(os.sep, "."), f"{field_set.address.target_name}.zip"
+    output_filename = field_set.output_path.value_or_default(
+        field_set.address,
+        # Lambdas typically use the .zip suffix, so we use that instead of .pex.
+        file_ending="zip",
+        use_legacy_format=global_options.options.pants_distdir_legacy_paths,
     )
-    if global_options.options.pants_distdir_legacy_paths:
-        pex_filename = f"{field_set.address.target_name}.zip"
-        logger.warning(
-            f"Writing to the legacy subpath: {pex_filename}, which may not be unique. An "
-            f"upcoming version of Pants will switch to writing to the fully-qualified subpath: "
-            f"{disambiguated_pex_filename}. You can effect that switch now (and silence this "
-            f"warning) by setting `pants_distdir_legacy_paths = false` in the [GLOBAL] section of "
-            f"pants.toml."
-        )
-    else:
-        pex_filename = disambiguated_pex_filename
+
     # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.
     # (Running the "hello world" lambda in the example code will report the platform, and can be
     # used to verify correctness of these platform strings.)
@@ -83,7 +72,7 @@ async def create_python_awslambda(
             addresses=[field_set.address],
             internal_only=False,
             entry_point=None,
-            output_filename=pex_filename,
+            output_filename=output_filename,
             platforms=PexPlatforms([platform]),
             additional_args=[
                 # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
@@ -105,15 +94,15 @@ async def create_python_awslambda(
         ProcessResult,
         PexProcess(
             lambdex_setup.requirements_pex,
-            argv=("build", "-e", field_set.handler.value, pex_filename),
+            argv=("build", "-e", field_set.handler.value, output_filename),
             input_digest=input_digest,
-            output_files=(pex_filename,),
-            description=f"Setting up handler in {pex_filename}",
+            output_files=(output_filename,),
+            description=f"Setting up handler in {output_filename}",
         ),
     )
     return CreatedAWSLambda(
         digest=result.output_digest,
-        zip_file_relpath=pex_filename,
+        zip_file_relpath=output_filename,
         runtime=field_set.runtime.value,
         # The AWS-facing handler function is always lambdex_handler.handler, which is the wrapper
         # injected by lambdex that manages invocation of the actual handler.

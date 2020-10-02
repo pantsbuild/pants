@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 import os
 from dataclasses import dataclass
 from typing import Tuple
@@ -24,7 +23,7 @@ from pants.backend.python.util_rules.pex_from_targets import (
     TwoStepPexFromTargetsRequest,
 )
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, collect_rules, rule
@@ -34,8 +33,6 @@ from pants.option.global_options import FilesNotFoundBehavior, GlobalOptions
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
-logger = logging.getLogger(__name__)
-
 
 @dataclass(frozen=True)
 class PythonBinaryFieldSet(PackageFieldSet, BinaryFieldSet, RunFieldSet):
@@ -44,6 +41,7 @@ class PythonBinaryFieldSet(PackageFieldSet, BinaryFieldSet, RunFieldSet):
     sources: PythonBinarySources
     entry_point: PythonEntryPoint
 
+    output_path: OutputPathField
     always_write_cache: PexAlwaysWriteCache
     emit_warnings: PexEmitWarnings
     ignore_errors: PexIgnoreErrors
@@ -98,20 +96,11 @@ async def package_python_binary(
             os.path.relpath(entry_point_path, source_root.path)
         )
 
-    disambiguated_output_filename = os.path.join(
-        field_set.address.spec_path.replace(os.sep, "."), f"{field_set.address.target_name}.pex"
+    output_filename = field_set.output_path.value_or_default(
+        field_set.address,
+        file_ending="pex",
+        use_legacy_format=global_options.options.pants_distdir_legacy_paths,
     )
-    if global_options.options.pants_distdir_legacy_paths:
-        output_filename = f"{field_set.address.target_name}.pex"
-        logger.warning(
-            f"Writing to the legacy subpath: {output_filename}, which may not be unique. An "
-            f"upcoming version of Pants will switch to writing to the fully-qualified subpath: "
-            f"{disambiguated_output_filename}. You can effect that switch now (and silence this "
-            f"warning) by setting `pants_distdir_legacy_paths = false` in the [GLOBAL] section of "
-            f"pants.toml."
-        )
-    else:
-        output_filename = disambiguated_output_filename
     two_step_pex = await Get(
         TwoStepPex,
         TwoStepPexFromTargetsRequest(

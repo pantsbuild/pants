@@ -197,6 +197,7 @@ def test_archive() -> None:
                 packages=[":archive1"],
                 files=["resources:relocated_files"],
                 format="tar",
+                output_path="output/archive2.tar",
             )
             """
         ),
@@ -227,6 +228,7 @@ def test_archive() -> None:
     assert_archive1_is_valid(archive1.content)
 
     archive2 = get_archive("archive2")
+    assert archive2.path == "output/archive2.tar"
     io = BytesIO()
     io.write(archive2.content)
     io.seek(0)
