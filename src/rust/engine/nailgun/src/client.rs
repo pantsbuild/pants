@@ -33,7 +33,6 @@ use tokio::net::TcpStream;
 
 use std::io;
 use std::net::Ipv4Addr;
-use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
 
 use futures::channel::{mpsc, oneshot};
@@ -82,12 +81,14 @@ async fn client_execute_helper(
 ) -> Result<i32, String> {
   use nails::execution::{child_channel, Command};
 
+  let working_dir = std::env::current_dir().map_err(|e| e.to_string())?;
+
   let config = Config::default();
   let command = Command {
     command,
     args,
     env,
-    working_dir: PathBuf::from("/dev/null"),
+    working_dir,
   };
 
   let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
