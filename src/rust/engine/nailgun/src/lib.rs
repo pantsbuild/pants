@@ -27,8 +27,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 #![type_length_limit = "2058438"]
-#![allow(dead_code)]
-#![allow(unused_variables)]
 
 #[cfg(test)]
 mod tests;
@@ -146,7 +144,7 @@ pub async fn client_execute(
       debug!("Nailgun client future finished");
       execution_result
     }
-    Either::Right((exited, execution_result_future)) => {
+    Either::Right((_exited, _execution_result_future)) => {
       Err("Exiting nailgun client future via explicit quit message".to_string())
     }
   }

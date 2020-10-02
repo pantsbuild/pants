@@ -635,9 +635,9 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=float,
             default=5.0,
-            deprecation_start_version="",
-            help='["DEPRECATED: the pailgun client has been rewritten to no longer use this"].'
-            "The length of time (in seconds) to wait for further output after sending a "
+            removal_version="2.1.0.dev0",
+            removal_hint="The pailgun client has been rewritten to no longer use this",
+            help="The length of time (in seconds) to wait for further output after sending a "
             "signal to the remote pantsd process before killing it.",
         )
         register(

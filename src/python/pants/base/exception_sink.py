@@ -59,15 +59,14 @@ class SignalHandler:
             with self._ignore_sigint_lock:
                 self._ignoring_sigint = toggle
 
-    def _send_signal_to_children(self, _received_signal: int) -> None:
+    def _send_signal_to_children(self, received_signal: int) -> None:
         self_process = psutil.Process()
         children = self_process.children()
-        logger.warning(f"Sending SIGINT to child processes: {children}")
+        logger.debug(f"Sending signal number {received_signal} to child processes: {children}")
         for child_process in children:
-            child_process.send_signal(signal.SIGINT)
+            child_process.send_signal(received_signal)
 
     def handle_sigint(self, signum: int, _frame):
-        logger.warning("Calling handle_sigint in pantsd")
         ExceptionSink._signal_sent = signum
         self._send_signal_to_children(signum)
         raise KeyboardInterrupt("User interrupted execution with control-c!")

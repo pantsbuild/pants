@@ -58,20 +58,20 @@ class PailgunClientSignalHandler(SignalHandler):
         self.pid = pid
         super().__init__(pantsd_instance=False)
 
-    def _forward_signal_with_timeout(self, signum, signame):
+    def _forward_signal(self, signum, signame):
         ExceptionSink._signal_sent = signum
         logger.info(f"Sending {signame} to pantsd with pid {self.pid}")
         pantsd_process = psutil.Process(pid=self.pid)
         pantsd_process.send_signal(signum)
 
     def handle_sigint(self, signum, _frame):
-        self._forward_signal_with_timeout(signum, "SIGINT")
+        self._forward_signal(signum, "SIGINT")
 
     def handle_sigquit(self, signum, _frame):
-        self._forward_signal_with_timeout(signum, "SIGQUIT")
+        self._forward_signal(signum, "SIGQUIT")
 
     def handle_sigterm(self, signum, _frame):
-        self._forward_signal_with_timeout(signum, "SIGTERM")
+        self._forward_signal(signum, "SIGTERM")
 
 
 class RemotePantsRunner:
@@ -102,7 +102,8 @@ class RemotePantsRunner:
         self._client = PantsDaemonClient(self._bootstrap_options)
 
     def run(self) -> ExitCode:
-        """Runs pants remotely with retry and recovery for nascent executions."""
+        """Starts up a pantsd instance if one is not already running, then connects to it via
+        nailgun."""
 
         pantsd_handle = self._client.maybe_launch()
         logger.debug(f"Connecting to pantsd on port {pantsd_handle.port}")
@@ -136,4 +137,6 @@ class RemotePantsRunner:
         pantsd_signal_handler = PailgunClientSignalHandler(pid=pid)
 
         with ExceptionSink.trapped_signals(pantsd_signal_handler), STTYSettings.preserved():
-            return cast(int, rust_nailgun_client.execute(signal_fn, command, args, modified_env))
+            return cast(
+                ExitCode, rust_nailgun_client.execute(signal_fn, command, args, modified_env)
+            )

@@ -33,8 +33,6 @@
   clippy::transmute_ptr_to_ptr,
   clippy::zero_ptr
 )]
-#![allow(dead_code)]
-#![allow(unused_variables)]
 
 ///
 /// This crate is a wrapper around the engine crate which exposes a python module via cpython.
@@ -585,18 +583,7 @@ py_class!(class PyNailgunClient |py| {
   data executor: PyExecutor;
   data port: u16;
 
-  def execute(&self, py_signal_fn: PyObject, command: PyString, args: PyList, env: PyDict) -> CPyResult<PyInt> {
-
-    let command: String = command.to_string(py)
-      .map(|s| s.into())?;
-
-    let args: Vec<String> = args
-      .iter(py)
-      .map(|arg: PyObject| arg.cast_into::<PyString>(py)
-        .map_err(|err| err.into())
-        .and_then(|s: PyString| s.to_string(py).map(|rust_str| rust_str.into_owned()))
-      )
-      .collect::<Result<Vec<_>, _>>()?;
+  def execute(&self, py_signal_fn: PyObject, command: String, args: Vec<String>, env: PyDict) -> CPyResult<PyInt> {
 
     let env_list: Vec<(String, String)> = env
     .items(py)
@@ -633,7 +620,7 @@ py_class!(class PyNailgunClient |py| {
         let output = loop {
           let event = receiver.recv_timeout(timeout);
           if let Some(_termination) = maybe_break_execution_loop(&python_signal_fn) {
-            break Err("Quitting becuase of explicit interrupt".to_string());
+            break Err("Quitting because of explicit interrupt".to_string());
           }
 
           match event {
