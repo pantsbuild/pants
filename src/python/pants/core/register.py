@@ -7,7 +7,7 @@ These are always activated and cannot be disabled.
 """
 
 from pants.core.goals import binary, fmt, lint, package, repl, run, test, typecheck
-from pants.core.target_types import Files, GenericTarget, RelocatedFiles, Resources
+from pants.core.target_types import ArchiveTarget, Files, GenericTarget, RelocatedFiles, Resources
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
     archive,
@@ -50,4 +50,4 @@ def rules():
 
 
 def target_types():
-    return [Files, GenericTarget, Resources, RelocatedFiles]
+    return [ArchiveTarget, Files, GenericTarget, Resources, RelocatedFiles]

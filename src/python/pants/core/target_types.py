@@ -1,14 +1,20 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
+from dataclasses import dataclass
 from typing import Tuple
 
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
 from pants.engine.addresses import AddressInput
-from pants.engine.fs import AddPrefix, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -148,7 +154,11 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
     # Unlike normal codegen, we operate the on the sources of the `files_targets` field, not the
     # `sources` of the original `relocated_sources` target.
     original_files_targets = await MultiGet(
-        Get(WrappedTarget, AddressInput, AddressInput.parse(v))
+        Get(
+            WrappedTarget,
+            AddressInput,
+            AddressInput.parse(v, relative_to=request.protocol_target.address.spec_path),
+        )
         for v in request.protocol_target.get(RelocatedFilesOriginalTargets).value
     )
     original_files_sources = await MultiGet(
@@ -206,5 +216,139 @@ class GenericTarget(Target):
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies)
 
 
+# -----------------------------------------------------------------------------------------------
+# `archive` target
+# -----------------------------------------------------------------------------------------------
+
+# TODO(#10888): Teach project introspection goals that this is a special type of the `Dependencies`
+#  field.
+class ArchivePackages(StringSequenceField):
+    """Addresses to any targets that can be built with `./pants package`.
+
+    Pants will build the assets as if you had run `./pants package`. It will include the
+    results in your archive using the same name they would normally have, but without the
+    `--distdir` prefix (e.g. `dist/`).
+
+    You can include anything that can be built by `./pants package`, e.g. a `python_binary`,
+    `python_awslambda`, or even another `archive`.
+    """
+
+    alias = "packages"
+
+
+# TODO(#10888): Teach project introspection goals that this is a special type of the `Dependencies`
+#  field.
+class ArchiveFiles(StringSequenceField):
+    """Addresses to any `files` or `relocated_files` targets to include in the archive, e.g.
+    `["resources:logo"]`.
+
+    This is useful to include any loose files, like data files, image assets, or config files.
+
+    This will ignore any targets that are not `files` or `relocated_files` targets. If you instead
+    want those files included in any packages specified in the `packages` field for this target,
+    then use a `resources` target and have the original package (e.g. the `python_library`)
+    depend on the resources.
+    """
+
+    alias = "files"
+
+
+class ArchiveFormatField(StringField):
+    """The type of archive file to be generated."""
+
+    alias = "format"
+    valid_choices = ArchiveFormat
+    required = True
+    value: str
+
+
+class ArchiveTarget(Target):
+    """An archive (e.g. zip file) containing loose files and/or packages built via `./pants
+    package`."""
+
+    alias = "archive"
+    core_fields = (*COMMON_TARGET_FIELDS, ArchivePackages, ArchiveFiles, ArchiveFormatField)
+
+
+@dataclass(frozen=True)
+class ArchiveFieldSet(PackageFieldSet):
+    required_fields = (ArchiveFormatField,)
+
+    packages: ArchivePackages
+    files: ArchiveFiles
+    format_field: ArchiveFormatField
+
+
+@rule(level=LogLevel.DEBUG)
+async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
+    package_targets = await MultiGet(
+        Get(
+            WrappedTarget,
+            AddressInput,
+            AddressInput.parse(v, relative_to=field_set.address.spec_path),
+        )
+        for v in field_set.packages.value or ()
+    )
+    package_field_sets_per_target = await Get(
+        FieldSetsPerTarget,
+        FieldSetsPerTargetRequest(
+            PackageFieldSet,
+            (wrapped_tgt.target for wrapped_tgt in package_targets),
+        ),
+    )
+    packages = await MultiGet(
+        Get(BuiltPackage, PackageFieldSet, field_set)
+        for field_set in package_field_sets_per_target.field_sets
+    )
+
+    files_targets = await MultiGet(
+        Get(
+            WrappedTarget,
+            AddressInput,
+            AddressInput.parse(v, relative_to=field_set.address.spec_path),
+        )
+        for v in field_set.files.value or ()
+    )
+    files_sources = await MultiGet(
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(
+                wrapped_tgt.target.get(Sources),
+                for_sources_types=(FilesSources,),
+                enable_codegen=True,
+            ),
+        )
+        for wrapped_tgt in files_targets
+    )
+
+    input_snapshot = await Get(
+        Snapshot,
+        MergeDigests(
+            (
+                *(package.digest for package in packages),
+                *(sources.snapshot.digest for sources in files_sources),
+            )
+        ),
+    )
+    file_ending = field_set.format_field.value
+    output_filename = os.path.join(
+        field_set.address.spec_path.replace(os.sep, "."),
+        f"{field_set.address.target_name}.{file_ending}",
+    )
+    archive = await Get(
+        Digest,
+        CreateArchive(
+            input_snapshot,
+            output_filename=output_filename,
+            format=ArchiveFormat(field_set.format_field.value),
+        ),
+    )
+    return BuiltPackage(archive, relpath=output_filename)
+
+
 def rules():
-    return (*collect_rules(), UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest))
+    return (
+        *collect_rules(),
+        UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),
+        UnionRule(PackageFieldSet, ArchiveFieldSet),
+    )

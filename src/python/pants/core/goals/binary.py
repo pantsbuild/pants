@@ -27,7 +27,7 @@ class CreatedBinary:
 
 
 class BinarySubsystem(GoalSubsystem):
-    """Deprecated in favor of the `build` goal."""
+    """Deprecated in favor of the `package` goal."""
 
     name = "binary"
 

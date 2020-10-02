@@ -273,9 +273,12 @@ class PythonRuntimePackageDependencies(StringSequenceField):
     """Addresses to targets that can be built with the `./pants package` goal and whose resulting
     assets should be included in the test run.
 
-    Pants will build the asset as if it had run `./pants package`, and will include the result in
-    your test environment using the same name it would normally have, but without the `dist/`
-    prefix. For example, you can include a `python_binary`, `python_awslambda`, or `archive`.
+    Pants will build the assets as if you had run `./pants package`. It will include the
+    results in your archive using the same name they would normally have, but without the
+    `--distdir` prefix (e.g. `dist/`).
+
+    You can include anything that can be built by `./pants package`, e.g. a `python_binary`,
+    `python_awslambda`, or even another `archive`.
     """
 
     alias = "runtime_package_dependencies"

@@ -22,7 +22,7 @@ class ExtractedPexDistributions:
 async def extract_distributions(pex: Pex, unzip_binary: UnzipBinary) -> ExtractedPexDistributions:
     # We only unzip the `.deps` folder to avoid unnecessary work. Note that this will cause the
     # process to fail if there is no `.deps` folder, so we need to use `FallibleProcessResult`.
-    argv = (*unzip_binary.extract_argv(archive_path=pex.name, output_dir="."), ".deps/*")
+    argv = (*unzip_binary.extract_archive_argv(archive_path=pex.name, output_dir="."), ".deps/*")
     unzipped_pex = await Get(
         FallibleProcessResult,
         Process(
