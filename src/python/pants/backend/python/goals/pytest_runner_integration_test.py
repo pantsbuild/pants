@@ -446,11 +446,17 @@ def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.create_file(
         f"{PACKAGE}/test_binary_call.py",
         dedent(
-            """\
+            f"""\
+            import os.path
             import subprocess
 
             def test_embedded_binary():
                 assert  b"Hello, test!" in subprocess.check_output(args=['./bin.pex'])
+
+                # Ensure that we didn't accidentally pull in the binary's sources. This is a
+                # special type of dependency that should not be included with the rest of the
+                # normal dependencies.
+                assert os.path.exists("{BINARY_SOURCE.path}") is False
             """
         ),
     )
