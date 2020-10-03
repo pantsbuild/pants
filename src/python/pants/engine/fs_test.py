@@ -31,6 +31,7 @@ from pants.engine.fs import (
     Directory,
     DownloadFile,
     FileContent,
+    FileDigest,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
@@ -797,7 +798,7 @@ class FSTest(FSTestBase):
 
 
 class DownloadsTest(FSTestBase):
-    file_digest = Digest("8fcbc50cda241aee7238c71e87c27804e7abc60675974eaf6567aa16366bc105", 14)
+    file_digest = FileDigest("8fcbc50cda241aee7238c71e87c27804e7abc60675974eaf6567aa16366bc105", 14)
 
     expected_snapshot_digest = Digest(
         "4c9cf91fcd7ba1abbf7f9a0a1c8175556a82bee6a398e34db3284525ac24a3ad", 84
@@ -842,7 +843,7 @@ class DownloadsTest(FSTestBase):
                         [
                             DownloadFile(
                                 f"http://localhost:{port}/file.txt",
-                                Digest(
+                                FileDigest(
                                     self.file_digest.fingerprint,
                                     self.file_digest.serialized_bytes_length + 1,
                                 ),
@@ -861,7 +862,9 @@ class DownloadsTest(FSTestBase):
                 # so we shouldn't see an error...
                 url = DownloadFile(
                     f"http://localhost:{port}/roland",
-                    Digest("693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16),
+                    FileDigest(
+                        "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16
+                    ),
                 )
                 snapshot = self.request(Snapshot, [url])
                 self.assert_snapshot_equals(

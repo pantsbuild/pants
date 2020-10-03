@@ -397,6 +397,7 @@ py_class!(class PyTypes |py| {
   def __new__(
       _cls,
       directory_digest: PyType,
+      file_digest: PyType,
       snapshot: PyType,
       paths: PyType,
       file_content: PyType,
@@ -420,6 +421,7 @@ py_class!(class PyTypes |py| {
         py,
         RefCell::new(Some(Types {
         directory_digest: externs::type_for(directory_digest),
+        file_digest: externs::type_for(file_digest),
         snapshot: externs::type_for(snapshot),
         paths: externs::type_for(paths),
         file_content: externs::type_for(file_content),
@@ -878,14 +880,14 @@ async fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResul
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stdout_digest"),
-      crate::nodes::Snapshot::store_directory_digest(core, stdout_digest),
+      crate::nodes::Snapshot::store_file_digest(core, stdout_digest),
     ));
   }
 
   if let Some(stderr_digest) = &workunit.metadata.stderr.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stderr_digest"),
-      crate::nodes::Snapshot::store_directory_digest(core, stderr_digest),
+      crate::nodes::Snapshot::store_file_digest(core, stderr_digest),
     ));
   }
 
@@ -1358,33 +1360,33 @@ fn capture_snapshots(
   session_ptr: PySession,
   path_globs_and_root_tuple_wrapper: PyObject,
 ) -> CPyResult<PyObject> {
-  let values = externs::project_iterable(&path_globs_and_root_tuple_wrapper.into());
-  let path_globs_and_roots = values
-    .iter()
-    .map(|value| {
-      let root = PathBuf::from(externs::project_str(&value, "root"));
-      let path_globs = nodes::Snapshot::lift_prepared_path_globs(&externs::project_ignoring_type(
-        &value,
-        "path_globs",
-      ));
-      let digest_hint = {
-        let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
-        if maybe_digest == Value::from(externs::none()) {
-          None
-        } else {
-          Some(nodes::lift_digest(&maybe_digest)?)
-        }
-      };
-      path_globs.map(|path_globs| (path_globs, root, digest_hint))
-    })
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
-
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       // TODO: A parent_id should be an explicit argument.
       session.workunit_store().init_thread_state(None);
       let core = scheduler.core.clone();
+
+      let values = externs::project_iterable(&path_globs_and_root_tuple_wrapper.into());
+      let path_globs_and_roots = values
+        .iter()
+        .map(|value| {
+          let root = PathBuf::from(externs::project_str(&value, "root"));
+          let path_globs = nodes::Snapshot::lift_prepared_path_globs(
+            &externs::project_ignoring_type(&value, "path_globs"),
+          );
+          let digest_hint = {
+            let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
+            if maybe_digest == Value::from(externs::none()) {
+              None
+            } else {
+              Some(nodes::lift_directory_digest(&core.types, &maybe_digest)?)
+            }
+          };
+          path_globs.map(|path_globs| (path_globs, root, digest_hint))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
+
       let snapshot_futures = path_globs_and_roots
         .into_iter()
         .map(|(path_globs, root, digest_hint)| {
@@ -1422,9 +1424,14 @@ fn ensure_remote_has_recursive(
     let core = scheduler.core.clone();
     let store = core.store();
 
+    // NB: Supports either a FileDigest or Digest as input.
     let digests: Vec<Digest> = py_digests
       .iter(py)
-      .map(|item| crate::nodes::lift_digest(&item.into()))
+      .map(|item| {
+        let value = item.into();
+        crate::nodes::lift_directory_digest(&core.types, &value)
+          .or_else(|_| crate::nodes::lift_file_digest(&core.types, &value))
+      })
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
@@ -1444,14 +1451,14 @@ fn ensure_remote_has_recursive(
 fn single_file_digests_to_bytes(
   py: Python,
   scheduler_ptr: PyScheduler,
-  py_digests: PyList,
+  py_file_digests: PyList,
 ) -> CPyResult<PyList> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
 
-    let digests: Vec<Digest> = py_digests
+    let digests: Vec<Digest> = py_file_digests
       .iter(py)
-      .map(|item| crate::nodes::lift_digest(&item.into()))
+      .map(|item| crate::nodes::lift_file_digest(&core.types, &item.into()))
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
@@ -1513,7 +1520,7 @@ fn run_local_interactive_process(
           };
 
           let input_digest_value = externs::project_ignoring_type(&value, "input_digest");
-          let digest: Digest = nodes::lift_digest(&input_digest_value)?;
+          let digest: Digest = nodes::lift_directory_digest(types, &input_digest_value)?;
           if digest != EMPTY_DIGEST {
             if run_in_workspace {
               warn!("Local interactive process should not attempt to materialize files when run in workspace");
@@ -1581,12 +1588,13 @@ fn write_digest(
   digest: PyObject,
   path_prefix: String,
 ) -> PyUnitResult {
-  let lifted_digest =
-    nodes::lift_digest(&digest.into()).map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       // TODO: A parent_id should be an explicit argument.
       session.workunit_store().init_thread_state(None);
+
+      let lifted_digest = nodes::lift_directory_digest(&scheduler.core.types, &digest.into())
+        .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
 
       // Python will have already validated that path_prefix is a relative path.
       let mut destination = PathBuf::new();

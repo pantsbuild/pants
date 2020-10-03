@@ -5,6 +5,7 @@ use crate::core::TypeId;
 
 pub struct Types {
   pub directory_digest: TypeId,
+  pub file_digest: TypeId,
   pub snapshot: TypeId,
   pub paths: TypeId,
   pub file_content: TypeId,

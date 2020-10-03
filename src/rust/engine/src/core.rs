@@ -270,6 +270,12 @@ impl fmt::Debug for Value {
   }
 }
 
+impl fmt::Display for Value {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", externs::val_to_str(&self))
+  }
+}
+
 impl FromPyObject<'_> for Value {
   fn extract(py: Python, obj: &PyObject) -> PyResult<Self> {
     Ok(obj.clone_ref(py).into())

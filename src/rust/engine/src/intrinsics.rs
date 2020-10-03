@@ -2,7 +2,9 @@ use crate::context::Context;
 use crate::core::{throw, Value};
 use crate::externs;
 use crate::nodes::MultiPlatformExecuteProcess;
-use crate::nodes::{lift_digest, DownloadedFile, NodeResult, Paths, SessionValues, Snapshot};
+use crate::nodes::{
+  lift_directory_digest, DownloadedFile, NodeResult, Paths, SessionValues, Snapshot,
+};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 
@@ -133,27 +135,30 @@ fn multi_platform_process_request_to_process_result(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let core = context.core.clone();
-  let store = context.core.store();
   async move {
     let process_val = &args[0];
     // TODO: The platform will be used in a followup.
     let _platform_val = &args[1];
 
-    let process_request = MultiPlatformExecuteProcess::lift(process_val).map_err(|str| {
-      throw(&format!(
-        "Error lifting MultiPlatformExecuteProcess: {}",
-        str
-      ))
-    })?;
+    let process_request = MultiPlatformExecuteProcess::lift(&context.core.types, process_val)
+      .map_err(|str| {
+        throw(&format!(
+          "Error lifting MultiPlatformExecuteProcess: {}",
+          str
+        ))
+      })?;
     let result = context.get(process_request).await?.0;
 
-    let maybe_stdout = store
+    let maybe_stdout = context
+      .core
+      .store()
       .load_file_bytes_with(result.stdout_digest, |bytes: &[u8]| bytes.to_owned())
       .await
       .map_err(|s| throw(&s))?;
 
-    let maybe_stderr = store
+    let maybe_stderr = context
+      .core
+      .store()
       .load_file_bytes_with(result.stderr_digest, |bytes: &[u8]| bytes.to_owned())
       .await
       .map_err(|s| throw(&s))?;
@@ -178,13 +183,16 @@ fn multi_platform_process_request_to_process_result(
 
     let platform_name: String = result.platform.into();
     Ok(externs::unsafe_call(
-      core.types.process_result,
+      context.core.types.process_result,
       &[
         externs::store_bytes(&stdout_bytes),
         externs::store_bytes(&stderr_bytes),
         externs::store_i64(result.exit_code.into()),
-        Snapshot::store_directory_digest(&core, &result.output_directory),
-        externs::unsafe_call(core.types.platform, &[externs::store_utf8(&platform_name)]),
+        Snapshot::store_directory_digest(&context.core, &result.output_directory),
+        externs::unsafe_call(
+          context.core.types.platform,
+          &[externs::store_utf8(&platform_name)],
+        ),
       ],
     ))
   }
@@ -196,7 +204,7 @@ fn directory_digest_to_digest_contents(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let digest = lift_digest(&args[0]).map_err(|s| throw(&s))?;
+    let digest = lift_directory_digest(&context.core.types, &args[0]).map_err(|s| throw(&s))?;
     let snapshot = context
       .core
       .store()
@@ -218,8 +226,11 @@ fn remove_prefix_request_to_digest(
   let store = core.store();
 
   async move {
-    let input_digest =
-      lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
+    let input_digest = lift_directory_digest(
+      &core.types,
+      &externs::project_ignoring_type(&args[0], "digest"),
+    )
+    .map_err(|e| throw(&e))?;
     let prefix = externs::project_str(&args[0], "prefix");
     let prefix = RelativePath::new(PathBuf::from(prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
@@ -239,8 +250,11 @@ fn add_prefix_request_to_digest(
   let core = context.core;
   let store = core.store();
   async move {
-    let input_digest =
-      lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
+    let input_digest = lift_directory_digest(
+      &core.types,
+      &externs::project_ignoring_type(&args[0], "digest"),
+    )
+    .map_err(|e| throw(&e))?;
     let prefix = externs::project_str(&args[0], "prefix");
     let prefix = RelativePath::new(PathBuf::from(prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
@@ -257,7 +271,7 @@ fn digest_to_snapshot(context: Context, args: Vec<Value>) -> BoxFuture<'static, 
   let core = context.core.clone();
   let store = context.core.store();
   async move {
-    let digest = lift_digest(&args[0])?;
+    let digest = lift_directory_digest(&context.core.types, &args[0])?;
     let snapshot = store::Snapshot::from_digest(store, digest).await?;
     Snapshot::store_snapshot(&core, &snapshot)
   }
@@ -273,7 +287,7 @@ fn merge_digests_request_to_digest(
   let store = core.store();
   let digests: Result<Vec<hashing::Digest>, String> = externs::project_multi(&args[0], "digests")
     .into_iter()
-    .map(|val| lift_digest(&val))
+    .map(|val| lift_directory_digest(&core.types, &val))
     .collect();
   async move {
     let digest = store
@@ -386,8 +400,11 @@ fn digest_subset_to_digest(
 
   async move {
     let path_globs = Snapshot::lift_prepared_path_globs(&globs).map_err(|e| throw(&e))?;
-    let original_digest =
-      lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
+    let original_digest = lift_directory_digest(
+      &context.core.types,
+      &externs::project_ignoring_type(&args[0], "digest"),
+    )
+    .map_err(|e| throw(&e))?;
     let subset_params = SubsetParams { globs: path_globs };
     let digest = store
       .subset(original_digest, subset_params)

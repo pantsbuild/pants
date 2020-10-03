@@ -22,6 +22,7 @@ from pants.engine.fs import (
     DigestSubset,
     DownloadFile,
     FileContent,
+    FileDigest,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
@@ -130,6 +131,7 @@ class Scheduler:
 
         types = PyTypes(
             directory_digest=Digest,
+            file_digest=FileDigest,
             snapshot=Snapshot,
             paths=Paths,
             file_content=FileContent,

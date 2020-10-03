@@ -9,7 +9,7 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     UnknownVersion,
 )
-from pants.engine.fs import Digest, DownloadFile
+from pants.engine.fs import DownloadFile, FileDigest
 from pants.engine.platform import Platform
 from pants.testutil.option_util import create_subsystem
 
@@ -49,7 +49,7 @@ def test_generate_request() -> None:
         assert (
             ExternalToolRequest(
                 DownloadFile(
-                    url=expected_url, expected_digest=Digest(expected_sha256, expected_length)
+                    url=expected_url, expected_digest=FileDigest(expected_sha256, expected_length)
                 ),
                 f"foobar-{version}/bin/foobar",
             )

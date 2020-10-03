@@ -21,6 +21,7 @@ use crate::externs;
 use crate::externs::engine_aware::{self, EngineAwareInformation};
 use crate::selectors;
 use crate::tasks::{self, Rule};
+use crate::Types;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use cpython::{Python, PythonObject};
@@ -205,7 +206,25 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
+pub fn lift_directory_digest(types: &Types, digest: &Value) -> Result<hashing::Digest, String> {
+  if types.directory_digest != externs::get_type_for(digest) {
+    return Err(format!(
+      "{} is not of type {}.",
+      digest, types.directory_digest
+    ));
+  }
+  let fingerprint = externs::project_str(&digest, "fingerprint");
+  let digest_length = externs::project_u64(&digest, "serialized_bytes_length") as usize;
+  Ok(hashing::Digest(
+    hashing::Fingerprint::from_hex_string(&fingerprint)?,
+    digest_length,
+  ))
+}
+
+pub fn lift_file_digest(types: &Types, digest: &Value) -> Result<hashing::Digest, String> {
+  if types.file_digest != externs::get_type_for(digest) {
+    return Err(format!("{} is not of type {}.", digest, types.file_digest));
+  }
   let fingerprint = externs::project_str(&digest, "fingerprint");
   let digest_length = externs::project_u64(&digest, "serialized_bytes_length") as usize;
   Ok(hashing::Digest(
@@ -224,6 +243,7 @@ pub struct MultiPlatformExecuteProcess {
 
 impl MultiPlatformExecuteProcess {
   fn lift_execute_process(
+    types: &Types,
     value: &Value,
     target_platform: PlatformConstraint,
   ) -> Result<Process, String> {
@@ -238,8 +258,11 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let digest = lift_digest(&externs::project_ignoring_type(&value, "input_digest"))
-      .map_err(|err| format!("Error parsing digest {}", err))?;
+    let digest = lift_directory_digest(
+      types,
+      &externs::project_ignoring_type(&value, "input_digest"),
+    )
+    .map_err(|err| format!("Error parsing digest {}", err))?;
 
     let output_files = externs::project_multi_strs(&value, "output_files")
       .into_iter()
@@ -308,7 +331,7 @@ impl MultiPlatformExecuteProcess {
     })
   }
 
-  pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+  pub fn lift(types: &Types, value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
     let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
     if constraint_parts.len() % 2 != 0 {
       return Err("Error parsing platform_constraints: odd number of parts".to_owned());
@@ -336,8 +359,11 @@ impl MultiPlatformExecuteProcess {
     let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
       BTreeMap::new();
     for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
-      let underlying_req =
-        MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
+      let underlying_req = MultiPlatformExecuteProcess::lift_execute_process(
+        types,
+        execute_process,
+        constraint_key.1,
+      )?;
       if !underlying_req.cache_failures {
         cache_failures = false;
       }
@@ -572,6 +598,7 @@ impl Snapshot {
   pub fn from_path_globs(path_globs: PathGlobs) -> Snapshot {
     Snapshot { path_globs }
   }
+
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<store::Snapshot> {
     // We rely on Context::expand_globs tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
@@ -616,6 +643,16 @@ impl Snapshot {
   pub fn store_directory_digest(core: &Arc<Core>, item: &hashing::Digest) -> Value {
     externs::unsafe_call(
       core.types.directory_digest,
+      &[
+        externs::store_utf8(&item.0.to_hex()),
+        externs::store_i64(item.1 as i64),
+      ],
+    )
+  }
+
+  pub fn store_file_digest(core: &Arc<Core>, item: &hashing::Digest) -> Value {
+    externs::unsafe_call(
+      core.types.file_digest,
       &[
         externs::store_utf8(&item.0.to_hex()),
         externs::store_i64(item.1 as i64),
@@ -821,8 +858,11 @@ impl WrappedNode for DownloadedFile {
     let url = Url::parse(&url_str)
       .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_str, err)))?;
 
-    let expected_digest = lift_digest(&externs::project_ignoring_type(&value, "expected_digest"))
-      .map_err(|s| throw(&s))?;
+    let expected_digest = lift_file_digest(
+      &context.core.types,
+      &externs::project_ignoring_type(&value, "expected_digest"),
+    )
+    .map_err(|s| throw(&s))?;
 
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)
@@ -992,16 +1032,17 @@ impl WrappedNode for Task {
     let mut result_val = externs::call(&externs::val_for(&func.0), &deps)?;
     let mut result_type = externs::get_type_for(&result_val);
     if result_type == context.core.types.coroutine {
-      result_val = Self::generate(context, params, entry, result_val).await?;
+      result_val = Self::generate(context.clone(), params, entry, result_val).await?;
       result_type = externs::get_type_for(&result_val);
     }
 
     if result_type == product {
       let (new_level, message, new_artifacts) = if can_modify_workunit {
         (
-          engine_aware::EngineAwareLevel::retrieve(&result_val),
-          engine_aware::Message::retrieve(&result_val),
-          engine_aware::Artifacts::retrieve(&result_val).unwrap_or_else(Vec::new),
+          engine_aware::EngineAwareLevel::retrieve(&context.core.types, &result_val),
+          engine_aware::Message::retrieve(&context.core.types, &result_val),
+          engine_aware::Artifacts::retrieve(&context.core.types, &result_val)
+            .unwrap_or_else(Vec::new),
         )
       } else {
         (None, None, Vec::new())
@@ -1187,7 +1228,7 @@ impl Node for NodeKey {
             let py = gil.python();
             let python_type = value.get_type(py);
             if python_type.is_subtype_of(py, &engine_aware_param_ty) {
-              engine_aware::DebugHint::retrieve(&value)
+              engine_aware::DebugHint::retrieve(&context.core.types, &value)
             } else {
               None
             }
