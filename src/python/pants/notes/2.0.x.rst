@@ -5,6 +5,75 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0b3 (10/3/2020)
+-------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add a FileDigest type to differentiate file APIs from directory APIs (#10900)
+  `PR #10900 <https://github.com/pantsbuild/pants/pull/10900>`_
+
+* Deprecate `awslambda` and `binary` goals in favor of new `package` goal (#10881)
+  `PR #10881 <https://github.com/pantsbuild/pants/pull/10881>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `archive` target type to replace `python_app` (#10895)
+  `PR #10895 <https://github.com/pantsbuild/pants/pull/10895>`_
+
+* Add `relocated_files` target type (#10880)
+  `PR #10880 <https://github.com/pantsbuild/pants/pull/10880>`_
+
+* Add support for `.pyi` type stubs (including for first-party) (#10759)
+  `PR #10759 <https://github.com/pantsbuild/pants/pull/10759>`_
+
+Bugfixes
+~~~~~~~~
+
+* Upgrade Pex to 2.1.17. (#10901)
+  `PR #10901 <https://github.com/pantsbuild/pants/pull/10901>`_
+
+* Add back `blocked` flag on BoundedCommandRunner workunit (#10873)
+  `PR #10873 <https://github.com/pantsbuild/pants/pull/10873>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Log long running workunits when the dynamic UI is disabled (#10890)
+  `PR #10890 <https://github.com/pantsbuild/pants/pull/10890>`_
+
+* Add a 'coverage_' prefix to artifact key (#10891)
+  `PR #10891 <https://github.com/pantsbuild/pants/pull/10891>`_
+
+* Remove unused Nailgun code (#10883)
+  `PR #10883 <https://github.com/pantsbuild/pants/pull/10883>`_
+
+* Add several rule descriptions and debug hints (#10878)
+  `PR #10878 <https://github.com/pantsbuild/pants/pull/10878>`_
+
+* fs_util Directory subsetting ignores non-matches (#10854)
+  `PR #10854 <https://github.com/pantsbuild/pants/pull/10854>`_
+
+* Clean up trace logging (#10875)
+  `PR #10875 <https://github.com/pantsbuild/pants/pull/10875>`_
+
+* A new mechanism for showing "did you mean" help. (#10872)
+  `PR #10872 <https://github.com/pantsbuild/pants/pull/10872>`_
+
+* Check in the Pants logo. (#10871)
+  `PR #10871 <https://github.com/pantsbuild/pants/pull/10871>`_
+
+* Improved type annotations for OrderedSet and FrozenOrderedSet, removed code duplication (#10868)
+  `PR #10868 <https://github.com/pantsbuild/pants/pull/10868>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Prepare 1.30.2rc1 (#10887)
+  `PR #10887 <https://github.com/pantsbuild/pants/pull/10887>`_
+
 2.0.0b2 (9/25/2020)
 -------------------
 
