@@ -60,11 +60,13 @@ class OutputPathField(StringField):
         if use_legacy_format:
             ambiguous_name = f"{address.target_name}.{file_ending}"
             logger.warning(
-                f"Writing to the legacy subpath: {ambiguous_name}, which may not be unique. An "
-                "upcoming version of Pants will switch to writing to the fully-qualified "
-                f"subpath: {disambiguated}. You can effect that switch now (and silence this "
-                "warning) by setting `pants_distdir_legacy_paths = false` in the [GLOBAL] section "
-                "of pants.toml."
+                f"Writing to the legacy subpath {repr(ambiguous_name)} for the target {address}. "
+                f"This location may not be unique. An upcoming version of Pants will switch to "
+                f"writing to the fully-qualified subpath: {disambiguated}.\n\nYou can make that "
+                "switch now (and silence this warning) by setting "
+                "`pants_distdir_legacy_paths = false` in the [GLOBAL] section "
+                "of pants.toml.\n\nAlternatively, you can set the field `output_path` on the "
+                f"target {address} to a hardcoded value."
             )
             return ambiguous_name
         return disambiguated
