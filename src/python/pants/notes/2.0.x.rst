@@ -44,7 +44,7 @@ Refactoring, Improvements, and Tooling
 * Log long running workunits when the dynamic UI is disabled (#10890)
   `PR #10890 <https://github.com/pantsbuild/pants/pull/10890>`_
 
-* Add a 'coverage_' prefix to artifact key (#10891)
+* Add a ``'coverage_'`` prefix to artifact key (#10891)
   `PR #10891 <https://github.com/pantsbuild/pants/pull/10891>`_
 
 * Remove unused Nailgun code (#10883)
