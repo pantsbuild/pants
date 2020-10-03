@@ -8,7 +8,7 @@ from typing import List, Tuple, cast
 
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
-from pants.engine.fs import Digest, DownloadFile
+from pants.engine.fs import Digest, DownloadFile, FileDigest
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.subsystem import Subsystem
@@ -154,7 +154,7 @@ class ExternalTool(Subsystem):
                     f"help-advanced {self.options_scope}): {known_version}"
                 )
             if plat_val == plat.value and ver == self.version:
-                digest = Digest(fingerprint=sha256, serialized_bytes_length=int(length))
+                digest = FileDigest(fingerprint=sha256, serialized_bytes_length=int(length))
                 try:
                     url = self.generate_url(plat)
                     exe = self.generate_exe(plat)

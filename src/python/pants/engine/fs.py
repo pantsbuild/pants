@@ -52,6 +52,14 @@ class Paths:
 
 
 @dataclass(frozen=True)
+class FileDigest:
+    """A FileDigest is a digest that refers to a file's content, without its name."""
+
+    fingerprint: str
+    serialized_bytes_length: int
+
+
+@dataclass(frozen=True)
 class FileContent:
     """The content of a file.
 
@@ -251,7 +259,7 @@ class DownloadFile:
     """
 
     url: str
-    expected_digest: Digest
+    expected_digest: FileDigest
 
 
 @side_effecting
