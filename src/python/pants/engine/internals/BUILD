@@ -23,7 +23,10 @@ python_integration_tests(
 
 python_library(
   name='native',
-  sources=['native.py'],
+  sources=[
+    'native.py',
+    'native_engine.pyi',
+  ],
   dependencies=[
     ':native_engine',
   ],

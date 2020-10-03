@@ -381,6 +381,8 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::PyGeneratorResponseGet>(py)?;
   m.add_class::<externs::PyGeneratorResponseGetMulti>(py)?;
 
+  m.add_class::<externs::fs::PyDigest>(py)?;
+
   Ok(())
 });
 
@@ -396,7 +398,6 @@ py_class!(class PyTypes |py| {
 
   def __new__(
       _cls,
-      directory_digest: PyType,
       file_digest: PyType,
       snapshot: PyType,
       paths: PyType,
@@ -420,7 +421,7 @@ py_class!(class PyTypes |py| {
     Self::create_instance(
         py,
         RefCell::new(Some(Types {
-        directory_digest: externs::type_for(directory_digest),
+        directory_digest: externs::type_for(py.get_type::<externs::fs::PyDigest>()),
         file_digest: externs::type_for(file_digest),
         snapshot: externs::type_for(snapshot),
         paths: externs::type_for(paths),
@@ -539,14 +540,14 @@ py_class!(class PyRemotingOptions |py| {
 py_class!(class PySession |py| {
     data session: Session;
     def __new__(_cls,
-          scheduler_ptr: PyScheduler,
+          scheduler: PyScheduler,
           should_render_ui: bool,
           build_id: String,
           should_report_workunits: bool,
           session_values: PyObject
     ) -> CPyResult<Self> {
       Self::create_instance(py, Session::new(
-          scheduler_ptr.scheduler(py),
+          scheduler.scheduler(py),
           should_render_ui,
           build_id,
           should_report_workunits,

@@ -6,6 +6,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 
 from pants.engine.collection import Collection
+from pants.engine.internals.native_engine import PyDigest
 from pants.engine.rules import QueryRule, side_effecting
 from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.util.meta import frozen_after_init
@@ -14,16 +15,12 @@ if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
 
 
-@dataclass(frozen=True)
-class Digest:
-    """A Digest is a lightweight reference to a set of files known about by the engine.
+"""A Digest is a lightweight reference to a set of files known about by the engine.
 
-    You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use `await
-    Get(DigestContents, Digest)` to see the actual file content.
-    """
-
-    fingerprint: str
-    serialized_bytes_length: int
+You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use `await
+Get(DigestContents, Digest)` to see the actual file content.
+"""
+Digest = PyDigest
 
 
 @dataclass(frozen=True)

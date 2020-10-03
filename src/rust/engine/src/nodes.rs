@@ -640,14 +640,10 @@ impl Snapshot {
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
   }
 
-  pub fn store_directory_digest(core: &Arc<Core>, item: &hashing::Digest) -> Value {
-    externs::unsafe_call(
-      core.types.directory_digest,
-      &[
-        externs::store_utf8(&item.0.to_hex()),
-        externs::store_i64(item.1 as i64),
-      ],
-    )
+  pub fn store_directory_digest(item: &hashing::Digest) -> Result<Value, String> {
+    externs::fs::new_py_digest(*item)
+      .map(|d| d.into_object().into())
+      .map_err(|e| format!("{:?}", e))
   }
 
   pub fn store_file_digest(core: &Arc<Core>, item: &hashing::Digest) -> Value {
@@ -676,7 +672,7 @@ impl Snapshot {
     Ok(externs::unsafe_call(
       core.types.snapshot,
       &[
-        Self::store_directory_digest(core, &item.digest),
+        Self::store_directory_digest(&item.digest)?,
         externs::store_tuple(files),
         externs::store_tuple(dirs),
       ],
