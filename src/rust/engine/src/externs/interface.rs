@@ -1424,9 +1424,14 @@ fn ensure_remote_has_recursive(
     let core = scheduler.core.clone();
     let store = core.store();
 
+    // NB: Supports either a FileDigest or Digest as input.
     let digests: Vec<Digest> = py_digests
       .iter(py)
-      .map(|item| crate::nodes::lift_directory_digest(&core.types, &item.into()))
+      .map(|item| {
+        let value = item.into();
+        crate::nodes::lift_directory_digest(&core.types, &value)
+          .or_else(|_| crate::nodes::lift_file_digest(&core.types, &value))
+      })
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 

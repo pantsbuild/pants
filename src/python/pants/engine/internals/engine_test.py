@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import (
-    EMPTY_DIGEST,
+    EMPTY_FILE_DIGEST,
     EMPTY_SNAPSHOT,
     CreateDigest,
     Digest,
@@ -692,7 +692,7 @@ class StreamingWorkunitProcessTests(TestBase):
         stderr_digest = process_workunit["artifacts"]["stderr_digest"]
 
         assert result.stdout == b"stdout output\n"
-        assert stderr_digest == EMPTY_DIGEST
+        assert stderr_digest == EMPTY_FILE_DIGEST
         assert stdout_digest.serialized_bytes_length == len(result.stdout)
 
         tracker = WorkunitTracker()
@@ -721,7 +721,7 @@ class StreamingWorkunitProcessTests(TestBase):
         stderr_digest = process_workunit["artifacts"]["stderr_digest"]
 
         assert result.stderr == b"stderr output\n"
-        assert stdout_digest == EMPTY_DIGEST
+        assert stdout_digest == EMPTY_FILE_DIGEST
         assert stderr_digest.serialized_bytes_length == len(result.stderr)
 
         try:
