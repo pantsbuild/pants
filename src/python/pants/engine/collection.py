@@ -3,12 +3,13 @@
 
 from typing import Any, ClassVar, Iterable, Tuple, TypeVar, Union, cast, overload
 
+from pants.util.collections import MergeableOutput
 from pants.util.ordered_set import FrozenOrderedSet
 
 T = TypeVar("T")
 
 
-class Collection(Tuple[T, ...]):
+class Collection(Tuple[T, ...], MergeableOutput[T]):
     """A light newtype around immutable sequences for use with the V2 engine.
 
     This should be subclassed when you want to create a distinct collection type, such as:
@@ -53,11 +54,15 @@ class Collection(Tuple[T, ...]):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({list(self)})"
 
+    @classmethod
+    def from_iterable(cls, instances: Iterable[T]) -> "Collection[T]":
+        return cls(instances)
+
 
 # NB: This name is clunky. It would be more appropriate to call it `Set`, but that is claimed by
 #  `typing.Set` already. See
 #  https://github.com/pantsbuild/pants/pull/9590#pullrequestreview-395970440.
-class DeduplicatedCollection(FrozenOrderedSet[T]):
+class DeduplicatedCollection(FrozenOrderedSet[T], MergeableOutput[T]):
     """A light newtype around FrozenOrderedSet for use with the V2 engine.
 
     This should be subclassed when you want to create a distinct collection type, such as:
@@ -80,3 +85,7 @@ class DeduplicatedCollection(FrozenOrderedSet[T]):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({list(self._items)})"
+
+    @classmethod
+    def from_iterable(cls, instances: Iterable[T]) -> "DeduplicatedCollection[T]":
+        return cls(instances)

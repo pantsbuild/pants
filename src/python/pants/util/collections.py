@@ -3,7 +3,8 @@
 
 import collections
 import collections.abc
-from typing import Any, Iterable, List, MutableMapping, Type, TypeVar, Union
+from abc import ABCMeta, abstractmethod
+from typing import Any, Generic, Iterable, List, MutableMapping, Type, TypeVar, Union
 
 
 def recursively_update(d: MutableMapping, d2: MutableMapping) -> None:
@@ -69,3 +70,21 @@ def ensure_str_list(val: Union[str, Iterable[str]], *, allow_single_str: bool = 
     If `allow_single_str` is True, a single `str` will be wrapped into a `List[str]`.
     """
     return ensure_list(val, expected_type=str, allow_single_scalar=allow_single_str)
+
+
+_Mergeable = TypeVar("_Mergeable", bound="MergeableOutput")
+
+
+class MergeableOutput(Generic[_T], metaclass=ABCMeta):
+    """Mixin to allow merging of collections."""
+
+    # NB: @abstractmethod @classmethod methods are not yet checked *to exist* by mypy
+    # the way abstract instance methods are, but any *implementations* will be correctly checked!
+    @classmethod
+    @abstractmethod
+    def from_iterable(cls: Type["_Mergeable"], instances: Iterable[_T]) -> "_Mergeable":
+        ...
+
+    @classmethod
+    def from_multiple(cls: Type["_Mergeable"], instances: Iterable[Iterable[_T]]) -> "_Mergeable":
+        return cls.from_iterable(element for instance in instances for element in instance)
