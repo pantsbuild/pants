@@ -20,6 +20,7 @@ from typing import (
     Union,
 )
 
+from pex.interpreter import PythonIdentity
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
@@ -47,6 +48,7 @@ from pants.engine.fs import (
 )
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.process import (
+    BinaryPath,
     MultiPlatformProcess,
     Process,
     ProcessResult,
@@ -420,8 +422,13 @@ async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -
                 dedent(
                     """\
                     import hashlib
+                    import json
                     import os
                     import sys
+
+                    from pex.interpreter import PythonIdentity
+
+                    print(PythonIdentity.get().encode())
 
                     python = os.path.realpath(sys.executable)
                     print(python)
@@ -443,8 +450,12 @@ async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -
     result = await Get(
         ProcessResult, UncacheableProcess(process=process, scope=ProcessScope.PER_SESSION)
     )
-    path, fingerprint = result.stdout.decode().strip().splitlines()
-    return PythonExecutable(path=path, fingerprint=fingerprint)
+    encoded_identity, path, fingerprint = result.stdout.decode().strip().splitlines()
+    identity = PythonIdentity.decode(encoded_identity)
+    return PythonExecutable(
+        identity=identity,
+        binary=BinaryPath(path=path, fingerprint=fingerprint),
+    )
 
 
 @rule(level=LogLevel.DEBUG)
