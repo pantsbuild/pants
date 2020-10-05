@@ -59,16 +59,23 @@ class SignalHandler:
             with self._ignore_sigint_lock:
                 self._ignoring_sigint = toggle
 
-    def _send_signal_to_children(self, received_signal: int) -> None:
+    def _send_signal_to_children(self, received_signal: int, signame: str) -> None:
+        """Send a signal to any children of this process in order.
+
+        Pants may have spawned multiple subprocesses via Python or Rust. Upon receiving a signal,
+        this method is invoked to propagate the signal to all children, regardless of how they were
+        spawned.
+        """
+
         self_process = psutil.Process()
         children = self_process.children()
-        logger.debug(f"Sending signal number {received_signal} to child processes: {children}")
+        logger.debug(f"Sending signal {signame} ({received_signal}) to child processes: {children}")
         for child_process in children:
             child_process.send_signal(received_signal)
 
     def handle_sigint(self, signum: int, _frame):
         ExceptionSink._signal_sent = signum
-        self._send_signal_to_children(signum)
+        self._send_signal_to_children(signum, "SIGINT")
         raise KeyboardInterrupt("User interrupted execution with control-c!")
 
     # TODO(#7406): figure out how to let sys.exit work in a signal handler instead of having to raise
@@ -95,12 +102,12 @@ class SignalHandler:
 
     def handle_sigquit(self, signum, _frame):
         ExceptionSink._signal_sent = signum
-        self._send_signal_to_children(signum)
+        self._send_signal_to_children(signum, "SIGQUIT")
         raise self.SignalHandledNonLocalExit(signum, "SIGQUIT")
 
     def handle_sigterm(self, signum, _frame):
         ExceptionSink._signal_sent = signum
-        self._send_signal_to_children(signum)
+        self._send_signal_to_children(signum, "SIGTERM")
         raise self.SignalHandledNonLocalExit(signum, "SIGTERM")
 
 
