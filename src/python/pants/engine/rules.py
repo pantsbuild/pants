@@ -24,6 +24,7 @@ from typing import (
 )
 
 from pants.engine.goal import Goal
+from pants.engine.internals.selectors import GET_COMPATIBLE_CALLS
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import GetConstraints
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
@@ -57,7 +58,7 @@ class _RuleVisitor(ast.NodeVisitor):
         """Check if the node looks like a Get(T, ...) call."""
         if not isinstance(call_node.func, ast.Name):
             return None
-        if call_node.func.id != "Get":
+        if call_node.func.id not in GET_COMPATIBLE_CALLS:
             return None
         return call_node.args
 

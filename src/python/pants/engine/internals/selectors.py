@@ -8,9 +8,11 @@ from functools import partial
 from textwrap import dedent
 from typing import (
     Any,
+    ClassVar,
     Generator,
     Generic,
     Iterable,
+    List,
     Optional,
     Sequence,
     Tuple,
@@ -21,6 +23,7 @@ from typing import (
     overload,
 )
 
+from pants.engine.collection import MergeableOutput
 from pants.util.meta import frozen_after_init
 
 _Output = TypeVar("_Output")
@@ -202,6 +205,10 @@ class Get(GetConstraints, Generic[_Output, _Input]):
         """
         result = yield self
         return cast(_Output, result)
+
+    @property
+    def output(self) -> Type[_Output]:
+        return cast(Type[_Output], self.output_type)
 
 
 @dataclass(frozen=True)
@@ -608,3 +615,33 @@ class Params:
 
     def __init__(self, *args: Any) -> None:
         self.params = tuple(args)
+
+
+_Mergeable = TypeVar("_Mergeable", bound=MergeableOutput)
+
+
+@dataclass(frozen=True)
+class MergedGet(Generic[_Mergeable, _Input]):
+    output_type: Type[_Mergeable]
+    input_type: Type[_Input]
+    inputs: Iterable[_Input]
+
+    def __await__(
+        self,
+    ) -> "Generator[Tuple[Get[_Mergeable, _Input], ...], None, _Mergeable]":
+        """Yield a single output that merges the results of concurrent Get requests over inputs.
+
+        When MultiGet is used with an iterable, where each element of the iterable is itself a
+        MergeableOutput collection, this can be be substituted instead to cleanly call
+        .from_multiple() on the result.
+        """
+        inputs = tuple(Get(self.output_type, self.input_type, x) for x in self.inputs)
+        results = yield inputs
+        ret = self.output_type.from_multiple(cast(Tuple[_Mergeable, ...], results))
+        return ret
+
+
+# We parse Get calls within the body of each @rule with GetConstraints.parse_input_and_output_types.
+# In order to avoid complicating the parsing code, we require that any helper which produces its own
+# Get(...) calls must use the first two arguments as output and input type for its inner Get(...)s.
+GET_COMPATIBLE_CALLS = [Get.__name__, MergedGet.__name__]
