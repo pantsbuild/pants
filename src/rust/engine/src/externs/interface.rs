@@ -599,13 +599,13 @@ py_class!(class PyNailgunClient |py| {
     let executor_ptr = self.executor(py);
     let python_signal_fn: Value = py_signal_fn.into();
 
-    let (exit_sender, exit_receiver) = oneshot::channel();
+    let (send_task_shutdown_request, recv_task_shutdown_request) = oneshot::channel();
     let nailgun_fut = nailgun::client_execute(
       port,
       command,
       args,
       env_list,
-      exit_receiver,
+      recv_task_shutdown_request,
     );
 
     let exit_code: Result<i32, String> = with_executor(py, executor_ptr, |executor| {
@@ -634,7 +634,7 @@ py_class!(class PyNailgunClient |py| {
           }
         };
         debug!("Sending message to nailgun client task to exit.");
-        match exit_sender.send(()) {
+        match send_task_shutdown_request.send(()) {
           Ok(()) => (),
           Err(e) => {
             debug!("Error sending exit message to nailgun client task: {:?}", e);
