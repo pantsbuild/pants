@@ -41,7 +41,7 @@ class ProtobufLibrary(Target):
 
 
 class InjectProtobufDependencies(InjectDependenciesRequest):
-    inject_for = ProtobufDependencies
+    convert_from = ProtobufDependencies
 
 
 @rule

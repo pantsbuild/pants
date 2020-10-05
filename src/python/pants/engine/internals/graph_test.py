@@ -1055,11 +1055,11 @@ class CustomSmalltalkDependencies(SmalltalkDependencies):
 
 
 class InjectSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = SmalltalkDependencies
+    convert_from = SmalltalkDependencies
 
 
 class InjectCustomSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = CustomSmalltalkDependencies
+    convert_from = CustomSmalltalkDependencies
 
 
 @rule
@@ -1085,7 +1085,7 @@ class SmalltalkLibrary(Target):
 
 
 class InferSmalltalkDependencies(InferDependenciesRequest):
-    infer_from = SmalltalkSources
+    convert_from = SmalltalkSources
 
 
 @rule

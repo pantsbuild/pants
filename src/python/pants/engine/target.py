@@ -1561,7 +1561,7 @@ class DependenciesRequestLite(EngineAwareParameter):
 class InjectDependenciesRequest(EngineAwareParameter, ConvertibleFrom[Dependencies], ABC):
     """A request to inject dependencies, in addition to those explicitly provided.
 
-    To set up a new injection, subclass this class. Set the class property `inject_for` to the
+    To set up a new injection, subclass this class. Set the class property `convert_from` to the
     type of `Dependencies` field you want to inject for, such as `FortranDependencies`. This will
     cause the class, and any subclass, to have the injection. Register this subclass with
     `UnionRule(InjectDependenciesRequest, InjectFortranDependencies)`, for example.
@@ -1574,7 +1574,7 @@ class InjectDependenciesRequest(EngineAwareParameter, ConvertibleFrom[Dependenci
             pass
 
         class InjectFortranDependencies(InjectDependenciesRequest):
-            inject_for = FortranDependencies
+            convert_from = FortranDependencies
 
         @rule
         async def inject_fortran_dependencies(
@@ -1593,7 +1593,11 @@ class InjectDependenciesRequest(EngineAwareParameter, ConvertibleFrom[Dependenci
     """
 
     dependencies_field: Dependencies
-    inject_for: ClassVar[Type[Dependencies]]
+    convert_from: ClassVar[Type[Dependencies]]
+
+    @classmethod
+    def convert(cls, arg: Dependencies) -> "InjectDependenciesRequest":
+        return cls(arg)
 
     def debug_hint(self) -> str:
         return self.dependencies_field.address.spec
@@ -1609,7 +1613,7 @@ class InferDependenciesRequest(EngineAwareParameter, ConvertibleFrom[Sources]):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property
-    `infer_from` to the type of `Sources` field you are able to infer from, such as
+    `convert_from` to the type of `Sources` field you are able to infer from, such as
     `FortranSources`. This will cause the class, and any subclass, to use your inference
     implementation. Note that there cannot be more than one implementation for a particular
     `Sources` class. Register this subclass with
@@ -1636,7 +1640,11 @@ class InferDependenciesRequest(EngineAwareParameter, ConvertibleFrom[Sources]):
     """
 
     sources_field: Sources
-    infer_from: ClassVar[Type[Sources]]
+    convert_from: ClassVar[Type[Sources]]
+
+    @classmethod
+    def convert(cls, arg: Sources) -> "InferDependenciesRequest":
+        return cls(arg)
 
     def debug_hint(self) -> str:
         return self.sources_field.address.spec

@@ -554,7 +554,7 @@ class PythonDistribution(Target):
 
 
 class InjectPythonDistributionDependencies(InjectDependenciesRequest):
-    inject_for = PythonDistributionDependencies
+    convert_from = PythonDistributionDependencies
 
 
 @rule

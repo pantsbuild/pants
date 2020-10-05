@@ -96,7 +96,7 @@ class PythonInference(Subsystem):
 
 
 class InferPythonDependencies(InferDependenciesRequest):
-    infer_from = PythonSources
+    convert_from = PythonSources
 
 
 @rule(desc="Inferring Python dependencies.")
@@ -140,7 +140,7 @@ async def infer_python_dependencies(
 
 
 class InferInitDependencies(InferDependenciesRequest):
-    infer_from = PythonSources
+    convert_from = PythonSources
 
 
 @rule(desc="Inferring dependencies on `__init__.py` files")
@@ -170,7 +170,7 @@ async def infer_python_init_dependencies(
 
 
 class InferConftestDependencies(InferDependenciesRequest):
-    infer_from = PythonTestsSources
+    convert_from = PythonTestsSources
 
 
 @rule(desc="Inferring dependencies on `conftest.py` files")

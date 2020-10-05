@@ -823,33 +823,27 @@ async def resolve_dependencies(
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
     # of FortranDependencies will use that rule.
-    inject_request_types = union_membership.get(InjectDependenciesRequest)
+    injection_requests = convert_compatible_from(
+        union_membership.get(InjectDependenciesRequest),
+        request.field,
+    )
     injected = await MultiGet(
-        Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
-        for inject_request_type in inject_request_types
-        if isinstance(request.field, inject_request_type.inject_for)
+        Get(InjectedDependencies, InjectDependenciesRequest, injection_request)
+        for injection_request in injection_requests
     )
 
-    inference_request_types = union_membership.get(InferDependenciesRequest)
-    inferred: Tuple[InferredDependencies, ...] = ()
-    if inference_request_types:
-        # Dependency inference is solely determined by the `Sources` field for a Target, so we
-        # re-resolve the original target to inspect its `Sources` field, if any.
-        wrapped_tgt = await Get(WrappedTarget, Address, request.field.address)
-        sources_field = wrapped_tgt.target.get(Sources)
-        relevant_inference_request_types = [
-            inference_request_type
-            for inference_request_type in inference_request_types
-            if isinstance(sources_field, inference_request_type.infer_from)
-        ]
-        inferred = await MultiGet(
-            Get(
-                InferredDependencies,
-                InferDependenciesRequest,
-                inference_request_type(sources_field),
-            )
-            for inference_request_type in relevant_inference_request_types
-        )
+    # Dependency inference is determined by the `Sources` field for a Target, so we re-resolve the
+    # original target to inspect its `Sources` field, if any.
+    wrapped_tgt = await Get(WrappedTarget, Address, request.field.address)
+    sources_field = wrapped_tgt.target.get(Sources)
+    inference_requests = convert_compatible_from(
+        union_membership.get(InferDependenciesRequest),
+        sources_field,
+    )
+    inferred = await MultiGet(
+        Get(InferredDependencies, InferDependenciesRequest, inference_request)
+        for inference_request in inference_requests
+    )
 
     # If this is a base target, or no dependency inference implementation can infer dependencies on
     # a file address's sibling files, then we inject dependencies on all the base target's
@@ -898,11 +892,13 @@ async def resolve_dependencies_lite(
     )
 
     # Inject any dependencies.
-    inject_request_types = union_membership.get(InjectDependenciesRequest)
+    inject_requests = convert_compatible_from(
+        union_membership.get(InjectDependenciesRequest),
+        request.field,
+    )
     injected = await MultiGet(
-        Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
-        for inject_request_type in inject_request_types
-        if isinstance(request.field, inject_request_type.inject_for)
+        Get(InjectedDependencies, InjectDependenciesRequest, inject_request)
+        for inject_request in inject_requests
     )
 
     # Inject dependencies on all the base target's generated subtargets.

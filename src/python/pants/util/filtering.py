@@ -73,7 +73,7 @@ def and_filters(filters: Iterable[Filter]) -> Filter:
 
 
 _In = TypeVar("_In")
-_Out = TypeVar("_Out", bound='ConvertibleFrom')
+_Out = TypeVar("_Out", bound="ConvertibleFrom")
 
 
 class ConvertibleFrom(Generic[_In], metaclass=ABCMeta):
