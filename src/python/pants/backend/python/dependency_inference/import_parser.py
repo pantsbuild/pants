@@ -143,7 +143,9 @@ class _CSTVisitor(cst.CSTVisitor, _VisitorInterface):
         tree.visit(visitor)
         return visitor
 
-    def _maybe_add_inferred_import(self, s: str) -> None:
+    def _maybe_add_inferred_import(self, s: Union[str, bytes]) -> None:
+        if isinstance(s, bytes):
+            return
         if _INFERRED_IMPORT_REGEX.match(s):
             self.inferred_imports.add(s)
 
