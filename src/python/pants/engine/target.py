@@ -37,6 +37,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
+from pants.util.filtering import ConvertibleFrom
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.meta import frozen_after_init
@@ -1557,7 +1558,7 @@ class DependenciesRequestLite(EngineAwareParameter):
 
 @union
 @dataclass(frozen=True)
-class InjectDependenciesRequest(EngineAwareParameter, ABC):
+class InjectDependenciesRequest(EngineAwareParameter, ConvertibleFrom[Dependencies], ABC):
     """A request to inject dependencies, in addition to those explicitly provided.
 
     To set up a new injection, subclass this class. Set the class property `inject_for` to the
@@ -1604,7 +1605,7 @@ class InjectedDependencies(DeduplicatedCollection[Address]):
 
 @union
 @dataclass(frozen=True)
-class InferDependenciesRequest(EngineAwareParameter):
+class InferDependenciesRequest(EngineAwareParameter, ConvertibleFrom[Sources]):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property

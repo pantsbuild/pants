@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import operator
-from typing import Callable, Iterable, Sequence, Tuple, TypeVar
+from abc import ABCMeta, abstractmethod
+from typing import Callable, ClassVar, Generic, Iterable, List, Sequence, Tuple, Type, TypeVar
 
 _T = TypeVar("_T")
 Filter = Callable[[_T], bool]
@@ -69,3 +70,32 @@ def and_filters(filters: Iterable[Filter]) -> Filter:
         return True
 
     return combined_filter
+
+
+_In = TypeVar("_In")
+_Out = TypeVar("_Out", bound='ConvertibleFrom')
+
+
+class ConvertibleFrom(Generic[_In], metaclass=ABCMeta):
+    convert_from: ClassVar[Type[_In]]
+    """Declare that this class can convert itself from a specific type."""
+
+    # NB: @abstractmethod @classmethod methods are not yet checked *to exist* by mypy
+    # the way abstract instance methods are, but any *implementations* will be correctly checked!
+    @classmethod
+    @abstractmethod
+    def convert(cls: Type[_Out], arg: _In) -> _Out:
+        ...
+
+
+def convert_compatible_from(
+    convertibles: Iterable[Type[ConvertibleFrom[_In]]],
+    arg: _In,
+) -> Tuple[ConvertibleFrom[_In], ...]:
+    """Convert all the applicable convertibles."""
+    results: List[ConvertibleFrom[_In]] = []
+    for convertible in convertibles:
+        if isinstance(arg, convertible.convert_from):
+            converted = convertible.convert(arg)
+            results.append(converted)
+    return tuple(results)
