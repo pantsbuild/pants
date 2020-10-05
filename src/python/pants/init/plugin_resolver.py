@@ -11,6 +11,7 @@ from typing import Iterable, Iterator, List, Optional, Type, TypeVar, cast
 
 from pex import resolver
 from pex.interpreter import PythonInterpreter
+from pex.network_configuration import NetworkConfiguration
 from pkg_resources import Distribution, WorkingSet
 from pkg_resources import working_set as global_working_set
 
@@ -103,6 +104,9 @@ class PluginResolver:
             interpreter=self._interpreter,
             cache=self.plugin_cache_dir,
             allow_prereleases=PANTS_SEMVER.is_prerelease,
+            network_configuration=NetworkConfiguration.create(
+                cert=self._global_options.options.ca_certs_path
+            ),
         )
         return [
             self._install_plugin(resolved_dist.distribution) for resolved_dist in resolved_dists
@@ -166,12 +170,15 @@ class PluginResolver:
         return self._plugin_cache_dir
 
     @memoized_property
+    def _global_options(self):
+        return self._create_global_subsystem(GlobalOptions)
+
+    @memoized_property
     def _python_repos(self) -> PythonRepos:
         return self._create_global_subsystem(PythonRepos)
 
-    def _create_global_subsystem(self, subsystem_type: Type[S]) -> S:
-        options_scope = cast(str, subsystem_type.options_scope)
-
+    @memoized_property
+    def _defaulted_only_options(self):
         # NB: The PluginResolver runs very early in the pants startup sequence before the standard
         # Subsystem facility is wired up.  As a result PluginResolver is not itself a Subsystem with
         # PythonRepos as a dependency.  Instead it does the minimum possible work to hand-roll
@@ -185,7 +192,10 @@ class PluginResolver:
         # Ignore command line flags since we'd blow up on any we don't understand (most of them).
         # If someone wants to bootstrap plugins in a one-off custom way they'll need to use env vars
         # or a --pants-config-files pointing to a custom pants.toml snippet.
-        defaulted_only_options = options.drop_flag_values()
+        return options.drop_flag_values()
+
+    def _create_global_subsystem(self, subsystem_type: Type[S]) -> S:
+        options_scope = cast(str, subsystem_type.options_scope)
 
         # Finally, construct the Subsystem.
-        return subsystem_type(options_scope, defaulted_only_options.for_scope(options_scope))
+        return subsystem_type(options_scope, self._defaulted_only_options.for_scope(options_scope))
