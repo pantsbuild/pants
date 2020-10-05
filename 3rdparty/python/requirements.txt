@@ -2,6 +2,7 @@ ansicolors==1.1.8
 beautifulsoup4>=4.6.0,<4.7
 dataclasses==0.6
 fasteners==0.15.0
+libcst==0.3.12
 
 # The MyPy requirement should be maintained in lockstep with the requirement the Pants repo uses
 # for the mypy task since it configures custom MyPy plugins. That requirement can be found via:
