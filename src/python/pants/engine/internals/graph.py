@@ -823,14 +823,15 @@ async def resolve_dependencies(
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
     # of FortranDependencies will use that rule.
     inject_request_types = union_membership.get(InjectDependenciesRequest)
-    injected = await MultiGet(
+    all_injected = await MultiGet(
         Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
         for inject_request_type in inject_request_types
         if isinstance(request.field, inject_request_type.inject_for)
     )
+    injected = InjectedDependencies.from_multiple(all_injected)
 
     inference_request_types = union_membership.get(InferDependenciesRequest)
-    inferred: Tuple[InferredDependencies, ...] = ()
+    inferred = InferredDependencies()
     if inference_request_types:
         # Dependency inference is solely determined by the `Sources` field for a Target, so we
         # re-resolve the original target to inspect its `Sources` field, if any.
@@ -841,7 +842,7 @@ async def resolve_dependencies(
             for inference_request_type in inference_request_types
             if isinstance(sources_field, inference_request_type.infer_from)
         ]
-        inferred = await MultiGet(
+        all_inferred = await MultiGet(
             Get(
                 InferredDependencies,
                 InferDependenciesRequest,
@@ -849,13 +850,14 @@ async def resolve_dependencies(
             )
             for inference_request_type in relevant_inference_request_types
         )
+        inferred = InferredDependencies.from_multiple(all_inferred)
 
     # If this is a base target, or no dependency inference implementation can infer dependencies on
     # a file address's sibling files, then we inject dependencies on all the base target's
     # generated subtargets.
     subtarget_addresses: Tuple[Address, ...] = ()
     no_sibling_file_deps_inferrable = not inferred or all(
-        inferred_deps.sibling_dependencies_inferrable is False for inferred_deps in inferred
+        inferred_dep.sibling_dependencies_inferrable is False for inferred_dep in inferred
     )
     if request.field.address.is_base_target or no_sibling_file_deps_inferrable:
         subtargets = await Get(
@@ -870,8 +872,8 @@ async def resolve_dependencies(
         for addr in (
             *subtarget_addresses,
             *literal_addresses,
-            *itertools.chain.from_iterable(injected),
-            *itertools.chain.from_iterable(inferred),
+            *injected,
+            *inferred.to_raw_addresses(),
         )
         if addr not in ignored_addresses
     }
@@ -898,11 +900,12 @@ async def resolve_dependencies_lite(
 
     # Inject any dependencies.
     inject_request_types = union_membership.get(InjectDependenciesRequest)
-    injected = await MultiGet(
+    all_injected = await MultiGet(
         Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
         for inject_request_type in inject_request_types
         if isinstance(request.field, inject_request_type.inject_for)
     )
+    injected = InjectedDependencies.from_multiple(all_injected)
 
     # Inject dependencies on all the base target's generated subtargets.
     subtargets = await Get(
@@ -917,7 +920,7 @@ async def resolve_dependencies_lite(
         for addr in (
             *subtarget_addresses,
             *literal_addresses,
-            *itertools.chain.from_iterable(injected),
+            *injected,
         )
         if addr not in ignored_addresses
     }

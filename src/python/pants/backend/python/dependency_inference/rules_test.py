@@ -98,7 +98,7 @@ def test_infer_python_imports() -> None:
         )
 
     normal_address = Address("src/python")
-    assert run_dep_inference(normal_address) == InferredDependencies(
+    assert run_dep_inference(normal_address) == InferredDependencies.as_group(
         [
             Address("3rdparty/python", target_name="Django"),
             Address("src/python", relative_file_path="app.py"),
@@ -110,13 +110,13 @@ def test_infer_python_imports() -> None:
     generated_subtarget_address = Address(
         "src/python", relative_file_path="f2.py", target_name="python"
     )
-    assert run_dep_inference(generated_subtarget_address) == InferredDependencies(
+    assert run_dep_inference(generated_subtarget_address) == InferredDependencies.as_group(
         [Address("src/python", relative_file_path="app.py", target_name="python")],
         sibling_dependencies_inferrable=True,
     )
     assert run_dep_inference(
         generated_subtarget_address, enable_string_imports=True
-    ) == InferredDependencies(
+    ) == InferredDependencies.as_group(
         [
             Address("src/python", relative_file_path="app.py", target_name="python"),
             Address("src/python/str_import/subdir", relative_file_path="f.py"),
@@ -160,7 +160,9 @@ def test_infer_python_inits() -> None:
             [InferInitDependencies(target[PythonSources])],
         )
 
-    assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
+    assert run_dep_inference(
+        Address.parse("src/python/root/mid/leaf")
+    ) == InferredDependencies.as_group(
         [
             Address("src/python/root", relative_file_path="__init__.py", target_name="root"),
             Address("src/python/root/mid", relative_file_path="__init__.py", target_name="mid"),
@@ -200,7 +202,9 @@ def test_infer_python_conftests() -> None:
             [InferConftestDependencies(target[PythonSources])],
         )
 
-    assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
+    assert run_dep_inference(
+        Address.parse("src/python/root/mid/leaf")
+    ) == InferredDependencies.as_group(
         [
             Address("src/python/root", relative_file_path="conftest.py", target_name="root"),
             Address("src/python/root/mid", relative_file_path="conftest.py", target_name="mid"),

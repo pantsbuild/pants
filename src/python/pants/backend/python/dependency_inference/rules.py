@@ -104,7 +104,7 @@ async def infer_python_dependencies(
     request: InferPythonDependencies, python_inference: PythonInference
 ) -> InferredDependencies:
     if not python_inference.imports:
-        return InferredDependencies([], sibling_dependencies_inferrable=False)
+        return InferredDependencies.as_group([], sibling_dependencies_inferrable=False)
 
     stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.sources_field]))
     modules = tuple(
@@ -136,7 +136,7 @@ async def infer_python_dependencies(
     merged_result = sorted(
         set(itertools.chain.from_iterable(owners_per_import)) - {request.sources_field.address}
     )
-    return InferredDependencies(merged_result, sibling_dependencies_inferrable=True)
+    return InferredDependencies.as_group(merged_result, sibling_dependencies_inferrable=True)
 
 
 class InferInitDependencies(InferDependenciesRequest):
@@ -148,7 +148,7 @@ async def infer_python_init_dependencies(
     request: InferInitDependencies, python_inference: PythonInference
 ) -> InferredDependencies:
     if not python_inference.inits:
-        return InferredDependencies([], sibling_dependencies_inferrable=False)
+        return InferredDependencies.as_group([], sibling_dependencies_inferrable=False)
 
     # Locate __init__.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
@@ -164,7 +164,7 @@ async def infer_python_init_dependencies(
     owners = await MultiGet(
         Get(Owners, OwnersRequest((f,))) for f in extra_init_files.snapshot.files
     )
-    return InferredDependencies(
+    return InferredDependencies.as_group(
         itertools.chain.from_iterable(owners), sibling_dependencies_inferrable=False
     )
 
@@ -179,7 +179,7 @@ async def infer_python_conftest_dependencies(
     python_inference: PythonInference,
 ) -> InferredDependencies:
     if not python_inference.conftests:
-        return InferredDependencies([], sibling_dependencies_inferrable=False)
+        return InferredDependencies.as_group([], sibling_dependencies_inferrable=False)
 
     # Locate conftest.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
@@ -194,7 +194,7 @@ async def infer_python_conftest_dependencies(
         Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
         for f in extra_conftest_files.snapshot.files
     )
-    return InferredDependencies(
+    return InferredDependencies.as_group(
         itertools.chain.from_iterable(owners), sibling_dependencies_inferrable=False
     )
 

@@ -15,7 +15,6 @@ from typing import (
     Dict,
     Generic,
     Iterable,
-    Iterator,
     Mapping,
     Optional,
     Sequence,
@@ -1625,7 +1624,7 @@ class InferDependenciesRequest(EngineAwareParameter):
         def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
             hydrated_sources = await Get(HydratedSources, HydrateSources(request.sources_field))
             ...
-            return InferredDependencies(...)
+            return InferredDependencies.as_group(...)
 
         def rules():
             return [
@@ -1641,30 +1640,33 @@ class InferDependenciesRequest(EngineAwareParameter):
         return self.sources_field.address.spec
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class InferredDependencies:
-    dependencies: FrozenOrderedSet[Address]
+@dataclass(frozen=True, order=True)
+class InferredDependency:
+    """The result of inferring dependencies.
+
+    If the inference implementation is able to infer file-level dependencies on sibling files
+    belonging to the same target, set sibling_dependencies_inferrable=True. This allows for finer-
+    grained caching because the dependency rule will not automatically add a dependency on all
+    sibling files.
+    """
+
+    address: Address
     sibling_dependencies_inferrable: bool
 
-    def __init__(
-        self, dependencies: Iterable[Address], *, sibling_dependencies_inferrable: bool
-    ) -> None:
-        """The result of inferring dependencies.
 
-        If the inference implementation is able to infer file-level dependencies on sibling files
-        belonging to the same target, set sibling_dependencies_inferrable=True. This allows for
-        finer-grained caching because the dependency rule will not automatically add a dependency on
-        all sibling files.
-        """
-        self.dependencies = FrozenOrderedSet(sorted(dependencies))
-        self.sibling_dependencies_inferrable = sibling_dependencies_inferrable
+class InferredDependencies(DeduplicatedCollection[InferredDependency]):
+    sort_input = True
 
-    def __bool__(self) -> bool:
-        return bool(self.dependencies)
+    @classmethod
+    def as_group(
+        cls,
+        dependencies: Iterable[Address],
+        sibling_dependencies_inferrable: bool,
+    ) -> "InferredDependencies":
+        return cls(InferredDependency(dep, sibling_dependencies_inferrable) for dep in dependencies)
 
-    def __iter__(self) -> Iterator[Address]:
-        return iter(self.dependencies)
+    def to_raw_addresses(self) -> Iterable[Address]:
+        return [inf_dep.address for inf_dep in self]
 
 
 # -----------------------------------------------------------------------------------------------

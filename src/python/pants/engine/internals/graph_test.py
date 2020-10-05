@@ -1102,7 +1102,7 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     )
     # NB: See `test_depends_on_subtargets` for why we set the field
     # `sibling_dependencies_inferrable` this way.
-    return InferredDependencies(resolved, sibling_dependencies_inferrable=bool(resolved))
+    return InferredDependencies.as_group(resolved, sibling_dependencies_inferrable=bool(resolved))
 
 
 @pytest.fixture
