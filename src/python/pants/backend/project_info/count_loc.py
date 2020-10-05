@@ -60,7 +60,7 @@ class SuccinctCodeCounter(ExternalTool):
 
 
 class CountLinesOfCodeSubsystem(GoalSubsystem):
-    """Count lines of code using `scc` (Succinct Code Counter, https://github.com/boyter/scc)."""
+    """Count lines of code."""
 
     name = "count-loc"
 

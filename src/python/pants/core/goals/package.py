@@ -29,7 +29,7 @@ class BuiltPackage:
 
 
 class PackageSubsystem(GoalSubsystem):
-    """Package an asset and put in `--distdir`, such as an archive, PEX, wheel, AWS Lambda, etc."""
+    """Create a distributable package."""
 
     name = "package"
 

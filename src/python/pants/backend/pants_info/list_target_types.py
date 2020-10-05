@@ -31,7 +31,7 @@ from pants.util.objects import get_docstring, get_docstring_summary, pretty_prin
 
 
 class TargetTypesSubsystem(LineOriented, GoalSubsystem):
-    """List all the registered target types, including custom plugin types."""
+    """List all registered target types."""
 
     name = "target-types"
 
