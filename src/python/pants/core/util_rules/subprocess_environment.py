@@ -22,12 +22,13 @@ SETTABLE_ENV_VARS = (
     "ftp_proxy",
     "all_proxy",
     "no_proxy",
-    "requests_ca_bundle",
     "HTTP_PROXY",
     "HTTPS_PROXY",
     "FTP_PROXY",
     "ALL_PROXY",
     "NO_PROXY",
+    # Allow Requests to verify SSL certificates for HTTPS requests
+    # https://requests.readthedocs.io/en/master/user/advanced/#ssl-cert-verification
     "REQUESTS_CA_BUNDLE",
 )
 
