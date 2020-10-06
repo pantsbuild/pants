@@ -6,8 +6,6 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import Mapping, Optional, Tuple, cast
 
-from pex.interpreter import PythonIdentity
-
 from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine import process
@@ -92,11 +90,8 @@ class PexRuntimeEnvironment(Subsystem):
         return level
 
 
-@dataclass(frozen=True)
-class PythonExecutable(EngineAwareReturnType):
+class PythonExecutable(BinaryPath, EngineAwareReturnType):
     """The BinaryPath of a Python executable."""
-    identity: PythonIdentity
-    binary: BinaryPath
 
     def message(self) -> str:
         return f"Selected {self.path} to run PEXes with."
@@ -113,7 +108,7 @@ class PexEnvironment(EngineAwareReturnType):
         self, pex_path: str, *args: str, python: Optional[PythonExecutable] = None
     ) -> Tuple[str, ...]:
         python = python or self.bootstrap_python
-        argv = [python.binary.path] if python else []
+        argv = [python.path] if python else []
         argv.extend((pex_path, *args))
         return tuple(argv)
 
@@ -207,13 +202,8 @@ async def find_pex_python(
         for binary_paths in all_python_binary_paths:
             if binary_paths.first_path:
                 return PythonExecutable(
-                    # TODO: Avoid touching the filesystem again here and figure out how to extract
-                    # it from a BinaryPathRequest!
-                    identity=PythonIdentity.get(binary_paths.first_path.path),
-                    binary=BinaryPath(
-                        path=binary_paths.first_path.path,
-                        fingerprint=binary_paths.first_path.fingerprint,
-                    ),
+                    path=binary_paths.first_path.path,
+                    fingerprint=binary_paths.first_path.fingerprint,
                 )
         return None
 

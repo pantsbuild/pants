@@ -3,10 +3,9 @@
 
 import re
 from dataclasses import dataclass
-from typing import Any, Optional, Set, Tuple, Type, TypeVar, Union
+from typing import Any, Optional, Set, Type, TypeVar, Union
 
 import libcst as cst
-from pex.interpreter import PythonIdentity
 from typed_ast import ast27
 
 from pants.util.memo import memoized_property
@@ -35,61 +34,13 @@ class ParsedPythonImports:
         return FrozenOrderedSet(sorted([*self.explicit_imports, *self.inferred_imports]))
 
 
-def parse_file(
-    identity: PythonIdentity,
-    *,
-    filename: str,
-    content: str,
-) -> Tuple[Any, "_VisitorInterface"]:
-    major, minor, _patch = identity.version
-    if major == 2:
-        py27_tree = ast27.parse(content, filename=filename)
-        return py27_tree, _Py27AstVisitor
-
-    if major != 3:
-        raise ValueError(
-            f"Unrecognized python version: {identity}. Currently only 2.7 "
-            "and 3.5-3.8 are supported."
-        )
-
-    # Parse all python 3 code with libCST.
-    config = cst.PartialParserConfig(python_version=f"{major}.{minor}")
-    cst_tree = cst.parse_module(content, config=config)
-    visitor_cls = _CSTVisitor
-    return cst_tree, visitor_cls
-
-
-def find_python_imports(
-    identity: PythonIdentity,
-    *,
-    filename: str,
-    content: str,
-    module_name: str,
-) -> ParsedPythonImports:
-    # If there were syntax errors, gracefully early return. This is more user friendly than
-    # propagating the exception. Dependency inference simply won't be used for that file, and
-    # it'll be up to the tool actually being run (e.g. Pytest or Flake8) to error.
-    try:
-        parse_result = parse_file(identity, filename=filename, content=content)
-    except (SyntaxError, cst.ParserSyntaxError):
-        return ParsedPythonImports(FrozenOrderedSet(), FrozenOrderedSet())
-    tree, ast_visitor_cls = parse_result
-    ast_visitor = ast_visitor_cls.visit_tree(tree, module_name)
-    return ParsedPythonImports(
-        explicit_imports=FrozenOrderedSet(sorted(ast_visitor.explicit_imports)),
-        inferred_imports=FrozenOrderedSet(sorted(ast_visitor.inferred_imports)),
-    )
-
-
-# This regex is used to infer imports from strings, e.g.
-#  `importlib.import_module("example.subdir.Foo")`.
-_INFERRED_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\d]*\.){2,}[a-zA-Z_]\w*$")
-
-
 _Visitor = TypeVar("_Visitor")
 
 
-class _VisitorInterface:
+class VisitorInterface:
+    explicit_imports: Set[str]
+    inferred_imports: Set[str]
+
     def __init__(self, module_name: str) -> None:
         ...
 
@@ -98,7 +49,49 @@ class _VisitorInterface:
         ...
 
 
-class _Py27AstVisitor(ast27.NodeVisitor, _VisitorInterface):
+def parse_file(*, filename: str, content: str, module_name: str) -> VisitorInterface:
+    """Parse the file for python imports, and return a visitor with the imports it found."""
+    try:
+        py27_tree = ast27.parse(content, filename=filename)
+        completed_visitor = _Py27AstVisitor.visit_tree(py27_tree, module_name=module_name)
+        return completed_visitor
+    except SyntaxError:
+        # NB: When the python 2 ast visitor fails to parse python 3 syntax, it raises a
+        # SyntaxError. This may also occur when the file contains invalid python code. If we parse a
+        # python 3 file with a python 2 parser, that should not change the imports we calculate.
+        pass
+
+    # Parse all python 3 code with libCST.
+    # NB: Since all python 3 code is forwards-compatible with the 3.8 parser, and the import syntax
+    # remains unchanged, we are safely able to use the 3.8 parser for parsing imports.
+    config = cst.PartialParserConfig(python_version="3.8")
+    cst_tree = cst.parse_module(content, config=config)
+    # NB: If the file contains invalid python code, it will raise an exception we expect to be
+    # caught.
+    completed_visitor = _CSTVisitor.visit_tree(cst_tree, module_name=module_name)
+    return completed_visitor
+
+
+def find_python_imports(*, filename: str, content: str, module_name: str) -> ParsedPythonImports:
+    # If there were syntax errors, gracefully early return. This is more user friendly than
+    # propagating the exception. Dependency inference simply won't be used for that file, and
+    # it'll be up to the tool actually being run (e.g. Pytest or Flake8) to error.
+    try:
+        completed_visitor = parse_file(filename=filename, content=content, module_name=module_name)
+    except cst.ParserSyntaxError:
+        return ParsedPythonImports(FrozenOrderedSet(), FrozenOrderedSet())
+    return ParsedPythonImports(
+        explicit_imports=FrozenOrderedSet(sorted(completed_visitor.explicit_imports)),
+        inferred_imports=FrozenOrderedSet(sorted(completed_visitor.inferred_imports)),
+    )
+
+
+# This regex is used to infer imports from strings, e.g.
+#  `importlib.import_module("example.subdir.Foo")`.
+_INFERRED_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\d]*\.){2,}[a-zA-Z_]\w*$")
+
+
+class _Py27AstVisitor(ast27.NodeVisitor, VisitorInterface):
     def __init__(self, module_name: str) -> None:
         self._module_parts = module_name.split(".")
         self.explicit_imports: Set[str] = set()
@@ -131,7 +124,7 @@ class _Py27AstVisitor(ast27.NodeVisitor, _VisitorInterface):
         self._maybe_add_inferred_import(val)
 
 
-class _CSTVisitor(cst.CSTVisitor, _VisitorInterface):
+class _CSTVisitor(cst.CSTVisitor, VisitorInterface):
     def __init__(self, module_name: str) -> None:
         self._module_parts = module_name.split(".")
         self.explicit_imports: Set[str] = set()

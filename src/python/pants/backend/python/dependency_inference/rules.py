@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-from dataclasses import dataclass
 from pathlib import PurePath
 from typing import List, cast
 
@@ -10,18 +9,11 @@ from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
-from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonSources,
-    PythonTestsSources,
-)
+from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.backend.python.util_rules import ancestor_files
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
-from pants.backend.python.util_rules.pex import PexInterpreterConstraints
-from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.addresses import Address
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -30,12 +22,10 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
-from pants.python.python_setup import PythonSetup
 
 
 class PythonInference(Subsystem):
@@ -109,24 +99,6 @@ class InferPythonDependencies(InferDependenciesRequest):
     infer_from = PythonSources
 
 
-@dataclass(frozen=True)
-class InterpreterForPythonTargetRequest:
-    address: Address
-
-
-@rule
-async def interpreter_for_target(
-    request: InterpreterForPythonTargetRequest,
-    python_setup: PythonSetup,
-) -> PythonExecutable:
-    wrapped_tgt = await Get(WrappedTarget, Address, request.address)
-    compatibility = wrapped_tgt.target.get(PythonInterpreterCompatibility)
-    pex_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        [compatibility], python_setup
-    )
-    return await Get(PythonExecutable, PexInterpreterConstraints, pex_constraints)
-
-
 @rule(desc="Inferring Python dependencies.")
 async def infer_python_dependencies(
     request: InferPythonDependencies,
@@ -142,14 +114,9 @@ async def infer_python_dependencies(
     )
     digest_contents = await Get(DigestContents, Digest, stripped_sources.snapshot.digest)
 
-    interpreter_binary = await Get(
-        PythonExecutable, InterpreterForPythonTargetRequest(request.sources_field.address)
-    )
-
     owners_requests: List[Get[PythonModuleOwners, PythonModule]] = []
     for file_content, module in zip(digest_contents, modules):
         file_imports_obj = find_python_imports(
-            interpreter_binary.identity,
             filename=file_content.path,
             content=file_content.content.decode(),
             module_name=module.module,
