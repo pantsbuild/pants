@@ -63,6 +63,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
     TransitiveTargets,
+    TransitiveTargetsRequest,
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
@@ -293,15 +294,16 @@ def _detect_cycles(
 
 
 @rule(desc="Resolve transitive targets")
-async def transitive_targets(targets: Targets) -> TransitiveTargets:
+async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots.
 
     This uses iteration, rather than recursion, so that we can tolerate dependency cycles. Unlike a
     traditional BFS algorithm, we batch each round of traversals via `MultiGet` for improved
     performance / concurrency.
     """
+    roots_as_targets = await Get(Targets, Addresses(request.roots))
     visited: OrderedSet[Target] = OrderedSet()
-    queued = FrozenOrderedSet(targets)
+    queued = FrozenOrderedSet(roots_as_targets)
     dependency_mapping: Dict[Address, Tuple[Address, ...]] = {}
     while queued:
         direct_dependencies = await MultiGet(
@@ -320,12 +322,15 @@ async def transitive_targets(targets: Targets) -> TransitiveTargets:
         )
         visited.update(queued)
 
-    _detect_cycles(tuple(t.address for t in targets), dependency_mapping)
+    # NB: We use `roots_as_targets` to get the root addresses, rather than `request.roots`. This
+    # is because expanding from the `Addresses` -> `Targets` may have resulted in generated
+    # subtargets being used, so we need to use `roots_as_targets` to have this expansion.
+    _detect_cycles(tuple(t.address for t in roots_as_targets), dependency_mapping)
 
     # Apply any transitive excludes (`!!` ignores).
     transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
     unevaluated_transitive_excludes = []
-    for t in (*targets, *visited):
+    for t in (*roots_as_targets, *visited):
         unparsed = t.get(Dependencies).unevaluated_transitive_excludes
         if unparsed.values:
             unevaluated_transitive_excludes.append(Get(Targets, UnparsedAddressInputs, unparsed))
@@ -336,7 +341,7 @@ async def transitive_targets(targets: Targets) -> TransitiveTargets:
         )
 
     return TransitiveTargets(
-        tuple(targets), FrozenOrderedSet(visited.difference(transitive_excludes))
+        tuple(roots_as_targets), FrozenOrderedSet(visited.difference(transitive_excludes))
     )
 
 

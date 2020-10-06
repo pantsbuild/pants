@@ -604,6 +604,21 @@ class TransitiveTargets:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
+class TransitiveTargetsRequest:
+    """A request to get the transitive dependencies of the input roots.
+
+    Resolve the transitive targets with `await Get(TransitiveTargets,
+    TransitiveTargetsRequest([addr1, addr2])
+    """
+
+    roots: Tuple[Address, ...]
+
+    def __init__(self, roots: Iterable[Address]) -> None:
+        self.roots = tuple(roots)
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class RegisteredTargetTypes:
     aliases_to_types: FrozenDict[str, Type[Target]]
 

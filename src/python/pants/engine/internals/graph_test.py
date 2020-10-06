@@ -68,6 +68,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
     TransitiveTargets,
+    TransitiveTargetsRequest,
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -91,7 +92,7 @@ def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(Targets, (DependenciesRequest,)),
-            QueryRule(TransitiveTargets, (Addresses,)),
+            QueryRule(TransitiveTargets, (TransitiveTargetsRequest,)),
         ],
         target_types=[MockTarget],
     )
@@ -128,7 +129,7 @@ def test_transitive_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     assert direct_deps == Targets([d1, d2, d3])
 
     transitive_targets = transitive_targets_rule_runner.request(
-        TransitiveTargets, [Addresses([root.address, d2.address])]
+        TransitiveTargets, [TransitiveTargetsRequest([root.address, d2.address])]
     )
     assert transitive_targets.roots == (root, d2)
     # NB: `//:d2` is both a target root and a dependency of `//:root`.
@@ -161,7 +162,7 @@ def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: R
     assert intermediate_direct_deps == Targets([base])
 
     transitive_targets = transitive_targets_rule_runner.request(
-        TransitiveTargets, [Addresses([root.address, intermediate.address])]
+        TransitiveTargets, [TransitiveTargetsRequest([root.address, intermediate.address])]
     )
     assert transitive_targets.roots == (root, intermediate)
     assert transitive_targets.dependencies == FrozenOrderedSet([intermediate])
@@ -188,7 +189,7 @@ def test_transitive_targets_tolerates_subtarget_cycles(
     )
     result = transitive_targets_rule_runner.request(
         TransitiveTargets,
-        [Addresses([Address("", target_name="t2")])],
+        [TransitiveTargetsRequest([Address("", target_name="t2")])],
     )
     assert len(result.roots) == 1
     assert result.roots[0].address == Address("", relative_file_path="t2.txt", target_name="t2")
@@ -208,7 +209,8 @@ def assert_failed_cycle(
 ) -> None:
     with pytest.raises(ExecutionError) as e:
         rule_runner.request(
-            TransitiveTargets, [Addresses([Address("", target_name=root_target_name)])]
+            TransitiveTargets,
+            [TransitiveTargetsRequest([Address("", target_name=root_target_name)])],
         )
     (cycle_exception,) = e.value.wrapped_exceptions
     assert isinstance(cycle_exception, CycleException)
@@ -295,7 +297,7 @@ def test_dep_nocycle_indirect(transitive_targets_rule_runner: RuleRunner) -> Non
     )
     result = transitive_targets_rule_runner.request(
         TransitiveTargets,
-        [Addresses([Address("", target_name="t1")])],
+        [TransitiveTargetsRequest([Address("", target_name="t1")])],
     )
     assert len(result.roots) == 1
     assert result.roots[0].address == Address("", target_name="t1")
@@ -822,7 +824,7 @@ async def generate_smalltalk_from_avro(
 
     # Many codegen implementations will need to look up a protocol target's dependencies in their
     # rule. We add this here to ensure that this does not result in rule graph issues.
-    _ = await Get(TransitiveTargets, Addresses([request.protocol_target.address]))
+    _ = await Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address]))
 
     def generate_fortran(fp: str) -> FileContent:
         parent = str(PurePath(fp).parent).replace("src/avro", "src/smalltalk")

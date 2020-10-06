@@ -40,7 +40,7 @@ from pants.base.specs import (
 )
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
     AddPrefix,
@@ -65,6 +65,7 @@ from pants.engine.target import (
     Targets,
     TargetsWithOrigins,
     TransitiveTargets,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.option.custom_types import shell_str
@@ -395,7 +396,8 @@ async def run_setup_pys(
     if setup_py_subsystem.transitive:
         # Expand out to all owners of the entire dep closure.
         transitive_targets = await Get(
-            TransitiveTargets, Addresses(et.target.address for et in exported_targets)
+            TransitiveTargets,
+            TransitiveTargetsRequest(et.target.address for et in exported_targets),
         )
         owners = await MultiGet(
             Get(ExportedTarget, OwnedDependency(tgt))
@@ -521,7 +523,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     owned_deps, transitive_targets = await MultiGet(
         Get(OwnedDependencies, DependencyOwner(exported_target)),
-        Get(TransitiveTargets, Addresses([exported_target.target.address])),
+        Get(TransitiveTargets, TransitiveTargetsRequest([exported_target.target.address])),
     )
 
     # files() targets aren't owned by a single exported target - they aren't code, so
@@ -632,7 +634,7 @@ async def get_requirements(
     dep_owner: DependencyOwner, union_membership: UnionMembership
 ) -> ExportedTargetRequirements:
     transitive_targets = await Get(
-        TransitiveTargets, Addresses([dep_owner.exported_target.target.address])
+        TransitiveTargets, TransitiveTargetsRequest([dep_owner.exported_target.target.address])
     )
 
     ownable_tgts = [
@@ -689,7 +691,8 @@ async def get_owned_dependencies(
     Includes dependency_owner itself.
     """
     transitive_targets = await Get(
-        TransitiveTargets, Addresses([dependency_owner.exported_target.target.address])
+        TransitiveTargets,
+        TransitiveTargetsRequest([dependency_owner.exported_target.target.address]),
     )
     ownable_targets = [
         tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
@@ -729,7 +732,9 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     )
     exported_ancestor_iter = iter(exported_ancestor_tgts)
     for exported_ancestor in exported_ancestor_iter:
-        transitive_targets = await Get(TransitiveTargets, Addresses([exported_ancestor.address]))
+        transitive_targets = await Get(
+            TransitiveTargets, TransitiveTargetsRequest([exported_ancestor.address])
+        )
         if target in transitive_targets.closure:
             owner = exported_ancestor
             # Find any exported siblings of owner that also depend on target. They have the
@@ -737,7 +742,9 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
             sibling_owners = []
             sibling = next(exported_ancestor_iter, None)
             while sibling and sibling.address.spec_path == owner.address.spec_path:
-                transitive_targets = await Get(TransitiveTargets, Addresses([sibling.address]))
+                transitive_targets = await Get(
+                    TransitiveTargets, TransitiveTargetsRequest([sibling.address])
+                )
                 if target in transitive_targets.closure:
                     sibling_owners.append(sibling)
                 sibling = next(exported_ancestor_iter, None)

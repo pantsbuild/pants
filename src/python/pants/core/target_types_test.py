@@ -21,9 +21,14 @@ from pants.core.target_types import (
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
-from pants.engine.target import GeneratedSources, Sources, TransitiveTargets
+from pants.engine.target import (
+    GeneratedSources,
+    Sources,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -33,7 +38,7 @@ def test_relocated_files() -> None:
             *target_type_rules(),
             *source_files_rules(),
             QueryRule(GeneratedSources, [RelocateFilesViaCodegenRequest]),
-            QueryRule(TransitiveTargets, [Addresses]),
+            QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
         target_types=[Files, RelocatedFiles],
@@ -73,7 +78,9 @@ def test_relocated_files() -> None:
         # target and then getting all the code of that closure, we only end up with the relocated
         # files. If we naively marked the original files targets as a typical `Dependencies` field,
         # we would hit this issue.
-        transitive_targets = rule_runner.request(TransitiveTargets, [Addresses([tgt.address])])
+        transitive_targets = rule_runner.request(
+            TransitiveTargets, [TransitiveTargetsRequest([tgt.address])]
+        )
         all_sources = rule_runner.request(
             SourceFiles,
             [
