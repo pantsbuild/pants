@@ -146,10 +146,6 @@ def test_works_with_python2() -> None:
     assert set(imports.inferred_imports) == {"dep.from.bytes", "dep.from.str"}
 
 
-@pytest.mark.skipif(
-    sys.version_info[:2] < (3, 8),
-    reason="Cannot parse Python 3.8 unless Pants is run with Python 3.8.",
-)
 def test_works_with_python38() -> None:
     imports = find_python_imports(
         filename="foo.py",

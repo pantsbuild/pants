@@ -101,8 +101,7 @@ class InferPythonDependencies(InferDependenciesRequest):
 
 @rule(desc="Inferring Python dependencies.")
 async def infer_python_dependencies(
-    request: InferPythonDependencies,
-    python_inference: PythonInference,
+    request: InferPythonDependencies, python_inference: PythonInference
 ) -> InferredDependencies:
     if not python_inference.imports:
         return InferredDependencies([], sibling_dependencies_inferrable=False)
