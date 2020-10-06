@@ -300,7 +300,7 @@ def resolve_conflicting_options(
 ):
     """Utility for resolving an option that's been migrated to a new location.
 
-    This ensures that the user does not try to specify both options.
+    The option names should use snake_case, rather than --kebab-case.
     """
     old_configured = not old_container.is_default(old_option)
     new_configured = not new_container.is_default(new_option)

@@ -8,6 +8,7 @@ from typing import Any, ClassVar, Iterable, List, Optional, Set, Tuple, Type, ca
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -164,6 +165,14 @@ class EngineInitializer:
         native = Native()
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        print_stacktrace = resolve_conflicting_options(
+            old_option="print_exception_stacktrace",
+            new_option="print_stacktrace",
+            old_scope="",
+            new_scope="",
+            old_container=bootstrap_options,
+            new_container=bootstrap_options,
+        )
         return EngineInitializer.setup_graph_extended(
             options_bootstrapper,
             build_configuration,
@@ -178,7 +187,7 @@ class EngineInitializer:
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
             native=native,
-            include_trace_on_error=bootstrap_options.print_exception_stacktrace,
+            include_trace_on_error=print_stacktrace,
         )
 
     @staticmethod
