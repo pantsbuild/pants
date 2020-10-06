@@ -96,7 +96,7 @@ def test_address_input_parse_bad_path_component() -> None:
 def test_address_input_parse_bad_target_component() -> None:
     def assert_bad_target_component(spec: str) -> None:
         with pytest.raises(InvalidTargetName):
-            print(repr(AddressInput.parse(spec)))
+            repr(AddressInput.parse(spec))
 
     # Missing target_component
     assert_bad_target_component("")

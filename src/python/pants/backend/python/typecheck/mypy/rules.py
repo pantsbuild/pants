@@ -31,7 +31,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules import pants_bin
-from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -186,10 +186,7 @@ LAUNCHER_FILE = FileContent(
 
 @rule
 async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> TypecheckResult:
-    plugin_target_addresses = await MultiGet(
-        Get(Address, AddressInput, plugin_addr) for plugin_addr in mypy.source_plugins
-    )
-
+    plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, mypy.source_plugins)
     plugin_transitive_targets_request = Get(TransitiveTargets, Addresses(plugin_target_addresses))
     plugin_transitive_targets, launcher_script = await MultiGet(
         plugin_transitive_targets_request, Get(Digest, CreateDigest([LAUNCHER_FILE]))

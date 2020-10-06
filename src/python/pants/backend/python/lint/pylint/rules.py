@@ -27,7 +27,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -232,9 +232,7 @@ async def pylint_lint(
     if pylint.skip:
         return LintResults([], linter_name="Pylint")
 
-    plugin_target_addresses = await MultiGet(
-        Get(Address, AddressInput, plugin_addr) for plugin_addr in pylint.source_plugins
-    )
+    plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, pylint.source_plugins)
     plugin_targets_request = Get(TransitiveTargets, Addresses(plugin_target_addresses))
     linted_targets_request = Get(
         Targets, Addresses(field_set.address for field_set in request.field_sets)

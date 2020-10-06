@@ -29,7 +29,7 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.specs import Spec
-from pants.engine.addresses import Address, AddressInput, assert_single_address
+from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Snapshot
@@ -1494,11 +1494,12 @@ class Dependencies(AsyncField):
         return tuple(sorted(value_or_default))
 
     @memoized_property
-    def unevaluated_transitive_excludes(self) -> Tuple[AddressInput, ...]:
+    def unevaluated_transitive_excludes(self) -> UnparsedAddressInputs:
         if not self.supports_transitive_excludes or not self.sanitized_raw_value:
-            return ()
-        return tuple(
-            AddressInput.parse(v[2:]) for v in self.sanitized_raw_value if v.startswith("!!")
+            return UnparsedAddressInputs((), owning_address=self.address)
+        return UnparsedAddressInputs(
+            (v[2:] for v in self.sanitized_raw_value if v.startswith("!!")),
+            owning_address=self.address,
         )
 
 
@@ -1534,8 +1535,10 @@ class InjectDependenciesRequest(EngineAwareParameter, ABC):
         async def inject_fortran_dependencies(
             request: InjectFortranDependencies
         ) -> InjectedDependencies:
-            address = await Get(Address, AddressInput, AddressInput.parse("//:injected"))
-            return InjectedDependencies([address]]
+            addresses = await Get(
+                Addresses, UnparsedAddressInputs(["//:injected"], owning_address=None)
+            )
+            return InjectedDependencies(addresses)
 
         def rules():
             return [

@@ -25,6 +25,7 @@ from pants.engine.addresses import (
     AddressInput,
     AddressWithOrigin,
     BuildFileAddress,
+    UnparsedAddressInputs,
 )
 from pants.engine.collection import Collection
 from pants.engine.fs import (
@@ -321,13 +322,12 @@ async def transitive_targets(targets: Targets) -> TransitiveTargets:
 
     _detect_cycles(tuple(t.address for t in targets), dependency_mapping)
 
-    transitive_wrapped_excludes = await MultiGet(
-        Get(WrappedTarget, AddressInput, address_input)
+    nested_transitive_excludes = await MultiGet(
+        Get(Targets, UnparsedAddressInputs, t.get(Dependencies).unevaluated_transitive_excludes)
         for t in (*targets, *visited)
-        for address_input in t.get(Dependencies).unevaluated_transitive_excludes
     )
     transitive_excludes = FrozenOrderedSet(
-        wrapped_t.target for wrapped_t in transitive_wrapped_excludes
+        itertools.chain.from_iterable(excludes for excludes in nested_transitive_excludes)
     )
 
     return TransitiveTargets(
@@ -664,7 +664,7 @@ async def hydrate_sources(
 
 
 # -----------------------------------------------------------------------------------------------
-# Resolve the Dependencies field
+# Resolve addresses, including the Dependencies field
 # -----------------------------------------------------------------------------------------------
 
 
@@ -811,6 +811,25 @@ async def resolve_dependencies(
         if addr not in ignored_addresses
     }
     return Addresses(sorted(result))
+
+
+@rule(desc="Resolve addresses")
+async def resolve_unparsed_address_inputs(
+    request: UnparsedAddressInputs, global_options: GlobalOptions
+) -> Addresses:
+    addresses = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(
+                v,
+                relative_to=request.relative_to,
+                subproject_roots=global_options.options.subproject_roots,
+            ),
+        )
+        for v in request.values
+    )
+    return Addresses(addresses)
 
 
 # -----------------------------------------------------------------------------------------------

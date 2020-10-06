@@ -40,7 +40,7 @@ from pants.base.specs import (
 )
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
     AddPrefix,
@@ -557,17 +557,10 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         }
     )
     key_to_binary_spec = exported_target.provides.binaries
-    keys = list(key_to_binary_spec.keys())
-    addresses = await MultiGet(
-        Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(key_to_binary_spec[key], relative_to=target.address.spec_path),
-        )
-        for key in keys
+    binaries = await Get(
+        Targets, UnparsedAddressInputs(key_to_binary_spec.values(), owning_address=target.address)
     )
-    binaries = await Get(Targets, Addresses(addresses))
-    for key, binary in zip(keys, binaries):
+    for key, binary in zip(key_to_binary_spec.keys(), binaries):
         binary_entry_point = binary.get(PythonEntryPoint).value
         if not binary_entry_point:
             raise InvalidEntryPoint(

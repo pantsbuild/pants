@@ -24,6 +24,7 @@ from pants.engine.addresses import (
     AddressesWithOrigins,
     AddressInput,
     AddressWithOrigin,
+    UnparsedAddressInputs,
 )
 from pants.engine.fs import (
     CreateDigest,
@@ -1334,3 +1335,31 @@ def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
         # We only expect the inferred address, not any dependencies on sibling files.
         expected=[Address("src/smalltalk/util")],
     )
+
+
+def test_resolve_unparsed_address_inputs() -> None:
+    rule_runner = RuleRunner(
+        rules=[QueryRule(Addresses, [UnparsedAddressInputs])], target_types=[MockTarget]
+    )
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            target(name="t1")
+            target(name="t2")
+            target(name="t3")
+            """
+        ),
+    )
+    addresses = rule_runner.request(
+        Addresses,
+        [
+            UnparsedAddressInputs(
+                ["project:t1", ":t2"], owning_address=Address("project", target_name="t3")
+            )
+        ],
+    )
+    assert set(addresses) == {
+        Address("project", target_name="t1"),
+        Address("project", target_name="t2"),
+    }
