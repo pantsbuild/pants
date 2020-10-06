@@ -322,13 +322,18 @@ async def transitive_targets(targets: Targets) -> TransitiveTargets:
 
     _detect_cycles(tuple(t.address for t in targets), dependency_mapping)
 
-    nested_transitive_excludes = await MultiGet(
-        Get(Targets, UnparsedAddressInputs, t.get(Dependencies).unevaluated_transitive_excludes)
-        for t in (*targets, *visited)
-    )
-    transitive_excludes = FrozenOrderedSet(
-        itertools.chain.from_iterable(excludes for excludes in nested_transitive_excludes)
-    )
+    # Apply any transitive excludes (`!!` ignores).
+    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
+    unevaluated_transitive_excludes = []
+    for t in (*targets, *visited):
+        unparsed = t.get(Dependencies).unevaluated_transitive_excludes
+        if unparsed.values:
+            unevaluated_transitive_excludes.append(Get(Targets, UnparsedAddressInputs, unparsed))
+    if unevaluated_transitive_excludes:
+        nested_transitive_excludes = await MultiGet(*unevaluated_transitive_excludes)
+        transitive_excludes = FrozenOrderedSet(
+            itertools.chain.from_iterable(excludes for excludes in nested_transitive_excludes)
+        )
 
     return TransitiveTargets(
         tuple(targets), FrozenOrderedSet(visited.difference(transitive_excludes))
