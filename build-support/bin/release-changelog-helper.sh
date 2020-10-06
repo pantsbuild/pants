@@ -37,7 +37,10 @@ else
 fi
 
 echo
-echo "Potentially relevant headers:"
+echo "Headers. Delete any that are unused."
+echo "We do not include internal-only changes. However, in the release prep PR, it's helpful to put" \
+     "these internal-only changes in a comment so that other reviewers can check if any should be added" \
+     "back to the changelog."
 echo "----------------------------------------------------------------------------------------------------"
 cat <<EOF
 
@@ -55,10 +58,6 @@ New Features
 
 Bugfixes
 ~~~~~~~~
-
-
-Refactoring, Improvements, and Tooling
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 Documentation
