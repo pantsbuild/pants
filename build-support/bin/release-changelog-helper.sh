@@ -41,8 +41,12 @@ echo "Potentially relevant headers:"
 echo "----------------------------------------------------------------------------------------------------"
 cat <<EOF
 
-API Changes
-~~~~~~~~~~~
+User API Changes
+~~~~~~~~~~~~~~~~
+
+
+Plugin API Changes
+~~~~~~~~~~~~~~~~~~
 
 
 New Features
@@ -55,10 +59,6 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-Testing
-~~~~~~~
 
 
 Documentation
