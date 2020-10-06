@@ -1012,7 +1012,7 @@ class BoolField(PrimitiveField, metaclass=ABCMeta):
         return value_or_default
 
 
-class IntField(ScalarField, metaclass=ABCMeta):
+class IntField(ScalarField[int], metaclass=ABCMeta):
     expected_type = int
     expected_type_description = "an integer"
 
@@ -1021,7 +1021,7 @@ class IntField(ScalarField, metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class FloatField(ScalarField, metaclass=ABCMeta):
+class FloatField(ScalarField[float], metaclass=ABCMeta):
     expected_type = float
     expected_type_description = "a float"
 
@@ -1030,7 +1030,7 @@ class FloatField(ScalarField, metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class StringField(ScalarField, metaclass=ABCMeta):
+class StringField(ScalarField[str], metaclass=ABCMeta):
     """A field whose value is a string.
 
     If you expect the string to only be one of several values, set the class property
@@ -1100,10 +1100,7 @@ class SequenceField(Generic[T], PrimitiveField, metaclass=ABCMeta):
         return tuple(value_or_default)
 
 
-class StringSequenceField(SequenceField, metaclass=ABCMeta):
-    value: Optional[Tuple[str, ...]]
-    default: ClassVar[Optional[Tuple[str, ...]]] = None
-
+class StringSequenceField(SequenceField[str], metaclass=ABCMeta):
     expected_element_type = str
     expected_type_description = "an iterable of strings (e.g. a list of strings)"
 
@@ -1114,7 +1111,7 @@ class StringSequenceField(SequenceField, metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class StringOrStringSequenceField(SequenceField, metaclass=ABCMeta):
+class StringOrStringSequenceField(SequenceField[str], metaclass=ABCMeta):
     """The raw_value may either be a string or be an iterable of strings.
 
     This is syntactic sugar that we use for certain fields to make BUILD files simpler when the user
@@ -1122,9 +1119,6 @@ class StringOrStringSequenceField(SequenceField, metaclass=ABCMeta):
 
     Generally, this should not be used by any new Fields. This mechanism is a misfeature.
     """
-
-    value: Optional[Tuple[str, ...]]
-    default: ClassVar[Optional[Tuple[str, ...]]] = None
 
     expected_element_type = str
     expected_type_description = (

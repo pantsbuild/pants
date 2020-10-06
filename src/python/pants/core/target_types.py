@@ -1,11 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
 from pants.engine.addresses import AddressInput
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
@@ -26,6 +25,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 # -----------------------------------------------------------------------------------------------
@@ -267,7 +267,13 @@ class ArchiveTarget(Target):
     package`."""
 
     alias = "archive"
-    core_fields = (*COMMON_TARGET_FIELDS, ArchivePackages, ArchiveFiles, ArchiveFormatField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        OutputPathField,
+        ArchivePackages,
+        ArchiveFiles,
+        ArchiveFormatField,
+    )
 
 
 @dataclass(frozen=True)
@@ -277,10 +283,13 @@ class ArchiveFieldSet(PackageFieldSet):
     packages: ArchivePackages
     files: ArchiveFiles
     format_field: ArchiveFormatField
+    output_path: OutputPathField
 
 
 @rule(level=LogLevel.DEBUG)
-async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
+async def package_archive_target(
+    field_set: ArchiveFieldSet, global_options: GlobalOptions
+) -> BuiltPackage:
     package_targets = await MultiGet(
         Get(
             WrappedTarget,
@@ -330,10 +339,11 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
             )
         ),
     )
-    file_ending = field_set.format_field.value
-    output_filename = os.path.join(
-        field_set.address.spec_path.replace(os.sep, "."),
-        f"{field_set.address.target_name}.{file_ending}",
+
+    output_filename = field_set.output_path.value_or_default(
+        field_set.address,
+        file_ending=field_set.format_field.value,
+        use_legacy_format=global_options.options.pants_distdir_legacy_paths,
     )
     archive = await Get(
         Digest,

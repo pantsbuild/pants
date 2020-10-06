@@ -12,6 +12,7 @@ from pkg_resources import Requirement
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.base.deprecated import warn_or_error
+from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address, AddressInput
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -233,6 +234,7 @@ class PythonBinary(Target):
     alias = "python_binary"
     core_fields = (
         *COMMON_PYTHON_FIELDS,
+        OutputPathField,
         PythonBinarySources,
         PythonBinaryDependencies,
         PythonEntryPoint,
