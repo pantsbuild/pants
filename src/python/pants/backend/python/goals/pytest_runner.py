@@ -41,7 +41,7 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -160,18 +160,14 @@ async def setup_pytest_for_target(
         request.field_set.runtime_package_dependencies.value
         or request.field_set.runtime_binary_dependencies.value
     ):
-        runtime_package_addresses = await MultiGet(
-            Get(
-                Address,
-                AddressInput,
-                AddressInput.parse(v, relative_to=request.field_set.address.spec_path),
-            )
-            for v in (
-                *(request.field_set.runtime_package_dependencies.value or ()),
-                *(request.field_set.runtime_binary_dependencies.value or ()),
-            )
+        unparsed_addresses = (
+            *(request.field_set.runtime_package_dependencies.value or ()),
+            *(request.field_set.runtime_binary_dependencies.value or ()),
         )
-        runtime_package_targets = await Get(Targets, Addresses(runtime_package_addresses))
+        runtime_package_targets = await Get(
+            Targets,
+            UnparsedAddressInputs(unparsed_addresses, owning_address=request.field_set.address),
+        )
         field_sets_per_target = await Get(
             FieldSetsPerTarget,
             FieldSetsPerTargetRequest(PackageFieldSet, runtime_package_targets),

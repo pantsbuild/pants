@@ -13,8 +13,8 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
-from pants.engine.addresses import Address, AddressInput
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -569,13 +569,11 @@ async def inject_dependencies(
         return InjectedDependencies()
     # Note that we don't validate that these are all `python_binary` targets; we don't care about
     # that here. `setup_py.py` will do that validation.
-    addresses = await MultiGet(
-        Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(addr, relative_to=request.dependencies_field.address.spec_path),
-        )
-        for addr in with_binaries.values()
+    addresses = await Get(
+        Addresses,
+        UnparsedAddressInputs(
+            with_binaries.values(), owning_address=request.dependencies_field.address
+        ),
     )
     return InjectedDependencies(addresses)
 

@@ -6,7 +6,7 @@ from typing import Tuple
 
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
-from pants.engine.addresses import AddressInput
+from pants.engine.addresses import AddressInput, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -22,6 +22,7 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
+    Targets,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -153,6 +154,7 @@ class RelocateFilesViaCodegenRequest(GenerateSourcesRequest):
 async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSources:
     # Unlike normal codegen, we operate the on the sources of the `files_targets` field, not the
     # `sources` of the original `relocated_sources` target.
+    # TODO: using `await Get(Addresses, UnparsedAddressInputs)` causes a graph failure.
     original_files_targets = await MultiGet(
         Get(
             WrappedTarget,
@@ -290,44 +292,33 @@ class ArchiveFieldSet(PackageFieldSet):
 async def package_archive_target(
     field_set: ArchiveFieldSet, global_options: GlobalOptions
 ) -> BuiltPackage:
-    package_targets = await MultiGet(
+    package_targets, files_targets = await MultiGet(
         Get(
-            WrappedTarget,
-            AddressInput,
-            AddressInput.parse(v, relative_to=field_set.address.spec_path),
-        )
-        for v in field_set.packages.value or ()
-    )
-    package_field_sets_per_target = await Get(
-        FieldSetsPerTarget,
-        FieldSetsPerTargetRequest(
-            PackageFieldSet,
-            (wrapped_tgt.target for wrapped_tgt in package_targets),
+            Targets,
+            UnparsedAddressInputs(field_set.packages.value or (), owning_address=field_set.address),
         ),
+        Get(
+            Targets,
+            UnparsedAddressInputs(field_set.files.value or (), owning_address=field_set.address),
+        ),
+    )
+
+    package_field_sets_per_target = await Get(
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, package_targets)
     )
     packages = await MultiGet(
         Get(BuiltPackage, PackageFieldSet, field_set)
         for field_set in package_field_sets_per_target.field_sets
     )
 
-    files_targets = await MultiGet(
-        Get(
-            WrappedTarget,
-            AddressInput,
-            AddressInput.parse(v, relative_to=field_set.address.spec_path),
-        )
-        for v in field_set.files.value or ()
-    )
     files_sources = await MultiGet(
         Get(
             HydratedSources,
             HydrateSourcesRequest(
-                wrapped_tgt.target.get(Sources),
-                for_sources_types=(FilesSources,),
-                enable_codegen=True,
+                tgt.get(Sources), for_sources_types=(FilesSources,), enable_codegen=True
             ),
         )
-        for wrapped_tgt in files_targets
+        for tgt in files_targets
     )
 
     input_snapshot = await Get(

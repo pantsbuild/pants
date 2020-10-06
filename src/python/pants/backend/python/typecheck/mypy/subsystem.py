@@ -4,7 +4,7 @@
 from typing import Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.engine.addresses import AddressInput
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.option.custom_types import file_option, shell_str, target_option
 
 
@@ -70,5 +70,5 @@ class MyPy(PythonToolBase):
         return cast(Optional[str], self.options.config)
 
     @property
-    def source_plugins(self) -> Tuple[AddressInput, ...]:
-        return tuple(AddressInput.parse(v) for v in self.options.source_plugins)
+    def source_plugins(self) -> UnparsedAddressInputs:
+        return UnparsedAddressInputs(self.options.source_plugins, owning_address=None)
