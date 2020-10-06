@@ -1,5 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from pathlib import PurePath
 
 from pants.backend.codegen.protobuf.protoc import Protoc
@@ -9,6 +10,7 @@ from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.engine.addresses import Address, AddressInput
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -18,19 +20,25 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.internals.graph import parse_dependencies_field
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    Dependencies,
     GeneratedSources,
     GenerateSourcesRequest,
+    RegisteredTargetTypes,
     Sources,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
+    Subtargets,
+    Target,
+    WrappedTarget,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
@@ -40,7 +48,11 @@ class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
 
 @rule(desc="Generate Python from Protobuf", level=LogLevel.DEBUG)
 async def generate_python_from_protobuf(
-    request: GeneratePythonFromProtobufRequest, protoc: Protoc
+    request: GeneratePythonFromProtobufRequest,
+    protoc: Protoc,
+    union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
+    global_options: GlobalOptions,
 ) -> GeneratedSources:
     download_protoc_request = Get(
         DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)
@@ -52,15 +64,54 @@ async def generate_python_from_protobuf(
     # Protoc needs all transitive dependencies on `protobuf_libraries` to work properly. It won't
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])
-    )
+    # TODO(#10917): This monstrosity is because we are not able to use
+    # `await Get(TransitiveTargets`) without causing rule graph issues. So, we copy a hacky
+    # implementation of the rules to resolve direct deps + transitive deps. This implementation is
+    # much less robust:
+    #
+    #    - Does not use dependency injection.
+    #    - Does not use dependency inference.
+    #    - Always places dependencies on subtargets, and isn't as careful about avoiding
+    #      self-cycles.
+    #    - Worse performance, as this doesn't batch as efficiently.
+    #
+    # Normally, these restrictions would be a non-starter, but because we are solely looking for
+    # transitive dependencies on Protobuf libraries, these hacks are tolerable for now.
+    visited: OrderedSet[Target] = OrderedSet()
+    queued = OrderedSet([request.protocol_target])
+    while queued:
+        tgt = queued.pop()
+        visited.add(tgt)
+
+        # Recreate the DependenciesRequest rule.
+        parsed_deps = parse_dependencies_field(
+            tgt.get(Dependencies),
+            subproject_roots=global_options.options.subproject_roots,
+            registered_target_types=registered_target_types.types,
+            union_membership=union_membership,
+        )
+        included_wrapped_targets = await MultiGet(
+            Get(WrappedTarget, AddressInput, ai) for ai in parsed_deps.addresses
+        )
+        ignored_wrapped_targets = await MultiGet(
+            Get(WrappedTarget, AddressInput, ai) for ai in parsed_deps.ignored_addresses
+        )
+        subtargets = await Get(Subtargets, Address, tgt.address.maybe_convert_to_base_target())
+        direct_dependencies = FrozenOrderedSet(
+            wrapped_t.target for wrapped_t in included_wrapped_targets
+        ) | FrozenOrderedSet(subtargets.subtargets) - FrozenOrderedSet(
+            wrapped_t.target for wrapped_t in ignored_wrapped_targets
+        )
+
+        queued.update(direct_dependencies.difference(visited))
+    all_targets = visited
+
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
     # for Protobuf imports to be discoverable.
     all_stripped_sources_request = Get(
         StrippedSourceFiles,
         SourceFilesRequest(
-            (tgt.get(Sources) for tgt in transitive_targets.closure),
+            (tgt.get(Sources) for tgt in all_targets),
             for_sources_types=(ProtobufSources,),
         ),
     )
