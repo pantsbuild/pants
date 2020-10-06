@@ -75,7 +75,6 @@ class PantsRunner:
         # We enable logging here, and everything before it will be routed through regular
         # Python logging.
         setup_logging(global_bootstrap_options, stderr_logging=True)
-        ExceptionSink.set_logging_initialized()
 
         if self._should_run_with_pantsd(global_bootstrap_options):
             try:

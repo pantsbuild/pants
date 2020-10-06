@@ -123,9 +123,6 @@ class ExceptionSink:
     # Set in methods on SignalHandler and exposed to the engine rust code.
     _signal_sent: Optional[int] = None
 
-    # Whether the rust logger has been initialized so we can stop doing extra work in this class.
-    _logging_initialized: bool = False
-
     def __new__(cls, *args, **kwargs):
         raise TypeError("Instances of {} are not allowed to be constructed!".format(cls.__name__))
 
@@ -191,16 +188,6 @@ class ExceptionSink:
         cls._log_dir = new_log_location
         cls._pid_specific_error_fileobj = pid_specific_error_stream
         cls._shared_error_fileobj = shared_error_stream
-
-    @classmethod
-    def set_logging_initialized(cls):
-        """Set the flag (to True) which indicates that the rust logger has been initialized.
-
-        Class state:
-        - Overwrites `cls._logging_initialized`.
-        """
-        # NB: mutate the class variables!
-        cls._logging_initialized = True
 
     @classmethod
     def exceptions_log_path(cls, for_pid=None, in_dir=None):
@@ -384,15 +371,13 @@ Exception message: {exception_message}{maybe_newline}
             extra_err_msg = "Additional error logging unhandled exception {}: {}".format(exc, e)
             logger.error(extra_err_msg)
 
-        # The rust logger implementation is used for most of pants's execution, but at import time,
-        # we want to be able to see any stacktrace to know where the error is being raised.
-        if cls._logging_initialized:
-            logger.exception(exc)
-        else:
-            exception_log_entry = cls._format_unhandled_exception_log(
-                exc, tb, add_newline, should_print_backtrace=True
-            )
-            logger.error(exception_log_entry)
+        # The rust logger implementation will have its own stacktrace, but at import time, we want
+        # to be able to see any stacktrace to know where the error is being raised, so we reproduce
+        # it here.
+        exception_log_entry = cls._format_unhandled_exception_log(
+            exc, tb, add_newline, should_print_backtrace=True
+        )
+        logger.exception(exception_log_entry)
 
     @classmethod
     def _handle_signal_gracefully(cls, signum, signame, traceback_lines):
