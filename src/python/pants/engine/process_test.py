@@ -7,7 +7,15 @@ from typing import ClassVar, Tuple
 
 import pytest
 
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    DigestContents,
+    FileContent,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
     BinaryPathRequest,
@@ -451,7 +459,7 @@ class Broken {
 
 
 def test_running_interactive_process_in_workspace_cannot_have_input_files() -> None:
-    mock_digest = Digest("fake", 1)
+    mock_digest = Digest(EMPTY_DIGEST.fingerprint, 1)
     with pytest.raises(ValueError):
         InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)
 

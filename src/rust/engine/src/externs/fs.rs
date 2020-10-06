@@ -52,7 +52,9 @@ py_class!(pub class PyDigest |py| {
     data digest: Digest;
     def __new__(_cls, fingerprint: Cow<str>, serialized_bytes_length: usize) -> PyResult<Self> {
       let fingerprint = Fingerprint::from_hex_string(&fingerprint)
-        .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+        .map_err(|e| {
+          PyErr::new::<exc::Exception, _>(py, format!("Invalid digest hex: {}", e))
+        })?;
       Self::create_instance(py, Digest(fingerprint, serialized_bytes_length))
     }
 

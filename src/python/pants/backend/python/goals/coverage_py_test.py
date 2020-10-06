@@ -7,7 +7,14 @@ from typing import List, Optional
 import pytest
 
 from pants.backend.python.goals.coverage_py import CoverageSubsystem, create_coverage_config
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    DigestContents,
+    FileContent,
+    PathGlobs,
+)
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 
@@ -22,7 +29,7 @@ def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
         assert isinstance(request[0], FileContent)
         assert request[0].is_executable is False
         resolved_config.append(request[0].content.decode())
-        return Digest("jerry", 30)
+        return EMPTY_DIGEST
 
     def mock_read_config(_: PathGlobs) -> DigestContents:
         # This shouldn't be called if no config file provided.
@@ -37,7 +44,7 @@ def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
     ]
 
     result = run_rule_with_mocks(create_coverage_config, rule_args=[coverage], mock_gets=mock_gets)
-    assert result.digest.fingerprint == "jerry"
+    assert result.digest.fingerprint == EMPTY_DIGEST.fingerprint
     assert len(resolved_config) == 1
     return resolved_config[0]
 
