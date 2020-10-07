@@ -27,6 +27,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use byteorder::ByteOrder;
 use digest::consts::U32;
 use generic_array::GenericArray;
 use serde::de::{MapAccess, Visitor};
@@ -84,6 +85,14 @@ impl Fingerprint {
       fmt::Write::write_fmt(&mut s, format_args!("{:02x}", byte)).unwrap();
     }
     s
+  }
+
+  ///
+  /// Using the fact that a Fingerprint is computed using a strong hash function, computes a strong
+  /// but short hash value from a prefix.
+  ///
+  pub fn prefix_hash(&self) -> u64 {
+    byteorder::BigEndian::read_u64(&self.0)
   }
 }
 

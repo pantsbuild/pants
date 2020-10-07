@@ -272,9 +272,10 @@ def test_streaming_output_skip() -> None:
 
 
 def test_streaming_output_changed() -> None:
+    changed_digest = Digest(EMPTY_DIGEST.fingerprint, 2)
     result = FmtResult(
         input=EMPTY_DIGEST,
-        output=Digest("abc", 10),
+        output=changed_digest,
         stdout="stdout",
         stderr="stderr",
         formatter_name="formatter",

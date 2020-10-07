@@ -30,7 +30,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.native_engine import PyTypes  # type: ignore[import]
+from pants.engine.internals.native_engine import PyTypes
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
@@ -130,7 +130,6 @@ class Scheduler:
         tasks = self._register_rules(rule_index, union_membership)
 
         types = PyTypes(
-            directory_digest=Digest,
             file_digest=FileDigest,
             snapshot=Snapshot,
             paths=Paths,

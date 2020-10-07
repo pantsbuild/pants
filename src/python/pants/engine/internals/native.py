@@ -10,7 +10,7 @@ from typing_extensions import Protocol
 from pants.base.exiter import ExitCode
 from pants.engine.fs import PathGlobs
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import (  # type: ignore[import]
+from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutionStrategyOptions,
     PyExecutor,
@@ -71,18 +71,18 @@ class Externs:
             if isinstance(res, Get):
                 # Get.
                 return PyGeneratorResponseGet(
-                    res.output_type,
-                    res.input_type,
-                    res.input,
+                    product=res.output_type,
+                    declared_subject=res.input_type,
+                    subject=res.input,
                 )
             elif type(res) in (tuple, list):
                 # GetMulti.
                 return PyGeneratorResponseGetMulti(
-                    tuple(
+                    gets=tuple(
                         PyGeneratorResponseGet(
-                            get.output_type,
-                            get.input_type,
-                            get.input,
+                            product=get.output_type,
+                            declared_subject=get.input_type,
+                            subject=get.input,
                         )
                         for get in res
                     )
@@ -94,7 +94,7 @@ class Externs:
                 raise
             # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
             # by calling `next()` on an empty iterator.
-            return PyGeneratorResponseBreak(e.value)
+            return PyGeneratorResponseBreak(val=e.value)
 
 
 class RawFdRunner(Protocol):
@@ -211,11 +211,11 @@ class Native(metaclass=SingletonMetaclass):
         session_values: SessionValues,
     ) -> PySession:
         return PySession(
-            scheduler,
-            dynamic_ui,
-            build_id,
-            should_report_workunits,
-            session_values,
+            scheduler=scheduler,
+            should_render_ui=dynamic_ui,
+            build_id=build_id,
+            should_report_workunits=should_report_workunits,
+            session_values=session_values,
         )
 
     def new_scheduler(
@@ -266,20 +266,23 @@ class Native(metaclass=SingletonMetaclass):
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
         )
 
-        return self.lib.scheduler_create(
-            self._executor,
-            tasks,
-            types,
-            # Project tree.
-            build_root,
-            local_store_dir,
-            local_execution_root_dir,
-            named_caches_dir,
-            ca_certs_path,
-            ignore_patterns,
-            use_gitignore,
-            remoting_options,
-            exec_stategy_opts,
+        return cast(
+            PyScheduler,
+            self.lib.scheduler_create(
+                self._executor,
+                tasks,
+                types,
+                # Project tree.
+                build_root,
+                local_store_dir,
+                local_execution_root_dir,
+                named_caches_dir,
+                ca_certs_path,
+                ignore_patterns,
+                use_gitignore,
+                remoting_options,
+                exec_stategy_opts,
+            ),
         )
 
     def set_panic_handler(self):
