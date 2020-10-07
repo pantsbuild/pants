@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Optional, Set, Type, TypeVar, Union
@@ -13,8 +14,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
 
 
-class ImportParseError(ValueError):
-    pass
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -49,36 +49,42 @@ class VisitorInterface:
         ...
 
 
-def parse_file(*, filename: str, content: str, module_name: str) -> VisitorInterface:
+def parse_file(*, filename: str, content: str, module_name: str) -> Optional[VisitorInterface]:
     """Parse the file for python imports, and return a visitor with the imports it found."""
+    # Parse all python 3 code with libCST. We parse assuming python 3 goes first, because we assume
+    # most user code will be python 3.
+    # TODO(#10921): identify the appropriate interpreter version beforehand!
+    try:
+        # NB: Since all python 3 code is forwards-compatible with the 3.8 parser, and the import
+        # syntax remains unchanged, we are safely able to use the 3.8 parser for parsing imports.
+        # TODO(#10922): Support parsing python 3.9/3.10 with libCST!
+        config = cst.PartialParserConfig(python_version="3.8")
+        cst_tree = cst.parse_module(content, config=config)
+        completed_visitor = _CSTVisitor.visit_tree(cst_tree, module_name=module_name)
+        return completed_visitor
+    except cst.ParserSyntaxError as e:
+        # NB: When the python 3 ast visitor fails to parse python 2 syntax, it raises a
+        # ParserSyntaxError. This may also occur when the file contains invalid python code. If we
+        # successfully parse a python 2 file with a python 3 parser, that should not change the
+        # imports we calculate.
+        logger.debug(f"Failed to parse {filename} with python 3.8 libCST parser: {e}")
+
     try:
         py27_tree = ast27.parse(content, filename=filename)
         completed_visitor = _Py27AstVisitor.visit_tree(py27_tree, module_name=module_name)
         return completed_visitor
-    except SyntaxError:
-        # NB: When the python 2 ast visitor fails to parse python 3 syntax, it raises a
-        # SyntaxError. This may also occur when the file contains invalid python code. If we parse a
-        # python 3 file with a python 2 parser, that should not change the imports we calculate.
-        pass
+    except SyntaxError as e:
+        logger.debug(f"Failed to parse {filename} with python 2.7 typed-ast parser: {e}")
 
-    # Parse all python 3 code with libCST.
-    # NB: Since all python 3 code is forwards-compatible with the 3.8 parser, and the import syntax
-    # remains unchanged, we are safely able to use the 3.8 parser for parsing imports.
-    config = cst.PartialParserConfig(python_version="3.8")
-    cst_tree = cst.parse_module(content, config=config)
-    # NB: If the file contains invalid python code, it will raise an exception we expect to be
-    # caught.
-    completed_visitor = _CSTVisitor.visit_tree(cst_tree, module_name=module_name)
-    return completed_visitor
+    return None
 
 
 def find_python_imports(*, filename: str, content: str, module_name: str) -> ParsedPythonImports:
+    completed_visitor = parse_file(filename=filename, content=content, module_name=module_name)
     # If there were syntax errors, gracefully early return. This is more user friendly than
     # propagating the exception. Dependency inference simply won't be used for that file, and
     # it'll be up to the tool actually being run (e.g. Pytest or Flake8) to error.
-    try:
-        completed_visitor = parse_file(filename=filename, content=content, module_name=module_name)
-    except cst.ParserSyntaxError:
+    if completed_visitor is None:
         return ParsedPythonImports(FrozenOrderedSet(), FrozenOrderedSet())
     return ParsedPythonImports(
         explicit_imports=FrozenOrderedSet(sorted(completed_visitor.explicit_imports)),
