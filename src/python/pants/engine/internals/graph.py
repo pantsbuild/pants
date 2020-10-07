@@ -56,6 +56,7 @@ from pants.engine.target import (
     InjectedDependencies,
     RegisteredTargetTypes,
     Sources,
+    SpecialCasedDependencies,
     Subtargets,
     Target,
     TargetRootsToFieldSets,
@@ -309,7 +310,14 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
     dependency_mapping: Dict[Address, Tuple[Address, ...]] = {}
     while queued:
         direct_dependencies = await MultiGet(
-            Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in queued
+            Get(
+                Targets,
+                DependenciesRequest(
+                    tgt.get(Dependencies),
+                    include_special_cased_deps=request.include_special_cased_deps,
+                ),
+            )
+            for tgt in queued
         )
 
         dependency_mapping.update(
@@ -865,6 +873,35 @@ async def resolve_dependencies(
             t.address for t in subtargets.subtargets if t.address != request.field.address
         )
 
+    # If the target has `SpecialCasedDependencies`, such as the `archive` target having
+    # `files` and `packages` fields, then we possibly include those too. We don't want to always
+    # include those dependencies because they should often be excluded from the result due to
+    # being handled elsewhere in the calling code.
+    special_cased: Tuple[Address, ...] = ()
+    if request.include_special_cased_deps:
+        wrapped_tgt = await Get(WrappedTarget, Address, request.field.address)
+        # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
+        # SpecialCasedDependencies.
+        special_cased_fields = tuple(
+            field
+            for field in wrapped_tgt.target.field_values.values()
+            if isinstance(field, SpecialCasedDependencies)
+        )
+        # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
+        special_cased = await MultiGet(
+            Get(
+                Address,
+                AddressInput,
+                AddressInput.parse(
+                    addr,
+                    relative_to=request.field.address.spec_path,
+                    subproject_roots=global_options.options.subproject_roots,
+                ),
+            )
+            for special_cased_field in special_cased_fields
+            for addr in special_cased_field.to_unparsed_address_inputs().values
+        )
+
     result = {
         addr
         for addr in (
@@ -872,6 +909,7 @@ async def resolve_dependencies(
             *literal_addresses,
             *itertools.chain.from_iterable(injected),
             *itertools.chain.from_iterable(inferred),
+            *special_cased,
         )
         if addr not in ignored_addresses
     }

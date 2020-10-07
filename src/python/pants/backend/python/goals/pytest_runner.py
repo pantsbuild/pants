@@ -157,21 +157,23 @@ async def setup_pytest_for_target(
 
     # Create any assets that the test depends on through the `runtime_package_dependencies` field.
     assets: Tuple[BuiltPackage, ...] = ()
-    if (
-        request.field_set.runtime_package_dependencies.value
-        or request.field_set.runtime_binary_dependencies.value
-    ):
-        unparsed_addresses = (
-            *(request.field_set.runtime_package_dependencies.value or ()),
-            *(request.field_set.runtime_binary_dependencies.value or ()),
-        )
-        runtime_package_targets = await Get(
-            Targets,
-            UnparsedAddressInputs(unparsed_addresses, owning_address=request.field_set.address),
+    unparsed_runtime_packages = (
+        request.field_set.runtime_package_dependencies.to_unparsed_address_inputs()
+    )
+    unparsed_runtime_binaries = (
+        request.field_set.runtime_binary_dependencies.to_unparsed_address_inputs()
+    )
+    if unparsed_runtime_packages.values or unparsed_runtime_binaries.values:
+        runtime_package_targets, runtime_binary_dependencies = await MultiGet(
+            Get(Targets, UnparsedAddressInputs, unparsed_runtime_packages),
+            Get(Targets, UnparsedAddressInputs, unparsed_runtime_binaries),
         )
         field_sets_per_target = await Get(
             FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(PackageFieldSet, runtime_package_targets),
+            FieldSetsPerTargetRequest(
+                PackageFieldSet,
+                itertools.chain(runtime_package_targets, runtime_binary_dependencies),
+            ),
         )
         assets = await MultiGet(
             Get(BuiltPackage, PackageFieldSet, field_set)

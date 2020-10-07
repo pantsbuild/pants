@@ -70,12 +70,18 @@ async def dependencies(
     console: Console, addresses: Addresses, dependencies_subsystem: DependenciesSubsystem
 ) -> Dependencies:
     if dependencies_subsystem.transitive:
-        transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
+        transitive_targets = await Get(
+            TransitiveTargets, TransitiveTargetsRequest(addresses, include_special_cased_deps=True)
+        )
         targets = Targets(transitive_targets.dependencies)
     else:
         target_roots = await Get(UnexpandedTargets, Addresses, addresses)
         dependencies_per_target_root = await MultiGet(
-            Get(Targets, DependenciesRequest(tgt.get(DependenciesField))) for tgt in target_roots
+            Get(
+                Targets,
+                DependenciesRequest(tgt.get(DependenciesField), include_special_cased_deps=True),
+            )
+            for tgt in target_roots
         )
         targets = Targets(itertools.chain.from_iterable(dependencies_per_target_root))
 

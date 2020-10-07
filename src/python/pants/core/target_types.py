@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
@@ -19,8 +18,8 @@ from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
     Sources,
+    SpecialCasedDependencies,
     StringField,
-    StringSequenceField,
     Target,
     Targets,
     WrappedTarget,
@@ -62,9 +61,7 @@ class RelocatedFilesSources(Sources):
     expected_num_files = 0
 
 
-# TODO(#10888): Teach project introspection goals that this is a special type of the `Dependencies`
-#  field.
-class RelocatedFilesOriginalTargets(StringSequenceField):
+class RelocatedFilesOriginalTargets(SpecialCasedDependencies):
     """Addresses to the original `files()` targets that you want to relocate, such as
     `['//:json_files']`.
 
@@ -74,7 +71,6 @@ class RelocatedFilesOriginalTargets(StringSequenceField):
 
     alias = "files_targets"
     required = True
-    value: Tuple[str, ...]
 
 
 class RelocatedFilesSrcField(StringField):
@@ -161,7 +157,11 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
             AddressInput,
             AddressInput.parse(v, relative_to=request.protocol_target.address.spec_path),
         )
-        for v in request.protocol_target.get(RelocatedFilesOriginalTargets).value
+        for v in (
+            request.protocol_target.get(RelocatedFilesOriginalTargets)
+            .to_unparsed_address_inputs()
+            .values
+        )
     )
     original_files_sources = await MultiGet(
         Get(HydratedSources, HydrateSourcesRequest(wrapped_tgt.target.get(Sources)))
@@ -222,9 +222,8 @@ class GenericTarget(Target):
 # `archive` target
 # -----------------------------------------------------------------------------------------------
 
-# TODO(#10888): Teach project introspection goals that this is a special type of the `Dependencies`
-#  field.
-class ArchivePackages(StringSequenceField):
+
+class ArchivePackages(SpecialCasedDependencies):
     """Addresses to any targets that can be built with `./pants package`.
 
     Pants will build the assets as if you had run `./pants package`. It will include the
@@ -238,9 +237,7 @@ class ArchivePackages(StringSequenceField):
     alias = "packages"
 
 
-# TODO(#10888): Teach project introspection goals that this is a special type of the `Dependencies`
-#  field.
-class ArchiveFiles(StringSequenceField):
+class ArchiveFiles(SpecialCasedDependencies):
     """Addresses to any `files` or `relocated_files` targets to include in the archive, e.g.
     `["resources:logo"]`.
 
@@ -293,14 +290,8 @@ async def package_archive_target(
     field_set: ArchiveFieldSet, global_options: GlobalOptions
 ) -> BuiltPackage:
     package_targets, files_targets = await MultiGet(
-        Get(
-            Targets,
-            UnparsedAddressInputs(field_set.packages.value or (), owning_address=field_set.address),
-        ),
-        Get(
-            Targets,
-            UnparsedAddressInputs(field_set.files.value or (), owning_address=field_set.address),
-        ),
+        Get(Targets, UnparsedAddressInputs, field_set.packages.to_unparsed_address_inputs()),
+        Get(Targets, UnparsedAddressInputs, field_set.files.to_unparsed_address_inputs()),
     )
 
     package_field_sets_per_target = await Get(
