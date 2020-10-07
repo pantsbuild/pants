@@ -604,6 +604,37 @@ class TransitiveTargets:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
+class TransitiveTargetsRequest:
+    """A request to get the transitive dependencies of the input roots.
+
+    Resolve the transitive targets with `await Get(TransitiveTargets,
+    TransitiveTargetsRequest([addr1, addr2])`.
+    """
+
+    roots: Tuple[Address, ...]
+
+    def __init__(self, roots: Iterable[Address]) -> None:
+        self.roots = tuple(roots)
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class TransitiveTargetsRequestLite:
+    """A request to get the transitive dependencies of the input roots, but without considering
+    dependency inference.
+
+    This solely exists due to graph ambiguity with codegen implementations. Use
+    `TransitiveTargetsRequest` everywhere other than codegen.
+    """
+
+    roots: Tuple[Address, ...]
+
+    def __init__(self, roots: Iterable[Address]) -> None:
+        self.roots = tuple(roots)
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class RegisteredTargetTypes:
     aliases_to_types: FrozenDict[str, Type[Target]]
 
@@ -1456,7 +1487,6 @@ class GeneratedSources:
 # NB: To hydrate the dependencies, use one of:
 #   await Get(Addresses, DependenciesRequest(tgt[Dependencies])
 #   await Get(Targets, DependenciesRequest(tgt[Dependencies])
-#   await Get(TransitiveTargets, DependenciesRequest(tgt[Dependencies])
 class Dependencies(AsyncField):
     """Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib'].
 
@@ -1505,6 +1535,20 @@ class Dependencies(AsyncField):
 
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
+    field: Dependencies
+
+    def debug_hint(self) -> str:
+        return self.field.address.spec
+
+
+@dataclass(frozen=True)
+class DependenciesRequestLite(EngineAwareParameter):
+    """Like DependenciesRequest, but does not use dependency inference.
+
+    This solely exists due to graph ambiguity with codegen. Use `DependenciesRequest` everywhere but
+    with codegen.
+    """
+
     field: Dependencies
 
     def debug_hint(self) -> str:

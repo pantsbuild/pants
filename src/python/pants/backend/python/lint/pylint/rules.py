@@ -45,6 +45,7 @@ from pants.engine.target import (
     Target,
     Targets,
     TransitiveTargets,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
@@ -233,7 +234,9 @@ async def pylint_lint(
         return LintResults([], linter_name="Pylint")
 
     plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, pylint.source_plugins)
-    plugin_targets_request = Get(TransitiveTargets, Addresses(plugin_target_addresses))
+    plugin_targets_request = Get(
+        TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
+    )
     linted_targets_request = Get(
         Targets, Addresses(field_set.address for field_set in request.field_sets)
     )

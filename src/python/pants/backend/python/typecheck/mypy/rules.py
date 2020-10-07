@@ -43,7 +43,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet, Target, TransitiveTargets
+from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
@@ -187,7 +187,9 @@ LAUNCHER_FILE = FileContent(
 @rule
 async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> TypecheckResult:
     plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, mypy.source_plugins)
-    plugin_transitive_targets_request = Get(TransitiveTargets, Addresses(plugin_target_addresses))
+    plugin_transitive_targets_request = Get(
+        TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
+    )
     plugin_transitive_targets, launcher_script = await MultiGet(
         plugin_transitive_targets_request, Get(Digest, CreateDigest([LAUNCHER_FILE]))
     )
@@ -349,7 +351,8 @@ async def mypy_typecheck(
     # transitive closure to get the final resulting constraints.
     # TODO(#10863): Improve the performance of this.
     transitive_targets_per_field_set = await MultiGet(
-        Get(TransitiveTargets, Addresses([field_set.address])) for field_set in request.field_sets
+        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
+        for field_set in request.field_sets
     )
 
     interpreter_constraints_to_transitive_targets = defaultdict(set)

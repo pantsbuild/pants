@@ -37,7 +37,13 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, Targets, TransitiveTargets
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -184,7 +190,9 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         )
         all_targets = FrozenOrderedSet(itertools.chain(*direct_deps, targets))
     else:
-        transitive_targets = await Get(TransitiveTargets, Addresses, request.addresses)
+        transitive_targets = await Get(
+            TransitiveTargets, TransitiveTargetsRequest(request.addresses)
+        )
         all_targets = transitive_targets.closure
 
     input_digests = []
