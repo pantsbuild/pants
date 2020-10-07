@@ -546,11 +546,23 @@ class PythonProvidesField(ScalarField, ProvidesField):
         return cast(PythonArtifact, super().compute_value(raw_value, address=address))
 
 
+class SetupPyCommandsField(StringSequenceField):
+    """The runtime commands to invoke setup.py with to create the distribution."""
+
+    alias = "setup_py_commands"
+    expected_type_description = "an iterable of string commands to invoke setup.py with"
+
+
 class PythonDistribution(Target):
     """A publishable Python distribution."""
 
     alias = "python_distribution"
-    core_fields = (*COMMON_TARGET_FIELDS, PythonDistributionDependencies, PythonProvidesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PythonDistributionDependencies,
+        PythonProvidesField,
+        SetupPyCommandsField,
+    )
 
 
 class InjectPythonDistributionDependencies(InjectDependenciesRequest):

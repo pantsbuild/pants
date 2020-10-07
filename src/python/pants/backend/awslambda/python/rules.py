@@ -115,8 +115,8 @@ async def package_python_awslambda(field_set: PythonAwsLambdaFieldSet) -> BuiltP
     awslambda = await Get(CreatedAWSLambda, AWSLambdaFieldSet, field_set)
     return BuiltPackage(
         awslambda.digest,
-        relpath=awslambda.zip_file_relpath,
-        extra_log_info=f"  Runtime: {awslambda.runtime}\n  Handler: {awslambda.handler}",
+        relpaths=(awslambda.zip_file_relpath,),
+        extra_logs=(f"  Runtime: {awslambda.runtime}\n  Handler: {awslambda.handler}",),
     )
 
 

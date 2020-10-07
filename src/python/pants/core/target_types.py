@@ -344,7 +344,7 @@ async def package_archive_target(
             format=ArchiveFormat(field_set.format_field.value),
         ),
     )
-    return BuiltPackage(archive, relpath=output_filename)
+    return BuiltPackage(archive, relpaths=(output_filename,))
 
 
 def rules():

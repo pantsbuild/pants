@@ -5,7 +5,7 @@ import logging
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Optional
+from typing import Tuple
 
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
@@ -31,8 +31,10 @@ class PackageFieldSet(FieldSet, metaclass=ABCMeta):
 @dataclass(frozen=True)
 class BuiltPackage:
     digest: Digest
-    relpath: str
-    extra_log_info: Optional[str] = None
+    relpaths: Tuple[
+        str, ...
+    ]  # Used only for logging. Should reflect the package's paths in digest.
+    extra_logs: Tuple[str, ...] = tuple()
 
 
 class OutputPathField(StringField):
@@ -101,10 +103,10 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     merged_snapshot = await Get(Snapshot, MergeDigests(asset.digest for asset in assets))
     workspace.write_digest(merged_snapshot.digest, path_prefix=str(dist_dir.relpath))
     for asset in assets:
-        msg = f"Wrote {dist_dir.relpath / asset.relpath}"
-        if asset.extra_log_info:
-            msg += f"\n{asset.extra_log_info}"
-        logger.info(msg)
+        for asset_relpath in asset.relpaths:
+            logger.info(f"Wrote {dist_dir.relpath / asset_relpath}")
+        for extra_log in asset.extra_logs:
+            logger.info(extra_log)
     return Package(exit_code=0)
 
 

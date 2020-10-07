@@ -19,6 +19,7 @@ from pants.backend.python.target_types import (
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
+    SetupPyCommandsField,
 )
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -38,6 +39,7 @@ from pants.base.specs import (
     AscendantAddresses,
     FilesystemLiteralSpec,
 )
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
@@ -52,6 +54,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     RemovePrefix,
+    Snapshot,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -66,7 +69,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TransitiveTargets,
 )
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
@@ -160,6 +163,13 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
     """
 
     sort_input = True
+
+
+@dataclass(frozen=True)
+class PythonDistributionFieldSet(PackageFieldSet):
+    required_fields = (PythonProvidesField,)
+
+    provides: PythonProvidesField
 
 
 @dataclass(frozen=True)
@@ -304,7 +314,7 @@ class SetuptoolsSetup:
 
 
 class SetupPySubsystem(GoalSubsystem):
-    """Run setup.py commands."""
+    """Deprecated in favor of the `package` goal."""
 
     name = "setup-py"
 
@@ -362,6 +372,50 @@ def validate_args(args: Tuple[str, ...]):
         raise InvalidSetupPyArgs("Cannot use the `upload` or `register` setup.py commands")
 
 
+@rule
+async def package_python_dist(
+    field_set: PythonDistributionFieldSet,
+    python_setup: PythonSetup,
+) -> BuiltPackage:
+
+    transitive_targets = await Get(TransitiveTargets, Addresses([field_set.address]))
+    exported_target = ExportedTarget(transitive_targets.roots[0])
+    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+        (
+            tgt[PythonInterpreterCompatibility]
+            for tgt in transitive_targets.dependencies
+            if tgt.has_field(PythonInterpreterCompatibility)
+        ),
+        python_setup,
+    )
+    chroot = await Get(
+        SetupPyChroot,
+        SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
+    )
+
+    # If commands were provided, run setup.py with them; Otherwise just dump chroots.
+    if exported_target.target.has_field(SetupPyCommandsField):
+        setup_py_result = await Get(
+            RunSetupPyResult,
+            RunSetupPyRequest(
+                exported_target, chroot, exported_target.target[SetupPyCommandsField].value or ()
+            ),
+        )
+        dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
+        return BuiltPackage(
+            setup_py_result.output,
+            relpaths=dist_snapshot.files,
+        )
+
+    else:
+        dirname = f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}"
+        rel_chroot = await Get(Digest, AddPrefix(chroot.digest, dirname))
+        return BuiltPackage(
+            rel_chroot,
+            relpaths=(f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}",),
+        )
+
+
 @goal_rule
 async def run_setup_pys(
     targets_with_origins: TargetsWithOrigins,
@@ -371,6 +425,13 @@ async def run_setup_pys(
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> SetupPy:
+    logger.warning(
+        "The `setup_py` goal is deprecated in favor of the `package` goal, which behaves "
+        "similarly, except that you specify setup.py commands using the `setup_py_commands` "
+        "field on your `python_distribution` targets, instead of on the command line. "
+        "`setup_py` will be removed in 2.1.0.dev0."
+    )
+
     """Run setup.py commands on all exported targets addressed."""
     validate_args(setup_py_subsystem.args)
 
@@ -959,4 +1020,5 @@ def rules():
     return [
         *python_sources_rules(),
         *collect_rules(),
+        UnionRule(PackageFieldSet, PythonDistributionFieldSet),
     ]

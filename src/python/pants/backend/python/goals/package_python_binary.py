@@ -114,13 +114,13 @@ async def package_python_binary(
             )
         ),
     )
-    return BuiltPackage(two_step_pex.pex.digest, relpath=output_filename)
+    return BuiltPackage(two_step_pex.pex.digest, relpaths=(output_filename,))
 
 
 @rule(level=LogLevel.DEBUG)
 async def create_python_binary(field_set: PythonBinaryFieldSet) -> CreatedBinary:
     pex = await Get(BuiltPackage, PackageFieldSet, field_set)
-    return CreatedBinary(pex.digest, pex.relpath)
+    return CreatedBinary(pex.digest, pex.relpaths[0])
 
 
 def rules():
