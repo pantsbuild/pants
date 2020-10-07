@@ -50,6 +50,7 @@ from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    DependenciesRequestLite,
     FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
@@ -69,6 +70,7 @@ from pants.engine.target import (
     TargetWithOrigin,
     TransitiveTargets,
     TransitiveTargetsRequest,
+    TransitiveTargetsRequestLite,
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -92,7 +94,9 @@ def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(Targets, (DependenciesRequest,)),
+            QueryRule(Targets, (DependenciesRequestLite,)),
             QueryRule(TransitiveTargets, (TransitiveTargetsRequest,)),
+            QueryRule(TransitiveTargets, (TransitiveTargetsRequestLite,)),
         ],
         target_types=[MockTarget],
     )
@@ -136,6 +140,18 @@ def test_transitive_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
     assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
 
+    # Now test with TransitiveTargetsLite.
+    direct_deps = transitive_targets_rule_runner.request(
+        Targets, [DependenciesRequestLite(root[Dependencies])]
+    )
+    assert direct_deps == Targets([d1, d2, d3])
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets, [TransitiveTargetsRequestLite([root.address, d2.address])]
+    )
+    assert transitive_targets.roots == (root, d2)
+    assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
+    assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
+
 
 def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: RuleRunner) -> None:
     transitive_targets_rule_runner.add_to_build_file(
@@ -163,6 +179,18 @@ def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: R
 
     transitive_targets = transitive_targets_rule_runner.request(
         TransitiveTargets, [TransitiveTargetsRequest([root.address, intermediate.address])]
+    )
+    assert transitive_targets.roots == (root, intermediate)
+    assert transitive_targets.dependencies == FrozenOrderedSet([intermediate])
+    assert transitive_targets.closure == FrozenOrderedSet([root, intermediate])
+
+    # Test with TransitiveTargetsLite.
+    intermediate_direct_deps = transitive_targets_rule_runner.request(
+        Targets, [DependenciesRequestLite(intermediate[Dependencies])]
+    )
+    assert intermediate_direct_deps == Targets([base])
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets, [TransitiveTargetsRequestLite([root.address, intermediate.address])]
     )
     assert transitive_targets.roots == (root, intermediate)
     assert transitive_targets.dependencies == FrozenOrderedSet([intermediate])
@@ -1085,6 +1113,7 @@ def dependencies_rule_runner() -> RuleRunner:
             inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
             QueryRule(Addresses, (DependenciesRequest,)),
+            QueryRule(Addresses, (DependenciesRequestLite,)),
             UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
@@ -1098,12 +1127,11 @@ def assert_dependencies_resolved(
     *,
     requested_address: Address,
     expected: Iterable[Address],
+    lite: bool = False,
 ) -> None:
     target = rule_runner.get_target(requested_address)
-    result = rule_runner.request(
-        Addresses,
-        [DependenciesRequest(target[Dependencies])],
-    )
+    request_cls = DependenciesRequestLite if lite else DependenciesRequest
+    result = rule_runner.request(Addresses, [request_cls(target[Dependencies])])
     assert sorted(result) == sorted(expected)
 
 
@@ -1120,11 +1148,24 @@ def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
             Address("src/smalltalk", target_name="sibling"),
         ],
     )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        requested_address=Address("src/smalltalk"),
+        expected=[
+            Address("", target_name="dep1"),
+            Address("", target_name="dep2"),
+            Address("src/smalltalk", target_name="sibling"),
+        ],
+        lite=True,
+    )
 
     # Also test that we handle no dependencies.
     dependencies_rule_runner.add_to_build_file("no_deps", "smalltalk()")
     assert_dependencies_resolved(
         dependencies_rule_runner, requested_address=Address("no_deps"), expected=[]
+    )
+    assert_dependencies_resolved(
+        dependencies_rule_runner, requested_address=Address("no_deps"), expected=[], lite=True
     )
 
     # An ignore should override an include.
@@ -1133,6 +1174,9 @@ def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
     )
     assert_dependencies_resolved(
         dependencies_rule_runner, requested_address=Address("ignore"), expected=[]
+    )
+    assert_dependencies_resolved(
+        dependencies_rule_runner, requested_address=Address("ignore"), expected=[], lite=True
     )
 
 
@@ -1165,6 +1209,15 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
             Address("src/smalltalk/util", relative_file_path="f1.st", target_name="util"),
             Address("src/smalltalk/util", relative_file_path="f2.st", target_name="util"),
         ],
+    )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        requested_address=Address("src/smalltalk"),
+        expected=[
+            Address("src/smalltalk/util", relative_file_path="f1.st", target_name="util"),
+            Address("src/smalltalk/util", relative_file_path="f2.st", target_name="util"),
+        ],
+        lite=True,
     )
 
 
@@ -1318,6 +1371,15 @@ def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
             Address("src/smalltalk", relative_file_path="f2.st"),
         ],
     )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        requested_address=Address("src/smalltalk"),
+        expected=[
+            Address("src/smalltalk", relative_file_path="f1.st"),
+            Address("src/smalltalk", relative_file_path="f2.st"),
+        ],
+        lite=True,
+    )
 
     # Test that a file address depends on its siblings if it has no dependency inference rule,
     # or those inference rules do not claim to infer dependencies on siblings.
@@ -1325,6 +1387,12 @@ def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
         dependencies_rule_runner,
         requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
         expected=[Address("src/smalltalk", relative_file_path="f2.st")],
+    )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
+        expected=[Address("src/smalltalk", relative_file_path="f2.st")],
+        lite=True,
     )
 
     # Now we recreate the files so that the mock dependency inference will have results, which
