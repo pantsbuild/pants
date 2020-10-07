@@ -4,15 +4,15 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Optional, Set, Type, TypeVar, Union
+from typing import Optional, Set, Type, TypeVar, Union
 
 import libcst as cst
 from typed_ast import ast27
+from typing_extensions import Protocol
 
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
-
 
 logger = logging.getLogger(__name__)
 
@@ -34,19 +34,9 @@ class ParsedPythonImports:
         return FrozenOrderedSet(sorted([*self.explicit_imports, *self.inferred_imports]))
 
 
-_Visitor = TypeVar("_Visitor")
-
-
-class VisitorInterface:
+class VisitorInterface(Protocol):
     explicit_imports: Set[str]
     inferred_imports: Set[str]
-
-    def __init__(self, module_name: str) -> None:
-        ...
-
-    @classmethod
-    def visit_tree(cls: Type[_Visitor], tree: Any, module_name: str) -> _Visitor:
-        ...
 
 
 def parse_file(*, filename: str, content: str, module_name: str) -> Optional[VisitorInterface]:
@@ -60,8 +50,8 @@ def parse_file(*, filename: str, content: str, module_name: str) -> Optional[Vis
         # TODO(#10922): Support parsing python 3.9/3.10 with libCST!
         config = cst.PartialParserConfig(python_version="3.8")
         cst_tree = cst.parse_module(content, config=config)
-        completed_visitor = _CSTVisitor.visit_tree(cst_tree, module_name=module_name)
-        return completed_visitor
+        completed_cst_visitor = _CSTVisitor.visit_tree(cst_tree, module_name=module_name)
+        return completed_cst_visitor
     except cst.ParserSyntaxError as e:
         # NB: When the python 3 ast visitor fails to parse python 2 syntax, it raises a
         # ParserSyntaxError. This may also occur when the file contains invalid python code. If we
@@ -71,8 +61,8 @@ def parse_file(*, filename: str, content: str, module_name: str) -> Optional[Vis
 
     try:
         py27_tree = ast27.parse(content, filename=filename)
-        completed_visitor = _Py27AstVisitor.visit_tree(py27_tree, module_name=module_name)
-        return completed_visitor
+        completed_ast27_visitor = _Py27AstVisitor.visit_tree(py27_tree, module_name=module_name)
+        return completed_ast27_visitor
     except SyntaxError as e:
         logger.debug(f"Failed to parse {filename} with python 2.7 typed-ast parser: {e}")
 
@@ -97,14 +87,14 @@ def find_python_imports(*, filename: str, content: str, module_name: str) -> Par
 _INFERRED_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\d]*\.){2,}[a-zA-Z_]\w*$")
 
 
-class _Py27AstVisitor(ast27.NodeVisitor, VisitorInterface):
+class _Py27AstVisitor(ast27.NodeVisitor):
     def __init__(self, module_name: str) -> None:
         self._module_parts = module_name.split(".")
         self.explicit_imports: Set[str] = set()
         self.inferred_imports: Set[str] = set()
 
     @classmethod
-    def visit_tree(cls: Type[_Visitor], tree: Any, module_name: str) -> _Visitor:
+    def visit_tree(cls, tree: ast27.AST, module_name: str) -> "_Py27AstVisitor":
         visitor = cls(module_name)
         visitor.visit(tree)
         return visitor
@@ -113,31 +103,30 @@ class _Py27AstVisitor(ast27.NodeVisitor, VisitorInterface):
         if _INFERRED_IMPORT_REGEX.match(s):
             self.inferred_imports.add(s)
 
-    def visit_Import(self, node) -> None:
+    def visit_Import(self, node: ast27.Import) -> None:
         for alias in node.names:
             self.explicit_imports.add(alias.name)
 
-    def visit_ImportFrom(self, node) -> None:
-        rel_module = node.module
-        abs_module = ".".join(
-            self._module_parts[0 : -node.level] + ([] if rel_module is None else [rel_module])
-        )
+    def visit_ImportFrom(self, node: ast27.ImportFrom) -> None:
+        rel_module = [] if node.module is None else [node.module]
+        relative_level = 0 if node.level is None else node.level
+        abs_module = ".".join(self._module_parts[0:-relative_level] + rel_module)
         for alias in node.names:
             self.explicit_imports.add(f"{abs_module}.{alias.name}")
 
-    def visit_Str(self, node) -> None:
+    def visit_Str(self, node: ast27.Str) -> None:
         val = ensure_text(node.s)
         self._maybe_add_inferred_import(val)
 
 
-class _CSTVisitor(cst.CSTVisitor, VisitorInterface):
+class _CSTVisitor(cst.CSTVisitor):
     def __init__(self, module_name: str) -> None:
         self._module_parts = module_name.split(".")
         self.explicit_imports: Set[str] = set()
         self.inferred_imports: Set[str] = set()
 
     @classmethod
-    def visit_tree(cls: Type[_Visitor], tree: Any, module_name: str) -> _Visitor:
+    def visit_tree(cls, tree: cst.Module, module_name: str) -> "_CSTVisitor":
         visitor = cls(module_name)
         tree.visit(visitor)
         return visitor
@@ -148,26 +137,27 @@ class _CSTVisitor(cst.CSTVisitor, VisitorInterface):
         if _INFERRED_IMPORT_REGEX.match(s):
             self.inferred_imports.add(s)
 
-    def _flatten_attribute_or_name(self, node: Optional[Union[cst.Attribute, cst.Name]]) -> str:
-        if node is None:
-            return ""
+    def _flatten_attribute_or_name(self, node: cst.BaseExpression) -> str:
         if isinstance(node, cst.Name):
             return node.value
+        if not isinstance(node, cst.Attribute):
+            raise TypeError(f"Unrecognized cst.BaseExpression subclass: {node}")
         inner = self._flatten_attribute_or_name(node.value)
         return f"{inner}.{node.attr.value}"
 
-    def visit_Import(self, node) -> None:
+    def visit_Import(self, node: cst.Import) -> None:
         for alias in node.names:
             self.explicit_imports.add(self._flatten_attribute_or_name(alias.name))
 
-    def visit_ImportFrom(self, node) -> None:
-        rel_module = self._flatten_attribute_or_name(node.module)
-        abs_module = ".".join(
-            self._module_parts[0 : -len(node.relative)]
-            + ([] if rel_module is None else [rel_module])
-        )
-        for alias in node.names:
-            self.explicit_imports.add(f"{abs_module}.{alias.name.value}")
+    def visit_ImportFrom(self, node: cst.ImportFrom) -> None:
+        rel_module = [] if node.module is None else [self._flatten_attribute_or_name(node.module)]
+        relative_level = len(node.relative)
+        abs_module = ".".join(self._module_parts[0:-relative_level] + rel_module)
+        if isinstance(node.names, cst.ImportStar):
+            self.explicit_imports.add(f"{abs_module}.*")
+        else:
+            for alias in node.names:
+                self.explicit_imports.add(f"{abs_module}.{alias.name.value}")
 
-    def visit_SimpleString(self, node) -> None:
+    def visit_SimpleString(self, node: cst.SimpleString) -> None:
         self._maybe_add_inferred_import(node.evaluated_value)

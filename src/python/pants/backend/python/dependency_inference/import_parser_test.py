@@ -1,10 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import sys
 from textwrap import dedent
-
-import pytest
 
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
 
