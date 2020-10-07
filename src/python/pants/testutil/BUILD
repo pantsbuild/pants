@@ -14,10 +14,6 @@ python_distribution(
       'Topic :: Software Development :: Testing',
     ]
   ),
-  setup_py_commands=[
-    "bdist_wheel",
-    "sdist"
-  ]
 )
 
 python_library(

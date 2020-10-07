@@ -529,7 +529,7 @@ class PythonDistributionDependencies(Dependencies):
 
 
 class PythonProvidesField(ScalarField, ProvidesField):
-    """The`setup.py` kwargs for the external artifact built from this target.
+    """The setup.py kwargs for the external artifact built from this target.
 
     See https://www.pantsbuild.org/docs/python-setup-py-goal.
     """
@@ -547,10 +547,18 @@ class PythonProvidesField(ScalarField, ProvidesField):
 
 
 class SetupPyCommandsField(StringSequenceField):
-    """The runtime commands to invoke setup.py with to create the distribution."""
+    """The runtime commands to invoke setup.py with to create the distribution.
+
+    E.g., ["bdist_wheel", "--python-tag=py36.py37", "sdist"]
+
+    If empty or unspecified, will just create a chroot with a setup() function.
+
+    See https://www.pantsbuild.org/docs/python-setup-py-goal.
+    """
 
     alias = "setup_py_commands"
-    expected_type_description = "an iterable of string commands to invoke setup.py with"
+    expected_type_description = ("an iterable of string commands to invoke setup.py with, or "
+                                 "an empty list to just create a chroot with a setup() function.")
 
 
 class PythonDistribution(Target):

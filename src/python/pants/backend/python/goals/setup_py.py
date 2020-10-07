@@ -394,8 +394,11 @@ async def package_python_dist(
     )
 
     # If commands were provided, run setup.py with them; Otherwise just dump chroots.
+    commands = None
     if exported_target.target.has_field(SetupPyCommandsField):
-        commands = exported_target.target[SetupPyCommandsField].value or ()
+        commands = exported_target.target[SetupPyCommandsField].value
+
+    if commands:
         validate_commands(commands)
         setup_py_result = await Get(
             RunSetupPyResult,
@@ -406,7 +409,6 @@ async def package_python_dist(
             setup_py_result.output,
             relpaths=dist_snapshot.files,
         )
-
     else:
         dirname = f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}"
         rel_chroot = await Get(Digest, AddPrefix(chroot.digest, dirname))
