@@ -354,9 +354,9 @@ class SetupPy(Goal):
     subsystem_cls = SetupPySubsystem
 
 
-def validate_args(args: Tuple[str, ...]):
+def validate_commands(commands: Tuple[str, ...]):
     # We rely on the dist dir being the default, so we know where to find the created dists.
-    if "--dist-dir" in args or "-d" in args:
+    if "--dist-dir" in commands or "-d" in commands:
         raise InvalidSetupPyArgs(
             "Cannot set --dist-dir/-d in setup.py args. To change where dists "
             "are written, use the global --pants-distdir option."
@@ -368,7 +368,7 @@ def validate_args(args: Tuple[str, ...]):
     # the default version used by our Setuptools subsystem.
     # TODO: A `publish` rule, that can invoke Twine to do the actual uploading.
     #  See https://github.com/pantsbuild/pants/issues/8935.
-    if "upload" in args or "register" in args:
+    if "upload" in commands or "register" in commands:
         raise InvalidSetupPyArgs("Cannot use the `upload` or `register` setup.py commands")
 
 
@@ -395,11 +395,11 @@ async def package_python_dist(
 
     # If commands were provided, run setup.py with them; Otherwise just dump chroots.
     if exported_target.target.has_field(SetupPyCommandsField):
+        commands = exported_target.target[SetupPyCommandsField].value or ()
+        validate_commands(commands)
         setup_py_result = await Get(
             RunSetupPyResult,
-            RunSetupPyRequest(
-                exported_target, chroot, exported_target.target[SetupPyCommandsField].value or ()
-            ),
+            RunSetupPyRequest(exported_target, chroot, commands),
         )
         dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
         return BuiltPackage(
@@ -433,7 +433,7 @@ async def run_setup_pys(
     )
 
     """Run setup.py commands on all exported targets addressed."""
-    validate_args(setup_py_subsystem.args)
+    validate_commands(setup_py_subsystem.args)
 
     # Get all exported targets, ignoring any non-exported targets that happened to be
     # globbed over, but erroring on any explicitly-requested non-exported targets.

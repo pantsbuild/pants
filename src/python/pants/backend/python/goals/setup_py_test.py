@@ -30,7 +30,7 @@ from pants.backend.python.goals.setup_py import (
     get_owned_dependencies,
     get_requirements,
     get_sources,
-    validate_args,
+    validate_commands,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
@@ -729,14 +729,14 @@ def test_get_owner_multiple_ancestor_generations(exporting_owner_rule_runner: Ru
 
 def test_validate_args() -> None:
     with pytest.raises(InvalidSetupPyArgs):
-        validate_args(("bdist_wheel", "upload"))
+        validate_commands(("bdist_wheel", "upload"))
     with pytest.raises(InvalidSetupPyArgs):
-        validate_args(("sdist", "-d", "new_distdir/"))
+        validate_commands(("sdist", "-d", "new_distdir/"))
     with pytest.raises(InvalidSetupPyArgs):
-        validate_args(("--dist-dir", "new_distdir/", "sdist"))
+        validate_commands(("--dist-dir", "new_distdir/", "sdist"))
 
-    validate_args(("sdist",))
-    validate_args(("bdist_wheel", "--foo"))
+    validate_commands(("sdist",))
+    validate_commands(("bdist_wheel", "--foo"))
 
 
 def test_distutils_repr() -> None:
