@@ -6,7 +6,7 @@ import sys
 import termios
 import time
 from contextlib import contextmanager
-from typing import List, Mapping, cast
+from typing import List, Mapping
 
 import psutil
 
@@ -145,7 +145,7 @@ class RemotePantsRunner:
             with ExceptionSink.trapped_signals(pantsd_signal_handler), STTYSettings.preserved():
                 try:
                     output = rust_nailgun_client.execute(signal_fn, command, args, modified_env)
-                    return cast(ExitCode, output)
+                    return output
 
                 # NailgunConnectionException represents a failure connecting to pantsd, so we retry
                 # up to the retry limit.

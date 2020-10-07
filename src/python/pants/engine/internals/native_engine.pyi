@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable, Dict, List
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
@@ -31,6 +31,12 @@ class PyGeneratorResponseGetMulti:
 
 class PyNailgunServer:
     def __init__(self, **kwargs: Any) -> None: ...
+
+class PyNailgunClient:
+    def __init__(self, **kwargs: Any) -> None: ...
+    def execute(
+        self, signal_fn: Callable, command: str, args: List[str], env: Dict[str, str]
+    ) -> int: ...
 
 class PyRemotingOptions:
     def __init__(self, **kwargs: Any) -> None: ...
