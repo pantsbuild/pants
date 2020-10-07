@@ -110,9 +110,9 @@ class ExceptionSink:
     # Where to log stacktraces to in a SIGUSR2 handler.
     _interactive_output_stream = None
 
-    # An instance of `SignalHandler` which is invoked to handle a static set of specific
-    # nonfatal signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they
-    # don't need to exit immediately).
+    # An instance of `SignalHandler` which is invoked to handle a static set of specific nonfatal
+    # signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they don't
+    # need to exit immediately).
     _signal_handler: SignalHandler = SignalHandler(pantsd_instance=False)
 
     # These persistent open file descriptors are kept so the signal handler can do almost no work
@@ -120,6 +120,7 @@ class ExceptionSink:
     _pid_specific_error_fileobj = None
     _shared_error_fileobj = None
 
+    # Set in methods on SignalHandler and exposed to the engine rust code.
     _signal_sent: Optional[int] = None
 
     def __new__(cls, *args, **kwargs):
@@ -360,7 +361,8 @@ Exception message: {exception_message}{maybe_newline}
 
         extra_err_msg = None
         try:
-            # Always output the unhandled exception details into a log file, including the traceback.
+            # Always output the unhandled exception details into a log file, including the
+            # traceback.
             exception_log_entry = cls._format_unhandled_exception_log(
                 exc, tb, add_newline, should_print_backtrace=True
             )
@@ -369,8 +371,13 @@ Exception message: {exception_message}{maybe_newline}
             extra_err_msg = "Additional error logging unhandled exception {}: {}".format(exc, e)
             logger.error(extra_err_msg)
 
-        # Generate an unhandled exception report fit to be printed to the terminal.
-        logger.exception(exc)
+        # The rust logger implementation will have its own stacktrace, but at import time, we want
+        # to be able to see any stacktrace to know where the error is being raised, so we reproduce
+        # it here.
+        exception_log_entry = cls._format_unhandled_exception_log(
+            exc, tb, add_newline, should_print_backtrace=True
+        )
+        logger.exception(exception_log_entry)
 
     @classmethod
     def _handle_signal_gracefully(cls, signum, signame, traceback_lines):
