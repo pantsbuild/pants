@@ -131,7 +131,7 @@ class ExceptionSink:
     _pid_specific_error_fileobj = None
     _shared_error_fileobj = None
 
-    # Set in methods on SignalHandler and exposed to the engine rust code.
+    # Stores a signal received by the signal-handling logic so that rust code can check for it.
     _signal_sent: Optional[int] = None
 
     def __new__(cls, *args, **kwargs):
