@@ -4,7 +4,7 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional, Set, Type, TypeVar, Union
+from typing import Optional, Set, Union
 
 import libcst as cst
 from typed_ast import ast27
@@ -32,6 +32,10 @@ class ParsedPythonImports:
     @memoized_property
     def all_imports(self) -> FrozenOrderedSet[str]:
         return FrozenOrderedSet(sorted([*self.explicit_imports, *self.inferred_imports]))
+
+    @classmethod
+    def empty(cls) -> "ParsedPythonImports":
+        return cls(FrozenOrderedSet(), FrozenOrderedSet())
 
 
 class VisitorInterface(Protocol):
@@ -75,7 +79,7 @@ def find_python_imports(*, filename: str, content: str, module_name: str) -> Par
     # propagating the exception. Dependency inference simply won't be used for that file, and
     # it'll be up to the tool actually being run (e.g. Pytest or Flake8) to error.
     if completed_visitor is None:
-        return ParsedPythonImports(FrozenOrderedSet(), FrozenOrderedSet())
+        return ParsedPythonImports.empty()
     return ParsedPythonImports(
         explicit_imports=FrozenOrderedSet(sorted(completed_visitor.explicit_imports)),
         inferred_imports=FrozenOrderedSet(sorted(completed_visitor.inferred_imports)),
