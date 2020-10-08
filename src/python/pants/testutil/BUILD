@@ -13,7 +13,7 @@ python_distribution(
     classifiers=[
       'Topic :: Software Development :: Testing',
     ]
-  )
+  ),
 )
 
 python_library(

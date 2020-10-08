@@ -3,7 +3,7 @@
 
 import os
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, cast
 
 from pants.backend.python.target_types import (
     PexAlwaysWriteCache,
@@ -23,7 +23,12 @@ from pants.backend.python.util_rules.pex_from_targets import (
     TwoStepPexFromTargetsRequest,
 )
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
-from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    BuiltPackageArtifact,
+    OutputPathField,
+    PackageFieldSet,
+)
 from pants.core.goals.run import RunFieldSet
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, collect_rules, rule
@@ -114,13 +119,13 @@ async def package_python_binary(
             )
         ),
     )
-    return BuiltPackage(two_step_pex.pex.digest, relpath=output_filename)
+    return BuiltPackage(two_step_pex.pex.digest, (BuiltPackageArtifact(output_filename),))
 
 
 @rule(level=LogLevel.DEBUG)
 async def create_python_binary(field_set: PythonBinaryFieldSet) -> CreatedBinary:
     pex = await Get(BuiltPackage, PackageFieldSet, field_set)
-    return CreatedBinary(pex.digest, pex.relpath)
+    return CreatedBinary(pex.digest, cast(str, pex.artifacts[0].relpath))
 
 
 def rules():

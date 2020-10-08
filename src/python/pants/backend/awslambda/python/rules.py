@@ -23,7 +23,12 @@ from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
-from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    BuiltPackageArtifact,
+    OutputPathField,
+    PackageFieldSet,
+)
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
@@ -115,8 +120,12 @@ async def package_python_awslambda(field_set: PythonAwsLambdaFieldSet) -> BuiltP
     awslambda = await Get(CreatedAWSLambda, AWSLambdaFieldSet, field_set)
     return BuiltPackage(
         awslambda.digest,
-        relpath=awslambda.zip_file_relpath,
-        extra_log_info=f"  Runtime: {awslambda.runtime}\n  Handler: {awslambda.handler}",
+        (
+            BuiltPackageArtifact(
+                awslambda.zip_file_relpath,
+                (f"    Runtime: {awslambda.runtime}", f"    Handler: {awslambda.handler}"),
+            ),
+        ),
     )
 
 
