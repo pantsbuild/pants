@@ -13,10 +13,9 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.run import RunFieldSet, RunRequest
-from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import InvalidFieldException, TransitiveTargets
+from pants.engine.target import InvalidFieldException, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -49,7 +48,7 @@ async def create_python_binary_run_request(
         entry_point = PythonBinarySources.translate_source_file_to_entry_point(
             os.path.relpath(entry_point_path, source_root.path)
         )
-    transitive_targets = await Get(TransitiveTargets, Addresses([field_set.address]))
+    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
 
     # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
     # so that we can get the interpreter constraints for use in runner_pex_request.

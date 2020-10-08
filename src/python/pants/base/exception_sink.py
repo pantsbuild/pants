@@ -59,14 +59,23 @@ class SignalHandler:
             with self._ignore_sigint_lock:
                 self._ignoring_sigint = toggle
 
-    def handle_sigint(self, signum: int, _frame):
+    def _send_signal_to_children(self, received_signal: int, signame: str) -> None:
+        """Send a signal to any children of this process in order.
+
+        Pants may have spawned multiple subprocesses via Python or Rust. Upon receiving a signal,
+        this method is invoked to propagate the signal to all children, regardless of how they were
+        spawned.
+        """
+
         self_process = psutil.Process()
         children = self_process.children()
-        logger.debug(f"Sending SIGINT to child processes: {children}")
+        logger.debug(f"Sending signal {signame} ({received_signal}) to child processes: {children}")
         for child_process in children:
-            child_process.send_signal(signal.SIGINT)
+            child_process.send_signal(received_signal)
 
+    def handle_sigint(self, signum: int, _frame):
         ExceptionSink._signal_sent = signum
+        self._send_signal_to_children(signum, "SIGINT")
         raise KeyboardInterrupt("User interrupted execution with control-c!")
 
     # TODO(#7406): figure out how to let sys.exit work in a signal handler instead of having to raise
@@ -93,10 +102,12 @@ class SignalHandler:
 
     def handle_sigquit(self, signum, _frame):
         ExceptionSink._signal_sent = signum
+        self._send_signal_to_children(signum, "SIGQUIT")
         raise self.SignalHandledNonLocalExit(signum, "SIGQUIT")
 
     def handle_sigterm(self, signum, _frame):
         ExceptionSink._signal_sent = signum
+        self._send_signal_to_children(signum, "SIGTERM")
         raise self.SignalHandledNonLocalExit(signum, "SIGTERM")
 
 
@@ -110,9 +121,9 @@ class ExceptionSink:
     # Where to log stacktraces to in a SIGUSR2 handler.
     _interactive_output_stream = None
 
-    # An instance of `SignalHandler` which is invoked to handle a static set of specific
-    # nonfatal signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they
-    # don't need to exit immediately).
+    # An instance of `SignalHandler` which is invoked to handle a static set of specific nonfatal
+    # signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they don't
+    # need to exit immediately).
     _signal_handler: SignalHandler = SignalHandler(pantsd_instance=False)
 
     # These persistent open file descriptors are kept so the signal handler can do almost no work
@@ -120,6 +131,7 @@ class ExceptionSink:
     _pid_specific_error_fileobj = None
     _shared_error_fileobj = None
 
+    # Stores a signal received by the signal-handling logic so that rust code can check for it.
     _signal_sent: Optional[int] = None
 
     def __new__(cls, *args, **kwargs):
@@ -360,7 +372,8 @@ Exception message: {exception_message}{maybe_newline}
 
         extra_err_msg = None
         try:
-            # Always output the unhandled exception details into a log file, including the traceback.
+            # Always output the unhandled exception details into a log file, including the
+            # traceback.
             exception_log_entry = cls._format_unhandled_exception_log(
                 exc, tb, add_newline, should_print_backtrace=True
             )
@@ -369,8 +382,13 @@ Exception message: {exception_message}{maybe_newline}
             extra_err_msg = "Additional error logging unhandled exception {}: {}".format(exc, e)
             logger.error(extra_err_msg)
 
-        # Generate an unhandled exception report fit to be printed to the terminal.
-        logger.exception(exc)
+        # The rust logger implementation will have its own stacktrace, but at import time, we want
+        # to be able to see any stacktrace to know where the error is being raised, so we reproduce
+        # it here.
+        exception_log_entry = cls._format_unhandled_exception_log(
+            exc, tb, add_newline, should_print_backtrace=True
+        )
+        logger.exception(exception_log_entry)
 
     @classmethod
     def _handle_signal_gracefully(cls, signum, signame, traceback_lines):

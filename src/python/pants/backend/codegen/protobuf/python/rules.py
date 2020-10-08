@@ -1,5 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from pathlib import PurePath
 
 from pants.backend.codegen.protobuf.protoc import Protoc
@@ -9,7 +10,6 @@ from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -22,7 +22,13 @@ from pants.engine.fs import (
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import GeneratedSources, GenerateSourcesRequest, Sources, TransitiveTargets
+from pants.engine.target import (
+    GeneratedSources,
+    GenerateSourcesRequest,
+    Sources,
+    TransitiveTargets,
+    TransitiveTargetsRequestLite,
+)
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -47,7 +53,11 @@ async def generate_python_from_protobuf(
     # Protoc needs all transitive dependencies on `protobuf_libraries` to work properly. It won't
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
-    transitive_targets = await Get(TransitiveTargets, Addresses([request.protocol_target.address]))
+    # TODO(#10917): Use TransitiveTargets instead of TransitiveTargetsLite.
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequestLite([request.protocol_target.address])
+    )
+
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
     # for Protobuf imports to be discoverable.
     all_stripped_sources_request = Get(

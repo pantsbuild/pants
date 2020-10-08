@@ -41,7 +41,7 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -50,6 +50,7 @@ from pants.engine.target import (
     FieldSetsPerTargetRequest,
     Targets,
     TransitiveTargets,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
@@ -103,9 +104,9 @@ async def setup_pytest_for_target(
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
 ) -> TestSetup:
-    test_addresses = Addresses((request.field_set.address,))
-
-    transitive_targets = await Get(TransitiveTargets, Addresses, test_addresses)
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])
+    )
     all_targets = transitive_targets.closure
 
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
@@ -121,7 +122,7 @@ async def setup_pytest_for_target(
     requirements_pex_request = Get(
         Pex,
         PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(test_addresses, internal_only=True),
+        PexFromTargetsRequest.for_requirements([request.field_set.address], internal_only=True),
     )
 
     pytest_pex_request = Get(

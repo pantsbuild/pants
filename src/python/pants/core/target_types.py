@@ -159,7 +159,7 @@ class RelocateFilesViaCodegenRequest(GenerateSourcesRequest):
 async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSources:
     # Unlike normal codegen, we operate the on the sources of the `files_targets` field, not the
     # `sources` of the original `relocated_sources` target.
-    # TODO: using `await Get(Addresses, UnparsedAddressInputs)` causes a graph failure.
+    # TODO(#10915): using `await Get(Addresses, UnparsedAddressInputs)` causes a graph failure.
     original_files_targets = await MultiGet(
         Get(
             WrappedTarget,
