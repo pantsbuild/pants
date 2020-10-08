@@ -379,7 +379,7 @@ async def package_python_dist(
     python_setup: PythonSetup,
 ) -> BuiltPackage:
 
-    transitive_targets = await Get(TransitiveTargets, Addresses([field_set.address]))
+    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
