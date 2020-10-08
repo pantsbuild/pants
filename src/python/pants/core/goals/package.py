@@ -112,10 +112,12 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     workspace.write_digest(merged_snapshot.digest, path_prefix=str(dist_dir.relpath))
     for pkg in packages:
         for artifact in pkg.artifacts:
+            msg = ""
             if artifact.relpath:
-                logger.info(f"Wrote {dist_dir.relpath / artifact.relpath}")
+                msg += f"Wrote {dist_dir.relpath / artifact.relpath}"
             for line in artifact.extra_log_lines:
-                logger.info(line)
+                msg += f"\n{line}"
+            logger.info(msg)
     return Package(exit_code=0)
 
 
