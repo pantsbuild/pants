@@ -138,10 +138,15 @@ class ExternalTool(Subsystem):
         to a URL. The raised exception need not have a message - a sensible one will be generated.
         """
 
-    @abstractmethod
     def generate_exe(self, plat: Platform) -> str:
-        """Returns the relative path in the downloaded archive to the given version of the tool,
-        e.g. `./bin/protoc`."""
+        """Returns the path to the tool executable.
+
+        If the downloaded artifact is the executable itself, you can leave this unimplemented.
+
+        If the downloaded artifact is an archive, this should be overridden to provide a
+        relative path in the downloaded archive, e.g. `bin/protoc`.
+        """
+        return self.generate_url(plat).rsplit("/", 1)[-1]
 
     def get_request(self, plat: Platform) -> ExternalToolRequest:
         """Generate a request for this tool."""
