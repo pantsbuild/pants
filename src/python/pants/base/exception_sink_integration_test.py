@@ -80,8 +80,8 @@ def test_logs_unhandled_exception() -> None:
         pants_run = run_pants_with_workdir(
             ["--no-pantsd", "list", f"{directory}:this-target-does-not-exist"],
             workdir=tmpdir,
-            # The backtrace should be omitted when --print-exception-stacktrace=False.
-            print_exception_stacktrace=False,
+            # The backtrace should be omitted when --print-stacktrace=False.
+            print_stacktrace=False,
             hermetic=False,
         )
 

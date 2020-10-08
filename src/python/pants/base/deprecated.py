@@ -297,10 +297,14 @@ def resolve_conflicting_options(
     new_scope: str,
     old_container: Any,
     new_container: Any,
-):
+) -> Any:
     """Utility for resolving an option that's been migrated to a new location.
 
-    This ensures that the user does not try to specify both options.
+    This will check if either option was explicitly configured, and if so, use that. If both were
+    configured, it will error. Otherwise, it will use the default value for the new, preferred
+    option.
+
+    The option names should use snake_case, rather than --kebab-case.
     """
     old_configured = not old_container.is_default(old_option)
     new_configured = not new_container.is_default(new_option)

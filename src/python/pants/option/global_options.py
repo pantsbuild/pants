@@ -563,15 +563,20 @@ class GlobalOptions(Subsystem):
             "of the directory will be overwritten if any filenames collide.",
         )
         register(
+            "--print-stacktrace",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="Print the full exception stack trace for any errors.",
+        )
+        register(
             "--print-exception-stacktrace",
             advanced=True,
             type=bool,
             default=False,
-            # TODO: We must restart the daemon because of global mutable state in `init/logging.py`
-            #  from `ExceptionSink.should_print_exception_stacktrace`. Fix this and only use
-            #  `fingerprint=True` instead.
-            daemon=True,
             help="Print to console the full exception stack trace if encountered.",
+            removal_version="2.1.0.dev0",
+            removal_hint="Use `--print-stacktrace` instead of `--print-exception-stacktrace`.",
         )
 
         # BinaryUtil options.
