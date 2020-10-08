@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import cast
+
 from pants.backend.codegen.protobuf.target_types import ProtobufDependencies
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
@@ -32,10 +34,23 @@ class PythonProtobufSubsystem(Subsystem):
                 "be automatically added to every `protobuf_library` target"
             ),
         )
+        register(
+            "--mypy-plugin",
+            type=bool,
+            default=False,
+            help=(
+                "Use the `mypy-protobuf` plugin (https://github.com/dropbox/mypy-protobuf) to "
+                "also generate .pyi type stubs."
+            ),
+        )
 
     @property
     def runtime_dependencies(self) -> UnparsedAddressInputs:
         return UnparsedAddressInputs(self.options.runtime_dependencies, owning_address=None)
+
+    @property
+    def mypy_plugin(self) -> bool:
+        return cast(bool, self.options.mypy_plugin)
 
 
 class InjectPythonProtobufDependencies(InjectDependenciesRequest):
