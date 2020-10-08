@@ -45,7 +45,11 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, by
     )
     built_asset = rule_runner.request(BuiltPackage, [PythonAwsLambdaFieldSet.create(target)])
     assert created_awslambda.digest == built_asset.digest
-    assert created_awslambda.zip_file_relpath == built_asset.relpaths[0]
+    assert created_awslambda.zip_file_relpath == built_asset.artifacts[0].relpath
+    assert (
+        "    Runtime: python3.7",
+        "    Handler: lambdex_handler.handler",
+    ) == built_asset.artifacts[0].extra_log_lines
     created_awslambda_digest_contents = rule_runner.request(
         DigestContents, [created_awslambda.digest]
     )

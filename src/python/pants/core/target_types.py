@@ -4,7 +4,12 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    BuiltPackageArtifact,
+    OutputPathField,
+    PackageFieldSet,
+)
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
 from pants.engine.addresses import AddressInput, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
@@ -344,7 +349,7 @@ async def package_archive_target(
             format=ArchiveFormat(field_set.format_field.value),
         ),
     )
-    return BuiltPackage(archive, relpaths=(output_filename,))
+    return BuiltPackage(archive, (BuiltPackageArtifact(output_filename),))
 
 
 def rules():

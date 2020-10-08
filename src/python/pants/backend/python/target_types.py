@@ -557,8 +557,10 @@ class SetupPyCommandsField(StringSequenceField):
     """
 
     alias = "setup_py_commands"
-    expected_type_description = ("an iterable of string commands to invoke setup.py with, or "
-                                 "an empty list to just create a chroot with a setup() function.")
+    expected_type_description = (
+        "an iterable of string commands to invoke setup.py with, or "
+        "an empty list to just create a chroot with a setup() function."
+    )
 
 
 class PythonDistribution(Target):

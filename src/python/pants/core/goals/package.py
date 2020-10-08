@@ -5,7 +5,7 @@ import logging
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Tuple
 
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
@@ -29,12 +29,20 @@ class PackageFieldSet(FieldSet, metaclass=ABCMeta):
 
 
 @dataclass(frozen=True)
+class BuiltPackageArtifact:
+    """Information about artifacts in a built package.
+
+    Used for logging information about the artifacts that are dumped to the distdir.
+    """
+
+    relpath: Optional[str]
+    extra_log_lines: Tuple[str, ...] = tuple()
+
+
+@dataclass(frozen=True)
 class BuiltPackage:
     digest: Digest
-    relpaths: Tuple[
-        str, ...
-    ]  # Used only for logging. Should reflect the package's paths in digest.
-    extra_logs: Tuple[str, ...] = tuple()
+    artifacts: Tuple[BuiltPackageArtifact, ...]
 
 
 class OutputPathField(StringField):
@@ -96,17 +104,18 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
             error_if_no_applicable_targets=True,
         ),
     )
-    assets = await MultiGet(
+    packages = await MultiGet(
         Get(BuiltPackage, PackageFieldSet, field_set)
         for field_set in target_roots_to_field_sets.field_sets
     )
-    merged_snapshot = await Get(Snapshot, MergeDigests(asset.digest for asset in assets))
+    merged_snapshot = await Get(Snapshot, MergeDigests(pkg.digest for pkg in packages))
     workspace.write_digest(merged_snapshot.digest, path_prefix=str(dist_dir.relpath))
-    for asset in assets:
-        for asset_relpath in asset.relpaths:
-            logger.info(f"Wrote {dist_dir.relpath / asset_relpath}")
-        for extra_log in asset.extra_logs:
-            logger.info(extra_log)
+    for pkg in packages:
+        for artifact in pkg.artifacts:
+            if artifact.relpath:
+                logger.info(f"Wrote {dist_dir.relpath / artifact.relpath}")
+            for line in artifact.extra_log_lines:
+                logger.info(line)
     return Package(exit_code=0)
 
 

@@ -39,7 +39,7 @@ from pants.base.specs import (
     AscendantAddresses,
     FilesystemLiteralSpec,
 )
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
@@ -394,10 +394,7 @@ async def package_python_dist(
     )
 
     # If commands were provided, run setup.py with them; Otherwise just dump chroots.
-    commands = None
-    if exported_target.target.has_field(SetupPyCommandsField):
-        commands = exported_target.target[SetupPyCommandsField].value
-
+    commands = exported_target.target.get(SetupPyCommandsField).value or ()
     if commands:
         validate_commands(commands)
         setup_py_result = await Get(
@@ -407,15 +404,12 @@ async def package_python_dist(
         dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
         return BuiltPackage(
             setup_py_result.output,
-            relpaths=dist_snapshot.files,
+            tuple(BuiltPackageArtifact(path) for path in dist_snapshot.files),
         )
     else:
         dirname = f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}"
         rel_chroot = await Get(Digest, AddPrefix(chroot.digest, dirname))
-        return BuiltPackage(
-            rel_chroot,
-            relpaths=(f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}",),
-        )
+        return BuiltPackage(rel_chroot, (BuiltPackageArtifact(dirname),))
 
 
 @goal_rule
