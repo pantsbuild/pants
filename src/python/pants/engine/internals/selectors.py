@@ -62,9 +62,9 @@ class GetConstraints:
     output_type: Type
     input_type: Type
 
-    @classmethod
+    @staticmethod
     def parse_input_and_output_types(
-        cls, get_args: Sequence[ast.expr], *, source_file_name: str
+        get_args: Sequence[ast.expr], *, source_file_name: str
     ) -> Tuple[str, str]:
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=source_file_name)
 
@@ -559,7 +559,7 @@ async def MultiGet(  # noqa: F811
             return f"Get({arg.output_type.__name__}, {arg.input_type.__name__}, ...)"
         return repr(arg)
 
-    likely_args_exlicitly_passed = tuple(
+    likely_args_explicitly_passed = tuple(
         reversed(
             [
                 render_arg(arg)
@@ -567,12 +567,12 @@ async def MultiGet(  # noqa: F811
             ]
         )
     )
-    if any(arg is None for arg in likely_args_exlicitly_passed):
+    if any(arg is None for arg in likely_args_explicitly_passed):
         raise ValueError(
             dedent(
                 f"""\
                 Unexpected MultiGet None arguments: {', '.join(
-                    map(str, likely_args_exlicitly_passed)
+                    map(str, likely_args_explicitly_passed)
                 )}
 
                 When constructing a MultiGet from individual Gets all leading arguments must be
@@ -584,7 +584,7 @@ async def MultiGet(  # noqa: F811
     raise TypeError(
         dedent(
             f"""\
-            Unexpected MultiGet argument types: {', '.join(map(str, likely_args_exlicitly_passed))}
+            Unexpected MultiGet argument types: {', '.join(map(str, likely_args_explicitly_passed))}
 
             A MultiGet can be constructed in two ways:
             1. MultiGet(Iterable[Get[T]]) -> Tuple[T, ...]
