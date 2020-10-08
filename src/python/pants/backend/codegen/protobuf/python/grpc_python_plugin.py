@@ -7,7 +7,7 @@ from pants.util.enums import match
 
 
 class GrpcPythonPlugin(ExternalTool):
-    """The grpc protobuf plugin."""
+    """The grpc protobuf plugin for python."""
 
     options_scope = "grpc_python_plugin"
     default_version = "1.32.0"
