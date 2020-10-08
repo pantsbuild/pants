@@ -11,6 +11,11 @@ from pants.option.subsystem import Subsystem
 
 
 class PythonProtobufSubsystem(Subsystem):
+    """Options related to the Protobuf Python backend.
+
+    See https://www.pantsbuild.org/docs/protobuf.
+    """
+
     options_scope = "python-protobuf"
 
     @classmethod
