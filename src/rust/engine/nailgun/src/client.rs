@@ -27,7 +27,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use nails::execution::{stream_for, ChildInput, ChildOutput, ExitCode};
+use nails::execution::{ChildInput, ChildOutput, ExitCode};
 use nails::Config;
 use tokio::net::TcpStream;
 
@@ -65,10 +65,28 @@ async fn handle_client_output(
 
 async fn handle_client_input(mut stdin_write: mpsc::Sender<ChildInput>) -> Result<(), io::Error> {
   use nails::execution::send_to_io;
-  let mut stdin = stream_for(tokio::io::stdin());
-  while let Some(input_bytes) = stdin.next().await {
+  use std::io::Read;
+  use tokio::sync::mpsc::{UnboundedSender, UnboundedReceiver};
+  use bytes::Bytes;
+
+  let (sender, mut receiver): (UnboundedSender<Box<[u8]>>, UnboundedReceiver<Box<[u8]>>) = tokio::sync::mpsc::unbounded_channel();
+
+  let _handle = tokio::task::spawn_blocking(move || {
+    let mut sync_stdin = std::io::stdin();
+    let mut buf = vec![0; 8196];
+    while let Ok(ret) = sync_stdin.read(&mut buf[..]) {
+      let content = buf[0..ret].to_vec().into_boxed_slice();
+      match sender.send(content) {
+        Ok(()) => (),
+        Err(_) => break,
+      }
+    }
+  });
+
+  while let Some(input_bytes) = receiver.recv().await {
+    let bytes = Bytes::copy_from_slice(&input_bytes);
     stdin_write
-      .send(ChildInput::Stdin(input_bytes?))
+      .send(ChildInput::Stdin(bytes))
       .await
       .map_err(send_to_io)?;
   }
@@ -118,6 +136,8 @@ async fn client_execute_helper(
     nails::client_handle_connection(config, socket, command, stdio_write, stdin_read)
       .await
       .map_err(|err| NailgunClientError::PostConnect(format!("Nailgun client error: {}", err)))?;
+
+  let _ = _input_handler.await;
 
   let () = output_handler
     .await
