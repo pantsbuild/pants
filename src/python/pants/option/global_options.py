@@ -640,8 +640,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=float,
             default=5.0,
-            removal_version="2.1.0.dev0",
-            removal_hint="The pailgun client has been rewritten to no longer use this",
             help="The length of time (in seconds) to wait for further output after sending a "
             "signal to the remote pantsd process before killing it.",
         )

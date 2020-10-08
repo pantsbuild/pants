@@ -29,7 +29,7 @@ class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
                 ["--backend-packages=pants.backend.python", "list", "3rdparty::"]
             )
             ctx.checker.assert_started()
-            assert "[DEBUG] Connecting to pantsd on port" in daemon_run.stderr
+            assert "[DEBUG] connecting to pantsd on port" in daemon_run.stderr_data
 
             pantsd_log = "\n".join(read_pantsd_log(ctx.workdir))
             assert "[DEBUG] Logging reinitialized in pantsd context" in pantsd_log
