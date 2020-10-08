@@ -144,9 +144,9 @@ class ExternalTool(Subsystem):
         If the downloaded artifact is the executable itself, you can leave this unimplemented.
 
         If the downloaded artifact is an archive, this should be overridden to provide a
-        relative path in the downloaded archive, e.g. `bin/protoc`.
+        relative path in the downloaded archive, e.g. `./bin/protoc`.
         """
-        return self.generate_url(plat).rsplit("/", 1)[-1]
+        return f"./{self.generate_url(plat).rsplit('/', 1)[-1]}"
 
     def get_request(self, plat: Platform) -> ExternalToolRequest:
         """Generate a request for this tool."""
