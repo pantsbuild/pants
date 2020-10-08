@@ -49,7 +49,7 @@ async def inject_dependencies(
     _: InjectProtobufDependencies, protoc: Protoc
 ) -> InjectedDependencies:
     addresses = await Get(
-        Addresses, UnparsedAddressInputs((v for v in protoc.runtime_targets), owning_address=None)
+        Addresses, UnparsedAddressInputs(protoc.runtime_targets, owning_address=None)
     )
     return InjectedDependencies(addresses)
 

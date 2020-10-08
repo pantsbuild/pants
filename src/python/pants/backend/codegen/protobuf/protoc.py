@@ -33,6 +33,11 @@ class Protoc(ExternalTool):
                 "will be automatically injected into the `dependencies` field of every "
                 "`protobuf_library`."
             ),
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "Use the option `runtime_dependencies` in the new `[python-protobuf]` scope, which "
+                "behaves identically."
+            ),
         )
 
     def generate_url(self, plat: Platform) -> str:
