@@ -37,6 +37,7 @@ from pants.engine.fs import (
     Snapshot,
     SourcesSnapshot,
 )
+from pants.engine.internals.selectors import MergedGet
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -823,12 +824,15 @@ async def resolve_dependencies(
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
     # of FortranDependencies will use that rule.
     inject_request_types = union_membership.get(InjectDependenciesRequest)
-    all_injected = await MultiGet(
-        Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
-        for inject_request_type in inject_request_types
-        if isinstance(request.field, inject_request_type.inject_for)
+    injected = await MergedGet(
+        InjectedDependencies,
+        InjectDependenciesRequest,
+        (
+            inject_request_type(request.field)
+            for inject_request_type in inject_request_types
+            if isinstance(request.field, inject_request_type.inject_for)
+        ),
     )
-    injected = InjectedDependencies.from_multiple(all_injected)
 
     inference_request_types = union_membership.get(InferDependenciesRequest)
     inferred = InferredDependencies()
@@ -842,15 +846,14 @@ async def resolve_dependencies(
             for inference_request_type in inference_request_types
             if isinstance(sources_field, inference_request_type.infer_from)
         ]
-        all_inferred = await MultiGet(
-            Get(
-                InferredDependencies,
-                InferDependenciesRequest,
-                inference_request_type(sources_field),
-            )
-            for inference_request_type in relevant_inference_request_types
+        inferred = await MergedGet(
+            InferredDependencies,
+            InferDependenciesRequest,
+            (
+                inference_request_type(sources_field)
+                for inference_request_type in relevant_inference_request_types
+            ),
         )
-        inferred = InferredDependencies.from_multiple(all_inferred)
 
     # If this is a base target, or no dependency inference implementation can infer dependencies on
     # a file address's sibling files, then we inject dependencies on all the base target's
@@ -900,12 +903,15 @@ async def resolve_dependencies_lite(
 
     # Inject any dependencies.
     inject_request_types = union_membership.get(InjectDependenciesRequest)
-    all_injected = await MultiGet(
-        Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
-        for inject_request_type in inject_request_types
-        if isinstance(request.field, inject_request_type.inject_for)
+    injected = await MergedGet(
+        InjectedDependencies,
+        InjectDependenciesRequest,
+        (
+            inject_request_type(request.field)
+            for inject_request_type in inject_request_types
+            if isinstance(request.field, inject_request_type.inject_for)
+        ),
     )
-    injected = InjectedDependencies.from_multiple(all_injected)
 
     # Inject dependencies on all the base target's generated subtargets.
     subtargets = await Get(
