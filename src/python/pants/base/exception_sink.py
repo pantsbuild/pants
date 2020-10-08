@@ -75,7 +75,10 @@ class SignalHandler:
 
     def handle_sigint(self, signum: int, _frame):
         ExceptionSink._signal_sent = signum
-        self._send_signal_to_children(signum, "SIGINT")
+
+        # We need to send SIGTERM in this case in order to make sure we shut down a Python repl
+        # that may be a child process of this one.
+        self._send_signal_to_children(int(signal.SIGTERM), "SIGTERM")
         raise KeyboardInterrupt("User interrupted execution with control-c!")
 
     # TODO(#7406): figure out how to let sys.exit work in a signal handler instead of having to raise
