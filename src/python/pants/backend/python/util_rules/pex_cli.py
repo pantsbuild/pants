@@ -102,7 +102,7 @@ async def setup_pex_cli_process(
     tmpdir = ".tmp"
     gets: List[Get] = [
         Get(DownloadedExternalTool, ExternalToolRequest, pex_binary.get_request(Platform.current)),
-        Get(Digest, CreateDigest([Directory(f"{tmpdir}/.reserve")])),
+        Get(Digest, CreateDigest([Directory(tmpdir)])),
     ]
     cert_args = []
 
