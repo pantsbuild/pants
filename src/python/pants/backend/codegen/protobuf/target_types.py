@@ -6,6 +6,7 @@ from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    BoolField,
     Dependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
@@ -30,6 +31,13 @@ class ProtobufSources(Sources):
     expected_file_extensions = (".proto",)
 
 
+class ProtobufGrcpToggle(BoolField):
+    """Whether to generate gRPC code or not."""
+
+    alias = "grpc"
+    default = False
+
+
 class ProtobufLibrary(Target):
     """Protobuf files used to generate various languages.
 
@@ -37,7 +45,7 @@ class ProtobufLibrary(Target):
     """
 
     alias = "protobuf_library"
-    core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources)
+    core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources, ProtobufGrcpToggle)
 
 
 class InjectProtobufDependencies(InjectDependenciesRequest):

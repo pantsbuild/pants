@@ -5,8 +5,9 @@ from pathlib import PurePath
 
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
+from pants.backend.codegen.protobuf.python.grpc_python_plugin import GrpcPythonPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
-from pants.backend.codegen.protobuf.target_types import ProtobufSources
+from pants.backend.codegen.protobuf.target_types import ProtobufGrcpToggle, ProtobufSources
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import extract_pex, pex
 from pants.backend.python.util_rules.extract_pex import ExtractedPexDistributions
@@ -52,6 +53,7 @@ class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
 async def generate_python_from_protobuf(
     request: GeneratePythonFromProtobufRequest,
     protoc: Protoc,
+    grpc_python_plugin: GrpcPythonPlugin,
     python_protobuf_subsystem: PythonProtobufSubsystem,
 ) -> GeneratedSources:
     download_protoc_request = Get(
@@ -112,6 +114,16 @@ async def generate_python_from_protobuf(
         )
         extracted_mypy_wheels = await Get(ExtractedPexDistributions, Pex, mypy_pex)
 
+    downloaded_grpc_plugin = (
+        await Get(
+            DownloadedExternalTool,
+            ExternalToolRequest,
+            grpc_python_plugin.get_request(Platform.current),
+        )
+        if request.protocol_target.get(ProtobufGrcpToggle).value
+        else None
+    )
+
     unmerged_digests = [
         all_sources_stripped.snapshot.digest,
         downloaded_protoc_binary.digest,
@@ -119,6 +131,8 @@ async def generate_python_from_protobuf(
     ]
     if extracted_mypy_wheels:
         unmerged_digests.append(extracted_mypy_wheels.digest)
+    if downloaded_grpc_plugin:
+        unmerged_digests.append(downloaded_grpc_plugin.digest)
     input_digest = await Get(Digest, MergeDigests(unmerged_digests))
 
     argv = [downloaded_protoc_binary.exe, "--python_out", output_dir]
@@ -134,6 +148,10 @@ async def generate_python_from_protobuf(
                 "--mypy_out",
                 output_dir,
             ]
+        )
+    if downloaded_grpc_plugin:
+        argv.extend(
+            [f"--plugin=protoc-gen-grpc={downloaded_grpc_plugin.exe}", "--grpc_out", output_dir]
         )
     argv.extend(target_sources_stripped.snapshot.files)
 

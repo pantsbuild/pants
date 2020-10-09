@@ -232,3 +232,39 @@ def test_mypy_plugin(rule_runner: RuleRunner) -> None:
         mypy=True,
         expected_files=["src/protobuf/dir1/f_pb2.py", "src/protobuf/dir1/f_pb2.pyi"],
     )
+
+
+def test_grpc(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file(
+        "src/protobuf/dir1/f.proto",
+        dedent(
+            """\
+            syntax = "proto3";
+
+            package dir1;
+
+            // The greeter service definition.
+            service Greeter {
+              // Sends a greeting
+              rpc SayHello (HelloRequest) returns (HelloReply) {}
+            }
+
+            // The request message containing the user's name.
+            message HelloRequest {
+              string name = 1;
+            }
+
+            // The response message containing the greetings
+            message HelloReply {
+              string message = 1;
+            }
+            """
+        ),
+    )
+    rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library(grpc=True)")
+    assert_files_generated(
+        rule_runner,
+        "src/protobuf/dir1",
+        source_roots=["src/protobuf"],
+        expected_files=["src/protobuf/dir1/f_pb2.py", "src/protobuf/dir1/f_pb2_grpc.py"],
+    )
