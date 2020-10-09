@@ -14,6 +14,7 @@ from pants.engine.fs import EMPTY_DIGEST, PathGlobs, Snapshot
 from pants.engine.rules import Get, rule
 from pants.engine.target import (
     AsyncField,
+    AsyncStringSequenceField,
     BoolField,
     Dependencies,
     DictStringToStringField,
@@ -718,31 +719,14 @@ def test_dict_string_to_string_sequence_field() -> None:
     assert ExampleDefault(None, address=addr).value == FrozenDict({"default": ("val",)})
 
 
-# -----------------------------------------------------------------------------------------------
-# Test Sources and Dependencies. Also see engine/internals/graph_test.py.
-# -----------------------------------------------------------------------------------------------
+def test_async_string_sequence_field() -> None:
+    class Example(AsyncStringSequenceField):
+        alias = "example"
 
-
-def test_dependencies_and_sources_fields_raw_value_sanitation() -> None:
-    """Ensure that both Sources and Dependencies behave like a StringSequenceField does.
-
-    Normally, we would use StringSequenceField. However, these are both AsyncFields, and
-    StringSequenceField is a PrimitiveField, so we end up replicating that validation logic.
-    """
-    addr = Address.parse(":test")
-
-    def assert_flexible_constructor(raw_value: Iterable[str]) -> None:
-        assert Sources(raw_value, address=addr).sanitized_raw_value == tuple(raw_value)
-        assert Dependencies(raw_value, address=addr).sanitized_raw_value == tuple(raw_value)
-
-    for v in [("f1.txt", "f2.txt"), ["f1.txt", "f2.txt"], OrderedSet(["f1.txt", "f2.txt"])]:
-        assert_flexible_constructor(v)
-
-    def assert_invalid_type(raw_value: Any) -> None:
-        with pytest.raises(InvalidFieldTypeException):
-            Sources(raw_value, address=addr)
-        with pytest.raises(InvalidFieldTypeException):
-            Dependencies(raw_value, address=addr)
-
-    for v in [0, object(), "f1.txt"]:  # type: ignore[assignment]
-        assert_invalid_type(v)
+    addr = Address("", target_name="example")
+    assert Example(["hello", "world"], address=addr).sanitized_raw_value == ("hello", "world")
+    assert Example(None, address=addr).sanitized_raw_value is None
+    with pytest.raises(InvalidFieldTypeException):
+        Example("strings are technically iterable...", address=addr)
+    with pytest.raises(InvalidFieldTypeException):
+        Example(["hello", 0, "world"], address=addr)

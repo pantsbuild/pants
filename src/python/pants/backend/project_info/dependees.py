@@ -34,7 +34,8 @@ async def map_addresses_to_dependees() -> AddressToDependees:
     )
     all_targets = {*all_expanded_targets, *all_explicit_targets}
     dependencies_per_target = await MultiGet(
-        Get(Addresses, DependenciesRequest(tgt.get(Dependencies))) for tgt in all_targets
+        Get(Addresses, DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True))
+        for tgt in all_targets
     )
 
     address_to_dependees = defaultdict(set)

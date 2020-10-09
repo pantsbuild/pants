@@ -612,9 +612,13 @@ class TransitiveTargetsRequest:
     """
 
     roots: Tuple[Address, ...]
+    include_special_cased_deps: bool
 
-    def __init__(self, roots: Iterable[Address]) -> None:
+    def __init__(
+        self, roots: Iterable[Address], *, include_special_cased_deps: bool = False
+    ) -> None:
         self.roots = tuple(roots)
+        self.include_special_cased_deps = include_special_cased_deps
 
 
 @frozen_after_init
@@ -1216,23 +1220,9 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
         return FrozenDict(result)
 
 
-# -----------------------------------------------------------------------------------------------
-# Sources and codegen
-# -----------------------------------------------------------------------------------------------
-
-
-class Sources(AsyncField):
-    """A list of files and globs that belong to this target.
-
-    Paths are relative to the BUILD file's directory. You can ignore files/globs by prefixing them
-    with `!`. Example: `sources=['example.py', 'test_*.py', '!test_ignore.py']`.
-    """
-
-    alias = "sources"
+class AsyncStringSequenceField(AsyncField):
     sanitized_raw_value: Optional[Tuple[str, ...]]
     default: ClassVar[Optional[Tuple[str, ...]]] = None
-    expected_file_extensions: ClassVar[Optional[Tuple[str, ...]]] = None
-    expected_num_files: ClassVar[Optional[Union[int, range]]] = None
 
     @classmethod
     def sanitize_raw_value(
@@ -1251,6 +1241,23 @@ class Sources(AsyncField):
                 expected_type="an iterable of strings (e.g. a list of strings)",
             )
         return tuple(sorted(value_or_default))
+
+
+# -----------------------------------------------------------------------------------------------
+# Sources and codegen
+# -----------------------------------------------------------------------------------------------
+
+
+class Sources(AsyncStringSequenceField):
+    """A list of files and globs that belong to this target.
+
+    Paths are relative to the BUILD file's directory. You can ignore files/globs by prefixing them
+    with `!`. Example: `sources=['example.py', 'test_*.py', '!test_ignore.py']`.
+    """
+
+    alias = "sources"
+    expected_file_extensions: ClassVar[Optional[Tuple[str, ...]]] = None
+    expected_num_files: ClassVar[Optional[Union[int, range]]] = None
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         """Perform any additional validation on the resulting source files, e.g. ensuring that
@@ -1487,7 +1494,7 @@ class GeneratedSources:
 # NB: To hydrate the dependencies, use one of:
 #   await Get(Addresses, DependenciesRequest(tgt[Dependencies])
 #   await Get(Targets, DependenciesRequest(tgt[Dependencies])
-class Dependencies(AsyncField):
+class Dependencies(AsyncStringSequenceField):
     """Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib'].
 
     Alternatively, you may include file names. Pants will find which target owns that file, and
@@ -1501,27 +1508,7 @@ class Dependencies(AsyncField):
     """
 
     alias = "dependencies"
-    sanitized_raw_value: Optional[Tuple[str, ...]]
-    default: ClassVar[Optional[Tuple[str, ...]]] = None
     supports_transitive_excludes = False
-
-    @classmethod
-    def sanitize_raw_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[Address, ...]]:
-        value_or_default = super().sanitize_raw_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        try:
-            ensure_str_list(value_or_default)
-        except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                value_or_default,
-                expected_type="an iterable of strings (e.g. a list of strings)",
-            )
-        return tuple(sorted(value_or_default))
 
     @memoized_property
     def unevaluated_transitive_excludes(self) -> UnparsedAddressInputs:
@@ -1536,6 +1523,7 @@ class Dependencies(AsyncField):
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
+    include_special_cased_deps: bool = False
 
     def debug_hint(self) -> str:
         return self.field.address.spec
@@ -1665,6 +1653,27 @@ class InferredDependencies:
 
     def __iter__(self) -> Iterator[Address]:
         return iter(self.dependencies)
+
+
+class SpecialCasedDependencies(AsyncStringSequenceField):
+    """Subclass this for fields that act similarly to the `dependencies` field, but are handled
+    differently than normal dependencies.
+
+    For example, you might have a field for package/binary dependencies, which you will call
+    the equivalent of `./pants package` on. While you could put these in the normal
+    `dependencies` field, it is often clearer to the user to call out this magic through a
+    dedicated field.
+
+    This type will ensure that the dependencies show up in project introspection,
+    like `dependencies` and `dependees`, but not show up when you call `Get(TransitiveTargets,
+    TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
+
+    To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,
+    tgt.get(MyField).to_unparsed_address_inputs()`.
+    """
+
+    def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
+        return UnparsedAddressInputs(self.sanitized_raw_value or (), owning_address=self.address)
 
 
 # -----------------------------------------------------------------------------------------------

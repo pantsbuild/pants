@@ -7,13 +7,17 @@ from typing import List
 from pants.backend.project_info.dependees import DependeesGoal
 from pants.backend.project_info.dependees import DependeesOutputFormat as OutputFormat
 from pants.backend.project_info.dependees import rules as dependee_rules
-from pants.engine.target import Dependencies, Target
+from pants.engine.target import Dependencies, SpecialCasedDependencies, Target
 from pants.testutil.test_base import TestBase
+
+
+class SpecialDeps(SpecialCasedDependencies):
+    alias = "special_deps"
 
 
 class MockTarget(Target):
     alias = "tgt"
-    core_fields = (Dependencies,)
+    core_fields = (Dependencies, SpecialDeps)
 
 
 class DependeesTest(TestBase):
@@ -138,4 +142,11 @@ class DependeesTest(TestBase):
                     ]
                 }"""
             ).splitlines(),
+        )
+
+    def test_special_cased_dependencies(self) -> None:
+        self.add_to_build_file("special", "tgt(special_deps=['intermediate'])")
+        self.assert_dependees(targets=["intermediate"], expected=["leaf", "special"])
+        self.assert_dependees(
+            targets=["base"], transitive=True, expected=["intermediate", "leaf", "special"]
         )
