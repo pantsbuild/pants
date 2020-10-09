@@ -10,8 +10,7 @@ from pants.backend.codegen.protobuf.python import additional_fields
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, ProtobufSources
-from pants.backend.python.util_rules import extract_pex, pex
-from pants.core.util_rules import external_tool, stripped_source_files
+from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
@@ -24,9 +23,6 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *protobuf_rules(),
-            *extract_pex.rules(),
-            *pex.rules(),
-            *external_tool.rules(),
             *additional_fields.rules(),
             *stripped_source_files.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),

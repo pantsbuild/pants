@@ -8,6 +8,7 @@ from pants.backend.codegen.protobuf.python.additional_fields import PythonSource
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
 from pants.backend.codegen.protobuf.target_types import ProtobufSources
 from pants.backend.python.target_types import PythonSources
+from pants.backend.python.util_rules import extract_pex, pex
 from pants.backend.python.util_rules.extract_pex import ExtractedPexDistributions
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -175,5 +176,7 @@ async def generate_python_from_protobuf(
 def rules():
     return [
         *collect_rules(),
+        *extract_pex.rules(),
+        *pex.rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromProtobufRequest),
     ]
