@@ -1015,11 +1015,13 @@ impl<R: Rule> Builder<R> {
               to_visit.extend(
                 edge_refs
                   .iter()
-                  .filter(|edge_ref| match graph[edge_ref.target()].deleted_reason() {
-                    Some(NodePrunedReason::Ambiguous)
-                    | Some(NodePrunedReason::NoSourceOfParam)
-                    | Some(NodePrunedReason::NoValidCombinationsOfDependencies) => true,
-                    _ => false,
+                  .filter(|edge_ref| {
+                    matches!(
+                      graph[edge_ref.target()].deleted_reason(),
+                      Some(NodePrunedReason::Ambiguous)
+                        | Some(NodePrunedReason::NoSourceOfParam)
+                        | Some(NodePrunedReason::NoValidCombinationsOfDependencies)
+                    )
                   })
                   .map(|edge_ref| edge_ref.target()),
               );

@@ -305,10 +305,7 @@ impl GitignoreStyleExcludes {
   }
 
   fn is_ignored(&self, stat: &Stat) -> bool {
-    let is_dir = match stat {
-      &Stat::Dir(_) => true,
-      _ => false,
-    };
+    let is_dir = matches!(stat, &Stat::Dir(_));
     self.is_ignored_path(stat.path(), is_dir)
   }
 
@@ -357,17 +354,11 @@ impl StrictGlobMatching {
   }
 
   pub fn should_check_glob_matches(&self) -> bool {
-    match self {
-      &StrictGlobMatching::Ignore => false,
-      _ => true,
-    }
+    !matches!(self, &StrictGlobMatching::Ignore)
   }
 
   pub fn should_throw_on_error(&self) -> bool {
-    match self {
-      &StrictGlobMatching::Error(_) => true,
-      _ => false,
-    }
+    matches!(self, &StrictGlobMatching::Error(_))
   }
 }
 
