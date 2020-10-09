@@ -686,13 +686,9 @@ impl<N: Node> Graph<N> {
   ) -> Result<Vec<Generation>, N::Error> {
     let generations = {
       let inner = self.inner.lock();
-      let dep_ids = inner
+      inner
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
-        .collect::<Vec<_>>();
-
-      dep_ids
-        .into_iter()
         .map(|dep_id| {
           let mut entry = inner
             .entry_for_id(dep_id)
