@@ -354,7 +354,7 @@ impl StrictGlobMatching {
   }
 
   pub fn should_check_glob_matches(&self) -> bool {
-    matches!(self, &StrictGlobMatching::Ignore)
+    !matches!(self, &StrictGlobMatching::Ignore)
   }
 
   pub fn should_throw_on_error(&self) -> bool {
