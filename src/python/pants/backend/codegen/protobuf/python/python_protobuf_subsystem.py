@@ -43,6 +43,16 @@ class PythonProtobufSubsystem(Subsystem):
                 "also generate .pyi type stubs."
             ),
         )
+        register(
+            "--mypy-plugin-version",
+            type=str,
+            default="mypy-protobuf==1.23",
+            advanced=True,
+            help=(
+                "The pip-style requirement string for `mypy-protobuf`. You must still set "
+                "`--mypy-plugin` for this option to be used."
+            ),
+        )
 
     @property
     def runtime_dependencies(self) -> UnparsedAddressInputs:
@@ -51,6 +61,10 @@ class PythonProtobufSubsystem(Subsystem):
     @property
     def mypy_plugin(self) -> bool:
         return cast(bool, self.options.mypy_plugin)
+
+    @property
+    def mypy_plugin_version(self) -> str:
+        return cast(str, self.options.mypy_plugin_version)
 
 
 class InjectPythonProtobufDependencies(InjectDependenciesRequest):

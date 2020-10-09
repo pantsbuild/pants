@@ -103,8 +103,11 @@ async def generate_python_from_protobuf(
             PexRequest(
                 output_filename="mypy_protobuf.pex",
                 internal_only=True,
-                requirements=PexRequirements(["mypy-protobuf==1.23"]),
-                interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5,<3.9"]),
+                requirements=PexRequirements([python_protobuf_subsystem.mypy_plugin_version]),
+                # These interpreter constraints do not need to correspond to the repository's
+                # Python interpreter constraints. The generated type stubs work with any Python
+                # version, even Py2.
+                interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5"]),
             ),
         )
         extracted_mypy_wheels = await Get(ExtractedPexDistributions, Pex, mypy_pex)
