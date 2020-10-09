@@ -32,7 +32,7 @@ class PexBinary(ExternalTool):
 
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.17"
+    default_version = "v2.1.18"
 
     @classproperty
     def default_known_versions(cls):
@@ -41,8 +41,8 @@ class PexBinary(ExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "df836ddd102d8fc9fb390cc4c7fc478caf5afa1600cbdeb7753b185e27a6a8b0",
-                    "2673293",
+                    "3a47dcbcf49294c06439fdda50675546edc9ea09a116c4c57ee5a8e337a63509",
+                    "2678219",
                 )
             )
             for plat in ["darwin", "linux"]
@@ -133,17 +133,20 @@ async def setup_pex_cli_process(
         *cert_args,
         "--pex-root",
         pex_root_path,
-        python=request.python,
-    )
-    env = {
         # Ensure Pex and its subprocesses create temporary files in the the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we
         # have known use cases where /tmp is too small to hold large wheel downloads Pex is asked to
         # perform. Making the TMPDIR local to the sandbox allows control via
         # --local-execution-root-dir for the local case and should work well with remote cases where
         # a remoting implementation has to allow for processes producing large binaries in a
-        # sandbox to support reasonable workloads.
-        "TMPDIR": tmpdir,
+        # sandbox to support reasonable workloads. Communicating TMPDIR via --tmpdir instead of via
+        # environment variable allows Pex to absolutize the path ensuring subprocesses that change
+        # CWD can find the TMPDIR.
+        "--tmpdir",
+        tmpdir,
+        python=request.python,
+    )
+    env = {
         **pex_env.environment_dict(python_configured=request.python is not None),
         **python_native_code.environment_dict,
         **(request.extra_env or {}),
