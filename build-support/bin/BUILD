@@ -12,22 +12,22 @@ python_tests(
   timeout=90,
 )
 
-python_binary(
+pex_binary(
    name = 'bootstrap_and_deploy_ci_pants_pex',
    sources = ['bootstrap_and_deploy_ci_pants_pex.py'],
  )
 
-python_binary(
+pex_binary(
   name = 'check_banned_imports',
   sources = ['check_banned_imports.py'],
 )
 
-python_binary(
+pex_binary(
   name = 'check_inits',
   sources = ['check_inits.py'],
 )
 
-python_binary(
+pex_binary(
   name = 'ci',
   sources = ['ci.py'],
 )
@@ -37,17 +37,17 @@ python_library(
   sources = ['common.py'],
 )
 
-python_binary(
+pex_binary(
   name = 'deploy_to_s3',
   sources = ['deploy_to_s3.py'],
 )
 
-python_binary(
+pex_binary(
   name = 'generate_travis_yml',
   sources = ['generate_travis_yml.py'],
 )
 
-python_binary(
+pex_binary(
   name = 'generate_docs',
   sources = ['generate_docs.py'],
   dependencies = [
@@ -60,23 +60,23 @@ resources(
   sources = ['docs_templates/*.mustache'],
 )
 
-python_binary(
+pex_binary(
   name = 'get_rbe_token',
   sources = ['get_rbe_token.py'],
 )
 
-python_binary(
+pex_binary(
   name='reversion',
   sources=["reversion.py"],
 )
 
-python_binary(
+pex_binary(
   name = 'shellcheck',
   sources = ['shellcheck.py'],
 )
 
 # TODO: rename this to `release.py` once done porting Bash to Python.
-python_binary(
+pex_binary(
   name = "packages",
   sources = ["packages.py"],
 )

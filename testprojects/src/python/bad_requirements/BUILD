@@ -6,7 +6,7 @@ python_requirement_library(
   requirements=['badreq==99.99.99'],
 )
 
-python_binary(
+pex_binary(
   name='use_badreq',
   dependencies=[':badreq'],
   entry_point='bad_requirements.use_badreq',

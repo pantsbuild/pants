@@ -23,9 +23,11 @@ from typing import (
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
-from pants.backend.python.target_types import PythonInterpreterCompatibility
-from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
-from pants.backend.python.target_types import PythonRequirementsField
+from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
+from pants.backend.python.target_types import (
+    PythonInterpreterCompatibility,
+    PythonRequirementsField,
+)
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_environment import (

@@ -96,7 +96,7 @@ class PythonSetup(Subsystem):
             removal_version="2.1.0.dev0",
             removal_hint=(
                 "The option `--python-setup-platforms` does not do anything anymore. Instead, "
-                "explicitly set the `platforms` field on each `python_binary`."
+                "explicitly set the `platforms` field on each `pex_binary` target."
             ),
         )
         register(

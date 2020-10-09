@@ -10,7 +10,7 @@ from typing import List, Mapping, Optional
 import pytest
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import package_python_binary, pytest_runner
+from pants.backend.python.goals import package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_coverage_config
 from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import (
@@ -40,7 +40,7 @@ def rule_runner() -> RuleRunner:
             *dependency_inference_rules.rules(),  # For conftest detection.
             *distdir.rules(),
             *binary.rules(),
-            *package_python_binary.rules(),
+            *package_pex_binary.rules(),
             get_filtered_environment,
             QueryRule(TestResult, (PythonTestFieldSet,)),
             QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
@@ -110,13 +110,13 @@ def create_test_target(
     return tgt
 
 
-def create_python_binary_target(rule_runner: RuleRunner, source_file: FileContent) -> None:
+def create_pex_binary_target(rule_runner: RuleRunner, source_file: FileContent) -> None:
     rule_runner.create_file(source_file.path, source_file.content.decode())
     rule_runner.add_to_build_file(
         relpath=PACKAGE,
         target=dedent(
             f"""\
-            python_binary(
+            pex_binary(
               name='bin',
               sources=['{PurePath(source_file.path).name}'],
             )
@@ -442,7 +442,7 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
 
 
 def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
-    create_python_binary_target(rule_runner, BINARY_SOURCE)
+    create_pex_binary_target(rule_runner, BINARY_SOURCE)
     rule_runner.create_file(
         f"{PACKAGE}/test_binary_call.py",
         dedent(

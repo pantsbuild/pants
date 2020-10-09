@@ -149,7 +149,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             """
             python_library()
 
-            python_binary(name="bin", entry_point="foo.qux.bin")
+            pex_binary(name="bin", entry_point="foo.qux.bin")
             """
         ),
     )
@@ -226,7 +226,7 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
         textwrap.dedent(
             """
             python_library(name='not_a_binary', sources=[])
-            python_binary(name='no_entrypoint')
+            pex_binary(name='no_entrypoint')
             python_distribution(
                 name='invalid_bin1',
                 provides=setup_py(

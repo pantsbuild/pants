@@ -11,13 +11,13 @@ from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 @pytest.mark.parametrize(
     "tgt_content",
     [
-        "python_binary(sources=['app.py'])",
-        "python_binary(sources=['app.py'], entry_point='project.app')",
-        "python_binary(sources=['app.py'], entry_point='project.app:main')",
+        "pex_binary(sources=['app.py'])",
+        "pex_binary(sources=['app.py'], entry_point='project.app')",
+        "pex_binary(sources=['app.py'], entry_point='project.app:main')",
     ],
 )
 def test_run_sample_script(tgt_content: str) -> None:
-    """Test that we properly run a `python_binary` target.
+    """Test that we properly run a `pex_binary` target.
 
     This checks a few things:
     - We can handle source roots.
