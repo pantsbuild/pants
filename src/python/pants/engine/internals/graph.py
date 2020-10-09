@@ -831,7 +831,7 @@ async def resolve_dependencies(
     injected = InjectedDependencies.from_multiple(all_injected)
 
     inference_request_types = union_membership.get(InferDependenciesRequest)
-    inferred = InferredDependencies()
+    inferred: Tuple[InferredDependencies, ...] = ()
     if inference_request_types:
         # Dependency inference is solely determined by the `Sources` field for a Target, so we
         # re-resolve the original target to inspect its `Sources` field, if any.
@@ -842,7 +842,7 @@ async def resolve_dependencies(
             for inference_request_type in inference_request_types
             if isinstance(sources_field, inference_request_type.infer_from)
         ]
-        all_inferred = await MultiGet(
+        inferred = await MultiGet(
             Get(
                 InferredDependencies,
                 InferDependenciesRequest,
@@ -850,14 +850,13 @@ async def resolve_dependencies(
             )
             for inference_request_type in relevant_inference_request_types
         )
-        inferred = InferredDependencies.from_multiple(all_inferred)
 
     # If this is a base target, or no dependency inference implementation can infer dependencies on
     # a file address's sibling files, then we inject dependencies on all the base target's
     # generated subtargets.
     subtarget_addresses: Tuple[Address, ...] = ()
     no_sibling_file_deps_inferrable = not inferred or all(
-        inferred_dep.sibling_dependencies_inferrable is False for inferred_dep in inferred
+        inferred_deps.sibling_dependencies_inferrable is False for inferred_deps in inferred
     )
     if request.field.address.is_base_target or no_sibling_file_deps_inferrable:
         subtargets = await Get(
@@ -873,7 +872,7 @@ async def resolve_dependencies(
             *subtarget_addresses,
             *literal_addresses,
             *injected,
-            *inferred.to_raw_addresses(),
+            *itertools.chain.from_iterable(inferred),
         )
         if addr not in ignored_addresses
     }
