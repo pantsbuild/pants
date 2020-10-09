@@ -37,14 +37,20 @@ def rule_runner() -> RuleRunner:
 
 
 def assert_files_generated(
-    rule_runner: RuleRunner, spec: str, *, expected_files: List[str], source_roots: List[str]
+    rule_runner: RuleRunner,
+    spec: str,
+    *,
+    expected_files: List[str],
+    source_roots: List[str],
+    mypy: bool = False,
 ) -> None:
-    rule_runner.set_options(
-        [
-            "--backend-packages=pants.backend.codegen.protobuf.python",
-            f"--source-root-patterns={repr(source_roots)}",
-        ]
-    )
+    options = [
+        "--backend-packages=pants.backend.codegen.protobuf.python",
+        f"--source-root-patterns={repr(source_roots)}",
+    ]
+    if mypy:
+        options.append("--python-protobuf-mypy-plugin")
+    rule_runner.set_options(options)
     tgt = rule_runner.get_target(Address(spec))
     protocol_sources = rule_runner.request(
         HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSources])]
@@ -67,14 +73,14 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
         "src/protobuf/dir1/f.proto",
         dedent(
             """\
-            syntax = "proto2";
+            syntax = "proto3";
 
             package dir1;
 
             message Person {
-              required string name = 1;
-              required int32 id = 2;
-              optional string email = 3;
+              string name = 1;
+              int32 id = 2;
+              string email = 3;
             }
             """
         ),
@@ -83,7 +89,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
         "src/protobuf/dir1/f2.proto",
         dedent(
             """\
-            syntax = "proto2";
+            syntax = "proto3";
 
             package dir1;
             """
@@ -95,7 +101,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
         "src/protobuf/dir2/f.proto",
         dedent(
             """\
-            syntax = "proto2";
+            syntax = "proto3";
 
             package dir2;
 
@@ -113,7 +119,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
         "tests/protobuf/test_protos/f.proto",
         dedent(
             """\
-            syntax = "proto2";
+            syntax = "proto3";
 
             package test_protos;
 
@@ -151,7 +157,7 @@ def test_top_level_proto_root(rule_runner: RuleRunner) -> None:
         "protos/f.proto",
         dedent(
             """\
-            syntax = "proto2";
+            syntax = "proto3";
 
             package protos;
             """
@@ -168,7 +174,7 @@ def test_top_level_python_source_root(rule_runner: RuleRunner) -> None:
         "src/proto/protos/f.proto",
         dedent(
             """\
-            syntax = "proto2";
+            syntax = "proto3";
 
             package protos;
             """
@@ -188,7 +194,7 @@ def test_bad_python_source_root(rule_runner: RuleRunner) -> None:
         "src/protobuf/dir1/f.proto",
         dedent(
             """\
-            syntax = "proto2";
+            syntax = "proto3";
 
             package dir1;
             """
@@ -203,3 +209,30 @@ def test_bad_python_source_root(rule_runner: RuleRunner) -> None:
         )
     assert len(exc.value.wrapped_exceptions) == 1
     assert isinstance(exc.value.wrapped_exceptions[0], NoSourceRootError)
+
+
+def test_mypy_plugin(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file(
+        "src/protobuf/dir1/f.proto",
+        dedent(
+            """\
+            syntax = "proto3";
+
+            package dir1;
+
+            message Person {
+              string name = 1;
+              int32 id = 2;
+              string email = 3;
+            }
+            """
+        ),
+    )
+    rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library()")
+    assert_files_generated(
+        rule_runner,
+        "src/protobuf/dir1",
+        source_roots=["src/protobuf"],
+        mypy=True,
+        expected_files=["src/protobuf/dir1/f_pb2.py", "src/protobuf/dir1/f_pb2.pyi"],
+    )

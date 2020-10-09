@@ -7,6 +7,8 @@ from typing import List, Optional, Sequence
 
 import pytest
 
+from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
+from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.typecheck.mypy.plugin_target_type import MyPySourcePlugin
@@ -721,6 +723,74 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     result = run_mypy_with_plugin(plugin_tgt)
     assert result.exit_code == 0
     assert "Success: no issues found in 7 source files" in result.stdout
+
+
+def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
+    rule_runner = RuleRunner(
+        rules=[*rule_runner.rules, *protobuf_rules()],
+        target_types=[*rule_runner.target_types, ProtobufLibrary],
+    )
+
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            python_requirement_library(
+                name="protobuf",
+                requirements=["protobuf==3.13.0"],
+            )
+            """
+        ),
+    )
+
+    rule_runner.create_file(f"{PACKAGE}/__init__.py")
+    rule_runner.create_file(
+        f"{PACKAGE}/proto.proto",
+        dedent(
+            """\
+            syntax = "proto3";
+            package project;
+
+            message Person {
+                string name = 1;
+                int32 id = 2;
+                string email = 3;
+            }
+            """
+        ),
+    )
+    rule_runner.create_file(
+        f"{PACKAGE}/app.py",
+        dedent(
+            """\
+            from project.proto_pb2 import Person
+
+            x = Person(name=123, id="abc", email=None)
+            """
+        ),
+    )
+    rule_runner.add_to_build_file(
+        PACKAGE,
+        dedent(
+            """\
+            python_library(dependencies=[':proto'])
+            protobuf_library(name='proto')
+            """
+        ),
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE))
+    result = run_mypy(
+        rule_runner,
+        [tgt],
+        additional_args=[
+            "--backend-packages=pants.backend.codegen.protobuf.python",
+            "--python-protobuf-mypy-plugin",
+        ],
+    )
+    assert len(result) == 1
+    assert 'Argument "name" to "Person" has incompatible type "int"' in result[0].stdout
+    assert 'Argument "id" to "Person" has incompatible type "str"' in result[0].stdout
+    assert result[0].exit_code == 1
 
 
 def test_determine_python_files() -> None:
