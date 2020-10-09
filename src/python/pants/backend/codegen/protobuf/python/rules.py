@@ -104,9 +104,9 @@ async def generate_python_from_protobuf(
                 output_filename="mypy_protobuf.pex",
                 internal_only=True,
                 requirements=PexRequirements([python_protobuf_subsystem.mypy_plugin_version]),
-                # These interpreter constraints do not need to correspond to the repository's
-                # Python interpreter constraints. The generated type stubs work with any Python
-                # version, even Py2.
+                # This is solely to ensure that we use an appropriate interpreter when resolving
+                # the distribution. We don't actually run the distribution directly with Python,
+                # as we extract out its binary.
                 interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5"]),
             ),
         )
