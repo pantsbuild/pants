@@ -27,6 +27,7 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
+    TriBoolField,
 )
 from pants.engine.unions import UnionMembership
 from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
@@ -130,10 +131,11 @@ class FieldInfo:
                 StringField,
                 StringOrStringSequenceField,
                 StringSequenceField,
+                TriBoolField,
             },
         )
         if issubclass(field, PrimitiveField):
-            raw_value_type = get_type_hints(field.compute_value)["raw_value"]
+            raw_value_type = get_type_hints(field.sanitize_raw_value)["raw_value"]
         elif issubclass(field, AsyncField):
             raw_value_type = get_type_hints(field.sanitize_raw_value)["raw_value"]
         else:
@@ -152,7 +154,7 @@ class FieldInfo:
         if field.required:
             # We hackily remove `None` as a valid option for the field when it's required. This
             # greatly simplifies Field definitions because it means that they don't need to
-            # override the type hints for `PrimitiveField.compute_value()` and
+            # override the type hints for `PrimitiveField.sanitize_raw_value()` and
             # `AsyncField.sanitize_raw_value()` to indicate that `None` is an invalid type.
             type_hint = type_hint.replace(" | None", "")
 

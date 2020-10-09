@@ -34,6 +34,7 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
+    TriBoolField,
     WrappedTarget,
 )
 from pants.option.subsystem import Subsystem
@@ -190,12 +191,12 @@ class PexInheritPathField(StringField):
 
     # TODO(#9388): deprecate allowing this to be a `bool`.
     @classmethod
-    def compute_value(
+    def sanitize_raw_value(
         cls, raw_value: Optional[Union[str, bool]], *, address: Address
     ) -> Optional[str]:
         if isinstance(raw_value, bool):
             return "prefer" if raw_value else "false"
-        return super().compute_value(raw_value, address=address)
+        return super().sanitize_raw_value(raw_value, address=address)
 
 
 class PexZipSafeField(BoolField):
@@ -206,7 +207,6 @@ class PexZipSafeField(BoolField):
 
     alias = "zip_safe"
     default = True
-    value: bool
 
 
 class PexAlwaysWriteCacheField(BoolField):
@@ -217,7 +217,6 @@ class PexAlwaysWriteCacheField(BoolField):
 
     alias = "always_write_cache"
     default = False
-    value: bool
 
 
 class PexIgnoreErrorsField(BoolField):
@@ -225,7 +224,6 @@ class PexIgnoreErrorsField(BoolField):
 
     alias = "ignore_errors"
     default = False
-    value: bool
 
 
 class PexShebangField(StringField):
@@ -234,7 +232,7 @@ class PexShebangField(StringField):
     alias = "shebang"
 
 
-class PexEmitWarningsField(BoolField):
+class PexEmitWarningsField(TriBoolField):
     """Whether or not to emit PEX warnings at runtime.
 
     The default is determined by the option `pex_runtime_warnings` in the `[python-binary]` scope.
@@ -343,8 +341,8 @@ class PythonTestsTimeout(IntField):
     alias = "timeout"
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        value = super().compute_value(raw_value, address=address)
+    def sanitize_raw_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
+        value = super().sanitize_raw_value(raw_value, address=address)
         if value is not None and value < 1:
             raise InvalidFieldException(
                 f"The value for the `timeout` field in target {address} must be > 0, but was "
@@ -441,29 +439,31 @@ def format_invalid_requirement_string_error(
     )
 
 
-class PythonRequirementsField(PrimitiveField):
+class PythonRequirementsField(PrimitiveField[Tuple[Requirement, ...]]):
     """A sequence of pip-style requirement strings, e.g. ['foo==1.8', 'bar<=3 ;
     python_version<'3']."""
 
     alias = "requirements"
     required = True
-    value: Tuple[Requirement, ...]
 
     @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
+    def sanitize_raw_value(
+        cls, raw_value: Optional[Union[str, PythonRequirement, Iterable[str]]], *, address: Address
     ) -> Tuple[Requirement, ...]:
-        value = super().compute_value(raw_value, address=address)
-        invalid_type_error = InvalidFieldTypeException(
-            address,
-            cls.alias,
-            value,
-            expected_type="an iterable of pip-style requirement strings (e.g. a list)",
-        )
+        value = super().sanitize_raw_value(raw_value, address=address)
+
+        def invalid_type_error():
+            raise InvalidFieldTypeException(
+                address,
+                cls.alias,
+                value,
+                expected_type="an iterable of pip-style requirement strings (e.g. a list)",
+            )
+
         if isinstance(value, (str, PythonRequirement)) or not isinstance(
             value, collections.abc.Iterable
         ):
-            raise invalid_type_error
+            raise invalid_type_error()
         result = []
         for v in value:
             # We allow passing a pre-parsed `Requirement`. This is intended for macros which might
@@ -501,7 +501,7 @@ class PythonRequirementsField(PrimitiveField):
                 )
                 result.append(v.requirement)
             else:
-                raise invalid_type_error
+                raise invalid_type_error()
         return tuple(result)
 
 
@@ -569,10 +569,10 @@ class PythonProvidesField(ScalarField, ProvidesField):
     required = True
 
     @classmethod
-    def compute_value(
+    def sanitize_raw_value(
         cls, raw_value: Optional[PythonArtifact], *, address: Address
     ) -> PythonArtifact:
-        return cast(PythonArtifact, super().compute_value(raw_value, address=address))
+        return cast(PythonArtifact, super().sanitize_raw_value(raw_value, address=address))
 
 
 class SetupPyCommandsField(StringSequenceField):

@@ -14,6 +14,7 @@ from typing import (
     ClassVar,
     Dict,
     Generic,
+    Hashable,
     Iterable,
     Iterator,
     Mapping,
@@ -49,14 +50,18 @@ from pants.util.strutil import pluralize
 # -----------------------------------------------------------------------------------------------
 
 # Type alias to express the intent that the type should be immutable and hashable. There's nothing
-# to actually enforce this, outside of convention. Maybe we could develop a MyPy plugin?
-ImmutableValue = Any
+# to enforce immutability, outside of convention. Maybe we could develop a MyPy plugin?
+ImmutableValue = Hashable
+
+_DefaultBase = TypeVar("_DefaultBase", bound=Optional[ImmutableValue])
 
 
-class Field(ABC):
+class Field(Generic[_DefaultBase], metaclass=ABCMeta):
+    # This is defined in PrimitiveField and AsyncField.
+    value: _DefaultBase
     # Subclasses must define these.
     alias: ClassVar[str]
-    default: ClassVar[ImmutableValue]
+    default: ClassVar[_DefaultBase]
     # Subclasses may define these.
     required: ClassVar[bool] = False
     deprecated_removal_version: ClassVar[Optional[str]] = None
@@ -80,17 +85,37 @@ class Field(ABC):
                 ),
             )
 
+    @classmethod
+    def sanitize_raw_value(
+        cls,
+        raw_value: Optional[Any],
+        *,
+        address: Address,
+    ) -> Optional[Any]:
+        """Convert the `raw_value` into `self.value`.
+
+        You should perform any optional validation and/or hydration here. For example, you may want
+        to check that an integer is > 0 or convert an Iterable[str] to List[str].
+
+        The resulting value must be hashable (and should be immutable).
+        """
+        if raw_value is None:
+            if cls.required:
+                raise RequiredFieldMissingException(address, cls.alias)
+            return cls.default
+        return raw_value
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class PrimitiveField(Field, metaclass=ABCMeta):
+class PrimitiveField(Field[_DefaultBase], metaclass=ABCMeta):
     """A Field that does not need the engine in order to be hydrated.
 
     The majority of fields should use subclasses of `PrimitiveField`, e.g. use `BoolField`,
     `StringField`, or `StringSequenceField`. These subclasses will provide sane type hints and
     hydration/validation automatically.
 
-    If you are directly subclassing `PrimitiveField`, you should likely override `compute_value()`
+    If you are directly subclassing `PrimitiveField`, you should likely override `sanitize_raw_value()`
     to perform any custom hydration and/or validation, such as converting unhashable types to
     hashable types or checking for banned values. The returned value must be hashable
     (and should be immutable) so that this Field may be used by the V2 engine. This means, for
@@ -108,14 +133,13 @@ class PrimitiveField(Field, metaclass=ABCMeta):
     Example:
 
         # NB: Really, this should subclass IntField. We only use PrimitiveField as an example.
-        class Timeout(PrimitiveField):
+        class Timeout(PrimitiveField[Optional[int]]):
             alias = "timeout"
-            value: Optional[int]
             default = None
 
             @classmethod
-            def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int:
-                value_or_default = super().compute_value(raw_value, address=address)
+            def sanitize_raw_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
+                value_or_default = super().sanitize_raw_value(raw_value, address=address)
                 if value_or_default is not None and not isinstance(value_or_default, int):
                     raise ValueError(
                         "The `timeout` field expects an integer, but was given"
@@ -124,8 +148,6 @@ class PrimitiveField(Field, metaclass=ABCMeta):
                 return value_or_default
     """
 
-    value: ImmutableValue
-
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
         # NB: We neither store the `address` or `raw_value` as attributes on this dataclass:
@@ -133,23 +155,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         #   this Field could not be passed around in the engine.
         # * Don't store `address` to avoid the cost in memory of storing `Address` on every single
         #   field encountered by Pants in a run.
-        super().__init__(raw_value, address=address)
-        self.value = self.compute_value(raw_value, address=address)
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
-        """Convert the `raw_value` into `self.value`.
-
-        You should perform any optional validation and/or hydration here. For example, you may want
-        to check that an integer is > 0 or convert an Iterable[str] to List[str].
-
-        The resulting value must be hashable (and should be immutable).
-        """
-        if raw_value is None:
-            if cls.required:
-                raise RequiredFieldMissingException(address, cls.alias)
-            return cls.default
-        return raw_value
+        self.value = cast(_DefaultBase, self.sanitize_raw_value(raw_value, address=address))
 
     def __repr__(self) -> str:
         return (
@@ -163,8 +169,8 @@ class PrimitiveField(Field, metaclass=ABCMeta):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class AsyncField(Field, metaclass=ABCMeta):
-    """A field that needs the engine in order to be hydrated.
+class AsyncField(Field[_DefaultBase], metaclass=ABCMeta):
+    """A field that needs to extract information from an Address via the engine to be hydrated.
 
     You should implement `sanitize_raw_value()` to convert the `raw_value` into a type that is
     immutable and hashable so that this Field may be used by the V2 engine. This means, for example,
@@ -176,9 +182,9 @@ class AsyncField(Field, metaclass=ABCMeta):
 
     For example:
 
-        class Sources(AsyncField):
-            alias: ClassVar = "sources"
-            sanitized_raw_value: Optional[Tuple[str, ...]]
+        class Sources(AsyncField[Optional[Tuple[str, ...]]]):
+            alias = "sources"
+            default = None
 
             def sanitize_raw_value(
                 raw_value: Optional[List[str]], *, address: Address
@@ -204,7 +210,7 @@ class AsyncField(Field, metaclass=ABCMeta):
 
         @rule
         def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
-            result = await Get(Snapshot, PathGlobs(request.field.sanitized_raw_value))
+            result = await Get(Snapshot, PathGlobs(request.field.value))
             request.field.validate_resolved_files(result.files)
             ...
             return HydratedSources(result)
@@ -221,37 +227,21 @@ class AsyncField(Field, metaclass=ABCMeta):
     """
 
     address: Address
-    sanitized_raw_value: ImmutableValue
 
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
         super().__init__(raw_value, address=address)
         self.address = address
-        self.sanitized_raw_value = self.sanitize_raw_value(raw_value, address=address)
-
-    @classmethod
-    def sanitize_raw_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
-        """Sanitize the `raw_value` into a type that is safe for the V2 engine to use.
-
-        The resulting type should be immutable and hashable.
-
-        You may also do light-weight validation in this method, such as ensuring that all
-        elements of a list are strings.
-        """
-        if raw_value is None:
-            if cls.required:
-                raise RequiredFieldMissingException(address, cls.alias)
-            return cls.default
-        return raw_value
+        self.value = cast(_DefaultBase, self.sanitize_raw_value(raw_value, address=address))
 
     def __repr__(self) -> str:
         return (
             f"{self.__class__}(alias={repr(self.alias)}, "
-            f"sanitized_raw_value={repr(self.sanitized_raw_value)}, default={repr(self.default)})"
+            f"value={repr(self.value)}, default={repr(self.default)})"
         )
 
     def __str__(self) -> str:
-        return f"{self.alias}={self.sanitized_raw_value}"
+        return f"{self.alias}={self.value}"
 
 
 # -----------------------------------------------------------------------------------------------
@@ -340,6 +330,8 @@ class Target(ABC):
     def _plugin_field_cls(cls) -> Type:
         # NB: We ensure that each Target subtype has its own `PluginField` class so that
         # registering a plugin field doesn't leak across target types.
+        # This is somewhat similar to scala's path-dependent types:
+        # https://stackoverflow.com/a/2694607/2518889.
 
         @union
         class PluginField:
@@ -750,6 +742,7 @@ def generate_subtarget(
 
     generated_target_fields = {}
     for field in base_target.field_values.values():
+        value: Optional[ImmutableValue]
         if isinstance(field, Sources):
             if not bool(matches_filespec(field.filespec, paths=[full_file_name])):
                 raise ValueError(
@@ -758,11 +751,7 @@ def generate_subtarget(
                 )
             value = (relativized_file_name,)
         else:
-            value = (
-                field.value
-                if isinstance(field, PrimitiveField)
-                else field.sanitized_raw_value  # type: ignore[attr-defined]
-            )
+            value = field.value
         generated_target_fields[field.alias] = value
 
     target_cls = type(base_target)
@@ -1011,36 +1000,35 @@ class UnrecognizedTargetTypeException(Exception):
 # Field templates
 # -----------------------------------------------------------------------------------------------
 
-T = TypeVar("T")
+T = TypeVar("T", bound=ImmutableValue)
 
 
-class ScalarField(Generic[T], PrimitiveField, metaclass=ABCMeta):
+class ScalarField(PrimitiveField[Optional[T]], metaclass=ABCMeta):
     """A field with a scalar value (vs. a compound value like a sequence or dict).
 
     Subclasses must define the class properties `expected_type` and `expected_type_description`.
-    They should also override the type hints for the classmethod `compute_value` so that we use the
+    They should also override the type hints for the classmethod `sanitize_raw_value` so that we use the
     correct type annotation in generated documentation.
 
-        class Example(ScalarField):
+        class Example(ScalarField[MyPluginObject]):
             alias = "example"
             expected_type = MyPluginObject
             expected_type_description = "a `my_plugin` object"
 
             @classmethod
-            def compute_value(
+            def sanitize_raw_value(
                 cls, raw_value: Optional[MyPluginObject], *, address: Address
             ) -> Optional[MyPluginObject]:
-                return super().compute_value(raw_value, address=address)
+                return super().sanitize_raw_value(raw_value, address=address)
     """
 
     expected_type: ClassVar[Type[T]]
     expected_type_description: ClassVar[str]
-    value: Optional[T]
     default: ClassVar[Optional[T]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> Optional[T]:
-        value_or_default = super().compute_value(raw_value, address=address)
+    def sanitize_raw_value(cls, raw_value: Optional[Any], *, address: Address) -> Optional[T]:
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
         if value_or_default is not None and not isinstance(value_or_default, cls.expected_type):
             raise InvalidFieldTypeException(
                 address,
@@ -1051,7 +1039,7 @@ class ScalarField(Generic[T], PrimitiveField, metaclass=ABCMeta):
         return value_or_default
 
 
-class BoolField(PrimitiveField, metaclass=ABCMeta):
+class TriBoolField(PrimitiveField[Optional[bool]], metaclass=ABCMeta):
     """A field whose value is a boolean.
 
     If subclasses do not set the class property `required = True` or `default`, the value will
@@ -1062,12 +1050,11 @@ class BoolField(PrimitiveField, metaclass=ABCMeta):
             default = True
     """
 
-    value: Optional[bool]
     default: ClassVar[Optional[bool]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[bool], *, address: Address) -> Optional[bool]:
-        value_or_default = super().compute_value(raw_value, address=address)
+    def sanitize_raw_value(cls, raw_value: Optional[bool], *, address: Address) -> Optional[bool]:
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
         if value_or_default is not None and not isinstance(value_or_default, bool):
             raise InvalidFieldTypeException(
                 address,
@@ -1078,13 +1065,20 @@ class BoolField(PrimitiveField, metaclass=ABCMeta):
         return value_or_default
 
 
+class BoolField(TriBoolField, metaclass=ABCMeta):
+    """A specialization of TriBoolField which has no None state."""
+
+    default: ClassVar[bool]
+    value: bool
+
+
 class IntField(ScalarField[int], metaclass=ABCMeta):
     expected_type = int
     expected_type_description = "an integer"
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        return super().compute_value(raw_value, address=address)
+    def sanitize_raw_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
+        return super().sanitize_raw_value(raw_value, address=address)
 
 
 class FloatField(ScalarField[float], metaclass=ABCMeta):
@@ -1092,8 +1086,8 @@ class FloatField(ScalarField[float], metaclass=ABCMeta):
     expected_type_description = "a float"
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[float], *, address: Address) -> Optional[float]:
-        return super().compute_value(raw_value, address=address)
+    def sanitize_raw_value(cls, raw_value: Optional[float], *, address: Address) -> Optional[float]:
+        return super().sanitize_raw_value(raw_value, address=address)
 
 
 class StringField(ScalarField[str], metaclass=ABCMeta):
@@ -1108,8 +1102,8 @@ class StringField(ScalarField[str], metaclass=ABCMeta):
     valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
-        value_or_default = super().compute_value(raw_value, address=address)
+    def sanitize_raw_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
         if value_or_default is not None and cls.valid_choices is not None:
             valid_choices = set(
                 cls.valid_choices
@@ -1123,12 +1117,12 @@ class StringField(ScalarField[str], metaclass=ABCMeta):
         return value_or_default
 
 
-class SequenceField(Generic[T], PrimitiveField, metaclass=ABCMeta):
+class SequenceField(PrimitiveField[Optional[Tuple[T, ...]]], metaclass=ABCMeta):
     """A field whose value is a homogeneous sequence.
 
     Subclasses must define the class properties `expected_element_type` and
     `expected_type_description`. They should also override the type hints for the classmethod
-    `compute_value` so that we use the correct type annotation in generated documentation.
+    `sanitize_raw_value` so that we use the correct type annotation in generated documentation.
 
         class Example(SequenceField):
             alias = "example"
@@ -1136,26 +1130,25 @@ class SequenceField(Generic[T], PrimitiveField, metaclass=ABCMeta):
             expected_type_description = "an iterable of `my_plugin` objects"
 
             @classmethod
-            def compute_value(
+            def sanitize_raw_value(
                 cls, raw_value: Optional[Iterable[MyPluginObject]], *, address: Address
             ) -> Optional[Tuple[MyPluginObject, ...]]:
-                return super().compute_value(raw_value, address=address)
+                return super().sanitize_raw_value(raw_value, address=address)
     """
 
     expected_element_type: ClassVar[Type[T]]
     expected_type_description: ClassVar[str]
-    value: Optional[Tuple[T, ...]]
     default: ClassVar[Optional[Tuple[T, ...]]] = None
 
     @classmethod
-    def compute_value(
+    def sanitize_raw_value(
         cls, raw_value: Optional[Iterable[Any]], *, address: Address
     ) -> Optional[Tuple[T, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
         if value_or_default is None:
             return None
         try:
-            ensure_list(value_or_default, expected_type=cls.expected_element_type)
+            list_value = ensure_list(value_or_default, expected_type=cls.expected_element_type)
         except ValueError:
             raise InvalidFieldTypeException(
                 address,
@@ -1163,7 +1156,7 @@ class SequenceField(Generic[T], PrimitiveField, metaclass=ABCMeta):
                 raw_value,
                 expected_type=cls.expected_type_description,
             )
-        return tuple(value_or_default)
+        return tuple(list_value)
 
 
 class StringSequenceField(SequenceField[str], metaclass=ABCMeta):
@@ -1171,10 +1164,10 @@ class StringSequenceField(SequenceField[str], metaclass=ABCMeta):
     expected_type_description = "an iterable of strings (e.g. a list of strings)"
 
     @classmethod
-    def compute_value(
+    def sanitize_raw_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Optional[Tuple[str, ...]]:
-        return super().compute_value(raw_value, address=address)
+        return super().sanitize_raw_value(raw_value, address=address)
 
 
 class StringOrStringSequenceField(SequenceField[str], metaclass=ABCMeta):
@@ -1192,44 +1185,48 @@ class StringOrStringSequenceField(SequenceField[str], metaclass=ABCMeta):
     )
 
     @classmethod
-    def compute_value(
+    def sanitize_raw_value(
         cls, raw_value: Optional[Union[str, Iterable[str]]], *, address: Address
     ) -> Optional[Tuple[str, ...]]:
         if isinstance(raw_value, str):
             return (raw_value,)
-        return super().compute_value(raw_value, address=address)
+        return super().sanitize_raw_value(raw_value, address=address)
 
 
-class DictStringToStringField(PrimitiveField, metaclass=ABCMeta):
-    value: Optional[FrozenDict[str, str]]
+class DictStringToStringField(PrimitiveField[Optional[FrozenDict[str, str]]], metaclass=ABCMeta):
     default: ClassVar[Optional[FrozenDict[str, str]]] = None
 
     @classmethod
-    def compute_value(
+    def sanitize_raw_value(
         cls, raw_value: Optional[Dict[str, str]], *, address: Address
     ) -> Optional[FrozenDict[str, str]]:
-        value_or_default = super().compute_value(raw_value, address=address)
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
         if value_or_default is None:
             return None
-        invalid_type_exception = InvalidFieldTypeException(
-            address, cls.alias, raw_value, expected_type="a dictionary of string -> string"
-        )
+
+        def invalid_type_exception():
+            raise InvalidFieldTypeException(
+                address, cls.alias, raw_value, expected_type="a dictionary of string -> string"
+            )
+
         if not isinstance(value_or_default, collections.abc.Mapping):
-            raise invalid_type_exception
+            raise invalid_type_exception()
         if not all(isinstance(k, str) and isinstance(v, str) for k, v in value_or_default.items()):
-            raise invalid_type_exception
+            raise invalid_type_exception()
         return FrozenDict(value_or_default)
 
 
-class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
-    value: Optional[FrozenDict[str, Tuple[str, ...]]]
+class DictStringToStringSequenceField(
+    PrimitiveField[Optional[FrozenDict[str, Tuple[str, ...]]]],
+    metaclass=ABCMeta,
+):
     default: ClassVar[Optional[FrozenDict[str, Tuple[str, ...]]]] = None
 
     @classmethod
-    def compute_value(
+    def sanitize_raw_value(
         cls, raw_value: Optional[Dict[str, Iterable[str]]], *, address: Address
     ) -> Optional[FrozenDict[str, Tuple[str, ...]]]:
-        value_or_default = super().compute_value(raw_value, address=address)
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
         if value_or_default is None:
             return None
         invalid_type_exception = InvalidFieldTypeException(
@@ -1251,8 +1248,7 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
         return FrozenDict(result)
 
 
-class AsyncStringSequenceField(AsyncField):
-    sanitized_raw_value: Optional[Tuple[str, ...]]
+class AsyncStringSequenceField(AsyncField[Optional[Tuple[str, ...]]]):
     default: ClassVar[Optional[Tuple[str, ...]]] = None
 
     @classmethod
@@ -1263,7 +1259,7 @@ class AsyncStringSequenceField(AsyncField):
         if value_or_default is None:
             return None
         try:
-            ensure_str_list(value_or_default)
+            list_value = ensure_str_list(value_or_default)
         except ValueError:
             raise InvalidFieldTypeException(
                 address,
@@ -1271,7 +1267,7 @@ class AsyncStringSequenceField(AsyncField):
                 value_or_default,
                 expected_type="an iterable of strings (e.g. a list of strings)",
             )
-        return tuple(sorted(value_or_default))
+        return tuple(sorted(list_value))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1346,7 +1342,7 @@ class Sources(AsyncStringSequenceField):
 
     @final
     def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
-        globs = self.sanitized_raw_value or ()
+        globs = self.value or ()
         error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
         conjunction = (
             GlobExpansionConjunction.all_match
@@ -1375,7 +1371,7 @@ class Sources(AsyncStringSequenceField):
         """
         includes = []
         excludes = []
-        for glob in self.sanitized_raw_value or ():
+        for glob in self.value or ():
             if glob.startswith("!"):
                 excludes.append(os.path.join(self.address.spec_path, glob[1:]))
             else:
@@ -1543,10 +1539,10 @@ class Dependencies(AsyncStringSequenceField):
 
     @memoized_property
     def unevaluated_transitive_excludes(self) -> UnparsedAddressInputs:
-        if not self.supports_transitive_excludes or not self.sanitized_raw_value:
+        if not self.supports_transitive_excludes or not self.value:
             return UnparsedAddressInputs((), owning_address=self.address)
         return UnparsedAddressInputs(
-            (v[2:] for v in self.sanitized_raw_value if v.startswith("!!")),
+            (v[2:] for v in self.value if v.startswith("!!")),
             owning_address=self.address,
         )
 
@@ -1704,7 +1700,7 @@ class SpecialCasedDependencies(AsyncStringSequenceField):
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.sanitized_raw_value or (), owning_address=self.address)
+        return UnparsedAddressInputs(self.value or (), owning_address=self.address)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1736,7 +1732,7 @@ COMMON_TARGET_FIELDS = (Tags, DescriptionField)
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
 #  Artifact, there is no common Artifact interface.
-class ProvidesField(PrimitiveField):
+class ProvidesField(PrimitiveField[Optional[Any]]):
     """An `artifact`, such as `setup_py`, that describes how to represent this target to the outside
     world."""
 

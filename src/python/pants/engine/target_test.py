@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, cast
 
 import pytest
 from typing_extensions import final
@@ -19,6 +19,7 @@ from pants.engine.target import (
     Dependencies,
     DictStringToStringField,
     DictStringToStringSequenceField,
+    Field,
     FieldSet,
     InvalidFieldChoiceException,
     InvalidFieldException,
@@ -47,16 +48,17 @@ from pants.util.ordered_set import OrderedSet
 # -----------------------------------------------------------------------------------------------
 
 
-class FortranExtensions(PrimitiveField):
+class FortranExtensions(PrimitiveField[Tuple[str, ...]]):
     alias = "fortran_extensions"
-    value: Tuple[str, ...]
     default = ()
 
     @classmethod
-    def compute_value(
+    def sanitize_raw_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Tuple[str, ...]:
-        value_or_default = super().compute_value(raw_value, address=address)
+        value_or_default = cast(
+            Iterable[str], super().sanitize_raw_value(raw_value, address=address)
+        )
         # Add some arbitrary validation to test that hydration/validation works properly.
         bad_extensions = [
             extension for extension in value_or_default if not extension.startswith("Fortran")
@@ -74,9 +76,8 @@ class UnrelatedField(BoolField):
     default = False
 
 
-class FortranSources(AsyncField):
+class FortranSources(AsyncField[Optional[Tuple[str, ...]]]):
     alias = "sources"
-    sanitized_raw_value: Optional[Tuple[str, ...]]
     default = None
 
     @classmethod
@@ -102,7 +103,7 @@ class FortranSourcesResult:
 @rule
 async def hydrate_fortran_sources(request: FortranSourcesRequest) -> FortranSourcesResult:
     sources_field = request.field
-    result = await Get(Snapshot, PathGlobs(sources_field.sanitized_raw_value or ()))
+    result = await Get(Snapshot, PathGlobs(sources_field.value or ()))
     # Validate after hydration
     non_fortran_sources = [
         fp for fp in result.files if PurePath(fp).suffix not in (".f95", ".f03", ".f08")
@@ -325,11 +326,11 @@ def test_override_preexisting_field_via_new_target() -> None:
         default_extensions = ("FortranCustomExt",)
 
         @classmethod
-        def compute_value(
+        def sanitize_raw_value(
             cls, raw_value: Optional[Iterable[str]], *, address: Address
         ) -> Tuple[str, ...]:
             # Ensure that we avoid certain problematic extensions and always use some defaults.
-            specified_extensions = super().compute_value(raw_value, address=address)
+            specified_extensions = super().sanitize_raw_value(raw_value, address=address)
             banned = [
                 extension
                 for extension in specified_extensions
@@ -345,7 +346,10 @@ def test_override_preexisting_field_via_new_target() -> None:
     class CustomFortranTarget(Target):
         alias = "custom_fortran"
         core_fields = tuple(
-            {*FortranTarget.core_fields, CustomFortranExtensions} - {FortranExtensions}
+            cast(
+                Iterable[Type[Field]],
+                {*FortranTarget.core_fields, CustomFortranExtensions} - {FortranExtensions},
+            )
         )
 
     custom_tgt = CustomFortranTarget(
@@ -492,7 +496,6 @@ def test_field_set() -> None:
     class UnrelatedField(StringField):
         alias = "unrelated_field"
         default = "default"
-        value: str
 
     class UnrelatedTarget(Target):
         alias = "unrelated_target"
@@ -555,10 +558,10 @@ def test_scalar_field() -> None:
         expected_type_description = "a `CustomObject` instance"
 
         @classmethod
-        def compute_value(
+        def sanitize_raw_value(
             cls, raw_value: Optional[CustomObject], *, address: Address
         ) -> Optional[CustomObject]:
-            return super().compute_value(raw_value, address=address)
+            return super().sanitize_raw_value(raw_value, address=address)
 
     addr = Address.parse(":example")
 
@@ -608,10 +611,10 @@ def test_sequence_field() -> None:
         expected_type_description = "an iterable of `CustomObject` instances"
 
         @classmethod
-        def compute_value(
+        def sanitize_raw_value(
             cls, raw_value: Optional[Iterable[CustomObject]], *, address: Address
         ) -> Optional[Tuple[CustomObject, ...]]:
-            return super().compute_value(raw_value, address=address)
+            return super().sanitize_raw_value(raw_value, address=address)
 
     addr = Address.parse(":example")
 
@@ -724,8 +727,8 @@ def test_async_string_sequence_field() -> None:
         alias = "example"
 
     addr = Address("", target_name="example")
-    assert Example(["hello", "world"], address=addr).sanitized_raw_value == ("hello", "world")
-    assert Example(None, address=addr).sanitized_raw_value is None
+    assert Example(["hello", "world"], address=addr).value == ("hello", "world")
+    assert Example(None, address=addr).value is None
     with pytest.raises(InvalidFieldTypeException):
         Example("strings are technically iterable...", address=addr)
     with pytest.raises(InvalidFieldTypeException):

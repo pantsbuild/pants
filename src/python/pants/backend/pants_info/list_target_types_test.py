@@ -8,7 +8,7 @@ from typing import Optional, cast
 
 from pants.backend.pants_info.list_target_types import TargetTypesSubsystem, list_target_types
 from pants.core.util_rules.pants_bin import PantsBin
-from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
+from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target, TriBoolField
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockConsole, run_rule_with_mocks
@@ -163,7 +163,7 @@ def test_list_all_json() -> None:
 
 
 def test_list_single() -> None:
-    class CustomField(BoolField):
+    class CustomField(TriBoolField):
         """My custom field!
 
         Use this field to...
