@@ -51,9 +51,6 @@ class PexBinary(ExternalTool):
     def generate_url(self, _: Platform) -> str:
         return f"https://github.com/pantsbuild/pex/releases/download/{self.version}/pex"
 
-    def generate_exe(self, _: Platform) -> str:
-        return "./pex"
-
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)

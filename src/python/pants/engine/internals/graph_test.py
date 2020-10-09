@@ -61,6 +61,7 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     Sources,
+    SpecialCasedDependencies,
     Tags,
     Target,
     TargetRootsToFieldSets,
@@ -84,9 +85,17 @@ class MockDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
+class SpecialCasedDeps1(SpecialCasedDependencies):
+    alias = "special_cased_deps1"
+
+
+class SpecialCasedDeps2(SpecialCasedDependencies):
+    alias = "special_cased_deps2"
+
+
 class MockTarget(Target):
     alias = "target"
-    core_fields = (MockDependencies, Sources)
+    core_fields = (MockDependencies, Sources, SpecialCasedDeps1, SpecialCasedDeps2)
 
 
 @pytest.fixture
@@ -195,6 +204,63 @@ def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: R
     assert transitive_targets.roots == (root, intermediate)
     assert transitive_targets.dependencies == FrozenOrderedSet([intermediate])
     assert transitive_targets.closure == FrozenOrderedSet([root, intermediate])
+
+
+def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) -> None:
+    """Test that subclasses of `SpecialCasedDependencies` show up if requested, but otherwise are
+    left off.
+
+    This uses the same test setup as `test_transitive_targets`, but does not use the `dependencies`
+    field like normal.
+    """
+    transitive_targets_rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            target(name='t1')
+            target(name='t2', special_cased_deps1=[':t1'])
+            target(name='d1', special_cased_deps1=[':t1'])
+            target(name='d2', special_cased_deps2=[':t2'])
+            target(name='d3')
+            target(name='root', special_cased_deps1=[':d1', ':d2'], special_cased_deps2=[':d3'])
+            """
+        ),
+    )
+
+    def get_target(name: str) -> Target:
+        return transitive_targets_rule_runner.get_target(Address("", target_name=name))
+
+    t1 = get_target("t1")
+    t2 = get_target("t2")
+    d1 = get_target("d1")
+    d2 = get_target("d2")
+    d3 = get_target("d3")
+    root = get_target("root")
+
+    direct_deps = transitive_targets_rule_runner.request(
+        Targets, [DependenciesRequest(root[Dependencies])]
+    )
+    assert direct_deps == Targets()
+
+    direct_deps = transitive_targets_rule_runner.request(
+        Targets, [DependenciesRequest(root[Dependencies], include_special_cased_deps=True)]
+    )
+    assert direct_deps == Targets([d1, d2, d3])
+
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets, [TransitiveTargetsRequest([root.address, d2.address])]
+    )
+    assert transitive_targets.roots == (root, d2)
+    assert transitive_targets.dependencies == FrozenOrderedSet()
+    assert transitive_targets.closure == FrozenOrderedSet([root, d2])
+
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets,
+        [TransitiveTargetsRequest([root.address, d2.address], include_special_cased_deps=True)],
+    )
+    assert transitive_targets.roots == (root, d2)
+    assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
+    assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
 
 
 def test_transitive_targets_tolerates_subtarget_cycles(

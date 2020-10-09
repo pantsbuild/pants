@@ -29,6 +29,7 @@ from pants.engine.target import (
     ProvidesField,
     ScalarField,
     Sources,
+    SpecialCasedDependencies,
     StringField,
     StringOrStringSequenceField,
     StringSequenceField,
@@ -269,9 +270,7 @@ class PythonTestsDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-# TODO(#10888): Teach project introspection goals that this is a special type of the `Dependencies`
-#  field.
-class PythonRuntimePackageDependencies(StringSequenceField):
+class PythonRuntimePackageDependencies(SpecialCasedDependencies):
     """Addresses to targets that can be built with the `./pants package` goal and whose resulting
     assets should be included in the test run.
 
@@ -286,14 +285,14 @@ class PythonRuntimePackageDependencies(StringSequenceField):
     alias = "runtime_package_dependencies"
 
 
-class PythonRuntimeBinaryDependencies(StringSequenceField):
+class PythonRuntimeBinaryDependencies(SpecialCasedDependencies):
     """Deprecated in favor of the `runtime_build_dependencies` field, which works with more target
     types like `archive` and `python_awslambda`."""
 
     alias = "runtime_binary_dependencies"
 
     @classmethod
-    def compute_value(
+    def sanitize_raw_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Optional[Tuple[str, ...]]:
         if raw_value is not None:
@@ -302,7 +301,7 @@ class PythonRuntimeBinaryDependencies(StringSequenceField):
                 "field is now deprecated in favor of the more flexible "
                 "`runtime_package_dependencies` field, and it will be removed in 2.1.0.dev0."
             )
-        return super().compute_value(raw_value, address=address)
+        return super().sanitize_raw_value(raw_value, address=address)
 
 
 class PythonTestsTimeout(IntField):

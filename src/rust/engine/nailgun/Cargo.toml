@@ -7,14 +7,14 @@ publish = false
 
 [dependencies]
 bytes = "0.5"
-futures = "0.3.5"
+futures = "0.3"
 log = "0.4"
 nails = "0.6.0"
 os_pipe = "0.9"
 task_executor = { path = "../task_executor" }
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["tcp", "fs", "sync", "io-std"] }
+tokio = { version = "=0.2.20", features = ["tcp", "fs", "sync"] }
 
 [dev-dependencies]
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["dns", "rt-threaded", "macros", "tcp", "io-std"] }
+tokio = { version = "=0.2.20", features = ["dns", "rt-threaded", "macros"] }

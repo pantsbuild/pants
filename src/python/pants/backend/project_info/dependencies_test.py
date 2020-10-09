@@ -9,12 +9,26 @@ import pytest
 
 from pants.backend.project_info.dependencies import Dependencies, DependencyType, rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.engine.target import SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
+
+
+# We verify that any subclasses of `SpecialCasedDependencies` will show up with the `dependencies`
+# goal by creating a mock target.
+class SpecialDepsField(SpecialCasedDependencies):
+    alias = "special_deps"
+
+
+class SpecialDepsTarget(Target):
+    alias = "special_deps_tgt"
+    core_fields = (SpecialDepsField,)
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=rules(), target_types=[PythonLibrary, PythonRequirementLibrary])
+    return RuleRunner(
+        rules=rules(), target_types=[PythonLibrary, PythonRequirementLibrary, SpecialDepsTarget]
+    )
 
 
 def create_python_library(
@@ -63,6 +77,21 @@ def test_no_dependencies(rule_runner: RuleRunner) -> None:
     create_python_library(rule_runner, path="some/target")
     assert_dependencies(rule_runner, specs=["some/target"], expected=[])
     assert_dependencies(rule_runner, specs=["some/target"], expected=[], transitive=True)
+
+
+def test_special_cased_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            special_deps_tgt(name='t1')
+            special_deps_tgt(name='t2', special_deps=[':t1'])
+            special_deps_tgt(name='t3', special_deps=[':t2'])
+            """
+        ),
+    )
+    assert_dependencies(rule_runner, specs=["//:t3"], expected=["//:t2"])
+    assert_dependencies(rule_runner, specs=["//:t3"], expected=["//:t1", "//:t2"], transitive=True)
 
 
 def test_python_dependencies(rule_runner: RuleRunner) -> None:
