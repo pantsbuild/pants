@@ -190,7 +190,8 @@ class Scheduler:
         tasks = self._native.new_tasks()
 
         for rule in rule_index.rules:
-            self._register_task(tasks, rule, union_membership)
+            for rule_version in rule.all_polymorphic_versions(union_membership):
+                self._register_task(tasks, rule_version, union_membership)
         for query in rule_index.queries:
             self._native.lib.tasks_query_add(
                 tasks,

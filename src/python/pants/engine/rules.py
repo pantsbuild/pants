@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import ast
+import dataclasses
 import inspect
 import itertools
 import sys
@@ -13,6 +14,7 @@ from typing import (
     Any,
     Callable,
     Iterable,
+    Iterator,
     List,
     Mapping,
     Optional,
@@ -27,7 +29,7 @@ from pants.engine.goal import Goal
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import GetConstraints
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.logging import LogLevel
@@ -434,6 +436,34 @@ class TaskRule(Rule):
     @property
     def output_type(self):
         return self._output_type
+
+    def all_polymorphic_versions(self, union_membership: UnionMembership) -> Iterator['TaskRule']:
+        for i, selector in enumerate(self.input_selectors):
+            replacements = union_membership.get(selector)
+            for union_member in replacements:
+                if union_member is selector:
+                    raise ValueError(f'The @union {selector} was registered as a member of its own '
+                                     'union via UnionRule! This cycle is not allowed.')
+                # The param at index i is now a (more) "concrete" type, so it will not get replaced
+                # again, unless the replacement is itself a union.
+                more_concrete_selectors = (
+                    *self.input_selectors[:i],
+                    union_member,
+                    *self.input_selectors[(i + 1):],
+                )
+                new_task = dataclasses.replace(
+                    self,
+                    input_selectors=more_concrete_selectors,
+                )
+                yield from new_task.all_polymorphic_versions(union_membership)
+            if replacements:
+                # If we have replaced any param with a more specific type, we can be sure that the
+                # recursion with `yield from` will have performed all the replacements for the later
+                # params.
+                break
+        else:
+            # If we have not performed any replacements whatsoever, we just return ourself.
+            yield self
 
 
 @frozen_after_init
