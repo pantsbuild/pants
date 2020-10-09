@@ -32,6 +32,7 @@ from pants.engine.target import (
     SpecialCasedDependencies,
     StringField,
     StringOrStringSequenceField,
+    StringSequenceField,
     Target,
     WrappedTarget,
 )
