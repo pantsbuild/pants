@@ -207,7 +207,7 @@ dependencies = [
  "bytes 0.4.12",
  "clap",
  "dirs",
- "env_logger",
+ "env_logger 0.5.13",
  "errno",
  "fuse",
  "futures 0.3.5",
@@ -695,7 +695,7 @@ dependencies = [
  "concrete_time",
  "cpython",
  "crossbeam-channel",
- "env_logger",
+ "env_logger 0.5.13",
  "fnv",
  "fs",
  "futures 0.1.29",
@@ -735,6 +735,19 @@ name = "env_logger"
 version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15b0a4d2e39f8420210be8b27eeda28029729e2fd4291019455016c348240c38"
+dependencies = [
+ "atty",
+ "humantime",
+ "log 0.4.8",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aafcde04e90a5226a6443b7aabdb016ba2f8307c847d524724bd9b346dd1a2d3"
 dependencies = [
  "atty",
  "humantime",
@@ -837,7 +850,7 @@ dependencies = [
  "boxfuture",
  "bytes 0.4.12",
  "clap",
- "env_logger",
+ "env_logger 0.5.13",
  "fs",
  "futures 0.1.29",
  "futures 0.3.5",
@@ -1067,7 +1080,7 @@ name = "graph"
 version = "0.0.1"
 dependencies = [
  "async-trait",
- "env_logger",
+ "env_logger 0.5.13",
  "fnv",
  "futures 0.3.5",
  "log 0.4.8",
@@ -1479,7 +1492,7 @@ name = "local_cas"
 version = "0.0.1"
 dependencies = [
  "clap",
- "env_logger",
+ "env_logger 0.5.13",
  "mock",
 ]
 
@@ -2103,6 +2116,7 @@ dependencies = [
  "concrete_time",
  "derivative",
  "double-checked-cell-async",
+ "env_logger 0.6.2",
  "fs",
  "futures 0.1.29",
  "futures 0.3.5",
@@ -2141,7 +2155,7 @@ version = "0.0.1"
 dependencies = [
  "clap",
  "dirs",
- "env_logger",
+ "env_logger 0.5.13",
  "fs",
  "futures 0.3.5",
  "hashing",
@@ -2170,7 +2184,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6325275b85605f58f576456a47af44417edf5956a6f670bb59fbe12aff69597"
 dependencies = [
  "bytes 0.4.12",
- "env_logger",
+ "env_logger 0.5.13",
  "heck",
  "itertools 0.7.11",
  "log 0.4.8",
@@ -2601,7 +2615,7 @@ dependencies = [
 name = "rule_graph"
 version = "0.0.1"
 dependencies = [
- "env_logger",
+ "env_logger 0.5.13",
  "indexmap",
  "log 0.4.8",
  "petgraph",

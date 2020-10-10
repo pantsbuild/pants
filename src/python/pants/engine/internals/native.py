@@ -260,6 +260,8 @@ class Native(metaclass=SingletonMetaclass):
             speculation_strategy=execution_options.process_execution_speculation_strategy,
             use_local_cache=execution_options.process_execution_use_local_cache,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
+            remote_cache_read=execution_options.remote_cache_read,
+            remote_cache_write=execution_options.remote_cache_write,
         )
 
         return cast(

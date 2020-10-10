@@ -96,6 +96,8 @@ pub struct ExecutionStrategyOptions {
   pub speculation_strategy: String,
   pub use_local_cache: bool,
   pub local_enable_nailgun: bool,
+  pub remote_cache_read: bool,
+  pub remote_cache_write: bool,
 }
 
 impl Core {
