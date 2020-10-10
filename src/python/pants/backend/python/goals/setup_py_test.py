@@ -34,7 +34,7 @@ from pants.backend.python.goals.setup_py import (
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
-    PythonBinary,
+    PexBinary,
     PythonDistribution,
     PythonLibrary,
     PythonRequirementLibrary,
@@ -56,7 +56,7 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
     return RuleRunner(
         rules=rules,
         target_types=[
-            PythonBinary,
+            PexBinary,
             PythonDistribution,
             PythonLibrary,
             PythonRequirementLibrary,

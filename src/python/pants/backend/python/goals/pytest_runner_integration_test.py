@@ -14,7 +14,7 @@ from pants.backend.python.goals import package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_coverage_config
 from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import (
-    PythonBinary,
+    PexBinary,
     PythonLibrary,
     PythonRequirementLibrary,
     PythonTests,
@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(TestResult, (PythonTestFieldSet,)),
             QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
         ],
-        target_types=[PythonBinary, PythonLibrary, PythonTests, PythonRequirementLibrary],
+        target_types=[PexBinary, PythonLibrary, PythonTests, PythonRequirementLibrary],
     )
 
 
