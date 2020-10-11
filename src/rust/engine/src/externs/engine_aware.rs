@@ -75,7 +75,7 @@ impl EngineAwareInformation for Artifacts {
           return None;
         }
       };
-      let digest_value: PyObject = externs::getattr(&Value::new(value), "digest")
+      let digest_value: PyObject = externs::getattr(&value, "digest")
         .map_err(|e| {
           log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
         })
