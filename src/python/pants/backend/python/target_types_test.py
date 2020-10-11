@@ -11,8 +11,8 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     InjectPythonDistributionDependencies,
-    PythonBinary,
-    PythonBinarySources,
+    PexBinary,
+    PexBinarySources,
     PythonDistribution,
     PythonDistributionDependencies,
     PythonRequirementsField,
@@ -65,12 +65,10 @@ def test_timeout_calculation() -> None:
 
 
 def test_translate_source_file_to_entry_point() -> None:
-    assert (
-        PythonBinarySources.translate_source_file_to_entry_point("example/app.py") == "example.app"
-    )
+    assert PexBinarySources.translate_source_file_to_entry_point("example/app.py") == "example.app"
     # NB: the onus is on the call site to strip the source roots before calling this method.
     assert (
-        PythonBinarySources.translate_source_file_to_entry_point("src/python/app.py")
+        PexBinarySources.translate_source_file_to_entry_point("src/python/app.py")
         == "src.python.app"
     )
 
@@ -127,14 +125,14 @@ def test_python_distribution_dependency_injection() -> None:
                 (InjectPythonDistributionDependencies,),
             ),
         ],
-        target_types=[PythonDistribution, PythonBinary],
+        target_types=[PythonDistribution, PexBinary],
         objects={"setup_py": PythonArtifact},
     )
     rule_runner.add_to_build_file(
         "project",
         dedent(
             """\
-            python_binary(name="my_binary")
+            pex_binary(name="my_binary")
             python_distribution(
                 name="dist",
                 provides=setup_py(

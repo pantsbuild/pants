@@ -5,13 +5,13 @@ import collections.abc
 import logging
 import os.path
 from textwrap import dedent
-from typing import Iterable, Optional, Tuple, Union, cast
+from typing import Any, Dict, Iterable, Optional, Tuple, Union, cast
 
 from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
@@ -36,6 +36,7 @@ from pants.engine.target import (
     Target,
     WrappedTarget,
 )
+from pants.engine.unions import UnionMembership
 from pants.option.subsystem import Subsystem
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
@@ -77,14 +78,16 @@ COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, PythonInterpreterCompatibility)
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_binary` target
+# `pex_binary` target
 # -----------------------------------------------------------------------------------------------
 
 
-class PythonBinaryDefaults(Subsystem):
-    """Default settings for creating Python executables."""
+class PexBinaryDefaults(Subsystem):
+    """Default settings for creating PEX executables."""
 
-    options_scope = "python-binary"
+    options_scope = "pex-binary"
+    deprecated_options_scope = "python-binary"
+    deprecated_options_scope_removal_version = "2.1.0.dev0"
 
     @classmethod
     def register_options(cls, register):
@@ -96,17 +99,38 @@ class PythonBinaryDefaults(Subsystem):
             default=True,
             help=(
                 "Whether built PEX binaries should emit pex warnings at runtime by default. "
-                "Can be over-ridden by specifying the `emit_warnings` parameter of individual "
-                "`python_binary` targets"
+                "Can be overridden by specifying the `emit_warnings` parameter of individual "
+                "`pex_binary` targets"
+            ),
+        )
+        register(
+            "--emit-warnings",
+            advanced=True,
+            type=bool,
+            default=True,
+            help=(
+                "Whether built PEX binaries should emit PEX warnings at runtime by default. "
+                "Can be overridden by specifying the `emit_warnings` parameter of individual "
+                "`pex_binary` targets"
             ),
         )
 
     @property
-    def pex_emit_warnings(self) -> bool:
-        return cast(bool, self.options.pex_emit_warnings)
+    def emit_warnings(self) -> bool:
+        return cast(
+            bool,
+            resolve_conflicting_options(
+                old_option="pex_emit_warnings",
+                new_option="emit_warnings",
+                old_scope=self.options_scope,
+                new_scope=self.deprecated_options_scope,
+                old_container=self.options,
+                new_container=self.options,
+            ),
+        )
 
 
-class PythonBinarySources(PythonSources):
+class PexBinarySources(PythonSources):
     """A single file containing the executable, such as ['app.py'].
 
     You can leave this off if you include the executable file in one of this target's
@@ -124,11 +148,11 @@ class PythonBinarySources(PythonSources):
         return module_base.replace(os.path.sep, ".")
 
 
-class PythonBinaryDependencies(Dependencies):
+class PexBinaryDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonEntryPoint(StringField):
+class PexEntryPointField(StringField):
     """The default entry point for the binary.
 
     If omitted, Pants will use the module name from the `sources` field, e.g. `project/app.py` will
@@ -138,7 +162,7 @@ class PythonEntryPoint(StringField):
     alias = "entry_point"
 
 
-class PythonPlatforms(StringOrStringSequenceField):
+class PexPlatformsField(StringOrStringSequenceField):
     """The platforms the built PEX should be compatible with.
 
     This defaults to the current platform, but can be overridden to different platforms. You can
@@ -155,7 +179,7 @@ class PythonPlatforms(StringOrStringSequenceField):
     alias = "platforms"
 
 
-class PexInheritPath(StringField):
+class PexInheritPathField(StringField):
     """Whether to inherit the `sys.path` of the environment that the binary runs in.
 
     Use `false` to not inherit `sys.path`; use `fallback` to inherit `sys.path` after packaged
@@ -175,7 +199,7 @@ class PexInheritPath(StringField):
         return super().compute_value(raw_value, address=address)
 
 
-class PexZipSafe(BoolField):
+class PexZipSafeField(BoolField):
     """Whether or not this binary is safe to run in compacted (zip-file) form.
 
     If they are not zip safe, they will be written to disk prior to execution. iff
@@ -186,7 +210,7 @@ class PexZipSafe(BoolField):
     value: bool
 
 
-class PexAlwaysWriteCache(BoolField):
+class PexAlwaysWriteCacheField(BoolField):
     """Whether PEX should always write the .deps cache of the .pex file to disk or not.
 
     This can use less memory in RAM constrained environments.
@@ -197,7 +221,7 @@ class PexAlwaysWriteCache(BoolField):
     value: bool
 
 
-class PexIgnoreErrors(BoolField):
+class PexIgnoreErrorsField(BoolField):
     """Should we ignore when PEX cannot resolve dependencies?"""
 
     alias = "ignore_errors"
@@ -205,13 +229,13 @@ class PexIgnoreErrors(BoolField):
     value: bool
 
 
-class PexShebang(StringField):
+class PexShebangField(StringField):
     """For the generated PEX, use this shebang."""
 
     alias = "shebang"
 
 
-class PexEmitWarnings(BoolField):
+class PexEmitWarningsField(BoolField):
     """Whether or not to emit PEX warnings at runtime.
 
     The default is determined by the option `pex_runtime_warnings` in the `[python-binary]` scope.
@@ -219,13 +243,37 @@ class PexEmitWarnings(BoolField):
 
     alias = "emit_warnings"
 
-    def value_or_global_default(self, python_binary_defaults: PythonBinaryDefaults) -> bool:
+    def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
         if self.value is None:
-            return python_binary_defaults.pex_emit_warnings
+            return pex_binary_defaults.emit_warnings
         return self.value
 
 
-class PythonBinary(Target):
+class PexBinary(Target):
+    """A Python target that can be converted into an executable PEX file.
+
+    PEX files are self-contained executable files that contain a complete Python environment capable
+    of running the target. For more information, see https://www.pantsbuild.org/docs/pex-files.
+    """
+
+    alias = "pex_binary"
+    core_fields = (
+        *COMMON_PYTHON_FIELDS,
+        OutputPathField,
+        PexBinarySources,
+        PexBinaryDependencies,
+        PexEntryPointField,
+        PexPlatformsField,
+        PexInheritPathField,
+        PexZipSafeField,
+        PexAlwaysWriteCacheField,
+        PexIgnoreErrorsField,
+        PexShebangField,
+        PexEmitWarningsField,
+    )
+
+
+class PythonBinary(PexBinary):
     """A Python target that can be converted into an executable PEX file.
 
     PEX files are self-contained executable files that contain a complete Python environment capable
@@ -233,20 +281,26 @@ class PythonBinary(Target):
     """
 
     alias = "python_binary"
-    core_fields = (
-        *COMMON_PYTHON_FIELDS,
-        OutputPathField,
-        PythonBinarySources,
-        PythonBinaryDependencies,
-        PythonEntryPoint,
-        PythonPlatforms,
-        PexInheritPath,
-        PexZipSafe,
-        PexAlwaysWriteCache,
-        PexIgnoreErrors,
-        PexShebang,
-        PexEmitWarnings,
-    )
+
+    def __init__(  # type: ignore[misc]  # This is `@final`, but it's fine to override here.
+        self,
+        unhydrated_values: Dict[str, Any],
+        *,
+        address: Address,
+        union_membership: Optional[UnionMembership] = None,
+    ) -> None:
+        warn_or_error(
+            removal_version="2.1.0.dev0",
+            deprecated_entity_description="the `python_binary` target",
+            hint=(
+                f"Use the target type `pex_binary`, rather than `python_binary` for {address}. "
+                "The behavior is identical.\n\nTo fix this globally, run the below command:\n\t"
+                "macOS: for f in $(find . -name BUILD); do sed -i '' -Ee "
+                "'s#^python_binary\\(#pex_binary(#g' $f ; done\n\tLinux: for f in $(find . "
+                "-name BUILD); do sed -i -Ee 's#^python_binary\\(#pex_binary(#g' $f ; done\n"
+            ),
+        )
+        super().__init__(unhydrated_values, address=address, union_membership=union_membership)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -278,7 +332,7 @@ class PythonRuntimePackageDependencies(SpecialCasedDependencies):
     results in your archive using the same name they would normally have, but without the
     `--distdir` prefix (e.g. `dist/`).
 
-    You can include anything that can be built by `./pants package`, e.g. a `python_binary`,
+    You can include anything that can be built by `./pants package`, e.g. a `pex_binary`,
     `python_awslambda`, or even another `archive`.
     """
 
@@ -588,7 +642,7 @@ async def inject_dependencies(
     with_binaries = original_tgt.target[PythonProvidesField].value.binaries
     if not with_binaries:
         return InjectedDependencies()
-    # Note that we don't validate that these are all `python_binary` targets; we don't care about
+    # Note that we don't validate that these are all `pex_binary` targets; we don't care about
     # that here. `setup_py.py` will do that validation.
     addresses = await Get(
         Addresses,

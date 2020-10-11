@@ -6,17 +6,16 @@ from dataclasses import dataclass
 from typing import Tuple, cast
 
 from pants.backend.python.target_types import (
-    PexAlwaysWriteCache,
-    PexEmitWarnings,
-    PexIgnoreErrors,
-    PexInheritPath,
-    PexShebang,
-    PexZipSafe,
-    PythonBinaryDefaults,
-    PythonBinarySources,
-    PythonEntryPoint,
+    PexAlwaysWriteCacheField,
+    PexBinaryDefaults,
+    PexBinarySources,
+    PexEmitWarningsField,
+    PexEntryPointField,
+    PexIgnoreErrorsField,
+    PexInheritPathField,
 )
-from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
+from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
+from pants.backend.python.target_types import PexShebangField, PexZipSafeField
 from pants.backend.python.util_rules.pex import PexPlatforms, TwoStepPex
 from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
@@ -40,28 +39,26 @@ from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
-class PythonBinaryFieldSet(PackageFieldSet, BinaryFieldSet, RunFieldSet):
-    required_fields = (PythonEntryPoint, PythonBinarySources)
+class PexBinaryFieldSet(PackageFieldSet, BinaryFieldSet, RunFieldSet):
+    required_fields = (PexEntryPointField, PexBinarySources)
 
-    sources: PythonBinarySources
-    entry_point: PythonEntryPoint
+    sources: PexBinarySources
+    entry_point: PexEntryPointField
 
     output_path: OutputPathField
-    always_write_cache: PexAlwaysWriteCache
-    emit_warnings: PexEmitWarnings
-    ignore_errors: PexIgnoreErrors
-    inherit_path: PexInheritPath
-    shebang: PexShebang
-    zip_safe: PexZipSafe
+    always_write_cache: PexAlwaysWriteCacheField
+    emit_warnings: PexEmitWarningsField
+    ignore_errors: PexIgnoreErrorsField
+    inherit_path: PexInheritPathField
+    shebang: PexShebangField
+    zip_safe: PexZipSafeField
     platforms: PythonPlatformsField
 
-    def generate_additional_args(
-        self, python_binary_defaults: PythonBinaryDefaults
-    ) -> Tuple[str, ...]:
+    def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> Tuple[str, ...]:
         args = []
         if self.always_write_cache.value is True:
             args.append("--always-write-cache")
-        if self.emit_warnings.value_or_global_default(python_binary_defaults) is False:
+        if self.emit_warnings.value_or_global_default(pex_binary_defaults) is False:
             args.append("--no-emit-warnings")
         if self.ignore_errors.value is True:
             args.append("--ignore-errors")
@@ -75,9 +72,9 @@ class PythonBinaryFieldSet(PackageFieldSet, BinaryFieldSet, RunFieldSet):
 
 
 @rule(level=LogLevel.DEBUG)
-async def package_python_binary(
-    field_set: PythonBinaryFieldSet,
-    python_binary_defaults: PythonBinaryDefaults,
+async def package_pex_binary(
+    field_set: PexBinaryFieldSet,
+    pex_binary_defaults: PexBinaryDefaults,
     global_options: GlobalOptions,
 ) -> BuiltPackage:
     entry_point = field_set.entry_point.value
@@ -97,7 +94,7 @@ async def package_python_binary(
             SourceRootRequest,
             SourceRootRequest.for_file(entry_point_path),
         )
-        entry_point = PythonBinarySources.translate_source_file_to_entry_point(
+        entry_point = PexBinarySources.translate_source_file_to_entry_point(
             os.path.relpath(entry_point_path, source_root.path)
         )
 
@@ -115,7 +112,7 @@ async def package_python_binary(
                 entry_point=entry_point,
                 platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
                 output_filename=output_filename,
-                additional_args=field_set.generate_additional_args(python_binary_defaults),
+                additional_args=field_set.generate_additional_args(pex_binary_defaults),
             )
         ),
     )
@@ -123,7 +120,7 @@ async def package_python_binary(
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_python_binary(field_set: PythonBinaryFieldSet) -> CreatedBinary:
+async def create_pex_binary(field_set: PexBinaryFieldSet) -> CreatedBinary:
     pex = await Get(BuiltPackage, PackageFieldSet, field_set)
     return CreatedBinary(pex.digest, cast(str, pex.artifacts[0].relpath))
 
@@ -131,6 +128,6 @@ async def create_python_binary(field_set: PythonBinaryFieldSet) -> CreatedBinary
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PackageFieldSet, PythonBinaryFieldSet),
-        UnionRule(BinaryFieldSet, PythonBinaryFieldSet),
+        UnionRule(PackageFieldSet, PexBinaryFieldSet),
+        UnionRule(BinaryFieldSet, PexBinaryFieldSet),
     ]

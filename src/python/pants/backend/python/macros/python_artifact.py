@@ -52,9 +52,9 @@ class PythonArtifact:
             my_command = ':my_library_bin'
           )
 
-        This adds a console_script entry_point for the python_binary target
+        This adds a console_script entry_point for the pex_binary target
         pointed at by :my_library_bin.  Currently only supports
-        python_binaries that specify entry_point explicitly instead of source.
+        pex_binaries that specify entry_point explicitly instead of source.
 
         Also can take a dictionary, e.g.
         with_binaries({'my-command': ':my_library_bin'})

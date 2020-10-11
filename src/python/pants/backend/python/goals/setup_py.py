@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
-    PythonEntryPoint,
+    PexEntryPointField,
     PythonInterpreterCompatibility,
     PythonProvidesField,
     PythonRequirementsField,
@@ -620,7 +620,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         Targets, UnparsedAddressInputs(key_to_binary_spec.values(), owning_address=target.address)
     )
     for key, binary in zip(key_to_binary_spec.keys(), binaries):
-        binary_entry_point = binary.get(PythonEntryPoint).value
+        binary_entry_point = binary.get(PexEntryPointField).value
         if not binary_entry_point:
             raise InvalidEntryPoint(
                 f"The binary {key} exported by {target.address} is not a valid entry point."

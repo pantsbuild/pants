@@ -3,8 +3,8 @@
 
 import os
 
-from pants.backend.python.goals.package_python_binary import PythonBinaryFieldSet
-from pants.backend.python.target_types import PythonBinaryDefaults, PythonBinarySources
+from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.target_types import PexBinaryDefaults, PexBinarySources
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
@@ -23,9 +23,9 @@ from pants.util.logging import LogLevel
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_python_binary_run_request(
-    field_set: PythonBinaryFieldSet,
-    python_binary_defaults: PythonBinaryDefaults,
+async def create_pex_binary_run_request(
+    field_set: PexBinaryFieldSet,
+    pex_binary_defaults: PexBinaryDefaults,
     pex_env: PexEnvironment,
 ) -> RunRequest:
     entry_point = field_set.entry_point.value
@@ -45,7 +45,7 @@ async def create_python_binary_run_request(
             SourceRootRequest,
             SourceRootRequest.for_file(entry_point_path),
         )
-        entry_point = PythonBinarySources.translate_source_file_to_entry_point(
+        entry_point = PexBinarySources.translate_source_file_to_entry_point(
             os.path.relpath(entry_point_path, source_root.path)
         )
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
@@ -70,7 +70,7 @@ async def create_python_binary_run_request(
         PexRequest(
             output_filename=output_filename,
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
-            additional_args=field_set.generate_additional_args(python_binary_defaults),
+            additional_args=field_set.generate_additional_args(pex_binary_defaults),
             internal_only=True,
             # Note that the entry point file is not in the Pex itself, but on the
             # PEX_PATH. This works fine!
@@ -105,4 +105,4 @@ async def create_python_binary_run_request(
 
 
 def rules():
-    return [*collect_rules(), UnionRule(RunFieldSet, PythonBinaryFieldSet)]
+    return [*collect_rules(), UnionRule(RunFieldSet, PexBinaryFieldSet)]

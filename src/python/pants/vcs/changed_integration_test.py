@@ -173,7 +173,7 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
     hermetic = False
 
     TEST_MAPPING = {
-        # A `python_binary` with `sources=['file.name']`.
+        # A `pex_binary` with `sources=['file.name']`.
         "src/python/python_targets/test_binary.py": dict(
             none=["src/python/python_targets/test_binary.py:test"],
             direct=[

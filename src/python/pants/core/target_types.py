@@ -235,7 +235,7 @@ class ArchivePackages(SpecialCasedDependencies):
     results in your archive using the same name they would normally have, but without the
     `--distdir` prefix (e.g. `dist/`).
 
-    You can include anything that can be built by `./pants package`, e.g. a `python_binary`,
+    You can include anything that can be built by `./pants package`, e.g. a `pex_binary`,
     `python_awslambda`, or even another `archive`.
     """
 
