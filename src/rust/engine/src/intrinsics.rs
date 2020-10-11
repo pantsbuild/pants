@@ -355,7 +355,7 @@ fn create_digest_to_digest(
         let path = RelativePath::new(PathBuf::from(path))
           .map_err(|e| format!("The `path` must be relative: {:?}", e))?;
 
-        if externs::hasattr(&file_content_or_directory, "content") {
+        if externs::hasattr(file_content_or_directory.as_ref(), "content") {
           let bytes = bytes::Bytes::from(externs::project_bytes(
             &file_content_or_directory,
             "content",

@@ -167,7 +167,7 @@ pub fn store_bool(val: bool) -> Value {
 ///
 /// Check if a Python object has the specified field.
 ///
-pub fn hasattr(value: &Value, field: &str) -> bool {
+pub fn hasattr(value: &PyObject, field: &str) -> bool {
   let gil = Python::acquire_gil();
   let py = gil.python();
   value.hasattr(py, field).unwrap()
