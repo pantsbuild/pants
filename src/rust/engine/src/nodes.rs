@@ -910,13 +910,13 @@ impl Task {
               .cloned()
               .ok_or_else(|| match get.input_type {
                 Some(ty) if externs::is_union(ty) => {
-                  let value = externs::type_for_type_id(ty).into_object().into();
+                  let value = externs::type_for_type_id(ty).into_object();
                   match externs::call_method(
                     &value,
                     "non_member_error_message",
                     &[externs::val_for(&get.input)],
                   ) {
-                    Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
+                    Ok(err_msg) => throw(&externs::val_to_str(&err_msg.into())),
                     // If the non_member_error_message() call failed for any reason,
                     // fall back to a generic message.
                     Err(_e) => throw(&format!(

@@ -328,24 +328,21 @@ pub fn create_exception(msg: &str) -> Value {
   Value::from(with_externs(|py, e| e.call_method(py, "create_exception", (msg,), None)).unwrap())
 }
 
-pub fn check_for_python_none(value: Value) -> Option<Value> {
+pub fn check_for_python_none(value: PyObject) -> Option<PyObject> {
   let gil = Python::acquire_gil();
   let py = gil.python();
 
-  if *value == py.None() {
+  if value == py.None() {
     return None;
   }
   Some(value)
 }
 
-pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value, Failure> {
+pub fn call_method(value: &PyObject, method: &str, args: &[Value]) -> Result<PyObject, PyErr> {
   let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let gil = Python::acquire_gil();
   let args_tuple = PyTuple::new(gil.python(), &arg_handles);
-  value
-    .call_method(gil.python(), method, args_tuple, None)
-    .map(Value::from)
-    .map_err(|py_err| Failure::from_py_err(gil.python(), py_err))
+  value.call_method(gil.python(), method, args_tuple, None)
 }
 
 pub fn call_function<T: AsRef<PyObject>>(func: T, args: &[Value]) -> Result<PyObject, PyErr> {
