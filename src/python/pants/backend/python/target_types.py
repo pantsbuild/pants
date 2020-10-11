@@ -294,7 +294,10 @@ class PythonBinary(PexBinary):
             deprecated_entity_description="the `python_binary` target",
             hint=(
                 f"Use the target type `pex_binary`, rather than `python_binary` for {address}. "
-                "The behavior is identical."
+                "The behavior is identical.\n\nTo fix this globally, run the below command:\n\t"
+                "macOS: for f in $(find . -name BUILD); do sed -i '' -Ee "
+                "'s#^python_binary\\(#pex_binary(#g' $f ; done\n\tLinux: for f in $(find . "
+                "-name BUILD); do sed -i -Ee 's#^python_binary\\(#pex_binary(#g' $f ; done\n"
             ),
         )
         super().__init__(unhydrated_values, address=address, union_membership=union_membership)
