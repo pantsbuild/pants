@@ -15,6 +15,7 @@ mod interface;
 mod interface_tests;
 
 use std::collections::BTreeMap;
+use std::convert::AsRef;
 use std::convert::TryInto;
 use std::fmt;
 use std::sync::atomic;
@@ -347,19 +348,12 @@ pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value,
     .map_err(|py_err| Failure::from_py_err(gil.python(), py_err))
 }
 
-pub fn call_function(func: &Value, args: &[Value]) -> Result<PyObject, PyErr> {
+pub fn call_function<T: AsRef<PyObject>>(func: T, args: &[Value]) -> Result<PyObject, PyErr> {
+  let func: &PyObject = func.as_ref();
   let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let gil = Python::acquire_gil();
   let args_tuple = PyTuple::new(gil.python(), &arg_handles);
   func.call(gil.python(), args_tuple, None)
-}
-
-pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
-  let output = call_function(func, args);
-  output.map(Value::from).map_err(|py_err| {
-    let gil = Python::acquire_gil();
-    Failure::from_py_err(gil.python(), py_err)
-  })
 }
 
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
