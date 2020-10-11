@@ -4,6 +4,7 @@
 use crate::core::Value;
 use crate::externs;
 use crate::nodes::lift_directory_digest;
+use crate::Failure;
 use crate::Types;
 
 use cpython::{PyDict, PyObject, PyString, Python};
@@ -24,9 +25,9 @@ impl EngineAwareInformation for EngineAwareLevel {
   type MaybeOutput = Level;
 
   fn retrieve(_types: &Types, value: &Value) -> Option<Level> {
-    let new_level_val: Value = externs::call_method(&value, "level", &[]).ok()?;
+    let new_level_val = externs::call_method(value.as_ref(), "level", &[]).ok()?;
     let new_level_val = externs::check_for_python_none(new_level_val)?;
-    externs::val_to_log_level(&new_level_val).ok()
+    externs::val_to_log_level(&new_level_val.into()).ok()
   }
 }
 
@@ -36,9 +37,9 @@ impl EngineAwareInformation for Message {
   type MaybeOutput = String;
 
   fn retrieve(_types: &Types, value: &Value) -> Option<String> {
-    let msg_val: Value = externs::call_method(&value, "message", &[]).ok()?;
+    let msg_val = externs::call_method(&value, "message", &[]).ok()?;
     let msg_val = externs::check_for_python_none(msg_val)?;
-    Some(externs::val_to_str(&msg_val))
+    Some(externs::val_to_str(&msg_val.into()))
   }
 }
 
@@ -48,14 +49,15 @@ impl EngineAwareInformation for Artifacts {
   type MaybeOutput = Vec<(String, Digest)>;
 
   fn retrieve(types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
-    let artifacts_val: Value = match externs::call_method(&value, "artifacts", &[]) {
+    let artifacts_val = match externs::call_method(&value, "artifacts", &[]) {
       Ok(value) => value,
-      Err(e) => {
-        log::error!("Error calling `artifacts` method: {}", e);
+      Err(py_err) => {
+        let failure = Failure::from_py_err(py_err);
+        log::error!("Error calling `artifacts` method: {}", failure);
         return None;
       }
     };
-    let artifacts_val: Value = externs::check_for_python_none(artifacts_val)?;
+    let artifacts_val = externs::check_for_python_none(artifacts_val)?;
     let gil = Python::acquire_gil();
     let py = gil.python();
     let artifacts_dict: &PyDict = artifacts_val.cast_as::<PyDict>(py).ok()?;
@@ -72,7 +74,7 @@ impl EngineAwareInformation for Artifacts {
           return None;
         }
       };
-      let digest_value: PyObject = externs::getattr(&Value::new(value), "digest")
+      let digest_value: PyObject = externs::getattr(&value, "digest")
         .map_err(|e| {
           log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
         })
@@ -100,6 +102,6 @@ impl EngineAwareInformation for DebugHint {
     externs::call_method(&value, "debug_hint", &[])
       .ok()
       .and_then(externs::check_for_python_none)
-      .map(|val| externs::val_to_str(&val))
+      .map(|val| externs::val_to_str(&val.into()))
   }
 }

@@ -15,6 +15,7 @@ mod interface;
 mod interface_tests;
 
 use std::collections::BTreeMap;
+use std::convert::AsRef;
 use std::convert::TryInto;
 use std::fmt;
 use std::sync::atomic;
@@ -97,14 +98,6 @@ pub fn type_for(py_type: PyType) -> TypeId {
   })
 }
 
-pub fn acquire_key_for(val: Value) -> Result<Key, Failure> {
-  key_for(val).map_err(|e| {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Failure::from_py_err(py, e)
-  })
-}
-
 pub fn key_for(val: Value) -> Result<Key, PyErr> {
   with_interns_mut(|interns| {
     let gil = Python::acquire_gil();
@@ -174,7 +167,7 @@ pub fn store_bool(val: bool) -> Value {
 ///
 /// Check if a Python object has the specified field.
 ///
-pub fn hasattr(value: &Value, field: &str) -> bool {
+pub fn hasattr(value: &PyObject, field: &str) -> bool {
   let gil = Python::acquire_gil();
   let py = gil.python();
   value.hasattr(py, field).unwrap()
@@ -183,7 +176,7 @@ pub fn hasattr(value: &Value, field: &str) -> bool {
 ///
 /// Gets an attribute of the given value as the given type.
 ///
-fn getattr<T>(value: &Value, field: &str) -> Result<T, String>
+fn getattr<T>(value: &PyObject, field: &str) -> Result<T, String>
 where
   for<'a> T: FromPyObject<'a>,
 {
@@ -235,7 +228,7 @@ fn collect_iterable(value: &Value) -> Result<Vec<Value>, String> {
 /// Pulls out the value specified by the field name from a given Value
 ///
 pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
-  getattr(value, field).unwrap()
+  getattr(value.as_ref(), field).unwrap()
 }
 
 pub fn project_iterable(value: &Value) -> Vec<Value> {
@@ -243,19 +236,19 @@ pub fn project_iterable(value: &Value) -> Vec<Value> {
 }
 
 pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
-  getattr(value, field).unwrap()
+  getattr(value.as_ref(), field).unwrap()
 }
 
 pub fn project_bool(value: &Value, field: &str) -> bool {
-  getattr(value, field).unwrap()
+  getattr(value.as_ref(), field).unwrap()
 }
 
 pub fn project_multi_strs(value: &Value, field: &str) -> Vec<String> {
-  getattr(value, field).unwrap()
+  getattr(value.as_ref(), field).unwrap()
 }
 
 pub fn project_frozendict(value: &Value, field: &str) -> BTreeMap<String, String> {
-  let frozendict = Value::new(getattr(value, field).unwrap());
+  let frozendict = getattr(value.as_ref(), field).unwrap();
   let pydict: PyDict = getattr(&frozendict, "_data").unwrap();
   let gil = Python::acquire_gil();
   let py = gil.python();
@@ -271,25 +264,25 @@ pub fn project_str(value: &Value, field: &str) -> String {
   // cloning in some cases.
   // TODO: We can't directly extract as a string here, because val_to_str defaults to empty string
   // for None.
-  val_to_str(&getattr(value, field).unwrap())
+  val_to_str(&getattr(value.as_ref(), field).unwrap())
 }
 
 pub fn project_u64(value: &Value, field: &str) -> u64 {
-  getattr(value, field).unwrap()
+  getattr(value.as_ref(), field).unwrap()
 }
 
 pub fn project_maybe_u64(value: &Value, field: &str) -> Result<u64, String> {
-  getattr(value, field)
+  getattr(value.as_ref(), field)
 }
 
 pub fn project_f64(value: &Value, field: &str) -> f64 {
-  getattr(value, field).unwrap()
+  getattr(value.as_ref(), field).unwrap()
 }
 
 pub fn project_bytes(value: &Value, field: &str) -> Vec<u8> {
   // TODO: It's possible to view a python bytes as a `&[u8]`, so we could avoid actually
   // cloning in some cases.
-  getattr(value, field).unwrap()
+  getattr(value.as_ref(), field).unwrap()
 }
 
 pub fn key_to_str(key: &Key) -> String {
@@ -327,39 +320,29 @@ pub fn create_exception(msg: &str) -> Value {
   Value::from(with_externs(|py, e| e.call_method(py, "create_exception", (msg,), None)).unwrap())
 }
 
-pub fn check_for_python_none(value: Value) -> Option<Value> {
+pub fn check_for_python_none(value: PyObject) -> Option<PyObject> {
   let gil = Python::acquire_gil();
   let py = gil.python();
 
-  if *value == py.None() {
+  if value == py.None() {
     return None;
   }
   Some(value)
 }
 
-pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value, Failure> {
+pub fn call_method(value: &PyObject, method: &str, args: &[Value]) -> Result<PyObject, PyErr> {
   let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let gil = Python::acquire_gil();
   let args_tuple = PyTuple::new(gil.python(), &arg_handles);
-  value
-    .call_method(gil.python(), method, args_tuple, None)
-    .map(Value::from)
-    .map_err(|py_err| Failure::from_py_err(gil.python(), py_err))
+  value.call_method(gil.python(), method, args_tuple, None)
 }
 
-pub fn call_function(func: &Value, args: &[Value]) -> Result<PyObject, PyErr> {
+pub fn call_function<T: AsRef<PyObject>>(func: T, args: &[Value]) -> Result<PyObject, PyErr> {
+  let func: &PyObject = func.as_ref();
   let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let gil = Python::acquire_gil();
   let args_tuple = PyTuple::new(gil.python(), &arg_handles);
   func.call(gil.python(), args_tuple, None)
-}
-
-pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
-  let output = call_function(func, args);
-  output.map(Value::from).map_err(|py_err| {
-    let gil = Python::acquire_gil();
-    Failure::from_py_err(gil.python(), py_err)
-  })
 }
 
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
@@ -370,7 +353,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
       (generator as &PyObject, arg as &PyObject),
       None,
     )
-    .map_err(|py_err| Failure::from_py_err(py, py_err))
+    .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))
   })?;
 
   let gil = Python::acquire_gil();
@@ -398,7 +381,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
         .map(|g| {
           let get = g
             .cast_as::<PyGeneratorResponseGet>(py)
-            .map_err(|e| Failure::from_py_err(py, e.into()))?;
+            .map_err(|e| Failure::from_py_err_with_gil(py, e.into()))?;
           Ok(Get::new(py, interns, get)?)
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -520,7 +503,7 @@ impl Get {
       output: interns.type_insert(py, get.product(py).clone_ref(py)),
       input: interns
         .key_insert(py, get.subject(py).clone_ref(py).into())
-        .map_err(|e| Failure::from_py_err(py, e))?,
+        .map_err(|e| Failure::from_py_err_with_gil(py, e))?,
       input_type: Some(interns.type_insert(py, get.declared_subject(py).clone_ref(py))),
     })
   }

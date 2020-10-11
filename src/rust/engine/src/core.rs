@@ -3,6 +3,7 @@
 
 use fnv::FnvHasher;
 
+use std::convert::AsRef;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, hash};
@@ -264,6 +265,12 @@ impl Deref for Value {
   }
 }
 
+impl AsRef<PyObject> for Value {
+  fn as_ref(&self) -> &PyObject {
+    &self.0
+  }
+}
+
 impl fmt::Debug for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", externs::val_to_str(&self))
@@ -347,7 +354,12 @@ impl Failure {
 }
 
 impl Failure {
-  pub fn from_py_err(py: Python, mut py_err: PyErr) -> Failure {
+  pub fn from_py_err(py_err: PyErr) -> Failure {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    Failure::from_py_err_with_gil(py, py_err)
+  }
+  pub fn from_py_err_with_gil(py: Python, mut py_err: PyErr) -> Failure {
     let val = Value::from(py_err.instance(py));
     let python_traceback = if let Some(tb) = py_err.ptraceback.as_ref() {
       let locals = PyDict::new(py);

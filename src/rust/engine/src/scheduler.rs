@@ -591,7 +591,7 @@ fn maybe_break_execution_loop(python_signal_fn: &Value) -> Option<ExecutionTermi
       {
         Some(ExecutionTermination::KeyboardInterrupt)
       } else {
-        let failure = Failure::from_py_err(py, e);
+        let failure = Failure::from_py_err_with_gil(py, e);
         std::mem::drop(gil);
         Some(ExecutionTermination::Fatal(format!(
           "Error when checking Python signal state: {}",

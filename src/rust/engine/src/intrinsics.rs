@@ -7,6 +7,7 @@ use crate::nodes::{
 };
 use crate::tasks::Intrinsic;
 use crate::types::Types;
+use crate::Failure;
 
 use fs::RelativePath;
 use futures::compat::Future01CompatExt;
@@ -304,7 +305,7 @@ fn download_file_to_digest(
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let key = externs::acquire_key_for(args.pop().unwrap())?;
+    let key = externs::key_for(args.pop().unwrap()).map_err(Failure::from_py_err)?;
     let digest = context.get(DownloadedFile(key)).await?;
     Snapshot::store_directory_digest(&digest).map_err(|s| throw(&s))
   }
@@ -354,7 +355,7 @@ fn create_digest_to_digest(
         let path = RelativePath::new(PathBuf::from(path))
           .map_err(|e| format!("The `path` must be relative: {:?}", e))?;
 
-        if externs::hasattr(&file_content_or_directory, "content") {
+        if externs::hasattr(file_content_or_directory.as_ref(), "content") {
           let bytes = bytes::Bytes::from(externs::project_bytes(
             &file_content_or_directory,
             "content",

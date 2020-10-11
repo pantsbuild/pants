@@ -910,13 +910,13 @@ impl Task {
               .cloned()
               .ok_or_else(|| match get.input_type {
                 Some(ty) if externs::is_union(ty) => {
-                  let value = externs::type_for_type_id(ty).into_object().into();
+                  let value = externs::type_for_type_id(ty).into_object();
                   match externs::call_method(
                     &value,
                     "non_member_error_message",
                     &[externs::val_for(&get.input)],
                   ) {
-                    Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
+                    Ok(err_msg) => throw(&externs::val_to_str(&err_msg.into())),
                     // If the non_member_error_message() call failed for any reason,
                     // fall back to a generic message.
                     Err(_e) => throw(&format!(
@@ -1025,7 +1025,9 @@ impl WrappedNode for Task {
     let product = self.product;
     let can_modify_workunit = self.task.can_modify_workunit;
 
-    let mut result_val = externs::call(&externs::val_for(&func.0), &deps)?;
+    let result_val =
+      externs::call_function(&externs::val_for(&func.0), &deps).map_err(Failure::from_py_err)?;
+    let mut result_val: Value = result_val.into();
     let mut result_type = externs::get_type_for(&result_val);
     if result_type == context.core.types.coroutine {
       result_val = Self::generate(context.clone(), params, entry, result_val).await?;
