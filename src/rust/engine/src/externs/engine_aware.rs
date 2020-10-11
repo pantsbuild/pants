@@ -52,8 +52,7 @@ impl EngineAwareInformation for Artifacts {
     let artifacts_val = match externs::call_method(&value, "artifacts", &[]) {
       Ok(value) => value,
       Err(py_err) => {
-        let gil = Python::acquire_gil();
-        let failure = Failure::from_py_err(gil.python(), py_err);
+        let failure = Failure::from_py_err(py_err);
         log::error!("Error calling `artifacts` method: {}", failure);
         return None;
       }

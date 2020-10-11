@@ -98,14 +98,6 @@ pub fn type_for(py_type: PyType) -> TypeId {
   })
 }
 
-pub fn acquire_key_for(val: Value) -> Result<Key, Failure> {
-  key_for(val).map_err(|e| {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Failure::from_py_err(py, e)
-  })
-}
-
 pub fn key_for(val: Value) -> Result<Key, PyErr> {
   with_interns_mut(|interns| {
     let gil = Python::acquire_gil();
@@ -361,7 +353,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
       (generator as &PyObject, arg as &PyObject),
       None,
     )
-    .map_err(|py_err| Failure::from_py_err(py, py_err))
+    .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))
   })?;
 
   let gil = Python::acquire_gil();
@@ -389,7 +381,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
         .map(|g| {
           let get = g
             .cast_as::<PyGeneratorResponseGet>(py)
-            .map_err(|e| Failure::from_py_err(py, e.into()))?;
+            .map_err(|e| Failure::from_py_err_with_gil(py, e.into()))?;
           Ok(Get::new(py, interns, get)?)
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -511,7 +503,7 @@ impl Get {
       output: interns.type_insert(py, get.product(py).clone_ref(py)),
       input: interns
         .key_insert(py, get.subject(py).clone_ref(py).into())
-        .map_err(|e| Failure::from_py_err(py, e))?,
+        .map_err(|e| Failure::from_py_err_with_gil(py, e))?,
       input_type: Some(interns.type_insert(py, get.declared_subject(py).clone_ref(py))),
     })
   }

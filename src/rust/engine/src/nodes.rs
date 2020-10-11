@@ -1026,11 +1026,7 @@ impl WrappedNode for Task {
     let can_modify_workunit = self.task.can_modify_workunit;
 
     let result_val =
-      externs::call_function(&externs::val_for(&func.0), &deps).map_err(|py_err| {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        Failure::from_py_err(py, py_err)
-      })?;
+      externs::call_function(&externs::val_for(&func.0), &deps).map_err(Failure::from_py_err)?;
     let mut result_val: Value = result_val.into();
     let mut result_type = externs::get_type_for(&result_val);
     if result_type == context.core.types.coroutine {
