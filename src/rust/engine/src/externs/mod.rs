@@ -271,10 +271,6 @@ pub fn project_u64(value: &Value, field: &str) -> u64 {
   getattr(value.as_ref(), field).unwrap()
 }
 
-pub fn project_maybe_u64(value: &Value, field: &str) -> Result<u64, String> {
-  getattr(value.as_ref(), field)
-}
-
 pub fn project_f64(value: &Value, field: &str) -> f64 {
   getattr(value.as_ref(), field).unwrap()
 }
@@ -305,11 +301,11 @@ pub fn val_to_str(obj: &PyObject) -> String {
   pystring.to_string(py).unwrap().into_owned()
 }
 
-pub fn val_to_log_level(val: &Value) -> Result<log::Level, String> {
-  let res: Result<PythonLogLevel, String> = project_maybe_u64(&val, "_level").and_then(|n: u64| {
+pub fn val_to_log_level(obj: &PyObject) -> Result<log::Level, String> {
+  let res: Result<PythonLogLevel, String> = getattr(obj, "_level").and_then(|n: u64| {
     n.try_into()
       .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
-        format!("Could not parse {:?} as a LogLevel: {}", val, e)
+        format!("Could not parse {:?} as a LogLevel: {}", val_to_str(obj), e)
       })
   });
   res.map(|py_level| py_level.into())

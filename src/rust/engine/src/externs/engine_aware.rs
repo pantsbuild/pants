@@ -27,7 +27,7 @@ impl EngineAwareInformation for EngineAwareLevel {
   fn retrieve(_types: &Types, value: &Value) -> Option<Level> {
     let new_level_val = externs::call_method(value.as_ref(), "level", &[]).ok()?;
     let new_level_val = externs::check_for_python_none(new_level_val)?;
-    externs::val_to_log_level(&new_level_val.into()).ok()
+    externs::val_to_log_level(&new_level_val).ok()
   }
 }
 

@@ -283,7 +283,8 @@ impl MultiPlatformExecuteProcess {
     };
 
     let description = externs::project_str(&value, "description");
-    let level = externs::val_to_log_level(&externs::project_ignoring_type(&value, "level"))?;
+    let level =
+      externs::val_to_log_level(&externs::project_ignoring_type(&value, "level").as_ref())?;
 
     let append_only_caches = externs::project_frozendict(&value, "append_only_caches")
       .into_iter()
