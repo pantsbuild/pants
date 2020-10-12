@@ -17,5 +17,5 @@ process_execution = { path = "../process_execution" }
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["rt-threaded", "macros"] }
+tokio = { version = "=0.2.22", features = ["rt-threaded", "macros"] }
 workunit_store = { path = "../workunit_store"}

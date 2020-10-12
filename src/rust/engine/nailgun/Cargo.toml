@@ -13,8 +13,8 @@ nails = "0.6.0"
 os_pipe = "0.9"
 task_executor = { path = "../task_executor" }
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["tcp", "fs", "sync"] }
+tokio = { version = "=0.2.22", features = ["tcp", "fs", "sync"] }
 
 [dev-dependencies]
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["dns", "rt-threaded", "macros"] }
+tokio = { version = "=0.2.22", features = ["dns", "rt-threaded", "macros"] }

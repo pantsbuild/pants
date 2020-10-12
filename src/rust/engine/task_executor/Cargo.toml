@@ -10,5 +10,5 @@ futures = "0.3"
 logging = { path = "../logging" }
 num_cpus = "1"
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["blocking", "rt-threaded"] }
+tokio = { version = "=0.2.22", features = ["blocking", "rt-threaded"] }
 workunit_store = { path = "../workunit_store" }

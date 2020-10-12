@@ -13,10 +13,10 @@ log = "0.4"
 parking_lot = "0.11"
 petgraph = "0.4.5"
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["time"] }
+tokio = { version = "=0.2.22", features = ["time"] }
 
 [dev-dependencies]
 rand = "0.6"
 env_logger = "0.5.4"
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["macros", "rt-threaded", "time"] }
+tokio = { version = "=0.2.22", features = ["macros", "rt-threaded", "time"] }

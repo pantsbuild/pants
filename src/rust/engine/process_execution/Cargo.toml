@@ -31,7 +31,7 @@ task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["process", "rt-threaded", "sync", "tcp", "time"] }
+tokio = { version = "=0.2.22", features = ["process", "rt-threaded", "sync", "tcp", "time"] }
 tokio-util = { version = "0.2", features = ["codec"] }
 uname = "0.1.1"
 workunit_store = { path = "../workunit_store" }
@@ -52,4 +52,4 @@ spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["macros"] }
+tokio = { version = "=0.2.22", features = ["macros"] }

@@ -22,4 +22,4 @@ task_executor = { path = "../task_executor" }
 tempfile = "3"
 testutil = { path = "../testutil" }
 # TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["rt-core", "macros"] }
+tokio = { version = "=0.2.22", features = ["rt-core", "macros"] }
