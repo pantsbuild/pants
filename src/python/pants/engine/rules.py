@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import ast
-import dataclasses
 import inspect
 import itertools
 import sys
@@ -451,9 +450,17 @@ class TaskRule(Rule):
                     union_member,
                     *self.input_selectors[(i + 1):],
                 )
-                new_task = dataclasses.replace(
-                    self,
+                # dataclasses.replace() cannot be used because the field `_output_type` does not
+                # match the argument `output_type` to __init__().
+                new_task = TaskRule(
+                    output_type=self.output_type,
                     input_selectors=more_concrete_selectors,
+                    func=self.func,
+                    input_gets=self.input_gets,
+                    canonical_name=self.canonical_name,
+                    desc=self.desc,
+                    level=self.level,
+                    cacheable=self.cacheable,
                 )
                 yield from new_task.all_polymorphic_versions(union_membership)
             if replacements:

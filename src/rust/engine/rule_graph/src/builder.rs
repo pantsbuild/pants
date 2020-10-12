@@ -1059,7 +1059,27 @@ impl<R: Rule> Builder<R> {
       }
     }
 
-    if errored.is_empty() {
+    // Leaf errors have no dependencies in the errored map.
+    let leaf_errors = {
+      let mut leaf_errors = errored
+        .iter()
+        .filter(|(&node_id, _)| {
+          !graph
+            .neighbors_directed(node_id, Direction::Outgoing)
+            .any(|dependency_id| errored.contains_key(&dependency_id) && node_id != dependency_id)
+        })
+        .flat_map(|(_, errors)| {
+          let mut errors = errors.clone();
+          errors.sort();
+          errors.into_iter().map(|e| e.trim().replace("\n", "\n    "))
+        })
+        .collect::<Vec<_>>();
+
+      leaf_errors.sort();
+      leaf_errors
+    };
+
+    if leaf_errors.is_empty() {
       // Finally, return a new graph with all deleted data discarded.
       Ok(graph.filter_map(
         |_node_id, node| {
@@ -1079,7 +1099,7 @@ impl<R: Rule> Builder<R> {
       ))
     } else {
       // Render the most specific errors.
-      Err(Self::render_prune_errors(&graph, errored))
+      Err(Self::render_prune_errors(&graph, errored, leaf_errors))
     }
   }
 
@@ -1143,24 +1163,8 @@ impl<R: Rule> Builder<R> {
   fn render_prune_errors(
     graph: &MonomorphizedGraph<R>,
     errored: HashMap<NodeIndex<u32>, Vec<String>>,
+    leaf_errors: Vec<String>,
   ) -> String {
-    // Leaf errors have no dependencies in the errored map.
-    let mut leaf_errors = errored
-      .iter()
-      .filter(|(&node_id, _)| {
-        !graph
-          .neighbors_directed(node_id, Direction::Outgoing)
-          .any(|dependency_id| errored.contains_key(&dependency_id) && node_id != dependency_id)
-      })
-      .flat_map(|(_, errors)| {
-        let mut errors = errors.clone();
-        errors.sort();
-        errors.into_iter().map(|e| e.trim().replace("\n", "\n    "))
-      })
-      .collect::<Vec<_>>();
-
-    leaf_errors.sort();
-
     let subgraph = graph.filter_map(
       |node_id, node| {
         if let Some(errors) = errored.get(&node_id) {

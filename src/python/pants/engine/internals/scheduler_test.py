@@ -76,11 +76,6 @@ class UnionWithNonMemberErrorMsg:
         return f"specific error message for {type(subject).__name__} instance"
 
 
-class UnionWrapper:
-    def __init__(self, inner):
-        self.inner = inner
-
-
 class UnionA:
     @staticmethod
     def a() -> A:
@@ -103,11 +98,24 @@ def select_union_b(union_b: UnionB) -> A:
     return union_b.a()
 
 
-# TODO: add MultiGet testing for unions!
 @rule
-async def a_union_test(union_wrapper: UnionWrapper) -> A:
-    union_a = await Get(A, UnionBase, union_wrapper.inner)
+async def a_union_test(union_base: UnionBase) -> A:
+    # NB: two versions of this rule will be generated, substituting UnionBase for UnionA and UnionB!
+    union_a = await Get(A, UnionBase, union_base)
     return union_a
+
+
+class UnionWrapper:
+    """Used to test what happens when an `await Get()` for a union base fails inside of a @rule."""
+    def __init__(self, inner):
+        self.inner = inner
+
+
+@rule
+async def union_wrapper_failure(union_wrapper: UnionWrapper) -> A:
+    # NB: The inner value should _not_ be registered as a union member.
+    _ = await Get(A, UnionBase, union_wrapper.inner)
+    raise AssertionError("The statement above this one should have failed!")
 
 
 class UnionX:
@@ -116,8 +124,7 @@ class UnionX:
 
 @rule
 async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
-    # NB: We install a UnionRule to make UnionWrapper a member of this union, but then we pass the
-    # inner value, which is _not_ registered.
+    # NB: The inner value should _not_ be registered as a union member.
     _ = await Get(A, UnionWithNonMemberErrorMsg, union_wrapper.inner)
     raise AssertionError("The statement above this one should have failed!")
 
@@ -177,11 +184,13 @@ class SchedulerTest(TestBase):
             transitive_coroutine_rule,
             QueryRule(D, (C,)),
             UnionRule(UnionBase, UnionA),
-            UnionRule(UnionWithNonMemberErrorMsg, UnionWrapper),
             select_union_a,
             UnionRule(union_base=UnionBase, union_member=UnionB),
             select_union_b,
             a_union_test,
+            QueryRule(A, (UnionA,)),
+            QueryRule(A, (UnionB,)),
+            union_wrapper_failure,
             QueryRule(A, (UnionWrapper,)),
             error_msg_test_rule,
             QueryRule(UnionX, (UnionWrapper,)),
@@ -236,13 +245,13 @@ class SchedulerTest(TestBase):
             yield
 
     def test_union_rules(self):
-        self.request(A, [UnionWrapper(UnionA())])
-        self.request(A, [UnionWrapper(UnionB())])
+        self.request(A, [UnionA()])
+        self.request(A, [UnionB()])
         # Fails due to no union relationship from A -> UnionBase.
         with self._assert_execution_error("Type A is not a member of the UnionBase @union"):
             self.request(A, [UnionWrapper(A())])
 
-    def test_union_rules_no_docstring(self):
+    def test_union_rules_non_member_error_message(self):
         with self._assert_execution_error("specific error message for UnionA instance"):
             self.request(UnionX, [UnionWrapper(UnionA())])
 
