@@ -176,7 +176,7 @@ pub fn hasattr(value: &PyObject, field: &str) -> bool {
 ///
 /// Gets an attribute of the given value as the given type.
 ///
-fn getattr<T>(value: &PyObject, field: &str) -> Result<T, String>
+pub fn getattr<T>(value: &PyObject, field: &str) -> Result<T, String>
 where
   for<'a> T: FromPyObject<'a>,
 {
@@ -236,10 +236,6 @@ pub fn project_iterable(value: &Value) -> Vec<Value> {
 }
 
 pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
-  getattr(value.as_ref(), field).unwrap()
-}
-
-pub fn project_bool(value: &Value, field: &str) -> bool {
   getattr(value.as_ref(), field).unwrap()
 }
 

@@ -300,7 +300,7 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let is_nailgunnable = externs::project_bool(&value, "is_nailgunnable");
+    let is_nailgunnable: bool = externs::getattr(&value, "is_nailgunnable").unwrap();
 
     let execution_slot_variable = {
       let s = externs::project_str(&value, "execution_slot_variable");
@@ -311,7 +311,7 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let cache_failures = externs::project_bool(&value, "cache_failures");
+    let cache_failures: bool = externs::getattr(&value, "cache_failures").unwrap();
 
     Ok(process_execution::Process {
       argv: externs::project_multi_strs(&value, "argv"),

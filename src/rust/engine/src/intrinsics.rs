@@ -360,7 +360,8 @@ fn create_digest_to_digest(
             &file_content_or_directory,
             "content",
           ));
-          let is_executable = externs::project_bool(&file_content_or_directory, "is_executable");
+          let is_executable: bool =
+            externs::getattr(&file_content_or_directory, "is_executable").unwrap();
 
           let digest = store.store_file_bytes(bytes, true).await?;
           let snapshot = store

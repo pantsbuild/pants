@@ -1513,7 +1513,7 @@ fn run_local_interactive_process(
             return Err("Empty argv list not permitted".to_string());
           }
 
-          let run_in_workspace = externs::project_bool(&value, "run_in_workspace");
+          let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
           let maybe_tempdir = if run_in_workspace {
             None
           } else {
@@ -1558,7 +1558,7 @@ fn run_local_interactive_process(
             command.current_dir(tempdir.path());
           }
 
-          let hermetic_env = externs::project_bool(&value, "hermetic_env");
+          let hermetic_env: bool = externs::getattr(&value, "hermetic_env").unwrap();
           if hermetic_env {
             command.env_clear();
           }
