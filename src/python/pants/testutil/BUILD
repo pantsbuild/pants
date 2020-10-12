@@ -14,6 +14,7 @@ python_distribution(
       'Topic :: Software Development :: Testing',
     ]
   ),
+  setup_py_commands=["bdist_wheel", "--python-tag", "py36.py37.py38"]
 )
 
 python_library(

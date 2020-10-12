@@ -33,7 +33,8 @@ python_distribution(
     ext_modules=[('native_engine', {'sources': ['src/pants/dummy.c']})],
   ).with_binaries(
     pants='src/python/pants/bin:pants',
-  )
+  ),
+  setup_py_commands=["bdist_wheel"]
 )
 
 # NB: we use this to avoid clang/gcc complaining `error: no input files` when building

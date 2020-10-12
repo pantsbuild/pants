@@ -7,13 +7,12 @@ import re
 import shutil
 import subprocess
 import sys
-from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import contextmanager
 from functools import total_ordering
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Dict, Iterable, Iterator, List, NamedTuple, Set, Tuple, cast
+from typing import Dict, Iterable, Iterator, List, NamedTuple, Set, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
@@ -32,11 +31,9 @@ class Package:
         self,
         name: str,
         target: str,
-        bdist_wheel_flags: Tuple[str, ...] = ("--python-tag", "py36.py37.py38"),
     ) -> None:
         self.name = name
         self.target = target
-        self.bdist_wheel_flags = bdist_wheel_flags
 
     def __lt__(self, other):
         return self.name < other.name
@@ -84,7 +81,7 @@ PACKAGES = sorted(
     {
         # NB: This a native wheel. We expect a distinct wheel for each Python version and each
         # platform (macOS x linux).
-        Package("pantsbuild.pants", "src/python/pants:pants-packaged", bdist_wheel_flags=()),
+        Package("pantsbuild.pants", "src/python/pants:pants-packaged"),
         Package("pantsbuild.pants.testutil", "src/python/pants/testutil:testutil_wheel"),
     }
 )
@@ -201,7 +198,7 @@ def build_pants_wheels() -> None:
     destination = CONSTANTS.deploy_pants_wheel_dir / version
     destination.mkdir(parents=True, exist_ok=True)
 
-    def build(packages: Iterable[Package], bdist_wheel_flags: Iterable[str]) -> None:
+    with set_pants_version(CONSTANTS.pants_unstable_version):
         args = (
             "./pants",
             # TODO(#9924).
@@ -209,23 +206,20 @@ def build_pants_wheels() -> None:
             # TODO(#7654): It's not safe to use Pantsd because we're already using Pants to run
             #  this script.
             "--concurrent",
-            "setup-py",
-            *(package.target for package in packages),
-            "--",
-            "bdist_wheel",
-            *bdist_wheel_flags,
+            "package",
+            *(pkg.target for pkg in PACKAGES),
         )
         try:
             subprocess.run(args, check=True)
-            for package in packages:
-                found_wheels = sorted(Path("dist").glob(f"{package}-{version}-*.whl"))
+            for pkg in PACKAGES:
+                found_wheels = sorted(Path("dist").glob(f"{pkg}-{version}-*.whl"))
                 # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
                 # top-level `dist` will only have wheels built for the current platform. This
                 # should be safe because it is not possible to build native wheels for another
                 # platform.
                 if not is_cross_platform(found_wheels) and len(found_wheels) > 1:
                     raise ValueError(
-                        f"Found multiple wheels for {package} in the `dist/` folder, but was "
+                        f"Found multiple wheels for {pkg} in the `dist/` folder, but was "
                         f"expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}."
                     )
                 for wheel in found_wheels:
@@ -233,20 +227,13 @@ def build_pants_wheels() -> None:
                         # We use `copy2` to preserve metadata.
                         shutil.copy2(wheel, destination)
         except subprocess.CalledProcessError as e:
-            failed_packages = ",".join(package.name for package in packages)
-            failed_targets = " ".join(package.target for package in packages)
+            failed_packages = ",".join(package.name for package in PACKAGES)
+            failed_targets = " ".join(package.target for package in PACKAGES)
             die(
                 f"Failed to build packages {failed_packages} for {version} with targets "
                 f"{failed_targets}.\n\n{e!r}",
             )
 
-    packages_by_flags = defaultdict(list)
-    for package in PACKAGES:
-        packages_by_flags[package.bdist_wheel_flags].append(package)
-
-    with set_pants_version(CONSTANTS.pants_unstable_version):
-        for flags, packages in packages_by_flags.items():
-            build(packages, flags)
     green(f"Wrote Pants wheels to {destination}.")
 
 
@@ -326,25 +313,22 @@ def check_ownership(users, minimum_owner_count: int = 3) -> None:
     insufficient = set()
     unowned: Dict[str, Set[Package]] = dict()
 
-    def check_ownership(i: int, package: Package) -> None:
+    for i, pkg in enumerate(PACKAGES):
         banner(
-            f"[{i}/{len(PACKAGES)}] checking ownership for {package}: > {minimum_owner_count} "
+            f"[{i}/{len(PACKAGES)}] checking ownership for {pkg}: > {minimum_owner_count} "
             f"releasers including {', '.join(users)}"
         )
-        if not package.exists_on_pypi():
-            print(f"The {package.name} package is new! There are no owners yet.")
+        if not pkg.exists_on_pypi():
+            print(f"The {pkg.name} package is new! There are no owners yet.")
             return
 
-        owners = package.owners()
+        owners = pkg.owners()
         if len(owners) <= minimum_owner_count:
-            insufficient.add(package)
+            insufficient.add(pkg)
 
         difference = users.difference(owners)
         for d in difference:
-            unowned.setdefault(d, set()).add(package)
-
-    for i, package in enumerate(PACKAGES):
-        check_ownership(i, package)
+            unowned.setdefault(d, set()).add(pkg)
 
     if unowned:
         for user, unowned_packages in sorted(unowned.items()):
