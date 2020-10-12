@@ -356,10 +356,9 @@ fn create_digest_to_digest(
           .map_err(|e| format!("The `path` must be relative: {:?}", e))?;
 
         if externs::hasattr(file_content_or_directory.as_ref(), "content") {
-          let bytes = bytes::Bytes::from(externs::project_bytes(
-            &file_content_or_directory,
-            "content",
-          ));
+          let bytes = bytes::Bytes::from(
+            externs::getattr::<Vec<u8>>(&file_content_or_directory, "content").unwrap(),
+          );
           let is_executable: bool =
             externs::getattr(&file_content_or_directory, "is_executable").unwrap();
 

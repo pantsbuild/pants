@@ -227,24 +227,24 @@ fn collect_iterable(value: &Value) -> Result<Vec<Value>, String> {
 ///
 /// Pulls out the value specified by the field name from a given Value
 ///
-pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
-  getattr(value.as_ref(), field).unwrap()
+pub fn project_ignoring_type(value: &PyObject, field: &str) -> Value {
+  getattr(value, field).unwrap()
 }
 
 pub fn project_iterable(value: &Value) -> Vec<Value> {
   collect_iterable(value).unwrap()
 }
 
-pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
-  getattr(value.as_ref(), field).unwrap()
+pub fn project_multi(value: &PyObject, field: &str) -> Vec<Value> {
+  getattr(value, field).unwrap()
 }
 
-pub fn project_multi_strs(value: &Value, field: &str) -> Vec<String> {
-  getattr(value.as_ref(), field).unwrap()
+pub fn project_multi_strs(value: &PyObject, field: &str) -> Vec<String> {
+  getattr(value, field).unwrap()
 }
 
-pub fn project_frozendict(value: &Value, field: &str) -> BTreeMap<String, String> {
-  let frozendict = getattr(value.as_ref(), field).unwrap();
+pub fn project_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
+  let frozendict = getattr(value, field).unwrap();
   let pydict: PyDict = getattr(&frozendict, "_data").unwrap();
   let gil = Python::acquire_gil();
   let py = gil.python();
@@ -255,26 +255,12 @@ pub fn project_frozendict(value: &Value, field: &str) -> BTreeMap<String, String
     .collect()
 }
 
-pub fn project_str(value: &Value, field: &str) -> String {
+pub fn project_str(value: &PyObject, field: &str) -> String {
   // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
   // cloning in some cases.
   // TODO: We can't directly extract as a string here, because val_to_str defaults to empty string
   // for None.
-  val_to_str(&getattr(value.as_ref(), field).unwrap())
-}
-
-pub fn project_u64(value: &Value, field: &str) -> u64 {
-  getattr(value.as_ref(), field).unwrap()
-}
-
-pub fn project_f64(value: &Value, field: &str) -> f64 {
-  getattr(value.as_ref(), field).unwrap()
-}
-
-pub fn project_bytes(value: &Value, field: &str) -> Vec<u8> {
-  // TODO: It's possible to view a python bytes as a `&[u8]`, so we could avoid actually
-  // cloning in some cases.
-  getattr(value.as_ref(), field).unwrap()
+  val_to_str(&getattr(value, field).unwrap())
 }
 
 pub fn key_to_str(key: &Key) -> String {
@@ -282,7 +268,7 @@ pub fn key_to_str(key: &Key) -> String {
 }
 
 pub fn type_to_str(type_id: TypeId) -> String {
-  project_str(&type_for_type_id(type_id).into_object().into(), "__name__")
+  project_str(&type_for_type_id(type_id).into_object(), "__name__")
 }
 
 pub fn val_to_str(obj: &PyObject) -> String {

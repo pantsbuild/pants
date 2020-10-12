@@ -214,7 +214,7 @@ pub fn lift_directory_digest(types: &Types, digest: &Value) -> Result<hashing::D
     ));
   }
   let fingerprint = externs::project_str(&digest, "fingerprint");
-  let digest_length = externs::project_u64(&digest, "serialized_bytes_length") as usize;
+  let digest_length: usize = externs::getattr(&digest, "serialized_bytes_length").unwrap();
   Ok(hashing::Digest(
     hashing::Fingerprint::from_hex_string(&fingerprint)?,
     digest_length,
@@ -226,7 +226,7 @@ pub fn lift_file_digest(types: &Types, digest: &Value) -> Result<hashing::Digest
     return Err(format!("{} is not of type {}.", digest, types.file_digest));
   }
   let fingerprint = externs::project_str(&digest, "fingerprint");
-  let digest_length = externs::project_u64(&digest, "serialized_bytes_length") as usize;
+  let digest_length: usize = externs::getattr(&digest, "serialized_bytes_length").unwrap();
   Ok(hashing::Digest(
     hashing::Fingerprint::from_hex_string(&fingerprint)?,
     digest_length,
@@ -274,7 +274,7 @@ impl MultiPlatformExecuteProcess {
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
-    let timeout_in_seconds = externs::project_f64(&value, "timeout_seconds");
+    let timeout_in_seconds: f64 = externs::getattr(&value, "timeout_seconds").unwrap();
 
     let timeout = if timeout_in_seconds < 0.0 {
       None
