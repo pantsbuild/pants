@@ -436,19 +436,27 @@ class TaskRule(Rule):
     def output_type(self):
         return self._output_type
 
-    def all_polymorphic_versions(self, union_membership: UnionMembership) -> Iterator['TaskRule']:
+    def all_polymorphic_versions(self, union_membership: UnionMembership) -> Iterator["TaskRule"]:
         for i, selector in enumerate(self.input_selectors):
             replacements = union_membership.get(selector)
             for union_member in replacements:
                 if union_member is selector:
-                    raise ValueError(f'The @union {selector} was registered as a member of its own '
-                                     'union via UnionRule! This cycle is not allowed.')
+                    raise ValueError(
+                        f"The @union {selector.__name__} was registered as a member of its own "
+                        "union via UnionRule! This cycle is not allowed."
+                    )
+                if not issubclass(union_member, selector):
+                    raise TypeError(
+                        f"The @union {selector.__name__} was used as a parameter to the rule "
+                        f"{self}, but the union member {union_member.__name__} registered via "
+                        f"UnionRule is not a subclass of {selector.__name__}!"
+                    )
                 # The param at index i is now a (more) "concrete" type, so it will not get replaced
                 # again, unless the replacement is itself a union.
                 more_concrete_selectors = (
                     *self.input_selectors[:i],
                     union_member,
-                    *self.input_selectors[(i + 1):],
+                    *self.input_selectors[(i + 1) :],
                 )
                 # dataclasses.replace() cannot be used because the field `_output_type` does not
                 # match the argument `output_type` to __init__().
@@ -503,7 +511,7 @@ class RuleIndex:
     union_rules: FrozenOrderedSet[UnionRule]
 
     @classmethod
-    def create(cls, rule_entries) -> "RuleIndex":
+    def create(cls, rule_entries: Iterable[Rule]) -> "RuleIndex":
         """Creates a RuleIndex with tasks indexed by their output type."""
         rules: OrderedSet[TaskRule] = OrderedSet()
         queries: OrderedSet[QueryRule] = OrderedSet()

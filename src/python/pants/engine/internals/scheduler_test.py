@@ -76,7 +76,7 @@ class UnionWithNonMemberErrorMsg:
         return f"specific error message for {type(subject).__name__} instance"
 
 
-class UnionA:
+class UnionA(UnionBase):
     @staticmethod
     def a() -> A:
         return A()
@@ -87,7 +87,7 @@ def select_union_a(union_a: UnionA) -> A:
     return union_a.a()
 
 
-class UnionB:
+class UnionB(UnionBase):
     @staticmethod
     def a() -> A:
         return A()
@@ -105,8 +105,29 @@ async def a_union_test(union_base: UnionBase) -> A:
     return union_a
 
 
+@union
+class AnotherUnion:
+    pass
+
+
+class AnotherInput:
+    pass
+
+
+class AnotherOutput:
+    pass
+
+
+@rule
+def another_union_no_subclass_test(another_union: AnotherUnion) -> AnotherOutput:
+    # If AnotherInput or AnotherUnion itself are registered as union members of AnotherUnion, an
+    # error should be raised!
+    raise AssertionError("This should have failed at rule creation time!")
+
+
 class UnionWrapper:
     """Used to test what happens when an `await Get()` for a union base fails inside of a @rule."""
+
     def __init__(self, inner):
         self.inner = inner
 
@@ -254,6 +275,50 @@ class SchedulerTest(TestBase):
     def test_union_rules_non_member_error_message(self):
         with self._assert_execution_error("specific error message for UnionA instance"):
             self.request(UnionX, [UnionWrapper(UnionA())])
+
+
+class SchedulerWithFailingUnionSubclassTest(TestBase):
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            UnionRule(AnotherUnion, AnotherInput),
+            another_union_no_subclass_test,
+        )
+
+    def test_union_rules_non_subclass_insert_parameter(self):
+        with self.assertRaisesRegex(
+            TypeError,
+            re.escape(
+                dedent(
+                    """\
+        The @union AnotherUnion was used as a parameter to the rule (name=<not defined>, AnotherOutput, (<class 'pants.util.meta.AnotherUnion'>,), another_union_no_subclass_test, gets=()), but the union member AnotherInput registered via UnionRule is not a subclass of AnotherUnion!"""
+                )
+            ),
+        ):
+            self.request(AnotherOutput, [AnotherInput()])
+
+
+class SchedulerWithUnionCycleTest(TestBase):
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            UnionRule(AnotherUnion, AnotherUnion),
+            another_union_no_subclass_test,
+        )
+
+    def test_union_rules_cycle(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            re.escape(
+                dedent(
+                    """\
+        The @union AnotherUnion was registered as a member of its own union via UnionRule! This cycle is not allowed."""
+                )
+            ),
+        ):
+            self.request(AnotherOutput, [AnotherInput()])
 
 
 class SchedulerWithNestedRaiseTest(TestBase):

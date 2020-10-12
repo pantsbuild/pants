@@ -35,7 +35,6 @@ def union(cls):
     Unions allow @rule bodies to be written without knowledge of what types may eventually be provided
     as input -- rather, they let the engine check that there is a valid path to the desired result.
     """
-    # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
     assert isinstance(cls, type)
 
     def non_member_error_message(subject):
