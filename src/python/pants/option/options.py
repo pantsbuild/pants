@@ -246,7 +246,9 @@ class Options:
             for section in config.sections():
                 scope = GLOBAL_SCOPE if section == GLOBAL_SCOPE_CONFIG_SECTION else section
                 try:
-                    valid_options_under_scope = set(self.for_scope(scope))
+                    valid_options_under_scope = set(
+                        self.for_scope(scope, inherit_from_enclosing_scope=False)
+                    )
                 # Only catch ConfigValidationError. Other exceptions will be raised directly.
                 except Config.ConfigValidationError:
                     error_log.append(f"Invalid scope [{section}] in {config.config_path}")
