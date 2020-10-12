@@ -10,7 +10,6 @@ concrete_time = { path = "../concrete_time" }
 hashing = { path = "../hashing" }
 parking_lot = "0.11"
 rand = "0.6"
-# TODO: See #10291.
-tokio = { version = "=0.2.22", features = ["rt-util"] }
+tokio = { version = "0.2.22", features = ["rt-util"] }
 petgraph = "0.4.5"
 log = "0.4"

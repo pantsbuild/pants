@@ -8,11 +8,9 @@ publish = false
 [dependencies]
 futures = "0.3"
 parking_lot = "0.11"
-# TODO: See #10291.
-tokio = { version = "=0.2.22", features = ["time"] }
+tokio = { version = "0.2.22", features = ["time"] }
 
 [dev-dependencies]
 maplit = "1"
 testutil = { path = "../testutil" }
-# TODO: See #10291.
-tokio = { version = "=0.2.22", features = ["rt-core", "macros"] }
+tokio = { version = "0.2.22", features = ["rt-core", "macros"] }
