@@ -541,6 +541,7 @@ async def run_setup_py(
             # TODO: Could there be other useful files to capture?
             output_directories=(dist_dir,),
             description=f"Run setuptools for {req.exported_target.target.address}",
+            level=LogLevel.DEBUG,
         ),
     )
     output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
@@ -739,7 +740,7 @@ async def get_requirements(
     return ExportedTargetRequirements(req_strs)
 
 
-@rule(desc="Find all code to be published in the distribution", level=LogLevel.INFO)
+@rule(desc="Find all code to be published in the distribution", level=LogLevel.DEBUG)
 async def get_owned_dependencies(
     dependency_owner: DependencyOwner, union_membership: UnionMembership
 ) -> OwnedDependencies:
