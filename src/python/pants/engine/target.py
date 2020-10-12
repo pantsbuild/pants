@@ -56,8 +56,10 @@ ImmutableValue = Hashable
 _DefaultBase = TypeVar("_DefaultBase", bound=Optional[ImmutableValue])
 
 
+# This @dataclass declaration is necessary for the `value` field to be propagated to the __hash__ of
+# all subclasses, but MyPy doesn't recognize generic abstract dataclasses yet.
+@dataclass(unsafe_hash=True)  # type: ignore[misc]
 class Field(Generic[_DefaultBase], metaclass=ABCMeta):
-    # This is defined in PrimitiveField and AsyncField.
     value: _DefaultBase
     # Subclasses must define these.
     alias: ClassVar[str]
@@ -68,7 +70,11 @@ class Field(Generic[_DefaultBase], metaclass=ABCMeta):
     deprecated_removal_hint: ClassVar[Optional[str]] = None
 
     # NB: We still expect `PrimitiveField` and `AsyncField` to define their own constructors. This
-    # is only implemented so that we have a common deprecation mechanism.
+    # is only implemented so that we have a common deprecation mechanism, and to ensure that all
+    # subclasses have this exact type signature for their constructor. Normally we would rely on the
+    # generated __init__ by declaring `address` as a field, but we don't want that on *every* Field
+    # subclass.
+    @abstractmethod
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
         if self.deprecated_removal_version and address.is_base_target and raw_value is not None:
             if not self.deprecated_removal_hint:
