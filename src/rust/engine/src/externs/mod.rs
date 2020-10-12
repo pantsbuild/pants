@@ -25,7 +25,7 @@ use crate::interning::Interns;
 
 use cpython::{
   py_class, CompareOp, FromPyObject, ObjectProtocol, PyBool, PyBytes, PyClone, PyDict, PyErr,
-  PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject, ToPyObject,
+  PyObject, PyResult as CPyResult, PyTuple, PyType, Python, PythonObject, ToPyObject,
 };
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
@@ -294,16 +294,16 @@ pub fn type_to_str(type_id: TypeId) -> String {
 }
 
 pub fn val_to_str(val: &Value) -> String {
-  // TODO: to_string(py) returns a Cow<str>, so we could avoid actually cloning in some cases.
-  with_externs(|py, e| {
-    e.call_method(py, "val_to_str", (val as &PyObject,), None)
-      .unwrap()
-      .cast_as::<PyString>(py)
-      .unwrap()
-      .to_string(py)
-      .map(|cow| cow.into_owned())
-      .unwrap()
-  })
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let obj: &PyObject = val.as_ref();
+  if *obj == py.None() {
+    return "".to_string();
+  }
+
+  let pystring = obj.str(py).unwrap();
+  pystring.to_string(py).unwrap().into_owned()
 }
 
 pub fn val_to_log_level(val: &Value) -> Result<log::Level, String> {

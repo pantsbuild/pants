@@ -55,10 +55,6 @@ class Externs:
         """Given a utf8 message string, create an Exception object."""
         return Exception(msg)
 
-    def val_to_str(self, val):
-        """Given a `obj`, return str(obj)."""
-        return "" if val is None else str(val)
-
     def generator_send(
         self, func, arg
     ) -> Union[PyGeneratorResponseGet, PyGeneratorResponseGetMulti, PyGeneratorResponseBreak]:
