@@ -39,7 +39,7 @@ impl EngineAwareInformation for Message {
   fn retrieve(_types: &Types, value: &Value) -> Option<String> {
     let msg_val = externs::call_method(&value, "message", &[]).ok()?;
     let msg_val = externs::check_for_python_none(msg_val)?;
-    Some(externs::val_to_str(&msg_val.into()))
+    Some(externs::val_to_str(&msg_val))
   }
 }
 
@@ -102,6 +102,6 @@ impl EngineAwareInformation for DebugHint {
     externs::call_method(&value, "debug_hint", &[])
       .ok()
       .and_then(externs::check_for_python_none)
-      .map(|val| externs::val_to_str(&val.into()))
+      .map(|val| externs::val_to_str(&val))
   }
 }

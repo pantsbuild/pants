@@ -694,10 +694,9 @@ fn nailgun_server_create(
         ];
         match externs::call_function(&runner, &runner_args) {
           Ok(exit_code) => {
-            let exit_code_val: Value = exit_code.into();
             // TODO: We don't currently expose a "project_i32", but it will not be necessary with
             // https://github.com/pantsbuild/pants/pull/9593.
-            nailgun::ExitCode(externs::val_to_str(&exit_code_val).parse().unwrap())
+            nailgun::ExitCode(externs::val_to_str(&exit_code).parse().unwrap())
           }
           Err(e) => {
             error!("Uncaught exception in nailgun handler: {:#?}", e);

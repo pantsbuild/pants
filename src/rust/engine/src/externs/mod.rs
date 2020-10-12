@@ -286,18 +286,17 @@ pub fn project_bytes(value: &Value, field: &str) -> Vec<u8> {
 }
 
 pub fn key_to_str(key: &Key) -> String {
-  val_to_str(&val_for(key))
+  val_to_str(&val_for(key).as_ref())
 }
 
 pub fn type_to_str(type_id: TypeId) -> String {
   project_str(&type_for_type_id(type_id).into_object().into(), "__name__")
 }
 
-pub fn val_to_str(val: &Value) -> String {
+pub fn val_to_str(obj: &PyObject) -> String {
   let gil = Python::acquire_gil();
   let py = gil.python();
 
-  let obj: &PyObject = val.as_ref();
   if *obj == py.None() {
     return "".to_string();
   }

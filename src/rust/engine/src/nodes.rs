@@ -916,7 +916,7 @@ impl Task {
                     "non_member_error_message",
                     &[externs::val_for(&get.input)],
                   ) {
-                    Ok(err_msg) => throw(&externs::val_to_str(&err_msg.into())),
+                    Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
                     // If the non_member_error_message() call failed for any reason,
                     // fall back to a generic message.
                     Err(_e) => throw(&format!(
