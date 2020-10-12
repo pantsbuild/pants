@@ -273,13 +273,13 @@ impl AsRef<PyObject> for Value {
 
 impl fmt::Debug for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::val_to_str(&self))
+    write!(f, "{}", externs::val_to_str(&self.as_ref()))
   }
 }
 
 impl fmt::Display for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::val_to_str(&self))
+    write!(f, "{}", externs::val_to_str(&self.as_ref()))
   }
 }
 
@@ -377,7 +377,7 @@ impl Failure {
       .extract::<String>(py)
       .unwrap()
     } else {
-      Self::native_traceback(&externs::val_to_str(&val))
+      Self::native_traceback(&externs::val_to_str(val.as_ref()))
     };
     Failure::Throw {
       val,
@@ -398,7 +398,7 @@ impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
-      Failure::Throw { val, .. } => write!(f, "{}", externs::val_to_str(val)),
+      Failure::Throw { val, .. } => write!(f, "{}", externs::val_to_str(val.as_ref())),
     }
   }
 }

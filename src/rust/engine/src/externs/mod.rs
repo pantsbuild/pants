@@ -25,7 +25,7 @@ use crate::interning::Interns;
 
 use cpython::{
   py_class, CompareOp, FromPyObject, ObjectProtocol, PyBool, PyBytes, PyClone, PyDict, PyErr,
-  PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject, ToPyObject,
+  PyObject, PyResult as CPyResult, PyTuple, PyType, Python, PythonObject, ToPyObject,
 };
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
@@ -271,10 +271,6 @@ pub fn project_u64(value: &Value, field: &str) -> u64 {
   getattr(value.as_ref(), field).unwrap()
 }
 
-pub fn project_maybe_u64(value: &Value, field: &str) -> Result<u64, String> {
-  getattr(value.as_ref(), field)
-}
-
 pub fn project_f64(value: &Value, field: &str) -> f64 {
   getattr(value.as_ref(), field).unwrap()
 }
@@ -286,31 +282,30 @@ pub fn project_bytes(value: &Value, field: &str) -> Vec<u8> {
 }
 
 pub fn key_to_str(key: &Key) -> String {
-  val_to_str(&val_for(key))
+  val_to_str(&val_for(key).as_ref())
 }
 
 pub fn type_to_str(type_id: TypeId) -> String {
   project_str(&type_for_type_id(type_id).into_object().into(), "__name__")
 }
 
-pub fn val_to_str(val: &Value) -> String {
-  // TODO: to_string(py) returns a Cow<str>, so we could avoid actually cloning in some cases.
-  with_externs(|py, e| {
-    e.call_method(py, "val_to_str", (val as &PyObject,), None)
-      .unwrap()
-      .cast_as::<PyString>(py)
-      .unwrap()
-      .to_string(py)
-      .map(|cow| cow.into_owned())
-      .unwrap()
-  })
+pub fn val_to_str(obj: &PyObject) -> String {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  if *obj == py.None() {
+    return "".to_string();
+  }
+
+  let pystring = obj.str(py).unwrap();
+  pystring.to_string(py).unwrap().into_owned()
 }
 
-pub fn val_to_log_level(val: &Value) -> Result<log::Level, String> {
-  let res: Result<PythonLogLevel, String> = project_maybe_u64(&val, "_level").and_then(|n: u64| {
+pub fn val_to_log_level(obj: &PyObject) -> Result<log::Level, String> {
+  let res: Result<PythonLogLevel, String> = getattr(obj, "_level").and_then(|n: u64| {
     n.try_into()
       .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
-        format!("Could not parse {:?} as a LogLevel: {}", val, e)
+        format!("Could not parse {:?} as a LogLevel: {}", val_to_str(obj), e)
       })
   });
   res.map(|py_level| py_level.into())
