@@ -5,6 +5,75 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0rc0 (10/11/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Deprecate `python_binary` in favor of `pex_binary` (#10939)
+  `PR #10939 <https://github.com/pantsbuild/pants/pull/10939>`_
+
+* Deprecate `[protoc].runtime_targets` in favor of `[python-protobuf].runtime_dependencies` (#10926)
+  `PR #10926 <https://github.com/pantsbuild/pants/pull/10926>`_
+
+* Use the `package` goal to build setup-py dists. (#10919)
+  `PR #10919 <https://github.com/pantsbuild/pants/pull/10919>`_
+
+* Deprecate `--print-exception-stacktrace` to `--print-stacktrace` (#10912)
+  `PR #10912 <https://github.com/pantsbuild/pants/pull/10912>`_
+
+Plugin API Changes
+~~~~~~~~~~~~~~~~~~
+
+* Use `TransitiveTargetsRequest` as input for resolving `TransitiveTargets` (#10915)
+  `PR #10915 <https://github.com/pantsbuild/pants/pull/10915>`_
+
+* Add `await Get(Addresses, UnparsedAddressInputs)`  (#10913)
+  `PR #10913 <https://github.com/pantsbuild/pants/pull/10913>`_
+
+* Upgrade to Pex 2.1.18. (#10938)
+  `PR #10938 <https://github.com/pantsbuild/pants/pull/10938>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add gRPC Python code generation (#10937)
+  `PR #10937 <https://github.com/pantsbuild/pants/pull/10937>`_
+
+* Add MyPy Protobuf plugin support (#10931)
+  `PR #10931 <https://github.com/pantsbuild/pants/pull/10931>`_
+
+* Add `output_path` field to `python_binary`, `python_awslambda`, and `archive` (#10899)
+  `PR #10899 <https://github.com/pantsbuild/pants/pull/10899>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix for log messages/dynamic UI teardown conflict (#10940)
+  `PR #10940 <https://github.com/pantsbuild/pants/pull/10940>`_
+
+* Fix some dependencies-like fields not showing up with project introspection (#10923)
+  `PR #10923 <https://github.com/pantsbuild/pants/pull/10923>`_
+
+* Send SIGTERM to child processes upon SIGINT (#10930)
+  `PR #10930 <https://github.com/pantsbuild/pants/pull/10930>`_
+
+* Fix Python 3.8 syntax not working with dependency inference (#10907)
+  `PR #10907 <https://github.com/pantsbuild/pants/pull/10907>`_
+
+* Plumb `ca_certs_path` to the plugin resolver. (#10910)
+  `PR #10910 <https://github.com/pantsbuild/pants/pull/10910>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Differentiate between User API vs. Plugin API changes in changelog (#10916)
+  `PR #10916 <https://github.com/pantsbuild/pants/pull/10916>`_
+
+* Streamline some goal descriptions. (#10911)
+  `PR #10911 <https://github.com/pantsbuild/pants/pull/10911>`_
+
 2.0.0b3 (10/3/2020)
 -------------------
 
