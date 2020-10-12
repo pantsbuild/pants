@@ -7,13 +7,12 @@ import re
 import shutil
 import subprocess
 import sys
-from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import contextmanager
 from functools import total_ordering
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Dict, Iterable, Iterator, List, NamedTuple, Set, Tuple, cast
+from typing import Dict, Iterable, Iterator, List, NamedTuple, Set, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
@@ -32,11 +31,9 @@ class Package:
         self,
         name: str,
         target: str,
-        bdist_wheel_flags: Tuple[str, ...] = ("--python-tag", "py36.py37.py38"),
     ) -> None:
         self.name = name
         self.target = target
-        self.bdist_wheel_flags = bdist_wheel_flags
 
     def __lt__(self, other):
         return self.name < other.name
@@ -84,7 +81,7 @@ PACKAGES = sorted(
     {
         # NB: This a native wheel. We expect a distinct wheel for each Python version and each
         # platform (macOS x linux).
-        Package("pantsbuild.pants", "src/python/pants:pants-packaged", bdist_wheel_flags=()),
+        Package("pantsbuild.pants", "src/python/pants:pants-packaged"),
         Package("pantsbuild.pants.testutil", "src/python/pants/testutil:testutil_wheel"),
     }
 )
@@ -201,52 +198,46 @@ def build_pants_wheels() -> None:
     destination = CONSTANTS.deploy_pants_wheel_dir / version
     destination.mkdir(parents=True, exist_ok=True)
 
-    def build(packages: Iterable[Package], bdist_wheel_flags: Iterable[str]) -> None:
-        args = (
-            "./pants",
-            # TODO(#9924).
-            "--no-dynamic-ui",
-            # TODO(#7654): It's not safe to use Pantsd because we're already using Pants to run
-            #  this script.
-            "--concurrent",
-            "setup-py",
-            *(package.target for package in packages),
-            "--",
-            "bdist_wheel",
-            *bdist_wheel_flags,
-        )
+    args = (
+        "./pants",
+        # TODO(#9924).
+        "--no-dynamic-ui",
+        # TODO(#7654): It's not safe to use Pantsd because we're already using Pants to run
+        #  this script.
+        "--concurrent",
+        "package",
+        *(package.target for package in PACKAGES),
+    )
+
+    with set_pants_version(CONSTANTS.pants_unstable_version):
         try:
             subprocess.run(args, check=True)
-            for package in packages:
-                found_wheels = sorted(Path("dist").glob(f"{package}-{version}-*.whl"))
-                # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
-                # top-level `dist` will only have wheels built for the current platform. This
-                # should be safe because it is not possible to build native wheels for another
-                # platform.
-                if not is_cross_platform(found_wheels) and len(found_wheels) > 1:
-                    raise ValueError(
-                        f"Found multiple wheels for {package} in the `dist/` folder, but was "
-                        f"expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}."
-                    )
-                for wheel in found_wheels:
-                    if not (destination / wheel.name).exists():
-                        # We use `copy2` to preserve metadata.
-                        shutil.copy2(wheel, destination)
         except subprocess.CalledProcessError as e:
-            failed_packages = ",".join(package.name for package in packages)
-            failed_targets = " ".join(package.target for package in packages)
+            failed_packages = ",".join(package.name for package in PACKAGES)
+            failed_targets = " ".join(package.target for package in PACKAGES)
             die(
                 f"Failed to build packages {failed_packages} for {version} with targets "
                 f"{failed_targets}.\n\n{e!r}",
             )
 
-    packages_by_flags = defaultdict(list)
-    for package in PACKAGES:
-        packages_by_flags[package.bdist_wheel_flags].append(package)
+        # TODO(#10718): Allow for sdist releases. We can build an sdist for
+        #  `pantsbuild.pants.testutil`, but need to wire it up to the rest of our release process.
+        for package in PACKAGES:
+            found_wheels = sorted(Path("dist").glob(f"{package}-{version}-*.whl"))
+            # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
+            # top-level `dist` will only have wheels built for the current platform. This
+            # should be safe because it is not possible to build native wheels for another
+            # platform.
+            if not is_cross_platform(found_wheels) and len(found_wheels) > 1:
+                raise ValueError(
+                    f"Found multiple wheels for {package} in the `dist/` folder, but was "
+                    f"expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}."
+                )
+            for wheel in found_wheels:
+                if not (destination / wheel.name).exists():
+                    # We use `copy2` to preserve metadata.
+                    shutil.copy2(wheel, destination)
 
-    with set_pants_version(CONSTANTS.pants_unstable_version):
-        for flags, packages in packages_by_flags.items():
-            build(packages, flags)
     green(f"Wrote Pants wheels to {destination}.")
 
 
