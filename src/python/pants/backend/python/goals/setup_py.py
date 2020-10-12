@@ -296,6 +296,7 @@ class RunSetupPyRequest:
     """A request to run a setup.py command."""
 
     exported_target: ExportedTarget
+    interpreter_constraints: PexInterpreterConstraints
     chroot: SetupPyChroot
     args: Tuple[str, ...]
 
@@ -305,13 +306,6 @@ class RunSetupPyResult:
     """The result of running a setup.py command."""
 
     output: Digest  # The state of the chroot after running setup.py.
-
-
-@dataclass(frozen=True)
-class SetuptoolsSetup:
-    """The setuptools tool."""
-
-    requirements_pex: Pex
 
 
 class SetupPySubsystem(GoalSubsystem):
@@ -378,7 +372,6 @@ async def package_python_dist(
     field_set: PythonDistributionFieldSet,
     python_setup: PythonSetup,
 ) -> BuiltPackage:
-
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
@@ -400,7 +393,7 @@ async def package_python_dist(
         validate_commands(commands)
         setup_py_result = await Get(
             RunSetupPyResult,
-            RunSetupPyRequest(exported_target, chroot, commands),
+            RunSetupPyRequest(exported_target, interpreter_constraints, chroot, commands),
         )
         dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
         return BuiltPackage(
@@ -484,7 +477,9 @@ async def run_setup_pys(
         setup_py_results = await MultiGet(
             Get(
                 RunSetupPyResult,
-                RunSetupPyRequest(exported_target, chroot, setup_py_subsystem.args),
+                RunSetupPyRequest(
+                    exported_target, interpreter_constraints, chroot, setup_py_subsystem.args
+                ),
             )
             for exported_target, chroot in zip(exported_targets, chroots)
         )
@@ -521,20 +516,31 @@ setup(**{setup_kwargs_str})
 
 
 @rule
-async def run_setup_py(
-    req: RunSetupPyRequest, setuptools_setup: SetuptoolsSetup
-) -> RunSetupPyResult:
+async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
-    input_digest = await Get(
-        Digest, MergeDigests((req.chroot.digest, setuptools_setup.requirements_pex.digest))
+    # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
+    # in turn imports from and invokes setuptools.
+    setuptools_pex = await Get(
+        Pex,
+        PexRequest(
+            output_filename="setuptools.pex",
+            internal_only=True,
+            requirements=PexRequirements(setuptools.all_requirements),
+            interpreter_constraints=(
+                req.interpreter_constraints
+                if setuptools.options.is_default("interpreter_constraints")
+                else PexInterpreterConstraints(setuptools.interpreter_constraints)
+            ),
+        ),
     )
+    input_digest = await Get(Digest, MergeDigests((req.chroot.digest, setuptools_pex.digest)))
     # The setuptools dist dir, created by it under the chroot (not to be confused with
     # pants's own dist dir, at the buildroot).
     dist_dir = "dist/"
     result = await Get(
         ProcessResult,
         PexProcess(
-            setuptools_setup.requirements_pex,
+            setuptools_pex,
             argv=("setup.py", *req.args),
             input_digest=input_digest,
             # setuptools commands that create dists write them to the distdir.
@@ -818,24 +824,6 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
         f"No python_distribution target found to own {target.address}. Note that "
         f"the owner must be in or above the owned target's directory, and must "
         f"depend on it (directly or indirectly)."
-    )
-
-
-@rule(desc="Set up setuptools")
-async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
-    # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
-    # in turn imports from and invokes setuptools.
-    requirements_pex = await Get(
-        Pex,
-        PexRequest(
-            output_filename="setuptools.pex",
-            internal_only=True,
-            requirements=PexRequirements(setuptools.all_requirements),
-            interpreter_constraints=PexInterpreterConstraints(setuptools.interpreter_constraints),
-        ),
-    )
-    return SetuptoolsSetup(
-        requirements_pex=requirements_pex,
     )
 
 
