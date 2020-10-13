@@ -161,7 +161,7 @@ impl Function {
     let name = externs::project_str(&val, "__name__");
     // NB: this is a custom dunder method that Python code should populate before sending the
     // function (e.g. an `@rule`) through FFI.
-    let line_number = externs::project_u64(&val, "__line_number__");
+    let line_number: u64 = externs::getattr(&val, "__line_number__").unwrap();
     format!("{}:{}:{}", module, line_number, name)
   }
 }
