@@ -246,6 +246,9 @@ class Options:
             for section in config.sections():
                 scope = GLOBAL_SCOPE if section == GLOBAL_SCOPE_CONFIG_SECTION else section
                 try:
+                    # TODO(#10834): this is broken for subscopes. Once we fix global options to no
+                    #  longer be included in self.for_scope(), we should set
+                    #  inherit_from_enclosing_scope=True.
                     valid_options_under_scope = set(
                         self.for_scope(scope, inherit_from_enclosing_scope=False)
                     )
