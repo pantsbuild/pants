@@ -224,7 +224,7 @@ pub fn collect_iterable(value: &PyObject) -> Result<Vec<PyObject>, String> {
   }
 }
 
-pub fn collect_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
+pub fn getattr_from_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
   let frozendict = getattr(value, field).unwrap();
   let pydict: PyDict = getattr(&frozendict, "_data").unwrap();
   let gil = Python::acquire_gil();
@@ -236,7 +236,7 @@ pub fn collect_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, Str
     .collect()
 }
 
-pub fn project_str(value: &PyObject, field: &str) -> String {
+pub fn getattr_as_string(value: &PyObject, field: &str) -> String {
   // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
   // cloning in some cases.
   // TODO: We can't directly extract as a string here, because val_to_str defaults to empty string
@@ -249,7 +249,7 @@ pub fn key_to_str(key: &Key) -> String {
 }
 
 pub fn type_to_str(type_id: TypeId) -> String {
-  project_str(&type_for_type_id(type_id).into_object(), "__name__")
+  getattr_as_string(&type_for_type_id(type_id).into_object(), "__name__")
 }
 
 pub fn val_to_str(obj: &PyObject) -> String {

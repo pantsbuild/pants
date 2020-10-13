@@ -1372,7 +1372,7 @@ fn capture_snapshots(
       let path_globs_and_roots = values
         .iter()
         .map(|value| {
-          let root = PathBuf::from(externs::project_str(&value, "root"));
+          let root = PathBuf::from(externs::getattr_as_string(&value, "root"));
           let path_globs = nodes::Snapshot::lift_prepared_path_globs(
             &externs::getattr(&value, "path_globs").unwrap(),
           );
@@ -1566,7 +1566,7 @@ fn run_local_interactive_process(
           if hermetic_env {
             command.env_clear();
           }
-          let env = externs::collect_frozendict(&value, "env");
+          let env = externs::getattr_from_frozendict(&value, "env");
           command.envs(env);
 
           let mut subprocess = command.spawn().map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
