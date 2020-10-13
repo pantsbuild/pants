@@ -343,7 +343,7 @@ fn create_digest_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let file_contents_and_directories = externs::project_iterable(&args[0]);
+  let file_contents_and_directories = externs::collect_iterable(&args[0]).unwrap();
   let digests: Vec<_> = file_contents_and_directories
     .into_iter()
     .map(|file_content_or_directory| {
@@ -353,7 +353,7 @@ fn create_digest_to_digest(
         let path = RelativePath::new(PathBuf::from(path))
           .map_err(|e| format!("The `path` must be relative: {:?}", e))?;
 
-        if externs::hasattr(file_content_or_directory.as_ref(), "content") {
+        if externs::hasattr(&file_content_or_directory, "content") {
           let bytes = bytes::Bytes::from(
             externs::getattr::<Vec<u8>>(&file_content_or_directory, "content").unwrap(),
           );

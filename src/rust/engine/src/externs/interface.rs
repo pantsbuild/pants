@@ -1367,7 +1367,7 @@ fn capture_snapshots(
       session.workunit_store().init_thread_state(None);
       let core = scheduler.core.clone();
 
-      let values = externs::project_iterable(&path_globs_and_root_tuple_wrapper.into());
+      let values = externs::collect_iterable(&path_globs_and_root_tuple_wrapper).unwrap();
       let path_globs_and_roots = values
         .iter()
         .map(|value| {

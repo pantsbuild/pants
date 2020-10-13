@@ -197,16 +197,16 @@ where
 }
 
 ///
-/// Collect the Values contained within an outer Python Iterable Value.
+/// Collect the Values contained within an outer Python Iterable PyObject.
 ///
-fn collect_iterable(value: &Value) -> Result<Vec<Value>, String> {
+pub fn collect_iterable(value: &PyObject) -> Result<Vec<PyObject>, String> {
   let gil = Python::acquire_gil();
   let py = gil.python();
   match value.iter(py) {
     Ok(py_iter) => py_iter
       .enumerate()
       .map(|(i, py_res)| {
-        py_res.map(Value::from).map_err(|py_err| {
+        py_res.map_err(|py_err| {
           format!(
             "Could not iterate {}, failed to extract {}th item: {:?}",
             val_to_str(value),
@@ -222,10 +222,6 @@ fn collect_iterable(value: &Value) -> Result<Vec<Value>, String> {
       py_err
     )),
   }
-}
-
-pub fn project_iterable(value: &Value) -> Vec<Value> {
-  collect_iterable(value).unwrap()
 }
 
 pub fn project_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
