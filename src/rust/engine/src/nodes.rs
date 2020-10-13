@@ -247,7 +247,7 @@ impl MultiPlatformExecuteProcess {
     value: &Value,
     target_platform: PlatformConstraint,
   ) -> Result<Process, String> {
-    let env = externs::project_frozendict(&value, "env");
+    let env = externs::collect_frozendict(&value, "env");
 
     let working_directory = {
       let val = externs::project_str(&value, "working_directory");
@@ -286,7 +286,7 @@ impl MultiPlatformExecuteProcess {
     let py_level: PyObject = externs::getattr(&value, "level").unwrap();
     let level = externs::val_to_log_level(&py_level)?;
 
-    let append_only_caches = externs::project_frozendict(&value, "append_only_caches")
+    let append_only_caches = externs::collect_frozendict(&value, "append_only_caches")
       .into_iter()
       .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
       .collect::<Result<_, String>>()?;

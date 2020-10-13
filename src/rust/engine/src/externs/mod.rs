@@ -224,7 +224,7 @@ pub fn collect_iterable(value: &PyObject) -> Result<Vec<PyObject>, String> {
   }
 }
 
-pub fn project_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
+pub fn collect_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
   let frozendict = getattr(value, field).unwrap();
   let pydict: PyDict = getattr(&frozendict, "_data").unwrap();
   let gil = Python::acquire_gil();

@@ -1566,7 +1566,7 @@ fn run_local_interactive_process(
           if hermetic_env {
             command.env_clear();
           }
-          let env = externs::project_frozendict(&value, "env");
+          let env = externs::collect_frozendict(&value, "env");
           command.envs(env);
 
           let mut subprocess = command.spawn().map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
