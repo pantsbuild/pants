@@ -1511,7 +1511,7 @@ fn run_local_interactive_process(
 
           let value: Value = request.into();
 
-          let argv: Vec<String> = externs::project_multi_strs(&value, "argv");
+          let argv: Vec<String> = externs::getattr(&value, "argv").unwrap();
           if argv.is_empty() {
             return Err("Empty argv list not permitted".to_string());
           }

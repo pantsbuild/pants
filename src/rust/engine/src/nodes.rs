@@ -262,12 +262,14 @@ impl MultiPlatformExecuteProcess {
     let digest = lift_directory_digest(types, &py_digest)
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
-    let output_files = externs::project_multi_strs(&value, "output_files")
+    let output_files = externs::getattr::<Vec<String>>(&value, "output_files")
+      .unwrap()
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
-    let output_directories = externs::project_multi_strs(&value, "output_directories")
+    let output_directories = externs::getattr::<Vec<String>>(&value, "output_directories")
+      .unwrap()
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
@@ -312,7 +314,7 @@ impl MultiPlatformExecuteProcess {
     let cache_failures: bool = externs::getattr(&value, "cache_failures").unwrap();
 
     Ok(process_execution::Process {
-      argv: externs::project_multi_strs(&value, "argv"),
+      argv: externs::getattr(&value, "argv").unwrap(),
       env,
       working_directory,
       input_files: digest,
@@ -331,7 +333,7 @@ impl MultiPlatformExecuteProcess {
   }
 
   pub fn lift(types: &Types, value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
-    let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
+    let constraint_parts: Vec<String> = externs::getattr(&value, "platform_constraints").unwrap();
     if constraint_parts.len() % 2 != 0 {
       return Err("Error parsing platform_constraints: odd number of parts".to_owned());
     }
@@ -611,7 +613,7 @@ impl Snapshot {
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
-    let globs = externs::project_multi_strs(item, "globs");
+    let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
 
     let description_of_origin_field = externs::project_str(item, "description_of_origin");
     let description_of_origin = if description_of_origin_field.is_empty() {

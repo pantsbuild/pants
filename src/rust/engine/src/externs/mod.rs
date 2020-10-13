@@ -228,10 +228,6 @@ pub fn project_iterable(value: &Value) -> Vec<Value> {
   collect_iterable(value).unwrap()
 }
 
-pub fn project_multi_strs(value: &PyObject, field: &str) -> Vec<String> {
-  getattr(value, field).unwrap()
-}
-
 pub fn project_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
   let frozendict = getattr(value, field).unwrap();
   let pydict: PyDict = getattr(&frozendict, "_data").unwrap();
