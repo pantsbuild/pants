@@ -443,33 +443,48 @@ async def run_setup_pys(
             f'{", ".join(so.address.spec for so in explicit_nonexported_targets)}'
         )
 
+    transitive_targets_per_exported_target = await MultiGet(
+        Get(TransitiveTargets, TransitiveTargetsRequest([et.target.address]))
+        for et in exported_targets
+    )
+
     if setup_py_subsystem.transitive:
-        # Expand out to all owners of the entire dep closure.
-        transitive_targets = await Get(
-            TransitiveTargets,
-            TransitiveTargetsRequest(et.target.address for et in exported_targets),
+        closure = FrozenOrderedSet(
+            itertools.chain.from_iterable(
+                tt.closure for tt in transitive_targets_per_exported_target
+            )
         )
         owners = await MultiGet(
             Get(ExportedTarget, OwnedDependency(tgt))
-            for tgt in transitive_targets.closure
+            for tgt in closure
             if is_ownable_target(tgt, union_membership)
         )
         exported_targets = list(FrozenOrderedSet(owners))
+        transitive_targets_per_exported_target = await MultiGet(
+            Get(TransitiveTargets, TransitiveTargetsRequest([et.target.address]))
+            for et in exported_targets
+        )
 
-    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (
-            target_with_origin.target[PythonInterpreterCompatibility]
-            for target_with_origin in targets_with_origins
-            if target_with_origin.target.has_field(PythonInterpreterCompatibility)
-        ),
-        python_setup,
+    interpreter_constraints_per_exported_target = tuple(
+        PexInterpreterConstraints.create_from_compatibility_fields(
+            (
+                tgt[PythonInterpreterCompatibility]
+                for tgt in transitive_targets.dependencies
+                if tgt.has_field(PythonInterpreterCompatibility)
+            ),
+            python_setup,
+        )
+        for transitive_targets in transitive_targets_per_exported_target
     )
+
     chroots = await MultiGet(
         Get(
             SetupPyChroot,
             SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
         )
-        for exported_target in exported_targets
+        for exported_target, interpreter_constraints in zip(
+            exported_targets, interpreter_constraints_per_exported_target
+        )
     )
 
     # If args were provided, run setup.py with them; Otherwise just dump chroots.
@@ -481,7 +496,9 @@ async def run_setup_pys(
                     exported_target, interpreter_constraints, chroot, setup_py_subsystem.args
                 ),
             )
-            for exported_target, chroot in zip(exported_targets, chroots)
+            for exported_target, interpreter_constraints, chroot in zip(
+                exported_targets, interpreter_constraints_per_exported_target, chroots
+            )
         )
 
         for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
