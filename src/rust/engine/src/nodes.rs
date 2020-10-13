@@ -24,7 +24,7 @@ use crate::tasks::{self, Rule};
 use crate::Types;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{self, BufMut};
-use cpython::{Python, PythonObject};
+use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
@@ -258,11 +258,9 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let digest = lift_directory_digest(
-      types,
-      &externs::project_ignoring_type(&value, "input_digest"),
-    )
-    .map_err(|err| format!("Error parsing digest {}", err))?;
+    let py_digest: Value = externs::getattr(&value, "input_digest").unwrap();
+    let digest = lift_directory_digest(types, &py_digest)
+      .map_err(|err| format!("Error parsing digest {}", err))?;
 
     let output_files = externs::project_multi_strs(&value, "output_files")
       .into_iter()
@@ -283,8 +281,8 @@ impl MultiPlatformExecuteProcess {
     };
 
     let description = externs::project_str(&value, "description");
-    let level =
-      externs::val_to_log_level(&externs::project_ignoring_type(&value, "level").as_ref())?;
+    let py_level: PyObject = externs::getattr(&value, "level").unwrap();
+    let level = externs::val_to_log_level(&py_level)?;
 
     let append_only_caches = externs::project_frozendict(&value, "append_only_caches")
       .into_iter()
@@ -346,7 +344,7 @@ impl MultiPlatformExecuteProcess {
         )
       })
       .collect();
-    let processes = externs::project_multi(&value, "processes");
+    let processes: Vec<Value> = externs::getattr(&value, "processes").unwrap();
     if constraint_parts.len() / 2 != processes.len() {
       return Err(format!(
         "Sizes of constraint keys and processes do not match: {} vs. {}",
@@ -622,13 +620,13 @@ impl Snapshot {
       Some(description_of_origin_field)
     };
 
-    let glob_match_error_behavior =
-      externs::project_ignoring_type(item, "glob_match_error_behavior");
+    let glob_match_error_behavior: PyObject =
+      externs::getattr(item, "glob_match_error_behavior").unwrap();
     let failure_behavior = externs::project_str(&glob_match_error_behavior, "value");
     let strict_glob_matching =
       StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
-    let conjunction_obj = externs::project_ignoring_type(item, "conjunction");
+    let conjunction_obj: PyObject = externs::getattr(item, "conjunction").unwrap();
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
     Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
@@ -855,11 +853,9 @@ impl WrappedNode for DownloadedFile {
     let url = Url::parse(&url_str)
       .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_str, err)))?;
 
-    let expected_digest = lift_file_digest(
-      &context.core.types,
-      &externs::project_ignoring_type(&value, "expected_digest"),
-    )
-    .map_err(|s| throw(&s))?;
+    let py_digest: Value = externs::getattr(&value, "expected_digest").unwrap();
+    let expected_digest =
+      lift_file_digest(&context.core.types, &py_digest).map_err(|s| throw(&s))?;
 
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)

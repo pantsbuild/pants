@@ -224,19 +224,8 @@ fn collect_iterable(value: &Value) -> Result<Vec<Value>, String> {
   }
 }
 
-///
-/// Pulls out the value specified by the field name from a given Value
-///
-pub fn project_ignoring_type(value: &PyObject, field: &str) -> Value {
-  getattr(value, field).unwrap()
-}
-
 pub fn project_iterable(value: &Value) -> Vec<Value> {
   collect_iterable(value).unwrap()
-}
-
-pub fn project_multi(value: &PyObject, field: &str) -> Vec<Value> {
-  getattr(value, field).unwrap()
 }
 
 pub fn project_multi_strs(value: &PyObject, field: &str) -> Vec<String> {

@@ -227,11 +227,9 @@ fn remove_prefix_request_to_digest(
   let store = core.store();
 
   async move {
-    let input_digest = lift_directory_digest(
-      &core.types,
-      &externs::project_ignoring_type(&args[0], "digest"),
-    )
-    .map_err(|e| throw(&e))?;
+    let input_digest =
+      lift_directory_digest(&core.types, &externs::getattr(&args[0], "digest").unwrap())
+        .map_err(|e| throw(&e))?;
     let prefix = externs::project_str(&args[0], "prefix");
     let prefix = RelativePath::new(PathBuf::from(prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
@@ -251,11 +249,9 @@ fn add_prefix_request_to_digest(
   let core = context.core;
   let store = core.store();
   async move {
-    let input_digest = lift_directory_digest(
-      &core.types,
-      &externs::project_ignoring_type(&args[0], "digest"),
-    )
-    .map_err(|e| throw(&e))?;
+    let input_digest =
+      lift_directory_digest(&core.types, &externs::getattr(&args[0], "digest").unwrap())
+        .map_err(|e| throw(&e))?;
     let prefix = externs::project_str(&args[0], "prefix");
     let prefix = RelativePath::new(PathBuf::from(prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
@@ -286,10 +282,12 @@ fn merge_digests_request_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core;
   let store = core.store();
-  let digests: Result<Vec<hashing::Digest>, String> = externs::project_multi(&args[0], "digests")
-    .into_iter()
-    .map(|val| lift_directory_digest(&core.types, &val))
-    .collect();
+  let digests: Result<Vec<hashing::Digest>, String> =
+    externs::getattr::<Vec<Value>>(&args[0], "digests")
+      .unwrap()
+      .into_iter()
+      .map(|val: Value| lift_directory_digest(&core.types, &val))
+      .collect();
   async move {
     let digest = store
       .merge(digests.map_err(|e| throw(&e))?)
@@ -394,14 +392,14 @@ fn digest_subset_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let globs = externs::project_ignoring_type(&args[0], "globs");
+  let globs = externs::getattr(&args[0], "globs").unwrap();
   let store = context.core.store();
 
   async move {
     let path_globs = Snapshot::lift_prepared_path_globs(&globs).map_err(|e| throw(&e))?;
     let original_digest = lift_directory_digest(
       &context.core.types,
-      &externs::project_ignoring_type(&args[0], "digest"),
+      &externs::getattr(&args[0], "digest").unwrap(),
     )
     .map_err(|e| throw(&e))?;
     let subset_params = SubsetParams { globs: path_globs };

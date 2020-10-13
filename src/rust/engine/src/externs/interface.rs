@@ -1373,14 +1373,17 @@ fn capture_snapshots(
         .map(|value| {
           let root = PathBuf::from(externs::project_str(&value, "root"));
           let path_globs = nodes::Snapshot::lift_prepared_path_globs(
-            &externs::project_ignoring_type(&value, "path_globs"),
+            &externs::getattr(&value, "path_globs").unwrap(),
           );
           let digest_hint = {
-            let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
-            if maybe_digest == Value::from(externs::none()) {
+            let maybe_digest: PyObject = externs::getattr(&value, "digest_hint").unwrap();
+            if maybe_digest == externs::none() {
               None
             } else {
-              Some(nodes::lift_directory_digest(&core.types, &maybe_digest)?)
+              Some(nodes::lift_directory_digest(
+                &core.types,
+                &Value::new(maybe_digest),
+              )?)
             }
           };
           path_globs.map(|path_globs| (path_globs, root, digest_hint))
@@ -1520,7 +1523,7 @@ fn run_local_interactive_process(
             Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
           };
 
-          let input_digest_value = externs::project_ignoring_type(&value, "input_digest");
+          let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
           let digest: Digest = nodes::lift_directory_digest(types, &input_digest_value)?;
           if digest != EMPTY_DIGEST {
             if run_in_workspace {
