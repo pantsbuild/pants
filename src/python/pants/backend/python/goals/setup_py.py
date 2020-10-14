@@ -460,6 +460,8 @@ async def run_setup_pys(
             if is_ownable_target(tgt, union_membership)
         )
         exported_targets = list(FrozenOrderedSet(owners))
+        # We must recalculate the transitive targets because it's possible the exported_targets
+        # have changed. Any prior results will be memoized.
         transitive_targets_per_exported_target = await MultiGet(
             Get(TransitiveTargets, TransitiveTargetsRequest([et.target.address]))
             for et in exported_targets
