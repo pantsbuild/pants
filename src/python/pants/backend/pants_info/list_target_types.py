@@ -178,7 +178,7 @@ class FieldInfo:
 
     def as_dict(self) -> Dict[str, Any]:
         d = dataclasses.asdict(self)
-        d.pop("alias")
+        del d["alias"]
         return d
 
 
