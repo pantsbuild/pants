@@ -198,6 +198,7 @@ class VerboseTargetInfo:
             fields=[
                 FieldInfo.create(field)
                 for field in target_type.class_field_types(union_membership=union_membership)
+                if not field.alias.startswith("_") and field.deprecated_removal_version is None
             ],
         )
 
@@ -208,11 +209,7 @@ class VerboseTargetInfo:
         output.extend(
             [
                 "Valid fields:\n",
-                *sorted(
-                    f"{field.format_for_cli(console)}\n"
-                    for field in self.fields
-                    if not field.alias.startswith("_")
-                ),
+                *sorted(f"{field.format_for_cli(console)}\n" for field in self.fields),
             ]
         )
         return "\n".join(output).rstrip()
@@ -239,7 +236,7 @@ def list_target_types(
                     target_type, union_membership=union_membership
                 ).as_dict()
                 for alias, target_type in registered_target_types.aliases_to_types.items()
-                if not alias.startswith("_")
+                if not alias.startswith("_") and target_type.deprecated_removal_version is None
             }
             print_stdout(json.dumps(all_target_types, sort_keys=True, indent=4))
         elif target_types_subsystem.details:
@@ -261,6 +258,10 @@ def list_target_types(
             target_infos = [
                 AbbreviatedTargetInfo.create(target_type)
                 for target_type in registered_target_types.types
+                if (
+                    not target_type.alias.startswith("_")
+                    and target_type.deprecated_removal_version is None
+                )
             ]
             longest_target_alias = max(
                 len(target_type.alias) for target_type in registered_target_types.types
@@ -276,7 +277,6 @@ def list_target_types(
                 *(
                     target_info.format_for_cli(console, longest_target_alias=longest_target_alias)
                     for target_info in target_infos
-                    if not target_info.alias.startswith("_")
                 ),
             ]
             print_stdout("\n".join(lines).rstrip())

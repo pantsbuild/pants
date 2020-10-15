@@ -5,7 +5,7 @@ import collections.abc
 import logging
 import os.path
 from textwrap import dedent
-from typing import Any, Dict, Iterable, Optional, Tuple, Union, cast
+from typing import Iterable, Optional, Tuple, Union, cast
 
 from pkg_resources import Requirement
 
@@ -36,7 +36,6 @@ from pants.engine.target import (
     Target,
     WrappedTarget,
 )
-from pants.engine.unions import UnionMembership
 from pants.option.subsystem import Subsystem
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
@@ -281,26 +280,13 @@ class PythonBinary(PexBinary):
     """
 
     alias = "python_binary"
-
-    def __init__(  # type: ignore[misc]  # This is `@final`, but it's fine to override here.
-        self,
-        unhydrated_values: Dict[str, Any],
-        *,
-        address: Address,
-        union_membership: Optional[UnionMembership] = None,
-    ) -> None:
-        warn_or_error(
-            removal_version="2.1.0.dev0",
-            deprecated_entity_description="the `python_binary` target",
-            hint=(
-                f"Use the target type `pex_binary`, rather than `python_binary` for {address}. "
-                "The behavior is identical.\n\nTo fix this globally, run the below command:\n\t"
-                "macOS: for f in $(find . -name BUILD); do sed -i '' -Ee "
-                "'s#^python_binary\\(#pex_binary(#g' $f ; done\n\tLinux: for f in $(find . "
-                "-name BUILD); do sed -i -Ee 's#^python_binary\\(#pex_binary(#g' $f ; done\n"
-            ),
-        )
-        super().__init__(unhydrated_values, address=address, union_membership=union_membership)
+    deprecated_removal_version = "2.1.0.dev0"
+    deprecated_removal_hint = (
+        "Use `pex_binary` instead, which behaves identically.\n\nTo fix this globally, run the "
+        "below command:\n\tmacOS: for f in $(find . -name BUILD); do sed -i '' -Ee "
+        "'s#^python_binary\\(#pex_binary(#g' $f ; done\n\tLinux: for f in $(find . -name BUILD); "
+        "do sed -i -Ee 's#^python_binary\\(#pex_binary(#g' $f ; done"
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -344,18 +330,8 @@ class PythonRuntimeBinaryDependencies(SpecialCasedDependencies):
     types like `archive` and `python_awslambda`."""
 
     alias = "runtime_binary_dependencies"
-
-    @classmethod
-    def sanitize_raw_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[str, ...]]:
-        if raw_value is not None:
-            logger.warning(
-                f"Using the `runtime_binary_dependencies` field in the target {address}. This "
-                "field is now deprecated in favor of the more flexible "
-                "`runtime_package_dependencies` field, and it will be removed in 2.1.0.dev0."
-            )
-        return super().sanitize_raw_value(raw_value, address=address)
+    deprecated_removal_version = "2.1.0dev0"
+    deprecated_removal_hint = "Use the more flexible `runtime_package_dependencies` field instead."
 
 
 class PythonTestsTimeout(IntField):
