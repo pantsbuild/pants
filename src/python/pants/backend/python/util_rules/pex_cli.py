@@ -32,7 +32,7 @@ class PexBinary(ExternalTool):
 
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.18"
+    default_version = "v2.1.19"
 
     @classproperty
     def default_known_versions(cls):
@@ -41,8 +41,8 @@ class PexBinary(ExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "3a47dcbcf49294c06439fdda50675546edc9ea09a116c4c57ee5a8e337a63509",
-                    "2678219",
+                    "9d3c492c8b5847ce52d806cf188562c5d5acac3e95ae9df65b8fcf451edde296",
+                    "2680733",
                 )
             )
             for plat in ["darwin", "linux"]
