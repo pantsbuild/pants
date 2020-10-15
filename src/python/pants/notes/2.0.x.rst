@@ -5,6 +5,36 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0rc1 (10/15/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Restore several removed targets and fields to help with upgrading (#10970)
+  `PR #10970 <https://github.com/pantsbuild/pants/pull/10970>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `./pants target-types --all` (Cherry-pick of #10957) (#10961)
+  `PR #10961 <https://github.com/pantsbuild/pants/pull/10961>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix interpreter selection when building a PEX to use `[python-setup].interpreter_search_paths` (Cherry-pick of #10965) (#10967)
+  `PR #10967 <https://github.com/pantsbuild/pants/pull/10967>`_
+
+* Automatically set setuptools interpreter constraints if unspecified (Cherry-pick of #10951) (#10958)
+  `PR #10958 <https://github.com/pantsbuild/pants/pull/10958>`_
+
+* Fix config validation not erroring on global options in wrong scope (Cherry-pick of #10950) (#10956)
+  `PR #10956 <https://github.com/pantsbuild/pants/pull/10956>`_
+
+* Fix logging of lint result files (Cherry-pick of #10959) (#10968)
+  `PR #10968 <https://github.com/pantsbuild/pants/pull/10968>`_
+
 2.0.0rc0 (10/11/2020)
 ---------------------
 
