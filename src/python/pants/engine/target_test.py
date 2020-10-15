@@ -24,7 +24,6 @@ from pants.engine.target import (
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
-    PrimitiveField,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
@@ -48,7 +47,7 @@ from pants.util.ordered_set import OrderedSet
 # -----------------------------------------------------------------------------------------------
 
 
-class FortranExtensions(PrimitiveField[Tuple[str, ...]]):
+class FortranExtensions(Field[Tuple[str, ...]]):
     alias = "fortran_extensions"
     default = ()
 
@@ -56,9 +55,7 @@ class FortranExtensions(PrimitiveField[Tuple[str, ...]]):
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Tuple[str, ...]:
-        value_or_default = cast(
-            Iterable[str], super().compute_value(raw_value, address=address)
-        )
+        value_or_default = cast(Iterable[str], super().compute_value(raw_value, address=address))
         # Add some arbitrary validation to test that hydration/validation works properly.
         bad_extensions = [
             extension for extension in value_or_default if not extension.startswith("Fortran")
@@ -394,7 +391,7 @@ def test_override_preexisting_field_via_new_target() -> None:
 
 
 def test_required_field() -> None:
-    class RequiredPrimitiveField(StringField):
+    class RequiredField(StringField):
         alias = "primitive"
         required = True
 
@@ -409,7 +406,7 @@ def test_required_field() -> None:
 
     class RequiredTarget(Target):
         alias = "required_target"
-        core_fields = (RequiredPrimitiveField, RequiredAsyncField)
+        core_fields = (RequiredField, RequiredAsyncField)
 
     address = Address.parse(":lib")
 

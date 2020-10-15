@@ -5,7 +5,7 @@ import collections.abc
 import dataclasses
 import itertools
 import os.path
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
@@ -49,47 +49,81 @@ from pants.util.strutil import pluralize
 # Core Field abstractions
 # -----------------------------------------------------------------------------------------------
 
-# Type alias to express the intent that the type should be immutable and hashable. There's nothing
-# to enforce immutability, outside of convention. Maybe we could develop a MyPy plugin?
-ImmutableValue = Hashable
-
-_DefaultBase = TypeVar("_DefaultBase", bound=Optional[ImmutableValue])
+# TODO: There's nothing to enforce immutability, outside of convention. Maybe we could develop a
+# MyPy plugin?
+_DefaultBase = TypeVar("_DefaultBase", bound=Optional[Hashable])
 
 
-# This @dataclass declaration is necessary for the `value` field to be propagated to the __hash__ of
-# all subclasses, but MyPy doesn't recognize generic abstract dataclasses yet.
-@dataclass(unsafe_hash=True)  # type: ignore[misc]
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class Field(Generic[_DefaultBase], metaclass=ABCMeta):
+    """A Field that does not need the engine in order to be hydrated.
+
+    The majority of fields should use subclasses of `Field`, e.g. use `BoolField`,
+    `StringField`, or `StringSequenceField`. These subclasses will provide sensible type hints and
+    hydration/validation automatically.
+
+    If you are directly subclassing `Field`, you will want to give it a type parameter to set the
+    type of `value`. These direct subclasses should also likely override `compute_value()` to
+    perform any custom hydration and/or validation, such as converting unhashable types to hashable
+    types or checking for banned values. The returned value must be hashable (and should be
+    immutable) so that this Field may be used by the V2 engine. This means, for example, using
+    tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
+
+    Direct subclasses of `Field` should also override the type hint for `raw_value`, as that is used
+    to generate documentation, e.g. for `./pants target-types`. If the field is required, do not use
+    `Optional` for the type hint of `raw_value`.
+
+    All hydration and/or validation happens eagerly in the constructor. If the
+    hydration is particularly expensive, use `AsyncField` instead to get the benefits of the
+    engine's caching.
+
+    Subclasses should also override the type hints for `value` and `raw_value` to be more precise
+    than `Any`. The type hint for `raw_value` is used to generate documentation, e.g. for
+    `./pants target-types`. If the field is required, do not use `Optional` for the type hint of
+    `raw_value`.
+
+    Example:
+
+        # NB: Really, this should subclass IntField. We only use Field as an example.
+        class Timeout(Field[Optional[int]]):
+            alias = "timeout"
+            default = None
+
+            @classmethod
+            def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
+                value_or_default = super().compute_value(raw_value, address=address)
+                if value_or_default is not None and not isinstance(value_or_default, int):
+                    raise ValueError(
+                        "The `timeout` field expects an integer, but was given"
+                        f"{value_or_default} for target {address}."
+                    )
+                return value_or_default
+    """
+
+    # This exists on every Field subclass.
     value: _DefaultBase
     # Subclasses must define these.
     alias: ClassVar[str]
     default: ClassVar[_DefaultBase]
     # Subclasses may define these.
+    # TODO: enforce that `raw_value` and `value` are *not* Optional if `required = True`, possibly
+    # via mixin or decorator?
     required: ClassVar[bool] = False
     deprecated_removal_version: ClassVar[Optional[str]] = None
     deprecated_removal_hint: ClassVar[Optional[str]] = None
 
-    # NB: We still expect `PrimitiveField` and `AsyncField` to define their own constructors. This
-    # is only implemented so that we have a common deprecation mechanism, and to ensure that all
-    # subclasses have this exact type signature for their constructor. Normally we would rely on the
-    # generated __init__ by declaring `address` as a field, but we don't want that on *every* Field
-    # subclass.
-    @abstractmethod
+    # This method is marked @final so that we have a common deprecation mechanism, and to ensure
+    # that all subclasses have this exact type signature for their constructor.
+    @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        if self.deprecated_removal_version and address.is_base_target and raw_value is not None:
-            if not self.deprecated_removal_hint:
-                raise ValueError(
-                    f"You specified `deprecated_removal_version` for {self.__class__}, but not "
-                    "the class property `deprecated_removal_hint`."
-                )
-            warn_or_error(
-                removal_version=self.deprecated_removal_version,
-                deprecated_entity_description=f"the {repr(self.alias)} field",
-                hint=(
-                    f"Using the `{self.alias}` field in the target {address}. "
-                    f"{self.deprecated_removal_hint}"
-                ),
-            )
+        self._check_deprecated(raw_value, address)
+        # NB: We neither store the `address` or `raw_value` as attributes on this dataclass:
+        # * Don't store `raw_value` because it very often is mutable and/or unhashable, which means
+        #   this Field could not be passed around in the engine.
+        # * Don't store `address` to avoid the cost in memory of storing `Address` on every single
+        #   field encountered by Pants in a run.
+        self.value = cast(_DefaultBase, self.compute_value(raw_value, address=address))
 
     @classmethod
     def compute_value(
@@ -111,57 +145,22 @@ class Field(Generic[_DefaultBase], metaclass=ABCMeta):
             return cls.default
         return raw_value
 
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class PrimitiveField(Field[_DefaultBase], metaclass=ABCMeta):
-    """A Field that does not need the engine in order to be hydrated.
-
-    The majority of fields should use subclasses of `PrimitiveField`, e.g. use `BoolField`,
-    `StringField`, or `StringSequenceField`. These subclasses will provide sane type hints and
-    hydration/validation automatically.
-
-    If you are directly subclassing `PrimitiveField`, you should likely override `compute_value()`
-    to perform any custom hydration and/or validation, such as converting unhashable types to
-    hashable types or checking for banned values. The returned value must be hashable
-    (and should be immutable) so that this Field may be used by the V2 engine. This means, for
-    example, using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
-
-    All hydration and/or validation happens eagerly in the constructor. If the
-    hydration is particularly expensive, use `AsyncField` instead to get the benefits of the
-    engine's caching.
-
-    Subclasses should also override the type hints for `value` and `raw_value` to be more precise
-    than `Any`. The type hint for `raw_value` is used to generate documentation, e.g. for
-    `./pants target-types`. If the field is required, do not use `Optional` for the type hint of
-    `raw_value`.
-
-    Example:
-
-        # NB: Really, this should subclass IntField. We only use PrimitiveField as an example.
-        class Timeout(PrimitiveField[Optional[int]]):
-            alias = "timeout"
-            default = None
-
-            @classmethod
-            def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-                value_or_default = super().compute_value(raw_value, address=address)
-                if value_or_default is not None and not isinstance(value_or_default, int):
-                    raise ValueError(
-                        "The `timeout` field expects an integer, but was given"
-                        f"{value_or_default} for target {address}."
-                    )
-                return value_or_default
-    """
-
-    @final
-    def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        # NB: We neither store the `address` or `raw_value` as attributes on this dataclass:
-        # * Don't store `raw_value` because it very often is mutable and/or unhashable, which means
-        #   this Field could not be passed around in the engine.
-        # * Don't store `address` to avoid the cost in memory of storing `Address` on every single
-        #   field encountered by Pants in a run.
-        self.value = cast(_DefaultBase, self.compute_value(raw_value, address=address))
+    @classmethod
+    def _check_deprecated(cls, raw_value: Optional[Any], address: Address) -> None:
+        if cls.deprecated_removal_version and address.is_base_target and raw_value is not None:
+            if not cls.deprecated_removal_hint:
+                raise ValueError(
+                    f"You specified `deprecated_removal_version` for {cls}, but not "
+                    "the class property `deprecated_removal_hint`."
+                )
+            warn_or_error(
+                removal_version=cls.deprecated_removal_version,
+                deprecated_entity_description=f"the {repr(cls.alias)} field",
+                hint=(
+                    f"Using the `{cls.alias}` field in the target {address}. "
+                    f"{cls.deprecated_removal_hint}"
+                ),
+            )
 
     def __repr__(self) -> str:
         return (
@@ -234,20 +233,15 @@ class AsyncField(Field[_DefaultBase], metaclass=ABCMeta):
 
     address: Address
 
-    @final
+    # We cheat here by ignoring the @final declaration *and* @frozen_after_init. We don't want to
+    # generalize this further, because we want to avoid having `Field` subclasses start adding
+    # arbitrary fields.
+    @final  # type: ignore[misc]
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
         super().__init__(raw_value, address=address)
+        self._unfreeze_instance()  # type: ignore[attr-defined]
         self.address = address
-        self.value = cast(_DefaultBase, self.compute_value(raw_value, address=address))
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__}(alias={repr(self.alias)}, "
-            f"value={repr(self.value)}, default={repr(self.default)})"
-        )
-
-    def __str__(self) -> str:
-        return f"{self.alias}={self.value}"
+        self._freeze_instance()  # type: ignore[attr-defined]
 
 
 # -----------------------------------------------------------------------------------------------
@@ -748,7 +742,7 @@ def generate_subtarget(
 
     generated_target_fields = {}
     for field in base_target.field_values.values():
-        value: Optional[ImmutableValue]
+        value: Optional[Hashable]
         if isinstance(field, Sources):
             if not bool(matches_filespec(field.filespec, paths=[full_file_name])):
                 raise ValueError(
@@ -1006,10 +1000,10 @@ class UnrecognizedTargetTypeException(Exception):
 # Field templates
 # -----------------------------------------------------------------------------------------------
 
-T = TypeVar("T", bound=ImmutableValue)
+T = TypeVar("T", bound=Hashable)
 
 
-class ScalarField(PrimitiveField[Optional[T]], metaclass=ABCMeta):
+class ScalarField(Field[Optional[T]], metaclass=ABCMeta):
     """A field with a scalar value (vs. a compound value like a sequence or dict).
 
     Subclasses must define the class properties `expected_type` and `expected_type_description`.
@@ -1045,7 +1039,7 @@ class ScalarField(PrimitiveField[Optional[T]], metaclass=ABCMeta):
         return value_or_default
 
 
-class TriBoolField(PrimitiveField[Optional[bool]], metaclass=ABCMeta):
+class TriBoolField(ScalarField[bool], metaclass=ABCMeta):
     """A field whose value is a boolean.
 
     If subclasses do not set the class property `required = True` or `default`, the value will
@@ -1056,19 +1050,8 @@ class TriBoolField(PrimitiveField[Optional[bool]], metaclass=ABCMeta):
             default = True
     """
 
-    default: ClassVar[Optional[bool]] = None
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[bool], *, address: Address) -> Optional[bool]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is not None and not isinstance(value_or_default, bool):
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                raw_value,
-                expected_type="a boolean",
-            )
-        return value_or_default
+    expected_type = bool
+    expected_type_description = "a boolean"
 
 
 class BoolField(TriBoolField, metaclass=ABCMeta):
@@ -1123,7 +1106,7 @@ class StringField(ScalarField[str], metaclass=ABCMeta):
         return value_or_default
 
 
-class SequenceField(PrimitiveField[Optional[Tuple[T, ...]]], metaclass=ABCMeta):
+class SequenceField(Field[Optional[Tuple[T, ...]]], metaclass=ABCMeta):
     """A field whose value is a homogeneous sequence.
 
     Subclasses must define the class properties `expected_element_type` and
@@ -1199,7 +1182,7 @@ class StringOrStringSequenceField(SequenceField[str], metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class DictStringToStringField(PrimitiveField[Optional[FrozenDict[str, str]]], metaclass=ABCMeta):
+class DictStringToStringField(Field[Optional[FrozenDict[str, str]]], metaclass=ABCMeta):
     default: ClassVar[Optional[FrozenDict[str, str]]] = None
 
     @classmethod
@@ -1223,7 +1206,7 @@ class DictStringToStringField(PrimitiveField[Optional[FrozenDict[str, str]]], me
 
 
 class DictStringToStringSequenceField(
-    PrimitiveField[Optional[FrozenDict[str, Tuple[str, ...]]]],
+    Field[Optional[FrozenDict[str, Tuple[str, ...]]]],
     metaclass=ABCMeta,
 ):
     default: ClassVar[Optional[FrozenDict[str, Tuple[str, ...]]]] = None
@@ -1738,7 +1721,7 @@ COMMON_TARGET_FIELDS = (Tags, DescriptionField)
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
 #  Artifact, there is no common Artifact interface.
-class ProvidesField(PrimitiveField[Optional[Any]]):
+class ProvidesField(Field[Optional[Any]]):
     """An `artifact`, such as `setup_py`, that describes how to represent this target to the outside
     world."""
 

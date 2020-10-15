@@ -19,7 +19,6 @@ from pants.engine.target import (
     Field,
     FloatField,
     IntField,
-    PrimitiveField,
     RegisteredTargetTypes,
     ScalarField,
     SequenceField,
@@ -108,7 +107,7 @@ class FieldInfo:
         # requiring the Field author to rewrite the docstring.
         #
         # However, if the original `Field` author did not define docstring, then this means we
-        # would typically fall back to the docstring for `AsyncField`, `PrimitiveField`, or a
+        # would typically fall back to the docstring for `AsyncField`, `Field`, or a
         # helper class like `StringField`. This is a quirk of this heuristic and it's not
         # intentional since these core `Field` types have documentation oriented to the custom
         # `Field` author and not the end user filling in fields in a BUILD file target.
@@ -119,7 +118,7 @@ class FieldInfo:
             ignored_ancestors={
                 *Field.mro(),
                 AsyncField,
-                PrimitiveField,
+                Field,
                 BoolField,
                 DictStringToStringField,
                 DictStringToStringSequenceField,
@@ -134,12 +133,7 @@ class FieldInfo:
                 TriBoolField,
             },
         )
-        if issubclass(field, PrimitiveField):
-            raw_value_type = get_type_hints(field.compute_value)["raw_value"]
-        elif issubclass(field, AsyncField):
-            raw_value_type = get_type_hints(field.compute_value)["raw_value"]
-        else:
-            raw_value_type = get_type_hints(field.__init__)["raw_value"]
+        raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
 
         # Check if the field only allows for certain choices.
@@ -154,7 +148,7 @@ class FieldInfo:
         if field.required:
             # We hackily remove `None` as a valid option for the field when it's required. This
             # greatly simplifies Field definitions because it means that they don't need to
-            # override the type hints for `PrimitiveField.compute_value()` and
+            # override the type hints for `Field.compute_value()` and
             # `AsyncField.compute_value()` to indicate that `None` is an invalid type.
             type_hint = type_hint.replace(" | None", "")
 
