@@ -53,11 +53,11 @@ class FortranExtensions(PrimitiveField[Tuple[str, ...]]):
     default = ()
 
     @classmethod
-    def sanitize_raw_value(
+    def compute_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Tuple[str, ...]:
         value_or_default = cast(
-            Iterable[str], super().sanitize_raw_value(raw_value, address=address)
+            Iterable[str], super().compute_value(raw_value, address=address)
         )
         # Add some arbitrary validation to test that hydration/validation works properly.
         bad_extensions = [
@@ -81,10 +81,10 @@ class FortranSources(AsyncField[Optional[Tuple[str, ...]]]):
     default = None
 
     @classmethod
-    def sanitize_raw_value(
+    def compute_value(
         cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
-        value_or_default = super().sanitize_raw_value(raw_value, address=address)
+        value_or_default = super().compute_value(raw_value, address=address)
         if value_or_default is None:
             return None
         return tuple(ensure_str_list(value_or_default))
@@ -326,11 +326,11 @@ def test_override_preexisting_field_via_new_target() -> None:
         default_extensions = ("FortranCustomExt",)
 
         @classmethod
-        def sanitize_raw_value(
+        def compute_value(
             cls, raw_value: Optional[Iterable[str]], *, address: Address
         ) -> Tuple[str, ...]:
             # Ensure that we avoid certain problematic extensions and always use some defaults.
-            specified_extensions = super().sanitize_raw_value(raw_value, address=address)
+            specified_extensions = super().compute_value(raw_value, address=address)
             banned = [
                 extension
                 for extension in specified_extensions
@@ -558,10 +558,10 @@ def test_scalar_field() -> None:
         expected_type_description = "a `CustomObject` instance"
 
         @classmethod
-        def sanitize_raw_value(
+        def compute_value(
             cls, raw_value: Optional[CustomObject], *, address: Address
         ) -> Optional[CustomObject]:
-            return super().sanitize_raw_value(raw_value, address=address)
+            return super().compute_value(raw_value, address=address)
 
     addr = Address.parse(":example")
 
@@ -611,10 +611,10 @@ def test_sequence_field() -> None:
         expected_type_description = "an iterable of `CustomObject` instances"
 
         @classmethod
-        def sanitize_raw_value(
+        def compute_value(
             cls, raw_value: Optional[Iterable[CustomObject]], *, address: Address
         ) -> Optional[Tuple[CustomObject, ...]]:
-            return super().sanitize_raw_value(raw_value, address=address)
+            return super().compute_value(raw_value, address=address)
 
     addr = Address.parse(":example")
 

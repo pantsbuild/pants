@@ -31,8 +31,8 @@ class PythonAwsLambdaRuntime(StringField):
     value: str
 
     @classmethod
-    def sanitize_raw_value(cls, raw_value: Optional[str], *, address: Address) -> str:
-        value = cast(str, super().sanitize_raw_value(raw_value, address=address))
+    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
+        value = cast(str, super().compute_value(raw_value, address=address))
         if not re.match(cls.PYTHON_RUNTIME_REGEX, value):
             raise InvalidFieldException(
                 f"runtime field in python_awslambda target at {address.spec} must "

@@ -191,12 +191,12 @@ class PexInheritPathField(StringField):
 
     # TODO(#9388): deprecate allowing this to be a `bool`.
     @classmethod
-    def sanitize_raw_value(
+    def compute_value(
         cls, raw_value: Optional[Union[str, bool]], *, address: Address
     ) -> Optional[str]:
         if isinstance(raw_value, bool):
             return "prefer" if raw_value else "false"
-        return super().sanitize_raw_value(raw_value, address=address)
+        return super().compute_value(raw_value, address=address)
 
 
 class PexZipSafeField(BoolField):
@@ -341,8 +341,8 @@ class PythonTestsTimeout(IntField):
     alias = "timeout"
 
     @classmethod
-    def sanitize_raw_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        value = super().sanitize_raw_value(raw_value, address=address)
+    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
+        value = super().compute_value(raw_value, address=address)
         if value is not None and value < 1:
             raise InvalidFieldException(
                 f"The value for the `timeout` field in target {address} must be > 0, but was "
@@ -447,10 +447,10 @@ class PythonRequirementsField(PrimitiveField[Tuple[Requirement, ...]]):
     required = True
 
     @classmethod
-    def sanitize_raw_value(
+    def compute_value(
         cls, raw_value: Optional[Union[str, PythonRequirement, Iterable[str]]], *, address: Address
     ) -> Tuple[Requirement, ...]:
-        value = super().sanitize_raw_value(raw_value, address=address)
+        value = super().compute_value(raw_value, address=address)
 
         def invalid_type_error():
             raise InvalidFieldTypeException(
@@ -569,10 +569,10 @@ class PythonProvidesField(ScalarField, ProvidesField):
     required = True
 
     @classmethod
-    def sanitize_raw_value(
+    def compute_value(
         cls, raw_value: Optional[PythonArtifact], *, address: Address
     ) -> PythonArtifact:
-        return cast(PythonArtifact, super().sanitize_raw_value(raw_value, address=address))
+        return cast(PythonArtifact, super().compute_value(raw_value, address=address))
 
 
 class SetupPyCommandsField(StringSequenceField):

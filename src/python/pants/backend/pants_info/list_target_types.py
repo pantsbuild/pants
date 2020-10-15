@@ -135,9 +135,9 @@ class FieldInfo:
             },
         )
         if issubclass(field, PrimitiveField):
-            raw_value_type = get_type_hints(field.sanitize_raw_value)["raw_value"]
+            raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         elif issubclass(field, AsyncField):
-            raw_value_type = get_type_hints(field.sanitize_raw_value)["raw_value"]
+            raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         else:
             raw_value_type = get_type_hints(field.__init__)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
@@ -154,8 +154,8 @@ class FieldInfo:
         if field.required:
             # We hackily remove `None` as a valid option for the field when it's required. This
             # greatly simplifies Field definitions because it means that they don't need to
-            # override the type hints for `PrimitiveField.sanitize_raw_value()` and
-            # `AsyncField.sanitize_raw_value()` to indicate that `None` is an invalid type.
+            # override the type hints for `PrimitiveField.compute_value()` and
+            # `AsyncField.compute_value()` to indicate that `None` is an invalid type.
             type_hint = type_hint.replace(" | None", "")
 
         return cls(
