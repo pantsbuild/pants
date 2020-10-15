@@ -25,6 +25,7 @@ from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty, frozen_after_init
+from pants.util.strutil import create_path_env_var
 
 
 class PexBinary(ExternalTool):
@@ -129,8 +130,9 @@ async def setup_pex_cli_process(
     pex_root_path = ".cache/pex_root"
     argv = pex_env.create_argv(
         downloaded_pex_bin.exe,
-        *request.argv,
         *cert_args,
+        "--python-path",
+        create_path_env_var(pex_env.interpreter_search_paths),
         "--pex-root",
         pex_root_path,
         # Ensure Pex and its subprocesses create temporary files in the the process execution
@@ -144,6 +146,9 @@ async def setup_pex_cli_process(
         # CWD can find the TMPDIR.
         "--tmpdir",
         tmpdir,
+        # NB: This comes at the end of the argv because the request may use `--` passthrough args,
+        # which must come at the end.
+        *request.argv,
         python=request.python,
     )
     env = {
