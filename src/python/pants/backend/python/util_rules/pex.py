@@ -5,6 +5,7 @@ import dataclasses
 import functools
 import itertools
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import (
@@ -187,16 +188,19 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
     def group_field_sets_by_constraints(
         cls, field_sets: Iterable[_FS], python_setup: PythonSetup
     ) -> FrozenDict["PexInterpreterConstraints", Tuple[_FS, ...]]:
-        constraints_to_field_sets = {
-            constraints: tuple(sorted(fs_collection, key=lambda fs: fs.address))
-            for constraints, fs_collection in itertools.groupby(
-                field_sets,
-                key=lambda fs: cls.create_from_compatibility_fields(
-                    [fs.compatibility], python_setup
-                ),
-            )
-        }
-        return FrozenDict(sorted(constraints_to_field_sets.items()))
+
+        results = defaultdict(set)
+
+        for fs in field_sets:
+            constraints = cls.create_from_compatibility_fields([fs.compatibility], python_setup)
+            results[constraints].add(fs)
+
+        return FrozenDict(
+            {
+                constraints: tuple(sorted(field_sets, key=lambda fs: fs.address))
+                for constraints, field_sets in sorted(results.items())
+            }
+        )
 
     def generate_pex_arg_list(self) -> List[str]:
         args = []
