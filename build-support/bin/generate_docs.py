@@ -7,7 +7,6 @@ import json
 import logging
 import os
 import pkgutil
-import sys
 from pathlib import Path, PosixPath
 from typing import Dict, Iterable, Optional, cast
 
@@ -31,10 +30,17 @@ class ReferenceGenerator:
         'pants.backend.awslambda.python']" \
       --no-verify-config help-all > /tmp/help_info
 
+    ./pants \
+      --backend-packages="-['internal_plugins.releases']" \
+      --backend-packages="+['pants.backend.python.lint.bandit', \
+        'pants.backend.python.lint.pylint', 'pants.backend.codegen.protobuf.python', \
+        'pants.backend.awslambda.python']" \
+      --no-verify-config target-types --all > /tmp/target_info
+
     to generate the data, and then:
 
     ./pants run build-support/bin/generate_docs.py -- \
-      --input=/tmp/help_info --api-key=<API_KEY> --sync
+      --help-input=/tmp/help_info --target-input=/tmp/target_info --api-key=<API_KEY> --sync
 
     Where API_KEY is your readme.io API Key, found here:
       https://dash.readme.com/project/pants/v2.0/api-key
@@ -50,10 +56,14 @@ class ReferenceGenerator:
         parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
         default_output_dir = PosixPath(os.path.sep) / "tmp" / "pants_docs" / "help" / "option"
         parser.add_argument(
-            "--input",
-            default=None,
-            help="Path to a file containing the output of `./pants help-all`. "
-            "If unspecified, reads from stdin.",
+            "--help-input",
+            required=True,
+            help="Path to a file containing the output of `./pants help-all`.",
+        )
+        parser.add_argument(
+            "--target-input",
+            required=True,
+            help="Path to a file containing the output of `./pants target-types --all`.",
         )
         parser.add_argument(
             "--sync",
@@ -71,9 +81,7 @@ class ReferenceGenerator:
             "Useful for viewing the files locally when testing and debugging "
             "the renderer.",
         )
-        parser.add_argument(
-            "--api-key", help="The readme.io API key to use. Required for --upload."
-        )
+        parser.add_argument("--api-key", help="The readme.io API key to use. Required for --sync.")
         return ReferenceGenerator(parser.parse_args())
 
     def __init__(self, args):
@@ -94,20 +102,19 @@ class ReferenceGenerator:
         self._category_id = None  # Fetched lazily.
 
         # Load the data.
-        if self._args.input is None:
-            json_bytes = sys.stdin.read()
-        else:
-            json_bytes = Path(self._args.input).read_bytes()
-        self._help_info = self.process_input(json_bytes.decode(), self._args.sync)
+        self._help_info = self.process_help_input(
+            Path(self._args.help_input).read_text(), sync=self._args.sync
+        )
+        self._target_info = self.process_target_input(Path(self._args.target_input).read_text())
 
     @staticmethod
-    def _link(scope: str, sync: bool) -> str:
+    def _link(scope: str, *, sync: bool) -> str:
         # docsite pages link to the slug, local pages to the .md source.
         return f"reference-{scope}" if sync else f"{scope}.md"
 
     @classmethod
-    def process_input(cls, json_str: str, sync: bool) -> Dict:
-        """Process the input, to make it easier to work with in the mustache template."""
+    def process_help_input(cls, json_str: str, *, sync: bool) -> Dict:
+        """Process the help input to make it easier to work with in the mustache template."""
 
         help_info = json.loads(json_str)
         scope_to_help_info = help_info["scope_to_help_info"]
@@ -118,7 +125,7 @@ class ReferenceGenerator:
         for goal, goal_info in help_info["name_to_goal_info"].items():
             consumed_scopes = sorted(goal_info["consumed_scopes"])
             linked_consumed_scopes = [
-                f"[{cs}]({cls._link(cs, sync)})" for cs in consumed_scopes if cs
+                f"[{cs}]({cls._link(cs, sync=sync)})" for cs in consumed_scopes if cs
             ]
             comma_separated_consumed_scopes = ", ".join(linked_consumed_scopes)
             scope_to_help_info[goal][
@@ -147,16 +154,19 @@ class ReferenceGenerator:
 
         return cast(Dict, help_info)
 
+    @classmethod
+    def process_target_input(cls, json_str: str) -> Dict:
+        """Process the help input to make it easier to work with in the mustache template."""
+
+        target_info = json.loads(json_str)
+        return target_info
+
     @property
-    def category_id(self):
+    def category_id(self) -> str:
         """The id of the "Reference" category on the docsite."""
         if self._category_id is None:
             self._category_id = self._get_id("categories/reference")
         return self._category_id
-
-    def _render_body(self, scope_help_info: Dict) -> str:
-        """Renders the body of a single options help page."""
-        return cast(str, self._renderer.render("{{> scoped_options}}", scope_help_info))
 
     def _access_readme_api(self, url_suffix: str, method: str, payload: str) -> Dict:
         """Sends requests to the readme.io API."""
@@ -239,14 +249,22 @@ class ReferenceGenerator:
         """Returns the id of the entity at the specified readme.io API url."""
         return cast(str, self._access_readme_api(url, "GET", "")["_id"])
 
+    def _render_help_body(self, scope_help_info: Dict) -> str:
+        """Renders the body of a single options help page."""
+        return cast(str, self._renderer.render("{{> scoped_options}}", scope_help_info))
+
+    def _render_target_types(self) -> str:
+        """Render the body of the target types page."""
+        return ""
+
     @classmethod
-    def _render_parent_page_body(cls, items: Iterable[str], sync: bool) -> str:
+    def _render_parent_page_body(cls, items: Iterable[str], *, sync: bool) -> str:
         """Returns the body of a parent page for the given items."""
         # The page just lists the items, with links to the page for each one.
-        lines = [f"- [{item}]({cls._link(item, sync)})\n" for item in items]
+        lines = [f"- [{item}]({cls._link(item, sync=sync)})" for item in items]
         return "\n".join(lines)
 
-    def render(self):
+    def render(self) -> None:
         """Renders the pages to local disk.
 
         Useful for debugging and iterating on the markdown.
@@ -263,18 +281,26 @@ class ReferenceGenerator:
             if scope and not shi["is_goal"]
         ]
 
-        def write(filename, content):
+        def write(filename: str, content: str) -> None:
             path = output_dir / filename
-            with open(str(path), "w") as fp:
+            with open(path, "w") as fp:
                 fp.write(content)
             logger.info(f"Wrote {path}")
 
         write("goals-index.md", self._render_parent_page_body(sorted(goals), sync=False))
         write("subsystems-index.md", self._render_parent_page_body(sorted(subsystems), sync=False))
+        write("target-types.md", self._render_target_types())
         for shi in self._help_info["scope_to_help_info"].values():
-            write(f"{shi['scope'] or 'GLOBAL'}.md", self._render_body(shi))
+            if not shi["scope"]:
+                name = "GLOBAL"
+            # Avoid a collision with the Target Types page.
+            elif shi["scope"] == "target-types":
+                name = "target-types-goal"
+            else:
+                name = shi["scope"]
+            write(f"{name}.md", self._render_help_body(shi))
 
-    def sync(self):
+    def sync(self) -> None:
         """Render the pages and sync them to the live docsite.
 
         All pages live under the "reference" category.
@@ -317,7 +343,7 @@ class ReferenceGenerator:
             parent_doc_id=None,
             slug_suffix="global",
             title="Global",
-            body=self._render_body(self._help_info["scope_to_help_info"][""]),
+            body=self._render_help_body(self._help_info["scope_to_help_info"][""]),
         )
         self._create(
             parent_doc_id=None,
@@ -333,15 +359,23 @@ class ReferenceGenerator:
                 sorted(scope for scope in subsystems.keys()), sync=True
             ),
         )
+        self._create(
+            parent_doc_id=None,
+            slug_suffix="target-types",
+            title="Target Types",
+            body=self._render_target_types(),
+        )
 
         # Create the individual goal/subsystem docs.
         all_goals_doc_id = self._get_id("docs/reference-all-goals")
         for scope, shi in sorted(goals.items()):
+            # Avoid a URL collision with the Target Types page.
+            slug_suffix = scope if scope != "target-types" else "target-types-goal"
             self._create(
                 parent_doc_id=all_goals_doc_id,
-                slug_suffix=scope,
+                slug_suffix=slug_suffix,
                 title=scope,
-                body=self._render_body(shi),
+                body=self._render_help_body(shi),
             )
 
         all_subsystems_doc_id = self._get_id("docs/reference-all-subsystems")
@@ -350,10 +384,10 @@ class ReferenceGenerator:
                 parent_doc_id=all_subsystems_doc_id,
                 slug_suffix=scope,
                 title=scope,
-                body=self._render_body(shi),
+                body=self._render_help_body(shi),
             )
 
-    def main(self):
+    def main(self) -> None:
         if self._args.sync:
             self.sync()
         else:
