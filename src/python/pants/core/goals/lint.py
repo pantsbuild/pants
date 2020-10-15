@@ -25,7 +25,7 @@ from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
