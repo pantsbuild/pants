@@ -1,11 +1,15 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Iterable, Optional
+
 from pants.backend.python.target_types import COMMON_PYTHON_FIELDS, PythonInterpreterCompatibility
+from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
+    InvalidFieldException,
     SequenceField,
     Sources,
     StringField,
@@ -103,6 +107,14 @@ class BundlesField(SequenceField):
     alias = "bundles"
     expected_element_type = Bundle
     expected_type_description = "an iterable of `bundle` objects"
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[Iterable[Bundle]], *, address: Address) -> None:
+        try:
+            super().compute_value(raw_value, address=address)
+        except InvalidFieldException:
+            pass
+        return None
 
 
 class PythonApp(Target):
