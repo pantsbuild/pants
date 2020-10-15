@@ -8,7 +8,7 @@ import logging
 import os
 import pkgutil
 from pathlib import Path, PosixPath
-from typing import Dict, Iterable, Optional, cast
+from typing import Any, Dict, Iterable, List, Optional, cast
 
 import pystache
 import requests
@@ -96,8 +96,13 @@ class ReferenceGenerator:
 
         options_scope_tpl = get_tpl("options_scope_reference.md.mustache")
         single_option_tpl = get_tpl("single_option_reference.md.mustache")
+        target_types_tpl = get_tpl("target_types_reference.md.mustache")
         self._renderer = pystache.Renderer(
-            partials={"scoped_options": options_scope_tpl, "single_option": single_option_tpl}
+            partials={
+                "scoped_options": options_scope_tpl,
+                "single_option": single_option_tpl,
+                "target_types": target_types_tpl,
+            }
         )
         self._category_id = None  # Fetched lazily.
 
@@ -156,10 +161,47 @@ class ReferenceGenerator:
 
     @classmethod
     def process_target_input(cls, json_str: str) -> Dict:
-        """Process the help input to make it easier to work with in the mustache template."""
+        """Process the help input to make it easier to work with in the mustache template.
 
-        target_info = json.loads(json_str)
-        return target_info
+        We go from a format of `{"my_tgt": {"fields": {"field1": {...}, ...}}, ...}` to
+        `{"target_types": [{"alias": "my_tgt", "fields": [{"alias": "field1", ...}, ...}, ...]}`.
+        """
+
+        def normalize_fields(fields: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+            """Go from `{'field1': {'description': 'foo', ...}, ...}` to
+            `[{'alias': 'field1', 'description': 'foo', ...}, ...]`.
+
+            We also combine the `default` and `required` fields into one.
+            """
+            result = []
+            for field_name, field_data in fields.items():
+                default_or_required = (
+                    "required" if field_data["required"] else f"default: {field_data['default']}"
+                )
+                result.append(
+                    {
+                        "alias": field_name,
+                        "description": field_data["description"],
+                        "default_or_required": default_or_required,
+                        "type_hint": field_data["type_hint"],
+                    }
+                )
+            return result
+
+        def normalize_target(
+            *, alias: str, description: str, fields: Dict[str, Dict[str, Any]]
+        ) -> Dict[str, Any]:
+            return {"alias": alias, "description": description, "fields": normalize_fields(fields)}
+
+        target_types = [
+            normalize_target(
+                alias=target_name,
+                description=target_data["description"],
+                fields=target_data["fields"],
+            )
+            for target_name, target_data in json.loads(json_str).items()
+        ]
+        return {"target_types": target_types}
 
     @property
     def category_id(self) -> str:
@@ -255,7 +297,7 @@ class ReferenceGenerator:
 
     def _render_target_types(self) -> str:
         """Render the body of the target types page."""
-        return ""
+        return cast(str, self._renderer.render("{{> target_types}}", self._target_info))
 
     @classmethod
     def _render_parent_page_body(cls, items: Iterable[str], *, sync: bool) -> str:
