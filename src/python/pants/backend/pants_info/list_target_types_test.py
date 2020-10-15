@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import json
 from enum import Enum
 from textwrap import dedent
 from typing import Optional, cast
@@ -71,7 +72,10 @@ class FortranBinary(Target):
 
 
 def run_goal(
-    *, union_membership: Optional[UnionMembership] = None, details_target: Optional[str] = None
+    *,
+    union_membership: Optional[UnionMembership] = None,
+    details_target: Optional[str] = None,
+    all: bool = False
 ) -> str:
     console = MockConsole(use_colors=False)
     run_rule_with_mocks(
@@ -80,7 +84,7 @@ def run_goal(
             RegisteredTargetTypes.create([FortranBinary, FortranLibrary, FortranTests]),
             union_membership or UnionMembership({}),
             create_goal_subsystem(
-                TargetTypesSubsystem, sep="\\n", output_file=None, details=details_target
+                TargetTypesSubsystem, sep="\\n", output_file=None, details=details_target, all=all
             ),
             console,
             PantsBin(name="./BNF"),
@@ -89,7 +93,7 @@ def run_goal(
     return cast(str, console.stdout.getvalue())
 
 
-def test_list_all() -> None:
+def test_list_all_abbreviated() -> None:
     stdout = run_goal()
     assert stdout == dedent(
         """\
@@ -108,6 +112,54 @@ def test_list_all() -> None:
         fortran_tests    Tests for Fortran code.
         """
     )
+
+
+def test_list_all_json() -> None:
+    stdout = run_goal(all=True)
+    fortran_version = {
+        "default": None,
+        "description": None,
+        "required": False,
+        "type_hint": "str | None",
+    }
+    assert json.loads(stdout) == {
+        "fortran_binary": {
+            "description": None,
+            "fields": {
+                "archive_format": {
+                    "default": "'.tgz'",
+                    "description": None,
+                    "required": False,
+                    "type_hint": "'.tar' | '.tgz' | None",
+                },
+                "error_behavior": {
+                    "default": None,
+                    "description": None,
+                    "required": True,
+                    "type_hint": "'error' | 'ignore' | 'warn'",
+                },
+                "fortran_version": fortran_version,
+            },
+        },
+        "fortran_library": {
+            "description": "A library of Fortran code.",
+            "fields": {"fortran_version": fortran_version},
+        },
+        "fortran_tests": {
+            "description": (
+                "Tests for Fortran code.\n\nThis assumes that you use the FRUIT test framework."
+            ),
+            "fields": {
+                "fortran_version": fortran_version,
+                "timeout": {
+                    "default": None,
+                    "description": "The number of seconds to run before timing out.",
+                    "required": False,
+                    "type_hint": "int | None",
+                },
+            },
+        },
+    }
 
 
 def test_list_single() -> None:
