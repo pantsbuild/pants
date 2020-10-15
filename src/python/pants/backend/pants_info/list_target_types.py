@@ -1,9 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
+import json
 import textwrap
 from dataclasses import dataclass
-from typing import Generic, Optional, Sequence, Type, cast, get_type_hints
+from typing import Any, Dict, Generic, Optional, Sequence, Type, cast, get_type_hints
 
 from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.console import Console
@@ -44,10 +46,20 @@ class TargetTypesSubsystem(LineOriented, GoalSubsystem):
             metavar="<target_type>",
             help="List all of the target type's registered fields.",
         )
+        register(
+            "--all",
+            type=bool,
+            default=False,
+            help="List all target types with their full descriptions and fields as JSON.",
+        )
 
     @property
     def details(self) -> Optional[str]:
         return cast(Optional[str], self.options.details)
+
+    @property
+    def all(self) -> bool:
+        return cast(bool, self.options.all)
 
 
 class TargetTypes(Goal):
@@ -99,29 +111,26 @@ class FieldInfo:
         # helper class like `StringField`. This is a quirk of this heuristic and it's not
         # intentional since these core `Field` types have documentation oriented to the custom
         # `Field` author and not the end user filling in fields in a BUILD file target.
-        description = (
-            get_docstring(
-                field,
-                flatten=True,
-                fallback_to_ancestors=True,
-                ignored_ancestors={
-                    *Field.mro(),
-                    AsyncField,
-                    PrimitiveField,
-                    BoolField,
-                    DictStringToStringField,
-                    DictStringToStringSequenceField,
-                    FloatField,
-                    Generic,  # type: ignore[arg-type]
-                    IntField,
-                    ScalarField,
-                    SequenceField,
-                    StringField,
-                    StringOrStringSequenceField,
-                    StringSequenceField,
-                },
-            )
-            or ""
+        description = get_docstring(
+            field,
+            flatten=True,
+            fallback_to_ancestors=True,
+            ignored_ancestors={
+                *Field.mro(),
+                AsyncField,
+                PrimitiveField,
+                BoolField,
+                DictStringToStringField,
+                DictStringToStringSequenceField,
+                FloatField,
+                Generic,  # type: ignore[arg-type]
+                IntField,
+                ScalarField,
+                SequenceField,
+                StringField,
+                StringOrStringSequenceField,
+                StringSequenceField,
+            },
         )
         if issubclass(field, PrimitiveField):
             raw_value_type = get_type_hints(field.compute_value)["raw_value"]
@@ -152,7 +161,9 @@ class FieldInfo:
             description=description,
             type_hint=type_hint,
             required=field.required,
-            default=repr(field.default) if not field.required else None,
+            default=(
+                repr(field.default) if (not field.required and field.default is not None) else None
+            ),
         )
 
     def format_for_cli(self, console: Console) -> str:
@@ -162,8 +173,13 @@ class FieldInfo:
         type_info = console.cyan(f"{indent}type: {self.type_hint}, {required_or_default}")
         lines = [field_alias, type_info]
         if self.description:
-            lines.extend(f"{indent}{line}" for line in textwrap.wrap(self.description, 80))
+            lines.extend(f"{indent}{line}" for line in textwrap.wrap(self.description or "", 80))
         return "\n".join(f"{indent}{line}" for line in lines)
+
+    def as_dict(self) -> Dict[str, Any]:
+        d = dataclasses.asdict(self)
+        del d["alias"]
+        return d
 
 
 @dataclass(frozen=True)
@@ -201,6 +217,12 @@ class VerboseTargetInfo:
         )
         return "\n".join(output).rstrip()
 
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "description": self.description,
+            "fields": {f.alias: f.as_dict() for f in self.fields},
+        }
+
 
 @goal_rule
 def list_target_types(
@@ -211,7 +233,16 @@ def list_target_types(
     pants_bin: PantsBin,
 ) -> TargetTypes:
     with target_types_subsystem.line_oriented(console) as print_stdout:
-        if target_types_subsystem.details:
+        if target_types_subsystem.all:
+            all_target_types = {
+                alias: VerboseTargetInfo.create(
+                    target_type, union_membership=union_membership
+                ).as_dict()
+                for alias, target_type in registered_target_types.aliases_to_types.items()
+                if not alias.startswith("_")
+            }
+            print_stdout(json.dumps(all_target_types, sort_keys=True, indent=4))
+        elif target_types_subsystem.details:
             alias = target_types_subsystem.details
             target_type = registered_target_types.aliases_to_types.get(alias)
             if target_type is None:
