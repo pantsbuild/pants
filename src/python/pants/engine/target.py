@@ -5,7 +5,7 @@ import collections.abc
 import dataclasses
 import itertools
 import os.path
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
@@ -28,6 +28,7 @@ from typing import (
 
 from typing_extensions import final
 
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import Spec
 from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -58,17 +59,26 @@ class Field(ABC):
     default: ClassVar[ImmutableValue]
     # Subclasses may define these.
     required: ClassVar[bool] = False
+    deprecated_removal_version: ClassVar[Optional[str]] = None
+    deprecated_removal_hint: ClassVar[Optional[str]] = None
 
-    # This is a little weird to have an abstract __init__(). We do this to ensure that all
-    # subclasses have this exact type signature for their constructor.
-    #
-    # Normally, with dataclasses, each constructor parameter would instead be specified via a
-    # dataclass field declaration. But, we don't want to declare either `address` or `raw_value` as
-    # attributes because we make no assumptions whether the subclasses actually store those values
-    # on each instance. All that we care about is a common constructor interface.
-    @abstractmethod
+    # NB: We still expect `PrimitiveField` and `AsyncField` to define their own constructors. This
+    # is only implemented so that we have a common deprecation mechanism.
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        pass
+        if self.deprecated_removal_version and address.is_base_target and raw_value is not None:
+            if not self.deprecated_removal_hint:
+                raise ValueError(
+                    f"You specified `deprecated_removal_version` for {self.__class__}, but not "
+                    "the class property `deprecated_removal_hint`."
+                )
+            warn_or_error(
+                removal_version=self.deprecated_removal_version,
+                deprecated_entity_description=f"the {repr(self.alias)} field",
+                hint=(
+                    f"Using the `{self.alias}` field in the target {address}. "
+                    f"{self.deprecated_removal_hint}"
+                ),
+            )
 
 
 @frozen_after_init
@@ -123,6 +133,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         #   this Field could not be passed around in the engine.
         # * Don't store `address` to avoid the cost in memory of storing `Address` on every single
         #   field encountered by Pants in a run.
+        super().__init__(raw_value, address=address)
         self.value = self.compute_value(raw_value, address=address)
 
     @classmethod
@@ -214,6 +225,7 @@ class AsyncField(Field, metaclass=ABCMeta):
 
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
+        super().__init__(raw_value, address=address)
         self.address = address
         self.sanitized_raw_value = self.sanitize_raw_value(raw_value, address=address)
 
@@ -260,6 +272,10 @@ class Target(ABC):
     alias: ClassVar[str]
     core_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    # Subclasses may define these.
+    deprecated_removal_version: ClassVar[Optional[str]] = None
+    deprecated_removal_hint: ClassVar[Optional[str]] = None
+
     # These get calculated in the constructor
     address: Address
     plugin_fields: Tuple[Type[Field], ...]
@@ -276,6 +292,21 @@ class Target(ABC):
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: Optional[UnionMembership] = None,
     ) -> None:
+        if self.deprecated_removal_version and address.is_base_target:
+            if not self.deprecated_removal_hint:
+                raise ValueError(
+                    f"You specified `deprecated_removal_version` for {self.__class__}, but not "
+                    "the class property `deprecated_removal_hint`."
+                )
+            warn_or_error(
+                removal_version=self.deprecated_removal_version,
+                deprecated_entity_description=f"the {repr(self.alias)} target type",
+                hint=(
+                    f"Using the `{self.alias}` target type for {address}. "
+                    f"{self.deprecated_removal_hint}"
+                ),
+            )
+
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
 
