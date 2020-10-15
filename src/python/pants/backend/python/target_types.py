@@ -367,6 +367,16 @@ class PythonTestsTimeout(IntField):
         return result
 
 
+class DeprecatedCoverageField(StringOrStringSequenceField):
+    alias = "coverage"
+    deprecated_removal_version = "2.1.0.dev0"
+    deprecated_removal_hint = (
+        "The `coverage` field no longer does anything, as Pants now gets coverage data for all "
+        "files encountered. Use the option `--coverage-py-filter` if you want more precise "
+        "results. See https://www.pantsbuild.org/docs/python-test-goal#coverage."
+    )
+
+
 class PythonTests(Target):
     """Python tests.
 
@@ -386,6 +396,7 @@ class PythonTests(Target):
         PythonRuntimePackageDependencies,
         PythonRuntimeBinaryDependencies,
         PythonTestsTimeout,
+        DeprecatedCoverageField,
     )
 
 
@@ -398,11 +409,35 @@ class PythonLibrarySources(PythonSources):
     default = ("*.py", "*.pyi") + tuple(f"!{pat}" for pat in PythonTestsSources.default)
 
 
+class DeprecatedProvidesField(ScalarField, ProvidesField):
+    expected_type = PythonArtifact
+    expected_type_description = "setup_py(name='my-dist', **kwargs)"
+    value: PythonArtifact
+    deprecated_removal_version = "2.1.0.dev0"
+    deprecated_removal_hint = (
+        "Rather than using the `provides` field on a `python_library` target, create a dedicated "
+        "`python_distribution` target. See "
+        "https://www.pantsbuild.org/docs/how-to-upgrade-pants-2-0#use--python_distribution-"
+        "target-type-for-providessetup_py-130-vs-20 for instructions."
+    )
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[PythonArtifact], *, address: Address
+    ) -> PythonArtifact:
+        return cast(PythonArtifact, super().compute_value(raw_value, address=address))
+
+
 class PythonLibrary(Target):
     """A Python library that may be imported by other targets."""
 
     alias = "python_library"
-    core_fields = (*COMMON_PYTHON_FIELDS, Dependencies, PythonLibrarySources)
+    core_fields = (
+        *COMMON_PYTHON_FIELDS,
+        Dependencies,
+        PythonLibrarySources,
+        DeprecatedProvidesField,
+    )
 
 
 # -----------------------------------------------------------------------------------------------

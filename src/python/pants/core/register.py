@@ -6,6 +6,15 @@
 These are always activated and cannot be disabled.
 """
 
+from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.deprecated_v1_target_types import (
+    AliasTarget,
+    Bundle,
+    PrepCommand,
+    PythonApp,
+    PythonGrpcioLibrary,
+    UnpackedWheels,
+)
 from pants.core.goals import binary, fmt, lint, package, repl, run, test, typecheck
 from pants.core.target_types import ArchiveTarget, Files, GenericTarget, RelocatedFiles, Resources
 from pants.core.target_types import rules as target_type_rules
@@ -21,6 +30,10 @@ from pants.core.util_rules import (
     subprocess_environment,
 )
 from pants.source import source_root
+
+
+def build_file_aliases():
+    return BuildFileAliases(context_aware_object_factories={"bundle": Bundle})
 
 
 def rules():
@@ -50,4 +63,16 @@ def rules():
 
 
 def target_types():
-    return [ArchiveTarget, Files, GenericTarget, Resources, RelocatedFiles]
+    return [
+        ArchiveTarget,
+        Files,
+        GenericTarget,
+        Resources,
+        RelocatedFiles,
+        # Deprecated targets.
+        AliasTarget,
+        PrepCommand,
+        PythonApp,
+        UnpackedWheels,
+        PythonGrpcioLibrary,
+    ]
