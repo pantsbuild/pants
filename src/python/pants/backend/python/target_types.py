@@ -5,7 +5,7 @@ import collections.abc
 import logging
 import os.path
 from textwrap import dedent
-from typing import Any, Dict, Iterable, Optional, Tuple, Union, cast
+from typing import Iterable, Optional, Tuple, Union, cast
 
 from pkg_resources import Requirement
 
@@ -36,7 +36,6 @@ from pants.engine.target import (
     Target,
     WrappedTarget,
 )
-from pants.engine.unions import UnionMembership
 from pants.option.subsystem import Subsystem
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
