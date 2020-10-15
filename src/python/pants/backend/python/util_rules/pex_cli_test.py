@@ -33,7 +33,7 @@ def test_custom_ca_certs(rule_runner: RuleRunner) -> None:
             Process,
             [PexCliProcess(argv=["some", "--args"], description="")],
         )
-        assert proc.argv[2:6] == ("some", "--args", "--cert", "certsfile")
+        assert proc.argv[2:4] == ("--cert", "certsfile")
         files = rule_runner.request(DigestContents, [proc.input_digest])
         chrooted_certs_file = [f for f in files if f.path == "certsfile"]
         assert len(chrooted_certs_file) == 1
