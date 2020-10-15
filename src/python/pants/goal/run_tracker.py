@@ -27,7 +27,6 @@ from pants.option.config import Config
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.subsystem import Subsystem
-from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
 from pants.util.dirutil import relative_symlink, safe_file_dump
 from pants.version import VERSION
@@ -163,7 +162,6 @@ class RunTracker(Subsystem):
 
         # Initialized in `start()`.
         self.report = None
-        self.json_reporter = None
         self._main_root_workunit = None
         self._all_options = None
 
@@ -264,13 +262,6 @@ class RunTracker(Subsystem):
         self._all_options = all_options
 
         self.report = Report()
-
-        # Set up the JsonReporter for V2 stats.
-        if self._stats_version == 2:
-            json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO)
-            self.json_reporter = JsonReporter(self, json_reporter_settings)
-            self.report.add_reporter("json", self.json_reporter)
-
         self.report.open()
 
         # And create the workunit.
@@ -481,9 +472,7 @@ class RunTracker(Subsystem):
             "cumulative_timings": self.cumulative_timings.get_all(),
             "recorded_options": self.get_options_to_record(),
         }
-        if self._stats_version == 2:
-            stats["workunits"] = self.json_reporter.results
-        else:
+        if self._stats_version != 2:
             stats.update(
                 {
                     "self_timings": self.self_timings.get_all(),
