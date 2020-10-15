@@ -163,6 +163,8 @@ def test_list_all_json() -> None:
 
 
 def test_list_single() -> None:
+    # The reason we want this to still be TriBoolField is that we want to test that required = True
+    # results in stripping | None from the help message.
     class CustomField(TriBoolField):
         """My custom field!
 
