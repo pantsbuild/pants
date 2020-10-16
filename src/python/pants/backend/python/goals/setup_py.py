@@ -328,7 +328,7 @@ class PythonDistributionSubsystem(Subsystem):
         register(
             "--first-party-dependency-version-scheme",
             type=FirstPartyDependencyVersionScheme,
-            default=FirstPartyDependencyVersionScheme.COMPATIBLE,
+            default=FirstPartyDependencyVersionScheme.EXACT,
             help=(
                 "What version to set in `install_requires` when a `python_distribution` depends on "
                 "other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will "

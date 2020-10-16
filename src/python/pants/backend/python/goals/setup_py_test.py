@@ -216,7 +216,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "packages": ("foo", "foo.qux"),
             "namespace_packages": ("foo",),
             "package_data": {"foo": ("resources/js/code.js",)},
-            "install_requires": ("baz~=1.1.1",),
+            "install_requires": ("baz==1.1.1",),
             "entry_points": {"console_scripts": ["foo_main=foo.qux.bin"]},
         },
         "src/python/foo:foo-dist",
