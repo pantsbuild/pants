@@ -112,5 +112,6 @@ class Changed(Subsystem):
             help="Include direct or transitive dependees of changed targets.",
         )
 
+
 def rules():
     return [*collect_rules(), *dependees.rules()]
