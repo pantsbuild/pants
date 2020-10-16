@@ -16,6 +16,7 @@ from pants.backend.python.goals.setup_py import (
     NoOwnerError,
     OwnedDependencies,
     OwnedDependency,
+    PythonDistributionSubsystem,
     SetupKwargs,
     SetupKwargsRequest,
     SetupPyChroot,
@@ -44,7 +45,7 @@ from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -93,6 +94,7 @@ def chroot_rule_runner() -> RuleRunner:
             get_exporting_owner,
             *python_sources.rules(),
             setup_kwargs_plugin,
+            SubsystemRule(PythonDistributionSubsystem),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
             QueryRule(SetupPyChroot, (SetupPyChrootRequest,)),
         ]
@@ -213,7 +215,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "packages": ("foo", "foo.qux"),
             "namespace_packages": ("foo",),
             "package_data": {"foo": ("resources/js/code.js",)},
-            "install_requires": ("baz==1.1.1",),
+            "install_requires": ("baz~=1.1.1",),
             "entry_points": {"console_scripts": ["foo_main=foo.qux.bin"]},
         },
         "src/python/foo:foo-dist",
@@ -366,6 +368,7 @@ def test_get_requirements() -> None:
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
+            SubsystemRule(PythonDistributionSubsystem),
             QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
         ]
     )
@@ -432,7 +435,11 @@ def test_get_requirements() -> None:
         ),
     )
 
-    def assert_requirements(expected_req_strs, addr):
+    def assert_requirements(expected_req_strs, addr, *, exact_first_party_deps: bool = False):
+        if exact_first_party_deps:
+            rule_runner.set_options(
+                ["--python-distribution-exact-first-party-dependency-requirements"]
+            )
         tgt = rule_runner.get_target(Address.parse(addr))
         reqs = rule_runner.request(
             ExportedTargetRequirements,
@@ -441,7 +448,13 @@ def test_get_requirements() -> None:
         assert sorted(expected_req_strs) == list(reqs)
 
     assert_requirements(["ext1==1.22.333", "ext2==4.5.6"], "src/python/foo/bar:bar-dist")
-    assert_requirements(["ext3==0.0.1", "bar==9.8.7"], "src/python/foo/corge:corge-dist")
+    assert_requirements(["ext3==0.0.1", "bar~=9.8.7"], "src/python/foo/corge:corge-dist")
+
+    assert_requirements(
+        ["ext3==0.0.1", "bar==9.8.7"],
+        "src/python/foo/corge:corge-dist",
+        exact_first_party_deps=True,
+    )
 
 
 def test_owned_dependencies() -> None:
