@@ -72,6 +72,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.custom_types import shell_str
+from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -306,6 +307,31 @@ class RunSetupPyResult:
     """The result of running a setup.py command."""
 
     output: Digest  # The state of the chroot after running setup.py.
+
+
+class PythonDistributionSubsystem(Subsystem):
+    """Options for packaging wheels/sdists from a `python_distribution` target."""
+
+    options_scope = "python-distribution"
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--exact-first-party-dependency-requirements",
+            type=bool,
+            default=False,
+            help=(
+                "If True, dependencies on other `python_distribution`s will use exact requirements "
+                "with `==`, rather than compatible releases with `~=`. See "
+                "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
+            ),
+        )
+
+    @property
+    def first_party_dependencies_version_specifier(self) -> str:
+        """The version specifier to use for first-party dependencies (either `==` or `~=`)."""
+        return "==" if self.options.exact_first_party_dependency_requirements else "~="
 
 
 class SetupPySubsystem(GoalSubsystem):
@@ -714,7 +740,9 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
 
 @rule(desc="Compute distribution's 3rd party requirements")
 async def get_requirements(
-    dep_owner: DependencyOwner, union_membership: UnionMembership
+    dep_owner: DependencyOwner,
+    union_membership: UnionMembership,
+    python_distribution_subsystem: PythonDistributionSubsystem,
 ) -> ExportedTargetRequirements:
     transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest([dep_owner.exported_target.target.address])
@@ -736,13 +764,6 @@ async def get_requirements(
     # if U is in the owned deps then we'll pick up R through U. And if U is not in the owned deps
     # then it's owned by an exported target ET, and so R will be in the requirements for ET, and we
     # will require ET.
-    #
-    # TODO: Note that this logic doesn't account for indirection via dep aggregator targets, of type
-    #  `target`. But we don't have those in v2 (yet) anyway. Plus, as we move towards buildgen and/or
-    #  stricter build graph hygiene, it makes sense to require that targets directly declare their
-    #  true dependencies. Plus, in the specific realm of setup-py, since we must exclude indirect
-    #  deps across exported target boundaries, it's not a big stretch to just insist that
-    #  requirements must be direct deps.
     direct_deps_tgts = await MultiGet(
         Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
@@ -754,11 +775,12 @@ async def get_requirements(
     req_strs = list(reqs)
 
     # Add the requirements on any exported targets on which we depend.
+    version_specifier = python_distribution_subsystem.first_party_dependencies_version_specifier
     kwargs_for_exported_targets_we_depend_on = await MultiGet(
         Get(SetupKwargs, OwnedDependency(tgt)) for tgt in owned_by_others
     )
     req_strs.extend(
-        f"{kwargs.name}=={kwargs.version}"
+        f"{kwargs.name}{version_specifier}{kwargs.version}"
         for kwargs in set(kwargs_for_exported_targets_we_depend_on)
     )
 
