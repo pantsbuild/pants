@@ -26,6 +26,9 @@ Bugfixes
 * Fix interpreter selection when building a PEX to use `[python-setup].interpreter_search_paths` (Cherry-pick of #10965) (#10967)
   `PR #10967 <https://github.com/pantsbuild/pants/pull/10967>`_
 
+* Fix linter targets being skipped when repo has multiple interpreter constraints (Cherry-pick of #10974) #10975
+  `PR #10975 <https://github.com/pantsbuild/pants/pull/10975>`_
+
 * Automatically set setuptools interpreter constraints if unspecified (Cherry-pick of #10951) (#10958)
   `PR #10958 <https://github.com/pantsbuild/pants/pull/10958>`_
 
