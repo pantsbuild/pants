@@ -75,7 +75,6 @@ def filter_targets(
     console: Console,
     registered_target_types: RegisteredTargetTypes,
 ) -> FilterGoal:
-
     def filter_target_type(target_type: str) -> TargetFilter:
         if target_type not in registered_target_types.aliases:
             raise UnrecognizedTargetTypeException(target_type, registered_target_types)
