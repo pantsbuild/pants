@@ -8,7 +8,6 @@ from typing import List, Optional, Tuple, cast
 from pants.backend.project_info import dependees
 from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -64,23 +63,7 @@ class ChangedOptions:
 
     @classmethod
     def from_options(cls, options: OptionValueContainer) -> "ChangedOptions":
-        since = resolve_conflicting_options(
-            old_option="changes_since",
-            new_option="since",
-            old_scope="changed",
-            new_scope="changed",
-            old_container=options,
-            new_container=options,
-        )
-        dependees = resolve_conflicting_options(
-            old_option="include_dependees",
-            new_option="dependees",
-            old_scope="changed",
-            new_scope="changed",
-            old_container=options,
-            new_container=options,
-        )
-        return cls(since, options.diffspec, dependees)
+        return cls(options.since, options.diffspec, options.dependees)
 
     @property
     def provided(self) -> bool:
@@ -117,17 +100,6 @@ class Changed(Subsystem):
             help="Calculate changes since this Git spec (commit range/SHA/ref).",
         )
         register(
-            "--changes-since",
-            "--parent",
-            type=str,
-            default=None,
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "Use `--changed-since` instead of `--changed-parent` or `--changed-changes-since`."
-            ),
-            help="Calculate changes since this tree-ish/scm ref.",
-        )
-        register(
             "--diffspec",
             type=str,
             default=None,
@@ -139,23 +111,6 @@ class Changed(Subsystem):
             default=DependeesOption.NONE,
             help="Include direct or transitive dependees of changed targets.",
         )
-        register(
-            "--include-dependees",
-            type=DependeesOption,
-            default=DependeesOption.NONE,
-            help="Include direct or transitive dependees of changed targets.",
-            removal_version="2.1.0.dev0",
-            removal_hint="Use `--changed-dependees` instead of `--changed-include-dependees`.",
-        )
-        register(
-            "--fast",
-            type=bool,
-            default=False,
-            help="Stop searching for owners once a source is mapped to at least one owning target.",
-            removal_version="2.1.0.dev0",
-            removal_hint="The option `--changed-fast` no longer does anything.",
-        )
-
 
 def rules():
     return [*collect_rules(), *dependees.rules()]
