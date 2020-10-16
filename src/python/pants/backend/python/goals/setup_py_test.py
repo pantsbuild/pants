@@ -100,9 +100,9 @@ def chroot_rule_runner() -> RuleRunner:
 
 
 def assert_chroot(
-    rule_runner: RuleRunner, expected_files, expected_setup_kwargs, addr: str
+    rule_runner: RuleRunner, expected_files, expected_setup_kwargs, addr: Address
 ) -> None:
-    tgt = rule_runner.get_target(Address.parse(addr))
+    tgt = rule_runner.get_target(addr)
     chroot = rule_runner.request(
         SetupPyChroot,
         [SetupPyChrootRequest(ExportedTarget(tgt), py2=False)],
@@ -112,8 +112,8 @@ def assert_chroot(
     assert expected_setup_kwargs == chroot.setup_kwargs.kwargs
 
 
-def assert_chroot_error(rule_runner: RuleRunner, addr: str, exc_cls: Type[Exception]) -> None:
-    tgt = rule_runner.get_target(Address.parse(addr))
+def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: Type[Exception]) -> None:
+    tgt = rule_runner.get_target(addr)
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
             SetupPyChroot,
@@ -216,7 +216,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "install_requires": ("baz==1.1.1",),
             "entry_points": {"console_scripts": ["foo_main=foo.qux.bin"]},
         },
-        "src/python/foo:foo-dist",
+        Address("src/python/foo", target_name="foo-dist"),
     )
 
 
@@ -244,10 +244,14 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
     )
 
     assert_chroot_error(
-        chroot_rule_runner, "src/python/invalid_binary:invalid_bin1", InvalidEntryPoint
+        chroot_rule_runner,
+        Address("src/python/invalid_binary", target_name="invalid_bin1"),
+        InvalidEntryPoint,
     )
     assert_chroot_error(
-        chroot_rule_runner, "src/python/invalid_binary:invalid_bin2", InvalidEntryPoint
+        chroot_rule_runner,
+        Address("src/python/invalid_binary", target_name="invalid_bin2"),
+        InvalidEntryPoint,
     )
 
 
@@ -286,7 +290,7 @@ def test_get_sources() -> None:
         expected_package_data,
         addrs,
     ):
-        targets = Targets(rule_runner.get_target(Address.parse(addr)) for addr in addrs)
+        targets = Targets(rule_runner.get_target(addr) for addr in addrs)
         srcs = rule_runner.request(
             SetupPySources,
             [SetupPySourcesRequest(targets, py2=False)],
@@ -303,7 +307,7 @@ def test_get_sources() -> None:
         expected_packages=["foo", "foo.bar", "foo.bar.baz"],
         expected_namespace_packages=["foo.bar"],
         expected_package_data={},
-        addrs=["src/python/foo/bar/baz:baz1"],
+        addrs=[Address("src/python/foo/bar/baz", target_name="baz1")],
     )
 
     assert_sources(
@@ -311,7 +315,7 @@ def test_get_sources() -> None:
         expected_packages=["foo", "foo.bar", "foo.bar.baz"],
         expected_namespace_packages=["foo.bar"],
         expected_package_data={},
-        addrs=["src/python/foo/bar/baz:baz2"],
+        addrs=[Address("src/python/foo/bar/baz", target_name="baz2")],
     )
 
     assert_sources(
@@ -319,7 +323,7 @@ def test_get_sources() -> None:
         expected_packages=["foo", "foo.qux"],
         expected_namespace_packages=[],
         expected_package_data={},
-        addrs=["src/python/foo/qux"],
+        addrs=[Address("src/python/foo/qux")],
     )
 
     assert_sources(
@@ -334,7 +338,11 @@ def test_get_sources() -> None:
         expected_packages=["foo", "foo.bar", "foo.bar.baz", "foo.qux"],
         expected_namespace_packages=["foo.bar"],
         expected_package_data={"foo": ("resources/js/code.js",)},
-        addrs=["src/python/foo/bar/baz:baz1", "src/python/foo/qux", "src/python/foo/resources"],
+        addrs=[
+            Address("src/python/foo/bar/baz", target_name="baz1"),
+            Address("src/python/foo/qux"),
+            Address("src/python/foo/resources"),
+        ],
     )
 
     assert_sources(
@@ -351,10 +359,10 @@ def test_get_sources() -> None:
         expected_namespace_packages=["foo.bar"],
         expected_package_data={"foo": ("resources/js/code.js",)},
         addrs=[
-            "src/python/foo/bar/baz:baz1",
-            "src/python/foo/bar/baz:baz2",
-            "src/python/foo/qux",
-            "src/python/foo/resources",
+            Address("src/python/foo/bar/baz", target_name="baz1"),
+            Address("src/python/foo/bar/baz", target_name="baz2"),
+            Address("src/python/foo/qux"),
+            Address("src/python/foo/resources"),
         ],
     )
 
@@ -432,16 +440,20 @@ def test_get_requirements() -> None:
         ),
     )
 
-    def assert_requirements(expected_req_strs, addr):
-        tgt = rule_runner.get_target(Address.parse(addr))
+    def assert_requirements(expected_req_strs, addr: Address):
+        tgt = rule_runner.get_target(addr)
         reqs = rule_runner.request(
             ExportedTargetRequirements,
             [DependencyOwner(ExportedTarget(tgt))],
         )
         assert sorted(expected_req_strs) == list(reqs)
 
-    assert_requirements(["ext1==1.22.333", "ext2==4.5.6"], "src/python/foo/bar:bar-dist")
-    assert_requirements(["ext3==0.0.1", "bar==9.8.7"], "src/python/foo/corge:corge-dist")
+    assert_requirements(
+        ["ext1==1.22.333", "ext2==4.5.6"], Address("src/python/foo/bar", target_name="bar-dist")
+    )
+    assert_requirements(
+        ["ext3==0.0.1", "bar==9.8.7"], Address("src/python/foo/corge", target_name="corge-dist")
+    )
 
 
 def test_owned_dependencies() -> None:
@@ -504,8 +516,8 @@ def test_owned_dependencies() -> None:
         ),
     )
 
-    def assert_owned(owned: Iterable[str], exported: str):
-        tgt = rule_runner.get_target(Address.parse(exported))
+    def assert_owned(owned: Iterable[str], exported: Address):
+        tgt = rule_runner.get_target(exported)
         assert sorted(owned) == sorted(
             od.target.address.spec
             for od in rule_runner.request(
@@ -516,7 +528,7 @@ def test_owned_dependencies() -> None:
 
     assert_owned(
         ["src/python/foo/bar:bar1", "src/python/foo/bar:bar1-dist", "src/python/foo/bar/baz:baz1"],
-        "src/python/foo/bar:bar1-dist",
+        Address("src/python/foo/bar", target_name="bar1-dist"),
     )
     assert_owned(
         [
@@ -526,7 +538,7 @@ def test_owned_dependencies() -> None:
             "src/python/foo/bar:bar-resources",
             "src/python/foo/bar/baz:baz2",
         ],
-        "src/python/foo:foo-dist",
+        Address("src/python/foo", target_name="foo-dist"),
     )
 
 
@@ -540,8 +552,8 @@ def exporting_owner_rule_runner() -> RuleRunner:
     )
 
 
-def assert_is_owner(rule_runner: RuleRunner, owner: str, owned: str):
-    tgt = rule_runner.get_target(Address.parse(owned))
+def assert_is_owner(rule_runner: RuleRunner, owner: str, owned: Address):
+    tgt = rule_runner.get_target(owned)
     assert (
         owner
         == rule_runner.request(
@@ -551,8 +563,8 @@ def assert_is_owner(rule_runner: RuleRunner, owner: str, owned: str):
     )
 
 
-def assert_owner_error(rule_runner, owned: str, exc_cls: Type[Exception]):
-    tgt = rule_runner.get_target(Address.parse(owned))
+def assert_owner_error(rule_runner, owned: Address, exc_cls: Type[Exception]):
+    tgt = rule_runner.get_target(owned)
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
             ExportedTarget,
@@ -563,11 +575,11 @@ def assert_owner_error(rule_runner, owned: str, exc_cls: Type[Exception]):
     assert type(ex.wrapped_exceptions[0]) == exc_cls
 
 
-def assert_no_owner(rule_runner: RuleRunner, owned: str):
+def assert_no_owner(rule_runner: RuleRunner, owned: Address):
     assert_owner_error(rule_runner, owned, NoOwnerError)
 
 
-def assert_ambiguous_owner(rule_runner: RuleRunner, owned: str):
+def assert_ambiguous_owner(rule_runner: RuleRunner, owned: Address):
     assert_owner_error(rule_runner, owned, AmbiguousOwnerError)
 
 
@@ -619,22 +631,42 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
     )
 
     assert_is_owner(
-        exporting_owner_rule_runner, "src/python/foo/bar:bar1", "src/python/foo/bar:bar1"
+        exporting_owner_rule_runner,
+        "src/python/foo/bar:bar1",
+        Address("src/python/foo/bar", target_name="bar1"),
     )
     assert_is_owner(
-        exporting_owner_rule_runner, "src/python/foo/bar:bar1", "src/python/foo/bar/baz:baz1"
+        exporting_owner_rule_runner,
+        "src/python/foo/bar:bar1",
+        Address("src/python/foo/bar/baz", target_name="baz1"),
     )
 
-    assert_is_owner(exporting_owner_rule_runner, "src/python/foo:foo1", "src/python/foo:foo1")
-
-    assert_is_owner(exporting_owner_rule_runner, "src/python/foo:foo3", "src/python/foo:foo3")
-    assert_is_owner(exporting_owner_rule_runner, "src/python/foo:foo3", "src/python/foo/bar:bar2")
     assert_is_owner(
-        exporting_owner_rule_runner, "src/python/foo:foo3", "src/python/foo/bar:bar-resources"
+        exporting_owner_rule_runner,
+        "src/python/foo:foo1",
+        Address("src/python/foo", target_name="foo1"),
     )
 
-    assert_no_owner(exporting_owner_rule_runner, "src/python/foo:foo2")
-    assert_ambiguous_owner(exporting_owner_rule_runner, "src/python/foo/bar/baz:baz2")
+    assert_is_owner(
+        exporting_owner_rule_runner,
+        "src/python/foo:foo3",
+        Address("src/python/foo", target_name="foo3"),
+    )
+    assert_is_owner(
+        exporting_owner_rule_runner,
+        "src/python/foo:foo3",
+        Address("src/python/foo/bar", target_name="bar2"),
+    )
+    assert_is_owner(
+        exporting_owner_rule_runner,
+        "src/python/foo:foo3",
+        Address("src/python/foo/bar", target_name="bar-resources"),
+    )
+
+    assert_no_owner(exporting_owner_rule_runner, Address("src/python/foo", target_name="foo2"))
+    assert_ambiguous_owner(
+        exporting_owner_rule_runner, Address("src/python/foo/bar/baz", target_name="baz2")
+    )
 
 
 def test_get_owner_siblings(exporting_owner_rule_runner: RuleRunner) -> None:
@@ -653,10 +685,14 @@ def test_get_owner_siblings(exporting_owner_rule_runner: RuleRunner) -> None:
     )
 
     assert_is_owner(
-        exporting_owner_rule_runner, "src/python/siblings:sibling2", "src/python/siblings:sibling1"
+        exporting_owner_rule_runner,
+        "src/python/siblings:sibling2",
+        Address("src/python/siblings", target_name="sibling1"),
     )
     assert_is_owner(
-        exporting_owner_rule_runner, "src/python/siblings:sibling2", "src/python/siblings:sibling2"
+        exporting_owner_rule_runner,
+        "src/python/siblings:sibling2",
+        Address("src/python/siblings", target_name="sibling2"),
     )
 
 
@@ -682,9 +718,11 @@ def test_get_owner_not_an_ancestor(exporting_owner_rule_runner: RuleRunner) -> N
         ),
     )
 
-    assert_no_owner(exporting_owner_rule_runner, "src/python/notanancestor/aaa")
+    assert_no_owner(exporting_owner_rule_runner, Address("src/python/notanancestor/aaa"))
     assert_is_owner(
-        exporting_owner_rule_runner, "src/python/notanancestor/bbb", "src/python/notanancestor/bbb"
+        exporting_owner_rule_runner,
+        "src/python/notanancestor/bbb",
+        Address("src/python/notanancestor/bbb"),
     )
 
 
@@ -722,9 +760,13 @@ def test_get_owner_multiple_ancestor_generations(exporting_owner_rule_runner: Ru
         ),
     )
 
-    assert_is_owner(exporting_owner_rule_runner, "src/python/aaa/bbb", "src/python/aaa/bbb/ccc")
-    assert_is_owner(exporting_owner_rule_runner, "src/python/aaa/bbb", "src/python/aaa/bbb")
-    assert_is_owner(exporting_owner_rule_runner, "src/python/aaa", "src/python/aaa")
+    assert_is_owner(
+        exporting_owner_rule_runner, "src/python/aaa/bbb", Address("src/python/aaa/bbb/ccc")
+    )
+    assert_is_owner(
+        exporting_owner_rule_runner, "src/python/aaa/bbb", Address("src/python/aaa/bbb")
+    )
+    assert_is_owner(exporting_owner_rule_runner, "src/python/aaa", Address("src/python/aaa"))
 
 
 def test_validate_args() -> None:

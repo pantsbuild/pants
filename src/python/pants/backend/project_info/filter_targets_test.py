@@ -60,7 +60,7 @@ def run_goal(
 
 def test_no_filters_provided() -> None:
     # `filter` behaves like `list` when there are no specified filters.
-    targets = [MockTarget({}, address=Address.parse(addr)) for addr in (":t3", ":t2", ":t1")]
+    targets = [MockTarget({}, address=Address("", target_name=name)) for name in ("t3", "t2", "t1")]
     assert run_goal(targets) == dedent(
         """\
         //:t1
@@ -79,8 +79,10 @@ def test_filter_by_target_type() -> None:
         alias = "smalltalk"
         core_fields = ()
 
-    fortran_targets = [Fortran({}, address=Address.parse(addr)) for addr in (":f1", ":f2")]
-    smalltalk_targets = [Smalltalk({}, address=Address.parse(addr)) for addr in (":s1", ":s2")]
+    fortran_targets = [Fortran({}, address=Address("", target_name=name)) for name in ("f1", "f2")]
+    smalltalk_targets = [
+        Smalltalk({}, address=Address("", target_name=name)) for name in ("s1", "s2")
+    ]
     targets = [*fortran_targets, *smalltalk_targets]
 
     assert run_goal(targets, target_type=["fortran"]).strip() == "//:f1\n//:f2"
@@ -105,8 +107,12 @@ def test_filter_by_target_type() -> None:
 
 def test_filter_by_address_regex() -> None:
     targets = [
-        MockTarget({}, address=Address.parse(addr))
-        for addr in ("dir1:lib", "dir2:lib", "common:tests")
+        MockTarget({}, address=addr)
+        for addr in (
+            Address("dir1", target_name="lib"),
+            Address("dir2", target_name="lib"),
+            Address("common", target_name="tests"),
+        )
     ]
     assert run_goal(targets, address_regex=[r"^dir"]).strip() == "dir1:lib\ndir2:lib"
     assert run_goal(targets, address_regex=[r"+dir1:lib$"]).strip() == "dir1:lib"
@@ -123,10 +129,10 @@ def test_filter_by_address_regex() -> None:
 
 def test_filter_by_tag_regex() -> None:
     targets = [
-        MockTarget({"tags": ["tag1"]}, address=Address.parse(":t1")),
-        MockTarget({"tags": ["tag2"]}, address=Address.parse(":t2")),
-        MockTarget({"tags": ["tag1", "tag2"]}, address=Address.parse(":both")),
-        MockTarget({}, address=Address.parse(":no_tags")),
+        MockTarget({"tags": ["tag1"]}, address=Address("", target_name="t1")),
+        MockTarget({"tags": ["tag2"]}, address=Address("", target_name="t2")),
+        MockTarget({"tags": ["tag1", "tag2"]}, address=Address("", target_name="both")),
+        MockTarget({}, address=Address("", target_name="no_tags")),
     ]
     assert run_goal(targets, tag_regex=[r"t.?g2$"]).strip() == "//:both\n//:t2"
     assert run_goal(targets, tag_regex=["+tag1"]).strip() == "//:both\n//:t1"

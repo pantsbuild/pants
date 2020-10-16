@@ -21,11 +21,13 @@ from pants.engine.target import InvalidFieldException
 )
 def test_to_interpreter_version(runtime, expected_major, expected_minor):
     assert (expected_major, expected_minor) == PythonAwsLambdaRuntime(
-        raw_value=runtime, address=Address.parse("foo/bar:baz")
+        raw_value=runtime, address=Address("foo/bar", target_name="baz")
     ).to_interpreter_version()
 
 
 @pytest.mark.parametrize(["invalid_runtime"], (["python88.99"], ["fooobar"]))
 def test_runtime_validation(invalid_runtime):
     with pytest.raises(InvalidFieldException):
-        PythonAwsLambdaRuntime(raw_value=invalid_runtime, address=Address.parse("foo/bar:baz"))
+        PythonAwsLambdaRuntime(
+            raw_value=invalid_runtime, address=Address("foo/bar", target_name="baz")
+        )

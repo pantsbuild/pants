@@ -26,9 +26,9 @@ def rule_runner() -> RuleRunner:
     )
 
 
-GOOD_SOURCE = FileContent(path="good.py", content=b"print('Nothing suspicious here..')\n")
-BAD_SOURCE = FileContent(path="bad.py", content=b"import typing\n")  # unused import
-PY3_ONLY_SOURCE = FileContent(path="py3.py", content=b"version: str = 'Py3 > Py2'\n")
+GOOD_SOURCE = FileContent("good.py", b"print('Nothing suspicious here..')\n")
+BAD_SOURCE = FileContent("bad.py", b"import typing\n")  # unused import
+PY3_ONLY_SOURCE = FileContent("py3.py", b"version: str = 'Py3 > Py2'\n")
 
 
 def make_target(
@@ -41,7 +41,7 @@ def make_target(
         rule_runner.create_file(source_file.path, source_file.content.decode())
     return PythonLibrary(
         {PythonInterpreterCompatibility.alias: interpreter_constraints},
-        address=Address.parse(":target"),
+        address=Address("", target_name="target"),
     )
 
 

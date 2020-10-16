@@ -107,7 +107,7 @@ def test_prelude_parsing_illegal_import() -> None:
 
 
 def test_strip_address_origin() -> None:
-    addr = Address.parse("//:demo")
+    addr = Address("", target_name="demo")
     result = run_rule_with_mocks(
         strip_address_origins,
         rule_args=[AddressesWithOrigins([AddressWithOrigin(addr, AddressLiteralSpec("", "demo"))])],

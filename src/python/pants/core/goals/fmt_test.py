@@ -136,7 +136,7 @@ class FmtTest(TestBase):
     def make_target(
         address: Optional[Address] = None, *, target_cls: Type[Target] = FortranTarget
     ) -> Target:
-        return target_cls({}, address=address or Address.parse(":tests"))
+        return target_cls({}, address=address or Address("", target_name="tests"))
 
     def run_fmt_rule(
         self,
@@ -234,8 +234,11 @@ class FmtTest(TestBase):
             `--per-file-caching`).
         * Correctly distinguish between skipped, changed, and did not change.
         """
-        fortran_addresses = [Address.parse(":f1"), Address.parse(":needs_formatting")]
-        smalltalk_addresses = [Address.parse(":s1"), Address.parse(":s2")]
+        fortran_addresses = [
+            Address("", target_name="f1"),
+            Address("", target_name="needs_formatting"),
+        ]
+        smalltalk_addresses = [Address("", target_name="s1"), Address("", target_name="s2")]
 
         fortran_targets = [
             self.make_target(addr, target_cls=FortranTarget) for addr in fortran_addresses

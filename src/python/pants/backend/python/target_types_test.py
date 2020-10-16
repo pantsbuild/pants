@@ -32,10 +32,10 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 def test_timeout_validation() -> None:
     with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(-100, address=Address.parse(":tests"))
+        PythonTestsTimeout(-100, address=Address("", target_name="tests"))
     with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(0, address=Address.parse(":tests"))
-    assert PythonTestsTimeout(5, address=Address.parse(":tests")).value == 5
+        PythonTestsTimeout(0, address=Address("", target_name="tests"))
+    assert PythonTestsTimeout(5, address=Address("", target_name="tests")).value == 5
 
 
 def test_timeout_calculation() -> None:
@@ -47,7 +47,7 @@ def test_timeout_calculation() -> None:
         global_max: Optional[int] = None,
         timeouts_enabled: bool = True,
     ) -> None:
-        field = PythonTestsTimeout(field_value, address=Address.parse(":tests"))
+        field = PythonTestsTimeout(field_value, address=Address("", target_name="tests"))
         pytest = create_subsystem(
             PyTest,
             timeouts=timeouts_enabled,
