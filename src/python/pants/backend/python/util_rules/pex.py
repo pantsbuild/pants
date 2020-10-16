@@ -140,22 +140,28 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
             merged_specs: Set[Tuple[str, str]] = set()
             expected_interpreter = parsed_constraints[0].project_name
             for parsed_constraint in parsed_constraints:
-                if parsed_constraint.project_name != expected_interpreter:
-                    attempted_interpreters = {
-                        interp: sorted(
-                            str(parsed_constraint) for parsed_constraint in parsed_constraints
-                        )
-                        for interp, parsed_constraints in itertools.groupby(
-                            parsed_constraints,
-                            key=lambda pc: pc.project_name,
-                        )
-                    }
-                    raise ValueError(
-                        "Tried ANDing Python interpreter constraints with different interpreter "
-                        "types. Please use only one interpreter type. Got "
-                        f"{attempted_interpreters}."
+                if parsed_constraint.project_name == expected_interpreter:
+                    merged_specs.update(parsed_constraint.specs)
+                    continue
+
+                def key_fn(req: Requirement):
+                    return req.project_name
+
+                # NB: We must pre-sort the data for itertools.groupby() to work properly.
+                sorted_constraints = sorted(parsed_constraints, key=key_fn)
+                attempted_interpreters = {
+                    interp: sorted(
+                        str(parsed_constraint) for parsed_constraint in parsed_constraints
                     )
-                merged_specs.update(parsed_constraint.specs)
+                    for interp, parsed_constraints in itertools.groupby(
+                        sorted_constraints, key=key_fn
+                    )
+                }
+                raise ValueError(
+                    "Tried ANDing Python interpreter constraints with different interpreter "
+                    "types. Please use only one interpreter type. Got "
+                    f"{attempted_interpreters}."
+                )
 
             formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
             return Requirement.parse(f"{expected_interpreter}{formatted_specs}")
