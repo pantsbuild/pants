@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import enum
 import io
 import itertools
 import logging
@@ -9,7 +10,6 @@ import pickle
 from abc import ABC, abstractmethod
 from collections import abc, defaultdict
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
@@ -310,7 +310,8 @@ class RunSetupPyResult:
     output: Digest  # The state of the chroot after running setup.py.
 
 
-class FirstPartyDependencyVersionScheme(Enum):
+@enum.unique
+class FirstPartyDependencyVersionScheme(enum.Enum):
     EXACT = "exact"  # i.e., ==
     COMPATIBLE = "compatible"  # i.e., ~=
     ANY = "any"  # i.e., no specifier
