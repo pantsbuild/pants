@@ -56,6 +56,13 @@ impl Executor {
     }
   }
 
+  pub fn new2() -> Executor {
+    Executor {
+      runtime: None,
+      handle: Handle::current(),
+    }
+  }
+
   ///
   /// Creates an Executor with an owned tokio::Runtime.
   ///
