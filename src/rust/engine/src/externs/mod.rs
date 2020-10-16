@@ -197,16 +197,16 @@ where
 }
 
 ///
-/// Collect the Values contained within an outer Python Iterable Value.
+/// Collect the Values contained within an outer Python Iterable PyObject.
 ///
-fn collect_iterable(value: &Value) -> Result<Vec<Value>, String> {
+pub fn collect_iterable(value: &PyObject) -> Result<Vec<PyObject>, String> {
   let gil = Python::acquire_gil();
   let py = gil.python();
   match value.iter(py) {
     Ok(py_iter) => py_iter
       .enumerate()
       .map(|(i, py_res)| {
-        py_res.map(Value::from).map_err(|py_err| {
+        py_res.map_err(|py_err| {
           format!(
             "Could not iterate {}, failed to extract {}th item: {:?}",
             val_to_str(value),
@@ -224,26 +224,7 @@ fn collect_iterable(value: &Value) -> Result<Vec<Value>, String> {
   }
 }
 
-///
-/// Pulls out the value specified by the field name from a given Value
-///
-pub fn project_ignoring_type(value: &PyObject, field: &str) -> Value {
-  getattr(value, field).unwrap()
-}
-
-pub fn project_iterable(value: &Value) -> Vec<Value> {
-  collect_iterable(value).unwrap()
-}
-
-pub fn project_multi(value: &PyObject, field: &str) -> Vec<Value> {
-  getattr(value, field).unwrap()
-}
-
-pub fn project_multi_strs(value: &PyObject, field: &str) -> Vec<String> {
-  getattr(value, field).unwrap()
-}
-
-pub fn project_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
+pub fn getattr_from_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
   let frozendict = getattr(value, field).unwrap();
   let pydict: PyDict = getattr(&frozendict, "_data").unwrap();
   let gil = Python::acquire_gil();
@@ -255,7 +236,7 @@ pub fn project_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, Str
     .collect()
 }
 
-pub fn project_str(value: &PyObject, field: &str) -> String {
+pub fn getattr_as_string(value: &PyObject, field: &str) -> String {
   // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
   // cloning in some cases.
   // TODO: We can't directly extract as a string here, because val_to_str defaults to empty string
@@ -268,7 +249,7 @@ pub fn key_to_str(key: &Key) -> String {
 }
 
 pub fn type_to_str(type_id: TypeId) -> String {
-  project_str(&type_for_type_id(type_id).into_object(), "__name__")
+  getattr_as_string(&type_for_type_id(type_id).into_object(), "__name__")
 }
 
 pub fn val_to_str(obj: &PyObject) -> String {
