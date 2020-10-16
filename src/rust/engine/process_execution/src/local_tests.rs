@@ -19,7 +19,6 @@ use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 use testutil::path::find_bash;
 use testutil::{owned_string_vec, relative_paths};
-use tokio::runtime::Handle;
 
 #[derive(PartialEq, Debug)]
 struct LocalTestResult {
@@ -492,7 +491,7 @@ async fn timeout() {
 #[tokio::test]
 async fn working_directory() {
   let store_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
   // Prepare the store to contain /cats/roland, because the EPR needs to materialize it and then run
@@ -550,7 +549,7 @@ async fn run_command_locally_in_dir(
 ) -> Result<LocalTestResult, String> {
   let store_dir = TempDir::new().unwrap();
   let named_cache_dir = TempDir::new().unwrap();
-  let executor = executor.unwrap_or_else(|| task_executor::Executor::new(Handle::current()));
+  let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let runner = crate::local::CommandRunner::new(

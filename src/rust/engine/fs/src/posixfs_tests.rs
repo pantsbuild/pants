@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::path::{Components, Path, PathBuf};
 use std::sync::Arc;
 use testutil::make_file;
-use tokio::runtime::Handle;
 
 #[tokio::test]
 async fn is_executable_false() {
@@ -387,7 +386,7 @@ fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
   PosixFS::new(
     dir.as_ref(),
     GitignoreStyleExcludes::empty(),
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
   )
   .unwrap()
 }
@@ -396,7 +395,7 @@ fn new_posixfs_symlink_oblivious<P: AsRef<Path>>(dir: P) -> PosixFS {
   PosixFS::new_with_symlink_behavior(
     dir.as_ref(),
     GitignoreStyleExcludes::empty(),
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     SymlinkBehavior::Oblivious,
   )
   .unwrap()
@@ -430,7 +429,7 @@ async fn test_basic_gitignore_functionality() {
   let gitignore_content = "*.tmp\n!*.x";
   let gitignore_path = root_path.join(".gitignore");
   make_file(&gitignore_path, gitignore_content.as_bytes(), 0o700);
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
   let ignorer =
     GitignoreStyleExcludes::create_with_gitignore_file(vec![], Some(gitignore_path.clone()))
       .unwrap();
@@ -453,7 +452,7 @@ async fn test_basic_gitignore_functionality() {
   assert!(!posix_fs.is_ignored(&stats[3]));
 
   // Test that .gitignore files work in tandem with explicit ignores.
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
   let ignorer = GitignoreStyleExcludes::create_with_gitignore_file(
     vec!["unimportant.x".to_string()],
     Some(gitignore_path),

@@ -14,7 +14,6 @@ use std::time::Duration;
 use store::Store;
 use tempfile::TempDir;
 use tokio;
-use tokio::runtime::Handle;
 use tokio::time::delay_for;
 
 #[tokio::test]
@@ -121,7 +120,7 @@ async fn run_speculation_test(
   let execute_request = echo_foo_request();
 
   let store_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
   let msg1: String = "m1".into();
   let msg2: String = "m2".into();

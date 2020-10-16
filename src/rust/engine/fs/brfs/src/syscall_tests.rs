@@ -9,12 +9,11 @@ use std::ffi::CString;
 use std::path::Path;
 use store::Store;
 use testutil::data::TestData;
-use tokio::runtime::Handle;
 
 #[tokio::test]
 async fn read_file_by_digest_exact_bytes() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
