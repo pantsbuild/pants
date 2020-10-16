@@ -241,6 +241,26 @@ def test_group_field_sets_by_constraints() -> None:
     )
 
 
+def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
+    py3_fs = [
+        MockFieldSet.create_for_test("src/python/a_dir/path.py:test", "==3.6.*"),
+        MockFieldSet.create_for_test("src/python/b_dir/path.py:test", ">2.7,<3"),
+        MockFieldSet.create_for_test("src/python/c_dir/path.py:test", "==3.6.*"),
+    ]
+
+    ic_36 = PexInterpreterConstraints([Requirement.parse("CPython==3.6.*")])
+
+    output = PexInterpreterConstraints.group_field_sets_by_constraints(
+        py3_fs,
+        python_setup=create_subsystem(PythonSetup, interpreter_constraints=[]),
+    )
+
+    assert output[ic_36] == (
+        MockFieldSet.create_for_test("src/python/a_dir/path.py:test", "==3.6.*"),
+        MockFieldSet.create_for_test("src/python/c_dir/path.py:test", "==3.6.*"),
+    )
+
+
 @dataclass(frozen=True)
 class ExactRequirement:
     project_name: str
