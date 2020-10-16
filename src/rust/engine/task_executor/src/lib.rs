@@ -49,14 +49,8 @@ impl Executor {
   /// existence of a Handle does not prevent a Runtime from shutting down. This is guaranteed by
   /// the scope of the tokio::{test, main} macros.
   ///
-  pub fn new(handle: Handle) -> Executor {
-    Executor {
-      runtime: None,
-      handle,
-    }
-  }
 
-  pub fn new2() -> Executor {
+  pub fn new() -> Executor {
     Executor {
       runtime: None,
       handle: Handle::current(),

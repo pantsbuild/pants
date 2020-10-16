@@ -21,7 +21,6 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use tokio::runtime::Handle;
 
 impl LoadMetadata {
   fn is_remote(&self) -> bool {
@@ -91,8 +90,7 @@ pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
 /// Create a new local store with whatever was already serialized in dir.
 ///
 fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
-  Store::local_only(task_executor::Executor::new(Handle::current()), dir)
-    .expect("Error creating local store")
+  Store::local_only(task_executor::Executor::new(), dir).expect("Error creating local store")
 }
 
 ///
@@ -100,7 +98,7 @@ fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
 ///
 fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
   Store::with_remote(
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     dir,
     vec![cas_address],
     None,
@@ -862,7 +860,7 @@ async fn instance_name_upload() {
     .expect("Error storing catnip locally");
 
   let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     dir.path(),
     vec![cas.address()],
     Some("dark-tower".to_owned()),
@@ -893,7 +891,7 @@ async fn instance_name_download() {
     .build();
 
   let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     dir.path(),
     vec![cas.address()],
     Some("dark-tower".to_owned()),
@@ -943,7 +941,7 @@ async fn auth_upload() {
     .expect("Error storing catnip locally");
 
   let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     dir.path(),
     vec![cas.address()],
     None,
@@ -974,7 +972,7 @@ async fn auth_download() {
     .build();
 
   let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     dir.path(),
     vec![cas.address()],
     None,

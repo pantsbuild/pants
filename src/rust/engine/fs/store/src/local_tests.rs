@@ -8,7 +8,6 @@ use bytes::{BufMut, Bytes, BytesMut};
 use hashing::{Digest, Fingerprint};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use tokio::runtime::Handle;
 use tokio::time::delay_for;
 use walkdir::WalkDir;
 
@@ -561,16 +560,11 @@ async fn all_digests() {
 }
 
 pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
-  ByteStore::new(task_executor::Executor::new(Handle::current()), dir).unwrap()
+  ByteStore::new(task_executor::Executor::new(), dir).unwrap()
 }
 
 pub fn new_store_with_lease_time<P: AsRef<Path>>(dir: P, lease_time: Duration) -> ByteStore {
-  ByteStore::new_with_lease_time(
-    task_executor::Executor::new(Handle::current()),
-    dir,
-    lease_time,
-  )
-  .unwrap()
+  ByteStore::new_with_lease_time(task_executor::Executor::new(), dir, lease_time).unwrap()
 }
 
 pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {

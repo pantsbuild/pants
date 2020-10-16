@@ -7,12 +7,11 @@ use std::os::unix::fs::symlink;
 use std::path::PathBuf;
 use store::Store;
 use tempfile::TempDir;
-use tokio::runtime::Handle;
 
 fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
   let store_dir = TempDir::new().unwrap();
   let named_cache_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
   let local_runner = crate::local::CommandRunner::new(
     store,

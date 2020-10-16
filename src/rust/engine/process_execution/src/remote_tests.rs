@@ -21,7 +21,6 @@ use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
-use tokio::runtime::Handle;
 use workunit_store::{Level, SpanId, Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
@@ -907,7 +906,7 @@ async fn sends_headers() {
     )
   };
   let cas = mock::StubCAS::empty();
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
   let store = Store::with_remote(
     runtime.clone(),
@@ -1071,7 +1070,7 @@ async fn ensure_inline_stdio_is_stored() {
   let workunit_store = WorkunitStore::new(false);
   workunit_store.init_thread_state(None);
 
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
 
   let test_stdout = TestData::roland();
   let test_stderr = TestData::catnip();
@@ -1464,7 +1463,7 @@ async fn execute_missing_file_uploads_if_known() {
   let workunit_store = WorkunitStore::new(false);
   workunit_store.init_thread_state(None);
 
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
 
   let roland = TestData::roland();
 
@@ -1606,7 +1605,7 @@ async fn execute_missing_file_errors_if_unknown() {
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let store = Store::with_remote(
     runtime.clone(),
     store_dir,
@@ -2322,7 +2321,7 @@ fn create_command_runner(
   cas: &mock::StubCAS,
   platform: Platform,
 ) -> (CommandRunner, Store) {
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
@@ -2436,7 +2435,7 @@ async fn extract_output_files_from_response(
     .tree(&TestTree::roland_at_root())
     .tree(&TestTree::robin_at_root())
     .build();
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), &cas, executor.clone());
   crate::remote::extract_output_files(store, execute_response.get_result(), false)

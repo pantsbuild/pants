@@ -13,7 +13,7 @@ use testutil::{
 async fn missing_digest() {
   let (store_dir, mount_dir) = make_dirs();
 
-  let runtime = task_executor::Executor::new2();
+  let runtime = task_executor::Executor::new();
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -29,7 +29,7 @@ async fn missing_digest() {
 #[tokio::test]
 async fn read_file_by_digest() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new2();
+  let runtime = task_executor::Executor::new();
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -53,7 +53,7 @@ async fn read_file_by_digest() {
 #[tokio::test]
 async fn list_directory() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new2();
+  let runtime = task_executor::Executor::new();
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -81,7 +81,7 @@ async fn list_directory() {
 #[tokio::test]
 async fn read_file_from_directory() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new2();
+  let runtime = task_executor::Executor::new();
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -111,7 +111,7 @@ async fn read_file_from_directory() {
 #[tokio::test]
 async fn list_recursive_directory() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new2();
+  let runtime = task_executor::Executor::new();
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -150,7 +150,7 @@ async fn list_recursive_directory() {
 #[tokio::test]
 async fn read_file_from_recursive_directory() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new2();
+  let runtime = task_executor::Executor::new();
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -194,7 +194,7 @@ async fn read_file_from_recursive_directory() {
 #[tokio::test]
 async fn files_are_correctly_executable() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new2();
+  let runtime = task_executor::Executor::new();
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");

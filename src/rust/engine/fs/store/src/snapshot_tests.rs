@@ -7,7 +7,6 @@ use task_executor;
 use tempfile;
 use testutil::data::TestDirectory;
 use testutil::make_file;
-use tokio::runtime::Handle;
 
 use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store};
 use fs::{
@@ -24,7 +23,7 @@ pub fn setup() -> (
   Arc<PosixFS>,
   OneOffStoreFileByDigest,
 ) {
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
   // TODO: Pass a remote CAS address through.
   let store = Store::local_only(
     executor.clone(),
