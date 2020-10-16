@@ -49,7 +49,7 @@ def mock_sources_field(
 ) -> SourcesField:
     sources_field = sources_field_cls(
         sources.source_files if include_sources else [],
-        address=Address.parse(f"{sources.source_root}:lib"),
+        address=Address(sources.source_root, target_name="lib"),
     )
     rule_runner.create_files(path=sources.source_root, files=sources.source_files)
     return sources_field

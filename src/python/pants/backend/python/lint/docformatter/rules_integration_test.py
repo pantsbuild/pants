@@ -30,15 +30,15 @@ def rule_runner() -> RuleRunner:
     )
 
 
-GOOD_SOURCE = FileContent(path="good.py", content=b'"""Good docstring."""\n')
-BAD_SOURCE = FileContent(path="bad.py", content=b'"""Oops, missing a period"""\n')
-FIXED_BAD_SOURCE = FileContent(path="bad.py", content=b'"""Oops, missing a period."""\n')
+GOOD_SOURCE = FileContent("good.py", b'"""Good docstring."""\n')
+BAD_SOURCE = FileContent("bad.py", b'"""Oops, missing a period"""\n')
+FIXED_BAD_SOURCE = FileContent("bad.py", b'"""Oops, missing a period."""\n')
 
 
 def make_target(rule_runner: RuleRunner, source_files: List[FileContent]) -> Target:
     for source_file in source_files:
         rule_runner.create_file(f"{source_file.path}", source_file.content.decode())
-    return PythonLibrary({}, address=Address.parse(":target"))
+    return PythonLibrary({}, address=Address("", target_name="target"))
 
 
 def run_docformatter(

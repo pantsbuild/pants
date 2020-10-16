@@ -122,14 +122,16 @@ class FortranTarget(Target):
 
 def test_invalid_fields_rejected() -> None:
     with pytest.raises(InvalidFieldException) as exc:
-        FortranTarget({"invalid_field": True}, address=Address.parse(":lib"))
+        FortranTarget({"invalid_field": True}, address=Address("", target_name="lib"))
     assert "Unrecognized field `invalid_field=True`" in str(exc)
     assert "//:lib" in str(exc)
 
 
 def test_get_field() -> None:
     extensions = ("FortranExt1",)
-    tgt = FortranTarget({FortranExtensions.alias: extensions}, address=Address.parse(":lib"))
+    tgt = FortranTarget(
+        {FortranExtensions.alias: extensions}, address=Address("", target_name="lib")
+    )
 
     assert tgt[FortranExtensions].value == extensions
     assert tgt.get(FortranExtensions).value == extensions
@@ -142,7 +144,7 @@ def test_get_field() -> None:
     # the field is not registered on the target type. To override the default field value, either
     # subclass the Field and create a new target, or, in your call site, interpret the result and
     # and apply your default.
-    default_field_tgt = FortranTarget({}, address=Address.parse(":default"))
+    default_field_tgt = FortranTarget({}, address=Address("", target_name="default"))
     assert default_field_tgt[FortranExtensions].value == ()
     assert default_field_tgt.get(FortranExtensions).value == ()
     assert default_field_tgt.get(FortranExtensions, default_raw_value=["FortranExt2"]).value == ()
@@ -173,7 +175,7 @@ def test_primitive_field_hydration_is_eager() -> None:
     with pytest.raises(InvalidFieldException) as exc:
         FortranTarget(
             {FortranExtensions.alias: ["FortranExt1", "DoesNotStartWithFortran"]},
-            address=Address.parse(":bad_extension"),
+            address=Address("", target_name="bad_extension"),
         )
     assert "DoesNotStartWithFortran" in str(exc)
     assert "//:bad_extension" in str(exc)
@@ -181,7 +183,7 @@ def test_primitive_field_hydration_is_eager() -> None:
 
 def test_has_fields() -> None:
     empty_union_membership = UnionMembership({})
-    tgt = FortranTarget({}, address=Address.parse(":lib"))
+    tgt = FortranTarget({}, address=Address("", target_name="lib"))
 
     assert tgt.field_types == (FortranExtensions, FortranSources)
     assert FortranTarget.class_field_types(union_membership=empty_union_membership) == (
@@ -228,7 +230,7 @@ def test_async_field() -> None:
         *, raw_source_files: List[str], hydrated_source_files: Tuple[str, ...]
     ) -> FortranSourcesResult:
         sources_field = FortranTarget(
-            {FortranSources.alias: raw_source_files}, address=Address.parse(":lib")
+            {FortranSources.alias: raw_source_files}, address=Address("", target_name="lib")
         )[FortranSources]
         result: FortranSourcesResult = run_rule_with_mocks(
             hydrate_fortran_sources,
@@ -254,7 +256,7 @@ def test_async_field() -> None:
 
     # Test that `raw_value` gets sanitized/validated eagerly.
     with pytest.raises(ValueError) as exc:
-        FortranTarget({FortranSources.alias: [0, 1, 2]}, address=Address.parse(":lib"))
+        FortranTarget({FortranSources.alias: [0, 1, 2]}, address=Address("", target_name="lib"))
     assert "Not all elements of the iterable have type" in str(exc)
 
     # Test post-hydration validation.
@@ -274,7 +276,7 @@ def test_add_custom_fields() -> None:
     )
     tgt_values = {CustomField.alias: True}
     tgt = FortranTarget(
-        tgt_values, address=Address.parse(":lib"), union_membership=union_membership
+        tgt_values, address=Address("", target_name="lib"), union_membership=union_membership
     )
 
     assert tgt.field_types == (FortranExtensions, FortranSources, CustomField)
@@ -295,7 +297,7 @@ def test_add_custom_fields() -> None:
     assert tgt[CustomField].value is True
 
     default_tgt = FortranTarget(
-        {}, address=Address.parse(":default"), union_membership=union_membership
+        {}, address=Address("", target_name="default"), union_membership=union_membership
     )
     assert default_tgt[CustomField].value is False
 
@@ -304,7 +306,7 @@ def test_add_custom_fields() -> None:
         alias = "other_target"
         core_fields = ()
 
-    other_tgt = OtherTarget({}, address=Address.parse(":other"))
+    other_tgt = OtherTarget({}, address=Address("", target_name="other"))
     assert other_tgt.plugin_fields == ()
     assert other_tgt.has_field(CustomField) is False
 
@@ -349,7 +351,7 @@ def test_override_preexisting_field_via_new_target() -> None:
         )
 
     custom_tgt = CustomFortranTarget(
-        {FortranExtensions.alias: ["FortranExt1"]}, address=Address.parse(":custom")
+        {FortranExtensions.alias: ["FortranExt1"]}, address=Address("", target_name="custom")
     )
 
     assert custom_tgt.has_field(FortranExtensions) is True
@@ -363,7 +365,7 @@ def test_override_preexisting_field_via_new_target() -> None:
     # Ensure that subclasses not defined on a target are not accepted. This allows us to, for
     # example, filter every target with `PythonSources` (or a subclass) and to ignore targets with
     # only `Sources`.
-    normal_tgt = FortranTarget({}, address=Address.parse(":normal"))
+    normal_tgt = FortranTarget({}, address=Address("", target_name="normal"))
     assert normal_tgt.has_field(FortranExtensions) is True
     assert normal_tgt.has_field(CustomFortranExtensions) is False
 
@@ -375,7 +377,7 @@ def test_override_preexisting_field_via_new_target() -> None:
 
     # Check custom default value
     assert (
-        CustomFortranTarget({}, address=Address.parse(":default"))[FortranExtensions].value
+        CustomFortranTarget({}, address=Address("", target_name="default"))[FortranExtensions].value
         == CustomFortranExtensions.default_extensions
     )
 
@@ -383,7 +385,7 @@ def test_override_preexisting_field_via_new_target() -> None:
     with pytest.raises(InvalidFieldException) as exc:
         CustomFortranTarget(
             {FortranExtensions.alias: CustomFortranExtensions.banned_extensions},
-            address=Address.parse(":invalid"),
+            address=Address("", target_name="invalid"),
         )
     assert str(list(CustomFortranExtensions.banned_extensions)) in str(exc)
     assert "//:invalid" in str(exc)
@@ -407,7 +409,7 @@ def test_required_field() -> None:
         alias = "required_target"
         core_fields = (RequiredPrimitiveField, RequiredAsyncField)
 
-    address = Address.parse(":lib")
+    address = Address("", target_name="lib")
 
     # No errors when all defined
     RequiredTarget({"primitive": "present", "async": 0}, address=address)
@@ -437,7 +439,7 @@ def test_generate_subtarget() -> None:
     # different address.
     single_source_tgt = MockTarget(
         {Sources.alias: ["demo.f95"], Tags.alias: ["demo"]},
-        address=Address.parse("src/fortran:demo"),
+        address=Address("src/fortran", target_name="demo"),
     )
     expected_single_source_address = Address(
         "src/fortran", relative_file_path="demo.f95", target_name="demo"
@@ -453,7 +455,8 @@ def test_generate_subtarget() -> None:
     )
 
     subdir_tgt = MockTarget(
-        {Sources.alias: ["demo.f95", "subdir/demo.f95"]}, address=Address.parse("src/fortran:demo")
+        {Sources.alias: ["demo.f95", "subdir/demo.f95"]},
+        address=Address("src/fortran", target_name="demo"),
     )
     expected_subdir_address = Address(
         "src/fortran", relative_file_path="subdir/demo.f95", target_name="demo"
@@ -515,11 +518,11 @@ def test_field_set() -> None:
 
         unrelated_field: UnrelatedField
 
-    fortran_addr = Address.parse(":fortran")
+    fortran_addr = Address("", target_name="fortran")
     fortran_tgt = FortranTarget({}, address=fortran_addr)
-    unrelated_addr = Address.parse(":unrelated")
+    unrelated_addr = Address("", target_name="unrelated")
     unrelated_tgt = UnrelatedTarget({UnrelatedField.alias: "configured"}, address=unrelated_addr)
-    no_fields_addr = Address.parse(":no_fields")
+    no_fields_addr = Address("", target_name="no_fields")
     no_fields_tgt = NoFieldsTarget({}, address=no_fields_addr)
 
     assert FortranFieldSet.is_applicable(fortran_tgt) is True
@@ -560,7 +563,7 @@ def test_scalar_field() -> None:
         ) -> Optional[CustomObject]:
             return super().compute_value(raw_value, address=address)
 
-    addr = Address.parse(":example")
+    addr = Address("", target_name="example")
 
     with pytest.raises(InvalidFieldTypeException) as exc:
         Example(1, address=addr)
@@ -584,7 +587,7 @@ def test_string_field_valid_choices() -> None:
         valid_choices = LeafyGreens
         default = LeafyGreens.KALE.value
 
-    addr = Address.parse(":example")
+    addr = Address("", target_name="example")
     assert GivenStrings("spinach", address=addr).value == "spinach"
     assert GivenEnum("spinach", address=addr).value == "spinach"
 
@@ -613,7 +616,7 @@ def test_sequence_field() -> None:
         ) -> Optional[Tuple[CustomObject, ...]]:
             return super().compute_value(raw_value, address=address)
 
-    addr = Address.parse(":example")
+    addr = Address("", target_name="example")
 
     def assert_flexible_constructor(raw_value: Iterable[CustomObject]) -> None:
         assert Example(raw_value, address=addr).value == tuple(raw_value)
@@ -636,7 +639,7 @@ def test_string_sequence_field() -> None:
     class Example(StringSequenceField):
         alias = "example"
 
-    addr = Address.parse(":example")
+    addr = Address("", target_name="example")
     assert Example(["hello", "world"], address=addr).value == ("hello", "world")
     assert Example(None, address=addr).value is None
     with pytest.raises(InvalidFieldTypeException):
@@ -649,7 +652,7 @@ def test_string_or_string_sequence_field() -> None:
     class Example(StringOrStringSequenceField):
         alias = "example"
 
-    addr = Address.parse(":example")
+    addr = Address("", target_name="example")
     assert Example(["hello", "world"], address=addr).value == ("hello", "world")
     assert Example("hello world", address=addr).value == ("hello world",)
     with pytest.raises(InvalidFieldTypeException):
@@ -686,7 +689,7 @@ def test_dict_string_to_string_sequence_field() -> None:
     class Example(DictStringToStringSequenceField):
         alias = "example"
 
-    addr = Address.parse(":example")
+    addr = Address("", target_name="example")
 
     def assert_flexible_constructor(raw_value: Dict[str, Iterable[str]]) -> None:
         assert Example(raw_value, address=addr).value == FrozenDict(

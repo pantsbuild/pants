@@ -160,7 +160,7 @@ def test_infer_python_inits() -> None:
             [InferInitDependencies(target[PythonSources])],
         )
 
-    assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
+    assert run_dep_inference(Address("src/python/root/mid/leaf")) == InferredDependencies(
         [
             Address("src/python/root", relative_file_path="__init__.py", target_name="root"),
             Address("src/python/root/mid", relative_file_path="__init__.py", target_name="mid"),
@@ -200,7 +200,7 @@ def test_infer_python_conftests() -> None:
             [InferConftestDependencies(target[PythonSources])],
         )
 
-    assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
+    assert run_dep_inference(Address("src/python/root/mid/leaf")) == InferredDependencies(
         [
             Address("src/python/root", relative_file_path="conftest.py", target_name="root"),
             Address("src/python/root/mid", relative_file_path="conftest.py", target_name="mid"),

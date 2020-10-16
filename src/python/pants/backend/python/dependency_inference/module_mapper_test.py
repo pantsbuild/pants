@@ -54,8 +54,8 @@ def test_first_party_modules_mapping() -> None:
 
 
 def test_third_party_modules_mapping() -> None:
-    colors_addr = Address.parse("//:ansicolors")
-    pants_addr = Address.parse("//:pantsbuild")
+    colors_addr = Address("", target_name="ansicolors")
+    pants_addr = Address("", target_name="pantsbuild")
     mapping = ThirdPartyModuleToAddressMapping(
         FrozenDict({"colors": colors_addr, "pants": pants_addr})
     )

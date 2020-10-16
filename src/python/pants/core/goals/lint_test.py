@@ -107,7 +107,7 @@ def rule_runner() -> RuleRunner:
 
 
 def make_target(address: Optional[Address] = None) -> Target:
-    return MockTarget({}, address=address or Address.parse(":tests"))
+    return MockTarget({}, address=address or Address("", target_name="tests"))
 
 
 def run_lint_rule(
@@ -189,8 +189,8 @@ def test_summary(rule_runner: RuleRunner) -> None:
     * Merge multiple results belonging to the same linter (`--per-file-caching`).
     * Decide correctly between skipped, failed, and succeeded.
     """
-    good_address = Address.parse(":good")
-    bad_address = Address.parse(":bad")
+    good_address = Address("", target_name="good")
+    bad_address = Address("", target_name="bad")
 
     def assert_expected(*, per_file_caching: bool) -> None:
         exit_code, stderr = run_lint_rule(

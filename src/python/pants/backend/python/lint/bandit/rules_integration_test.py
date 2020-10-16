@@ -42,7 +42,7 @@ def make_target(
         rule_runner.create_file(source_file.path, source_file.content.decode())
     return PythonLibrary(
         {PythonInterpreterCompatibility.alias: interpreter_constraints},
-        address=Address.parse(":target"),
+        address=Address("", target_name="target"),
     )
 
 

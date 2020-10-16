@@ -97,7 +97,7 @@ def rule_runner() -> RuleRunner:
 
 def make_target_with_origin(address: Optional[Address] = None) -> TargetWithOrigin:
     if address is None:
-        address = Address.parse(":tests")
+        address = Address("", target_name="tests")
     return TargetWithOrigin(
         MockTarget({}, address=address),
         origin=AddressLiteralSpec(address.spec_path, address.target_name),
@@ -233,8 +233,8 @@ def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
 
 
 def test_summary(rule_runner: RuleRunner) -> None:
-    good_address = Address.parse(":good")
-    bad_address = Address.parse(":bad")
+    good_address = Address("", target_name="good")
+    bad_address = Address("", target_name="bad")
 
     exit_code, stderr = run_test_rule(
         rule_runner,
@@ -262,8 +262,8 @@ def test_debug_target(rule_runner: RuleRunner) -> None:
 
 
 def test_coverage(rule_runner: RuleRunner) -> None:
-    addr1 = Address.parse(":t1")
-    addr2 = Address.parse(":t2")
+    addr1 = Address("", target_name="t1")
+    addr2 = Address("", target_name="t2")
     exit_code, stderr = run_test_rule(
         rule_runner,
         field_set=SuccessfulFieldSet,
