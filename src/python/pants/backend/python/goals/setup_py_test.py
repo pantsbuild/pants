@@ -11,6 +11,7 @@ from pants.backend.python.goals.setup_py import (
     DependencyOwner,
     ExportedTarget,
     ExportedTargetRequirements,
+    FirstPartyDependencyVersionScheme,
     InvalidEntryPoint,
     InvalidSetupPyArgs,
     NoOwnerError,
@@ -435,11 +436,15 @@ def test_get_requirements() -> None:
         ),
     )
 
-    def assert_requirements(expected_req_strs, addr, *, exact_first_party_deps: bool = False):
-        if exact_first_party_deps:
-            rule_runner.set_options(
-                ["--python-distribution-exact-first-party-dependency-requirements"]
-            )
+    def assert_requirements(
+        expected_req_strs,
+        addr,
+        *,
+        version_scheme: FirstPartyDependencyVersionScheme = FirstPartyDependencyVersionScheme.EXACT
+    ):
+        rule_runner.set_options(
+            [f"--python-distribution-first-party-dependency-version-scheme={version_scheme.value}"]
+        )
         tgt = rule_runner.get_target(Address.parse(addr))
         reqs = rule_runner.request(
             ExportedTargetRequirements,
@@ -448,12 +453,17 @@ def test_get_requirements() -> None:
         assert sorted(expected_req_strs) == list(reqs)
 
     assert_requirements(["ext1==1.22.333", "ext2==4.5.6"], "src/python/foo/bar:bar-dist")
-    assert_requirements(["ext3==0.0.1", "bar~=9.8.7"], "src/python/foo/corge:corge-dist")
+    assert_requirements(["ext3==0.0.1", "bar==9.8.7"], "src/python/foo/corge:corge-dist")
 
     assert_requirements(
-        ["ext3==0.0.1", "bar==9.8.7"],
+        ["ext3==0.0.1", "bar~=9.8.7"],
         "src/python/foo/corge:corge-dist",
-        exact_first_party_deps=True,
+        version_scheme=FirstPartyDependencyVersionScheme.COMPATIBLE,
+    )
+    assert_requirements(
+        ["ext3==0.0.1", "bar"],
+        "src/python/foo/corge:corge-dist",
+        version_scheme=FirstPartyDependencyVersionScheme.ANY,
     )
 
 

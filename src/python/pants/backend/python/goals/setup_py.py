@@ -9,6 +9,7 @@ import pickle
 from abc import ABC, abstractmethod
 from collections import abc, defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
@@ -309,6 +310,12 @@ class RunSetupPyResult:
     output: Digest  # The state of the chroot after running setup.py.
 
 
+class FirstPartyDependencyVersionScheme(Enum):
+    EXACT = "exact"  # i.e., ==
+    COMPATIBLE = "compatible"  # i.e., ~=
+    ANY = "any"  # i.e., no specifier
+
+
 class PythonDistributionSubsystem(Subsystem):
     """Options for packaging wheels/sdists from a `python_distribution` target."""
 
@@ -318,20 +325,27 @@ class PythonDistributionSubsystem(Subsystem):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--exact-first-party-dependency-requirements",
-            type=bool,
-            default=False,
+            "--first-party-dependency-version-scheme",
+            type=FirstPartyDependencyVersionScheme,
+            default=FirstPartyDependencyVersionScheme.COMPATIBLE,
             help=(
-                "If True, dependencies on other `python_distribution`s will use exact requirements "
-                "with `==`, rather than compatible releases with `~=`. See "
+                "What version to set in `install_requires` when a `python_distribution` depends on "
+                "other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will "
+                "use `~=`. If `any`, will leave off the version. See "
                 "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
             ),
         )
 
-    @property
-    def first_party_dependencies_version_specifier(self) -> str:
-        """The version specifier to use for first-party dependencies (either `==` or `~=`)."""
-        return "==" if self.options.exact_first_party_dependency_requirements else "~="
+    def first_party_dependency_version(self, version: str) -> str:
+        """Return the version string (e.g. '~=4.0') for a first-party dependency.
+
+        If the user specified to use "any" version, then this will return an empty string.
+        """
+        scheme = self.options.first_party_dependency_version_scheme
+        if scheme == FirstPartyDependencyVersionScheme.ANY:
+            return ""
+        specifier = "==" if scheme == FirstPartyDependencyVersionScheme.EXACT else "~="
+        return f"{specifier}{version}"
 
 
 class SetupPySubsystem(GoalSubsystem):
@@ -775,12 +789,11 @@ async def get_requirements(
     req_strs = list(reqs)
 
     # Add the requirements on any exported targets on which we depend.
-    version_specifier = python_distribution_subsystem.first_party_dependencies_version_specifier
     kwargs_for_exported_targets_we_depend_on = await MultiGet(
         Get(SetupKwargs, OwnedDependency(tgt)) for tgt in owned_by_others
     )
     req_strs.extend(
-        f"{kwargs.name}{version_specifier}{kwargs.version}"
+        f"{kwargs.name}{python_distribution_subsystem.first_party_dependency_version(kwargs.version)}"
         for kwargs in set(kwargs_for_exported_targets_we_depend_on)
     )
 
