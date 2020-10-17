@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Type, Union
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.lifecycle import ExtensionLifecycleHandler
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
@@ -26,6 +27,7 @@ class BuildConfiguration:
     rules: FrozenOrderedSet[Rule]
     union_rules: FrozenOrderedSet[UnionRule]
     target_types: FrozenOrderedSet[Type[Target]]
+    lifecycle_handlers: FrozenOrderedSet[ExtensionLifecycleHandler]
 
     @dataclass
     class Builder:
@@ -35,6 +37,9 @@ class BuildConfiguration:
         _rules: OrderedSet = field(default_factory=OrderedSet)
         _union_rules: OrderedSet = field(default_factory=OrderedSet)
         _target_types: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
+        _lifecycle_handlers: OrderedSet[ExtensionLifecycleHandler] = field(
+            default_factory=OrderedSet
+        )
 
         def registered_aliases(self) -> BuildFileAliases:
             """Return the registered aliases exposed in BUILD files.
@@ -161,6 +166,23 @@ class BuildConfiguration:
                 )
             self._target_types.update(target_types)
 
+        def register_lifecycle_handlers(self, handlers: typing.Iterable[ExtensionLifecycleHandler]):
+            if not isinstance(handlers, Iterable):
+                raise TypeError(
+                    f"The entrypoint `lifecycle_handlers` must return an iterable. Given {repr(handlers)}"
+                )
+            bad_elements = [
+                handler
+                for handler in handlers
+                if not isinstance(handler, ExtensionLifecycleHandler)
+            ]
+            if bad_elements:
+                raise TypeError(
+                    "Every element of the entrypoint `lifecycle_handlers` must be a subclass of "
+                    f"{ExtensionLifecycleHandler.__name__}. Bad elements: {bad_elements}."
+                )
+            self._lifecycle_handlers.update(handlers)
+
         def create(self) -> "BuildConfiguration":
             registered_aliases = BuildFileAliases(
                 objects=self._exposed_object_by_alias.copy(),
@@ -172,4 +194,5 @@ class BuildConfiguration:
                 rules=FrozenOrderedSet(self._rules),
                 union_rules=FrozenOrderedSet(self._union_rules),
                 target_types=FrozenOrderedSet(self._target_types),
+                lifecycle_handlers=FrozenOrderedSet(self._lifecycle_handlers),
             )

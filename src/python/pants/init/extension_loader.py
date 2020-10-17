@@ -96,6 +96,9 @@ def load_plugins(
         if "rules" in entries:
             rules = entries["rules"].load()()
             build_configuration.register_rules(rules)
+        if "lifecycle_handlers" in entries:
+            lifecycle_handlers = entries["lifecycle_handlers"].load()()
+            build_configuration.register_lifecycle_handlers(lifecycle_handlers)
         loaded[dist.as_requirement().key] = dist
 
 
@@ -151,3 +154,6 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
     rules = invoke_entrypoint("rules")
     if rules:
         build_configuration.register_rules(rules)
+    lifecycle_handlers = invoke_entrypoint("lifecycle_handlers")
+    if lifecycle_handlers:
+        build_configuration.register_lifecycle_handlers(lifecycle_handlers)

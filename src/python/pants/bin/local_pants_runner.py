@@ -4,7 +4,7 @@
 import logging
 import os
 from dataclasses import dataclass, replace
-from typing import Mapping, Optional, Tuple
+from typing import Mapping, Optional, Set, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
@@ -13,6 +13,7 @@ from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.base.workunit import WorkUnit
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.build_graph.lifecycle import SessionLifecycleHandler
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import ExecutionError
@@ -55,6 +56,7 @@ class LocalPantsRunner:
     union_membership: UnionMembership
     profile_path: Optional[str]
     _run_tracker: RunTracker
+    _session_lifecycle_handlers: Set[SessionLifecycleHandler]
 
     @classmethod
     def parse_options(
@@ -162,6 +164,14 @@ class LocalPantsRunner:
 
         profile_path = env.get("PANTS_PROFILE")
 
+        # Query registered extension lifecycle handlers to see if any wish to receive lifecycle events
+        # for this session.
+        session_lifecycle_handlers = []
+        for lifecycle_handler in build_config.lifecycle_handlers:
+            session_lifecycle_handler = lifecycle_handler.on_session_create(options)
+            if session_lifecycle_handler:
+                session_lifecycle_handlers.append(session_lifecycle_handler)
+
         return cls(
             build_root=build_root,
             options=options,
@@ -170,6 +180,7 @@ class LocalPantsRunner:
             graph_session=graph_session,
             union_membership=union_membership,
             profile_path=profile_path,
+            _session_lifecycle_handlers=session_lifecycle_handlers,
             _run_tracker=RunTracker.global_instance(),
         )
 
@@ -274,10 +285,19 @@ class LocalPantsRunner:
                 return help_printer.print_help()
 
             with streaming_reporter.session():
+                # Invoke the session lifecycle handlers, if any.
+                for session_lifecycle_handler in self._session_lifecycle_handlers:
+                    session_lifecycle_handler.on_session_start()
+
                 engine_result = PANTS_FAILED_EXIT_CODE
                 try:
                     engine_result = self._run_v2()
                 except Exception as e:
                     ExceptionSink.log_exception(e)
                 run_tracker_result = self._finish_run(engine_result)
+
+                # Invoke the session lifecycle handlers, if any.
+                for session_lifecycle_handler in self._session_lifecycle_handlers:
+                    session_lifecycle_handler.on_session_end()
+
             return self._merge_exit_codes(engine_result, run_tracker_result)
