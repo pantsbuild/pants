@@ -205,10 +205,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         input_digests.append(prepared_sources.stripped_source_files.snapshot.digest)
     merged_input_digest = await Get(Digest, MergeDigests(input_digests))
 
-    interpreter_constraints = (
-        request.hardcoded_interpreter_constraints
-        if request.hardcoded_interpreter_constraints
-        else PexInterpreterConstraints.create_from_compatibility_fields(
+    if request.hardcoded_interpreter_constraints:
+        interpreter_constraints = request.hardcoded_interpreter_constraints
+    else:
+        calculated_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
             (
                 tgt[PythonInterpreterCompatibility]
                 for tgt in all_targets
@@ -216,7 +216,11 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             ),
             python_setup,
         )
-    )
+        # If there are no targets, we fall back to the global constraints. This is relevant,
+        # for example, when running `./pants repl` with no specs.
+        interpreter_constraints = calculated_constraints or PexInterpreterConstraints(
+            python_setup.interpreter_constraints
+        )
 
     exact_reqs = PexRequirements.create_from_requirement_fields(
         (
