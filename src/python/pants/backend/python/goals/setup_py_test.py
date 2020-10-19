@@ -11,11 +11,13 @@ from pants.backend.python.goals.setup_py import (
     DependencyOwner,
     ExportedTarget,
     ExportedTargetRequirements,
+    FirstPartyDependencyVersionScheme,
     InvalidEntryPoint,
     InvalidSetupPyArgs,
     NoOwnerError,
     OwnedDependencies,
     OwnedDependency,
+    PythonDistributionSubsystem,
     SetupKwargs,
     SetupKwargsRequest,
     SetupPyChroot,
@@ -44,7 +46,7 @@ from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -93,6 +95,7 @@ def chroot_rule_runner() -> RuleRunner:
             get_exporting_owner,
             *python_sources.rules(),
             setup_kwargs_plugin,
+            SubsystemRule(PythonDistributionSubsystem),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
             QueryRule(SetupPyChroot, (SetupPyChrootRequest,)),
         ]
@@ -374,6 +377,7 @@ def test_get_requirements() -> None:
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
+            SubsystemRule(PythonDistributionSubsystem),
             QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
         ]
     )
@@ -440,7 +444,15 @@ def test_get_requirements() -> None:
         ),
     )
 
-    def assert_requirements(expected_req_strs, addr: Address):
+    def assert_requirements(
+        expected_req_strs,
+        addr: Address,
+        *,
+        version_scheme: FirstPartyDependencyVersionScheme = FirstPartyDependencyVersionScheme.EXACT,
+    ):
+        rule_runner.set_options(
+            [f"--python-distribution-first-party-dependency-version-scheme={version_scheme.value}"]
+        )
         tgt = rule_runner.get_target(addr)
         reqs = rule_runner.request(
             ExportedTargetRequirements,
@@ -453,6 +465,17 @@ def test_get_requirements() -> None:
     )
     assert_requirements(
         ["ext3==0.0.1", "bar==9.8.7"], Address("src/python/foo/corge", target_name="corge-dist")
+    )
+
+    assert_requirements(
+        ["ext3==0.0.1", "bar~=9.8.7"],
+        Address("src/python/foo/corge", target_name="corge-dist"),
+        version_scheme=FirstPartyDependencyVersionScheme.COMPATIBLE,
+    )
+    assert_requirements(
+        ["ext3==0.0.1", "bar"],
+        Address("src/python/foo/corge", target_name="corge-dist"),
+        version_scheme=FirstPartyDependencyVersionScheme.ANY,
     )
 
 
