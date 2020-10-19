@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import enum
 import io
 import itertools
 import logging
@@ -72,6 +73,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.custom_types import shell_str
+from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -306,6 +308,45 @@ class RunSetupPyResult:
     """The result of running a setup.py command."""
 
     output: Digest  # The state of the chroot after running setup.py.
+
+
+@enum.unique
+class FirstPartyDependencyVersionScheme(enum.Enum):
+    EXACT = "exact"  # i.e., ==
+    COMPATIBLE = "compatible"  # i.e., ~=
+    ANY = "any"  # i.e., no specifier
+
+
+class PythonDistributionSubsystem(Subsystem):
+    """Options for packaging wheels/sdists from a `python_distribution` target."""
+
+    options_scope = "python-distribution"
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--first-party-dependency-version-scheme",
+            type=FirstPartyDependencyVersionScheme,
+            default=FirstPartyDependencyVersionScheme.EXACT,
+            help=(
+                "What version to set in `install_requires` when a `python_distribution` depends on "
+                "other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will "
+                "use `~=`. If `any`, will leave off the version. See "
+                "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
+            ),
+        )
+
+    def first_party_dependency_version(self, version: str) -> str:
+        """Return the version string (e.g. '~=4.0') for a first-party dependency.
+
+        If the user specified to use "any" version, then this will return an empty string.
+        """
+        scheme = self.options.first_party_dependency_version_scheme
+        if scheme == FirstPartyDependencyVersionScheme.ANY:
+            return ""
+        specifier = "==" if scheme == FirstPartyDependencyVersionScheme.EXACT else "~="
+        return f"{specifier}{version}"
 
 
 class SetupPySubsystem(GoalSubsystem):
@@ -714,7 +755,9 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
 
 @rule(desc="Compute distribution's 3rd party requirements")
 async def get_requirements(
-    dep_owner: DependencyOwner, union_membership: UnionMembership
+    dep_owner: DependencyOwner,
+    union_membership: UnionMembership,
+    python_distribution_subsystem: PythonDistributionSubsystem,
 ) -> ExportedTargetRequirements:
     transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest([dep_owner.exported_target.target.address])
@@ -736,13 +779,6 @@ async def get_requirements(
     # if U is in the owned deps then we'll pick up R through U. And if U is not in the owned deps
     # then it's owned by an exported target ET, and so R will be in the requirements for ET, and we
     # will require ET.
-    #
-    # TODO: Note that this logic doesn't account for indirection via dep aggregator targets, of type
-    #  `target`. But we don't have those in v2 (yet) anyway. Plus, as we move towards buildgen and/or
-    #  stricter build graph hygiene, it makes sense to require that targets directly declare their
-    #  true dependencies. Plus, in the specific realm of setup-py, since we must exclude indirect
-    #  deps across exported target boundaries, it's not a big stretch to just insist that
-    #  requirements must be direct deps.
     direct_deps_tgts = await MultiGet(
         Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
@@ -758,7 +794,7 @@ async def get_requirements(
         Get(SetupKwargs, OwnedDependency(tgt)) for tgt in owned_by_others
     )
     req_strs.extend(
-        f"{kwargs.name}=={kwargs.version}"
+        f"{kwargs.name}{python_distribution_subsystem.first_party_dependency_version(kwargs.version)}"
         for kwargs in set(kwargs_for_exported_targets_we_depend_on)
     )
 
