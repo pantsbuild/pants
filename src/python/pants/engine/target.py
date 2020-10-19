@@ -803,6 +803,11 @@ class _AbstractFieldSet(EngineAwareParameter, ABC):
     def debug_hint(self) -> str:
         return self.address.spec
 
+    def __repr__(self) -> str:
+        # We use a short repr() because this often shows up in stack traces. We don't need any of
+        # the field information because we can ask a user to send us their BUILD file.
+        return f"{self.__class__.__name__}(address={self.address})"
+
 
 def _get_field_set_fields_from_target(
     field_set: Type[_AbstractFieldSet], target: Target
