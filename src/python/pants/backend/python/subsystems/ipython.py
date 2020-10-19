@@ -16,12 +16,12 @@ class IPython(PythonToolBase):
         super().register_options(register)
         register(
             "--ignore-cwd",
-            type=str,
+            type=bool,
             advanced=True,
             default=True,
             help="Whether to tell IPython not to put the CWD on the import path. "
             "Normally you want this to be True, so that imports come from the hermetic "
-            "environment Pants creates.  However IPython<7.13.0 doesn't support this option, "
+            "environment Pants creates. However IPython<7.13.0 doesn't support this option, "
             "so if you're using an earlier version (e.g., because you have Python 2.7 code) "
             "then you will need to set this to False, and you may have issues with imports "
             "from your CWD shading the hermetic environment.",
