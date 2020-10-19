@@ -13,7 +13,6 @@ use notify;
 use parking_lot::Mutex;
 use task_executor::Executor;
 use testutil::{append_to_existing_file, make_file};
-use tokio::runtime::Handle;
 
 fn setup_fs() -> (tempfile::TempDir, PathBuf) {
   // setup a build_root with a file in it to watch.
@@ -32,7 +31,7 @@ async fn setup_watch(
   build_root: PathBuf,
   file_path: PathBuf,
 ) -> Arc<InvalidationWatcher> {
-  let executor = Executor::new(Handle::current());
+  let executor = Executor::new();
   let watcher = InvalidationWatcher::new(executor, build_root, ignorer)
     .expect("Couldn't create InvalidationWatcher");
   watcher.watch(file_path).await.unwrap();

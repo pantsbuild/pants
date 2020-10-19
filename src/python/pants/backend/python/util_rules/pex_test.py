@@ -217,18 +217,21 @@ class MockFieldSet(FieldSet):
     compatibility: PythonInterpreterCompatibility
 
     @classmethod
-    def create_for_test(cls, address: str, compat: Optional[str]) -> "MockFieldSet":
-        addr = Address.parse(address)
-        return cls(address=addr, compatibility=PythonInterpreterCompatibility(compat, address=addr))
+    def create_for_test(cls, address: Address, compat: Optional[str]) -> "MockFieldSet":
+        return cls(
+            address=address, compatibility=PythonInterpreterCompatibility(compat, address=address)
+        )
 
 
 def test_group_field_sets_by_constraints() -> None:
-    py2_fs = MockFieldSet.create_for_test("//:py2", ">=2.7,<3")
+    py2_fs = MockFieldSet.create_for_test(Address("", target_name="py2"), ">=2.7,<3")
     py3_fs = [
-        MockFieldSet.create_for_test("//:py3", "==3.6.*"),
-        MockFieldSet.create_for_test("//:py3_second", "==3.6.*"),
+        MockFieldSet.create_for_test(Address("", target_name="py3"), "==3.6.*"),
+        MockFieldSet.create_for_test(Address("", target_name="py3_second"), "==3.6.*"),
     ]
-    no_constraints_fs = MockFieldSet.create_for_test("//:no_constraints", None)
+    no_constraints_fs = MockFieldSet.create_for_test(
+        Address("", target_name="no_constraints"), None
+    )
     assert PexInterpreterConstraints.group_field_sets_by_constraints(
         [py2_fs, *py3_fs, no_constraints_fs],
         python_setup=create_subsystem(PythonSetup, interpreter_constraints=[]),
@@ -243,9 +246,15 @@ def test_group_field_sets_by_constraints() -> None:
 
 def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
     py3_fs = [
-        MockFieldSet.create_for_test("src/python/a_dir/path.py:test", "==3.6.*"),
-        MockFieldSet.create_for_test("src/python/b_dir/path.py:test", ">2.7,<3"),
-        MockFieldSet.create_for_test("src/python/c_dir/path.py:test", "==3.6.*"),
+        MockFieldSet.create_for_test(
+            Address("src/python/a_dir/path.py", target_name="test"), "==3.6.*"
+        ),
+        MockFieldSet.create_for_test(
+            Address("src/python/b_dir/path.py", target_name="test"), ">2.7,<3"
+        ),
+        MockFieldSet.create_for_test(
+            Address("src/python/c_dir/path.py", target_name="test"), "==3.6.*"
+        ),
     ]
 
     ic_36 = PexInterpreterConstraints([Requirement.parse("CPython==3.6.*")])
@@ -256,8 +265,12 @@ def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
     )
 
     assert output[ic_36] == (
-        MockFieldSet.create_for_test("src/python/a_dir/path.py:test", "==3.6.*"),
-        MockFieldSet.create_for_test("src/python/c_dir/path.py:test", "==3.6.*"),
+        MockFieldSet.create_for_test(
+            Address("src/python/a_dir/path.py", target_name="test"), "==3.6.*"
+        ),
+        MockFieldSet.create_for_test(
+            Address("src/python/c_dir/path.py", target_name="test"), "==3.6.*"
+        ),
     )
 
 
@@ -270,13 +283,13 @@ class ExactRequirement:
     def parse(cls, requirement: str) -> "ExactRequirement":
         req = Requirement.parse(requirement)
         assert len(req.specs) == 1, (
-            "Expected an exact requirement with only 1 specifier, given {requirement} with "
-            "{count} specifiers".format(requirement=requirement, count=len(req.specs))
+            f"Expected an exact requirement with only 1 specifier, given {requirement} with "
+            f"{len(req.specs)} specifiers"
         )
         operator, version = req.specs[0]
         assert operator == "==", (
-            "Expected an exact requirement using only the '==' specifier, given {requirement} "
-            "using the {operator!r} operator".format(requirement=requirement, operator=operator)
+            f"Expected an exact requirement using only the '==' specifier, given {requirement} "
+            f"using the {operator!r} operator"
         )
         return cls(project_name=req.project_name, version=version)
 

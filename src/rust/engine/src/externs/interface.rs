@@ -694,9 +694,10 @@ fn nailgun_server_create(
         ];
         match externs::call_function(&runner, &runner_args) {
           Ok(exit_code) => {
-            // TODO: We don't currently expose a "project_i32", but it will not be necessary with
-            // https://github.com/pantsbuild/pants/pull/9593.
-            nailgun::ExitCode(externs::val_to_str(&exit_code).parse().unwrap())
+            let gil = Python::acquire_gil();
+            let py = gil.python();
+            let code: i32 = exit_code.extract(py).unwrap();
+            nailgun::ExitCode(code)
           }
           Err(e) => {
             error!("Uncaught exception in nailgun handler: {:#?}", e);
@@ -1367,20 +1368,23 @@ fn capture_snapshots(
       session.workunit_store().init_thread_state(None);
       let core = scheduler.core.clone();
 
-      let values = externs::project_iterable(&path_globs_and_root_tuple_wrapper.into());
+      let values = externs::collect_iterable(&path_globs_and_root_tuple_wrapper).unwrap();
       let path_globs_and_roots = values
         .iter()
         .map(|value| {
-          let root = PathBuf::from(externs::project_str(&value, "root"));
+          let root = PathBuf::from(externs::getattr_as_string(&value, "root"));
           let path_globs = nodes::Snapshot::lift_prepared_path_globs(
-            &externs::project_ignoring_type(&value, "path_globs"),
+            &externs::getattr(&value, "path_globs").unwrap(),
           );
           let digest_hint = {
-            let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
-            if maybe_digest == Value::from(externs::none()) {
+            let maybe_digest: PyObject = externs::getattr(&value, "digest_hint").unwrap();
+            if maybe_digest == externs::none() {
               None
             } else {
-              Some(nodes::lift_directory_digest(&core.types, &maybe_digest)?)
+              Some(nodes::lift_directory_digest(
+                &core.types,
+                &Value::new(maybe_digest),
+              )?)
             }
           };
           path_globs.map(|path_globs| (path_globs, root, digest_hint))
@@ -1508,7 +1512,7 @@ fn run_local_interactive_process(
 
           let value: Value = request.into();
 
-          let argv: Vec<String> = externs::project_multi_strs(&value, "argv");
+          let argv: Vec<String> = externs::getattr(&value, "argv").unwrap();
           if argv.is_empty() {
             return Err("Empty argv list not permitted".to_string());
           }
@@ -1520,7 +1524,7 @@ fn run_local_interactive_process(
             Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
           };
 
-          let input_digest_value = externs::project_ignoring_type(&value, "input_digest");
+          let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
           let digest: Digest = nodes::lift_directory_digest(types, &input_digest_value)?;
           if digest != EMPTY_DIGEST {
             if run_in_workspace {
@@ -1562,7 +1566,7 @@ fn run_local_interactive_process(
           if hermetic_env {
             command.env_clear();
           }
-          let env = externs::project_frozendict(&value, "env");
+          let env = externs::getattr_from_frozendict(&value, "env");
           command.envs(env);
 
           let mut subprocess = command.spawn().map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;

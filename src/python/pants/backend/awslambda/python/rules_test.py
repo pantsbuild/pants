@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, bytes]:
+def create_python_awslambda(rule_runner: RuleRunner, addr: Address) -> Tuple[str, bytes]:
     rule_runner.set_options(
         [
             "--backend-packages=pants.backend.awslambda.python",
@@ -39,7 +39,7 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: str) -> Tuple[str, by
             "--pants-distdir-legacy-paths=false",
         ]
     )
-    target = rule_runner.get_target(Address.parse(addr))
+    target = rule_runner.get_target(addr)
     created_awslambda = rule_runner.request(
         CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target)]
     )
@@ -88,7 +88,7 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
     )
 
     zip_file_relpath, content = create_python_awslambda(
-        rule_runner, "src/python/foo/bar:hello_world_lambda"
+        rule_runner, Address("src/python/foo/bar", target_name="hello_world_lambda")
     )
     assert "src.python.foo.bar/hello_world_lambda.zip" == zip_file_relpath
     zipfile = ZipFile(BytesIO(content))

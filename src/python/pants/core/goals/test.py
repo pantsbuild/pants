@@ -7,7 +7,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
@@ -412,9 +412,12 @@ async def run_tests(
     workspace.write_digest(merged_xml_results)
 
     if test_subsystem.use_coverage:
-        all_coverage_data: Iterable[CoverageData] = [
-            result.coverage_data for result in results if result.coverage_data is not None
-        ]
+        # NB: We must pre-sort the data for itertools.groupby() to work properly, using the same
+        # key function for both. However, you can't sort by `types`, so we call `str()` on it.
+        all_coverage_data = sorted(
+            (result.coverage_data for result in results if result.coverage_data is not None),
+            key=lambda cov_data: str(type(cov_data)),
+        )
 
         coverage_types_to_collection_types: Dict[
             Type[CoverageData], Type[CoverageDataCollection]

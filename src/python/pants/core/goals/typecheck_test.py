@@ -111,7 +111,7 @@ class InvalidRequest(MockTypecheckRequest):
 
 def make_target(address: Optional[Address] = None) -> Target:
     if address is None:
-        address = Address.parse(":tests")
+        address = Address("", target_name="tests")
     return MockTarget({}, address=address)
 
 
@@ -159,8 +159,8 @@ def test_invalid_target_noops() -> None:
 
 
 def test_summary() -> None:
-    good_address = Address.parse(":good")
-    bad_address = Address.parse(":bad")
+    good_address = Address("", target_name="good")
+    bad_address = Address("", target_name="bad")
     exit_code, stderr = run_typecheck_rule(
         request_types=[
             ConditionallySucceedsRequest,

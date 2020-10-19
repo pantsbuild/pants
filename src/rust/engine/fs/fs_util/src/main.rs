@@ -52,7 +52,6 @@ use serde_derive::Serialize;
 use store::{
   Snapshot, SnapshotOps, SnapshotOpsError, Store, StoreFileByDigest, SubsetParams, UploadSummary,
 };
-use tokio::runtime::Handle;
 
 #[derive(Debug)]
 enum ExitCode {
@@ -281,7 +280,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.values_of("server-address") {
       Some(cas_address) => {

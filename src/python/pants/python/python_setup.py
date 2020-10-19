@@ -11,7 +11,7 @@ from typing import Callable, Iterable, List, Optional, Tuple, cast
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
-from pants.option.custom_types import UnsetBool, file_option
+from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -83,59 +83,6 @@ class PythonSetup(Subsystem):
                 "but selectively turn it off via command-line-flag when building deployable "
                 "binaries, so that you only deploy the requirements you actually need for a "
                 "given binary. Requires [python-setup].requirement_constraints to be set."
-            ),
-        )
-        register(
-            "--platforms",
-            advanced=True,
-            type=list,
-            metavar="<platform>",
-            default=["current"],
-            help="A list of platforms to be supported by this Python environment. Each platform"
-            "is a string, as returned by pkg_resources.get_supported_platform().",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "The option `--python-setup-platforms` does not do anything anymore. Instead, "
-                "explicitly set the `platforms` field on each `pex_binary` target."
-            ),
-        )
-        register(
-            "--interpreter-cache-dir",
-            advanced=True,
-            default=None,
-            metavar="<dir>",
-            help="The parent directory for the interpreter cache. "
-            "If unspecified, a standard path under the workdir is used.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "The option `--python-setup-interpreter-cache-dir` does not do anything anymore."
-                "Instead, use the global option `--named-caches-dir`."
-            ),
-        )
-        register(
-            "--resolver-cache-dir",
-            advanced=True,
-            default=None,
-            metavar="<dir>",
-            help="The parent directory for the requirement resolver cache. "
-            "If unspecified, a standard path under the workdir is used.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "The option `--python-setup-resolver-cache-dir` does not do anything anymore. "
-                "Instead, use the global option `--named-caches-dir`."
-            ),
-        )
-        register(
-            "--resolver-allow-prereleases",
-            advanced=True,
-            type=bool,
-            default=UnsetBool,
-            help="Whether to include pre-releases when resolving requirements.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "The option `--python-setup-resolver-allow-prereleases` does not no anything. To "
-                "use a pre-release, explicitly use that pre-release version in your requirement "
-                "string, e.g. `my_dist==99.0.dev0`."
             ),
         )
         register(

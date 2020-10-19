@@ -157,8 +157,8 @@ impl Function {
   pub fn name(&self) -> String {
     let Function(key) = self;
     let val = externs::val_for(&key);
-    let module = externs::project_str(&val, "__module__");
-    let name = externs::project_str(&val, "__name__");
+    let module = externs::getattr_as_string(&val, "__module__");
+    let name = externs::getattr_as_string(&val, "__name__");
     // NB: this is a custom dunder method that Python code should populate before sending the
     // function (e.g. an `@rule`) through FFI.
     let line_number: u64 = externs::getattr(&val, "__line_number__").unwrap();

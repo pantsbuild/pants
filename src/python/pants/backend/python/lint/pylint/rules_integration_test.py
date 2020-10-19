@@ -283,7 +283,7 @@ def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
             rule_runner,
             [test_fc],
             package="tests/python/project",
-            dependencies=[Address.parse(f"{PACKAGE}:target")],
+            dependencies=[Address(PACKAGE, target_name="target")],
         ),
     ]
     result = run_pylint(rule_runner, targets)

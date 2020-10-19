@@ -37,7 +37,9 @@ def run_black_and_isort(
 ) -> LanguageFmtResults:
     for source_file in source_files:
         rule_runner.create_file(source_file.path, source_file.content.decode())
-    targets = PythonFmtTargets(Targets([PythonLibrary({}, address=Address.parse(f"test:{name}"))]))
+    targets = PythonFmtTargets(
+        Targets([PythonLibrary({}, address=Address("test", target_name=name))])
+    )
     rule_runner.set_options(
         [
             "--backend-packages=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",

@@ -20,7 +20,6 @@ from typing import (
     cast,
 )
 
-from pants.base.deprecated import deprecated
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable, OptionableFactory
 from pants.option.options import Options
@@ -196,16 +195,6 @@ class Subsystem(Optionable):
         super().__init__()
         self.scope = scope
         self.options = options
-
-    @deprecated(
-        removal_version="2.1.0.dev0", hint_message="Use the property `self.options` instead."
-    )
-    def get_options(self) -> OptionValueContainer:
-        """Returns the option values for this subsystem's scope.
-
-        :API: public
-        """
-        return self.options
 
     @staticmethod
     def get_streaming_workunit_callbacks(subsystem_names: Iterable[str]) -> List[Callable]:

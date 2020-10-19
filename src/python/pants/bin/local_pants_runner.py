@@ -88,14 +88,12 @@ class LocalPantsRunner:
         except UnknownFlagsError as err:
             cls._handle_unknown_flags(err, options_bootstrapper)
             raise
-        dynamic_ui = global_scope.dynamic_ui if global_scope.v2 else False
-        use_colors = global_scope.get("colors", True)
 
         stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
         return graph_scheduler_helper.new_session(
             RunTracker.global_instance().run_id,
-            dynamic_ui=dynamic_ui,
-            use_colors=use_colors,
+            dynamic_ui=global_scope.dynamic_ui,
+            use_colors=global_scope.get("colors", True),
             should_report_workunits=stream_workunits,
             session_values=SessionValues(
                 {

@@ -127,7 +127,7 @@ def create_isolated_git_repo():
             f"""
             [GLOBAL]
             pythonpath = ["{get_buildroot()}/pants-plugins"]
-            backend_packages2.add = ["pants.backend.python", "internal_plugins.releases"]
+            backend_packages.add = ["pants.backend.python", "internal_plugins.releases"]
             """,
         )
         copy_into(".gitignore")

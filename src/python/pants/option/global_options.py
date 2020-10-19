@@ -212,26 +212,6 @@ class GlobalOptions(Subsystem):
             ),
         )
 
-        register(
-            "--v1",
-            advanced=True,
-            type=bool,
-            default=False,
-            help="Enables execution of v1 Tasks.",
-            removal_version="2.1.0.dev0",
-            removal_hint="The v1 engine no longer exists. This option does nothing.",
-        )
-
-        register(
-            "--v2",
-            advanced=True,
-            type=bool,
-            default=True,
-            help="Enables execution of v2 @goal_rules.",
-            removal_version="2.1.0.dev0",
-            removal_hint="The v2 engine is the only one available. This option does nothing.",
-        )
-
         # TODO(#7203): make a regexp option type!
         register(
             "--ignore-pants-warnings",
@@ -244,21 +224,6 @@ class GlobalOptions(Subsystem):
             "from the start of the warning string, and will always be case-insensitive. "
             "See the `warnings` Python module documentation for more background "
             "on how these are used.",
-        )
-        register(
-            "--option-name-check-distance",
-            advanced=True,
-            type=int,
-            default=2,
-            help=(
-                "The maximum Levenshtein distance to use when offering suggestions for invalid "
-                "option names."
-            ),
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "The option `--option-name-check-distance` no longer does anything, as Pants now "
-                "uses a different method to compute suggestions."
-            ),
         )
 
         register(
@@ -287,19 +252,9 @@ class GlobalOptions(Subsystem):
             "--plugins",
             advanced=True,
             type=list,
-            help="Allow backends to be loaded from these plugins.  The default backends for "
+            help="Allow backends to be loaded from these plugins. The default backends for "
             "each plugin will be loaded automatically. Other backends in a plugin can be "
-            "loaded by listing them in --backend-packages.",
-        )
-        register(
-            "--plugins2",
-            advanced=True,
-            type=list,
-            removal_version="2.1.0.dev0",
-            removal_hint="Use --plugins instead.",
-            help="Allow backends to be loaded from these plugins.  The default backends for "
-            "each plugin will be loaded automatically. Other backends in a plugin can be "
-            "loaded by listing them in --backend-packages.",
+            "loaded by listing them in `backend_packages` in the `[GLOBAL]` scope.",
         )
         register(
             "--plugins-force-resolve",
@@ -319,19 +274,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=list,
             default=[],
-            help=(
-                "Register rules from these backends. The backend packages must be present on "
-                "the PYTHONPATH, typically because they are in the Pants core dist, in a "
-                "plugin dist, or available as sources in the repo."
-            ),
-        )
-        register(
-            "--backend-packages2",
-            advanced=True,
-            type=list,
-            default=[],
-            removal_version="2.1.0.dev0",
-            removal_hint="Use --backend-packages instead.",
             help=(
                 "Register rules from these backends. The backend packages must be present on "
                 "the PYTHONPATH, typically because they are in the Pants core dist, in a "
@@ -579,52 +521,6 @@ class GlobalOptions(Subsystem):
             removal_hint="Use `--print-stacktrace` instead of `--print-exception-stacktrace`.",
         )
 
-        # BinaryUtil options.
-        register(
-            "--binaries-baseurls",
-            type=list,
-            advanced=True,
-            default=["https://binaries.pantsbuild.org"],
-            help="List of URLs from which binary tools are downloaded. URLs are "
-            "searched in order until the requested path is found.",
-            removal_version="2.1.0.dev0",
-            removal_hint="This option has no effect",
-        )
-        register(
-            "--binaries-fetch-timeout-secs",
-            type=int,
-            default=30,
-            advanced=True,
-            help="Timeout in seconds for URL reads when fetching binary tools from the "
-            "repos specified by --baseurls.",
-            removal_version="2.1.0.dev0",
-            removal_hint="This option has no effect",
-        )
-        register(
-            "--binaries-path-by-id",
-            type=dict,
-            advanced=True,
-            help=(
-                "Maps output of uname for a machine to a binary search path: "
-                "(sysname, id) -> (os, arch), e.g. {('darwin', '15'): ('mac', '10.11'), "
-                "('linux', 'arm32'): ('linux', 'arm32')}."
-            ),
-            removal_version="2.1.0.dev0",
-            removal_hint="This option has no effect",
-        )
-        register(
-            "--allow-external-binary-tool-downloads",
-            type=bool,
-            default=True,
-            advanced=True,
-            help="If False, require BinaryTool subclasses to download their contents from urls "
-            "generated from --binaries-baseurls, even if the tool has an external url "
-            "generator. This can be necessary if using Pants in an environment which cannot "
-            "contact the wider Internet.",
-            removal_version="2.1.0.dev0",
-            removal_hint="This option has no effect",
-        )
-
         # Pants Daemon options.
         register(
             "--pantsd-pailgun-port",
@@ -800,16 +696,6 @@ class GlobalOptions(Subsystem):
             default={},
         )
         register(
-            "--remote-execution-enable-streaming",
-            type=bool,
-            default=True,
-            advanced=True,
-            help="This option no longer does anything. (It used to enable the streaming remote execution client "
-            "which is now the only remote execution client.)",
-            removal_version="2.1.0.dev0",
-            removal_hint="This option is no longer applicable.",
-        )
-        register(
             "--remote-execution-overall-deadline-secs",
             type=int,
             default=DEFAULT_EXECUTION_OPTIONS.remote_execution_overall_deadline_secs,
@@ -889,25 +775,6 @@ class GlobalOptions(Subsystem):
             help="Display a dynamically-updating console UI as Pants runs. This is true by default "
             "if Pants detects a TTY and there is no 'CI' environment variable indicating that "
             "Pants is running in a continuous integration environment; and false otherwise.",
-        )
-
-        register(
-            "--dependency-inference",
-            default=False,
-            type=bool,
-            advanced=True,
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "This option is now a noop: individual inference providers can be independently "
-                "enabled or disabled on their relevant subsystems. For Python, see "
-                "`./pants help python-infer`."
-            ),
-            help=(
-                "Enable dependency inference, meaning that Pants will read your source code to "
-                "infer the `dependencies` field for you in BUILD files. You can check what Pants "
-                "inferred by running `./pants dependencies` on your target. You may still need to "
-                "explicitly provide some `dependencies` that cannot be inferred."
-            ),
         )
 
         register(

@@ -24,7 +24,7 @@ use crate::tasks::{self, Rule};
 use crate::Types;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{self, BufMut};
-use cpython::{Python, PythonObject};
+use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
@@ -213,7 +213,7 @@ pub fn lift_directory_digest(types: &Types, digest: &Value) -> Result<hashing::D
       digest, types.directory_digest
     ));
   }
-  let fingerprint = externs::project_str(&digest, "fingerprint");
+  let fingerprint = externs::getattr_as_string(&digest, "fingerprint");
   let digest_length: usize = externs::getattr(&digest, "serialized_bytes_length").unwrap();
   Ok(hashing::Digest(
     hashing::Fingerprint::from_hex_string(&fingerprint)?,
@@ -225,7 +225,7 @@ pub fn lift_file_digest(types: &Types, digest: &Value) -> Result<hashing::Digest
   if types.file_digest != externs::get_type_for(digest) {
     return Err(format!("{} is not of type {}.", digest, types.file_digest));
   }
-  let fingerprint = externs::project_str(&digest, "fingerprint");
+  let fingerprint = externs::getattr_as_string(&digest, "fingerprint");
   let digest_length: usize = externs::getattr(&digest, "serialized_bytes_length").unwrap();
   Ok(hashing::Digest(
     hashing::Fingerprint::from_hex_string(&fingerprint)?,
@@ -247,10 +247,10 @@ impl MultiPlatformExecuteProcess {
     value: &Value,
     target_platform: PlatformConstraint,
   ) -> Result<Process, String> {
-    let env = externs::project_frozendict(&value, "env");
+    let env = externs::getattr_from_frozendict(&value, "env");
 
     let working_directory = {
-      let val = externs::project_str(&value, "working_directory");
+      let val = externs::getattr_as_string(&value, "working_directory");
       if val.is_empty() {
         None
       } else {
@@ -258,18 +258,18 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let digest = lift_directory_digest(
-      types,
-      &externs::project_ignoring_type(&value, "input_digest"),
-    )
-    .map_err(|err| format!("Error parsing digest {}", err))?;
+    let py_digest: Value = externs::getattr(&value, "input_digest").unwrap();
+    let digest = lift_directory_digest(types, &py_digest)
+      .map_err(|err| format!("Error parsing digest {}", err))?;
 
-    let output_files = externs::project_multi_strs(&value, "output_files")
+    let output_files = externs::getattr::<Vec<String>>(&value, "output_files")
+      .unwrap()
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
-    let output_directories = externs::project_multi_strs(&value, "output_directories")
+    let output_directories = externs::getattr::<Vec<String>>(&value, "output_directories")
+      .unwrap()
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
@@ -282,17 +282,17 @@ impl MultiPlatformExecuteProcess {
       Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
     };
 
-    let description = externs::project_str(&value, "description");
-    let level =
-      externs::val_to_log_level(&externs::project_ignoring_type(&value, "level").as_ref())?;
+    let description = externs::getattr_as_string(&value, "description");
+    let py_level: PyObject = externs::getattr(&value, "level").unwrap();
+    let level = externs::val_to_log_level(&py_level)?;
 
-    let append_only_caches = externs::project_frozendict(&value, "append_only_caches")
+    let append_only_caches = externs::getattr_from_frozendict(&value, "append_only_caches")
       .into_iter()
       .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
       .collect::<Result<_, String>>()?;
 
     let jdk_home = {
-      let val = externs::project_str(&value, "jdk_home");
+      let val = externs::getattr_as_string(&value, "jdk_home");
       if val.is_empty() {
         None
       } else {
@@ -303,7 +303,7 @@ impl MultiPlatformExecuteProcess {
     let is_nailgunnable: bool = externs::getattr(&value, "is_nailgunnable").unwrap();
 
     let execution_slot_variable = {
-      let s = externs::project_str(&value, "execution_slot_variable");
+      let s = externs::getattr_as_string(&value, "execution_slot_variable");
       if s.is_empty() {
         None
       } else {
@@ -314,7 +314,7 @@ impl MultiPlatformExecuteProcess {
     let cache_failures: bool = externs::getattr(&value, "cache_failures").unwrap();
 
     Ok(process_execution::Process {
-      argv: externs::project_multi_strs(&value, "argv"),
+      argv: externs::getattr(&value, "argv").unwrap(),
       env,
       working_directory,
       input_files: digest,
@@ -333,7 +333,7 @@ impl MultiPlatformExecuteProcess {
   }
 
   pub fn lift(types: &Types, value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
-    let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
+    let constraint_parts: Vec<String> = externs::getattr(&value, "platform_constraints").unwrap();
     if constraint_parts.len() % 2 != 0 {
       return Err("Error parsing platform_constraints: odd number of parts".to_owned());
     }
@@ -346,7 +346,7 @@ impl MultiPlatformExecuteProcess {
         )
       })
       .collect();
-    let processes = externs::project_multi(&value, "processes");
+    let processes: Vec<Value> = externs::getattr(&value, "processes").unwrap();
     if constraint_parts.len() / 2 != processes.len() {
       return Err(format!(
         "Sizes of constraint keys and processes do not match: {} vs. {}",
@@ -613,23 +613,23 @@ impl Snapshot {
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
-    let globs = externs::project_multi_strs(item, "globs");
+    let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
 
-    let description_of_origin_field = externs::project_str(item, "description_of_origin");
+    let description_of_origin_field = externs::getattr_as_string(item, "description_of_origin");
     let description_of_origin = if description_of_origin_field.is_empty() {
       None
     } else {
       Some(description_of_origin_field)
     };
 
-    let glob_match_error_behavior =
-      externs::project_ignoring_type(item, "glob_match_error_behavior");
-    let failure_behavior = externs::project_str(&glob_match_error_behavior, "value");
+    let glob_match_error_behavior: PyObject =
+      externs::getattr(item, "glob_match_error_behavior").unwrap();
+    let failure_behavior = externs::getattr_as_string(&glob_match_error_behavior, "value");
     let strict_glob_matching =
       StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
-    let conjunction_obj = externs::project_ignoring_type(item, "conjunction");
-    let conjunction_string = externs::project_str(&conjunction_obj, "value");
+    let conjunction_obj: PyObject = externs::getattr(item, "conjunction").unwrap();
+    let conjunction_string = externs::getattr_as_string(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
     Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
   }
@@ -850,16 +850,14 @@ impl WrappedNode for DownloadedFile {
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Digest> {
     let value = externs::val_for(&self.0);
-    let url_str = externs::project_str(&value, "url");
+    let url_str = externs::getattr_as_string(&value, "url");
 
     let url = Url::parse(&url_str)
       .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_str, err)))?;
 
-    let expected_digest = lift_file_digest(
-      &context.core.types,
-      &externs::project_ignoring_type(&value, "expected_digest"),
-    )
-    .map_err(|s| throw(&s))?;
+    let py_digest: Value = externs::getattr(&value, "expected_digest").unwrap();
+    let expected_digest =
+      lift_file_digest(&context.core.types, &py_digest).map_err(|s| throw(&s))?;
 
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)

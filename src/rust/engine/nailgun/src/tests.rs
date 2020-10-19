@@ -15,7 +15,7 @@ use tokio::time::delay_for;
 
 #[tokio::test]
 async fn spawn_and_bind() {
-  let server = Server::new(Executor::new(Handle::current()), 0, |_| ExitCode(0))
+  let server = Server::new(Executor::new(), 0, |_| ExitCode(0))
     .await
     .unwrap();
   // Should have bound a random port.
@@ -26,7 +26,7 @@ async fn spawn_and_bind() {
 #[tokio::test]
 async fn accept() {
   let exit_code = ExitCode(42);
-  let server = Server::new(Executor::new(Handle::current()), 0, move |_| exit_code)
+  let server = Server::new(Executor::new(), 0, move |_| exit_code)
     .await
     .unwrap();
 
@@ -43,7 +43,7 @@ async fn shutdown_awaits_ongoing() {
   let connection_accepted = Arc::new(Notify::new());
   let should_complete_connection = Arc::new(Notify::new());
   let exit_code = ExitCode(42);
-  let server = Server::new(Executor::new(Handle::current()), 0, {
+  let server = Server::new(Executor::new(), 0, {
     let connection_accepted = connection_accepted.clone();
     let should_complete_connection = should_complete_connection.clone();
     move |_| {
