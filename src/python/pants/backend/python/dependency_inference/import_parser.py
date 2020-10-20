@@ -1,20 +1,21 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
+import ast as ast3
 import re
+import sys
 from dataclasses import dataclass
-from typing import Optional, Set, Union
+from typing import Optional, Set, Tuple
 
-import libcst as cst
 from typed_ast import ast27
-from typing_extensions import Protocol
 
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
 
-logger = logging.getLogger(__name__)
+
+class ImportParseError(ValueError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -33,56 +34,41 @@ class ParsedPythonImports:
     def all_imports(self) -> FrozenOrderedSet[str]:
         return FrozenOrderedSet(sorted([*self.explicit_imports, *self.inferred_imports]))
 
-    @classmethod
-    def empty(cls) -> "ParsedPythonImports":
-        return cls(FrozenOrderedSet(), FrozenOrderedSet())
 
-
-class VisitorInterface(Protocol):
-    explicit_imports: Set[str]
-    inferred_imports: Set[str]
-
-
-def parse_file(*, filename: str, content: str, module_name: str) -> Optional[VisitorInterface]:
-    """Parse the file for python imports, and return a visitor with the imports it found."""
-    # Parse all python 3 code with libCST. We parse assuming python 3 goes first, because we assume
-    # most user code will be python 3.
-    # TODO(#10921): identify the appropriate interpreter version beforehand!
+def parse_file(*, filename: str, content: str) -> Optional[Tuple]:
     try:
-        # NB: Since all python 3 code is forwards-compatible with the 3.8 parser, and the import
-        # syntax remains unchanged, we are safely able to use the 3.8 parser for parsing imports.
-        # TODO(#10922): Support parsing python 3.9/3.10 with libCST!
-        config = cst.PartialParserConfig(python_version="3.8")
-        cst_tree = cst.parse_module(content, config=config)
-        completed_cst_visitor = _CSTVisitor.visit_tree(cst_tree, module_name=module_name)
-        return completed_cst_visitor
-    except cst.ParserSyntaxError as e:
-        # NB: When the python 3 ast visitor fails to parse python 2 syntax, it raises a
-        # ParserSyntaxError. This may also occur when the file contains invalid python code. If we
-        # successfully parse a python 2 file with a python 3 parser, that should not change the
-        # imports we calculate.
-        logger.debug(f"Failed to parse {filename} with python 3.8 libCST parser: {e}")
-
-    try:
-        py27_tree = ast27.parse(content, filename=filename)
-        completed_ast27_visitor = _Py27AstVisitor.visit_tree(py27_tree, module_name=module_name)
-        return completed_ast27_visitor
-    except SyntaxError as e:
-        logger.debug(f"Failed to parse {filename} with python 2.7 typed-ast parser: {e}")
-
-    return None
+        # NB: The Python 3 ast is generally backwards-compatible with earlier versions. The only
+        # breaking change is `async` `await` becoming reserved keywords in Python 3.7 (deprecated
+        # in 3.6). If the std-lib fails to parse, we could use typed-ast to try parsing with a
+        # target version of Python 3.5, but we don't because Python 3.5 is almost EOL and has very
+        # low usage.
+        # We will also fail to parse Python 3.8 syntax if Pants is run with Python 3.6 or 3.7.
+        # There is no known workaround for this, beyond users changing their `./pants` script to
+        # always use >= 3.8.
+        tree = ast3.parse(content, filename=filename)
+        visitor_cls = _Py3AstVisitor if sys.version_info[:2] < (3, 8) else _Py38AstVisitor
+        return tree, visitor_cls
+    except SyntaxError:
+        try:
+            py27_tree = ast27.parse(content, filename=filename)
+            return py27_tree, _Py27AstVisitor
+        except SyntaxError:
+            return None
 
 
 def find_python_imports(*, filename: str, content: str, module_name: str) -> ParsedPythonImports:
-    completed_visitor = parse_file(filename=filename, content=content, module_name=module_name)
+    parse_result = parse_file(filename=filename, content=content)
     # If there were syntax errors, gracefully early return. This is more user friendly than
     # propagating the exception. Dependency inference simply won't be used for that file, and
     # it'll be up to the tool actually being run (e.g. Pytest or Flake8) to error.
-    if completed_visitor is None:
-        return ParsedPythonImports.empty()
+    if parse_result is None:
+        return ParsedPythonImports(FrozenOrderedSet(), FrozenOrderedSet())
+    tree, ast_visitor_cls = parse_result
+    ast_visitor = ast_visitor_cls(module_name)
+    ast_visitor.visit(tree)
     return ParsedPythonImports(
-        explicit_imports=FrozenOrderedSet(sorted(completed_visitor.explicit_imports)),
-        inferred_imports=FrozenOrderedSet(sorted(completed_visitor.inferred_imports)),
+        explicit_imports=FrozenOrderedSet(sorted(ast_visitor.explicit_imports)),
+        inferred_imports=FrozenOrderedSet(sorted(ast_visitor.inferred_imports)),
     )
 
 
@@ -91,77 +77,42 @@ def find_python_imports(*, filename: str, content: str, module_name: str) -> Par
 _INFERRED_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\d]*\.){2,}[a-zA-Z_]\w*$")
 
 
-class _Py27AstVisitor(ast27.NodeVisitor):
+class _BaseAstVisitor:
     def __init__(self, module_name: str) -> None:
         self._module_parts = module_name.split(".")
         self.explicit_imports: Set[str] = set()
         self.inferred_imports: Set[str] = set()
 
-    @classmethod
-    def visit_tree(cls, tree: ast27.AST, module_name: str) -> "_Py27AstVisitor":
-        visitor = cls(module_name)
-        visitor.visit(tree)
-        return visitor
-
-    def _maybe_add_inferred_import(self, s: str) -> None:
+    def maybe_add_inferred_import(self, s: str) -> None:
         if _INFERRED_IMPORT_REGEX.match(s):
             self.inferred_imports.add(s)
 
-    def visit_Import(self, node: ast27.Import) -> None:
+    def visit_Import(self, node) -> None:
         for alias in node.names:
             self.explicit_imports.add(alias.name)
 
-    def visit_ImportFrom(self, node: ast27.ImportFrom) -> None:
-        rel_module = [] if node.module is None else [node.module]
-        relative_level = 0 if node.level is None else node.level
-        abs_module = ".".join(self._module_parts[0:-relative_level] + rel_module)
+    def visit_ImportFrom(self, node) -> None:
+        rel_module = node.module
+        abs_module = ".".join(
+            self._module_parts[0 : -node.level] + ([] if rel_module is None else [rel_module])
+        )
         for alias in node.names:
             self.explicit_imports.add(f"{abs_module}.{alias.name}")
 
-    def visit_Str(self, node: ast27.Str) -> None:
+
+class _Py27AstVisitor(ast27.NodeVisitor, _BaseAstVisitor):
+    def visit_Str(self, node) -> None:
         val = ensure_text(node.s)
-        self._maybe_add_inferred_import(val)
+        self.maybe_add_inferred_import(val)
 
 
-class _CSTVisitor(cst.CSTVisitor):
-    def __init__(self, module_name: str) -> None:
-        self._module_parts = module_name.split(".")
-        self.explicit_imports: Set[str] = set()
-        self.inferred_imports: Set[str] = set()
+class _Py3AstVisitor(ast3.NodeVisitor, _BaseAstVisitor):
+    def visit_Str(self, node) -> None:
+        self.maybe_add_inferred_import(node.s)
 
-    @classmethod
-    def visit_tree(cls, tree: cst.Module, module_name: str) -> "_CSTVisitor":
-        visitor = cls(module_name)
-        tree.visit(visitor)
-        return visitor
 
-    def _maybe_add_inferred_import(self, s: Union[str, bytes]) -> None:
-        if isinstance(s, bytes):
-            return
-        if _INFERRED_IMPORT_REGEX.match(s):
-            self.inferred_imports.add(s)
-
-    def _flatten_attribute_or_name(self, node: cst.BaseExpression) -> str:
-        if isinstance(node, cst.Name):
-            return node.value
-        if not isinstance(node, cst.Attribute):
-            raise TypeError(f"Unrecognized cst.BaseExpression subclass: {node}")
-        inner = self._flatten_attribute_or_name(node.value)
-        return f"{inner}.{node.attr.value}"
-
-    def visit_Import(self, node: cst.Import) -> None:
-        for alias in node.names:
-            self.explicit_imports.add(self._flatten_attribute_or_name(alias.name))
-
-    def visit_ImportFrom(self, node: cst.ImportFrom) -> None:
-        rel_module = [] if node.module is None else [self._flatten_attribute_or_name(node.module)]
-        relative_level = len(node.relative)
-        abs_module = ".".join(self._module_parts[0:-relative_level] + rel_module)
-        if isinstance(node.names, cst.ImportStar):
-            self.explicit_imports.add(f"{abs_module}.*")
-        else:
-            for alias in node.names:
-                self.explicit_imports.add(f"{abs_module}.{alias.name.value}")
-
-    def visit_SimpleString(self, node: cst.SimpleString) -> None:
-        self._maybe_add_inferred_import(node.evaluated_value)
+class _Py38AstVisitor(ast3.NodeVisitor, _BaseAstVisitor):
+    # Python 3.8 deprecated the Str node in favor of Constant.
+    def visit_Constant(self, node) -> None:
+        if isinstance(node.value, str):
+            self.maybe_add_inferred_import(node.value)
