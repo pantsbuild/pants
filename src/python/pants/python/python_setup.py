@@ -99,7 +99,7 @@ class PythonSetup(Subsystem):
                 '* "<PATH>", the contents of the PATH env var\n'
                 '* "<PYENV>", all Python versions under $(pyenv root)/versions\n'
                 '* "<PYENV_LOCAL>", the Pyenv interpreter with the version in '
-                'BUILD_ROOT/.python-version\n'
+                "BUILD_ROOT/.python-version\n"
                 '* "<PEXRC>", paths in the PEX_PYTHON_PATH variable in a pexrc file'
             ),
         )
@@ -247,15 +247,17 @@ class PythonSetup(Subsystem):
         pyenv_root = pyenv_root_func()
         if pyenv_root is None:
             return []
+
         versions_dir = Path(pyenv_root, "versions")
+        if not versions_dir.is_dir():
+            return []
 
         if pyenv_local:
-
             local_version_file = Path(get_buildroot(), ".python-version")
             if not local_version_file.exists():
-                logger.info(
+                logger.warning(
                     "No `.python-version` file found in the build root, "
-                    "but <PYENV_LOCAL> was set in `--python-setup-interpreter-constraints`."
+                    "but <PYENV_LOCAL> was set in `[python-setup].interpreter_search_paths`."
                 )
                 return []
 
