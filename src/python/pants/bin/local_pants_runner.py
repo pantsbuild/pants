@@ -55,7 +55,6 @@ class LocalPantsRunner:
     graph_session: GraphSession
     union_membership: UnionMembership
     profile_path: Optional[str]
-    _run_tracker: RunTracker
 
     @classmethod
     def parse_options(
@@ -171,16 +170,15 @@ class LocalPantsRunner:
             graph_session=graph_session,
             union_membership=union_membership,
             profile_path=profile_path,
-            _run_tracker=RunTracker.global_instance(),
         )
 
-    def _set_start_time(self, start_time: float) -> None:
-        self._run_tracker.start(self.options, run_start_time=start_time)
+    def _start_run(self, run_tracker: RunTracker, start_time: float) -> None:
+        run_tracker.start(self.options, run_start_time=start_time)
 
         spec_parser = SpecsParser(get_buildroot())
         specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
         # Note: This will not include values from `--changed-*` flags.
-        self._run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
+        run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
 
     def _run_v2(self, goals: Tuple[str, ...]) -> ExitCode:
         if not goals:
@@ -212,13 +210,13 @@ class LocalPantsRunner:
             poll_delay=(0.1 if poll else None),
         )
 
-    def _finish_run(self, code: ExitCode) -> None:
+    def _finish_run(self, run_tracker: RunTracker, code: ExitCode) -> None:
         """Cleans up the run tracker."""
 
         metrics = self.graph_session.scheduler_session.metrics()
-        self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
+        run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
         outcome = WorkUnit.SUCCESS if code == PANTS_SUCCEEDED_EXIT_CODE else WorkUnit.FAILURE
-        self._run_tracker.set_root_outcome(outcome)
+        run_tracker.set_root_outcome(outcome)
 
     def _print_help(self, request: HelpRequest) -> ExitCode:
         global_options = self.options.for_global_scope()
@@ -237,7 +235,8 @@ class LocalPantsRunner:
         return help_printer.print_help()
 
     def run(self, start_time: float) -> ExitCode:
-        self._set_start_time(start_time)
+        run_tracker = RunTracker.global_instance()
+        self._start_run(run_tracker, start_time)
 
         with maybe_profiled(self.profile_path):
             global_options = self.options.for_global_scope()
@@ -255,11 +254,12 @@ class LocalPantsRunner:
 
             goals = tuple(self.options.goals)
             with streaming_reporter.session():
-                self._run_tracker.set_v2_goal_rule_names(goals)
+                run_tracker.set_v2_goal_rule_names(goals)
                 engine_result = PANTS_FAILED_EXIT_CODE
                 try:
                     engine_result = self._run_v2(goals)
                 except Exception as e:
                     ExceptionSink.log_exception(e)
-                self._finish_run(engine_result)
+
+            self._finish_run(run_tracker, engine_result)
             return engine_result
