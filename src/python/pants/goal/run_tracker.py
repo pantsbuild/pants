@@ -12,6 +12,7 @@ import time
 import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -22,7 +23,6 @@ from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.goal.aggregated_timings import AggregatedTimings
-from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
@@ -30,6 +30,21 @@ from pants.option.subsystem import Subsystem
 from pants.reporting.report import Report
 from pants.util.dirutil import relative_symlink, safe_file_dump
 from pants.version import VERSION
+
+
+@dataclass
+class PantsDaemonStats:
+    """Tracks various stats about the daemon."""
+
+    scheduler_metrics: Dict[str, int] = field(default_factory=dict)
+
+    def set_scheduler_metrics(self, scheduler_metrics: Dict[str, int]) -> None:
+        self.scheduler_metrics = scheduler_metrics
+
+    def get_all(self) -> Dict[str, int]:
+        for key in ["target_root_size", "affected_targets_size"]:
+            self.scheduler_metrics.setdefault(key, 0)
+        return self.scheduler_metrics
 
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
