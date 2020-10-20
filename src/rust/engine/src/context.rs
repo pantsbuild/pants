@@ -264,6 +264,39 @@ impl Core {
     Ok(maybe_cached_command_runner)
   }
 
+  fn load_certificates(
+    ca_certs_path: Option<PathBuf>,
+  ) -> Result<Vec<reqwest::Certificate>, String> {
+    let certs = match ca_certs_path {
+      Some(ref path) => {
+        let mut content = String::new();
+        std::fs::File::open(path)
+          .and_then(|mut f| f.read_to_string(&mut content))
+          .map_err(|err| {
+            format!(
+              "Error reading root CA certs file {}: {}",
+              path.display(),
+              err
+            )
+          })?;
+        let pem_re = Regex::new(PEM_RE_STR).unwrap();
+        let certs_res: Result<Vec<reqwest::Certificate>, _> = pem_re
+          .find_iter(&content)
+          .map(|mat| reqwest::Certificate::from_pem(mat.as_str().as_bytes()))
+          .collect();
+        certs_res.map_err(|err| {
+          format!(
+            "Error parsing PEM from root CA certs file {}: {}",
+            path.display(),
+            err
+          )
+        })?
+      }
+      None => Vec::new(),
+    };
+    Ok(certs)
+  }
+
   pub fn new(
     executor: Executor,
     tasks: Tasks,
@@ -348,32 +381,7 @@ impl Core {
     let graph = Arc::new(InvalidatableGraph(Graph::new()));
 
     // These certs are for downloads, not to be confused with the ones used for remoting.
-    let ca_certs = if let Some(ref path) = ca_certs_path {
-      let mut content = String::new();
-      std::fs::File::open(path)
-        .and_then(|mut f| f.read_to_string(&mut content))
-        .map_err(|err| {
-          format!(
-            "Error reading root CA certs file {}: {}",
-            path.display(),
-            err
-          )
-        })?;
-      let pem_re = Regex::new(PEM_RE_STR).unwrap();
-      let certs_res: Result<Vec<reqwest::Certificate>, _> = pem_re
-        .find_iter(&content)
-        .map(|mat| reqwest::Certificate::from_pem(mat.as_str().as_bytes()))
-        .collect();
-      certs_res.map_err(|err| {
-        format!(
-          "Error parsing PEM from root CA certs file {}: {}",
-          path.display(),
-          err
-        )
-      })?
-    } else {
-      Vec::new()
-    };
+    let ca_certs = Core::load_certificates(ca_certs_path)?;
 
     let http_client_builder = ca_certs
       .iter()
