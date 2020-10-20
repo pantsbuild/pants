@@ -477,9 +477,9 @@ class SchedulerSession:
     def node_count(self):
         return self._scheduler.graph_len()
 
-    def metrics(self):
+    def metrics(self) -> Dict[str, int]:
         """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
-        return self._scheduler._metrics(self._session)
+        return cast(Dict[str, int], self._scheduler._metrics(self._session))
 
     def _maybe_visualize(self):
         if self._scheduler.visualize_to_dir is not None:
