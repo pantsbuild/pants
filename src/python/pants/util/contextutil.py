@@ -96,6 +96,7 @@ def argv_as(args: Tuple[str, ...]) -> Iterator[None]:
 @contextmanager
 def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str) -> Iterator[None]:
     """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
+    src = None
     if src_fd == -1:
         src = open("/dev/null", mode)
         src_fd = src.fileno()
@@ -114,6 +115,8 @@ def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str
         yield
     finally:
         try:
+            if src:
+                src.close()
             if is_atty:
                 termios.tcdrain(dst_fd)
             else:

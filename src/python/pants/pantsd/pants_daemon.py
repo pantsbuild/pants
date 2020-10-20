@@ -158,17 +158,14 @@ class PantsDaemon(PantsDaemonProcessManager):
             except OSError:
                 pass
 
-        # Redirect stdio to /dev/null for the rest of the run, to reserve those file descriptors
-        # for further forks.
+        # Redirect stdio to /dev/null for the rest of the run to reserve those file descriptors.
         with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
             # Reinitialize logging for the daemon context.
             global_options = self._bootstrap_options.for_global_scope()
-
             setup_logging(global_options, stderr_logging=False)
 
             log_dir = os.path.join(self._work_dir, self.name)
-            log_level = global_options.level
-            setup_logging_to_file(log_level, log_dir=log_dir, log_filename=self.LOG_NAME)
+            setup_logging_to_file(global_options.level, log_dir=log_dir, log_filename=self.LOG_NAME)
 
             self._logger.debug("Logging reinitialized in pantsd context")
             yield
