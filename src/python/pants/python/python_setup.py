@@ -89,14 +89,19 @@ class PythonSetup(Subsystem):
             "--interpreter-search-paths",
             advanced=True,
             type=list,
-            default=["<PEXRC>", "<PATH>"],
+            default=["<PYENV>", "<PATH>"],
             metavar="<binary-paths>",
-            help="A list of paths to search for python interpreters. The following special "
-            "strings are supported: "
-            '"<PATH>" (the contents of the PATH env var), '
-            '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
-            '"<PYENV>" (all python versions under $(pyenv root)/versions).'
-            '"<PYENV_LOCAL>" (the python version in BUILD_ROOT/.python-version).',
+            help=(
+                "A list of paths to search for Python interpreters that match your project's "
+                "interpreter constraints. You can specify absolute paths to interpreter binaries "
+                "and/or to directories containing interpreter binaries. The order of entries does "
+                "not matter. The following special strings are supported:\n\n"
+                '* "<PATH>", the contents of the PATH env var\n'
+                '* "<PYENV>", all Python versions under $(pyenv root)/versions\n'
+                '* "<PYENV_LOCAL>", the Pyenv interpreter with the version in '
+                'BUILD_ROOT/.python-version\n'
+                '* "<PEXRC>", paths in the PEX_PYTHON_PATH variable in a pexrc file'
+            ),
         )
         register(
             "--resolver-manylinux",
