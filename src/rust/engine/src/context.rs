@@ -137,7 +137,7 @@ impl Core {
     named_caches_dir: &Path,
     process_execution_metadata: &ProcessMetadata,
     exec_strategy_opts: &ExecutionStrategyOptions,
-  ) -> Result<Box<dyn CommandRunner>, String> {
+  ) -> Box<dyn CommandRunner> {
     let local_command_runner = process_execution::local::CommandRunner::new(
       store.clone(),
       executor.clone(),
@@ -158,10 +158,10 @@ impl Core {
         Box::new(local_command_runner)
       };
 
-    Ok(Box::new(BoundedCommandRunner::new(
+    Box::new(BoundedCommandRunner::new(
       maybe_nailgunnable_local_command_runner,
       exec_strategy_opts.local_parallelism,
-    )))
+    ))
   }
 
   fn make_remote_execution_runner(
@@ -209,7 +209,7 @@ impl Core {
       named_caches_dir,
       process_execution_metadata,
       &exec_strategy_opts,
-    )?;
+    );
 
     let command_runner: Box<dyn CommandRunner> = if remoting_opts.execution_enable {
       let remote_command_runner: Box<dyn process_execution::CommandRunner> = {
