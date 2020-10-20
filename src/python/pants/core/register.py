@@ -5,9 +5,7 @@
 
 These are always activated and cannot be disabled.
 """
-from typing import Optional
 
-from pants.build_graph.lifecycle import ExtensionLifecycleHandler, SessionLifecycleHandler
 from pants.core.goals import binary, fmt, lint, package, repl, run, test, typecheck
 from pants.core.target_types import ArchiveTarget, Files, GenericTarget, RelocatedFiles, Resources
 from pants.core.target_types import rules as target_type_rules
@@ -22,7 +20,6 @@ from pants.core.util_rules import (
     stripped_source_files,
     subprocess_environment,
 )
-from pants.option.options import Options
 from pants.source import source_root
 
 
@@ -54,25 +51,3 @@ def rules():
 
 def target_types():
     return [ArchiveTarget, Files, GenericTarget, Resources, RelocatedFiles]
-
-
-import logging
-logger = logging.getLogger(__name__)
-
-
-class CoreSessionLifecycleHandler(SessionLifecycleHandler):
-    def on_session_start(self):
-        logger.info("on_session_start")
-
-    def on_session_end(self):
-        logger.info("on_session_end")
-
-
-class CoreLifecycleHandler(ExtensionLifecycleHandler):
-    def on_session_create(self, options: Options) -> Optional[SessionLifecycleHandler]:
-        logger.info("on_session_create")
-        return CoreSessionLifecycleHandler()
-
-
-def lifecycle_handlers():
-    return [CoreLifecycleHandler()]

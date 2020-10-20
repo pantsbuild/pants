@@ -166,7 +166,9 @@ class BuildConfiguration:
                 )
             self._target_types.update(target_types)
 
-        def register_lifecycle_handlers(self, handlers: typing.Iterable[ExtensionLifecycleHandler]):
+        def register_lifecycle_handlers(
+            self, handlers: Union[typing.Iterable[ExtensionLifecycleHandler], typing.Any]
+        ):
             if not isinstance(handlers, Iterable):
                 raise TypeError(
                     f"The entrypoint `lifecycle_handlers` must return an iterable. Given {repr(handlers)}"

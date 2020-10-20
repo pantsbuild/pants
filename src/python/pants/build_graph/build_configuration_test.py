@@ -2,10 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
+from typing import Optional
 
+from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.lifecycle import ExtensionLifecycleHandler, SessionLifecycleHandler
 from pants.engine.unions import UnionRule, union
+from pants.option.options import Options
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -64,3 +68,31 @@ class BuildConfigurationTest(unittest.TestCase):
         self.bc_builder.register_rules([union_a])
         self.bc_builder.register_rules([union_b])
         assert self.bc_builder.create().union_rules == FrozenOrderedSet([union_a, union_b])
+
+    def test_register_lifecycle_handlers(self) -> None:
+        class FooHandler(ExtensionLifecycleHandler):
+            def on_session_create(
+                self,
+                *,
+                build_root: str,
+                options: Options,
+                specs: Specs,
+            ) -> Optional[SessionLifecycleHandler]:
+                return None
+
+        class BarHandler(ExtensionLifecycleHandler):
+            def on_session_create(
+                self,
+                *,
+                build_root: str,
+                options: Options,
+                specs: Specs,
+            ) -> Optional[SessionLifecycleHandler]:
+                return None
+
+        self.bc_builder.register_lifecycle_handlers([FooHandler()])
+        self.bc_builder.register_lifecycle_handlers([BarHandler()])
+        bc = self.bc_builder.create()
+        handlers = list(bc.lifecycle_handlers)
+        assert isinstance(handlers[0], FooHandler)
+        assert isinstance(handlers[1], BarHandler)

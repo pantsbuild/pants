@@ -4,7 +4,7 @@
 import logging
 import os
 from dataclasses import dataclass, replace
-from typing import Mapping, Optional, Set, Tuple
+from typing import List, Mapping, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
@@ -56,7 +56,7 @@ class LocalPantsRunner:
     union_membership: UnionMembership
     profile_path: Optional[str]
     _run_tracker: RunTracker
-    _session_lifecycle_handlers: Set[SessionLifecycleHandler]
+    _session_lifecycle_handlers: List[SessionLifecycleHandler]
 
     @classmethod
     def parse_options(
@@ -168,7 +168,9 @@ class LocalPantsRunner:
         # for this session.
         session_lifecycle_handlers = []
         for lifecycle_handler in build_config.lifecycle_handlers:
-            session_lifecycle_handler = lifecycle_handler.on_session_create(options)
+            session_lifecycle_handler = lifecycle_handler.on_session_create(
+                build_root=build_root, options=options, specs=specs
+            )
             if session_lifecycle_handler:
                 session_lifecycle_handlers.append(session_lifecycle_handler)
 
@@ -298,6 +300,6 @@ class LocalPantsRunner:
 
                 # Invoke the session lifecycle handlers, if any.
                 for session_lifecycle_handler in self._session_lifecycle_handlers:
-                    session_lifecycle_handler.on_session_end()
+                    session_lifecycle_handler.on_session_end(engine_result=engine_result)
 
             return self._merge_exit_codes(engine_result, run_tracker_result)
