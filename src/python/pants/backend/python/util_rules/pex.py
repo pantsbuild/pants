@@ -479,7 +479,7 @@ async def create_pex(
         *(f"--index={index}" for index in python_repos.indexes),
         *(f"--repo={repo}" for repo in python_repos.repos),
         "--cache-ttl",
-        python_setup.resolver_http_cache_ttl,
+        str(python_setup.resolver_http_cache_ttl),
         *request.additional_args,
     ]
 
