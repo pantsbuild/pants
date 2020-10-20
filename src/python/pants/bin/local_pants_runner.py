@@ -25,6 +25,7 @@ from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
+from pants.option.arg_splitter import HelpRequest
 from pants.option.errors import UnknownFlagsError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -245,33 +246,38 @@ class LocalPantsRunner:
 
         return run_tracker_result
 
+    def _print_help(self, request: HelpRequest) -> ExitCode:
+        global_options = self.options.for_global_scope()
+
+        all_help_info = HelpInfoExtracter.get_all_help_info(
+            self.options,
+            self.union_membership,
+            self.graph_session.goal_consumed_subsystem_scopes,
+        )
+        help_printer = HelpPrinter(
+            bin_name=global_options.pants_bin_name,
+            help_request=request,
+            all_help_info=all_help_info,
+            color=global_options.colors,
+        )
+        return help_printer.print_help()
+
     def run(self, start_time: float) -> ExitCode:
         self._set_start_time(start_time)
 
         with maybe_profiled(self.profile_path):
             global_options = self.options.for_global_scope()
+
+            if self.options.help_request:
+                return self._print_help(self.options.help_request)
+
             streaming_handlers = global_options.streaming_workunits_handlers
-            report_interval = global_options.streaming_workunits_report_interval
             callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
             streaming_reporter = StreamingWorkunitHandler(
                 self.graph_session.scheduler_session,
                 callbacks=callbacks,
-                report_interval_seconds=report_interval,
+                report_interval_seconds=global_options.streaming_workunits_report_interval,
             )
-
-            if self.options.help_request:
-                all_help_info = HelpInfoExtracter.get_all_help_info(
-                    self.options,
-                    self.union_membership,
-                    self.graph_session.goal_consumed_subsystem_scopes,
-                )
-                help_printer = HelpPrinter(
-                    bin_name=global_options.pants_bin_name,
-                    help_request=self.options.help_request,
-                    all_help_info=all_help_info,
-                    color=global_options.colors,
-                )
-                return help_printer.print_help()
 
             with streaming_reporter.session():
                 engine_result = PANTS_FAILED_EXIT_CODE
