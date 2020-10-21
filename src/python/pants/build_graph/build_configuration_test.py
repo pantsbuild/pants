@@ -106,8 +106,10 @@ def test_validation(caplog, bc_builder: BuildConfiguration.Builder) -> None:
     )
     with pytest.raises(TypeError) as e:
         bc_builder.create()
-    assert ("Naming collision: `bar-bar`/`Bar_bar` is registered as a subsystem and a "
-            "target type." in caplog.text)
+    assert (
+        "Naming collision: `bar-bar`/`Bar_bar` is registered as a subsystem and a "
+        "target type." in caplog.text
+    )
     assert "Naming collision: `qux` is registered as a goal and a target type." in caplog.text
     assert (
         "Naming collision: `global` is registered as a reserved name, a subsystem "

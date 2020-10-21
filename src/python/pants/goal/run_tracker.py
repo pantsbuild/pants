@@ -3,7 +3,6 @@
 
 import ast
 import copy
-import dataclasses
 import json
 import multiprocessing
 import os
@@ -13,7 +12,6 @@ import time
 import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
-from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -32,21 +30,6 @@ from pants.option.subsystem import Subsystem
 from pants.reporting.report import Report
 from pants.util.dirutil import relative_symlink, safe_file_dump
 from pants.version import VERSION
-
-
-@dataclass
-class PantsDaemonStats:
-    """Tracks various stats about the daemon."""
-
-    scheduler_metrics: Dict[str, int] = dataclasses.field(default_factory=dict)
-
-    def set_scheduler_metrics(self, scheduler_metrics: Dict[str, int]) -> None:
-        self.scheduler_metrics = scheduler_metrics
-
-    def get_all(self) -> Dict[str, int]:
-        for key in ["target_root_size", "affected_targets_size"]:
-            self.scheduler_metrics.setdefault(key, 0)
-        return self.scheduler_metrics
 
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
@@ -175,7 +158,6 @@ class RunTracker(Subsystem):
         self.run_info = None
         self.cumulative_timings = None
         self.self_timings = None
-        self.pantsd_stats = None
 
         # Initialized in `start()`.
         self.report = None
@@ -273,8 +255,8 @@ class RunTracker(Subsystem):
 
         # Time spent in a workunit, not including its children.
         self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, "self_timings"))
-        # Daemon stats.
-        self.pantsd_stats = PantsDaemonStats()
+        # pantsd stats.
+        self._pantsd_metrics: Dict[str, int] = dict()
 
         self._all_options = all_options
 
@@ -293,6 +275,13 @@ class RunTracker(Subsystem):
     def set_root_outcome(self, outcome):
         """Useful for setup code that doesn't have a reference to a workunit."""
         self._main_root_workunit.set_outcome(outcome)
+
+    def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
+        self._pantsd_metrics = metrics
+
+    @property
+    def pantsd_scheduler_metrics(self) -> Dict[str, int]:
+        return dict(self._pantsd_metrics)  # defensive copy
 
     @property
     def logger(self):
@@ -485,7 +474,7 @@ class RunTracker(Subsystem):
     def _stats(self) -> dict:
         stats = {
             "run_info": self.run_information(),
-            "pantsd_stats": self.pantsd_stats.get_all(),
+            "pantsd_stats": self.pantsd_scheduler_metrics,
             "cumulative_timings": self.cumulative_timings.get_all(),
             "recorded_options": self.get_options_to_record(),
         }

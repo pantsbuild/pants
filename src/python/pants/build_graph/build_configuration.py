@@ -79,7 +79,8 @@ class BuildConfiguration:
                 scats = sorted(cat.value for cat in cats)
                 cats_str = ", ".join(f"a {cat}" for cat in scats[:-1]) + f" and a {scats[-1]}."
                 colliding_names = "`/`".join(
-                    sorted({name, normalized_to_orig_name.get(name, name)}))
+                    sorted({name, normalized_to_orig_name.get(name, name)})
+                )
                 logger.error(f"Naming collision: `{colliding_names}` is registered as {cats_str}")
                 found_collision = True
 

@@ -11,7 +11,7 @@ GLOBAL_SCOPE_CONFIG_SECTION = "GLOBAL"
 
 
 def normalize_scope(scope: str):
-    return scope.lower().replace('-', '_')
+    return scope.lower().replace("-", "_")
 
 
 @dataclass(frozen=True)

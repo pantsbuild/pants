@@ -214,7 +214,7 @@ class LocalPantsRunner:
         """Cleans up the run tracker."""
 
         metrics = self.graph_session.scheduler_session.metrics()
-        run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
+        run_tracker.set_pantsd_scheduler_metrics(metrics)
         outcome = WorkUnit.SUCCESS if code == PANTS_SUCCEEDED_EXIT_CODE else WorkUnit.FAILURE
         run_tracker.set_root_outcome(outcome)
 
