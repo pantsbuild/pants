@@ -1,13 +1,12 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
+import sys
 from textwrap import dedent
 
-from pants.backend.python.dependency_inference.import_parser import (
-    ParsedPythonImports,
-    find_python_imports,
-)
+import pytest
+
+from pants.backend.python.dependency_inference.import_parser import find_python_imports
 
 
 def test_normal_imports() -> None:
@@ -147,6 +146,10 @@ def test_works_with_python2() -> None:
     assert set(imports.inferred_imports) == {"dep.from.bytes", "dep.from.str"}
 
 
+@pytest.mark.skipif(
+    sys.version_info[:2] < (3, 8),
+    reason="Cannot parse Python 3.8 unless Pants is run with Python 3.8.",
+)
 def test_works_with_python38() -> None:
     imports = find_python_imports(
         filename="foo.py",
@@ -166,39 +169,3 @@ def test_works_with_python38() -> None:
     )
     assert set(imports.explicit_imports) == {"demo", "project.demo.Demo"}
     assert set(imports.inferred_imports) == {"dep.from.str"}
-
-
-def test_debug_log_with_python39(caplog) -> None:
-    """We can't parse python 3.9 yet, so we want to be able to provide good debug log."""
-    caplog.set_level(logging.DEBUG)
-    imports = find_python_imports(
-        filename="foo.py",
-        # See https://www.python.org/dev/peps/pep-0614/ for the newly relaxed decorator expressions.
-        content=dedent(
-            """\
-        @buttons[0].clicked.connect
-        def spam():
-            ...
-        """
-        ),
-        module_name="project.app",
-    )
-    assert imports == ParsedPythonImports.empty()
-    assert len(caplog.records) == 2
-    messages = [rec.getMessage() for rec in caplog.records]
-
-    cst_parse_error = dedent(
-        """\
-    Failed to parse foo.py with python 3.8 libCST parser: Syntax Error @ 1:9.
-    Incomplete input. Encountered '[', but expected '(', or 'NEWLINE'.
-
-    @buttons[0].clicked.connect
-            ^"""
-    )
-    assert cst_parse_error == messages[0]
-
-    ast27_parse_error = dedent(
-        """\
-    Failed to parse foo.py with python 2.7 typed-ast parser: invalid syntax (foo.py, line 1)"""
-    )
-    assert ast27_parse_error == messages[1]
