@@ -7,7 +7,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Mapping, Set, Type, Union, cast
+from typing import Any, DefaultDict, Dict, Set, Type, Union, cast
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.goal import GoalSubsystem
@@ -17,6 +17,7 @@ from pants.engine.unions import UnionRule
 from pants.goal.run_tracker import RunTracker
 from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
+from pants.option.scope import normalize_scope
 from pants.reporting.reporting import Reporting
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.vcs.changed import Changed
@@ -57,11 +58,16 @@ class BuildConfiguration:
             subsystem = "subsystem"
             target_type = "target type"
 
-        name_to_categories: Mapping[str, Set[Category]] = defaultdict(set)
+        name_to_categories: DefaultDict[str, Set[Category]] = defaultdict(set)
+        normalized_to_orig_name: Dict[str, str] = {}
+
         for opt in self.all_optionables:
-            name_to_categories[cast(str, opt.options_scope)].add(
+            scope = cast(str, opt.options_scope)
+            normalized_scope = normalize_scope(scope)
+            name_to_categories[normalized_scope].add(
                 Category.goal if issubclass(opt, GoalSubsystem) else Category.subsystem
             )
+            normalized_to_orig_name[normalized_scope] = scope
         for tgt_type in self.target_types:
             name_to_categories[tgt_type.alias].add(Category.target_type)
         for reserved_name in _RESERVED_NAMES:
@@ -72,7 +78,9 @@ class BuildConfiguration:
             if len(cats) > 1:
                 scats = sorted(cat.value for cat in cats)
                 cats_str = ", ".join(f"a {cat}" for cat in scats[:-1]) + f" and a {scats[-1]}."
-                logger.error(f"Naming collision: `{name}` is registered as {cats_str}")
+                colliding_names = "`/`".join(
+                    sorted({name, normalized_to_orig_name.get(name, name)}))
+                logger.error(f"Naming collision: `{colliding_names}` is registered as {cats_str}")
                 found_collision = True
 
         if found_collision:
