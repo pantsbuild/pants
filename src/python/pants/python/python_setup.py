@@ -142,14 +142,19 @@ class PythonSetup(Subsystem):
             "--interpreter-search-paths",
             advanced=True,
             type=list,
-            default=["<PEXRC>", "<PATH>"],
+            default=["<PYENV>", "<PATH>"],
             metavar="<binary-paths>",
-            help="A list of paths to search for python interpreters. The following special "
-            "strings are supported: "
-            '"<PATH>" (the contents of the PATH env var), '
-            '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
-            '"<PYENV>" (all python versions under $(pyenv root)/versions).'
-            '"<PYENV_LOCAL>" (the python version in BUILD_ROOT/.python-version).',
+            help=(
+                "A list of paths to search for Python interpreters that match your project's "
+                "interpreter constraints. You can specify absolute paths to interpreter binaries "
+                "and/or to directories containing interpreter binaries. The order of entries does "
+                "not matter. The following special strings are supported:\n\n"
+                '* "<PATH>", the contents of the PATH env var\n'
+                '* "<PYENV>", all Python versions under $(pyenv root)/versions\n'
+                '* "<PYENV_LOCAL>", the Pyenv interpreter with the version in '
+                "BUILD_ROOT/.python-version\n"
+                '* "<PEXRC>", paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc'
+            ),
         )
         register(
             "--resolver-manylinux",
@@ -310,15 +315,17 @@ class PythonSetup(Subsystem):
         pyenv_root = pyenv_root_func()
         if pyenv_root is None:
             return []
+
         versions_dir = Path(pyenv_root, "versions")
+        if not versions_dir.is_dir():
+            return []
 
         if pyenv_local:
-
             local_version_file = Path(get_buildroot(), ".python-version")
             if not local_version_file.exists():
-                logger.info(
+                logger.warning(
                     "No `.python-version` file found in the build root, "
-                    "but <PYENV_LOCAL> was set in `--python-setup-interpreter-constraints`."
+                    "but <PYENV_LOCAL> was set in `[python-setup].interpreter_search_paths`."
                 )
                 return []
 
