@@ -84,7 +84,7 @@ COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, PythonInterpreterCompatibility)
 class PexBinaryDefaults(Subsystem):
     """Default settings for creating PEX executables."""
 
-    options_scope = "pex-binary"
+    options_scope = "pex-binary-defaults"
     deprecated_options_scope = "python-binary"
     deprecated_options_scope_removal_version = "2.1.0.dev0"
 
