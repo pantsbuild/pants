@@ -100,7 +100,7 @@ class PythonSetup(Subsystem):
                 '* "<PYENV>", all Python versions under $(pyenv root)/versions\n'
                 '* "<PYENV_LOCAL>", the Pyenv interpreter with the version in '
                 "BUILD_ROOT/.python-version\n"
-                '* "<PEXRC>", paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc
+                '* "<PEXRC>", paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc'
             ),
         )
         register(
