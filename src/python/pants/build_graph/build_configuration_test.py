@@ -95,19 +95,19 @@ def test_validation(caplog, bc_builder: BuildConfiguration.Builder) -> None:
     bc_builder.register_optionables(
         (
             mk_dummy_opt("foo"),
-            mk_dummy_opt("bar-bar"),
+            mk_dummy_opt("Bar-bar"),
             mk_dummy_opt("baz"),
             mk_dummy_opt("qux", goal=True),
             mk_dummy_opt("global"),
         )
     )
     bc_builder.register_target_types(
-        (mk_dummy_tgt("Bar_bar"), mk_dummy_tgt("qux"), mk_dummy_tgt("global"))
+        (mk_dummy_tgt("bar_bar"), mk_dummy_tgt("qux"), mk_dummy_tgt("global"))
     )
     with pytest.raises(TypeError) as e:
         bc_builder.create()
     assert (
-        "Naming collision: `bar-bar`/`Bar_bar` is registered as a subsystem and a "
+        "Naming collision: `Bar-bar`/`bar_bar` is registered as a subsystem and a "
         "target type." in caplog.text
     )
     assert "Naming collision: `qux` is registered as a goal and a target type." in caplog.text

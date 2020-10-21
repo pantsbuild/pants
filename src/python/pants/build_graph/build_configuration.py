@@ -69,9 +69,9 @@ class BuildConfiguration:
             )
             normalized_to_orig_name[normalized_scope] = scope
         for tgt_type in self.target_types:
-            name_to_categories[tgt_type.alias].add(Category.target_type)
+            name_to_categories[normalize_scope(tgt_type.alias)].add(Category.target_type)
         for reserved_name in _RESERVED_NAMES:
-            name_to_categories[reserved_name].add(Category.reserved_name)
+            name_to_categories[normalize_scope(reserved_name)].add(Category.reserved_name)
 
         found_collision = False
         for name, cats in name_to_categories.items():
