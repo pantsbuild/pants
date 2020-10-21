@@ -255,7 +255,6 @@ class LocalPantsRunner:
 
             goals = tuple(self.options.goals)
             with streaming_reporter.session():
-                run_tracker.set_v2_goal_rule_names(goals)
                 engine_result = PANTS_FAILED_EXIT_CODE
                 try:
                     engine_result = self._run_v2(goals)

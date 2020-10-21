@@ -209,9 +209,6 @@ class RunTracker(Subsystem):
 
         self._end_memoized_result: Optional[ExitCode] = None
 
-    def set_v2_goal_rule_names(self, v2_goal_rule_names: Tuple[str, ...]) -> None:
-        self._v2_goal_rule_names = v2_goal_rule_names
-
     @property
     def v2_goals_rule_names(self) -> Tuple[str, ...]:
         return self._v2_goal_rule_names
@@ -271,6 +268,10 @@ class RunTracker(Subsystem):
         # Set the true start time in the case of e.g. the daemon.
         self._main_root_workunit.start(run_start_time)
         self.report.start_workunit(self._main_root_workunit)
+
+
+        goal_names: Tuple[str, ...] = tuple(all_options.goals)
+        self._v2_goal_rule_names = goal_names
 
     def set_root_outcome(self, outcome):
         """Useful for setup code that doesn't have a reference to a workunit."""
