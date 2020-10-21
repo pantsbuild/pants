@@ -451,7 +451,7 @@ def test_get_requirements() -> None:
         version_scheme: FirstPartyDependencyVersionScheme = FirstPartyDependencyVersionScheme.EXACT,
     ):
         rule_runner.set_options(
-            [f"--python-distribution-first-party-dependency-version-scheme={version_scheme.value}"]
+            [f"--setup-py-generation-first-party-dependency-version-scheme={version_scheme.value}"]
         )
         tgt = rule_runner.get_target(addr)
         reqs = rule_runner.request(
