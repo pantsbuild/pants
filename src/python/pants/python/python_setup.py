@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import multiprocessing
 import os
 import subprocess
 from enum import Enum
@@ -115,11 +116,11 @@ class PythonSetup(Subsystem):
         register(
             "--resolver-jobs",
             type=int,
-            default=2,
+            default=multiprocessing.cpu_count() // 2,
             advanced=True,
             help=(
                 "The maximum number of concurrent jobs to build wheels with. Because Pants "
-                "can run multiple subprocesses in parallel, the total parallelism will be "
+                "can run multiple subprocesses in parallel, the maximum total parallelism will be "
                 "`--process-execution-{local,remote}-parallelism x --python-setup-resolver-jobs`. "
                 "Setting this option higher may result in better parallelism, but, if set too "
                 "high, may result in starvation and Out of Memory errors."
