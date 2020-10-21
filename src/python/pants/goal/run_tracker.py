@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import ast
 import copy
 import json
 import multiprocessing
@@ -192,20 +191,6 @@ class RunTracker(Subsystem):
         SubprocPool.foreground()
 
         self._aborted = False
-
-        # Data will be organized first by target and then scope.
-        # Eg:
-        # {
-        #   'target/address:name': {
-        #     'running_scope': {
-        #       'run_duration': 356.09
-        #     },
-        #     'GLOBAL': {
-        #       'target_type': 'pants.test'
-        #     }
-        #   }
-        # }
-        self._target_to_data = {}
 
         self._end_memoized_result: Optional[ExitCode] = None
 
@@ -467,9 +452,6 @@ class RunTracker(Subsystem):
     def run_information(self):
         """Basic information about this run."""
         run_information = self.run_info.get_as_dict()
-        target_data = run_information.get("target_data", None)
-        if target_data:
-            run_information["target_data"] = ast.literal_eval(target_data)
         return run_information
 
     def _stats(self) -> dict:
@@ -543,9 +525,6 @@ class RunTracker(Subsystem):
         if self.run_info.get_info("outcome") is None:
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
             self.run_info.add_info("outcome", outcome_str, ignore_errors=True)
-
-        if self._target_to_data:
-            self.run_info.add_info("target_data", self._target_to_data)
 
         self.report.close()
         self.store_stats()
