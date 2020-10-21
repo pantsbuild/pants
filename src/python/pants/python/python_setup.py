@@ -173,6 +173,17 @@ class PythonSetup(Subsystem):
                 "high, may result in starvation and Out of Memory errors."
             ),
         )
+        register(
+            "--resolver-http-cache-ttl",
+            type=int,
+            default=3_600,  # This matches PEX's default.
+            advanced=True,
+            help=(
+                "The maximum time (in seconds) for items in the HTTP cache. When the cache expires,"
+                "the PEX resolver will make network requests to see if new versions of your "
+                "requirements are available."
+            ),
+        )
 
     @property
     def interpreter_constraints(self) -> Tuple[str, ...]:
@@ -204,6 +215,10 @@ class PythonSetup(Subsystem):
     @property
     def resolver_jobs(self) -> int:
         return cast(int, self.options.resolver_jobs)
+
+    @property
+    def resolver_http_cache_ttl(self) -> int:
+        return cast(int, self.options.resolver_http_cache_ttl)
 
     @property
     def scratch_dir(self):
