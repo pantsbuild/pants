@@ -317,10 +317,10 @@ class FirstPartyDependencyVersionScheme(enum.Enum):
     ANY = "any"  # i.e., no specifier
 
 
-class PythonDistributionSubsystem(Subsystem):
-    """Options for packaging wheels/sdists from a `python_distribution` target."""
+class SetupPyGeneration(Subsystem):
+    """Options to control how setup.py is generated from a `python_distribution` target."""
 
-    options_scope = "python-distribution"
+    options_scope = "setup-py-generation"
 
     @classmethod
     def register_options(cls, register):
@@ -757,7 +757,7 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
 async def get_requirements(
     dep_owner: DependencyOwner,
     union_membership: UnionMembership,
-    python_distribution_subsystem: PythonDistributionSubsystem,
+    setup_py_generation: SetupPyGeneration,
 ) -> ExportedTargetRequirements:
     transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest([dep_owner.exported_target.target.address])
@@ -794,7 +794,7 @@ async def get_requirements(
         Get(SetupKwargs, OwnedDependency(tgt)) for tgt in owned_by_others
     )
     req_strs.extend(
-        f"{kwargs.name}{python_distribution_subsystem.first_party_dependency_version(kwargs.version)}"
+        f"{kwargs.name}{setup_py_generation.first_party_dependency_version(kwargs.version)}"
         for kwargs in set(kwargs_for_exported_targets_we_depend_on)
     )
 

@@ -17,11 +17,11 @@ from pants.backend.python.goals.setup_py import (
     NoOwnerError,
     OwnedDependencies,
     OwnedDependency,
-    PythonDistributionSubsystem,
     SetupKwargs,
     SetupKwargsRequest,
     SetupPyChroot,
     SetupPyChrootRequest,
+    SetupPyGeneration,
     SetupPySources,
     SetupPySourcesRequest,
     declares_pkg_resources_namespace_package,
@@ -95,7 +95,7 @@ def chroot_rule_runner() -> RuleRunner:
             get_exporting_owner,
             *python_sources.rules(),
             setup_kwargs_plugin,
-            SubsystemRule(PythonDistributionSubsystem),
+            SubsystemRule(SetupPyGeneration),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
             QueryRule(SetupPyChroot, (SetupPyChrootRequest,)),
         ]
@@ -377,7 +377,7 @@ def test_get_requirements() -> None:
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
-            SubsystemRule(PythonDistributionSubsystem),
+            SubsystemRule(SetupPyGeneration),
             QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
         ]
     )
