@@ -40,6 +40,7 @@ from pants.backend.python.target_types import (
     PythonDistribution,
     PythonLibrary,
     PythonRequirementLibrary,
+    resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.target_types import Files, Resources
@@ -47,7 +48,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import SubsystemRule, rule
-from pants.engine.target import Targets
+from pants.engine.target import InvalidFieldException, Targets
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -95,6 +96,7 @@ def chroot_rule_runner() -> RuleRunner:
             get_exporting_owner,
             *python_sources.rules(),
             setup_kwargs_plugin,
+            resolve_pex_entry_point,
             SubsystemRule(SetupPyGeneration),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
             QueryRule(SetupPyChroot, (SetupPyChrootRequest,)),
@@ -254,7 +256,7 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
     assert_chroot_error(
         chroot_rule_runner,
         Address("src/python/invalid_binary", target_name="invalid_bin2"),
-        InvalidEntryPoint,
+        InvalidFieldException,
     )
 
 
