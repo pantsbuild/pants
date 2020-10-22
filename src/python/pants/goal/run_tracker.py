@@ -244,7 +244,7 @@ class RunTracker(Subsystem):
         goal_names: Tuple[str, ...] = tuple(all_options.goals)
         self._v2_goal_rule_names = goal_names
 
-        self.run_logs_file = Path(self.run_info_dir, "per-run-logs")
+        self.run_logs_file = Path(self.run_info_dir, "logs")
         self.native.set_per_run_log_path(str(self.run_logs_file))
 
     def set_root_outcome(self, outcome):
@@ -528,10 +528,8 @@ class RunTracker(Subsystem):
         output = []
         try:
             with open(self.run_logs_file, "r") as f:
-                for line in f:
-                    output.append(line)
+                output = f.readlines()
         except OSError as e:
-            logger.warning("Error retrieving per-run logs from RunTracker:")
-            logger.warning(e)
+            logger.warning("Error retrieving per-run logs from RunTracker.", exc_info=e)
 
         return output

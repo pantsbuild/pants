@@ -137,6 +137,8 @@ class Native(metaclass=SingletonMetaclass):
         )
 
     def set_per_run_log_path(self, path: Optional[str]) -> None:
+        """Instructs the logging code to also write emitted logs to a run-specific log file; or
+        disables writing to any run-specific file if `None` is passed."""
         self.lib.set_per_run_log_path(path)
 
     def default_cache_path(self) -> str:
