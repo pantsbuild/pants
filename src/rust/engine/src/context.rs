@@ -377,13 +377,20 @@ impl Core {
       None
     };
 
+    let need_remote_store = remoting_opts.execution_enable
+      || exec_strategy_opts.remote_cache_read
+      || exec_strategy_opts.remote_cache_write;
+    if need_remote_store && remote_store_servers.is_empty() {
+      return Err("Remote store required but none provided".into());
+    }
+
     let store = safe_create_dir_all_ioerror(&local_store_dir)
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
       .and_then(|_| {
         Core::make_store(
           &executor,
           &local_store_dir,
-          remoting_opts.execution_enable && !remote_store_servers.is_empty(),
+          need_remote_store,
           &remoting_opts,
           &remote_store_servers,
           &root_ca_certs,

@@ -938,3 +938,13 @@ class GlobalOptions(Subsystem):
                 "The `--remote-execution-server` option requires also setting "
                 "`--remote-store-server`. Often these have the same value."
             )
+        if opts.remote_cache_read and not opts.remote_store_server:
+            raise OptionsError(
+                "The `--remote-cache-read` option requires also setting "
+                "`--remote-store-server` to work properly."
+            )
+        if opts.remote_cache_write and not opts.remote_store_server:
+            raise OptionsError(
+                "The `--remote-cache-write` option requires also setting "
+                "`--remote-store-server` to work properly."
+            )
