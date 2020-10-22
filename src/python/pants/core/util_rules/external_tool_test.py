@@ -61,11 +61,6 @@ class TemplatedFooBar(TemplatedExternalTool):
         return f"foobar-{self.version}/bin/foobar"
 
 
-def test_abstractmethods_not_implemented() -> None:
-    with pytest.raises(TypeError):
-        _ = ExternalTool()  # type: ignore[abstract, call-arg]
-
-
 def test_generate_request() -> None:
     def do_test(
         expected_url: str, expected_length: int, expected_sha256: str, plat: Platform, version: str
