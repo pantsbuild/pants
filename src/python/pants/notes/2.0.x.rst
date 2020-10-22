@@ -12,6 +12,9 @@ https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
 User API Changes
 ~~~~~~~~~~~~~~~~
 
+* Fold target help into the help system. (Cherry-pick of #11022) #11028
+  `PR #11028 <https://github.com/pantsbuild/pants/pull/11028>`_
+
 * Rename pex-binary/python-distribution subsystems to avoid naming collisions. (Cherry-pick of #11007) (#11010)
   `PR #11010 <https://github.com/pantsbuild/pants/pull/11010>`_
 
