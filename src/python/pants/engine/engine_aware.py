@@ -56,3 +56,10 @@ class EngineAwareReturnType(ABC):
         `artifacts` is a mapping of arbitrary string keys to `Snapshot`s.
         """
         return None
+
+    def metadata(self) -> Optional[Dict[str, str]]:
+        """If implemented, adds arbitrary key-value pairs to the `metadata` entry of the `@rule`
+        workunit.
+        """
+
+        return None
