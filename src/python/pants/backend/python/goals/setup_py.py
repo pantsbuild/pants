@@ -709,7 +709,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
         entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
-        console_scripts.append(f"{key}={binary_entry_point}")
+        console_scripts.append(f"{key}={binary_entry_point.val}")
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
