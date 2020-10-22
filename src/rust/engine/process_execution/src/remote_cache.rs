@@ -400,7 +400,7 @@ impl crate::CommandRunner for CommandRunner {
     // Check the remote Action Cache to see if this request was already computed.
     // If so, return immediately with the result.
     if self.cache_read {
-      let cached_response_opt = with_workunit(
+      let response = with_workunit(
         context.workunit_store.clone(),
         "check_action_cache".to_owned(),
         WorkunitMetadata::with_level(Level::Debug),
@@ -415,21 +415,29 @@ impl crate::CommandRunner for CommandRunner {
         ),
         |_, md| md,
       )
-      .await?;
-      log::debug!(
-        "action cache response: digest={:?}: {:?}",
-        action_digest,
-        cached_response_opt
-      );
-      if let Some(cached_response) = cached_response_opt {
-        return Ok(cached_response);
-      }
+      .await;
+      match response {
+        Ok(cached_response_opt) => {
+          log::debug!(
+            "remote cache response: digest={:?}: {:?}",
+            action_digest,
+            cached_response_opt
+          );
+
+          if let Some(cached_response) = cached_response_opt {
+            return Ok(cached_response);
+          }
+        }
+        Err(err) => {
+          log::warn!("failed to read from remote cache: {}", err);
+        }
+      };
     }
 
     let result = self.underlying.run(req, context.clone()).await?;
     if result.exit_code == 0 && self.cache_write {
       // Store the result in the remote cache if not the product of a remote execution.
-      self
+      if let Err(err) = self
         .update_action_cache(
           &context,
           &request,
@@ -439,7 +447,10 @@ impl crate::CommandRunner for CommandRunner {
           action_digest,
           command_digest,
         )
-        .await?;
+        .await
+      {
+        log::warn!("failed to update remote cache: {}", err)
+      }
     }
 
     Ok(result)

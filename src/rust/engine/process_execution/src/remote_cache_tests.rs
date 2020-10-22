@@ -1,10 +1,9 @@
 use std::collections::BTreeMap;
-use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use futures::compat::Future01CompatExt;
 use mock::{StubActionCache, StubCAS};
 use store::{BackoffConfig, Store};
 use tempfile::TempDir;
@@ -156,58 +155,24 @@ async fn failures_not_cached() {
 }
 
 #[tokio::test]
-async fn recover_from_missing_store_contents() {
+async fn skip_cache_on_error() {
   env_logger::init();
   let workunit_store = WorkunitStore::new(false);
   workunit_store.init_thread_state(None);
 
   let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
-  let (caching, _cache_dir, _stub_action_cache) = create_cached_runner(local, store.clone());
+  let (caching, _cache_dir, stub_action_cache) = create_cached_runner(local, store.clone());
   let (process, _script_path, _script_dir) = create_script(0);
 
-  // Run once to cache the process.
-  let first_result = caching
+  stub_action_cache
+    .always_errors
+    .store(true, Ordering::SeqCst);
+
+  // Run once to ensure the cache is skipped on errors.
+  let result = caching
     .run(process.clone().into(), Context::default())
     .await
     .unwrap();
 
-  // Delete the first child of the output directory parent to confirm that we ensure that more
-  // than just the root of the output is present when hitting the cache.
-  {
-    let output_dir_digest = first_result.output_directory;
-    let (output_dir, _) = store
-      .load_directory(output_dir_digest)
-      .await
-      .unwrap()
-      .unwrap();
-    let output_child_digest = output_dir
-      .get_files()
-      .first()
-      .unwrap()
-      .get_digest()
-      .try_into()
-      .unwrap();
-    let removed = store.remove_file(output_child_digest).await.unwrap();
-    assert!(removed);
-    let result = store
-      .contents_for_directory(output_dir_digest)
-      .compat()
-      .await;
-    log::info!("{:?}", &result);
-    assert!(result.err().is_some());
-  }
-
-  // Ensure that we don't fail if we re-run.
-  let second_result = caching
-    .run(process.clone().into(), Context::default())
-    .await
-    .unwrap();
-
-  // And that the entire output directory can be loaded.
-  assert!(store
-    .contents_for_directory(second_result.output_directory)
-    .compat()
-    .await
-    .ok()
-    .is_some())
+  assert_eq!(result.exit_code, 0);
 }

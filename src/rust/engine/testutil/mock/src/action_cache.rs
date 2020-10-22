@@ -28,6 +28,8 @@ clippy::too_many_arguments
 #![allow(clippy::mutex_atomic)]
 
 use std::collections::HashMap;
+use std::convert::TryInto;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use bazel_protos::remote_execution::{
@@ -36,16 +38,17 @@ use bazel_protos::remote_execution::{
 use grpcio::{RpcContext, UnarySink};
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use std::convert::TryInto;
 
 pub struct StubActionCache {
   server_transport: grpcio::Server,
   pub action_map: Arc<Mutex<HashMap<Fingerprint, ActionResult>>>,
+  pub always_errors: Arc<AtomicBool>,
 }
 
 #[derive(Clone)]
 struct ActionCacheResponder {
   action_map: Arc<Mutex<HashMap<Fingerprint, ActionResult>>>,
+  always_errors: Arc<AtomicBool>,
 }
 
 impl bazel_protos::remote_execution_grpc::ActionCache for ActionCacheResponder {
@@ -55,6 +58,14 @@ impl bazel_protos::remote_execution_grpc::ActionCache for ActionCacheResponder {
     req: GetActionResultRequest,
     sink: UnarySink<ActionResult>,
   ) {
+    if self.always_errors.load(Ordering::SeqCst) {
+      sink.fail(grpcio::RpcStatus::new(
+        grpcio::RpcStatusCode::UNAVAILABLE,
+        Some("unavailable".to_owned()),
+      ));
+      return;
+    }
+
     let action_digest: Digest = match req.get_action_digest().try_into() {
       Ok(digest) => digest,
       Err(_) => {
@@ -111,8 +122,10 @@ impl bazel_protos::remote_execution_grpc::ActionCache for ActionCacheResponder {
 impl StubActionCache {
   pub fn new() -> Result<Self, String> {
     let action_map = Arc::new(Mutex::new(HashMap::new()));
+    let always_errors = Arc::new(AtomicBool::new(false));
     let responder = ActionCacheResponder {
       action_map: action_map.clone(),
+      always_errors: always_errors.clone(),
     };
 
     let env = Arc::new(grpcio::Environment::new(1));
@@ -128,6 +141,7 @@ impl StubActionCache {
     Ok(StubActionCache {
       server_transport,
       action_map,
+      always_errors,
     })
   }
 
