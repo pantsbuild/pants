@@ -13,13 +13,18 @@ from pants.backend.python.target_types import (
     InjectPythonDistributionDependencies,
     PexBinary,
     PexBinarySources,
+    PexEntryPointField,
     PythonDistribution,
     PythonDistributionDependencies,
     PythonRequirementsField,
     PythonTestsTimeout,
+    ResolvedPexEntryPoint,
+    ResolvePexEntryPointRequest,
+    resolve_pex_entry_point,
 )
 from pants.backend.python.target_types import rules as target_type_rules
 from pants.engine.addresses import Address
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
     InjectedDependencies,
     InvalidFieldException,
@@ -64,13 +69,32 @@ def test_timeout_calculation() -> None:
     assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
 
 
-def test_translate_source_file_to_entry_point() -> None:
-    assert PexBinarySources.translate_source_file_to_entry_point("example/app.py") == "example.app"
-    # NB: the onus is on the call site to strip the source roots before calling this method.
-    assert (
-        PexBinarySources.translate_source_file_to_entry_point("src/python/app.py")
-        == "src.python.app"
+def test_resolve_pex_binary_entry_point() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            resolve_pex_entry_point,
+            QueryRule(ResolvedPexEntryPoint, [ResolvePexEntryPointRequest]),
+        ]
     )
+
+    def assert_resolved(
+        *, entry_point: Optional[str], source: Optional[str], expected: str
+    ) -> None:
+        addr = Address("src/python/project")
+        rule_runner.create_file("src/python/project/app.py")
+        ep_field = PexEntryPointField(entry_point, address=addr)
+        sources = PexBinarySources([source] if source else None, address=addr)
+        result = rule_runner.request(
+            ResolvedPexEntryPoint, [ResolvePexEntryPointRequest(ep_field, sources)]
+        )
+        assert result.val == expected
+
+    assert_resolved(
+        entry_point="custom.entry_point:func", source="app.py", expected="custom.entry_point:func"
+    )
+    assert_resolved(entry_point=None, source="app.py", expected="project.app")
+    with pytest.raises(ExecutionError):
+        assert_resolved(entry_point=None, source=None, expected="doesnt matter")
 
 
 def test_requirements_field() -> None:

@@ -4,6 +4,7 @@
 import collections.abc
 import logging
 import os.path
+from dataclasses import dataclass
 from textwrap import dedent
 from typing import Iterable, Optional, Tuple, Union, cast
 
@@ -14,6 +15,7 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -36,9 +38,11 @@ from pants.engine.target import (
     Target,
     WrappedTarget,
 )
+from pants.option.global_options import FilesNotFoundBehavior
 from pants.option.subsystem import Subsystem
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
+from pants.source.source_root import SourceRoot, SourceRootRequest
 
 logger = logging.getLogger(__name__)
 
@@ -141,24 +145,57 @@ class PexBinarySources(PythonSources):
 
     expected_num_files = range(0, 2)
 
-    @staticmethod
-    def translate_source_file_to_entry_point(stripped_source_path: str) -> str:
-        module_base, _ = os.path.splitext(stripped_source_path)
-        return module_base.replace(os.path.sep, ".")
-
 
 class PexBinaryDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
 class PexEntryPointField(StringField):
-    """The default entry point for the binary.
+    """The entry point for the binary.
 
     If omitted, Pants will use the module name from the `sources` field, e.g. `project/app.py` will
     become the entry point `project.app` .
     """
 
     alias = "entry_point"
+
+
+@dataclass(frozen=True)
+class ResolvedPexEntryPoint:
+    val: str
+
+
+@dataclass(frozen=True)
+class ResolvePexEntryPointRequest:
+    """Determine the entry_point by using the `PexEntryPointField` and falling back to the sources
+    field."""
+
+    entry_point_field: PexEntryPointField
+    sources: PexBinarySources
+
+
+@rule
+async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
+    if request.entry_point_field.value:
+        return ResolvedPexEntryPoint(request.entry_point_field.value)
+    binary_source_paths = await Get(
+        Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
+    )
+    if len(binary_source_paths.files) != 1:
+        raise InvalidFieldException(
+            "No `entry_point` was set for the target "
+            f"{repr(request.sources.address)}, so it must have exactly one source, but it has "
+            f"{len(binary_source_paths.files)}."
+        )
+    entry_point_path = binary_source_paths.files[0]
+    source_root = await Get(
+        SourceRoot,
+        SourceRootRequest,
+        SourceRootRequest.for_file(entry_point_path),
+    )
+    stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
+    module_base, _ = os.path.splitext(stripped_source_path)
+    return ResolvedPexEntryPoint(module_base.replace(os.path.sep, "."))
 
 
 class PexPlatformsField(StringOrStringSequenceField):

@@ -15,11 +15,14 @@ from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
+    PexBinarySources,
     PexEntryPointField,
     PythonInterpreterCompatibility,
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
+    ResolvedPexEntryPoint,
+    ResolvePexEntryPointRequest,
     SetupPyCommandsField,
 )
 from pants.backend.python.util_rules.pex import (
@@ -682,16 +685,28 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             "install_requires": (*requirements, *setup_kwargs.get("install_requires", [])),
         }
     )
+
+    # Add `.with_binries()` to the entry points.
     key_to_binary_spec = exported_target.provides.binaries
     binaries = await Get(
         Targets, UnparsedAddressInputs(key_to_binary_spec.values(), owning_address=target.address)
     )
-    for key, binary in zip(key_to_binary_spec.keys(), binaries):
-        binary_entry_point = binary.get(PexEntryPointField).value
-        if not binary_entry_point:
+    entry_point_requests = []
+    for binary in binaries:
+        if not binary.has_fields([PexEntryPointField, PexBinarySources]):
             raise InvalidEntryPoint(
-                f"The binary {key} exported by {target.address} is not a valid entry point."
+                "Expected addresses to `pex_binary` targets in `.with_binaries()` for the "
+                f"`provides` field for {exported_target.target.address}, "
+                f"but found {binary.address} with target type {binary.alias}."
             )
+        entry_point_requests.append(
+            ResolvePexEntryPointRequest(binary[PexEntryPointField], binary[PexBinarySources])
+        )
+    binary_entry_points = await MultiGet(
+        Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest, request)
+        for request in entry_point_requests
+    )
+    for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
         entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
         console_scripts.append(f"{key}={binary_entry_point}")

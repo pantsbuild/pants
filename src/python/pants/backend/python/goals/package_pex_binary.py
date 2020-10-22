@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 from dataclasses import dataclass
 from typing import Tuple, cast
 
@@ -15,7 +14,12 @@ from pants.backend.python.target_types import (
     PexInheritPathField,
 )
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import PexShebangField, PexZipSafeField
+from pants.backend.python.target_types import (
+    PexShebangField,
+    PexZipSafeField,
+    ResolvedPexEntryPoint,
+    ResolvePexEntryPointRequest,
+)
 from pants.backend.python.util_rules.pex import PexPlatforms, TwoStepPex
 from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
@@ -29,12 +33,9 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet
-from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import InvalidFieldException
 from pants.engine.unions import UnionRule
-from pants.option.global_options import FilesNotFoundBehavior, GlobalOptions
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 
@@ -77,27 +78,9 @@ async def package_pex_binary(
     pex_binary_defaults: PexBinaryDefaults,
     global_options: GlobalOptions,
 ) -> BuiltPackage:
-    entry_point = field_set.entry_point.value
-    if entry_point is None:
-        binary_source_paths = await Get(
-            Paths, PathGlobs, field_set.sources.path_globs(FilesNotFoundBehavior.error)
-        )
-        if len(binary_source_paths.files) != 1:
-            raise InvalidFieldException(
-                "No `entry_point` was set for the target "
-                f"{repr(field_set.address)}, so it must have exactly one source, but it has "
-                f"{len(binary_source_paths.files)}"
-            )
-        entry_point_path = binary_source_paths.files[0]
-        source_root = await Get(
-            SourceRoot,
-            SourceRootRequest,
-            SourceRootRequest.for_file(entry_point_path),
-        )
-        entry_point = PexBinarySources.translate_source_file_to_entry_point(
-            os.path.relpath(entry_point_path, source_root.path)
-        )
-
+    resolved_entry_point = await Get(
+        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point, field_set.sources)
+    )
     output_filename = field_set.output_path.value_or_default(
         field_set.address,
         file_ending="pex",
@@ -109,7 +92,7 @@ async def package_pex_binary(
             PexFromTargetsRequest(
                 addresses=[field_set.address],
                 internal_only=False,
-                entry_point=entry_point,
+                entry_point=resolved_entry_point.val,
                 platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
                 output_filename=output_filename,
                 additional_args=field_set.generate_additional_args(pex_binary_defaults),
