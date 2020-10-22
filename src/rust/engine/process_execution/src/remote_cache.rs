@@ -195,7 +195,11 @@ impl CommandRunner {
           Component::Normal(name) => name
             .to_str()
             .ok_or_else(|| format!("unable to convert '{:?}' to string", name))?,
-          _ => return Err("illegal state: unexpected path component in relative path".into()),
+          _ => {
+            return Err(
+              "Illegal state: Found an unexpected path component in relative path.".into(),
+            )
+          }
         };
 
         // Load the Directory proto corresponding to `current_directory_digest`.
@@ -203,7 +207,7 @@ impl CommandRunner {
           Some((dir, _)) => dir,
           None => {
             return Err(format!(
-              "illegal state: directory for digest {:?} did not exist locally",
+              "Illegal state: The directory for digest {:?} did not exist locally.",
               &current_directory_digest
             ))
           }
@@ -218,7 +222,7 @@ impl CommandRunner {
           Some(dn) => dn,
           None => {
             return Err(format!(
-              "unable to find path component {:?} in directory",
+              "Unable to find path component {:?} in directory.",
               next_name
             ))
           }
@@ -236,7 +240,7 @@ impl CommandRunner {
       Some((dir, _)) => dir,
       None => {
         return Err(format!(
-          "illegal state: directory for digest {:?} did not exist locally",
+          "Illegal state: The directory for digest {:?} did not exist locally.",
           &current_directory_digest
         ))
       }
@@ -249,7 +253,7 @@ impl CommandRunner {
       .iter()
       .find(|n| n.get_name() == file_base_name)
       .cloned()
-      .ok_or_else(|| format!("file {:?} did not exist did not exist locally", file_path))
+      .ok_or_else(|| format!("File {:?} did not exist locally.", file_path))
   }
 
   async fn make_action_result(
@@ -425,7 +429,7 @@ impl crate::CommandRunner for CommandRunner {
           }
         }
         Err(err) => {
-          log::warn!("failed to read from remote cache: {}", err);
+          log::warn!("Failed to read from remote cache: {}", err);
         }
       };
     }
@@ -445,7 +449,7 @@ impl crate::CommandRunner for CommandRunner {
         )
         .await
       {
-        log::warn!("failed to update remote cache: {}", err)
+        log::warn!("Failed to update remote cache: {}", err)
       }
     }
 
