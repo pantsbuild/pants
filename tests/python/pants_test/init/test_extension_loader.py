@@ -108,8 +108,6 @@ class LoaderTest(unittest.TestCase):
     def create_register(
         self,
         build_file_aliases=None,
-        register_goals=None,
-        global_subsystems=None,
         rules=None,
         target_types=None,
         module_name="register",
@@ -131,8 +129,6 @@ class LoaderTest(unittest.TestCase):
                     setattr(register_module, function_name, function)
 
             register_entrypoint("build_file_aliases", build_file_aliases)
-            register_entrypoint("global_subsystems", global_subsystems)
-            register_entrypoint("register_goals", register_goals)
             register_entrypoint("rules", rules)
             register_entrypoint("target_types", target_types)
 
