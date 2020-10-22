@@ -53,6 +53,7 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     cache:
@@ -84,8 +85,7 @@ jobs:
       ${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     services:
     - docker
-    stage: Bootstrap Pants (Cron)
-    sudo: required
+    stage: Bootstrap Pants
   - addons:
       apt:
         packages:
@@ -106,6 +106,7 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     cache:
@@ -138,7 +139,6 @@ jobs:
     services:
     - docker
     stage: Bootstrap Pants (Cron)
-    sudo: required
   - after_failure:
     - ./build-support/bin/ci-failure.sh
     before_cache:
@@ -179,7 +179,7 @@ jobs:
     - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.6
       --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
       --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    stage: Bootstrap Pants (Cron)
+    stage: Bootstrap Pants
   - after_failure:
     - ./build-support/bin/ci-failure.sh
     before_cache:
@@ -241,12 +241,13 @@ jobs:
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
-    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -270,8 +271,7 @@ jobs:
       --githooks --smoke-tests --python-version 3.6
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --lint --python-version 3.6
-    stage: Test Pants (Cron)
-    sudo: required
+    stage: Test Pants
   - addons:
       apt:
         packages:
@@ -292,12 +292,13 @@ jobs:
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
-    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -322,15 +323,15 @@ jobs:
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --lint --python-version 3.7
     stage: Test Pants (Cron)
-    sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
-    - sudo sysctl fs.inotify.max_user_watches=524288
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -377,12 +378,13 @@ jobs:
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
-    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -404,8 +406,7 @@ jobs:
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --integration-tests --python-version 3.6
-    stage: Test Pants (Cron)
-    sudo: required
+    stage: Test Pants
   - addons:
       apt:
         packages:
@@ -428,12 +429,13 @@ jobs:
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
-    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -456,15 +458,15 @@ jobs:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --integration-tests --python-version 3.7
     stage: Test Pants (Cron)
-    sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
-    - sudo sysctl fs.inotify.max_user_watches=524288
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -495,7 +497,7 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${MACOS_PYENV_PY36_VERSION}"
     - brew cask install osxfuse
     before_script:
     - ulimit -n 8192
@@ -543,9 +545,10 @@ jobs:
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
-    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -577,8 +580,7 @@ jobs:
       -f"
     services:
     - docker
-    stage: Test Pants (Cron)
-    sudo: required
+    stage: Test Pants
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
@@ -623,7 +625,7 @@ jobs:
     - USE_PY37=true ./build-support/bin/release.sh -n
     - USE_PY38=true ./build-support/bin/release.sh -n
     - ./build-support/bin/release.sh -f
-    stage: Test Pants (Cron)
+    stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -648,7 +650,7 @@ jobs:
     os: osx
     script:
     - ./build-support/bin/ci.py --platform-specific-tests --python-version 3.6
-    stage: Test Pants (Cron)
+    stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -699,7 +701,7 @@ jobs:
     osx_image: xcode9.2
     script:
     - MODE=debug ./build-support/bin/ci.py --smoke-tests --python-version 3.6
-    stage: Test Pants (Cron)
+    stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -751,7 +753,7 @@ jobs:
     osx_image: xcode10.1
     script:
     - MODE=debug ./build-support/bin/ci.py --smoke-tests --python-version 3.6
-    stage: Test Pants (Cron)
+    stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -798,9 +800,10 @@ jobs:
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
-    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -834,7 +837,6 @@ jobs:
     script:
     - ./build-support/bin/release.sh -p
     stage: Deploy Pants Pex
-    sudo: required
   - addons:
       apt:
         packages:
@@ -855,9 +857,10 @@ jobs:
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    - ls /opt/python
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
-    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -883,7 +886,6 @@ jobs:
     - mkdir -p dist/deploy/pex/
     - mv dist/pants*.pex dist/deploy/pex/
     stage: Deploy Pants Pex Unstable
-    sudo: required
 stages:
 - if: type != cron
   name: Bootstrap Pants

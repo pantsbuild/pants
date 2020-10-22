@@ -129,14 +129,14 @@ class PythonVersion(Enum):
     def default_stage(self, *, is_bootstrap: bool = False) -> Stage:
         if is_bootstrap:
             return {
-                self.py36: Stage.bootstrap_cron,
+                self.py36: Stage.bootstrap,
                 self.py37: Stage.bootstrap_cron,
-                self.py38: Stage.bootstrap,
+                self.py38: Stage.bootstrap_cron,
             }[self]  # type: ignore[index]
         return {
-            self.py36: Stage.test_cron,
+            self.py36: Stage.test,
             self.py37: Stage.test_cron,
-            self.py38: Stage.test,
+            self.py38: Stage.test_cron,
         }[self]  # type: ignore[index]
 
 
@@ -262,6 +262,7 @@ def _linux_before_install(
     include_test_config: bool = True, install_travis_wait: bool = False
 ) -> List[str]:
     commands = [
+        "ls /opt/python",
         "./build-support/bin/install_aws_cli_for_ci.sh",
         # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
         #   https://github.com/pantsbuild/pants/issues/7601
@@ -279,7 +280,7 @@ def _linux_before_install(
             ]
         )
     if include_test_config:
-        commands.append("sudo sysctl fs.inotify.max_user_watches=524288")
+        return ["sudo sysctl fs.inotify.max_user_watches=524288", *commands]
     return commands
 
 
@@ -295,7 +296,6 @@ def linux_shard(
     setup = {
         "os": "linux",
         "dist": "bionic",
-        "sudo": "required",
         "python": ["2.7", "3.6", "3.7"],
         "addons": {
             "apt": {
@@ -625,7 +625,7 @@ def rust_tests_osx() -> Dict:
         #      See https://gist.github.com/stuhood/856a9b09bbaa86141f36c9925c14fae7
         "osx_image": "xcode8",
         "before_install": [
-            './build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"',
+            './build-support/bin/install_python_for_ci.sh "${MACOS_PYENV_PY36_VERSION}"',
             # We don't use the standard travis "addons" section here because it will either silently
             # fail (on older images) or cause a multi-minute `brew update` (on newer images), neither of
             # which we want. This doesn't happen if we just manually run `brew cask install`.
