@@ -18,6 +18,7 @@ from pants.backend.python.target_types import (
     PythonLibrary,
     PythonRequirementLibrary,
     PythonTests,
+    resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals import binary
@@ -42,6 +43,7 @@ def rule_runner() -> RuleRunner:
             *binary.rules(),
             *package_pex_binary.rules(),
             get_filtered_environment,
+            resolve_pex_entry_point,
             QueryRule(TestResult, (PythonTestFieldSet,)),
             QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
         ],
