@@ -3,12 +3,12 @@
 
 from typing import List, cast
 
-from pants.core.util_rules.external_tool import ExternalTool
+from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.option.custom_types import target_option
 
 
-class Protoc(ExternalTool):
+class Protoc(TemplatedExternalTool):
     """The protocol buffer compiler (https://developers.google.com/protocol-buffers)."""
 
     options_scope = "protoc"

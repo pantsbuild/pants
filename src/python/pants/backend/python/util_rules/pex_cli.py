@@ -13,8 +13,8 @@ from pants.backend.python.util_rules.pex_environment import PexEnvironment, Pyth
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalTool,
     ExternalToolRequest,
+    TemplatedExternalTool,
 )
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
 from pants.engine.internals.selectors import MultiGet
@@ -28,7 +28,7 @@ from pants.util.meta import classproperty, frozen_after_init
 from pants.util.strutil import create_path_env_var
 
 
-class PexBinary(ExternalTool):
+class PexBinary(TemplatedExternalTool):
     """The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."""
 
     options_scope = "download-pex-bin"

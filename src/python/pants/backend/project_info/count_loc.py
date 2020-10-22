@@ -5,8 +5,8 @@ from typing import Tuple
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalTool,
     ExternalToolRequest,
+    TemplatedExternalTool,
 )
 from pants.engine.console import Console
 from pants.engine.fs import Digest, MergeDigests, SourcesSnapshot
@@ -19,7 +19,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-class SuccinctCodeCounter(ExternalTool):
+class SuccinctCodeCounter(TemplatedExternalTool):
     """The Succinct Code Counter, aka `scc` (https://github.com/boyter/scc)."""
 
     options_scope = "scc"

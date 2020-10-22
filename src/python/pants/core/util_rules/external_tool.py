@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import textwrap
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, cast
 
@@ -35,7 +36,7 @@ class DownloadedExternalTool:
     exe: str
 
 
-class ExternalTool(Subsystem):
+class ExternalTool(Subsystem, metaclass=ABCMeta):
     """Configuration for an invocable tool that we download from an external source.
 
     Subclass this to configure a specific tool.
@@ -71,8 +72,6 @@ class ExternalTool(Subsystem):
     # Subclasses must set appropriately.
     default_version: str
     default_known_versions: List[str]
-    default_url_template: str
-    default_url_platform_mapping: Optional[Dict[str, str]] = None
 
     @classproperty
     def name(cls):
@@ -120,6 +119,83 @@ class ExternalTool(Subsystem):
             advanced=True,
             help=help_str,
         )
+
+    @property
+    def version(self) -> str:
+        return cast(str, self.options.version)
+
+    @property
+    def known_versions(self) -> Tuple[str, ...]:
+        return tuple(self.options.known_versions)
+
+    @abstractmethod
+    def generate_url(self, plat: Platform) -> str:
+        """Returns the URL for the given version of the tool, runnable on the given os+arch.
+
+        os and arch default to those of the current system.
+
+        Implementations should raise ExternalToolError if they cannot resolve the arguments
+        to a URL. The raised exception need not have a message - a sensible one will be generated.
+        """
+        pass
+
+    def generate_exe(self, plat: Platform) -> str:
+        """Returns the path to the tool executable.
+
+        If the downloaded artifact is the executable itself, you can leave this unimplemented.
+
+        If the downloaded artifact is an archive, this should be overridden to provide a
+        relative path in the downloaded archive, e.g. `./bin/protoc`.
+        """
+        return f"./{self.generate_url(plat).rsplit('/', 1)[-1]}"
+
+    def get_request(self, plat: Platform) -> ExternalToolRequest:
+        """Generate a request for this tool."""
+        for known_version in self.known_versions:
+            try:
+                ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
+            except ValueError:
+                raise ExternalToolError(
+                    f"Bad value for --known-versions (see {self.options.pants_bin_name} "
+                    f"help-advanced {self.options_scope}): {known_version}"
+                )
+            if plat_val == plat.value and ver == self.version:
+                digest = FileDigest(fingerprint=sha256, serialized_bytes_length=int(length))
+                try:
+                    url = self.generate_url(plat)
+                    exe = self.generate_exe(plat)
+                except ExternalToolError as e:
+                    raise ExternalToolError(
+                        f"Couldn't find {self.name} version {self.version} on {plat.value}"
+                    ) from e
+                return ExternalToolRequest(DownloadFile(url=url, expected_digest=digest), exe)
+        raise UnknownVersion(
+            f"No known version of {self.name} {self.version} for {plat.value} found in "
+            f"{self.known_versions}"
+        )
+
+
+class TemplatedExternalTool(ExternalTool):
+    """Extends the ExternalTool to allow url templating for custom/self-hosted source.
+
+    In addition to ExternalTool functionalities, it is needed to set, e.g.:
+
+    default_url_template = "https://tool.url/{version}/{platform}-mytool.zip"
+    default_url_platform_mapping = {
+        "darwin": "osx",
+        "linux": "linux",
+    }
+
+    The platform mapping dict is optional.
+    """
+
+    default_url_template: str
+    default_url_platform_mapping: Optional[Dict[str, str]] = None
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+
         register(
             "--url-template",
             type=str,
@@ -134,6 +210,7 @@ class ExternalTool(Subsystem):
                 "For example, https://github.com/.../protoc-{version}-{platform}.zip."
             ),
         )
+
         register(
             "--url-platform-mapping",
             type=dict,
@@ -150,14 +227,6 @@ class ExternalTool(Subsystem):
         )
 
     @property
-    def version(self) -> str:
-        return cast(str, self.options.version)
-
-    @property
-    def known_versions(self) -> Tuple[str, ...]:
-        return tuple(self.options.known_versions)
-
-    @property
     def url_template(self) -> str:
         return cast(str, self.options.url_template)
 
@@ -165,48 +234,9 @@ class ExternalTool(Subsystem):
     def url_platform_mapping(self) -> Optional[Dict[str, str]]:
         return cast(Optional[Dict[str, str]], self.options.url_platform_mapping)
 
-    def _generate_url(self, plat: Platform) -> str:
-        """Returns the URL for the given version of the tool, runnable on the given os+arch.
-
-        os and arch default to those of the current system.
-        """
+    def generate_url(self, plat: Platform):
         platform = self.url_platform_mapping[plat.value] if self.url_platform_mapping else ""
         return self.url_template.format(version=self.version, platform=platform)
-
-    def generate_exe(self, plat: Platform) -> str:
-        """Returns the path to the tool executable.
-
-        If the downloaded artifact is the executable itself, you can leave this unimplemented.
-
-        If the downloaded artifact is an archive, this should be overridden to provide a
-        relative path in the downloaded archive, e.g. `./bin/protoc`.
-        """
-        return f"./{self._generate_url(plat).rsplit('/', 1)[-1]}"
-
-    def get_request(self, plat: Platform) -> ExternalToolRequest:
-        """Generate a request for this tool."""
-        for known_version in self.known_versions:
-            try:
-                ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
-            except ValueError:
-                raise ExternalToolError(
-                    f"Bad value for --known-versions (see {self.options.pants_bin_name} "
-                    f"help-advanced {self.options_scope}): {known_version}"
-                )
-            if plat_val == plat.value and ver == self.version:
-                digest = FileDigest(fingerprint=sha256, serialized_bytes_length=int(length))
-                try:
-                    url = self._generate_url(plat)
-                    exe = self.generate_exe(plat)
-                except ExternalToolError as e:
-                    raise ExternalToolError(
-                        f"Couldn't find {self.name} version {self.version} on {plat.value}"
-                    ) from e
-                return ExternalToolRequest(DownloadFile(url=url, expected_digest=digest), exe)
-        raise UnknownVersion(
-            f"No known version of {self.name} {self.version} for {plat.value} found in "
-            f"{self.known_versions}"
-        )
 
 
 @rule(level=LogLevel.DEBUG)
