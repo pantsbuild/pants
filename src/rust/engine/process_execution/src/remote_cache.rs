@@ -179,8 +179,7 @@ impl CommandRunner {
     Ok(tree)
   }
 
-  async fn extract_output_file(
-    &self,
+  pub(crate) async fn extract_output_file(
     root_directory_digest: Digest,
     file_path: RelativePath,
     store: &Store,
@@ -292,13 +291,12 @@ impl CommandRunner {
 
     let mut file_digests = Vec::new();
     for output_file in &command.output_files {
-      let file_node = self
-        .extract_output_file(
-          result.output_directory,
-          RelativePath::new(output_file).unwrap(),
-          store,
-        )
-        .await?;
+      let file_node = Self::extract_output_file(
+        result.output_directory,
+        RelativePath::new(output_file).unwrap(),
+        store,
+      )
+      .await?;
 
       file_digests.push(file_node.get_digest().try_into()?);
 

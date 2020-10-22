@@ -181,8 +181,6 @@ async fn skip_cache_on_error() {
 
 #[tokio::test]
 async fn make_tree_from_directory() {
-  env_logger::init();
-
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
@@ -240,4 +238,39 @@ async fn make_tree_from_directory() {
   )
   .await
   .unwrap_err();
+}
+
+#[tokio::test]
+async fn extract_output_file() {
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+  // Prepare the store to contain /pets/cats/roland. We will then extract varios pieces of it
+  // into Tree protos.
+
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+  let directory_digest = store
+    .record_directory(&TestDirectory::nested().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let file_node = crate::remote_cache::CommandRunner::extract_output_file(
+    directory_digest,
+    RelativePath::new("cats/roland").unwrap(),
+    &store,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(file_node.get_name(), "roland");
+  let file_digest: Digest = file_node.get_digest().try_into().unwrap();
+  assert_eq!(file_digest, TestData::roland().digest());
 }
