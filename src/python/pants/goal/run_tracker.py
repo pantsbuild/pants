@@ -161,9 +161,6 @@ class RunTracker(Subsystem):
         # Note that multiple threads may share a name (e.g., all the threads in a pool).
         self._threadlocal = threading.local()
 
-        # A logger facade that logs into this RunTracker.
-        self._logger = RunTrackerLogger(self)
-
         # For background work.  Created lazily if needed.
         self._background_root_workunit = None
 
@@ -506,22 +503,3 @@ class RunTracker(Subsystem):
             raise ValueError(
                 f"Couldn't find option scope {scope}{option_str} for recording ({e!r})"
             )
-
-
-class RunTrackerLogger:
-    """A logger facade that logs into a run tracker."""
-
-    def __init__(self, run_tracker):
-        self._run_tracker = run_tracker
-
-    def debug(self, *msg_elements):
-        self._run_tracker.log(Report.DEBUG, *msg_elements)
-
-    def info(self, *msg_elements):
-        self._run_tracker.log(Report.INFO, *msg_elements)
-
-    def warn(self, *msg_elements):
-        self._run_tracker.log(Report.WARN, *msg_elements)
-
-    def error(self, *msg_elements):
-        self._run_tracker.log(Report.ERROR, *msg_elements)
