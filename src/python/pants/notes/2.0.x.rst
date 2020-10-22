@@ -6,13 +6,13 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release, and
 https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
 
-2.0.0rc2 (10/21/2020)
+2.0.0rc2 (10/22/2020)
 ---------------------
 
 User API Changes
 ~~~~~~~~~~~~~~~~
 
-* Rename pex-binary/python-distribution to avoid naming collisions. (Cherry-pick of #11007) (#11010)
+* Rename pex-binary/python-distribution subsystems to avoid naming collisions. (Cherry-pick of #11007) (#11010)
   `PR #11010 <https://github.com/pantsbuild/pants/pull/11010>`_
 
 * Increase default `[python-setup].resolver_jobs` to `cpu_count / 2` (Cherry-pick of #11006) (#11011)
@@ -39,8 +39,8 @@ New Features
 * Add `[python-setup].resolver_http_cache_ttl` option (Cherry-pick of #10997) (#11002)
   `PR #11002 <https://github.com/pantsbuild/pants/pull/11002>`_
 
-* Allow changing the URL to download tools like PEX and Protoc (Cherry-pick of #11013) (#10...)
-  `PR #10... <https://github.com/pantsbuild/pants/pull/10...>`_
+* Allow changing the URL to download tools like PEX and Protoc (Cherry-pick of #11013) (#11024)
+  `PR #11024 <https://github.com/pantsbuild/pants/pull/11024>`_
 
 Bugfixes
 ~~~~~~~~
@@ -53,6 +53,9 @@ Bugfixes
 
 * Fix `./pants repl` to use global constrains when no targets specified (Cherry-pick of #10991) (#10992)
   `PR #10992 <https://github.com/pantsbuild/pants/pull/10992>`_
+
+* Fix `setup_py().with_binaries()` to use the default entry point (Cherry-pick of #11021) #11026
+  `PR #11026 <https://github.com/pantsbuild/pants/pull/11026>`_
 
 * Fix overly verbose `FieldSet` in stack traces (Cherry-pick of #10978) (#10990)
   `PR #10990 <https://github.com/pantsbuild/pants/pull/10990>`_
