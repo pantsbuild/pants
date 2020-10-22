@@ -295,10 +295,10 @@ def run_smoke_tests() -> None:
             die(f"Failed to execute `./pants {command}`.")
 
     checks = [
-        ["goals"],
+        ["help", "goals"],
         ["list", "::"],
         ["roots"],
-        ["target-types"],
+        ["help", "targets"],
     ]
     with travis_section("SmokeTest", "Smoke testing bootstrapped Pants and repo BUILD files"):
         check_pants_pex_exists()

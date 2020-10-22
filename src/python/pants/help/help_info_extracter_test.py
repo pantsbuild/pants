@@ -3,9 +3,10 @@
 
 import dataclasses
 from enum import Enum
-from typing import Tuple
+from typing import Any, Optional, Tuple
 
 from pants.engine.goal import GoalSubsystem
+from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, to_help_str
 from pants.option.config import Config
@@ -133,7 +134,7 @@ def test_default() -> None:
 
 
 def test_compute_default():
-    def do_test(expected_default, **kwargs):
+    def do_test(expected_default: Optional[Any], **kwargs):
         kwargs["default"] = RankedValue(Rank.HARDCODED, kwargs["default"])
         assert expected_default == HelpInfoExtracter.compute_default(**kwargs)
 
@@ -227,6 +228,31 @@ def test_get_all_help_info():
 
         name = "bar"
 
+    class QuxField(StringField):
+        """A qux string."""
+
+        alias = "qux"
+        default = "blahblah"
+
+    class QuuxField(IntField):
+        """A quux int.
+
+        Must be non-zero. Or zero. Whatever you like really.
+        """
+
+        alias = "quux"
+        required = True
+
+    class BazLibrary(Target):
+        """A library of baz-es.
+
+        Use it however you like.
+        """
+
+        alias = "baz_library"
+
+        core_fields = [QuxField, QuuxField]
+
     options = Options.create(
         env={},
         config=Config.load_file_contents(""),
@@ -242,7 +268,10 @@ def test_get_all_help_info():
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
 
     all_help_info = HelpInfoExtracter.get_all_help_info(
-        options, UnionMembership({}), fake_consumed_scopes_mapper
+        options,
+        UnionMembership({}),
+        fake_consumed_scopes_mapper,
+        RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
     )
     all_help_info_dict = dataclasses.asdict(all_help_info)
     expected_all_help_info_dict = {
@@ -344,6 +373,30 @@ def test_get_all_help_info():
                 "description": "The bar goal.",
                 "consumed_scopes": ("somescope", "used_by_bar"),
                 "is_implemented": True,
+            }
+        },
+        "name_to_target_type_info": {
+            "baz_library": {
+                "alias": "baz_library",
+                "summary": "A library of baz-es.",
+                "description": "A library of baz-es.\n\nUse it however you like.",
+                "fields": (
+                    {
+                        "alias": "qux",
+                        "default": "'blahblah'",
+                        "description": "A qux string.",
+                        "required": False,
+                        "type_hint": "str | None",
+                    },
+                    {
+                        "alias": "quux",
+                        "default": None,
+                        "description": "A quux int. Must be non-zero. Or zero. "
+                        "Whatever you like really.",
+                        "required": True,
+                        "type_hint": "int",
+                    },
+                ),
             }
         },
     }
