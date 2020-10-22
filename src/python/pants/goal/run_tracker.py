@@ -10,7 +10,6 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
-from contextlib import contextmanager
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -45,25 +44,7 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
 
 
 class RunTracker(Subsystem):
-    """Tracks and times the execution of a pants run.
-
-    Also manages background work.
-
-    Use like this:
-
-    run_tracker.start()
-    with run_tracker.new_workunit('compile'):
-      with run_tracker.new_workunit('java'):
-        ...
-      with run_tracker.new_workunit('scala'):
-        ...
-    run_tracker.close()
-
-    Can track execution against multiple 'roots', e.g., one for the main thread and another for
-    background threads.
-
-    :API: public
-    """
+    """Tracks and times the execution of a pants run."""
 
     options_scope = "run-tracker"
 
@@ -254,7 +235,6 @@ class RunTracker(Subsystem):
         self._main_root_workunit.start(run_start_time)
         self.report.start_workunit(self._main_root_workunit)
 
-
         goal_names: Tuple[str, ...] = tuple(all_options.goals)
         self._v2_goal_rule_names = goal_names
 
@@ -270,89 +250,9 @@ class RunTracker(Subsystem):
         return dict(self._pantsd_metrics)  # defensive copy
 
     @property
-    def logger(self):
-        return self._logger
-
-    @contextmanager
-    def new_workunit(self, name, labels=None, cmd="", log_config=None):
-        """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
-
-        - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
-        - labels: An optional iterable of labels. The reporters can use this to decide how to
-                  display information about this work.
-        - cmd: An optional longer string representing this work.
-               E.g., the cmd line of a compiler invocation.
-        - log_config: An optional tuple WorkUnit.LogConfig of task-level options affecting reporting.
-
-        Use like this:
-
-        with run_tracker.new_workunit(name='compile', labels=[WorkUnitLabel.TASK]) as workunit:
-          <do scoped work here>
-          <set the outcome on workunit if necessary>
-
-        Note that the outcome will automatically be set to failure if an exception is raised
-        in a workunit, and to success otherwise, so usually you only need to set the
-        outcome explicitly if you want to set it to warning.
-
-        :API: public
-        """
-        parent = self._threadlocal.current_workunit
-        with self.new_workunit_under_parent(
-            name, parent=parent, labels=labels, cmd=cmd, log_config=log_config
-        ) as workunit:
-            self._threadlocal.current_workunit = workunit
-            try:
-                yield workunit
-            finally:
-                self._threadlocal.current_workunit = parent
-
-    @contextmanager
-    def new_workunit_under_parent(self, name, parent, labels=None, cmd="", log_config=None):
-        """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
-
-        - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
-        - parent: The new workunit is created under this parent.
-        - labels: An optional iterable of labels. The reporters can use this to decide how to
-                  display information about this work.
-        - cmd: An optional longer string representing this work.
-               E.g., the cmd line of a compiler invocation.
-
-        Task code should not typically call this directly.
-
-        :API: public
-        """
-        workunit = WorkUnit(
-            run_info_dir=self.run_info_dir,
-            parent=parent,
-            name=name,
-            labels=labels,
-            cmd=cmd,
-            log_config=log_config,
-        )
-        workunit.start()
-
-        outcome = WorkUnit.FAILURE  # Default to failure we will override if we get success/abort.
-        try:
-            self.report.start_workunit(workunit)
-            yield workunit
-        except KeyboardInterrupt:
-            outcome = WorkUnit.ABORTED
-            self._aborted = True
-            raise
-        else:
-            outcome = WorkUnit.SUCCESS
-        finally:
-            workunit.set_outcome(outcome)
-            self.end_workunit(workunit)
-
-    @property
     def _stats_version(self) -> int:
         stats_version: int = self.options.stats_version
         return stats_version
-
-    def log(self, level, *msg_elements):
-        """Log a message against the current workunit."""
-        self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
     @classmethod
     def _get_headers(cls, stats_version: int) -> Dict[str, str]:
@@ -492,8 +392,6 @@ class RunTracker(Subsystem):
                 stats_version=self._stats_version,
             )
 
-    _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
-
     def has_ended(self) -> bool:
         return self._end_memoized_result is not None
 
@@ -509,18 +407,12 @@ class RunTracker(Subsystem):
 
         self.shutdown_worker_pool()
 
-        # Run a dummy work unit to write out one last timestamp.
-        with self.new_workunit("complete"):
-            pass
-
         self.end_workunit(self._main_root_workunit)
 
         outcome = self._main_root_workunit.outcome()
         if self._background_root_workunit:
             outcome = min(outcome, self._background_root_workunit.outcome())
         outcome_str = WorkUnit.outcome_string(outcome)
-        log_level = RunTracker._log_levels[outcome]
-        self.log(log_level, outcome_str)
 
         if self.run_info.get_info("outcome") is None:
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
