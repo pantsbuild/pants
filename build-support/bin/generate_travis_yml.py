@@ -262,6 +262,8 @@ def _linux_before_install(
     include_test_config: bool = True, install_travis_wait: bool = False
 ) -> List[str]:
     commands = [
+        "ls /opt/python",
+        "pyenv root",
         "pyenv global",
         "./build-support/bin/install_aws_cli_for_ci.sh",
         # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
