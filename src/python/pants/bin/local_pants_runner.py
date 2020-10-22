@@ -217,6 +217,7 @@ class LocalPantsRunner:
         run_tracker.set_pantsd_scheduler_metrics(metrics)
         outcome = WorkUnit.SUCCESS if code == PANTS_SUCCEEDED_EXIT_CODE else WorkUnit.FAILURE
         run_tracker.set_root_outcome(outcome)
+        run_tracker.end()
 
     def _print_help(self, request: HelpRequest) -> ExitCode:
         global_options = self.options.for_global_scope()
@@ -254,12 +255,11 @@ class LocalPantsRunner:
 
             goals = tuple(self.options.goals)
             with streaming_reporter.session():
-                run_tracker.set_v2_goal_rule_names(goals)
                 engine_result = PANTS_FAILED_EXIT_CODE
                 try:
                     engine_result = self._run_v2(goals)
                 except Exception as e:
                     ExceptionSink.log_exception(e)
 
-            self._finish_run(run_tracker, engine_result)
+                self._finish_run(run_tracker, engine_result)
             return engine_result
