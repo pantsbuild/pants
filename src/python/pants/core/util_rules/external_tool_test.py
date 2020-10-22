@@ -3,12 +3,7 @@
 
 import pytest
 
-from pants.core.util_rules.external_tool import (
-    ExternalTool,
-    ExternalToolError,
-    ExternalToolRequest,
-    UnknownVersion,
-)
+from pants.core.util_rules.external_tool import ExternalTool, ExternalToolRequest, UnknownVersion
 from pants.engine.fs import DownloadFile, FileDigest
 from pants.engine.platform import Platform
 from pants.testutil.option_util import create_subsystem
@@ -25,15 +20,11 @@ class FooBar(ExternalTool):
         "3.4.7|darwin   |9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
         "3.4.7|linux    |a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
     ]
-
-    def generate_url(self, plat: Platform) -> str:
-        if plat == Platform.darwin:
-            plat_str = "osx-x86_64"
-        elif plat == Platform.linux:
-            plat_str = "linux-x86_64"
-        else:
-            raise ExternalToolError()
-        return f"https://foobar.org/bin/v{self.version}/foobar-{self.version}-{plat_str}.tgz"
+    default_url_template = "https://foobar.org/bin/v{version}/foobar-{version}-{platform}.tgz"
+    default_url_platform_mapping = {
+        "darwin": "osx-x86_64",
+        "linux": "linux-x86_64",
+    }
 
     def generate_exe(self, plat: Platform) -> str:
         return f"foobar-{self.version}/bin/foobar"
@@ -44,7 +35,11 @@ def test_generate_request() -> None:
         expected_url: str, expected_length: int, expected_sha256: str, plat: Platform, version: str
     ) -> None:
         foobar = create_subsystem(
-            FooBar, version=version, known_versions=FooBar.default_known_versions
+            FooBar,
+            version=version,
+            known_versions=FooBar.default_known_versions,
+            url_template=FooBar.default_url_template,
+            url_platform_mapping=FooBar.default_url_platform_mapping,
         )
         assert (
             ExternalToolRequest(

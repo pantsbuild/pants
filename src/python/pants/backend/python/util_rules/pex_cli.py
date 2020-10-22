@@ -34,6 +34,7 @@ class PexBinary(ExternalTool):
     options_scope = "download-pex-bin"
     name = "pex"
     default_version = "v2.1.19"
+    default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
 
     @classproperty
     def default_known_versions(cls):
@@ -48,9 +49,6 @@ class PexBinary(ExternalTool):
             )
             for plat in ["darwin", "linux"]
         ]
-
-    def generate_url(self, _: Platform) -> str:
-        return f"https://github.com/pantsbuild/pex/releases/download/{self.version}/pex"
 
 
 @frozen_after_init

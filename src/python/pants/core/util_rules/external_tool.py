@@ -2,9 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import textwrap
-from abc import abstractmethod
 from dataclasses import dataclass
-from typing import List, Tuple, cast
+from typing import Dict, List, Optional, Tuple, cast
 
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
@@ -72,6 +71,8 @@ class ExternalTool(Subsystem):
     # Subclasses must set appropriately.
     default_version: str
     default_known_versions: List[str]
+    default_url_template: str
+    default_url_platform_mapping: Optional[Dict[str, str]] = None
 
     @classproperty
     def name(cls):
@@ -119,6 +120,34 @@ class ExternalTool(Subsystem):
             advanced=True,
             help=help_str,
         )
+        register(
+            "--url-template",
+            type=str,
+            default=cls.default_url_template,
+            advanced=True,
+            help=(
+                "URL to download the tool, either as a single binary file or a compressed file "
+                "(e.g. zip file). You can change this to point to your own hosted file, e.g. to "
+                "work with proxies. Use {version} to have the value from --version substituted, "
+                "and {platform} to have a value from --url-platform-mapping substituted in, "
+                "depending on the current platform. "
+                "For example, https://github.com/.../protoc-{version}-{platform}.zip."
+            ),
+        )
+        register(
+            "--url-platform-mapping",
+            type=dict,
+            default=cls.default_url_platform_mapping,
+            advanced=True,
+            help=(
+                "A dictionary mapping platforms to strings to be used when generating the URL "
+                "to download the tool. In --url-template, anytime the {platform} string is used, "
+                "Pants will determine the current platform, and substitute {platform} with the "
+                'respective value from your dictionary. For example, if you define `{"darwin": '
+                '"apple-darwin", "linux": "unknown-linux"}, and run Pants on Linux, then '
+                "{platform} will be substituted in the --url-template option with unknown-linux."
+            ),
+        )
 
     @property
     def version(self) -> str:
@@ -128,15 +157,21 @@ class ExternalTool(Subsystem):
     def known_versions(self) -> Tuple[str, ...]:
         return tuple(self.options.known_versions)
 
-    @abstractmethod
-    def generate_url(self, plat: Platform) -> str:
+    @property
+    def url_template(self) -> str:
+        return cast(str, self.options.url_template)
+
+    @property
+    def url_platform_mapping(self) -> Optional[Dict[str, str]]:
+        return cast(Optional[Dict[str, str]], self.options.url_platform_mapping)
+
+    def _generate_url(self, plat: Platform) -> str:
         """Returns the URL for the given version of the tool, runnable on the given os+arch.
 
         os and arch default to those of the current system.
-
-        Implementations should raise ExternalToolError if they cannot resolve the arguments
-        to a URL. The raised exception need not have a message - a sensible one will be generated.
         """
+        platform = self.url_platform_mapping[plat.value] if self.url_platform_mapping else ""
+        return self.url_template.format(version=self.version, platform=platform)
 
     def generate_exe(self, plat: Platform) -> str:
         """Returns the path to the tool executable.
@@ -146,7 +181,7 @@ class ExternalTool(Subsystem):
         If the downloaded artifact is an archive, this should be overridden to provide a
         relative path in the downloaded archive, e.g. `./bin/protoc`.
         """
-        return f"./{self.generate_url(plat).rsplit('/', 1)[-1]}"
+        return f"./{self._generate_url(plat).rsplit('/', 1)[-1]}"
 
     def get_request(self, plat: Platform) -> ExternalToolRequest:
         """Generate a request for this tool."""
@@ -161,7 +196,7 @@ class ExternalTool(Subsystem):
             if plat_val == plat.value and ver == self.version:
                 digest = FileDigest(fingerprint=sha256, serialized_bytes_length=int(length))
                 try:
-                    url = self.generate_url(plat)
+                    url = self._generate_url(plat)
                     exe = self.generate_exe(plat)
                 except ExternalToolError as e:
                     raise ExternalToolError(
