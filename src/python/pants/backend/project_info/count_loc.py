@@ -5,8 +5,8 @@ from typing import Tuple
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalTool,
     ExternalToolRequest,
+    TemplatedExternalTool,
 )
 from pants.engine.console import Console
 from pants.engine.fs import Digest, MergeDigests, SourcesSnapshot
@@ -15,12 +15,11 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.option.custom_types import shell_str
-from pants.util.enums import match
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-class SuccinctCodeCounter(ExternalTool):
+class SuccinctCodeCounter(TemplatedExternalTool):
     """The Succinct Code Counter, aka `scc` (https://github.com/boyter/scc)."""
 
     options_scope = "scc"
@@ -29,6 +28,14 @@ class SuccinctCodeCounter(ExternalTool):
         "2.12.0|darwin|70b7002cd1e4541cb37b7b9cbc0eeedd13ceacb49628e82ab46332bb2e65a5a6|1842530",
         "2.12.0|linux|8eca3e98fe8a78d417d3779a51724515ac4459760d3ec256295f80954a0da044|1753059",
     ]
+    default_url_template = (
+        "https://github.com/boyter/scc/releases/download/v{version}/scc-{version}-"
+        "x86_64-{platform}.zip"
+    )
+    default_url_platform_mapping = {
+        "darwin": "apple-darwin",
+        "linux": "unknown-linux",
+    }
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -47,13 +54,6 @@ class SuccinctCodeCounter(ExternalTool):
     @property
     def args(self) -> Tuple[str, ...]:
         return tuple(self.options.args)
-
-    def generate_url(self, plat: Platform) -> str:
-        plat_str = match(plat, {Platform.darwin: "apple-darwin", Platform.linux: "unknown-linux"})
-        return (
-            f"https://github.com/boyter/scc/releases/download/v{self.version}/scc-{self.version}-"
-            f"x86_64-{plat_str}.zip"
-        )
 
     def generate_exe(self, _: Platform) -> str:
         return "./scc"

@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import textwrap
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import List, Tuple, cast
+from typing import Dict, List, Optional, Tuple, cast
 
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
@@ -36,7 +36,7 @@ class DownloadedExternalTool:
     exe: str
 
 
-class ExternalTool(Subsystem):
+class ExternalTool(Subsystem, metaclass=ABCMeta):
     """Configuration for an invocable tool that we download from an external source.
 
     Subclass this to configure a specific tool.
@@ -137,6 +137,7 @@ class ExternalTool(Subsystem):
         Implementations should raise ExternalToolError if they cannot resolve the arguments
         to a URL. The raised exception need not have a message - a sensible one will be generated.
         """
+        pass
 
     def generate_exe(self, plat: Platform) -> str:
         """Returns the path to the tool executable.
@@ -172,6 +173,70 @@ class ExternalTool(Subsystem):
             f"No known version of {self.name} {self.version} for {plat.value} found in "
             f"{self.known_versions}"
         )
+
+
+class TemplatedExternalTool(ExternalTool):
+    """Extends the ExternalTool to allow url templating for custom/self-hosted source.
+
+    In addition to ExternalTool functionalities, it is needed to set, e.g.:
+
+    default_url_template = "https://tool.url/{version}/{platform}-mytool.zip"
+    default_url_platform_mapping = {
+        "darwin": "osx",
+        "linux": "linux",
+    }
+
+    The platform mapping dict is optional.
+    """
+
+    default_url_template: str
+    default_url_platform_mapping: Optional[Dict[str, str]] = None
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+
+        register(
+            "--url-template",
+            type=str,
+            default=cls.default_url_template,
+            advanced=True,
+            help=(
+                "URL to download the tool, either as a single binary file or a compressed file "
+                "(e.g. zip file). You can change this to point to your own hosted file, e.g. to "
+                "work with proxies. Use `{version}` to have the value from --version substituted, "
+                "and `{platform}` to have a value from --url-platform-mapping substituted in, "
+                "depending on the current platform. "
+                "For example, https://github.com/.../protoc-{version}-{platform}.zip."
+            ),
+        )
+
+        register(
+            "--url-platform-mapping",
+            type=dict,
+            default=cls.default_url_platform_mapping,
+            advanced=True,
+            help=(
+                "A dictionary mapping platforms to strings to be used when generating the URL "
+                "to download the tool. In --url-template, anytime the `{platform}` string is used, "
+                "Pants will determine the current platform, and substitute `{platform}` with the "
+                'respective value from your dictionary. For example, if you define `{"darwin": '
+                '"apple-darwin", "linux": "unknown-linux"}, and run Pants on Linux, then '
+                "`{platform}` will be substituted in the --url-template option with unknown-linux."
+            ),
+        )
+
+    @property
+    def url_template(self) -> str:
+        return cast(str, self.options.url_template)
+
+    @property
+    def url_platform_mapping(self) -> Optional[Dict[str, str]]:
+        return cast(Optional[Dict[str, str]], self.options.url_platform_mapping)
+
+    def generate_url(self, plat: Platform):
+        platform = self.url_platform_mapping[plat.value] if self.url_platform_mapping else ""
+        return self.url_template.format(version=self.version, platform=platform)
 
 
 @rule(level=LogLevel.DEBUG)
