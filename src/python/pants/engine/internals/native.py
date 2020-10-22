@@ -136,6 +136,9 @@ class Native(metaclass=SingletonMetaclass):
             level, log_show_rust_3rdparty, use_color, show_target, log_levels_as_ints
         )
 
+    def set_per_run_log_path(self, path: Optional[str]) -> None:
+        self.lib.set_per_run_log_path(path)
+
     def default_cache_path(self) -> str:
         return cast(str, self.lib.default_cache_path())
 

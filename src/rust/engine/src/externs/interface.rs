@@ -110,6 +110,13 @@ py_module_initializer!(native_engine, |py, m| {
     "write_log",
     py_fn!(py, write_log(a: String, b: u64, c: String)),
   )?;
+
+  m.add(
+    py,
+    "set_per_run_log_path",
+    py_fn!(py, set_per_run_log_path(a: Option<String>)),
+  )?;
+
   m.add(
     py,
     "write_stdout",
@@ -1687,6 +1694,13 @@ fn setup_pantsd_logger(py: Python, log_file: String) -> CPyResult<i64> {
 fn setup_stderr_logger(_: Python) -> PyUnitResult {
   logging::set_thread_destination(Destination::Stderr);
   Ok(None)
+}
+
+fn set_per_run_log_path(py: Python, log_path: Option<String>) -> PyUnitResult {
+  py.allow_threads(|| {
+    PANTS_LOGGER.set_per_run_logs(log_path.map(PathBuf::from));
+    Ok(None)
+  })
 }
 
 fn write_log(py: Python, msg: String, level: u64, path: String) -> PyUnitResult {
