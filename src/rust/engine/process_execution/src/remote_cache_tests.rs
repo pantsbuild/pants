@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
@@ -7,7 +8,7 @@ use std::time::Duration;
 use mock::{StubActionCache, StubCAS};
 use store::{BackoffConfig, Store};
 use tempfile::TempDir;
-use testutil::data::TestData;
+use testutil::data::{TestData, TestDirectory};
 use testutil::relative_paths;
 use workunit_store::WorkunitStore;
 
@@ -15,6 +16,8 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
   Platform, Process, ProcessMetadata,
 };
+use fs::RelativePath;
+use hashing::Digest;
 
 struct RoundtripResults {
   uncached: Result<FallibleProcessResultWithPlatform, String>,
@@ -156,7 +159,6 @@ async fn failures_not_cached() {
 
 #[tokio::test]
 async fn skip_cache_on_error() {
-  env_logger::init();
   let workunit_store = WorkunitStore::new(false);
   workunit_store.init_thread_state(None);
 
@@ -175,4 +177,67 @@ async fn skip_cache_on_error() {
     .unwrap();
 
   assert_eq!(result.exit_code, 0);
+}
+
+#[tokio::test]
+async fn make_tree_from_directory() {
+  env_logger::init();
+
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+  // Prepare the store to contain /pets/cats/roland. We will then extract varios pieces of it
+  // into Tree protos.
+
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+  store
+    .record_directory(&TestDirectory::nested().directory(), true)
+    .await
+    .expect("Error saving directory");
+  let directory_digest = store
+    .record_directory(&TestDirectory::double_nested().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let tree = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
+    directory_digest,
+    RelativePath::new("pets").unwrap(),
+    &store,
+  )
+  .await
+  .unwrap();
+
+  let root_dir = tree.get_root();
+  assert_eq!(root_dir.get_files().len(), 0);
+  assert_eq!(root_dir.get_directories().len(), 1);
+  let dir_node = &root_dir.get_directories()[0];
+  assert_eq!(dir_node.get_name(), "cats");
+  let dir_digest: Digest = dir_node.get_digest().try_into().unwrap();
+  assert_eq!(dir_digest, TestDirectory::containing_roland().digest());
+  let children = tree.get_children();
+  assert_eq!(children.len(), 1);
+  let child_dir = &children[0];
+  assert_eq!(child_dir.get_files().len(), 1);
+  assert_eq!(child_dir.get_directories().len(), 0);
+  let file_node = &child_dir.get_files()[0];
+  assert_eq!(file_node.get_name(), "roland");
+  let file_digest: Digest = file_node.get_digest().try_into().unwrap();
+  assert_eq!(file_digest, TestData::roland().digest());
+
+  // Test that extracting a non-existent output directory fails.
+  crate::remote_cache::CommandRunner::make_tree_for_output_directory(
+    directory_digest,
+    RelativePath::new("animals").unwrap(),
+    &store,
+  )
+  .await
+  .unwrap_err();
 }

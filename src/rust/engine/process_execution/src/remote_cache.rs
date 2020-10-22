@@ -96,8 +96,7 @@ impl CommandRunner {
   /// merged final output directory to find the specific path to extract. (REAPI requires
   /// output directories to be stored as `Tree` protos that contain all of the `Directory`
   /// protos that constitute the directory tree.)
-  async fn make_tree_for_output_directory(
-    &self,
+  pub(crate) async fn make_tree_for_output_directory(
     root_directory_digest: Digest,
     directory_path: RelativePath,
     store: &Store,
@@ -268,13 +267,12 @@ impl CommandRunner {
 
     let mut tree_digests = Vec::new();
     for output_directory in &command.output_directories {
-      let tree = self
-        .make_tree_for_output_directory(
-          result.output_directory,
-          RelativePath::new(output_directory).unwrap(),
-          store,
-        )
-        .await?;
+      let tree = Self::make_tree_for_output_directory(
+        result.output_directory,
+        RelativePath::new(output_directory).unwrap(),
+        store,
+      )
+      .await?;
 
       let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
       tree_digests.push(tree_digest);
