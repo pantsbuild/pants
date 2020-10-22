@@ -12,7 +12,7 @@ from pants.option.arg_splitter import (
     AllHelp,
     ArgSplitter,
     NoGoalHelp,
-    OptionsHelp,
+    ThingHelp,
     UnknownGoalHelp,
     VersionHelp,
 )
@@ -54,7 +54,7 @@ class ArgSplitterTest(unittest.TestCase):
         assert expected_passthru == split_args.passthru
         assert expected_is_help == (splitter.help_request is not None)
         assert expected_help_advanced == (
-            isinstance(splitter.help_request, OptionsHelp) and splitter.help_request.advanced
+            isinstance(splitter.help_request, ThingHelp) and splitter.help_request.advanced
         )
         assert expected_help_all == isinstance(splitter.help_request, AllHelp)
 
@@ -102,8 +102,8 @@ class ArgSplitterTest(unittest.TestCase):
         # With files/directories on disk to tiebreak.
         with temporary_dir() as tmpdir:
             splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, tmpdir)
-            for dir in directories_vs_goals:
-                Path(tmpdir, dir).mkdir()
+            for directory in directories_vs_goals:
+                Path(tmpdir, directory).mkdir()
             for f in files_vs_subscopes:
                 Path(tmpdir, f).touch()
             for spec in ambiguous_specs:

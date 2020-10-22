@@ -17,6 +17,7 @@ from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
+from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.help.flag_error_help_printer import FlagErrorHelpPrinter
@@ -226,6 +227,7 @@ class LocalPantsRunner:
             self.options,
             self.union_membership,
             self.graph_session.goal_consumed_subsystem_scopes,
+            RegisteredTargetTypes.create(self.build_config.target_types),
         )
         help_printer = HelpPrinter(
             bin_name=global_options.pants_bin_name,

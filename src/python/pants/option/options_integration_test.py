@@ -157,7 +157,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
                         """
                     )
                 )
-            pants_run = self.run_pants([f"--pants-config-files={config_path}", "goals"])
+            pants_run = self.run_pants([f"--pants-config-files={config_path}", "roots"])
             pants_run.assert_failure()
             self.assertIn("ERROR] Invalid scope [invalid_scope]", pants_run.stderr)
             self.assertIn("ERROR] Invalid scope [another_invalid_scope]", pants_run.stderr)
