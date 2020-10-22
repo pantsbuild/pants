@@ -43,12 +43,11 @@ class FilesSources(Sources):
 
 
 class Files(Target):
-    """A collection of loose files which do not have their source roots stripped.
+    """Loose files that live outside code packages.
 
-    The sources of a `files` target can be accessed via language-specific APIs, such as Python's
-    `open()`. Unlike the similar `resources()` target type, Pants will not strip the source root of
-    `files()`, meaning that `src/python/project/f1.txt` will not be stripped down to
-    `project/f1.txt`.
+    Files are placed directly in archives, outside of code artifacts such as Python wheels or JVM
+    JARs. The sources of a `files` target are accessed via filesystem APIs, such as Python's
+    `open()`, via paths relative to the repo root.
     """
 
     alias = "files"
@@ -101,8 +100,10 @@ class RelocatedFilesDestField(StringField):
 
 
 class RelocatedFiles(Target):
-    """Relocate the paths for `files()` targets at runtime to something more convenient than the
-    default of their actual paths in your project.
+    """Loose files with path manipulation applied.
+
+    Allows you to relocate the files at runtime to something more convenient than
+    their actual paths in your project.
 
     For example, you can relocate `src/resources/project1/data.json` to instead be
     `resources/data.json`. Your other target types can then add this target to their
@@ -195,12 +196,11 @@ class ResourcesSources(Sources):
 
 
 class Resources(Target):
-    """A collection of loose files.
+    """Data emebdded in a code package and accessed in a location-independent manner.
 
-    The sources of a `resources` target can be accessed via language-specific APIs, such as Python's
-    `open()`. Resources are meant to be included in deployable units like JARs or Python wheels.
-    Unlike the similar `files()` target type, Pants will strip the source root of `resources()`,
-    meaning that `src/python/project/f1.txt` will be stripped down to `project/f1.txt`.
+    Resources are embedded in code artifacts such as Python wheels or JVM JARs. The sources of a
+    `resources` target are accessed via language-specific resource APIs, such as Python's pkgutil or
+    JVM's ClassLoader, via paths relative to the target's source root.
     """
 
     alias = "resources"
@@ -213,7 +213,7 @@ class Resources(Target):
 
 
 class GenericTarget(Target):
-    """A generic target with no specific target type.
+    """A generic target with no specific type.
 
     This can be used as a generic "bag of dependencies", i.e. you can group several different
     targets into one single target so that your other targets only need to depend on one thing.
@@ -267,8 +267,7 @@ class ArchiveFormatField(StringField):
 
 
 class ArchiveTarget(Target):
-    """An archive (e.g. zip file) containing loose files and/or packages built via `./pants
-    package`."""
+    """A ZIP or TAR file containing loose files and code packages."""
 
     alias = "archive"
     core_fields = (

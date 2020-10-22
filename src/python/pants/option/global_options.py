@@ -164,12 +164,7 @@ class GlobalOptions(Subsystem):
         default_rel_distdir = f"/{default_distdir_name}/"
 
         register(
-            "-l",
-            "--level",
-            type=LogLevel,
-            default=LogLevel.INFO,
-            help="Set the logging level. The logging levels are one of: "
-            '"error", "warn", "info", "debug", "trace".',
+            "-l", "--level", type=LogLevel, default=LogLevel.INFO, help="Set the logging level."
         )
         register(
             "--show-log-target",

@@ -140,7 +140,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         # Set for pytest output display.
         self.maxDiff = None
 
-        cmds = [["goals"], ["target-types"], ["roots"]]
+        cmds = [["help", "goals"], ["help", "targets"], ["roots"]]
 
         non_daemon_runs = [self.run_pants(cmd) for cmd in cmds]
 
@@ -149,12 +149,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             ctx.checker.assert_started()
 
         for cmd, run in zip(cmds, daemon_runs):
-            print(f"(cmd, run) = ({cmd}, {run.stdout_data}, {run.stderr_data})")
-            self.assertNotEqual(run.stdout_data, "", f"Empty stdout for {cmd}")
+            print(f"(cmd, run) = ({cmd}, {run.stdout}, {run.stderr_data})")
+            self.assertNotEqual(run.stdout, "", f"Empty stdout for {cmd}")
 
         for run_pair in zip(non_daemon_runs, daemon_runs):
             non_daemon_stdout = run_pair[0].stdout
-            daemon_stdout = run_pair[1].stdout_data
+            daemon_stdout = run_pair[1].stdout
 
             for line_pair in zip(non_daemon_stdout.splitlines(), daemon_stdout.splitlines()):
                 assert line_pair[0] == line_pair[1]
@@ -198,7 +198,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 )
                 ctx.checker.assert_running()
 
-            self.assertEqual(EXPECTED_VALUE, "".join(result.stdout_data).strip())
+            self.assertEqual(EXPECTED_VALUE, "".join(result.stdout).strip())
 
     def test_pantsd_launch_env_var_is_not_inherited_by_pantsd_runner_children(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -377,17 +377,17 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
                 result = ctx.runner(filedeps_cmd)
                 ctx.checker.assert_running()
-                assert non_existent_file not in result.stdout_data
+                assert non_existent_file not in result.stdout
 
                 safe_file_dump(test_build_file, "python_library(sources=['*.py'])")
                 result = ctx.runner(filedeps_cmd)
                 ctx.checker.assert_running()
-                assert non_existent_file not in result.stdout_data
+                assert non_existent_file not in result.stdout
 
                 safe_file_dump(test_src_file, "print('hello')\n")
                 result = ctx.runner(filedeps_cmd)
                 ctx.checker.assert_running()
-                assert test_src_file in result.stdout_data
+                assert test_src_file in result.stdout
         finally:
             rm_rf(test_path)
 
@@ -636,7 +636,7 @@ Interrupted by user over pailgun client!
                     ctx.checker.assert_started()
                     result.assert_success()
                     expected_targets = {f"{directory}:{target}" for target in ("A", "B")}
-                    self.assertEqual(expected_targets, set(result.stdout_data.strip().split("\n")))
+                    self.assertEqual(expected_targets, set(result.stdout.strip().split("\n")))
 
                 with open(os.path.join(directory, "BUILD"), "w") as f:
                     f.write(template.format(a_deps='dependencies = [":B"],', b_deps=""))
@@ -651,7 +651,9 @@ Interrupted by user over pailgun client!
         concurrent runs under pantsd."""
         config = {"GLOBAL": {"concurrent": True, "pantsd": True}}
         with temporary_workdir() as workdir:
-            pants_run = self.run_pants_with_workdir(["goals"], workdir=workdir, config=config)
+            pants_run = self.run_pants_with_workdir(
+                ["help", "goals"], workdir=workdir, config=config
+            )
             pants_run.assert_success()
             pantsd_log_location = os.path.join(workdir, "pantsd", "pantsd.log")
             self.assertFalse(os.path.exists(pantsd_log_location))

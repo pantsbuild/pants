@@ -3,6 +3,7 @@
 
 import difflib
 
+from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.maybe_color import MaybeColor
@@ -20,9 +21,10 @@ class FlagErrorHelpPrinter(MaybeColor):
         self._all_help_info = HelpInfoExtracter.get_all_help_info(
             options,
             # We only care about the options-related help info, so we pass in
-            # dummy values for union_membership and consumed_scopes_mapper.
+            # dummy values for the other arguments.
             UnionMembership({}),
             lambda x: tuple(),
+            RegisteredTargetTypes({}),
         )
 
     def handle_unknown_flags(self, err: UnknownFlagsError):
