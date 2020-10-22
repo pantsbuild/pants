@@ -10,7 +10,6 @@ use store::{BackoffConfig, Store};
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::relative_paths;
-use tokio::runtime::Handle;
 use workunit_store::WorkunitStore;
 
 use crate::{
@@ -24,7 +23,7 @@ struct RoundtripResults {
 }
 
 fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir, StubCAS) {
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let base_dir = TempDir::new().unwrap();
   let named_cache_dir = base_dir.path().join("named_cache_dir");
   let stub_cas = StubCAS::builder().build();
