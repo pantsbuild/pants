@@ -61,8 +61,8 @@ async def create_pex_binary_run_request(
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
             additional_args=field_set.generate_additional_args(pex_binary_defaults),
             internal_only=True,
-            # Note that the entry point file is not in the Pex itself, but only present in the
-            # chroot. This works fine!
+            # Note that the entry point file is not in the PEX itself. It's loaded by setting
+            # `PEX_EXTRA_SYS_PATH`.
             entry_point=entry_point.val,
         ),
     )

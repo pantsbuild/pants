@@ -686,7 +686,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         }
     )
 
-    # Add `.with_binries()` to the entry points.
+    # Add any `pex_binary` targets from `setup_py().with_binaries()` to the dist's entry points.
     key_to_binary_spec = exported_target.provides.binaries
     binaries = await Get(
         Targets, UnparsedAddressInputs(key_to_binary_spec.values(), owning_address=target.address)
