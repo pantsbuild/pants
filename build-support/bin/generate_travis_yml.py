@@ -126,22 +126,18 @@ class PythonVersion(Enum):
     def decimal(self) -> float:
         return {self.py36: 3.6, self.py37: 3.7, self.py38: 3.8}[self]  # type: ignore[index]
 
-    @property
-    def is_py36(self) -> bool:
-        return self == PythonVersion.py36
-
-    @property
-    def is_py37(self) -> bool:
-        return self == PythonVersion.py37
-
-    @property
-    def is_py38(self) -> bool:
-        return self == PythonVersion.py38
-
     def default_stage(self, *, is_bootstrap: bool = False) -> Stage:
         if is_bootstrap:
-            return {self.py36: Stage.bootstrap, self.py37: Stage.bootstrap_cron, self.py38: Stage.bootstrap_cron}[self]  # type: ignore[index]
-        return {self.py36: Stage.test, self.py37: Stage.test_cron, self.py38: Stage.test_cron}[self]  # type: ignore[index]
+            return {
+                self.py36: Stage.bootstrap_cron,
+                self.py37: Stage.bootstrap_cron,
+                self.py38: Stage.bootstrap,
+            }[self]  # type: ignore[index]
+        return {
+            self.py36: Stage.test_cron,
+            self.py37: Stage.test_cron,
+            self.py38: Stage.test,
+        }[self]  # type: ignore[index]
 
 
 # ----------------------------------------------------------------------
@@ -210,8 +206,8 @@ def docker_run_travis_ci_image(command: str) -> str:
 # The default timeout is 180 seconds, and our larger cache uploads exceed this.
 # TODO: Now that we trim caches, perhaps we no longer need this modified timeout.
 _cache_timeout = 500
-# NB: Attempting to cache directories that don't exist (e.g., the custom osx pyenv root on linux) causes no harm,
-# and simplifies the code.
+# NB: Attempting to cache directories that don't exist (e.g., the custom osx pyenv root on linux)
+# causes no harm, and simplifies the code.
 _cache_common_directories = ["${AWS_CLI_ROOT}", "${PYENV_ROOT_OSX}"]
 # Ensure permissions to do the below removals, which happen with or without caching enabled.
 _cache_set_required_permissions = 'sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"'
@@ -227,8 +223,8 @@ CACHE_NATIVE_ENGINE = {
     ],
     "cache": {
         "timeout": _cache_timeout,
-        "directories": _cache_common_directories
-        + [
+        "directories": [
+            *_cache_common_directories,
             "${HOME}/.cache/pants/rust/cargo",
             "build-support/virtualenvs",
             "src/rust/engine/target",
@@ -239,33 +235,13 @@ CACHE_NATIVE_ENGINE = {
 CACHE_PANTS_RUN = {
     "before_cache": [
         _cache_set_required_permissions,
-        # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
-        # effect on resolution time is in the noise, but they are
-        # re-timestamped in internal comments and fields on each run and this
-        # leads to travis-ci cache thrash.  Kill these files before the cache
-        # check to avoid un-needed cache re-packing and re-upload (a ~100s
-        # operation).
-        'find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete',
-        "rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}",
-        # We have several tests that do local file:// url resolves for
-        # com.example artifacts, these disrupt the cache but are fast since
-        # they're resolved from local files when omitted from the cache.
-        "rm -rf ${HOME}/.ivy2/pants/com.example",
         # Render a summary to assist with further tuning the cache.
         "du -m -d2 ${HOME}/.cache/pants | sort -r -n",
         "./build-support/bin/prune_travis_cache.sh",
     ],
     "cache": {
         "timeout": _cache_timeout,
-        "directories": _cache_common_directories
-        + [
-            "${HOME}/.cache/pants/tools",
-            "${HOME}/.cache/pants/zinc",
-            "${HOME}/.ivy2/pants",
-            # TODO(John Sirois): Update this to ~/.npm/pants when pants starts using its own isolated
-            #  cache: https://github.com/pantsbuild/pants/issues/2485
-            "${HOME}/.npm",
-        ],
+        "directories": _cache_common_directories,
     },
 }
 
@@ -286,28 +262,25 @@ def _linux_before_install(
     include_test_config: bool = True, install_travis_wait: bool = False
 ) -> List[str]:
     commands = [
+        "pyenv global",
         "./build-support/bin/install_aws_cli_for_ci.sh",
         # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
         #   https://github.com/pantsbuild/pants/issues/7601
-        "pyenv global 2.7.15 3.6.7 3.7.1",
+        "pyenv global 2.7.15 3.6.7 3.7.1 3.8.0",
     ]
     if install_travis_wait:
         commands.extend(
             [
                 (
-                    'wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2'
-                    '.1_linux_x86_64.tar.gz" | tar -zxvf - travis-wait-enhanced'
+                    'wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/'
+                    'v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz" | tar -zxvf - '
+                    'travis-wait-enhanced'
                 ),
                 "mv travis-wait-enhanced /home/travis/bin/",
             ]
         )
-
     if include_test_config:
-        return [
-            'PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH',
-            "JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64",
-            "sudo sysctl fs.inotify.max_user_watches=524288",
-        ] + commands
+        commands.append("sudo sysctl fs.inotify.max_user_watches=524288")
     return commands
 
 
@@ -324,7 +297,7 @@ def linux_shard(
         "os": "linux",
         "dist": "xenial",
         "sudo": "required",
-        "python": ["2.7", "3.6", "3.7"],
+        "python": ["2.7", "3.6", "3.7", "3.8"],
         "addons": {
             "apt": {
                 "packages": [
@@ -351,10 +324,7 @@ def linux_shard(
     }
     if load_test_config:
         setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]
-        setup["env"] = [
-            f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux",
-            "PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem",
-        ]
+        setup["env"] = [f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux"]
         setup = {**setup, **CACHE_PANTS_RUN}
     if use_docker:
         setup["services"] = ["docker"]
@@ -366,8 +336,8 @@ def linux_fuse_shard() -> Dict:
         "os": "linux",
         "dist": "xenial",
         "sudo": "required",
-        "before_install": _linux_before_install()
-        + [
+        "before_install": [
+            *_linux_before_install(),
             "sudo apt-get install -y pkg-config fuse libfuse-dev",
             "sudo modprobe fuse",
             "sudo chmod 666 /dev/fuse",
@@ -800,7 +770,7 @@ class NoAliasDumper(yaml.SafeDumper):
 
 
 def main() -> None:
-    supported_python_versions = [PythonVersion.py36, PythonVersion.py37]
+    supported_python_versions = [PythonVersion.py36, PythonVersion.py37, PythonVersion.py38]
     generated_yaml = yaml.dump(
         {
             # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1

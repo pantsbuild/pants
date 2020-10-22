@@ -53,8 +53,9 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -74,6 +75,7 @@ jobs:
     - '2.7'
     - '3.6'
     - '3.7'
+    - '3.8'
     script:
     - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
@@ -84,7 +86,7 @@ jobs:
       ${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     services:
     - docker
-    stage: Bootstrap Pants
+    stage: Bootstrap Pants (Cron)
     sudo: required
   - addons:
       apt:
@@ -106,8 +108,9 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -127,6 +130,7 @@ jobs:
     - '2.7'
     - '3.6'
     - '3.7'
+    - '3.8'
     script:
     - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
@@ -138,6 +142,61 @@ jobs:
     services:
     - docker
     stage: Bootstrap Pants (Cron)
+    sudo: required
+  - addons:
+      apt:
+        packages:
+        - lib32stdc++6
+        - lib32z1
+        - lib32z1-dev
+        - gcc-multilib
+        - python-dev
+        - openssl
+        - libssl-dev
+        - jq
+        - unzip
+        - shellcheck
+    after_failure:
+    - ./build-support/bin/ci-failure.sh
+    before_cache:
+    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
+    before_install:
+    - pyenv global
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
+    cache:
+      directories:
+      - ${AWS_CLI_ROOT}
+      - ${PYENV_ROOT_OSX}
+      - ${HOME}/.cache/pants/rust/cargo
+      - build-support/virtualenvs
+      - src/rust/engine/target
+      timeout: 500
+    dist: xenial
+    env:
+    - CACHE_NAME=bootstrap.linux.py38
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.linux
+    language: python
+    name: Build Linux native engine and pants.pex (Python 3.8)
+    os: linux
+    python:
+    - '2.7'
+    - '3.6'
+    - '3.7'
+    - '3.8'
+    script:
+    - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
+      "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
+      -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py
+      --python-version 3.8 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix
+      ${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
+    services:
+    - docker
+    stage: Bootstrap Pants
     sudo: required
   - after_failure:
     - ./build-support/bin/ci-failure.sh
@@ -179,7 +238,7 @@ jobs:
     - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.6
       --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
       --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    stage: Bootstrap Pants
+    stage: Bootstrap Pants (Cron)
   - after_failure:
     - ./build-support/bin/ci-failure.sh
     before_cache:
@@ -221,6 +280,47 @@ jobs:
       --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
       --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     stage: Bootstrap Pants (Cron)
+  - after_failure:
+    - ./build-support/bin/ci-failure.sh
+    before_cache:
+    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
+    before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
+      -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY38_VERSION}
+    before_script:
+    - ulimit -n 8192
+    cache:
+      directories:
+      - ${AWS_CLI_ROOT}
+      - ${PYENV_ROOT_OSX}
+      - ${HOME}/.cache/pants/rust/cargo
+      - build-support/virtualenvs
+      - src/rust/engine/target
+      timeout: 500
+    env:
+    - PATH="/usr/local/opt/openssl/bin:${PATH}"
+    - LDFLAGS="-L/usr/local/opt/openssl/lib"
+    - CPPFLAGS="-I/usr/local/opt/openssl/include"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - CACHE_NAME=bootstrap.osx.py38
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
+    language: generic
+    name: Build OSX native engine and pants.pex (Python 3.8)
+    os: osx
+    osx_image: xcode8
+    script:
+    - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.8
+      --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
+      --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    stage: Bootstrap Pants
   - addons:
       apt:
         packages:
@@ -238,35 +338,26 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
+    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=lint.py36
     language: python
     name: Self-checks and lint (Python 3.6)
@@ -275,12 +366,13 @@ jobs:
     - '2.7'
     - '3.6'
     - '3.7'
+    - '3.8'
     script:
     - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
       --githooks --smoke-tests --python-version 3.6
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --lint --python-version 3.6
-    stage: Test Pants
+    stage: Test Pants (Cron)
     sudo: required
   - addons:
       apt:
@@ -299,35 +391,26 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
+    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=lint.py37
     language: python
     name: Self-checks and lint (Python 3.7)
@@ -336,6 +419,7 @@ jobs:
     - '2.7'
     - '3.6'
     - '3.7'
+    - '3.8'
     script:
     - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
       --githooks --smoke-tests --python-version 3.7
@@ -343,16 +427,68 @@ jobs:
       --lint --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
+  - addons:
+      apt:
+        packages:
+        - lib32stdc++6
+        - lib32z1
+        - lib32z1-dev
+        - gcc-multilib
+        - python-dev
+        - openssl
+        - libssl-dev
+        - jq
+        - unzip
+        - shellcheck
+    after_failure:
+    - ./build-support/bin/ci-failure.sh
+    before_cache:
+    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
+    before_install:
+    - pyenv global
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
+    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
+      | tar -zxvf - travis-wait-enhanced
+    - mv travis-wait-enhanced /home/travis/bin/
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    before_script:
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    cache:
+      directories:
+      - ${AWS_CLI_ROOT}
+      - ${PYENV_ROOT_OSX}
+      timeout: 500
+    dist: xenial
+    env:
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.linux
+    - CACHE_NAME=lint.py38
+    language: python
+    name: Self-checks and lint (Python 3.8)
+    os: linux
+    python:
+    - '2.7'
+    - '3.6'
+    - '3.7'
+    - '3.8'
+    script:
+    - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
+      --githooks --smoke-tests --python-version 3.8
+    - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
+      --lint --python-version 3.8
+    stage: Test Pants
+    sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
+    - sudo sysctl fs.inotify.max_user_watches=524288
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -396,35 +532,26 @@ jobs:
     - ./build-support/bin/upload_coverage.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
+    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=python_tests.py36
     language: python
     name: Python tests (Python 3.6)
@@ -433,10 +560,11 @@ jobs:
     - '2.7'
     - '3.6'
     - '3.7'
+    - '3.8'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --integration-tests --python-version 3.6
-    stage: Test Pants
+    stage: Test Pants (Cron)
     sudo: required
   - addons:
       apt:
@@ -457,35 +585,26 @@ jobs:
     - ./build-support/bin/upload_coverage.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
+    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=python_tests.py37
     language: python
     name: Python tests (Python 3.7)
@@ -494,21 +613,74 @@ jobs:
     - '2.7'
     - '3.6'
     - '3.7'
+    - '3.8'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --integration-tests --python-version 3.7
     stage: Test Pants (Cron)
+    sudo: required
+  - addons:
+      apt:
+        packages:
+        - lib32stdc++6
+        - lib32z1
+        - lib32z1-dev
+        - gcc-multilib
+        - python-dev
+        - openssl
+        - libssl-dev
+        - jq
+        - unzip
+        - shellcheck
+    after_failure:
+    - ./build-support/bin/ci-failure.sh
+    after_success:
+    - ./build-support/bin/upload_coverage.sh
+    before_cache:
+    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
+    before_install:
+    - pyenv global
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
+    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
+      | tar -zxvf - travis-wait-enhanced
+    - mv travis-wait-enhanced /home/travis/bin/
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    before_script:
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    cache:
+      directories:
+      - ${AWS_CLI_ROOT}
+      - ${PYENV_ROOT_OSX}
+      timeout: 500
+    dist: xenial
+    env:
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.linux
+    - CACHE_NAME=python_tests.py38
+    language: python
+    name: Python tests (Python 3.8)
+    os: linux
+    python:
+    - '2.7'
+    - '3.6'
+    - '3.7'
+    - '3.8'
+    script:
+    - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
+      --unit-tests --integration-tests --python-version 3.8
+    stage: Test Pants
     sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
+    - sudo sysctl fs.inotify.max_user_watches=524288
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -584,32 +756,23 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
+    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.linux
     if: commit_message !~ /\[ci skip-build-wheels\]/ OR type NOT IN (pull_request,
@@ -621,6 +784,7 @@ jobs:
     - '2.7'
     - '3.6'
     - '3.7'
+    - '3.8'
     script:
     - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
@@ -631,7 +795,7 @@ jobs:
       -f"
     services:
     - docker
-    stage: Test Pants
+    stage: Test Pants (Cron)
     sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
@@ -677,7 +841,7 @@ jobs:
     - USE_PY37=true ./build-support/bin/release.sh -n
     - USE_PY38=true ./build-support/bin/release.sh -n
     - ./build-support/bin/release.sh -f
-    stage: Test Pants
+    stage: Test Pants (Cron)
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -702,7 +866,7 @@ jobs:
     os: osx
     script:
     - ./build-support/bin/ci.py --platform-specific-tests --python-version 3.6
-    stage: Test Pants
+    stage: Test Pants (Cron)
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -733,6 +897,31 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY38_VERSION}
+    before_script:
+    - ulimit -n 8192
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    env:
+    - PATH="/usr/local/opt/openssl/bin:${PATH}"
+    - LDFLAGS="-L/usr/local/opt/openssl/lib"
+    - CPPFLAGS="-I/usr/local/opt/openssl/include"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
+    - CACHE_NAME=osx_platform_tests.py38
+    language: generic
+    name: OSX platform-specific tests (Python 3.8)
+    os: osx
+    script:
+    - ./build-support/bin/ci.py --platform-specific-tests --python-version 3.8
+    stage: Test Pants
+  - before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
+      -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
     - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY36_VERSION}
     before_script:
     - ulimit -n 8192
@@ -753,7 +942,7 @@ jobs:
     osx_image: xcode9.2
     script:
     - MODE=debug ./build-support/bin/ci.py --smoke-tests --python-version 3.6
-    stage: Test Pants
+    stage: Test Pants (Cron)
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -785,6 +974,32 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY38_VERSION}
+    before_script:
+    - ulimit -n 8192
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    env:
+    - PATH="/usr/local/opt/openssl/bin:${PATH}"
+    - LDFLAGS="-L/usr/local/opt/openssl/lib"
+    - CPPFLAGS="-I/usr/local/opt/openssl/include"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
+    - CACHE_NAME=osx_smoke_tests.10_12.py38
+    language: generic
+    name: OSX 10.12 smoke test (Python 3.8)
+    os: osx
+    osx_image: xcode9.2
+    script:
+    - MODE=debug ./build-support/bin/ci.py --smoke-tests --python-version 3.8
+    stage: Test Pants
+  - before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
+      -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
     - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY36_VERSION}
     before_script:
     - ulimit -n 8192
@@ -805,7 +1020,7 @@ jobs:
     osx_image: xcode10.1
     script:
     - MODE=debug ./build-support/bin/ci.py --smoke-tests --python-version 3.6
-    stage: Test Pants
+    stage: Test Pants (Cron)
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -832,6 +1047,32 @@ jobs:
     script:
     - MODE=debug ./build-support/bin/ci.py --smoke-tests --python-version 3.7
     stage: Test Pants (Cron)
+  - before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
+      -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY38_VERSION}
+    before_script:
+    - ulimit -n 8192
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    env:
+    - PATH="/usr/local/opt/openssl/bin:${PATH}"
+    - LDFLAGS="-L/usr/local/opt/openssl/lib"
+    - CPPFLAGS="-I/usr/local/opt/openssl/include"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
+    - CACHE_NAME=osx_smoke_tests.10_13.py38
+    language: generic
+    name: OSX 10.13 smoke test (Python 3.8)
+    os: osx
+    osx_image: xcode10.1
+    script:
+    - MODE=debug ./build-support/bin/ci.py --smoke-tests --python-version 3.8
+    stage: Test Pants
   - addons:
       apt:
         packages:
@@ -849,27 +1090,19 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
+    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
     deploy:
       api_key:
@@ -884,7 +1117,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - RUN_PANTS_FROM_PEX=1
     - PANTS_PEX_RELEASE=stable
     - CACHE_NAME=deploy.stable
@@ -895,6 +1127,7 @@ jobs:
     - '2.7'
     - '3.6'
     - '3.7'
+    - '3.8'
     script:
     - ./build-support/bin/release.sh -p
     stage: Deploy Pants Pex
@@ -916,32 +1149,23 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv global
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.15 3.6.7 3.7.1 3.8.0
+    - sudo sysctl fs.inotify.max_user_watches=524288
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - RUN_PANTS_FROM_PEX=1
     - PREPARE_DEPLOY=1
     - CACHE_NAME=deploy.unstable
@@ -952,6 +1176,7 @@ jobs:
     - '2.7'
     - '3.6'
     - '3.7'
+    - '3.8'
     script:
     - ./build-support/bin/release.sh -p
     - mkdir -p dist/deploy/pex/
