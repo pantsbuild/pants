@@ -651,7 +651,9 @@ Interrupted by user over pailgun client!
         concurrent runs under pantsd."""
         config = {"GLOBAL": {"concurrent": True, "pantsd": True}}
         with temporary_workdir() as workdir:
-            pants_run = self.run_pants_with_workdir(["help", "goals"], workdir=workdir, config=config)
+            pants_run = self.run_pants_with_workdir(
+                ["help", "goals"], workdir=workdir, config=config
+            )
             pants_run.assert_success()
             pantsd_log_location = os.path.join(workdir, "pantsd", "pantsd.log")
             self.assertFalse(os.path.exists(pantsd_log_location))
