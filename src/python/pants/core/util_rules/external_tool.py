@@ -128,8 +128,8 @@ class ExternalTool(Subsystem):
             help=(
                 "URL to download the tool, either as a single binary file or a compressed file "
                 "(e.g. zip file). You can change this to point to your own hosted file, e.g. to "
-                "work with proxies. Use {version} to have the value from --version substituted, "
-                "and {platform} to have a value from --url-platform-mapping substituted in, "
+                "work with proxies. Use `{version}` to have the value from --version substituted, "
+                "and `{platform}` to have a value from --url-platform-mapping substituted in, "
                 "depending on the current platform. "
                 "For example, https://github.com/.../protoc-{version}-{platform}.zip."
             ),
@@ -141,11 +141,11 @@ class ExternalTool(Subsystem):
             advanced=True,
             help=(
                 "A dictionary mapping platforms to strings to be used when generating the URL "
-                "to download the tool. In --url-template, anytime the {platform} string is used, "
-                "Pants will determine the current platform, and substitute {platform} with the "
+                "to download the tool. In --url-template, anytime the `{platform}` string is used, "
+                "Pants will determine the current platform, and substitute `{platform}` with the "
                 'respective value from your dictionary. For example, if you define `{"darwin": '
                 '"apple-darwin", "linux": "unknown-linux"}, and run Pants on Linux, then '
-                "{platform} will be substituted in the --url-template option with unknown-linux."
+                "`{platform}` will be substituted in the --url-template option with unknown-linux."
             ),
         )
 
