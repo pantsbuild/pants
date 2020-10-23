@@ -22,7 +22,10 @@ class PythonAwsLambdaHandler(StringField):
 
 
 class PythonAwsLambdaRuntime(StringField):
-    """The identifier of the AWS Lambda runtime to target (pythonX.Y)."""
+    """The identifier of the AWS Lambda runtime to target (pythonX.Y).
+
+    This should be one of https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html.
+    """
 
     PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
 

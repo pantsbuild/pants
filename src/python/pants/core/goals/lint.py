@@ -140,7 +140,7 @@ class LintRequest(StyleRequest):
 
 
 class LintSubsystem(GoalSubsystem):
-    """Lint source code."""
+    """Run all linters and/or formatters in check mode."""
 
     name = "lint"
 

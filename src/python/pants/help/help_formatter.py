@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
+from enum import Enum
 from textwrap import wrap
 from typing import List, Optional
 
@@ -61,13 +62,23 @@ class HelpFormatter(MaybeColor):
         def maybe_parens(s: Optional[str]) -> str:
             return f" ({s})" if s else ""
 
-        def format_value(val: RankedValue, prefix: str, left_padding: str) -> List[str]:
-            if isinstance(val.value, (list, dict)):
-                val_lines = json.dumps(val.value, sort_keys=True, indent=4).split("\n")
+        def format_value(ranked_val: RankedValue, prefix: str, left_padding: str) -> List[str]:
+            if isinstance(ranked_val.value, (list, dict)):
+                is_enum_list = (
+                    isinstance(ranked_val.value, list)
+                    and len(ranked_val.value) > 0
+                    and isinstance(ranked_val.value[0], Enum)
+                )
+                normalized_val = (
+                    [enum_elmt.value for enum_elmt in ranked_val.value]
+                    if is_enum_list
+                    else ranked_val.value
+                )
+                val_lines = json.dumps(normalized_val, sort_keys=True, indent=4).split("\n")
             else:
-                val_lines = [to_help_str(val.value)]
+                val_lines = [to_help_str(ranked_val.value)]
             val_lines[0] = f"{prefix}{val_lines[0]}"
-            val_lines[-1] = f"{val_lines[-1]}{maybe_parens(val.details)}"
+            val_lines[-1] = f"{val_lines[-1]}{maybe_parens(ranked_val.details)}"
             val_lines = [self.maybe_cyan(f"{left_padding}{line}") for line in val_lines]
             return val_lines
 

@@ -17,13 +17,7 @@ from pants.engine.unions import UnionRule
 
 
 class ProtobufDependencies(Dependencies):
-    """Addresses to other targets that this target depends on, e.g. `['protobuf/example:lib']`.
-
-    Pants will automatically inject any targets that you configure in the option `runtime_targets`
-    in the `[protoc]` scope. For example, if you set that option to include the Python runtime
-    library for Protobuf, every `protobuf_library` will automatically include that in its
-    `dependencies`.
-    """
+    pass
 
 
 class ProtobufSources(Sources):

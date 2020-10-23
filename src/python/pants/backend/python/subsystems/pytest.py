@@ -56,13 +56,16 @@ class PyTest(Subsystem):
             "--timeout-default",
             type=int,
             advanced=True,
-            help="The default timeout (in seconds) for a test target if the timeout field is not set on the target.",
+            help=(
+                "The default timeout (in seconds) for a test target if the `timeout` field is not "
+                "set on the target."
+            ),
         )
         register(
             "--timeout-maximum",
             type=int,
             advanced=True,
-            help="The maximum timeout (in seconds) that can be set on a test target.",
+            help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
         )
         register(
             "--junit-xml-dir",
