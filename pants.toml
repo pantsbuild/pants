@@ -22,6 +22,10 @@ build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
 pantsd_invalidation_globs.add = [
   "!*_test.py",
   "!BUILD",
+  # TODO: For the demo.
+  "!src/python/pants/option/parser.py",
+  "!src/python/pants/backend/python/lint/isort/rules_integration_test.py",
+  "!src/python/pants/backend/python/lint/bandit/rules.py",
   # NB: The `target` directory is ignored via `pants_ignore` below.
   "src/rust/engine/**/*.rs",
   "src/rust/engine/**/*.toml",
