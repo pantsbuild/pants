@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from pants.engine.fs import Snapshot
 from pants.util.logging import LogLevel
@@ -57,7 +57,7 @@ class EngineAwareReturnType(ABC):
         """
         return None
 
-    def metadata(self) -> Optional[Dict[str, str]]:
+    def metadata(self) -> Optional[Dict[str, Any]]:
         """If implemented, adds arbitrary key-value pairs to the `metadata` entry of the `@rule`
         workunit."""
 
