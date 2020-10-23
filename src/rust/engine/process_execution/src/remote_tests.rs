@@ -21,7 +21,7 @@ use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
-use workunit_store::{Level, SpanId, Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
+use workunit_store::{WorkunitState, WorkunitStore};
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
@@ -1830,64 +1830,51 @@ async fn remote_workunits_are_stored() {
     .await
     .unwrap();
 
-  let span_id = SpanId::new();
-  let got_workunits = workunits_with_constant_span_id(&mut workunit_store, span_id);
+  let got_workunit_items: HashSet<(String, WorkunitState)> =
+    workunit_store.with_latest_workunits(log::Level::Trace, |_, completed| {
+      completed
+        .iter()
+        .map(|workunit| (workunit.name.clone(), workunit.state.clone()))
+        .collect()
+    });
 
   use concrete_time::Duration;
   use concrete_time::TimeSpan;
 
-  let want_workunits = hashset! {
-    Workunit {
-      name: String::from("remote execution action scheduling"),
-      state: WorkunitState::Completed {
-        time_span: TimeSpan {
-          start: Duration::new(0, 0),
-          duration: Duration::new(1, 0),
-        }
-      },
-      span_id,
-      parent_id: None,
-      metadata: WorkunitMetadata::with_level(Level::Debug),
+  let wanted_workunit_items = hashset! {
+    (String::from("remote execution action scheduling"),
+     WorkunitState::Completed {
+      time_span: TimeSpan {
+        start: Duration::new(0, 0),
+        duration: Duration::new(1, 0),
+      }
     },
-    Workunit {
-      name: String::from("remote execution worker input fetching"),
-      state: WorkunitState::Completed {
+    ),
+    (String::from("remote execution worker input fetching"),
+     WorkunitState::Completed {
         time_span: TimeSpan {
           start: Duration::new(2, 0),
           duration: Duration::new(1, 0),
         }
-      },
-      span_id,
-      parent_id: None,
-      metadata: WorkunitMetadata::with_level(Level::Debug),
-    },
-    Workunit {
-      name: String::from("remote execution worker command executing"),
-      state: WorkunitState::Completed {
+      }),
+    (String::from("remote execution worker command executing"),
+     WorkunitState::Completed {
         time_span: TimeSpan {
           start: Duration::new(4, 0),
           duration: Duration::new(1, 0),
         }
-      },
-      span_id,
-      parent_id: None,
-      metadata: WorkunitMetadata::with_level(Level::Debug),
-    },
-    Workunit {
-      name: String::from("remote execution worker output uploading"),
-      state: WorkunitState::Completed {
+      }),
+      (String::from("remote execution worker output uploading"),
+      WorkunitState::Completed {
         time_span: TimeSpan {
           start: Duration::new(6, 0),
           duration: Duration::new(1, 0),
         }
-      },
-      span_id,
-      parent_id: None,
-      metadata: WorkunitMetadata::with_level(Level::Debug),
-    }
+      }),
+
   };
 
-  assert!(got_workunits.is_superset(&want_workunits));
+  assert!(got_workunit_items.is_superset(&wanted_workunit_items));
 }
 
 #[tokio::test]
@@ -2115,21 +2102,6 @@ async fn extract_output_files_from_response_no_prefix() {
     extract_output_files_from_response(&execute_response).await,
     Ok(TestDirectory::containing_roland().digest())
   )
-}
-
-pub(crate) fn workunits_with_constant_span_id(
-  workunit_store: &mut WorkunitStore,
-  span_id: SpanId,
-) -> HashSet<Workunit> {
-  workunit_store.with_latest_workunits(log::Level::Trace, |_, completed_workunits| {
-    completed_workunits
-      .iter()
-      .map(|workunit| Workunit {
-        span_id,
-        ..workunit.clone()
-      })
-      .collect()
-  })
 }
 
 pub fn echo_foo_request() -> MultiPlatformProcess {
