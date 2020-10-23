@@ -3,7 +3,6 @@
 
 import os
 from dataclasses import dataclass
-from typing import ClassVar, Tuple
 
 import pytest
 
@@ -23,7 +22,6 @@ from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
     Process,
-    ProcessExecutionFailure,
     ProcessResult,
 )
 from pants.engine.rules import Get, rule
