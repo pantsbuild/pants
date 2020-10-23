@@ -21,8 +21,6 @@ from pants.backend.python.target_types import (
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
-    ResolvedPexEntryPoint,
-    ResolvePexEntryPointRequest,
     SetupPyCommandsField,
 )
 from pants.backend.python.util_rules.pex import (
@@ -647,6 +645,7 @@ async def determine_setup_kwargs(
 @rule
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     exported_target = request.exported_target
+    exported_addr = exported_target.target.address
 
     owned_deps, transitive_targets = await MultiGet(
         Get(OwnedDependencies, DependencyOwner(exported_target)),
@@ -691,25 +690,36 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     binaries = await Get(
         Targets, UnparsedAddressInputs(key_to_binary_spec.values(), owning_address=target.address)
     )
-    entry_point_requests = []
+    binary_entry_points = []
     for binary in binaries:
         if not binary.has_fields([PexEntryPointField, PexBinarySources]):
             raise InvalidEntryPoint(
                 "Expected addresses to `pex_binary` targets in `.with_binaries()` for the "
-                f"`provides` field for {exported_target.target.address}, "
-                f"but found {binary.address} with target type {binary.alias}."
+                f"`provides` field for {exported_addr}, but found {binary.address} with target "
+                f"type {binary.alias}."
             )
-        entry_point_requests.append(
-            ResolvePexEntryPointRequest(binary[PexEntryPointField], binary[PexBinarySources])
-        )
-    binary_entry_points = await MultiGet(
-        Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest, request)
-        for request in entry_point_requests
-    )
+        entry_point = binary[PexEntryPointField].value
+        if not entry_point:
+            raise InvalidEntryPoint(
+                "Every `pex_binary` used in `.with_binaries()` for the `provides` field for "
+                f"{exported_addr} must explicitly set the `entry_point` field, but "
+                f"{binary.address} left the field off. Set `entry_point` to "
+                "`path.to.module:func`, e.g. `project.app:main`."
+            )
+        if ":" not in entry_point:
+            raise InvalidEntryPoint(
+                "Every `pex_binary` used in `with_binaries()` for the `provides()` field for "
+                f"{exported_addr} must set the `entry_point` field in the format "
+                f"`path.to.module:func`, but {binary.address} set it to {repr(entry_point)} "
+                f"without the `:func` suffix. For example, set `entry_point='{entry_point}:main'. "
+                "See https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html#"
+                "the-console-scripts-entry-point."
+            )
+        binary_entry_points.append(entry_point)
     for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
         entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
-        console_scripts.append(f"{key}={binary_entry_point.val}")
+        console_scripts.append(f"{key}={binary_entry_point}")
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
