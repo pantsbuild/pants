@@ -3,7 +3,68 @@
 
 This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
-See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
+See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release, and
+https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
+
+2.0.0rc2 (10/22/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Fold target help into the help system. (Cherry-pick of #11022) #11028
+  `PR #11028 <https://github.com/pantsbuild/pants/pull/11028>`_
+
+* Rename pex-binary/python-distribution subsystems to avoid naming collisions. (Cherry-pick of #11007) (#11010)
+  `PR #11010 <https://github.com/pantsbuild/pants/pull/11010>`_
+
+* Increase default `[python-setup].resolver_jobs` to `cpu_count / 2` (Cherry-pick of #11006) (#11011)
+  `PR #11011 <https://github.com/pantsbuild/pants/pull/11011>`_
+
+* Include `<PYENV>` in `[python-setup].interpreter_search_paths` default (Cherry-pick of #10998) (#11008)
+  `PR #11008 <https://github.com/pantsbuild/pants/pull/11008>`_
+
+* Upgrade Pex to 2.1.20 (Cherry-pick of #11014) (#11016)
+  `PR #11016 <https://github.com/pantsbuild/pants/pull/11016>`_
+
+Plugin API Changes
+~~~~~~~~~~~~~~~~~~
+
+* Validate that option scopes and target aliases don't collide. (Cherry-pick of #11004) #11015
+  `PR #11015 <https://github.com/pantsbuild/pants/pull/11015>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow changing the versioning scheme for `python_distribution` first-party dependencies (Cherry-pick of #10977) (#10989)
+  `PR #10989 <https://github.com/pantsbuild/pants/pull/10989>`_
+
+* Add `[python-setup].resolver_http_cache_ttl` option (Cherry-pick of #10997) (#11002)
+  `PR #11002 <https://github.com/pantsbuild/pants/pull/11002>`_
+
+* Allow changing the URL to download tools like PEX and Protoc (Cherry-pick of #11013) (#11024)
+  `PR #11024 <https://github.com/pantsbuild/pants/pull/11024>`_
+
+Bugfixes
+~~~~~~~~
+
+* Revert using libCST for dep inference due to performance (Cherry-pick of #11001) (#11005)
+  `PR #11005 <https://github.com/pantsbuild/pants/pull/11005>`_
+
+* Fix resource leak warning with stdio (Cherry-pick of #10995) (#10996)
+  `PR #10996 <https://github.com/pantsbuild/pants/pull/10996>`_
+
+* Fix `./pants repl` to use global constrains when no targets specified (Cherry-pick of #10991) (#10992)
+  `PR #10992 <https://github.com/pantsbuild/pants/pull/10992>`_
+
+* Fix `setup_py().with_binaries()` to use the default entry point (Cherry-pick of #11021) #11026
+  `PR #11026 <https://github.com/pantsbuild/pants/pull/11026>`_
+
+* Fix overly verbose `FieldSet` in stack traces (Cherry-pick of #10978) (#10990)
+  `PR #10990 <https://github.com/pantsbuild/pants/pull/10990>`_
+
+* Fix several bad usages of `itertools.groupby()` (Cherry-pick of #10976) (#10979)
+  `PR #10979 <https://github.com/pantsbuild/pants/pull/10979>`_
 
 2.0.0rc1 (10/15/2020)
 ---------------------

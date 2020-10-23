@@ -76,10 +76,10 @@ GLOBAL_ENV_VARS = [
     # mitigate risk.
     "BOOTSTRAPPED_PEX_KEY_PREFIX=daily/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex",
     "NATIVE_ENGINE_SO_KEY_PREFIX=monthly/native_engine_so",
-    "PYENV_PY27_VERSION=2.7.18",
-    "PYENV_PY36_VERSION=3.6.10",
-    "PYENV_PY37_VERSION=3.7.7",
-    "PYENV_PY38_VERSION=3.8.3",
+    "MACOS_PYENV_PY27_VERSION=2.7.18",
+    "MACOS_PYENV_PY36_VERSION=3.6.10",
+    "MACOS_PYENV_PY37_VERSION=3.7.7",
+    "MACOS_PYENV_PY38_VERSION=3.8.3",
     # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
     # override the default value because Linux pre-installs Python via Pyenv and we must keep their
     # $PYENV_ROOT for this to still work.
@@ -129,15 +129,15 @@ class PythonVersion(Enum):
     def default_stage(self, *, is_bootstrap: bool = False) -> Stage:
         if is_bootstrap:
             return {
-                self.py36: Stage.bootstrap_cron,
+                self.py36: Stage.bootstrap,
                 self.py37: Stage.bootstrap_cron,
-                self.py38: Stage.bootstrap,
-            }[self]  # type: ignore[index]
-        return {
-            self.py36: Stage.test_cron,
-            self.py37: Stage.test_cron,
-            self.py38: Stage.test,
-        }[self]  # type: ignore[index]
+                self.py38: Stage.bootstrap_cron,
+            }[
+                self  # type: ignore[index]
+            ]
+        return {self.py36: Stage.test, self.py37: Stage.test_cron, self.py38: Stage.test_cron}[
+            self  # type: ignore[index]
+        ]
 
 
 # ----------------------------------------------------------------------
@@ -259,16 +259,18 @@ class Platform(Enum):
 
 
 def _linux_before_install(
-    include_test_config: bool = True, install_travis_wait: bool = False
+    include_test_config: bool = True, install_travis_wait: bool = False, *, xenial: bool = False
 ) -> List[str]:
     commands = [
-        "ls /opt/python",
-        "pyenv root",
-        "pyenv global",
         "./build-support/bin/install_aws_cli_for_ci.sh",
+        # These are pre-installed through Travis, but we must still activate them.
         # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
         #   https://github.com/pantsbuild/pants/issues/7601
-        "pyenv global 2.7.15 3.6.7 3.7.1 3.8.0",
+        (
+            "pyenv global 2.7.17 3.6.10 3.7.6 3.8.1"
+            if not xenial
+            else "pyenv global 2.7.15 3.6.7 3.7.1"
+        ),
     ]
     if install_travis_wait:
         commands.extend(
@@ -276,13 +278,13 @@ def _linux_before_install(
                 (
                     'wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/'
                     'v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz" | tar -zxvf - '
-                    'travis-wait-enhanced'
+                    "travis-wait-enhanced"
                 ),
                 "mv travis-wait-enhanced /home/travis/bin/",
             ]
         )
     if include_test_config:
-        commands.append("sudo sysctl fs.inotify.max_user_watches=524288")
+        return ["sudo sysctl fs.inotify.max_user_watches=524288", *commands]
     return commands
 
 
@@ -297,8 +299,7 @@ def linux_shard(
         raise ValueError("Must provide the Python version if using a test config.")
     setup = {
         "os": "linux",
-        "dist": "xenial",
-        "sudo": "required",
+        "dist": "bionic",
         "python": ["2.7", "3.6", "3.7", "3.8"],
         "addons": {
             "apt": {
@@ -339,7 +340,7 @@ def linux_fuse_shard() -> Dict:
         "dist": "xenial",
         "sudo": "required",
         "before_install": [
-            *_linux_before_install(),
+            *_linux_before_install(xenial=True),
             "sudo apt-get install -y pkg-config fuse libfuse-dev",
             "sudo modprobe fuse",
             "sudo chmod 666 /dev/fuse",
@@ -352,10 +353,10 @@ def _osx_before_install(
     python_versions: Iterable[PythonVersion], *, install_py27: bool = True
 ) -> List[str]:
     versions_to_install = " ".join(
-        f"${{PYENV_PY{python_version.number}_VERSION}}" for python_version in python_versions
+        f"${{MACOS_PYENV_PY{python_version.number}_VERSION}}" for python_version in python_versions
     )
     if install_py27:
-        versions_to_install = f"${{PYENV_PY27_VERSION}} {versions_to_install}"
+        versions_to_install = f"${{MACOS_PYENV_PY27_VERSION}} {versions_to_install}"
     return [
         "curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq",
         "chmod 755 /usr/local/bin/jq",
@@ -375,10 +376,10 @@ def _osx_env() -> List[str]:
 def _osx_env_with_pyenv() -> List[str]:
     return [
         *_osx_env(),
-        'PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"',
-        'PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"',
-        'PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"',
-        'PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"',
+        'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"',
+        'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"',
+        'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"',
+        'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"',
     ]
 
 
@@ -455,7 +456,7 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
         # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
         # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
         **osx_shard(load_test_config=False, python_version=python_version, osx_image="xcode8"),
-        "name": f"Build OSX native engine and pants.pex (Python {python_version.decimal})",
+        "name": f"Build macOS native engine and pants.pex (Python {python_version.decimal})",
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage(is_bootstrap=True).value,
         "script": [_bootstrap_command(python_version=python_version)],
@@ -628,7 +629,7 @@ def rust_tests_osx() -> Dict:
         #      See https://gist.github.com/stuhood/856a9b09bbaa86141f36c9925c14fae7
         "osx_image": "xcode8",
         "before_install": [
-            './build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"',
+            './build-support/bin/install_python_for_ci.sh "${MACOS_PYENV_PY36_VERSION}"',
             # We don't use the standard travis "addons" section here because it will either silently
             # fail (on older images) or cause a multi-minute `brew update` (on newer images), neither of
             # which we want. This doesn't happen if we just manually run `brew cask install`.
@@ -652,7 +653,7 @@ def rust_tests_osx() -> Dict:
 def osx_platform_tests(python_version: PythonVersion) -> Dict:
     shard = {
         **osx_shard(python_version=python_version),
-        "name": f"OSX platform-specific tests (Python {python_version.decimal})",
+        "name": f"macOS platform-specific tests (Python {python_version.decimal})",
         "script": [
             f"./build-support/bin/ci.py --platform-specific-tests --python-version {python_version.decimal}"
         ],
@@ -671,7 +672,7 @@ def _osx_smoke_test(
 ) -> Dict:
     shard = {
         **osx_shard(python_version=python_version, osx_image=osx_image),
-        "name": f"OSX 10.{os_version_number} smoke test (Python {python_version.decimal})",
+        "name": f"macOS 10.{os_version_number} smoke test (Python {python_version.decimal})",
         "script": [
             f"MODE=debug ./build-support/bin/ci.py --smoke-tests --python-version {python_version.decimal}"
         ],

@@ -136,6 +136,11 @@ class Native(metaclass=SingletonMetaclass):
             level, log_show_rust_3rdparty, use_color, show_target, log_levels_as_ints
         )
 
+    def set_per_run_log_path(self, path: Optional[str]) -> None:
+        """Instructs the logging code to also write emitted logs to a run-specific log file; or
+        disables writing to any run-specific file if `None` is passed."""
+        self.lib.set_per_run_log_path(path)
+
     def default_cache_path(self) -> str:
         return cast(str, self.lib.default_cache_path())
 
