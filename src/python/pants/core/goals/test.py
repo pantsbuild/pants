@@ -264,7 +264,7 @@ class TestSubsystem(GoalSubsystem):
             type=bool,
             default=False,
             help=(
-                "Run a single test target in an interactive process. This is necessary, for "
+                "Run tests sequentially in an interactive process. This is necessary, for "
                 "example, when you add breakpoints to your code."
             ),
         )
@@ -303,9 +303,7 @@ class TestSubsystem(GoalSubsystem):
             help=(
                 "Additional environment variables to include in test processes. "
                 "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
-                "`ENV_VAR` to copy the value of a variable in Pants's own environment. `value` may "
-                "be a string with spaces in it such as `ENV_VAR=has some spaces`. `ENV_VAR=` sets "
-                "a variable to be the empty string."
+                "`ENV_VAR` to copy the value of a variable in Pants's own environment."
             ),
         )
 

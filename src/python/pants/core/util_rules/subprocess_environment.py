@@ -71,10 +71,8 @@ class SubprocessEnvironment(Subsystem):
             help=(
                 "Environment variables to set for process invocations. "
                 "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-                "or just `ENV_VAR` to copy the value from Pants's own environment. `value` may "
-                "be a string with spaces in it such as `ENV_VAR=has some spaces`. `ENV_VAR=` sets "
-                "a variable to be the empty string. Each ENV_VAR must be one of "
-                f"{','.join(SETTABLE_ENV_VARS)}."
+                "or just `ENV_VAR` to copy the value from Pants's own environment.\n\nEach ENV_VAR "
+                f"must be one of {', '.join(f'`{v}`' for v in SETTABLE_ENV_VARS)}."
             ),
         )
 

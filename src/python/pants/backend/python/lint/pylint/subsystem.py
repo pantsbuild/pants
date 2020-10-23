@@ -47,9 +47,8 @@ class Pylint(PythonToolBase):
             advanced=True,
             help=(
                 "An optional list of `pylint_source_plugin` target addresses. This allows you to "
-                "load custom plugins defined in source code. Run the goal `target-types "
-                "--details=pylint_source_plugin` for instructions, including how to load "
-                "third-party plugins."
+                "load custom plugins defined in source code. Run `./pants help "
+                "pylint_source_plugin` for instructions, including how to load third-party plugins."
             ),
         )
 

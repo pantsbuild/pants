@@ -250,8 +250,7 @@ class ArchiveFiles(SpecialCasedDependencies):
 
     This will ignore any targets that are not `files` or `relocated_files` targets. If you instead
     want those files included in any packages specified in the `packages` field for this target,
-    then use a `resources` target and have the original package (e.g. the `python_library`)
-    depend on the resources.
+    then use a `resources` target and have the original package depend on the resources.
     """
 
     alias = "files"
