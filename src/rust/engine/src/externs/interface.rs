@@ -481,7 +481,9 @@ py_class!(class PyExecutionStrategyOptions |py| {
     speculation_delay: f64,
     speculation_strategy: String,
     use_local_cache: bool,
-    local_enable_nailgun: bool
+    local_enable_nailgun: bool,
+    remote_cache_read: bool,
+    remote_cache_write: bool
   ) -> CPyResult<Self> {
     Self::create_instance(py,
       ExecutionStrategyOptions {
@@ -492,6 +494,8 @@ py_class!(class PyExecutionStrategyOptions |py| {
         speculation_strategy,
         use_local_cache,
         local_enable_nailgun,
+        remote_cache_read,
+        remote_cache_write,
       }
     )
   }

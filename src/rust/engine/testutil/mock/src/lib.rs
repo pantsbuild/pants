@@ -27,7 +27,10 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+mod action_cache;
 mod cas;
-pub use crate::cas::StubCAS;
 pub mod execution_server;
+
+pub use crate::action_cache::StubActionCache;
+pub use crate::cas::StubCAS;
 pub use crate::execution_server::MockExecution;

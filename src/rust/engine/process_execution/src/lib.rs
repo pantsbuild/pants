@@ -57,6 +57,10 @@ pub mod remote;
 #[cfg(test)]
 pub mod remote_tests;
 
+pub mod remote_cache;
+#[cfg(test)]
+mod remote_cache_tests;
+
 pub mod speculate;
 #[cfg(test)]
 mod speculate_tests;
