@@ -264,8 +264,8 @@ class GlobalOptions(Subsystem):
             "using the requested version, as Pants cannot dynamically change the version it "
             "is using once the program is already running.\n\nIf you use the `./pants` script from "
             "https://www.pantsbuild.org/docs/installation, however, changing the value in your "
-            "`pants.toml` will cause the version to change. Run `./pants --version` to check what "
-            "is being used.",
+            "`pants.toml` will cause the new version to be installed and run automatically.\n\n"
+            "Run `./pants --version` to check what is being used.",
         )
         register(
             "--pants-bin-name",

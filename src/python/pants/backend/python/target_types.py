@@ -240,7 +240,7 @@ class PexInheritPathField(StringField):
 class PexZipSafeField(BoolField):
     """Whether or not this binary is safe to run in compacted (zip-file) form.
 
-    If they are not zip safe, they will be written to disk prior to execution. You may need to mark
+    If the PEX is not zip safe, it will be written to disk prior to execution. You may need to mark
     `zip_safe=False` if you're having issues loading your code.
     """
 
@@ -270,7 +270,7 @@ class PexIgnoreErrorsField(BoolField):
 
 class PexShebangField(StringField):
     """Set the generated PEX to use this shebang, rather than the default of PEX choosing a shebang
-    based on the interpreter constraints for the PEX.
+    based on the interpreter constraints.
 
     This influences the behavior of running `./result.pex`. You can ignore the shebang by instead
     running `/path/to/python_interpreter ./result.pex`.
@@ -447,8 +447,8 @@ class PythonLibrary(Target):
     """Python source code.
 
     A `python_library` does not necessarily correspond to a distribution you publish (see
-    `python_distribution` and `pex_binary` for that). `python_library` is intended for your first-
-    party library code, meaning your code imported by tests and deployables/binaries.
+    `python_distribution` and `pex_binary` for that); multiple `python_library` targets may be
+    packaged into a distribution or binary.
     """
 
     alias = "python_library"
@@ -643,7 +643,7 @@ class SetupPyCommandsField(StringSequenceField):
 
 
 class PythonDistribution(Target):
-    """A publishable Python distribution (e.g. wheel)."""
+    """A publishable Python setuptools distribution (e.g. an sdist or wheel)."""
 
     alias = "python_distribution"
     core_fields = (

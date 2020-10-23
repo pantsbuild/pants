@@ -38,7 +38,7 @@ class ReplImplementation(ABC):
 
 
 class ReplSubsystem(GoalSubsystem):
-    """Open a REPL with the specified code loaded."""
+    """Open a REPL with the specified code loadable."""
 
     name = "repl"
     required_union_implementations = (ReplImplementation,)
