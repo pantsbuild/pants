@@ -59,7 +59,6 @@ class EngineAwareReturnType(ABC):
 
     def metadata(self) -> Optional[Dict[str, str]]:
         """If implemented, adds arbitrary key-value pairs to the `metadata` entry of the `@rule`
-        workunit.
-        """
+        workunit."""
 
         return None

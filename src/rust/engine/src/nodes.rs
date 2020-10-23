@@ -1262,6 +1262,7 @@ impl Node for NodeKey {
       stdout: None,
       stderr: None,
       artifacts: Vec::new(),
+      user_metadata: Vec::new(),
     };
     let metadata2 = metadata.clone();
 
@@ -1340,6 +1341,10 @@ impl Node for NodeKey {
         level,
         message,
         artifacts,
+        user_metadata: user_metadata
+          .into_iter()
+          .map(|(key, val)| (key, val.consume_into_arc()))
+          .collect(),
         ..metadata
       };
       (result, final_metadata)
