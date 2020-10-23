@@ -96,6 +96,8 @@ pub struct ExecutionStrategyOptions {
   pub speculation_strategy: String,
   pub use_local_cache: bool,
   pub local_enable_nailgun: bool,
+  pub remote_cache_read: bool,
+  pub remote_cache_write: bool,
 }
 
 impl Core {
@@ -192,6 +194,7 @@ impl Core {
 
   fn make_command_runner(
     store: &Store,
+    remote_store_servers: &[String],
     executor: &Executor,
     local_execution_root_dir: &Path,
     named_caches_dir: &Path,
@@ -202,6 +205,14 @@ impl Core {
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
   ) -> Result<Box<dyn CommandRunner>, String> {
+    if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
+      && remoting_opts.execution_enable
+    {
+      return Err(
+        "Remote caching mode and remote execution mode cannot be enabled concurrently".into(),
+      );
+    }
+
     let local_command_runner = Core::make_local_execution_runner(
       store,
       executor,
@@ -243,7 +254,29 @@ impl Core {
       local_command_runner
     };
 
-    let maybe_cached_command_runner = if exec_strategy_opts.use_local_cache {
+    let maybe_remote_cached_command_runner =
+      if exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write {
+        let action_cache_address = remote_store_servers
+          .first()
+          .ok_or_else(|| "at least one remote store must be specified".to_owned())?;
+
+        Box::new(process_execution::remote_cache::CommandRunner::new(
+          command_runner.into(),
+          process_execution_metadata.clone(),
+          store.clone(),
+          action_cache_address.as_str(),
+          root_ca_certs.clone(),
+          oauth_bearer_token.clone(),
+          remoting_opts.execution_headers.clone(),
+          Platform::current()?,
+          exec_strategy_opts.remote_cache_read,
+          exec_strategy_opts.remote_cache_write,
+        )?)
+      } else {
+        command_runner
+      };
+
+    let maybe_local_cached_command_runner = if exec_strategy_opts.use_local_cache {
       let process_execution_store = ShardedLmdb::new(
         local_store_dir.join("processes"),
         5 * GIGABYTES,
@@ -252,16 +285,16 @@ impl Core {
       )
       .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       Box::new(process_execution::cache::CommandRunner::new(
-        command_runner.into(),
+        maybe_remote_cached_command_runner.into(),
         process_execution_store,
         store.clone(),
         process_execution_metadata.clone(),
       ))
     } else {
-      command_runner
+      maybe_remote_cached_command_runner
     };
 
-    Ok(maybe_cached_command_runner)
+    Ok(maybe_local_cached_command_runner)
   }
 
   fn load_certificates(
@@ -344,13 +377,20 @@ impl Core {
       None
     };
 
+    let need_remote_store = remoting_opts.execution_enable
+      || exec_strategy_opts.remote_cache_read
+      || exec_strategy_opts.remote_cache_write;
+    if need_remote_store && remote_store_servers.is_empty() {
+      return Err("Remote store required but none provided".into());
+    }
+
     let store = safe_create_dir_all_ioerror(&local_store_dir)
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
       .and_then(|_| {
         Core::make_store(
           &executor,
           &local_store_dir,
-          remoting_opts.execution_enable && !remote_store_servers.is_empty(),
+          need_remote_store,
           &remoting_opts,
           &remote_store_servers,
           &root_ca_certs,
@@ -367,6 +407,7 @@ impl Core {
 
     let command_runner = Core::make_command_runner(
       &store,
+      &remote_store_servers,
       &executor,
       &local_execution_root_dir,
       &named_caches_dir,

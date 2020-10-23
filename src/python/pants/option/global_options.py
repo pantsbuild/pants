@@ -86,6 +86,8 @@ class ExecutionOptions:
     remote_execution_headers: Any
     remote_execution_overall_deadline_secs: int
     process_execution_local_enable_nailgun: bool
+    remote_cache_read: bool
+    remote_cache_write: bool
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
@@ -112,6 +114,8 @@ class ExecutionOptions:
             remote_execution_headers=bootstrap_options.remote_execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
+            remote_cache_read=bootstrap_options.remote_cache_read,
+            remote_cache_write=bootstrap_options.remote_cache_write,
         )
 
 
@@ -138,6 +142,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_headers={},
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
     process_execution_local_enable_nailgun=False,
+    remote_cache_read=False,
+    remote_cache_write=False,
 )
 
 
@@ -754,6 +760,20 @@ class GlobalOptions(Subsystem):
             help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
             advanced=True,
         )
+        register(
+            "--remote-cache-read",
+            type=bool,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read,
+            advanced=True,
+            help="Whether to enable reading from a remote cache",
+        )
+        register(
+            "--remote-cache-write",
+            type=bool,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_write,
+            advanced=True,
+            help="Whether to enable writing results to a remote cache",
+        )
 
     @classmethod
     def register_options(cls, register):
@@ -912,4 +932,14 @@ class GlobalOptions(Subsystem):
             raise OptionsError(
                 "The `--remote-execution-server` option requires also setting "
                 "`--remote-store-server`. Often these have the same value."
+            )
+        if opts.remote_cache_read and not opts.remote_store_server:
+            raise OptionsError(
+                "The `--remote-cache-read` option requires also setting "
+                "`--remote-store-server` to work properly."
+            )
+        if opts.remote_cache_write and not opts.remote_store_server:
+            raise OptionsError(
+                "The `--remote-cache-write` option requires also setting "
+                "`--remote-store-server` to work properly."
             )
