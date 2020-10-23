@@ -154,7 +154,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             """
             python_library()
 
-            pex_binary(name="bin", entry_point="foo.qux.bin")
+            pex_binary(name="bin", entry_point="foo.qux.bin:main")
             """
         ),
     )
@@ -219,19 +219,21 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "namespace_packages": ("foo",),
             "package_data": {"foo": ("resources/js/code.js",)},
             "install_requires": ("baz==1.1.1",),
-            "entry_points": {"console_scripts": ["foo_main=foo.qux.bin"]},
+            "entry_points": {"console_scripts": ["foo_main=foo.qux.bin:main"]},
         },
         Address("src/python/foo", target_name="foo-dist"),
     )
 
 
 def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
+    chroot_rule_runner.create_file("src/python/invalid_binary/app.py")
     chroot_rule_runner.add_to_build_file(
         "src/python/invalid_binary",
         textwrap.dedent(
             """
             python_library(name='not_a_binary', sources=[])
-            pex_binary(name='no_entrypoint')
+            pex_binary(name='no_explicit_entrypoint', sources=["app.py"])
+            pex_binary(name='malformed_entrypoint', entry_point='invalid_binary.app')
             python_distribution(
                 name='invalid_bin1',
                 provides=setup_py(
@@ -242,7 +244,13 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
                 name='invalid_bin2',
                 provides=setup_py(
                     name='invalid_bin2', version='1.1.1'
-                ).with_binaries(foo=':no_entrypoint')
+                ).with_binaries(foo=':no_explicit_entrypoint')
+            )
+            python_distribution(
+                name='invalid_bin3',
+                provides=setup_py(
+                    name='invalid_bin3', version='1.1.1'
+                ).with_binaries(foo=':malformed_entrypoint')
             )
             """
         ),
@@ -256,7 +264,12 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
     assert_chroot_error(
         chroot_rule_runner,
         Address("src/python/invalid_binary", target_name="invalid_bin2"),
-        InvalidFieldException,
+        InvalidEntryPoint,
+    )
+    assert_chroot_error(
+        chroot_rule_runner,
+        Address("src/python/invalid_binary", target_name="invalid_bin3"),
+        InvalidEntryPoint,
     )
 
 
