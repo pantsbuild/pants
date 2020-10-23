@@ -3,6 +3,7 @@
 
 import copy
 import json
+import logging
 import multiprocessing
 import os
 import sys
@@ -10,7 +11,8 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
-from typing import Any, Dict, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -19,6 +21,7 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.engine.internals.native import Native
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.option.config import Config
 from pants.option.options import Options
@@ -28,6 +31,8 @@ from pants.option.subsystem import Subsystem
 from pants.reporting.report import Report
 from pants.util.dirutil import relative_symlink, safe_file_dump
 from pants.version import VERSION
+
+logger = logging.getLogger(__name__)
 
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
@@ -172,6 +177,10 @@ class RunTracker(Subsystem):
 
         self._end_memoized_result: Optional[ExitCode] = None
 
+        self.native = Native()
+
+        self.run_logs_file: Optional[Path] = None
+
     @property
     def v2_goals_rule_names(self) -> Tuple[str, ...]:
         return self._v2_goal_rule_names
@@ -234,6 +243,9 @@ class RunTracker(Subsystem):
 
         goal_names: Tuple[str, ...] = tuple(all_options.goals)
         self._v2_goal_rule_names = goal_names
+
+        self.run_logs_file = Path(self.run_info_dir, "logs")
+        self.native.set_per_run_log_path(str(self.run_logs_file))
 
     def set_root_outcome(self, outcome):
         """Useful for setup code that doesn't have a reference to a workunit."""
@@ -421,6 +433,9 @@ class RunTracker(Subsystem):
         run_failed = outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED]
         result = PANTS_FAILED_EXIT_CODE if run_failed else PANTS_SUCCEEDED_EXIT_CODE
         self._end_memoized_result = result
+
+        self.native.set_per_run_log_path(None)
+
         return self._end_memoized_result
 
     def end_workunit(self, workunit):
@@ -503,3 +518,18 @@ class RunTracker(Subsystem):
             raise ValueError(
                 f"Couldn't find option scope {scope}{option_str} for recording ({e!r})"
             )
+
+    def retrieve_logs(self) -> List[str]:
+        """Get a list of every log entry recorded during this run."""
+
+        if not self.run_logs_file:
+            return []
+
+        output = []
+        try:
+            with open(self.run_logs_file, "r") as f:
+                output = f.readlines()
+        except OSError as e:
+            logger.warning("Error retrieving per-run logs from RunTracker.", exc_info=e)
+
+        return output
