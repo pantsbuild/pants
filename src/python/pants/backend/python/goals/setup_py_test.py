@@ -48,7 +48,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import SubsystemRule, rule
-from pants.engine.target import InvalidFieldException, Targets
+from pants.engine.target import Targets
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
