@@ -800,7 +800,7 @@ impl DownloadedFile {
           if new_size > self.size_limit {
             Err(std::io::Error::new(
               std::io::ErrorKind::InvalidData,
-              "Downloaded file was larger than expected digest",
+              format!("Downloaded file size ({}) was larger than expected digest ({}).", new_size, self.size_limit)
             ))
           } else {
             self.written = new_size;
