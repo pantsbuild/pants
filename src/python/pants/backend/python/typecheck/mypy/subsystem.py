@@ -51,9 +51,8 @@ class MyPy(PythonToolBase):
             advanced=True,
             help=(
                 "An optional list of `mypy_source_plugin` target addresses. This allows you to "
-                "load custom plugins defined in source code. Run the goal `target-types "
-                "--details=mypy_source_plugin` for instructions, including how to load "
-                "third-party plugins."
+                "load custom plugins defined in source code. Run `./pants help mypy_source_plugin` "
+                "for instructions, including how to load third-party plugins."
             ),
         )
 

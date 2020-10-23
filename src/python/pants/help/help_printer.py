@@ -151,7 +151,7 @@ class HelpPrinter(MaybeColor):
         print_cmd("help targets", "List all installed target types.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
-        print_cmd("help [targettype/goal/subsystem]", "Help for a target type, goal or subsystem.")
+        print_cmd("help [target_type/goal/subsystem]", "Help for a target type, goal or subsystem.")
         print_cmd(
             "help-advanced [goal/subsystem]", "Help for a goal or subsystem's advanced options."
         )
@@ -216,7 +216,7 @@ class HelpPrinter(MaybeColor):
             alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
             summary = target_type_info.summary or "<no description>"
             print(f"{alias_str}{summary}\n")
-        specific_help_cmd = f"{self._bin_name} help $targettype"
+        specific_help_cmd = f"{self._bin_name} help $target_type"
         print(
             f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific "
             f"target type.\n"

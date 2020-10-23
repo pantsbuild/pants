@@ -105,6 +105,8 @@ class PexBinaryDefaults(Subsystem):
                 "Can be overridden by specifying the `emit_warnings` parameter of individual "
                 "`pex_binary` targets"
             ),
+            removal_version="2.1.0.dev0",
+            removal_hint="Use `emit_warnings` rather than `pex_emit_warnings`.",
         )
         register(
             "--emit-warnings",
@@ -238,7 +240,8 @@ class PexInheritPathField(StringField):
 class PexZipSafeField(BoolField):
     """Whether or not this binary is safe to run in compacted (zip-file) form.
 
-    If they are not zip safe, they will be written to disk prior to execution. iff
+    If the PEX is not zip safe, it will be written to disk prior to execution. You may need to mark
+    `zip_safe=False` if you're having issues loading your code.
     """
 
     alias = "zip_safe"
@@ -266,7 +269,12 @@ class PexIgnoreErrorsField(BoolField):
 
 
 class PexShebangField(StringField):
-    """For the generated PEX, use this shebang."""
+    """Set the generated PEX to use this shebang, rather than the default of PEX choosing a shebang
+    based on the interpreter constraints.
+
+    This influences the behavior of running `./result.pex`. You can ignore the shebang by instead
+    running `/path/to/python_interpreter ./result.pex`.
+    """
 
     alias = "shebang"
 
@@ -274,7 +282,7 @@ class PexShebangField(StringField):
 class PexEmitWarningsField(BoolField):
     """Whether or not to emit PEX warnings at runtime.
 
-    The default is determined by the option `pex_runtime_warnings` in the `[python-binary]` scope.
+    The default is determined by the option `emit_warnings` in the `[pex-binary-defaults]` scope.
     """
 
     alias = "emit_warnings"
@@ -356,7 +364,7 @@ class PythonRuntimePackageDependencies(SpecialCasedDependencies):
     `--distdir` prefix (e.g. `dist/`).
 
     You can include anything that can be built by `./pants package`, e.g. a `pex_binary`,
-    `python_awslambda`, or even another `archive`.
+    `python_awslambda`, or an `archive`.
     """
 
     alias = "runtime_package_dependencies"
@@ -436,7 +444,12 @@ class PythonLibrarySources(PythonSources):
 
 
 class PythonLibrary(Target):
-    """A Python library that may be imported by other targets."""
+    """Python source code.
+
+    A `python_library` does not necessarily correspond to a distribution you publish (see
+    `python_distribution` and `pex_binary` for that); multiple `python_library` targets may be
+    packaged into a distribution or binary.
+    """
 
     alias = "python_library"
     core_fields = (*COMMON_PYTHON_FIELDS, Dependencies, PythonLibrarySources)
@@ -555,7 +568,7 @@ class ModuleMappingField(DictStringToStringSequenceField):
 
 
 class PythonRequirementLibrary(Target):
-    """A set of Pip requirements.
+    """Python requirements installable by pip.
 
     This target is useful when you want to declare Python requirements inline in a BUILD file. If
     you have a `requirements.txt` file already, you can instead use the macro
@@ -630,7 +643,7 @@ class SetupPyCommandsField(StringSequenceField):
 
 
 class PythonDistribution(Target):
-    """A publishable Python distribution."""
+    """A publishable Python setuptools distribution (e.g. an sdist or wheel)."""
 
     alias = "python_distribution"
     core_fields = (

@@ -54,8 +54,8 @@ class PythonSetup(Subsystem):
             help="Constrain the selected Python interpreter. Specify with requirement syntax, "
             "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
             "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
-            "be ORed together. These constraints are applied in addition to any "
-            "compatibilities required by the relevant targets.",
+            "be ORed together. These constraints are used as the default value for the "
+            "`compatibility` field of Python targets.",
         )
         register(
             "--requirement-constraints",
@@ -65,7 +65,7 @@ class PythonSetup(Subsystem):
                 "When resolving third-party requirements, use this "
                 "constraints file to determine which versions to use. See "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
-                "on the format of constraint files and how constraints are applied in Pex and Pip."
+                "on the format of constraint files and how constraints are applied in Pex and pip."
             ),
         )
         register(
@@ -80,10 +80,11 @@ class PythonSetup(Subsystem):
                 "constraints file, each subset will be independently resolved as needed, which is "
                 "more correct - work is only invalidated if a requirement it actually depends on "
                 "changes - but also a lot slower, due to the extra resolving. "
-                "You may wish to leave this option set for normal work, such as running tests, "
-                "but selectively turn it off via command-line-flag when building deployable "
-                "binaries, so that you only deploy the requirements you actually need for a "
-                "given binary. Requires [python-setup].requirement_constraints to be set."
+                "\n\n* `never` will always use proper subsets, regardless of the goal being "
+                "run.\n* `nondeployables` will use proper subsets for `./pants package`, but "
+                "otherwise attempt to use a single resolve.\n* `always` will always attempt to use "
+                "a single resolve."
+                "\n\nRequires [python-setup].requirement_constraints to be set."
             ),
         )
         register(
@@ -111,7 +112,7 @@ class PythonSetup(Subsystem):
             default="manylinux2014",
             help="Whether to allow resolution of manylinux wheels when resolving requirements for "
             "foreign linux platforms. The value should be a manylinux platform upper bound, "
-            "e.g.: manylinux2010, or else [Ff]alse, [Nn]o or [Nn]one to disallow.",
+            "e.g.: 'manylinux2010', or else the string 'no' to disallow.",
         )
         register(
             "--resolver-jobs",

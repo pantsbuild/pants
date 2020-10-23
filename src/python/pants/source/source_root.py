@@ -117,8 +117,8 @@ class SourceRootConfig(Subsystem):
             help="A list of source root suffixes. A directory with this suffix will be considered "
             "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
             "`<buildroot>/project1/src/python` etc. Prepend a `/` to anchor the match at the "
-            "buildroot.  E.g., `/src/python` will match `<buildroot>/src/python` but not "
-            "`<buildroot>/project1/src/python`.  A `*` wildcard will match a single path segment, "
+            "buildroot. E.g., `/src/python` will match `<buildroot>/src/python` but not "
+            "`<buildroot>/project1/src/python`. A `*` wildcard will match a single path segment, "
             "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
             "Use `/` to signify that the buildroot itself is a source root. "
             "See https://www.pantsbuild.org/docs/source-roots.",
@@ -132,9 +132,9 @@ class SourceRootConfig(Subsystem):
             default=None,
             advanced=True,
             help="The presence of a file of this name in a directory indicates that the directory "
-            "is a source root.  The content of the file doesn't matter, and may be empty. "
+            "is a source root. The content of the file doesn't matter, and may be empty. "
             "Useful when you can't or don't wish to centrally enumerate source roots via "
-            "--root-patterns.",
+            "`root_patterns`.",
         )
 
     @memoized_method

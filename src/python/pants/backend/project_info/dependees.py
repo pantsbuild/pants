@@ -96,7 +96,7 @@ class DependeesOutputFormat(Enum):
 
 
 class DependeesSubsystem(LineOriented, GoalSubsystem):
-    """List all targets that depend on any of the input targets."""
+    """List all targets that depend on any of the input files/targets."""
 
     name = "dependees"
 
@@ -107,10 +107,7 @@ class DependeesSubsystem(LineOriented, GoalSubsystem):
             "--transitive",
             default=False,
             type=bool,
-            help=(
-                "List all targets which transitively depend on the specified target, rather than "
-                "only targets that directly depend on the specified target."
-            ),
+            help="List all transitive dependees, instead of only direct dependees.",
         )
         register(
             "--closed",

@@ -74,7 +74,8 @@ class PythonInference(Subsystem):
             default=True,
             type=bool,
             help=(
-                "Infer a test target's dependencies on any conftest.py files in parent directories."
+                "Infer a test target's dependencies on any conftest.py files in the current "
+                "directory and ancestor directories."
             ),
         )
 
