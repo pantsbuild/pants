@@ -3699,6 +3699,7 @@ name = "workunit_store"
 version = "0.0.1"
 dependencies = [
  "concrete_time",
+ "cpython",
  "hashing",
  "log 0.4.8",
  "parking_lot",
