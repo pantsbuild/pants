@@ -24,6 +24,11 @@ class Cookies(Subsystem):
             default=os.path.join(register.bootstrap.pants_bootstrapdir, "auth", "cookies"),
             help="Path to file that stores persistent cookies. "
             "Defaults to <pants bootstrap dir>/auth/cookies.",
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "The option `--cookies-path` does not do anything and the `[cookies]` subsystem "
+                "will be removed."
+            )
         )
 
     def update(self, cookies):

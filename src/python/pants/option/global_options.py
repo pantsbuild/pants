@@ -286,14 +286,14 @@ class GlobalOptions(Subsystem):
             advanced=True,
             metavar="<dir>",
             default=get_pants_cachedir(),
-            help="Use this dir for global cache.",
+            help="Unused. Will be deprecated in 2.1.0.",
         )
         register(
             "--pants-configdir",
             advanced=True,
             metavar="<dir>",
             default=get_pants_configdir(),
-            help="Use this dir for global config files.",
+            help="Unused. Will be deprecated in 2.1.0.",
         )
         register(
             "--pants-workdir",
@@ -318,14 +318,14 @@ class GlobalOptions(Subsystem):
             advanced=True,
             metavar="<dir>",
             default=os.path.join(buildroot, "build-support"),
-            help="Use support files from this dir.",
+            help="Unused. Will be deprecated in 2.1.0.",
         )
         register(
             "--pants-distdir",
             advanced=True,
             metavar="<dir>",
             default=os.path.join(buildroot, "dist"),
-            help="Write end-product artifacts to this dir.",
+            help="Write end-product artifacts to this dir, like the results of `./pants package`.",
         )
         # TODO: Change the default to false in 2.1, deprecate the option in 2.2 and remove in 2.3.
         register(
@@ -343,7 +343,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=os.path.join(buildroot, ".pids"),
             daemon=True,
-            help="The directory to use for tracking subprocess metadata, if any. This should "
+            help="The directory to use for tracking subprocess metadata. This should "
             "live outside of the dir used by `pants_workdir` to allow for tracking "
             "subprocesses that outlive the workdir data.",
         )
@@ -398,7 +398,8 @@ class GlobalOptions(Subsystem):
         register(
             "--spec-files",
             type=list,
-            # NB: See `--pants-config-files`.
+            # NB: We don't fingerprint spec files because the content of the files independently
+            # affects fingerprints.
             fingerprint=False,
             help=(
                 "Read additional specs (target addresses, files, and/or globs), one per line,"
@@ -557,6 +558,8 @@ class GlobalOptions(Subsystem):
             default=None,
             daemon=True,
             help="The directory to log pantsd output to.",
+            removal_version="2.1.0.dev0",
+            removal_hint="The global option `pantsd_log_dir` does not do anything.",
         )
         register(
             "--pantsd-invalidation-globs",
@@ -585,12 +588,6 @@ class GlobalOptions(Subsystem):
             default=os.path.join(get_pants_cachedir(), "lmdb_store"),
         )
         register(
-            "--local-execution-root-dir",
-            advanced=True,
-            help=f"Directory to use for local process execution sandboxing. {cache_instructions}",
-            default=tempfile.gettempdir(),
-        )
-        register(
             "--named-caches-dir",
             advanced=True,
             help=(
@@ -598,6 +595,28 @@ class GlobalOptions(Subsystem):
                 f"concurrency-safe caches. {cache_instructions}"
             ),
             default=os.path.join(get_pants_cachedir(), "named_caches"),
+        )
+
+        register(
+            "--local-execution-root-dir",
+            advanced=True,
+            help=f"Directory to use for local process execution sandboxing. {cache_instructions}",
+            default=tempfile.gettempdir(),
+        )
+        register(
+            "--process-execution-use-local-cache",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Whether to keep process executions in a local cache persisted to disk.",
+        )
+        register(
+            "--process-execution-cleanup-local-dirs",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Whether or not to cleanup directories used for local process execution "
+            "(primarily useful for e.g. debugging).",
         )
 
         register(
@@ -624,14 +643,6 @@ class GlobalOptions(Subsystem):
             help="Number of concurrent processes that may be executed remotely.",
         )
         register(
-            "--process-execution-cleanup-local-dirs",
-            type=bool,
-            default=True,
-            advanced=True,
-            help="Whether or not to cleanup directories used for local process execution "
-            "(primarily useful for e.g. debugging).",
-        )
-        register(
             "--process-execution-speculation-delay",
             type=float,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_speculation_delay,
@@ -651,13 +662,6 @@ class GlobalOptions(Subsystem):
             "and fall back to the local host if remote calls take longer than the speculation timeout.\n"
             "`none`: Do not speculate about long running processes.",
             advanced=True,
-        )
-        register(
-            "--process-execution-use-local-cache",
-            type=bool,
-            default=True,
-            advanced=True,
-            help="Whether to keep process executions in a local cache persisted to disk.",
         )
         register(
             "--process-execution-local-enable-nailgun",
@@ -906,6 +910,8 @@ class GlobalOptions(Subsystem):
             default=True,
             help="Use a global lock to exclude other versions of Pants from running during "
             "critical operations.",
+            removal_version="2.1.0.dev0",
+            removal_hint="The global option `lock` does not do anything.",
         )
 
         register(
