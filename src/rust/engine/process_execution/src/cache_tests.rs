@@ -12,7 +12,7 @@ use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
-use tokio::runtime::Handle;
+use testutil::relative_paths;
 
 struct RoundtripResults {
   uncached: Result<FallibleProcessResultWithPlatform, String>,
@@ -20,7 +20,7 @@ struct RoundtripResults {
 }
 
 fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let base_dir = TempDir::new().unwrap();
   let named_cache_dir = base_dir.path().join("named_cache_dir");
   let store_dir = base_dir.path().join("store_dir");
@@ -39,7 +39,7 @@ fn create_cached_runner(
   local: Box<dyn CommandRunnerTrait>,
   store: Store,
 ) -> (Box<dyn CommandRunnerTrait>, TempDir) {
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let cache_dir = TempDir::new().unwrap();
   let max_lmdb_size = 50 * 1024 * 1024; //50 MB - I didn't pick that number but it seems reasonable.
 
@@ -85,7 +85,7 @@ fn create_script(script_exit_code: i8) -> (Process, PathBuf, TempDir) {
     testutil::path::find_bash(),
     format!("{}", script_path.display()),
   ])
-  .output_files(vec![PathBuf::from("roland")].into_iter().collect());
+  .output_files(relative_paths(&["roland"]).collect());
 
   (process, script_path, script_dir)
 }

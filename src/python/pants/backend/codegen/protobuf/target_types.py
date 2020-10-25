@@ -2,10 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.engine.addresses import Address, AddressInput
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    BoolField,
     Dependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
@@ -16,18 +17,19 @@ from pants.engine.unions import UnionRule
 
 
 class ProtobufDependencies(Dependencies):
-    """Addresses to other targets that this target depends on, e.g. `['protobuf/example:lib']`.
-
-    Pants will automatically inject any targets that you configure in the option `runtime_targets`
-    in the `[protoc]` scope. For example, if you set that option to include the Python runtime
-    library for Protobuf, every `protobuf_library` will automatically include that in its
-    `dependencies`.
-    """
+    pass
 
 
 class ProtobufSources(Sources):
     default = ("*.proto",)
     expected_file_extensions = (".proto",)
+
+
+class ProtobufGrcpToggle(BoolField):
+    """Whether to generate gRPC code or not."""
+
+    alias = "grpc"
+    default = False
 
 
 class ProtobufLibrary(Target):
@@ -37,7 +39,7 @@ class ProtobufLibrary(Target):
     """
 
     alias = "protobuf_library"
-    core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources)
+    core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources, ProtobufGrcpToggle)
 
 
 class InjectProtobufDependencies(InjectDependenciesRequest):
@@ -48,8 +50,8 @@ class InjectProtobufDependencies(InjectDependenciesRequest):
 async def inject_dependencies(
     _: InjectProtobufDependencies, protoc: Protoc
 ) -> InjectedDependencies:
-    addresses = await MultiGet(
-        Get(Address, AddressInput, AddressInput.parse(addr)) for addr in protoc.runtime_targets
+    addresses = await Get(
+        Addresses, UnparsedAddressInputs(protoc.runtime_targets, owning_address=None)
     )
     return InjectedDependencies(addresses)
 

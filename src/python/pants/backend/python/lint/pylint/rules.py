@@ -27,7 +27,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -45,6 +45,7 @@ from pants.engine.target import (
     Target,
     Targets,
     TransitiveTargets,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
@@ -108,24 +109,6 @@ def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ..
 
 @rule(level=LogLevel.DEBUG)
 async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> LintResult:
-    # We build one PEX with Pylint requirements (including any first-party plugins), and another
-    # with all direct 3rd-party dependencies. Splitting this into two PEXes gives us finer-grained
-    # caching. We then merge via `--pex-path`. We use `PexFromTargetsRequest.for_requirements()`
-    # to get cache hits with other goals like `test` and `repl`.
-    plugin_requirements = PexRequirements.create_from_requirement_fields(
-        plugin_tgt[PythonRequirementsField]
-        for plugin_tgt in partition.plugin_targets
-        if plugin_tgt.has_field(PythonRequirementsField)
-    )
-    pylint_pex_request = Get(
-        Pex,
-        PexRequest(
-            output_filename="pylint.pex",
-            internal_only=True,
-            requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
-            interpreter_constraints=partition.interpreter_constraints,
-        ),
-    )
     requirements_pex_request = Get(
         Pex,
         PexFromTargetsRequest,
@@ -139,19 +122,25 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
             direct_deps_only=True,
         ),
     )
-    # TODO(John Sirois): Support shading python binaries:
-    #   https://github.com/pantsbuild/pants/issues/9206
+
+    plugin_requirements = PexRequirements.create_from_requirement_fields(
+        plugin_tgt[PythonRequirementsField]
+        for plugin_tgt in partition.plugin_targets
+        if plugin_tgt.has_field(PythonRequirementsField)
+    )
     # Right now any Pylint transitive requirements will shadow corresponding user
     # requirements, which could lead to problems.
-    pylint_runner_pex_args = ["--pex-path", ":".join(["pylint.pex", "requirements.pex"])]
-    pylint_runner_pex_request = Get(
+    pylint_pex_request = Get(
         Pex,
         PexRequest(
-            output_filename="pylint_runner.pex",
+            output_filename="pylint.pex",
             internal_only=True,
+            requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
             entry_point=pylint.entry_point,
             interpreter_constraints=partition.interpreter_constraints,
-            additional_args=pylint_runner_pex_args,
+            # TODO(John Sirois): Support shading python binaries:
+            #   https://github.com/pantsbuild/pants/issues/9206
+            additional_args=("--pex-path", requirements_pex_request.input.output_filename),
         ),
     )
 
@@ -177,7 +166,6 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     (
         pylint_pex,
         requirements_pex,
-        pylint_runner_pex,
         config_digest,
         prepared_plugin_sources,
         prepared_python_sources,
@@ -185,7 +173,6 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     ) = await MultiGet(
         pylint_pex_request,
         requirements_pex_request,
-        pylint_runner_pex_request,
         config_digest_request,
         prepare_plugin_sources_request,
         prepare_python_sources_request,
@@ -216,7 +203,6 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
             (
                 pylint_pex.digest,
                 requirements_pex.digest,
-                pylint_runner_pex.digest,
                 config_digest,
                 prefixed_plugin_sources,
                 prepared_python_sources.source_files.snapshot.digest,
@@ -227,7 +213,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     result = await Get(
         FallibleProcessResult,
         PexProcess(
-            pylint_runner_pex,
+            pylint_pex,
             argv=generate_args(source_files=field_set_sources, pylint=pylint),
             input_digest=input_digest,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
@@ -247,10 +233,10 @@ async def pylint_lint(
     if pylint.skip:
         return LintResults([], linter_name="Pylint")
 
-    plugin_target_addresses = await MultiGet(
-        Get(Address, AddressInput, plugin_addr) for plugin_addr in pylint.source_plugins
+    plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, pylint.source_plugins)
+    plugin_targets_request = Get(
+        TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
     )
-    plugin_targets_request = Get(TransitiveTargets, Addresses(plugin_target_addresses))
     linted_targets_request = Get(
         Targets, Addresses(field_set.address for field_set in request.field_sets)
     )

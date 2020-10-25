@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Optional, Sequence
 
-from pants.base.deprecated import deprecated
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
@@ -197,7 +197,7 @@ class AddressInput:
         return Address(spec_path=self.path_component, target_name=self.target_component)
 
 
-class Address:
+class Address(EngineAwareParameter):
     """A target address.
 
     An address is a unique name for a `pants.engine.target.Target`, and optionally a particular file
@@ -213,29 +213,6 @@ class Address:
 
     Where `path/to/buildfile:targetname` is the dependent target address.
     """
-
-    @classmethod
-    @deprecated(
-        "2.1.0.dev0",
-        hint_message=(
-            "An Address object should be resolved from an AddressInput using the engine. "
-            "This does not work properly with generated subtargets."
-        ),
-    )
-    def parse(cls, spec: str, relative_to: str = "", subproject_roots=None) -> "Address":
-        """Parses an address from its serialized form.
-
-        NB: This method is oblivious to file Addresses.
-
-        :param spec: An address in string form <path>:<name>.
-        :param relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
-                            the missing spec_path part as `relative_to`.
-        :param list subproject_roots: Paths that correspond with embedded build roots
-                                      under the current build root.
-        """
-        return AddressInput.parse(
-            spec, relative_to=relative_to, subproject_roots=subproject_roots
-        ).dir_to_address()
 
     def __init__(
         self,
@@ -334,14 +311,6 @@ class Address:
             target_portion = f"{parent_prefix}{target_name}"
         return f"{self.spec_path.replace(os.path.sep, '.')}{file_portion}{target_portion}"
 
-    @deprecated(
-        removal_version="2.1.0.dev0",
-        hint_message="Use the property .spec, which is the same thing.",
-    )
-    def reference(self) -> str:
-        """How to reference this address in a BUILD file."""
-        return self.spec
-
     def maybe_convert_to_base_target(self) -> "Address":
         """If this address is a generated subtarget, convert it back into its original base target.
 
@@ -378,6 +347,9 @@ class Address:
             (other._relative_file_path or ""),
             (other._target_name or ""),
         )
+
+    def debug_hint(self) -> str:
+        return self.spec
 
 
 @dataclass(frozen=True)

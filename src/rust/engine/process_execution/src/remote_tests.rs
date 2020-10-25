@@ -20,9 +20,8 @@ use spectral::{assert_that, string::StrAssertions};
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
-use testutil::owned_string_vec;
-use tokio::runtime::Handle;
-use workunit_store::{Level, SpanId, Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
+use testutil::{owned_string_vec, relative_paths};
+use workunit_store::{WorkunitState, WorkunitStore};
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
@@ -74,14 +73,8 @@ async fn make_execute_request() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: vec!["path/to/file", "other/file"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    output_directories: vec!["directory/name"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
+    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: None,
     description: "some description".to_owned(),
     level: log::Level::Info,
@@ -161,14 +154,8 @@ async fn make_execute_request_with_instance_name() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: vec!["path/to/file", "other/file"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    output_directories: vec!["directory/name"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
+    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: None,
     description: "some description".to_owned(),
     level: log::Level::Info,
@@ -261,14 +248,8 @@ async fn make_execute_request_with_cache_key_gen_version() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: vec!["path/to/file", "other/file"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    output_directories: vec!["directory/name"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
+    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: None,
     description: "some description".to_owned(),
     level: log::Level::Info,
@@ -510,14 +491,8 @@ async fn make_execute_request_with_timeout() {
     working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
-    output_files: vec!["path/to/file", "other/file"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    output_directories: vec!["directory/name"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
+    output_files: relative_paths(&["path/to/file", "other/file"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
     level: log::Level::Info,
@@ -931,7 +906,7 @@ async fn sends_headers() {
     )
   };
   let cas = mock::StubCAS::empty();
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
   let store = Store::with_remote(
     runtime.clone(),
@@ -1095,7 +1070,7 @@ async fn ensure_inline_stdio_is_stored() {
   let workunit_store = WorkunitStore::new(false);
   workunit_store.init_thread_state(None);
 
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
 
   let test_stdout = TestData::roland();
   let test_stderr = TestData::catnip();
@@ -1488,7 +1463,7 @@ async fn execute_missing_file_uploads_if_known() {
   let workunit_store = WorkunitStore::new(false);
   workunit_store.init_thread_state(None);
 
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
 
   let roland = TestData::roland();
 
@@ -1630,7 +1605,7 @@ async fn execute_missing_file_errors_if_unknown() {
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let store = Store::with_remote(
     runtime.clone(),
     store_dir,
@@ -1855,64 +1830,51 @@ async fn remote_workunits_are_stored() {
     .await
     .unwrap();
 
-  let span_id = SpanId::new();
-  let got_workunits = workunits_with_constant_span_id(&mut workunit_store, span_id);
+  let got_workunit_items: HashSet<(String, WorkunitState)> =
+    workunit_store.with_latest_workunits(log::Level::Trace, |_, completed| {
+      completed
+        .iter()
+        .map(|workunit| (workunit.name.clone(), workunit.state.clone()))
+        .collect()
+    });
 
   use concrete_time::Duration;
   use concrete_time::TimeSpan;
 
-  let want_workunits = hashset! {
-    Workunit {
-      name: String::from("remote execution action scheduling"),
-      state: WorkunitState::Completed {
-        time_span: TimeSpan {
-          start: Duration::new(0, 0),
-          duration: Duration::new(1, 0),
-        }
-      },
-      span_id,
-      parent_id: None,
-      metadata: WorkunitMetadata::with_level(Level::Debug),
+  let wanted_workunit_items = hashset! {
+    (String::from("remote execution action scheduling"),
+     WorkunitState::Completed {
+      time_span: TimeSpan {
+        start: Duration::new(0, 0),
+        duration: Duration::new(1, 0),
+      }
     },
-    Workunit {
-      name: String::from("remote execution worker input fetching"),
-      state: WorkunitState::Completed {
+    ),
+    (String::from("remote execution worker input fetching"),
+     WorkunitState::Completed {
         time_span: TimeSpan {
           start: Duration::new(2, 0),
           duration: Duration::new(1, 0),
         }
-      },
-      span_id,
-      parent_id: None,
-      metadata: WorkunitMetadata::with_level(Level::Debug),
-    },
-    Workunit {
-      name: String::from("remote execution worker command executing"),
-      state: WorkunitState::Completed {
+      }),
+    (String::from("remote execution worker command executing"),
+     WorkunitState::Completed {
         time_span: TimeSpan {
           start: Duration::new(4, 0),
           duration: Duration::new(1, 0),
         }
-      },
-      span_id,
-      parent_id: None,
-      metadata: WorkunitMetadata::with_level(Level::Debug),
-    },
-    Workunit {
-      name: String::from("remote execution worker output uploading"),
-      state: WorkunitState::Completed {
+      }),
+      (String::from("remote execution worker output uploading"),
+      WorkunitState::Completed {
         time_span: TimeSpan {
           start: Duration::new(6, 0),
           duration: Duration::new(1, 0),
         }
-      },
-      span_id,
-      parent_id: None,
-      metadata: WorkunitMetadata::with_level(Level::Debug),
-    }
+      }),
+
   };
 
-  assert!(got_workunits.is_superset(&want_workunits));
+  assert!(got_workunit_items.is_superset(&wanted_workunit_items));
 }
 
 #[tokio::test]
@@ -2142,21 +2104,6 @@ async fn extract_output_files_from_response_no_prefix() {
   )
 }
 
-pub(crate) fn workunits_with_constant_span_id(
-  workunit_store: &mut WorkunitStore,
-  span_id: SpanId,
-) -> HashSet<Workunit> {
-  workunit_store.with_latest_workunits(log::Level::Trace, |_, completed_workunits| {
-    completed_workunits
-      .iter()
-      .map(|workunit| Workunit {
-        span_id,
-        ..workunit.clone()
-      })
-      .collect()
-  })
-}
-
 pub fn echo_foo_request() -> MultiPlatformProcess {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]));
   req.timeout = Some(Duration::from_millis(5000));
@@ -2346,7 +2293,7 @@ fn create_command_runner(
   cas: &mock::StubCAS,
   platform: Platform,
 ) -> (CommandRunner, Store) {
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
@@ -2460,7 +2407,7 @@ async fn extract_output_files_from_response(
     .tree(&TestTree::roland_at_root())
     .tree(&TestTree::robin_at_root())
     .build();
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), &cas, executor.clone());
   crate::remote::extract_output_files(store, execute_response.get_result(), false)

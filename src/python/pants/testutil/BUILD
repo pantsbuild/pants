@@ -7,13 +7,14 @@ python_distribution(
     ':testutil',
     ':int-test-for-export',
   ],
+  setup_py_commands=["bdist_wheel", "--python-tag", "py36.py37.py38", "sdist"],
   provides=setup_py(
     name='pantsbuild.pants.testutil',
     description='Test support for writing Pants plugins.',
     classifiers=[
       'Topic :: Software Development :: Testing',
     ]
-  )
+  ),
 )
 
 python_library(

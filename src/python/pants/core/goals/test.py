@@ -7,7 +7,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
@@ -18,11 +18,11 @@ from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
-from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     Sources,
@@ -142,15 +142,12 @@ class TestDebugRequest:
 
 
 @union
-class TestFieldSet(FieldSet, EngineAwareParameter, metaclass=ABCMeta):
+class TestFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
 
     sources: Sources
 
     __test__ = False
-
-    def debug_hint(self):
-        return self.address.spec
 
 
 class CoverageData(ABC):
@@ -216,7 +213,7 @@ class FilesystemCoverageReport(CoverageReport):
         return self.report_file
 
     def get_artifact(self) -> Optional[Tuple[str, Snapshot]]:
-        return self.report_type, self.result_snapshot
+        return f"coverage_{self.report_type}", self.result_snapshot
 
 
 @dataclass(frozen=True)
@@ -267,7 +264,7 @@ class TestSubsystem(GoalSubsystem):
             type=bool,
             default=False,
             help=(
-                "Run a single test target in an interactive process. This is necessary, for "
+                "Run tests sequentially in an interactive process. This is necessary, for "
                 "example, when you add breakpoints to your code."
             ),
         )
@@ -306,9 +303,7 @@ class TestSubsystem(GoalSubsystem):
             help=(
                 "Additional environment variables to include in test processes. "
                 "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
-                "`ENV_VAR` to copy the value of a variable in Pants's own environment. `value` may "
-                "be a string with spaces in it such as `ENV_VAR=has some spaces`. `ENV_VAR=` sets "
-                "a variable to be the empty string."
+                "`ENV_VAR` to copy the value of a variable in Pants's own environment."
             ),
         )
 
@@ -415,9 +410,12 @@ async def run_tests(
     workspace.write_digest(merged_xml_results)
 
     if test_subsystem.use_coverage:
-        all_coverage_data: Iterable[CoverageData] = [
-            result.coverage_data for result in results if result.coverage_data is not None
-        ]
+        # NB: We must pre-sort the data for itertools.groupby() to work properly, using the same
+        # key function for both. However, you can't sort by `types`, so we call `str()` on it.
+        all_coverage_data = sorted(
+            (result.coverage_data for result in results if result.coverage_data is not None),
+            key=lambda cov_data: str(type(cov_data)),
+        )
 
         coverage_types_to_collection_types: Dict[
             Type[CoverageData], Type[CoverageDataCollection]
@@ -450,7 +448,7 @@ async def run_tests(
     return Test(exit_code)
 
 
-@_uncacheable_rule
+@rule
 def get_filtered_environment(
     test_subsystem: TestSubsystem, pants_env: PantsEnvironment
 ) -> TestExtraEnv:

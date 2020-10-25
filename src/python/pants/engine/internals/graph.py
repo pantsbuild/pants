@@ -25,6 +25,7 @@ from pants.engine.addresses import (
     AddressInput,
     AddressWithOrigin,
     BuildFileAddress,
+    UnparsedAddressInputs,
 )
 from pants.engine.collection import Collection
 from pants.engine.fs import (
@@ -41,6 +42,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    DependenciesRequestLite,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
@@ -54,6 +56,7 @@ from pants.engine.target import (
     InjectedDependencies,
     RegisteredTargetTypes,
     Sources,
+    SpecialCasedDependencies,
     Subtargets,
     Target,
     TargetRootsToFieldSets,
@@ -62,6 +65,8 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
     TransitiveTargets,
+    TransitiveTargetsRequest,
+    TransitiveTargetsRequestLite,
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
@@ -99,8 +104,6 @@ async def generate_subtargets(address: Address, global_options: GlobalOptions) -
     sources_field_path_globs = sources_field.path_globs(
         global_options.options.files_not_found_behavior
     )
-    if sources_field_path_globs is None:
-        return Subtargets(base_target, ())
 
     # Generate a subtarget per source.
     paths = await Get(Paths, PathGlobs, sources_field_path_globs)
@@ -293,20 +296,28 @@ def _detect_cycles(
             )
 
 
-@rule
-async def transitive_targets(targets: Targets) -> TransitiveTargets:
+@rule(desc="Resolve transitive targets")
+async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots.
 
     This uses iteration, rather than recursion, so that we can tolerate dependency cycles. Unlike a
     traditional BFS algorithm, we batch each round of traversals via `MultiGet` for improved
     performance / concurrency.
     """
+    roots_as_targets = await Get(Targets, Addresses(request.roots))
     visited: OrderedSet[Target] = OrderedSet()
-    queued = FrozenOrderedSet(targets)
+    queued = FrozenOrderedSet(roots_as_targets)
     dependency_mapping: Dict[Address, Tuple[Address, ...]] = {}
     while queued:
         direct_dependencies = await MultiGet(
-            Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in queued
+            Get(
+                Targets,
+                DependenciesRequest(
+                    tgt.get(Dependencies),
+                    include_special_cased_deps=request.include_special_cased_deps,
+                ),
+            )
+            for tgt in queued
         )
 
         dependency_mapping.update(
@@ -321,19 +332,79 @@ async def transitive_targets(targets: Targets) -> TransitiveTargets:
         )
         visited.update(queued)
 
-    _detect_cycles(tuple(t.address for t in targets), dependency_mapping)
+    # NB: We use `roots_as_targets` to get the root addresses, rather than `request.roots`. This
+    # is because expanding from the `Addresses` -> `Targets` may have resulted in generated
+    # subtargets being used, so we need to use `roots_as_targets` to have this expansion.
+    _detect_cycles(tuple(t.address for t in roots_as_targets), dependency_mapping)
 
-    transitive_wrapped_excludes = await MultiGet(
-        Get(WrappedTarget, AddressInput, address_input)
-        for t in (*targets, *visited)
-        for address_input in t.get(Dependencies).unevaluated_transitive_excludes
+    # Apply any transitive excludes (`!!` ignores).
+    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
+    unevaluated_transitive_excludes = []
+    for t in (*roots_as_targets, *visited):
+        unparsed = t.get(Dependencies).unevaluated_transitive_excludes
+        if unparsed.values:
+            unevaluated_transitive_excludes.append(Get(Targets, UnparsedAddressInputs, unparsed))
+    if unevaluated_transitive_excludes:
+        nested_transitive_excludes = await MultiGet(*unevaluated_transitive_excludes)
+        transitive_excludes = FrozenOrderedSet(
+            itertools.chain.from_iterable(excludes for excludes in nested_transitive_excludes)
+        )
+
+    return TransitiveTargets(
+        tuple(roots_as_targets), FrozenOrderedSet(visited.difference(transitive_excludes))
+    )
+
+
+@rule(desc="Resolve transitive targets")
+async def transitive_targets_lite(request: TransitiveTargetsRequestLite) -> TransitiveTargets:
+    roots_as_targets = await Get(Targets, Addresses(request.roots))
+    visited: OrderedSet[Target] = OrderedSet()
+    queued = FrozenOrderedSet(roots_as_targets)
+    dependency_mapping: Dict[Address, Tuple[Address, ...]] = {}
+    while queued:
+        direct_dependencies_addresses_per_tgt = await MultiGet(
+            Get(Addresses, DependenciesRequestLite(tgt.get(Dependencies))) for tgt in queued
+        )
+        direct_dependencies_per_tgt = []
+        for addresses_per_tgt in direct_dependencies_addresses_per_tgt:
+            wrapped_tgts = await MultiGet(
+                Get(WrappedTarget, Address, addr) for addr in addresses_per_tgt
+            )
+            direct_dependencies_per_tgt.append(
+                tuple(wrapped_t.target for wrapped_t in wrapped_tgts)
+            )
+
+        dependency_mapping.update(
+            zip(
+                (t.address for t in queued),
+                (tuple(t.address for t in deps) for deps in direct_dependencies_per_tgt),
+            )
+        )
+
+        queued = FrozenOrderedSet(
+            itertools.chain.from_iterable(direct_dependencies_per_tgt)
+        ).difference(visited)
+        visited.update(queued)
+
+    # NB: We use `roots_as_targets` to get the root addresses, rather than `request.roots`. This
+    # is because expanding from the `Addresses` -> `Targets` may have resulted in generated
+    # subtargets being used, so we need to use `roots_as_targets` to have this expansion.
+    _detect_cycles(tuple(t.address for t in roots_as_targets), dependency_mapping)
+
+    # Apply any transitive excludes (`!!` ignores).
+    wrapped_transitive_excludes = await MultiGet(
+        Get(
+            WrappedTarget, AddressInput, AddressInput.parse(addr, relative_to=tgt.address.spec_path)
+        )
+        for tgt in (*roots_as_targets, *visited)
+        for addr in tgt.get(Dependencies).unevaluated_transitive_excludes.values
     )
     transitive_excludes = FrozenOrderedSet(
-        wrapped_t.target for wrapped_t in transitive_wrapped_excludes
+        wrapped_t.target for wrapped_t in wrapped_transitive_excludes
     )
 
     return TransitiveTargets(
-        tuple(targets), FrozenOrderedSet(visited.difference(transitive_excludes))
+        tuple(roots_as_targets), FrozenOrderedSet(visited.difference(transitive_excludes))
     )
 
 
@@ -358,7 +429,7 @@ class Owners(Collection[Address]):
     pass
 
 
-@rule
+@rule(desc="Find which targets own certain files")
 async def find_owners(owners_request: OwnersRequest) -> Owners:
     # Determine which of the sources are live and which are deleted.
     sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
@@ -598,7 +669,7 @@ class AmbiguousCodegenImplementationsException(Exception):
             )
 
 
-@rule
+@rule(desc="Hydrate the `sources` field")
 async def hydrate_sources(
     request: HydrateSourcesRequest,
     global_options: GlobalOptions,
@@ -648,8 +719,6 @@ async def hydrate_sources(
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
     path_globs = sources_field.path_globs(global_options.options.files_not_found_behavior)
-    if path_globs is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=sources_type)
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
     sources_field.validate_resolved_files(snapshot.files)
 
@@ -668,7 +737,7 @@ async def hydrate_sources(
 
 
 # -----------------------------------------------------------------------------------------------
-# Resolve the Dependencies field
+# Resolve addresses, including the Dependencies field
 # -----------------------------------------------------------------------------------------------
 
 
@@ -740,7 +809,7 @@ def parse_dependencies_field(
     return ParsedDependencies(addresses, ignored_addresses)
 
 
-@rule
+@rule(desc="Resolve direct dependencies")
 async def resolve_dependencies(
     request: DependenciesRequest,
     union_membership: UnionMembership,
@@ -804,6 +873,35 @@ async def resolve_dependencies(
             t.address for t in subtargets.subtargets if t.address != request.field.address
         )
 
+    # If the target has `SpecialCasedDependencies`, such as the `archive` target having
+    # `files` and `packages` fields, then we possibly include those too. We don't want to always
+    # include those dependencies because they should often be excluded from the result due to
+    # being handled elsewhere in the calling code.
+    special_cased: Tuple[Address, ...] = ()
+    if request.include_special_cased_deps:
+        wrapped_tgt = await Get(WrappedTarget, Address, request.field.address)
+        # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
+        # SpecialCasedDependencies.
+        special_cased_fields = tuple(
+            field
+            for field in wrapped_tgt.target.field_values.values()
+            if isinstance(field, SpecialCasedDependencies)
+        )
+        # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
+        special_cased = await MultiGet(
+            Get(
+                Address,
+                AddressInput,
+                AddressInput.parse(
+                    addr,
+                    relative_to=request.field.address.spec_path,
+                    subproject_roots=global_options.options.subproject_roots,
+                ),
+            )
+            for special_cased_field in special_cased_fields
+            for addr in special_cased_field.to_unparsed_address_inputs().values
+        )
+
     result = {
         addr
         for addr in (
@@ -811,10 +909,76 @@ async def resolve_dependencies(
             *literal_addresses,
             *itertools.chain.from_iterable(injected),
             *itertools.chain.from_iterable(inferred),
+            *special_cased,
         )
         if addr not in ignored_addresses
     }
     return Addresses(sorted(result))
+
+
+@rule(desc="Resolve direct dependencies")
+async def resolve_dependencies_lite(
+    request: DependenciesRequestLite,
+    union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
+    global_options: GlobalOptions,
+) -> Addresses:
+    provided = parse_dependencies_field(
+        request.field,
+        subproject_roots=global_options.options.subproject_roots,
+        registered_target_types=registered_target_types.types,
+        union_membership=union_membership,
+    )
+    literal_addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in provided.addresses)
+    ignored_addresses = set(
+        await MultiGet(Get(Address, AddressInput, ai) for ai in provided.ignored_addresses)
+    )
+
+    # Inject any dependencies.
+    inject_request_types = union_membership.get(InjectDependenciesRequest)
+    injected = await MultiGet(
+        Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
+        for inject_request_type in inject_request_types
+        if isinstance(request.field, inject_request_type.inject_for)
+    )
+
+    # Inject dependencies on all the base target's generated subtargets.
+    subtargets = await Get(
+        Subtargets, Address, request.field.address.maybe_convert_to_base_target()
+    )
+    subtarget_addresses = tuple(
+        t.address for t in subtargets.subtargets if t.address != request.field.address
+    )
+
+    result = {
+        addr
+        for addr in (
+            *subtarget_addresses,
+            *literal_addresses,
+            *itertools.chain.from_iterable(injected),
+        )
+        if addr not in ignored_addresses
+    }
+    return Addresses(sorted(result))
+
+
+@rule(desc="Resolve addresses")
+async def resolve_unparsed_address_inputs(
+    request: UnparsedAddressInputs, global_options: GlobalOptions
+) -> Addresses:
+    addresses = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(
+                v,
+                relative_to=request.relative_to,
+                subproject_roots=global_options.options.subproject_roots,
+            ),
+        )
+        for v in request.values
+    )
+    return Addresses(addresses)
 
 
 # -----------------------------------------------------------------------------------------------

@@ -22,7 +22,7 @@ python_library(
 # pip installers, ie: it is why this works to get `pants` on your PATH:
 # $ pip install pantsbuild.pants
 # $ pants
-python_binary(
+pex_binary(
   name='pants',
   entry_point='pants.bin.pants_loader:main',
   dependencies=[
@@ -35,7 +35,7 @@ python_binary(
 
 # This binary is for internal use only. It adds deps on internal_plugins and build-support config
 # files, both of which are not meant for publishing in the `pantsbuild.pants` sdist.
-python_binary(
+pex_binary(
   name='pants_local_binary',
   entry_point='pants.bin.pants_loader:main',
   dependencies=[

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.core.util_rules.pants_environment import PantsEnvironment
-from pants.engine.rules import _uncacheable_rule, collect_rules
+from pants.engine.rules import collect_rules, rule
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 
@@ -27,6 +27,9 @@ SETTABLE_ENV_VARS = (
     "FTP_PROXY",
     "ALL_PROXY",
     "NO_PROXY",
+    # Allow Requests to verify SSL certificates for HTTPS requests
+    # https://requests.readthedocs.io/en/master/user/advanced/#ssl-cert-verification
+    "REQUESTS_CA_BUNDLE",
 )
 
 
@@ -68,10 +71,8 @@ class SubprocessEnvironment(Subsystem):
             help=(
                 "Environment variables to set for process invocations. "
                 "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-                "or just `ENV_VAR` to copy the value from Pants's own environment. `value` may "
-                "be a string with spaces in it such as `ENV_VAR=has some spaces`. `ENV_VAR=` sets "
-                "a variable to be the empty string. Each ENV_VAR must be one of "
-                f"{','.join(SETTABLE_ENV_VARS)}."
+                "or just `ENV_VAR` to copy the value from Pants's own environment.\n\nEach ENV_VAR "
+                f"must be one of {', '.join(f'`{v}`' for v in SETTABLE_ENV_VARS)}."
             ),
         )
 
@@ -115,12 +116,14 @@ class SubprocessEnvironmentVars:
     vars: FrozenDict[str, str]
 
 
-@_uncacheable_rule
+@rule
 def get_subprocess_environment(
     subproc_env: SubprocessEnvironment, pants_env: PantsEnvironment
 ) -> SubprocessEnvironmentVars:
     return SubprocessEnvironmentVars(
-        pants_env.get_subset(subproc_env.env_vars_to_pass_to_subprocesses, SETTABLE_ENV_VARS)
+        pants_env.get_subset(
+            subproc_env.env_vars_to_pass_to_subprocesses, allowed=SETTABLE_ENV_VARS
+        )
     )
 
 

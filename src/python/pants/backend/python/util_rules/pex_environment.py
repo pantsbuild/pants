@@ -105,11 +105,12 @@ class PexEnvironment(EngineAwareReturnType):
     bootstrap_python: Optional[PythonExecutable] = None
 
     def create_argv(
-        self, pex_path: str, *args: str, python: Optional[PythonExecutable] = None
+        self, pex_filepath: str, *args: str, python: Optional[PythonExecutable] = None
     ) -> Tuple[str, ...]:
         python = python or self.bootstrap_python
         argv = [python.path] if python else []
-        argv.extend((pex_path, *args))
+        argv.append(pex_filepath)
+        argv.extend(args)
         return tuple(argv)
 
     def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
@@ -125,7 +126,8 @@ class PexEnvironment(EngineAwareReturnType):
             **self.subprocess_environment_dict,
         )
         # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
-        # pre-selected by Pants. Otherwise, Pex may try to find another interpreter.
+        # pre-selected by Pants. Otherwise, Pex would inadvertently try to find another interpreter
+        # when running PEXes. (Creating a PEX will ignore this env var in favor of `--python-path`.)
         if not python_configured:
             d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)
         return d
@@ -143,7 +145,7 @@ class PexEnvironment(EngineAwareReturnType):
         return f"Selected {self.bootstrap_python.path} to bootstrap PEXes with."
 
 
-@rule(desc="Find PEX Python", level=LogLevel.DEBUG)
+@rule(desc="Find Python interpreter to bootstrap PEX", level=LogLevel.DEBUG)
 async def find_pex_python(
     python_setup: PythonSetup,
     pex_runtime_env: PexRuntimeEnvironment,
@@ -164,30 +166,31 @@ async def find_pex_python(
                         "-c",
                         # N.B.: The following code snippet must be compatible with Python 2.7 and
                         # Python 3.5+.
+                        #
+                        # We hash the underlying Python interpreter executable to ensure we detect
+                        # changes in the real interpreter that might otherwise be masked by Pyenv
+                        # shim scripts found on the search path. Naively, just printing out the full
+                        # version_info would be enough, but that does not account for supported abi
+                        # changes (e.g.: a pyenv switch from a py27mu interpreter to a py27m
+                        # interpreter.)
+                        #
+                        # When hashing, we pick 8192 for efficiency of reads and fingerprint updates
+                        # (writes) since it's a common OS buffer size and an even multiple of the
+                        # hash block size.
                         dedent(
                             """\
                             import sys
 
                             major, minor = sys.version_info[:2]
-                            if (major, minor) == (2, 7) or (major == 3 and minor >= 5):
-                                # Here we hash the underlying python interpreter executable to
-                                # ensure we detect changes in the real interpreter that might
-                                # otherwise be masked by pyenv shim scripts found on the search
-                                # path. Naively, just printing out the full version_info would be
-                                # enough, but that does not account for supported abi changes (e.g.:
-                                # a pyenv switch from a py27mu interpreter to a py27m interpreter.
-                                import hashlib
-                                hasher = hashlib.sha256()
-                                with open(sys.executable, "rb") as fp:
-                                    # We pick 8192 for efficiency of reads and fingerprint updates
-                                    # (writes) since it's a common OS buffer size and an even
-                                    # multiple of the hash block size.
-                                    for chunk in iter(lambda: fp.read(8192), b""):
-                                        hasher.update(chunk)
-                                sys.stdout.write(hasher.hexdigest())
-                                sys.exit(0)
-                            else:
+                            if (major, minor) != (2, 7) and not (major == 3 and minor >= 5):
                                 sys.exit(1)
+
+                            import hashlib
+                            hasher = hashlib.sha256()
+                            with open(sys.executable, "rb") as fp:
+                                for chunk in iter(lambda: fp.read(8192), b""):
+                                    hasher.update(chunk)
+                            sys.stdout.write(hasher.hexdigest())
                             """
                         ),
                     ],

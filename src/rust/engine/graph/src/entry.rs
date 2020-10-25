@@ -2,10 +2,10 @@ use std::mem;
 use std::sync::Arc;
 
 use crate::node::{EntryId, Node, NodeContext, NodeError};
+use crate::test_trace_log;
 
 use futures::channel::oneshot;
 use futures::future::{self, AbortHandle, Abortable, Aborted, BoxFuture, FutureExt};
-use log::{self, trace};
 use parking_lot::Mutex;
 
 ///
@@ -307,12 +307,14 @@ impl<N: Node> Entry<N> {
             context.stats().cleaning_succeeded += 1;
             true
           }
+          // `x` is unused if `test_trace_log`ging is disabled.
+          #[allow(unused_variables)]
           x => {
             // If dependency generations mismatched or failed to fetch, clear its
             // dependencies and indicate that it should re-run.
             context.graph().clear_deps(entry_id, run_token);
             context.stats().cleaning_failed += 1;
-            log::trace!(
+            test_trace_log!(
               "Failed to clean {}: {:?} vs {:?}",
               node,
               x,
@@ -415,7 +417,7 @@ impl<N: Node> Entry<N> {
           dep_generations,
           ..
         } => {
-          trace!(
+          test_trace_log!(
             "Re-starting node {:?}. It was: previous_result={:?}",
             self.node,
             result,
@@ -487,7 +489,7 @@ impl<N: Node> Entry<N> {
       _ => {
         // We care about exactly one case: a Running state with the same run_token. All other states
         // represent various (legal) race conditions.
-        trace!(
+        test_trace_log!(
           "Not completing node {:?} because it was invalidated.",
           self.node
         );
@@ -569,7 +571,7 @@ impl<N: Node> Entry<N> {
     mut waiters: Vec<Waiter<N>>,
     next_result: Result<(N::Item, Generation), N::Error>,
   ) {
-    trace!(
+    test_trace_log!(
       "Notifying {} waiters of node {:?}: {:?}",
       waiters.len(),
       self.node,
@@ -652,7 +654,7 @@ impl<N: Node> Entry<N> {
         } => (run_token, generation, Some(result)),
       };
 
-    trace!("Clearing node {:?}", self.node);
+    test_trace_log!("Clearing node {:?}", self.node);
 
     if graph_still_contains_edges {
       if let Some(previous_result) = previous_result.as_mut() {
@@ -676,7 +678,7 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn dirty(&mut self, _graph: &mut super::InnerGraph<N>) {
     let state = &mut *self.state.lock();
-    trace!("Dirtying node {:?}", self.node);
+    test_trace_log!("Dirtying node {:?}", self.node);
     match state {
       &mut EntryState::Completed {
         ref mut result,
@@ -709,7 +711,7 @@ impl<N: Node> Entry<N> {
         ..
       } => {
         // Dirtying a Running node immediately cancels it.
-        trace!("Node {:?} was dirtied while running.", self.node);
+        test_trace_log!("Node {:?} was dirtied while running.", self.node);
         abort_handle.abort();
         EntryState::NotStarted {
           run_token,

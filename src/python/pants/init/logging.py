@@ -9,6 +9,7 @@ from logging import Formatter, Handler, LogRecord, StreamHandler
 from typing import Dict, Iterable, Optional, Tuple
 
 import pants.util.logging as pants_logging
+from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.internals.native import Native
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir
@@ -35,6 +36,8 @@ def init_rust_logger(
 
 def setup_warning_filtering(warnings_filter_regexes: Iterable[str]) -> None:
     """Sets up regex-based ignores for messages using the Python warnings system."""
+
+    warnings.resetwarnings()
     for message_regexp in warnings_filter_regexes or ():
         warnings.filterwarnings(action="ignore", message=message_regexp)
 
@@ -62,7 +65,7 @@ class NativeHandler(StreamHandler):
 
 
 class ExceptionFormatter(Formatter):
-    """Uses the `--print-exception-stacktrace` option to decide whether to render stacktraces."""
+    """Uses the `--print-stacktrace` option to decide whether to render stacktraces."""
 
     def __init__(self, print_stacktrace: bool):
         super().__init__(None)
@@ -71,7 +74,7 @@ class ExceptionFormatter(Formatter):
     def formatException(self, exc_info):
         if self.print_stacktrace:
             return super().formatException(exc_info)
-        return "\n(Use --print-exception-stacktrace to see more error details.)"
+        return "\n(Use --print-stacktrace to see more error details.)"
 
 
 def clear_logging_handlers():
@@ -133,9 +136,16 @@ def setup_logging(global_bootstrap_options: OptionValueContainer, stderr_logging
         global_level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
     )
 
-    print_exception_stacktrace = global_bootstrap_options.print_exception_stacktrace
+    print_stacktrace = resolve_conflicting_options(
+        old_option="print_exception_stacktrace",
+        new_option="print_stacktrace",
+        old_scope="",
+        new_scope="",
+        old_container=global_bootstrap_options,
+        new_container=global_bootstrap_options,
+    )
     if stderr_logging:
-        setup_logging_to_stderr(global_level, print_exception_stacktrace)
+        setup_logging_to_stderr(global_level, print_stacktrace)
 
     if log_dir:
         setup_logging_to_file(global_level, log_dir=log_dir)

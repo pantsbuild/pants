@@ -41,7 +41,6 @@ use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
 use store::Store;
-use tokio::runtime::Handle;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::stream::StreamExt;
 use tokio::task;
@@ -719,7 +718,7 @@ async fn main() {
     None
   };
 
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
 
   let store = match args.value_of("server-address") {
     Some(address) => Store::with_remote(

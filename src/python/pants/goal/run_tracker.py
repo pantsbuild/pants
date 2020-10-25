@@ -1,9 +1,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import ast
 import copy
 import json
+import logging
 import multiprocessing
 import os
 import sys
@@ -11,8 +11,8 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
-from contextlib import contextmanager
-from typing import Any, Dict, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -21,15 +21,18 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.engine.internals.native import Native
 from pants.goal.aggregated_timings import AggregatedTimings
-from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
+from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
+from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.subsystem import Subsystem
-from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
 from pants.util.dirutil import relative_symlink, safe_file_dump
 from pants.version import VERSION
+
+logger = logging.getLogger(__name__)
 
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
@@ -46,25 +49,7 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
 
 
 class RunTracker(Subsystem):
-    """Tracks and times the execution of a pants run.
-
-    Also manages background work.
-
-    Use like this:
-
-    run_tracker.start()
-    with run_tracker.new_workunit('compile'):
-      with run_tracker.new_workunit('java'):
-        ...
-      with run_tracker.new_workunit('scala'):
-        ...
-    run_tracker.close()
-
-    Can track execution against multiple 'roots', e.g., one for the main thread and another for
-    background threads.
-
-    :API: public
-    """
+    """Tracks and times the execution of a pants run."""
 
     options_scope = "run-tracker"
 
@@ -86,6 +71,8 @@ class RunTracker(Subsystem):
             advanced=True,
             type=dict,
             default={},
+            removal_version="2.1.0.dev0",
+            removal_hint="RunTracker no longer directly supports uploading run stats to urls.",
             help="Upload stats to these URLs on run completion.  Value is a map from URL to the "
             "name of the auth provider the user must auth against in order to upload stats "
             "to that URL, or None/empty string if no auth is required.  Currently the "
@@ -95,6 +82,8 @@ class RunTracker(Subsystem):
             "--stats-upload-timeout",
             advanced=True,
             type=int,
+            removal_version="2.1.0.dev0",
+            removal_hint="RunTracker no longer directly supports uploading run stats to urls.",
             default=2,
             help="Wait at most this many seconds for the stats upload to complete.",
         )
@@ -104,12 +93,16 @@ class RunTracker(Subsystem):
             type=int,
             default=1,
             choices=cls.SUPPORTED_STATS_VERSIONS,
+            removal_version="2.1.0.dev0",
+            removal_hint="RunTracker no longer directly supports uploading run stats to urls.",
             help="Format of stats JSON for uploads and local json file.",
         )
         register(
             "--num-foreground-workers",
             advanced=True,
             type=int,
+            removal_version="2.1.0.dev0",
+            removal_hint="RunTracker no longer uses foreground workers.",
             default=multiprocessing.cpu_count(),
             help="Number of threads for foreground work.",
         )
@@ -117,6 +110,8 @@ class RunTracker(Subsystem):
             "--num-background-workers",
             advanced=True,
             type=int,
+            removal_version="2.1.0.dev0",
+            removal_hint="RunTracker no longer uses background workers.",
             default=multiprocessing.cpu_count(),
             help="Number of threads for background work.",
         )
@@ -158,11 +153,9 @@ class RunTracker(Subsystem):
         self.run_info = None
         self.cumulative_timings = None
         self.self_timings = None
-        self.pantsd_stats = None
 
         # Initialized in `start()`.
         self.report = None
-        self.json_reporter = None
         self._main_root_workunit = None
         self._all_options = None
 
@@ -183,9 +176,6 @@ class RunTracker(Subsystem):
         # Note that multiple threads may share a name (e.g., all the threads in a pool).
         self._threadlocal = threading.local()
 
-        # A logger facade that logs into this RunTracker.
-        self._logger = RunTrackerLogger(self)
-
         # For background work.  Created lazily if needed.
         self._background_root_workunit = None
 
@@ -195,24 +185,11 @@ class RunTracker(Subsystem):
 
         self._aborted = False
 
-        # Data will be organized first by target and then scope.
-        # Eg:
-        # {
-        #   'target/address:name': {
-        #     'running_scope': {
-        #       'run_duration': 356.09
-        #     },
-        #     'GLOBAL': {
-        #       'target_type': 'pants.test'
-        #     }
-        #   }
-        # }
-        self._target_to_data = {}
-
         self._end_memoized_result: Optional[ExitCode] = None
 
-    def set_v2_goal_rule_names(self, v2_goal_rule_names: Tuple[str, ...]) -> None:
-        self._v2_goal_rule_names = v2_goal_rule_names
+        self.native = Native()
+
+        self.run_logs_file: Optional[Path] = None
 
     @property
     def v2_goals_rule_names(self) -> Tuple[str, ...]:
@@ -232,7 +209,7 @@ class RunTracker(Subsystem):
     def is_background_root_workunit(self, workunit):
         return workunit is self._background_root_workunit
 
-    def start(self, all_options, run_start_time=None):
+    def start(self, all_options: Options, run_start_time: float) -> None:
         """Start tracking this pants run."""
         if self.run_info:
             raise AssertionError("RunTracker.start must not be called multiple times.")
@@ -257,19 +234,12 @@ class RunTracker(Subsystem):
 
         # Time spent in a workunit, not including its children.
         self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, "self_timings"))
-        # Daemon stats.
-        self.pantsd_stats = PantsDaemonStats()
+        # pantsd stats.
+        self._pantsd_metrics: Dict[str, int] = dict()
 
         self._all_options = all_options
 
         self.report = Report()
-
-        # Set up the JsonReporter for V2 stats.
-        if self._stats_version == 2:
-            json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO)
-            self.json_reporter = JsonReporter(self, json_reporter_settings)
-            self.report.add_reporter("json", self.json_reporter)
-
         self.report.open()
 
         # And create the workunit.
@@ -281,94 +251,27 @@ class RunTracker(Subsystem):
         self._main_root_workunit.start(run_start_time)
         self.report.start_workunit(self._main_root_workunit)
 
+        goal_names: Tuple[str, ...] = tuple(all_options.goals)
+        self._v2_goal_rule_names = goal_names
+
+        self.run_logs_file = Path(self.run_info_dir, "logs")
+        self.native.set_per_run_log_path(str(self.run_logs_file))
+
     def set_root_outcome(self, outcome):
         """Useful for setup code that doesn't have a reference to a workunit."""
         self._main_root_workunit.set_outcome(outcome)
 
+    def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
+        self._pantsd_metrics = metrics
+
     @property
-    def logger(self):
-        return self._logger
-
-    @contextmanager
-    def new_workunit(self, name, labels=None, cmd="", log_config=None):
-        """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
-
-        - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
-        - labels: An optional iterable of labels. The reporters can use this to decide how to
-                  display information about this work.
-        - cmd: An optional longer string representing this work.
-               E.g., the cmd line of a compiler invocation.
-        - log_config: An optional tuple WorkUnit.LogConfig of task-level options affecting reporting.
-
-        Use like this:
-
-        with run_tracker.new_workunit(name='compile', labels=[WorkUnitLabel.TASK]) as workunit:
-          <do scoped work here>
-          <set the outcome on workunit if necessary>
-
-        Note that the outcome will automatically be set to failure if an exception is raised
-        in a workunit, and to success otherwise, so usually you only need to set the
-        outcome explicitly if you want to set it to warning.
-
-        :API: public
-        """
-        parent = self._threadlocal.current_workunit
-        with self.new_workunit_under_parent(
-            name, parent=parent, labels=labels, cmd=cmd, log_config=log_config
-        ) as workunit:
-            self._threadlocal.current_workunit = workunit
-            try:
-                yield workunit
-            finally:
-                self._threadlocal.current_workunit = parent
-
-    @contextmanager
-    def new_workunit_under_parent(self, name, parent, labels=None, cmd="", log_config=None):
-        """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
-
-        - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
-        - parent: The new workunit is created under this parent.
-        - labels: An optional iterable of labels. The reporters can use this to decide how to
-                  display information about this work.
-        - cmd: An optional longer string representing this work.
-               E.g., the cmd line of a compiler invocation.
-
-        Task code should not typically call this directly.
-
-        :API: public
-        """
-        workunit = WorkUnit(
-            run_info_dir=self.run_info_dir,
-            parent=parent,
-            name=name,
-            labels=labels,
-            cmd=cmd,
-            log_config=log_config,
-        )
-        workunit.start()
-
-        outcome = WorkUnit.FAILURE  # Default to failure we will override if we get success/abort.
-        try:
-            self.report.start_workunit(workunit)
-            yield workunit
-        except KeyboardInterrupt:
-            outcome = WorkUnit.ABORTED
-            self._aborted = True
-            raise
-        else:
-            outcome = WorkUnit.SUCCESS
-        finally:
-            workunit.set_outcome(outcome)
-            self.end_workunit(workunit)
+    def pantsd_scheduler_metrics(self) -> Dict[str, int]:
+        return dict(self._pantsd_metrics)  # defensive copy
 
     @property
     def _stats_version(self) -> int:
         stats_version: int = self.options.stats_version
         return stats_version
-
-    def log(self, level, *msg_elements):
-        """Log a message against the current workunit."""
-        self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
     @classmethod
     def _get_headers(cls, stats_version: int) -> Dict[str, str]:
@@ -468,21 +371,16 @@ class RunTracker(Subsystem):
     def run_information(self):
         """Basic information about this run."""
         run_information = self.run_info.get_as_dict()
-        target_data = run_information.get("target_data", None)
-        if target_data:
-            run_information["target_data"] = ast.literal_eval(target_data)
         return run_information
 
     def _stats(self) -> dict:
         stats = {
             "run_info": self.run_information(),
-            "pantsd_stats": self.pantsd_stats.get_all(),
+            "pantsd_stats": self.pantsd_scheduler_metrics,
             "cumulative_timings": self.cumulative_timings.get_all(),
             "recorded_options": self.get_options_to_record(),
         }
-        if self._stats_version == 2:
-            stats["workunits"] = self.json_reporter.results
-        else:
+        if self._stats_version != 2:
             stats.update(
                 {
                     "self_timings": self.self_timings.get_all(),
@@ -513,8 +411,6 @@ class RunTracker(Subsystem):
                 stats_version=self._stats_version,
             )
 
-    _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
-
     def has_ended(self) -> bool:
         return self._end_memoized_result is not None
 
@@ -530,25 +426,16 @@ class RunTracker(Subsystem):
 
         self.shutdown_worker_pool()
 
-        # Run a dummy work unit to write out one last timestamp.
-        with self.new_workunit("complete"):
-            pass
-
         self.end_workunit(self._main_root_workunit)
 
         outcome = self._main_root_workunit.outcome()
         if self._background_root_workunit:
             outcome = min(outcome, self._background_root_workunit.outcome())
         outcome_str = WorkUnit.outcome_string(outcome)
-        log_level = RunTracker._log_levels[outcome]
-        self.log(log_level, outcome_str)
 
         if self.run_info.get_info("outcome") is None:
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
             self.run_info.add_info("outcome", outcome_str, ignore_errors=True)
-
-        if self._target_to_data:
-            self.run_info.add_info("target_data", self._target_to_data)
 
         self.report.close()
         self.store_stats()
@@ -556,6 +443,9 @@ class RunTracker(Subsystem):
         run_failed = outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED]
         result = PANTS_FAILED_EXIT_CODE if run_failed else PANTS_SUCCEEDED_EXIT_CODE
         self._end_memoized_result = result
+
+        self.native.set_per_run_log_path(None)
+
         return self._end_memoized_result
 
     def end_workunit(self, workunit):
@@ -613,6 +503,8 @@ class RunTracker(Subsystem):
             scopes = self._all_options.known_scope_to_info.keys()
         for scope in scopes:
             scope_and_maybe_option = scope.split("^")
+            if scope == GLOBAL_SCOPE:
+                scope = GLOBAL_SCOPE_CONFIG_SECTION
             recorded_options[scope] = self._get_option_to_record(*scope_and_maybe_option)
         return recorded_options
 
@@ -622,7 +514,7 @@ class RunTracker(Subsystem):
         Returns a dict of of all options in the scope, if option is None. Returns the specific
         option if option is not None. Raises ValueError if scope or option could not be found.
         """
-        scope_to_look_up = scope if scope != "GLOBAL" else ""
+        scope_to_look_up = scope if scope != GLOBAL_SCOPE_CONFIG_SECTION else ""
         try:
             value = self._all_options.for_scope(
                 scope_to_look_up, inherit_from_enclosing_scope=False
@@ -637,21 +529,17 @@ class RunTracker(Subsystem):
                 f"Couldn't find option scope {scope}{option_str} for recording ({e!r})"
             )
 
+    def retrieve_logs(self) -> List[str]:
+        """Get a list of every log entry recorded during this run."""
 
-class RunTrackerLogger:
-    """A logger facade that logs into a run tracker."""
+        if not self.run_logs_file:
+            return []
 
-    def __init__(self, run_tracker):
-        self._run_tracker = run_tracker
+        output = []
+        try:
+            with open(self.run_logs_file, "r") as f:
+                output = f.readlines()
+        except OSError as e:
+            logger.warning("Error retrieving per-run logs from RunTracker.", exc_info=e)
 
-    def debug(self, *msg_elements):
-        self._run_tracker.log(Report.DEBUG, *msg_elements)
-
-    def info(self, *msg_elements):
-        self._run_tracker.log(Report.INFO, *msg_elements)
-
-    def warn(self, *msg_elements):
-        self._run_tracker.log(Report.WARN, *msg_elements)
-
-    def error(self, *msg_elements):
-        self._run_tracker.log(Report.ERROR, *msg_elements)
+        return output

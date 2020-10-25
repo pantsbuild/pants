@@ -37,7 +37,13 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, Targets, TransitiveTargets
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -184,7 +190,9 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         )
         all_targets = FrozenOrderedSet(itertools.chain(*direct_deps, targets))
     else:
-        transitive_targets = await Get(TransitiveTargets, Addresses, request.addresses)
+        transitive_targets = await Get(
+            TransitiveTargets, TransitiveTargetsRequest(request.addresses)
+        )
         all_targets = transitive_targets.closure
 
     input_digests = []
@@ -197,10 +205,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         input_digests.append(prepared_sources.stripped_source_files.snapshot.digest)
     merged_input_digest = await Get(Digest, MergeDigests(input_digests))
 
-    interpreter_constraints = (
-        request.hardcoded_interpreter_constraints
-        if request.hardcoded_interpreter_constraints
-        else PexInterpreterConstraints.create_from_compatibility_fields(
+    if request.hardcoded_interpreter_constraints:
+        interpreter_constraints = request.hardcoded_interpreter_constraints
+    else:
+        calculated_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
             (
                 tgt[PythonInterpreterCompatibility]
                 for tgt in all_targets
@@ -208,7 +216,11 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             ),
             python_setup,
         )
-    )
+        # If there are no targets, we fall back to the global constraints. This is relevant,
+        # for example, when running `./pants repl` with no specs.
+        interpreter_constraints = calculated_constraints or PexInterpreterConstraints(
+            python_setup.interpreter_constraints
+        )
 
     exact_reqs = PexRequirements.create_from_requirement_fields(
         (

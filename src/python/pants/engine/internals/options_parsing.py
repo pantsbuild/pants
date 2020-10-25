@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import cast
 
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
-from pants.engine.session import SessionValues
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import GlobalOptions
 from pants.option.options import Options
@@ -46,11 +46,7 @@ class _Options:
 def parse_options(build_config: BuildConfiguration, session_values: SessionValues) -> _Options:
     # TODO: Once the OptionsBootstrapper has been removed from all relevant QueryRules, this lookup
     # should be extracted into a separate @rule.
-    maybe_options_bootstrapper = session_values.values.get(OptionsBootstrapper)
-    if maybe_options_bootstrapper is None:
-        raise ValueError("Expected an OptionsBootstrapper to be provided via SessionValues.")
-    options_bootstrapper = cast(OptionsBootstrapper, maybe_options_bootstrapper)
-
+    options_bootstrapper = session_values[OptionsBootstrapper]
     return _Options(options_bootstrapper, build_config)
 
 

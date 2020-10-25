@@ -27,7 +27,7 @@ class CreatedBinary:
 
 
 class BinarySubsystem(GoalSubsystem):
-    """Create a runnable binary."""
+    """Deprecated in favor of the `package` goal."""
 
     name = "binary"
 
@@ -40,6 +40,10 @@ class Binary(Goal):
 
 @goal_rule
 async def create_binary(workspace: Workspace, dist_dir: DistDir) -> Binary:
+    logger.warning(
+        "The `binary` goal is deprecated in favor of the `package` goal, which behaves "
+        "identically. `binary` will be removed in 2.1.0.dev0.",
+    )
     target_roots_to_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(

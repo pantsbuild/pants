@@ -44,7 +44,7 @@ use std::time::Duration;
 
 use fnv::FnvHasher;
 use futures::future;
-use log::{debug, info, trace, warn};
+use log::{debug, info, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -500,7 +500,7 @@ impl<N: Node> Graph<N> {
         }
 
         // Valid dependency.
-        trace!(
+        test_trace_log!(
           "Adding dependency from {:?} to {:?}",
           inner.entry_for_id(src_id).unwrap().node(),
           inner.entry_for_id(dst_id).unwrap().node()
@@ -514,7 +514,7 @@ impl<N: Node> Graph<N> {
         !inner.entry_for_id(src_id).unwrap().node().cacheable()
       } else {
         // Otherwise, this is an external request: always retry.
-        trace!(
+        test_trace_log!(
           "Requesting node {:?}",
           inner.entry_for_id(dst_id).unwrap().node()
         );
@@ -686,13 +686,9 @@ impl<N: Node> Graph<N> {
   ) -> Result<Vec<Generation>, N::Error> {
     let generations = {
       let inner = self.inner.lock();
-      let dep_ids = inner
+      inner
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
-        .collect::<Vec<_>>();
-
-      dep_ids
-        .into_iter()
         .map(|dep_id| {
           let mut entry = inner
             .entry_for_id(dep_id)
@@ -908,6 +904,19 @@ impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
 
     None
   }
+}
+
+///
+/// Logs at trace level, but only in `cfg(test)`.
+///
+#[macro_export]
+macro_rules! test_trace_log {
+    ($($arg:tt)+) => {
+      #[cfg(test)]
+      {
+        log::trace!($($arg)+)
+      }
+    };
 }
 
 #[cfg(test)]

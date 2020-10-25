@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 # Like Hello world, but built with Pants.
-python_binary(
+pex_binary(
   dependencies=[
     'examples/src/python/example/hello/greet:greet',
     ':lib',

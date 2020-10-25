@@ -12,18 +12,6 @@ python_integration_tests(
 )
 
 python_integration_tests(
-  name = 'changed_integration',
-  sources = ['changed_integration_test.py'],
-  dependencies = [
-    '//:gitignore',
-    'testprojects/src/python:python_targets_directory',
-    'testprojects/src/python:sources_directory',
-  ],
-  uses_pants_run=True,
-  timeout = 600,
-)
-
-python_integration_tests(
   name = 'goal_rule_integration',
   sources = ['goal_rule_integration_test.py'],
   dependencies = [

@@ -34,7 +34,8 @@ async def map_addresses_to_dependees() -> AddressToDependees:
     )
     all_targets = {*all_expanded_targets, *all_explicit_targets}
     dependencies_per_target = await MultiGet(
-        Get(Addresses, DependenciesRequest(tgt.get(Dependencies))) for tgt in all_targets
+        Get(Addresses, DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True))
+        for tgt in all_targets
     )
 
     address_to_dependees = defaultdict(set)
@@ -95,7 +96,7 @@ class DependeesOutputFormat(Enum):
 
 
 class DependeesSubsystem(LineOriented, GoalSubsystem):
-    """List all targets that depend on any of the input targets."""
+    """List all targets that depend on any of the input files/targets."""
 
     name = "dependees"
 
@@ -106,10 +107,7 @@ class DependeesSubsystem(LineOriented, GoalSubsystem):
             "--transitive",
             default=False,
             type=bool,
-            help=(
-                "List all targets which transitively depend on the specified target, rather than "
-                "only targets that directly depend on the specified target."
-            ),
+            help="List all transitive dependees, instead of only direct dependees.",
         )
         register(
             "--closed",

@@ -96,7 +96,7 @@ def test_address_input_parse_bad_path_component() -> None:
 def test_address_input_parse_bad_target_component() -> None:
     def assert_bad_target_component(spec: str) -> None:
         with pytest.raises(InvalidTargetName):
-            print(repr(AddressInput.parse(spec)))
+            repr(AddressInput.parse(spec))
 
     # Missing target_component
     assert_bad_target_component("")
@@ -236,7 +236,6 @@ def test_address_spec() -> None:
     def assert_spec(address: Address, *, expected: str, expected_path_spec: str) -> None:
         assert address.spec == expected
         assert str(address) == expected
-        assert address.reference() == expected
         assert address.path_safe_spec == expected_path_spec
 
     assert_spec(Address("a/b"), expected="a/b", expected_path_spec="a.b")
@@ -331,22 +330,3 @@ def test_address_spec_to_address_input() -> None:
         Address("a/b/c", relative_file_path="subdir/f.txt", target_name="tgt"),
         expected=AddressInput("a/b/c/subdir/f.txt", "../tgt"),
     )
-
-
-def test_address_parse_method() -> None:
-    def assert_parsed(spec_path: str, target_name: str, address: Address) -> None:
-        assert spec_path == address.spec_path
-        assert target_name == address.target_name
-
-    assert_parsed("a/b", "target", Address.parse("a/b:target"))
-    assert_parsed("a/b", "target", Address.parse("//a/b:target"))
-    assert_parsed("a/b", "b", Address.parse("a/b"))
-    assert_parsed("a/b", "b", Address.parse("//a/b"))
-    assert_parsed("a/b", "target", Address.parse(":target", relative_to="a/b"))
-    assert_parsed("", "target", Address.parse("//:target", relative_to="a/b"))
-    assert_parsed("", "target", Address.parse(":target"))
-    assert_parsed("a/b", "target", Address.parse(":target", relative_to="a/b"))
-
-    # Do not attempt to parse generated subtargets, as we would have no way to find the
-    # generated_base_target_name.
-    assert_parsed("a/b/f.py", "f.py", Address.parse("a/b/f.py"))

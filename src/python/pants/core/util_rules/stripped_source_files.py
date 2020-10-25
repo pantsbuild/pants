@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
+from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.core.util_rules.source_files import SourceFiles
@@ -42,18 +42,12 @@ async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
         SourceRootsRequest.for_files(rooted_files_snapshot.files),
     )
 
-    file_to_source_root = {
-        str(file): root for file, root in source_roots_result.path_to_root.items()
-    }
-    files_grouped_by_source_root = {
-        source_root.path: tuple(str(f) for f in files)
-        for source_root, files in itertools.groupby(
-            file_to_source_root.keys(), key=file_to_source_root.__getitem__
-        )
-    }
+    source_roots_to_files = defaultdict(set)
+    for f, root in source_roots_result.path_to_root.items():
+        source_roots_to_files[root.path].add(str(f))
 
-    if len(files_grouped_by_source_root) == 1:
-        source_root = next(iter(files_grouped_by_source_root.keys()))
+    if len(source_roots_to_files) == 1:
+        source_root = next(iter(source_roots_to_files.keys()))
         if source_root == ".":
             resulting_snapshot = rooted_files_snapshot
         else:
@@ -63,11 +57,11 @@ async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
     else:
         digest_subsets = await MultiGet(
             Get(Digest, DigestSubset(rooted_files_snapshot.digest, PathGlobs(files)))
-            for files in files_grouped_by_source_root.values()
+            for files in source_roots_to_files.values()
         )
         resulting_digests = await MultiGet(
             Get(Digest, RemovePrefix(digest, source_root))
-            for digest, source_root in zip(digest_subsets, files_grouped_by_source_root.keys())
+            for digest, source_root in zip(digest_subsets, source_roots_to_files.keys())
         )
         resulting_snapshot = await Get(Snapshot, MergeDigests(resulting_digests))
 

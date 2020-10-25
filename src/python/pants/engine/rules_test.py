@@ -456,13 +456,12 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
             def a_named_rule(a: int, b: str) -> bool:
                 return False
 
-    def test_goal_rule_automatically_gets_name_from_goal(self):
+    def test_goal_rule_automatically_gets_desc_from_goal(self):
         @goal_rule
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        name = some_goal_rule.rule.canonical_name
-        self.assertEqual(name, "example")
+        assert some_goal_rule.rule.desc == "`example` goal"
 
     def test_can_override_goal_rule_name(self):
         @goal_rule(canonical_name="some_other_name")

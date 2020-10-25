@@ -41,7 +41,6 @@ use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
 use process_execution::{Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata};
 use store::{BackoffConfig, Store};
-use tokio::runtime::Handle;
 use workunit_store::WorkunitStore;
 
 /// A binary which takes args of format:
@@ -276,12 +275,18 @@ async fn main() {
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let output_files = if let Some(values) = args.values_of("output-file-path") {
-    values.map(PathBuf::from).collect()
+    values
+      .map(RelativePath::new)
+      .collect::<Result<BTreeSet<_>, _>>()
+      .unwrap()
   } else {
     BTreeSet::new()
   };
   let output_directories = if let Some(values) = args.values_of("output-directory-path") {
-    values.map(PathBuf::from).collect()
+    values
+      .map(RelativePath::new)
+      .collect::<Result<BTreeSet<_>, _>>()
+      .unwrap()
   } else {
     BTreeSet::new()
   };
@@ -291,7 +296,7 @@ async fn main() {
     .unwrap_or_default();
   let overall_deadline_secs = value_t!(args.value_of("overall-deadline-secs"), u64).unwrap_or(3600);
 
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
 
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {

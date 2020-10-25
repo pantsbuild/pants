@@ -16,6 +16,7 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRuntimeBinaryDependencies,
+    PythonRuntimePackageDependencies,
     PythonTestsSources,
     PythonTestsTimeout,
 )
@@ -31,7 +32,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -40,7 +41,7 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -49,6 +50,7 @@ from pants.engine.target import (
     FieldSetsPerTargetRequest,
     Targets,
     TransitiveTargets,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
@@ -65,14 +67,15 @@ class PythonTestFieldSet(TestFieldSet):
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
     runtime_binary_dependencies: PythonRuntimeBinaryDependencies
+    runtime_package_dependencies: PythonRuntimePackageDependencies
 
-    def is_conftest(self) -> bool:
-        """We skip `conftest.py`, even though it belongs to a `python_tests` target, because it does
-        not have any tests to run on."""
-        return (
-            not self.address.is_base_target
-            and PurePath(self.address.filename).name == "conftest.py"
-        )
+    def is_conftest_or_type_stub(self) -> bool:
+        """We skip both `conftest.py` and `.pyi` stubs, even though though they often belong to a
+        `python_tests` target, because neither contain any tests to run on."""
+        if self.address.is_base_target:
+            return False
+        file_name = PurePath(self.address.filename)
+        return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
 
 
 @dataclass(frozen=True)
@@ -101,9 +104,9 @@ async def setup_pytest_for_target(
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
 ) -> TestSetup:
-    test_addresses = Addresses((request.field_set.address,))
-
-    transitive_targets = await Get(TransitiveTargets, Addresses, test_addresses)
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])
+    )
     all_targets = transitive_targets.closure
 
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
@@ -115,13 +118,12 @@ async def setup_pytest_for_target(
         python_setup,
     )
 
-    # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
-    # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
-    # from zip files. `zipp` has pathologically bad behavior with large zipfiles.
-    # TODO: this does have a performance cost as the pex must now be expanded to disk. Long term,
-    # it would be better to fix Zipp (whose fix would then need to be used by importlib_metadata
-    # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
-    additional_args_for_pytest = ("--not-zip-safe",)
+    # Defaults to zip_safe=False.
+    requirements_pex_request = Get(
+        Pex,
+        PexFromTargetsRequest,
+        PexFromTargetsRequest.for_requirements([request.field_set.address], internal_only=True),
+    )
 
     pytest_pex_request = Get(
         Pex,
@@ -129,39 +131,23 @@ async def setup_pytest_for_target(
             output_filename="pytest.pex",
             requirements=PexRequirements(pytest.get_requirement_strings()),
             interpreter_constraints=interpreter_constraints,
-            additional_args=additional_args_for_pytest,
-            internal_only=True,
-        ),
-    )
-
-    # Defaults to zip_safe=False.
-    requirements_pex_request = Get(
-        Pex,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(test_addresses, internal_only=True),
-    )
-
-    test_runner_pex_request = Get(
-        Pex,
-        PexRequest(
-            interpreter_constraints=interpreter_constraints,
-            output_filename="test_runner.pex",
             entry_point="pytest:main",
+            internal_only=True,
             additional_args=(
-                "--pex-path",
+                # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
+                # `importlib_metadata` and thus `zipp`, does not play nicely when doing import
+                # magic directly from zip files. `zipp` has pathologically bad behavior with large
+                # zipfiles.
+                # TODO: this does have a performance cost as the pex must now be expanded to disk.
+                # Long term, it would be better to fix Zipp (whose fix would then need to be used
+                # by importlib_metadata and then by Pytest). See
+                # https://github.com/jaraco/zipp/pull/26.
+                "--not-zip-safe",
                 # TODO(John Sirois): Support shading python binaries:
                 #   https://github.com/pantsbuild/pants/issues/9206
-                # Right now any pytest transitive requirements will shadow corresponding user
-                # requirements which will lead to problems when APIs that are used by either
-                # `pytest:main` or the tests themselves break between the two versions.
-                ":".join(
-                    (
-                        pytest_pex_request.input.output_filename,
-                        requirements_pex_request.input.output_filename,
-                    )
-                ),
+                "--pex-path",
+                requirements_pex_request.input.output_filename,
             ),
-            internal_only=True,
         ),
     )
 
@@ -169,24 +155,28 @@ async def setup_pytest_for_target(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
 
-    # Create any binaries that the test depends on through the `runtime_binary_dependencies` field.
-    binaries: Tuple[CreatedBinary, ...] = ()
-    if request.field_set.runtime_binary_dependencies.value:
-        runtime_binary_addresses = await MultiGet(
-            Get(
-                Address,
-                AddressInput,
-                AddressInput.parse(v, relative_to=request.field_set.address.spec_path),
-            )
-            for v in request.field_set.runtime_binary_dependencies.value
+    # Create any assets that the test depends on through the `runtime_package_dependencies` field.
+    assets: Tuple[BuiltPackage, ...] = ()
+    unparsed_runtime_packages = (
+        request.field_set.runtime_package_dependencies.to_unparsed_address_inputs()
+    )
+    unparsed_runtime_binaries = (
+        request.field_set.runtime_binary_dependencies.to_unparsed_address_inputs()
+    )
+    if unparsed_runtime_packages.values or unparsed_runtime_binaries.values:
+        runtime_package_targets, runtime_binary_dependencies = await MultiGet(
+            Get(Targets, UnparsedAddressInputs, unparsed_runtime_packages),
+            Get(Targets, UnparsedAddressInputs, unparsed_runtime_binaries),
         )
-        runtime_binary_targets = await Get(Targets, Addresses(runtime_binary_addresses))
         field_sets_per_target = await Get(
             FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(BinaryFieldSet, runtime_binary_targets),
+            FieldSetsPerTargetRequest(
+                PackageFieldSet,
+                itertools.chain(runtime_package_targets, runtime_binary_dependencies),
+            ),
         )
-        binaries = await MultiGet(
-            Get(CreatedBinary, BinaryFieldSet, field_set)
+        assets = await MultiGet(
+            Get(BuiltPackage, PackageFieldSet, field_set)
             for field_set in field_sets_per_target.field_sets
         )
 
@@ -196,16 +186,9 @@ async def setup_pytest_for_target(
         SourceFiles, SourceFilesRequest([request.field_set.sources])
     )
 
-    (
-        pytest_pex,
-        requirements_pex,
-        test_runner_pex,
-        prepared_sources,
-        field_set_source_files,
-    ) = await MultiGet(
+    pytest_pex, requirements_pex, prepared_sources, field_set_source_files = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
-        test_runner_pex_request,
         prepared_sources_request,
         field_set_source_files_request,
     )
@@ -218,8 +201,7 @@ async def setup_pytest_for_target(
                 prepared_sources.source_files.snapshot.digest,
                 requirements_pex.digest,
                 pytest_pex.digest,
-                test_runner_pex.digest,
-                *(binary.digest for binary in binaries),
+                *(binary.digest for binary in assets),
             )
         ),
     )
@@ -254,7 +236,7 @@ async def setup_pytest_for_target(
     process = await Get(
         Process,
         PexProcess(
-            test_runner_pex,
+            pytest_pex,
             argv=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
             extra_env=extra_env,
             input_digest=input_digest,
@@ -273,7 +255,7 @@ async def setup_pytest_for_target(
 async def run_python_test(
     field_set: PythonTestFieldSet, test_subsystem: TestSubsystem, pytest: PyTest
 ) -> TestResult:
-    if field_set.is_conftest():
+    if field_set.is_conftest_or_type_stub():
         return TestResult.skip(field_set.address)
 
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
@@ -312,7 +294,7 @@ async def run_python_test(
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
 async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
-    if field_set.is_conftest():
+    if field_set.is_conftest_or_type_stub():
         return TestDebugRequest(None)
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(

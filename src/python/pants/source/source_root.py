@@ -10,11 +10,13 @@ from typing import Dict, Iterable, Optional, Set, Tuple, Union
 
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 from pants.util.meta import frozen_after_init
 
@@ -115,8 +117,8 @@ class SourceRootConfig(Subsystem):
             help="A list of source root suffixes. A directory with this suffix will be considered "
             "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
             "`<buildroot>/project1/src/python` etc. Prepend a `/` to anchor the match at the "
-            "buildroot.  E.g., `/src/python` will match `<buildroot>/src/python` but not "
-            "`<buildroot>/project1/src/python`.  A `*` wildcard will match a single path segment, "
+            "buildroot. E.g., `/src/python` will match `<buildroot>/src/python` but not "
+            "`<buildroot>/project1/src/python`. A `*` wildcard will match a single path segment, "
             "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
             "Use `/` to signify that the buildroot itself is a source root. "
             "See https://www.pantsbuild.org/docs/source-roots.",
@@ -130,9 +132,9 @@ class SourceRootConfig(Subsystem):
             default=None,
             advanced=True,
             help="The presence of a file of this name in a directory indicates that the directory "
-            "is a source root.  The content of the file doesn't matter, and may be empty. "
+            "is a source root. The content of the file doesn't matter, and may be empty. "
             "Useful when you can't or don't wish to centrally enumerate source roots via "
-            "--root-patterns.",
+            "`root_patterns`.",
         )
 
     @memoized_method
@@ -167,7 +169,7 @@ class SourceRootsRequest:
 
 
 @dataclass(frozen=True)
-class SourceRootRequest:
+class SourceRootRequest(EngineAwareParameter):
     """Find the source root for the given path.
 
     If you have multiple paths, particularly if many of them share parent directories, you'll get
@@ -197,6 +199,9 @@ class SourceRootRequest:
     @classmethod
     def for_target(cls, target: Target) -> "SourceRootRequest":
         return cls.for_address(target.address)
+
+    def debug_hint(self) -> str:
+        return str(self.path)
 
 
 @dataclass(frozen=True)
@@ -308,7 +313,7 @@ class AllSourceRoots(DeduplicatedCollection[SourceRoot]):
     sort_input = True
 
 
-@rule(desc="Compute all source roots")
+@rule(desc="Compute all source roots", level=LogLevel.DEBUG)
 async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
     source_root_pattern_matcher = source_root_config.get_pattern_matcher()
 

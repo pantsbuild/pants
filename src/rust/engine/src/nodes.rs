@@ -21,9 +21,10 @@ use crate::externs;
 use crate::externs::engine_aware::{self, EngineAwareInformation};
 use crate::selectors;
 use crate::tasks::{self, Rule};
+use crate::Types;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{self, BufMut};
-use cpython::{Python, PythonObject};
+use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
@@ -205,9 +206,27 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
-  let fingerprint = externs::project_str(&digest, "fingerprint");
-  let digest_length = externs::project_u64(&digest, "serialized_bytes_length") as usize;
+pub fn lift_directory_digest(types: &Types, digest: &Value) -> Result<hashing::Digest, String> {
+  if types.directory_digest != externs::get_type_for(digest) {
+    return Err(format!(
+      "{} is not of type {}.",
+      digest, types.directory_digest
+    ));
+  }
+  let fingerprint = externs::getattr_as_string(&digest, "fingerprint");
+  let digest_length: usize = externs::getattr(&digest, "serialized_bytes_length").unwrap();
+  Ok(hashing::Digest(
+    hashing::Fingerprint::from_hex_string(&fingerprint)?,
+    digest_length,
+  ))
+}
+
+pub fn lift_file_digest(types: &Types, digest: &Value) -> Result<hashing::Digest, String> {
+  if types.file_digest != externs::get_type_for(digest) {
+    return Err(format!("{} is not of type {}.", digest, types.file_digest));
+  }
+  let fingerprint = externs::getattr_as_string(&digest, "fingerprint");
+  let digest_length: usize = externs::getattr(&digest, "serialized_bytes_length").unwrap();
   Ok(hashing::Digest(
     hashing::Fingerprint::from_hex_string(&fingerprint)?,
     digest_length,
@@ -224,13 +243,14 @@ pub struct MultiPlatformExecuteProcess {
 
 impl MultiPlatformExecuteProcess {
   fn lift_execute_process(
+    types: &Types,
     value: &Value,
     target_platform: PlatformConstraint,
   ) -> Result<Process, String> {
-    let env = externs::project_frozendict(&value, "env");
+    let env = externs::getattr_from_frozendict(&value, "env");
 
     let working_directory = {
-      let val = externs::project_str(&value, "working_directory");
+      let val = externs::getattr_as_string(&value, "working_directory");
       if val.is_empty() {
         None
       } else {
@@ -238,20 +258,23 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let digest = lift_digest(&externs::project_ignoring_type(&value, "input_digest"))
+    let py_digest: Value = externs::getattr(&value, "input_digest").unwrap();
+    let digest = lift_directory_digest(types, &py_digest)
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
-    let output_files = externs::project_multi_strs(&value, "output_files")
+    let output_files = externs::getattr::<Vec<String>>(&value, "output_files")
+      .unwrap()
       .into_iter()
-      .map(PathBuf::from)
-      .collect();
+      .map(RelativePath::new)
+      .collect::<Result<_, _>>()?;
 
-    let output_directories = externs::project_multi_strs(&value, "output_directories")
+    let output_directories = externs::getattr::<Vec<String>>(&value, "output_directories")
+      .unwrap()
       .into_iter()
-      .map(PathBuf::from)
-      .collect();
+      .map(RelativePath::new)
+      .collect::<Result<_, _>>()?;
 
-    let timeout_in_seconds = externs::project_f64(&value, "timeout_seconds");
+    let timeout_in_seconds: f64 = externs::getattr(&value, "timeout_seconds").unwrap();
 
     let timeout = if timeout_in_seconds < 0.0 {
       None
@@ -259,16 +282,17 @@ impl MultiPlatformExecuteProcess {
       Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
     };
 
-    let description = externs::project_str(&value, "description");
-    let level = externs::val_to_log_level(&externs::project_ignoring_type(&value, "level"))?;
+    let description = externs::getattr_as_string(&value, "description");
+    let py_level: PyObject = externs::getattr(&value, "level").unwrap();
+    let level = externs::val_to_log_level(&py_level)?;
 
-    let append_only_caches = externs::project_frozendict(&value, "append_only_caches")
+    let append_only_caches = externs::getattr_from_frozendict(&value, "append_only_caches")
       .into_iter()
       .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
       .collect::<Result<_, String>>()?;
 
     let jdk_home = {
-      let val = externs::project_str(&value, "jdk_home");
+      let val = externs::getattr_as_string(&value, "jdk_home");
       if val.is_empty() {
         None
       } else {
@@ -276,10 +300,10 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let is_nailgunnable = externs::project_bool(&value, "is_nailgunnable");
+    let is_nailgunnable: bool = externs::getattr(&value, "is_nailgunnable").unwrap();
 
     let execution_slot_variable = {
-      let s = externs::project_str(&value, "execution_slot_variable");
+      let s = externs::getattr_as_string(&value, "execution_slot_variable");
       if s.is_empty() {
         None
       } else {
@@ -287,10 +311,10 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let cache_failures = externs::project_bool(&value, "cache_failures");
+    let cache_failures: bool = externs::getattr(&value, "cache_failures").unwrap();
 
     Ok(process_execution::Process {
-      argv: externs::project_multi_strs(&value, "argv"),
+      argv: externs::getattr(&value, "argv").unwrap(),
       env,
       working_directory,
       input_files: digest,
@@ -308,8 +332,8 @@ impl MultiPlatformExecuteProcess {
     })
   }
 
-  pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
-    let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
+  pub fn lift(types: &Types, value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+    let constraint_parts: Vec<String> = externs::getattr(&value, "platform_constraints").unwrap();
     if constraint_parts.len() % 2 != 0 {
       return Err("Error parsing platform_constraints: odd number of parts".to_owned());
     }
@@ -322,7 +346,7 @@ impl MultiPlatformExecuteProcess {
         )
       })
       .collect();
-    let processes = externs::project_multi(&value, "processes");
+    let processes: Vec<Value> = externs::getattr(&value, "processes").unwrap();
     if constraint_parts.len() / 2 != processes.len() {
       return Err(format!(
         "Sizes of constraint keys and processes do not match: {} vs. {}",
@@ -336,8 +360,11 @@ impl MultiPlatformExecuteProcess {
     let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
       BTreeMap::new();
     for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
-      let underlying_req =
-        MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
+      let underlying_req = MultiPlatformExecuteProcess::lift_execute_process(
+        types,
+        execute_process,
+        constraint_key.1,
+      )?;
       if !underlying_req.cache_failures {
         cache_failures = false;
       }
@@ -489,10 +516,15 @@ impl From<Scandir> for NodeKey {
 /// This is similar to the Snapshot node, but avoids digesting the files and writing to LMDB store
 /// as a performance optimization.
 ///
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Paths(pub Key);
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Paths {
+  path_globs: PathGlobs,
+}
 
 impl Paths {
+  pub fn from_path_globs(path_globs: PathGlobs) -> Paths {
+    Paths { path_globs }
+  }
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<Vec<PathStat>> {
     context
       .expand_globs(path_globs)
@@ -525,8 +557,7 @@ impl WrappedNode for Paths {
   type Item = Arc<Vec<PathStat>>;
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<Vec<PathStat>>> {
-    let path_globs = Snapshot::lift_path_globs(&externs::val_for(&self.0))
-      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
+    let path_globs = self.path_globs.parse().map_err(|e| throw(&e))?;
     let path_stats = Self::create(context, path_globs).await?;
     Ok(Arc::new(path_stats))
   }
@@ -559,10 +590,16 @@ impl From<SessionValues> for NodeKey {
 ///
 /// A Node that captures an store::Snapshot for a PathGlobs subject.
 ///
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Snapshot(pub Key);
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Snapshot {
+  path_globs: PathGlobs,
+}
 
 impl Snapshot {
+  pub fn from_path_globs(path_globs: PathGlobs) -> Snapshot {
+    Snapshot { path_globs }
+  }
+
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<store::Snapshot> {
     // We rely on Context::expand_globs tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
@@ -575,34 +612,44 @@ impl Snapshot {
       .await
   }
 
-  pub fn lift_path_globs(item: &Value) -> Result<PreparedPathGlobs, String> {
-    let globs = externs::project_multi_strs(item, "globs");
+  pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
+    let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
 
-    let description_of_origin_field = externs::project_str(item, "description_of_origin");
+    let description_of_origin_field = externs::getattr_as_string(item, "description_of_origin");
     let description_of_origin = if description_of_origin_field.is_empty() {
       None
     } else {
       Some(description_of_origin_field)
     };
 
-    let glob_match_error_behavior =
-      externs::project_ignoring_type(item, "glob_match_error_behavior");
-    let failure_behavior = externs::project_str(&glob_match_error_behavior, "value");
+    let glob_match_error_behavior: PyObject =
+      externs::getattr(item, "glob_match_error_behavior").unwrap();
+    let failure_behavior = externs::getattr_as_string(&glob_match_error_behavior, "value");
     let strict_glob_matching =
       StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
-    let conjunction_obj = externs::project_ignoring_type(item, "conjunction");
-    let conjunction_string = externs::project_str(&conjunction_obj, "value");
+    let conjunction_obj: PyObject = externs::getattr(item, "conjunction").unwrap();
+    let conjunction_string = externs::getattr_as_string(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
-
-    PathGlobs::new(globs.clone(), strict_glob_matching, conjunction)
-      .parse()
-      .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", globs, e))
+    Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
   }
 
-  pub fn store_directory_digest(core: &Arc<Core>, item: &hashing::Digest) -> Value {
+  pub fn lift_prepared_path_globs(item: &Value) -> Result<PreparedPathGlobs, String> {
+    let path_globs = Snapshot::lift_path_globs(item)?;
+    path_globs
+      .parse()
+      .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
+  }
+
+  pub fn store_directory_digest(item: &hashing::Digest) -> Result<Value, String> {
+    externs::fs::new_py_digest(*item)
+      .map(|d| d.into_object().into())
+      .map_err(|e| format!("{:?}", e))
+  }
+
+  pub fn store_file_digest(core: &Arc<Core>, item: &hashing::Digest) -> Value {
     externs::unsafe_call(
-      core.types.directory_digest,
+      core.types.file_digest,
       &[
         externs::store_utf8(&item.0.to_hex()),
         externs::store_i64(item.1 as i64),
@@ -626,7 +673,7 @@ impl Snapshot {
     Ok(externs::unsafe_call(
       core.types.snapshot,
       &[
-        Self::store_directory_digest(core, &item.digest),
+        Self::store_directory_digest(&item.digest)?,
         externs::store_tuple(files),
         externs::store_tuple(dirs),
       ],
@@ -669,8 +716,7 @@ impl WrappedNode for Snapshot {
   type Item = Digest;
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Digest> {
-    let path_globs = Self::lift_path_globs(&externs::val_for(&self.0))
-      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
+    let path_globs = self.path_globs.parse().map_err(|e| throw(&e))?;
     let snapshot = Self::create(context, path_globs).await?;
     Ok(snapshot.digest)
   }
@@ -804,13 +850,14 @@ impl WrappedNode for DownloadedFile {
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Digest> {
     let value = externs::val_for(&self.0);
-    let url_str = externs::project_str(&value, "url");
+    let url_str = externs::getattr_as_string(&value, "url");
 
     let url = Url::parse(&url_str)
       .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_str, err)))?;
 
-    let expected_digest = lift_digest(&externs::project_ignoring_type(&value, "expected_digest"))
-      .map_err(|s| throw(&s))?;
+    let py_digest: Value = externs::getattr(&value, "expected_digest").unwrap();
+    let expected_digest =
+      lift_file_digest(&context.core.types, &py_digest).map_err(|s| throw(&s))?;
 
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)
@@ -862,7 +909,7 @@ impl Task {
               .cloned()
               .ok_or_else(|| match get.input_type {
                 Some(ty) if externs::is_union(ty) => {
-                  let value = externs::type_for_type_id(ty).into_object().into();
+                  let value = externs::type_for_type_id(ty).into_object();
                   match externs::call_method(
                     &value,
                     "non_member_error_message",
@@ -945,6 +992,7 @@ pub struct PythonRuleOutput {
   new_level: Option<log::Level>,
   message: Option<String>,
   new_artifacts: Vec<(String, hashing::Digest)>,
+  new_metadata: Vec<(String, Value)>,
 }
 
 #[async_trait]
@@ -977,28 +1025,34 @@ impl WrappedNode for Task {
     let product = self.product;
     let can_modify_workunit = self.task.can_modify_workunit;
 
-    let mut result_val = externs::call(&externs::val_for(&func.0), &deps)?;
+    let result_val =
+      externs::call_function(&externs::val_for(&func.0), &deps).map_err(Failure::from_py_err)?;
+    let mut result_val: Value = result_val.into();
     let mut result_type = externs::get_type_for(&result_val);
     if result_type == context.core.types.coroutine {
-      result_val = Self::generate(context, params, entry, result_val).await?;
+      result_val = Self::generate(context.clone(), params, entry, result_val).await?;
       result_type = externs::get_type_for(&result_val);
     }
 
     if result_type == product {
-      let (new_level, message, new_artifacts) = if can_modify_workunit {
+      let (new_level, message, new_artifacts, new_metadata) = if can_modify_workunit {
         (
-          engine_aware::EngineAwareLevel::retrieve(&result_val),
-          engine_aware::Message::retrieve(&result_val),
-          engine_aware::Artifacts::retrieve(&result_val).unwrap_or_else(Vec::new),
+          engine_aware::EngineAwareLevel::retrieve(&context.core.types, &result_val),
+          engine_aware::Message::retrieve(&context.core.types, &result_val),
+          engine_aware::Artifacts::retrieve(&context.core.types, &result_val)
+            .unwrap_or_else(Vec::new),
+          engine_aware::Metadata::retrieve(&context.core.types, &result_val)
+            .unwrap_or_else(Vec::new),
         )
       } else {
-        (None, None, Vec::new())
+        (None, None, Vec::new(), Vec::new())
       };
       Ok(PythonRuleOutput {
         value: result_val,
         new_level,
         message,
         new_artifacts,
+        new_metadata,
       })
     } else {
       Err(throw(&format!(
@@ -1131,8 +1185,8 @@ impl NodeKey {
   fn user_facing_name(&self) -> Option<String> {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
-      NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.0)),
-      NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.0)),
+      NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
+      NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.path_globs)),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => Some(mp_epr.process.user_facing_name()),
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
@@ -1162,9 +1216,7 @@ impl Node for NodeKey {
     let workunit_name = self.workunit_name();
     let failure_name = match &self {
       NodeKey::Task(ref task) => {
-        let name = user_facing_name
-          .clone()
-          .unwrap_or_else(|| workunit_name.clone());
+        let name = workunit_name.clone();
         let engine_aware_param_ty =
           externs::type_for_type_id(context.core.types.engine_aware_parameter);
         let displayable_param_names: Vec<_> = task
@@ -1177,7 +1229,7 @@ impl Node for NodeKey {
             let py = gil.python();
             let python_type = value.get_type(py);
             if python_type.is_subtype_of(py, &engine_aware_param_ty) {
-              engine_aware::DebugHint::retrieve(&value)
+              engine_aware::DebugHint::retrieve(&context.core.types, &value)
             } else {
               None
             }
@@ -1199,9 +1251,7 @@ impl Node for NodeKey {
           )
         }
       }
-      _ => user_facing_name
-        .clone()
-        .unwrap_or_else(|| workunit_name.clone()),
+      _ => workunit_name.clone(),
     };
 
     let metadata = WorkunitMetadata {
@@ -1212,6 +1262,7 @@ impl Node for NodeKey {
       stdout: None,
       stderr: None,
       artifacts: Vec::new(),
+      user_metadata: Vec::new(),
     };
     let metadata2 = metadata.clone();
 
@@ -1236,6 +1287,8 @@ impl Node for NodeKey {
       let mut level = metadata.level;
       let mut message = None;
       let mut artifacts = Vec::new();
+      let mut user_metadata = Vec::new();
+
       let mut result = match self {
         NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::DownloadedFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
@@ -1266,6 +1319,7 @@ impl Node for NodeKey {
               }
               message = python_rule_output.message;
               artifacts = python_rule_output.new_artifacts;
+              user_metadata = python_rule_output.new_metadata;
               NodeOutput::Value(python_rule_output.value)
             })
             .await
@@ -1287,6 +1341,10 @@ impl Node for NodeKey {
         level,
         message,
         artifacts,
+        user_metadata: user_metadata
+          .into_iter()
+          .map(|(key, val)| (key, val.consume_into_arc()))
+          .collect(),
         ..metadata
       };
       (result, final_metadata)
@@ -1347,9 +1405,9 @@ impl Display for NodeKey {
         // could get gigantic.
         write!(f, "@rule({})", task.task.display_info.name)
       }
-      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.0),
+      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.path_globs),
       &NodeKey::SessionValues(_) => write!(f, "SessionValues"),
-      &NodeKey::Paths(ref s) => write!(f, "Paths({})", s.0),
+      &NodeKey::Paths(ref s) => write!(f, "Paths({})", s.path_globs),
     }
   }
 }
@@ -1407,6 +1465,7 @@ impl TryFrom<NodeOutput> for PythonRuleOutput {
         new_level: None,
         message: None,
         new_artifacts: Vec::new(),
+        new_metadata: Vec::new(),
       }),
       _ => Err(()),
     }

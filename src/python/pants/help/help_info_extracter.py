@@ -6,14 +6,32 @@ import inspect
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Tuple, Type, cast
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, Type, cast, get_type_hints
 
 from pants.base import deprecated
 from pants.engine.goal import GoalSubsystem
+from pants.engine.target import (
+    AsyncField,
+    BoolField,
+    DictStringToStringField,
+    DictStringToStringSequenceField,
+    Field,
+    FloatField,
+    IntField,
+    PrimitiveField,
+    RegisteredTargetTypes,
+    ScalarField,
+    SequenceField,
+    StringField,
+    StringOrStringSequenceField,
+    StringSequenceField,
+    Target,
+)
 from pants.engine.unions import UnionMembership
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
+from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
 
 
 class HelpJSONEncoder(json.JSONEncoder):
@@ -99,6 +117,20 @@ class OptionScopeHelpInfo:
     advanced: Tuple[OptionHelpInfo, ...]
     deprecated: Tuple[OptionHelpInfo, ...]
 
+    def collect_unscoped_flags(self) -> List[str]:
+        flags: List[str] = []
+        for options in (self.basic, self.advanced, self.deprecated):
+            for ohi in options:
+                flags.extend(ohi.unscoped_cmd_line_args)
+        return flags
+
+    def collect_scoped_flags(self) -> List[str]:
+        flags: List[str] = []
+        for options in (self.basic, self.advanced, self.deprecated):
+            for ohi in options:
+                flags.extend(ohi.scoped_cmd_line_args)
+        return flags
+
 
 @dataclass(frozen=True)
 class GoalHelpInfo:
@@ -111,11 +143,115 @@ class GoalHelpInfo:
 
 
 @dataclass(frozen=True)
+class TargetFieldHelpInfo:
+    """A container for help information for a field in a target type."""
+
+    alias: str
+    description: Optional[str]
+    type_hint: str
+    required: bool
+    default: Optional[str]
+
+    @classmethod
+    def create(cls, field: Type[Field]) -> "TargetFieldHelpInfo":
+        # NB: It is very common (and encouraged) to subclass Fields to give custom behavior, e.g.
+        # `PythonSources` subclassing `Sources`. Here, we set `fallback_to_ancestors=True` so that
+        # we can still generate meaningful documentation for all these custom fields without
+        # requiring the Field author to rewrite the docstring.
+        #
+        # However, if the original `Field` author did not define docstring, then this means we
+        # would typically fall back to the docstring for `AsyncField`, `PrimitiveField`, or a
+        # helper class like `StringField`. This is a quirk of this heuristic and it's not
+        # intentional since these core `Field` types have documentation oriented to the custom
+        # `Field` author and not the end user filling in fields in a BUILD file target.
+        description = get_docstring(
+            field,
+            flatten=True,
+            fallback_to_ancestors=True,
+            ignored_ancestors={
+                *Field.mro(),
+                AsyncField,
+                PrimitiveField,
+                BoolField,
+                DictStringToStringField,
+                DictStringToStringSequenceField,
+                FloatField,
+                Generic,  # type: ignore[arg-type]
+                IntField,
+                ScalarField,
+                SequenceField,
+                StringField,
+                StringOrStringSequenceField,
+                StringSequenceField,
+            },
+        )
+        if issubclass(field, PrimitiveField):
+            raw_value_type = get_type_hints(field.compute_value)["raw_value"]
+        elif issubclass(field, AsyncField):
+            raw_value_type = get_type_hints(field.sanitize_raw_value)["raw_value"]
+        else:
+            raw_value_type = get_type_hints(field.__init__)["raw_value"]
+        type_hint = pretty_print_type_hint(raw_value_type)
+
+        # Check if the field only allows for certain choices.
+        if issubclass(field, StringField) and field.valid_choices is not None:
+            valid_choices = sorted(
+                field.valid_choices
+                if isinstance(field.valid_choices, tuple)
+                else (choice.value for choice in field.valid_choices)
+            )
+            type_hint = " | ".join([*(repr(c) for c in valid_choices), "None"])
+
+        if field.required:
+            # We hackily remove `None` as a valid option for the field when it's required. This
+            # greatly simplifies Field definitions because it means that they don't need to
+            # override the type hints for `PrimitiveField.compute_value()` and
+            # `AsyncField.sanitize_raw_value()` to indicate that `None` is an invalid type.
+            type_hint = type_hint.replace(" | None", "")
+
+        return cls(
+            alias=field.alias,
+            description=description,
+            type_hint=type_hint,
+            required=field.required,
+            default=(
+                repr(field.default) if (not field.required and field.default is not None) else None
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class TargetTypeHelpInfo:
+    """A container for help information for a target type."""
+
+    alias: str
+    summary: Optional[str]
+    description: Optional[str]
+    fields: Tuple[TargetFieldHelpInfo, ...]
+
+    @classmethod
+    def create(
+        cls, target_type: Type[Target], *, union_membership: UnionMembership
+    ) -> "TargetTypeHelpInfo":
+        return cls(
+            alias=target_type.alias,
+            summary=get_docstring_summary(target_type),
+            description=get_docstring(target_type),
+            fields=tuple(
+                TargetFieldHelpInfo.create(field)
+                for field in target_type.class_field_types(union_membership=union_membership)
+                if not field.alias.startswith("_") and field.deprecated_removal_version is None
+            ),
+        )
+
+
+@dataclass(frozen=True)
 class AllHelpInfo:
     """All available help info."""
 
     scope_to_help_info: Dict[str, OptionScopeHelpInfo]
     name_to_goal_info: Dict[str, GoalHelpInfo]
+    name_to_target_type_info: Dict[str, TargetTypeHelpInfo]
 
 
 ConsumedScopesMapper = Callable[[str], Tuple[str, ...]]
@@ -130,6 +266,7 @@ class HelpInfoExtracter:
         options: Options,
         union_membership: UnionMembership,
         consumed_scopes_mapper: ConsumedScopesMapper,
+        registered_target_types: RegisteredTargetTypes,
     ) -> AllHelpInfo:
         scope_to_help_info = {}
         name_to_goal_info = {}
@@ -166,8 +303,16 @@ class HelpInfoExtracter:
                     consumed_scopes_mapper(scope_info.scope),
                 )
 
+        name_to_target_type_info = {
+            alias: TargetTypeHelpInfo.create(target_type, union_membership=union_membership)
+            for alias, target_type in registered_target_types.aliases_to_types.items()
+            if not alias.startswith("_") and target_type.deprecated_removal_version is None
+        }
+
         return AllHelpInfo(
-            scope_to_help_info=scope_to_help_info, name_to_goal_info=name_to_goal_info
+            scope_to_help_info=scope_to_help_info,
+            name_to_goal_info=name_to_goal_info,
+            name_to_target_type_info=name_to_target_type_info,
         )
 
     @staticmethod

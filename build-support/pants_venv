@@ -56,7 +56,7 @@ MESSAGE
 
 function activate_pants_venv() {
   # Allow for multiple calls to `activate_pants_venv`.
-  if [ -n "$VENV_ACTIVATED_FOR_PANTS" ]; then
+  if [[ -n "${VENV_ACTIVATED_FOR_PANTS:-}" ]]; then
     return
   else
     export VENV_ACTIVATED_FOR_PANTS="true"
@@ -89,7 +89,9 @@ function activate_pants_venv() {
     ensure_gcc
 
     for req in "${REQUIREMENTS[@]}"; do
-      pip install "${pip_extra[@]}" -r "${req}" || \
+      # NB: For the pip_extra reference, see:
+      #   https://stackoverflow.com/questions/7577052/bash-empty-array-expansion-with-set-u
+      pip install "${pip_extra[@]+"${pip_extra[@]}"}" -r "${req}" || \
         die "Failed to install requirements from ${req}."
     done
     touch "${BOOTSTRAPPED_FILE}"

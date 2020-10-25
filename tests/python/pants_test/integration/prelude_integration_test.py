@@ -12,7 +12,7 @@ def test_build_file_prelude() -> None:
         "prelude.py": dedent(
             """\
             def make_binary_macro():
-                python_binary(name="main", sources=["main.py"])
+                pex_binary(name="main", sources=["main.py"])
             """
         ),
         "BUILD": "make_binary_macro()",

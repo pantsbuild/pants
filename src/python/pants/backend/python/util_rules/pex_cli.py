@@ -13,8 +13,8 @@ from pants.backend.python.util_rules.pex_environment import PexEnvironment, Pyth
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalTool,
     ExternalToolRequest,
+    TemplatedExternalTool,
 )
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
 from pants.engine.internals.selectors import MultiGet
@@ -25,14 +25,16 @@ from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty, frozen_after_init
+from pants.util.strutil import create_path_env_var
 
 
-class PexBinary(ExternalTool):
+class PexBinary(TemplatedExternalTool):
     """The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."""
 
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.16"
+    default_version = "v2.1.20"
+    default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
 
     @classproperty
     def default_known_versions(cls):
@@ -41,18 +43,12 @@ class PexBinary(ExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "38712847654254088a23394728f9a5fb93c6c83631300e7ab427ec780a88f653",
-                    "2662638",
+                    "885970ed8dfbbe25abb39eac2b6f1a0feb1f6eefc4d0d5631ac67870f60e9511",
+                    "2681620",
                 )
             )
             for plat in ["darwin", "linux"]
         ]
-
-    def generate_url(self, _: Platform) -> str:
-        return f"https://github.com/pantsbuild/pex/releases/download/{self.version}/pex"
-
-    def generate_exe(self, _: Platform) -> str:
-        return "./pex"
 
 
 @frozen_after_init
@@ -105,7 +101,7 @@ async def setup_pex_cli_process(
     tmpdir = ".tmp"
     gets: List[Get] = [
         Get(DownloadedExternalTool, ExternalToolRequest, pex_binary.get_request(Platform.current)),
-        Get(Digest, CreateDigest([Directory(f"{tmpdir}/.reserve")])),
+        Get(Digest, CreateDigest([Directory(tmpdir)])),
     ]
     cert_args = []
 
@@ -132,21 +128,28 @@ async def setup_pex_cli_process(
     pex_root_path = ".cache/pex_root"
     argv = pex_env.create_argv(
         downloaded_pex_bin.exe,
-        *request.argv,
         *cert_args,
+        "--python-path",
+        create_path_env_var(pex_env.interpreter_search_paths),
         "--pex-root",
         pex_root_path,
-        python=request.python,
-    )
-    env = {
         # Ensure Pex and its subprocesses create temporary files in the the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we
         # have known use cases where /tmp is too small to hold large wheel downloads Pex is asked to
         # perform. Making the TMPDIR local to the sandbox allows control via
         # --local-execution-root-dir for the local case and should work well with remote cases where
         # a remoting implementation has to allow for processes producing large binaries in a
-        # sandbox to support reasonable workloads.
-        "TMPDIR": tmpdir,
+        # sandbox to support reasonable workloads. Communicating TMPDIR via --tmpdir instead of via
+        # environment variable allows Pex to absolutize the path ensuring subprocesses that change
+        # CWD can find the TMPDIR.
+        "--tmpdir",
+        tmpdir,
+        # NB: This comes at the end of the argv because the request may use `--` passthrough args,
+        # which must come at the end.
+        *request.argv,
+        python=request.python,
+    )
+    env = {
         **pex_env.environment_dict(python_configured=request.python is not None),
         **python_native_code.environment_dict,
         **(request.extra_env or {}),

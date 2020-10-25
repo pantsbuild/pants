@@ -7,12 +7,13 @@ from pathlib import PurePath
 from typing import ClassVar, Dict, Iterable, Mapping, Optional, Tuple, Type, cast
 
 from pants.base.build_root import BuildRoot
+from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import Targets, TransitiveTargets
+from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
@@ -37,7 +38,7 @@ class ReplImplementation(ABC):
 
 
 class ReplSubsystem(GoalSubsystem):
-    """Opens a REPL."""
+    """Open a REPL with the specified code loadable."""
 
     name = "repl"
     required_union_implementations = (ReplImplementation,)
@@ -86,11 +87,15 @@ async def run_repl(
     workspace: Workspace,
     interactive_runner: InteractiveRunner,
     repl_subsystem: ReplSubsystem,
-    transitive_targets: TransitiveTargets,
+    all_specified_addresses: Addresses,
     build_root: BuildRoot,
     union_membership: UnionMembership,
     global_options: GlobalOptions,
 ) -> Repl:
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequest(all_specified_addresses)
+    )
+
     # TODO: When we support multiple languages, detect the default repl to use based
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"

@@ -29,6 +29,7 @@
 
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::mpsc;
 use std::time::Duration;
 
 use futures::future::{self, FutureExt, TryFutureExt};
@@ -38,13 +39,15 @@ use uuid::Uuid;
 
 use logging::logger::{StdioHandler, PANTS_LOGGER};
 use task_executor::Executor;
-use workunit_store::WorkunitStore;
+use workunit_store::{format_workunit_duration, WorkunitStore};
 
 pub struct ConsoleUI {
   workunit_store: WorkunitStore,
   local_parallelism: usize,
   // While the UI is running, there will be an Instance present.
   instance: Option<Instance>,
+  teardown_in_progress: bool,
+  teardown_mpsc: (mpsc::Sender<()>, mpsc::Receiver<()>),
 }
 
 impl ConsoleUI {
@@ -53,6 +56,8 @@ impl ConsoleUI {
       workunit_store,
       local_parallelism,
       instance: None,
+      teardown_in_progress: false,
+      teardown_mpsc: mpsc::channel(),
     }
   }
 
@@ -81,10 +86,15 @@ impl ConsoleUI {
     Ok(())
   }
 
-  pub fn write_stderr(&self, msg: &str) {
+  pub fn write_stderr(&mut self, msg: &str) {
     if let Some(instance) = &self.instance {
       instance.bars[0].println(msg);
     } else {
+      if self.teardown_in_progress {
+        let receiver = &self.teardown_mpsc.1;
+        let _ = receiver.recv();
+        self.teardown_in_progress = false;
+      }
       eprint!("{}", msg);
     }
   }
@@ -118,10 +128,7 @@ impl ConsoleUI {
       .map(|(label, maybe_duration)| {
         let duration_label = match maybe_duration {
           None => "(Waiting) ".to_string(),
-          Some(duration) => {
-            let duration_secs: f64 = (duration.as_millis() as f64) / 1000.0;
-            format!("{:.2}s ", duration_secs)
-          }
+          Some(duration) => format_workunit_duration(*duration),
         };
         format!("{}{}", duration_label, label)
       })
@@ -203,10 +210,16 @@ impl ConsoleUI {
   ///
   pub fn teardown(&mut self) -> impl Future<Output = Result<(), String>> {
     if let Some(instance) = self.instance.take() {
+      let sender = self.teardown_mpsc.0.clone();
+      self.teardown_in_progress = true;
       PANTS_LOGGER.deregister_stderr_handler(instance.logger_handle);
       instance
         .multi_progress_task
         .map_err(|e| format!("Failed to render UI: {}", e))
+        .and_then(move |()| {
+          sender.send(()).unwrap();
+          future::ok(())
+        })
         .boxed()
     } else {
       future::ok(()).boxed()

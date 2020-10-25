@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import multiprocessing
 import os
 import subprocess
 from enum import Enum
@@ -11,7 +12,7 @@ from typing import Callable, Iterable, List, Optional, Tuple, cast
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
-from pants.option.custom_types import UnsetBool, file_option
+from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -53,8 +54,8 @@ class PythonSetup(Subsystem):
             help="Constrain the selected Python interpreter. Specify with requirement syntax, "
             "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
             "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
-            "be ORed together. These constraints are applied in addition to any "
-            "compatibilities required by the relevant targets.",
+            "be ORed together. These constraints are used as the default value for the "
+            "`compatibility` field of Python targets.",
         )
         register(
             "--requirement-constraints",
@@ -64,7 +65,7 @@ class PythonSetup(Subsystem):
                 "When resolving third-party requirements, use this "
                 "constraints file to determine which versions to use. See "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
-                "on the format of constraint files and how constraints are applied in Pex and Pip."
+                "on the format of constraint files and how constraints are applied in Pex and pip."
             ),
         )
         register(
@@ -79,77 +80,30 @@ class PythonSetup(Subsystem):
                 "constraints file, each subset will be independently resolved as needed, which is "
                 "more correct - work is only invalidated if a requirement it actually depends on "
                 "changes - but also a lot slower, due to the extra resolving. "
-                "You may wish to leave this option set for normal work, such as running tests, "
-                "but selectively turn it off via command-line-flag when building deployable "
-                "binaries, so that you only deploy the requirements you actually need for a "
-                "given binary. Requires [python-setup].requirement_constraints to be set."
-            ),
-        )
-        register(
-            "--platforms",
-            advanced=True,
-            type=list,
-            metavar="<platform>",
-            default=["current"],
-            help="A list of platforms to be supported by this Python environment. Each platform"
-            "is a string, as returned by pkg_resources.get_supported_platform().",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "The option `--python-setup-platforms` does not do anything anymore. Instead, "
-                "explicitly set the `platforms` field on each `python_binary`."
-            ),
-        )
-        register(
-            "--interpreter-cache-dir",
-            advanced=True,
-            default=None,
-            metavar="<dir>",
-            help="The parent directory for the interpreter cache. "
-            "If unspecified, a standard path under the workdir is used.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "The option `--python-setup-interpreter-cache-dir` does not do anything anymore."
-                "Instead, use the global option `--named-caches-dir`."
-            ),
-        )
-        register(
-            "--resolver-cache-dir",
-            advanced=True,
-            default=None,
-            metavar="<dir>",
-            help="The parent directory for the requirement resolver cache. "
-            "If unspecified, a standard path under the workdir is used.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "The option `--python-setup-resolver-cache-dir` does not do anything anymore. "
-                "Instead, use the global option `--named-caches-dir`."
-            ),
-        )
-        register(
-            "--resolver-allow-prereleases",
-            advanced=True,
-            type=bool,
-            default=UnsetBool,
-            help="Whether to include pre-releases when resolving requirements.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "The option `--python-setup-resolver-allow-prereleases` does not no anything. To "
-                "use a pre-release, explicitly use that pre-release version in your requirement "
-                "string, e.g. `my_dist==99.0.dev0`."
+                "\n\n* `never` will always use proper subsets, regardless of the goal being "
+                "run.\n* `nondeployables` will use proper subsets for `./pants package`, but "
+                "otherwise attempt to use a single resolve.\n* `always` will always attempt to use "
+                "a single resolve."
+                "\n\nRequires [python-setup].requirement_constraints to be set."
             ),
         )
         register(
             "--interpreter-search-paths",
             advanced=True,
             type=list,
-            default=["<PEXRC>", "<PATH>"],
+            default=["<PYENV>", "<PATH>"],
             metavar="<binary-paths>",
-            help="A list of paths to search for python interpreters. The following special "
-            "strings are supported: "
-            '"<PATH>" (the contents of the PATH env var), '
-            '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
-            '"<PYENV>" (all python versions under $(pyenv root)/versions).'
-            '"<PYENV_LOCAL>" (the python version in BUILD_ROOT/.python-version).',
+            help=(
+                "A list of paths to search for Python interpreters that match your project's "
+                "interpreter constraints. You can specify absolute paths to interpreter binaries "
+                "and/or to directories containing interpreter binaries. The order of entries does "
+                "not matter. The following special strings are supported:\n\n"
+                '* "<PATH>", the contents of the PATH env var\n'
+                '* "<PYENV>", all Python versions under $(pyenv root)/versions\n'
+                '* "<PYENV_LOCAL>", the Pyenv interpreter with the version in '
+                "BUILD_ROOT/.python-version\n"
+                '* "<PEXRC>", paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc'
+            ),
         )
         register(
             "--resolver-manylinux",
@@ -158,19 +112,30 @@ class PythonSetup(Subsystem):
             default="manylinux2014",
             help="Whether to allow resolution of manylinux wheels when resolving requirements for "
             "foreign linux platforms. The value should be a manylinux platform upper bound, "
-            "e.g.: manylinux2010, or else [Ff]alse, [Nn]o or [Nn]one to disallow.",
+            "e.g.: 'manylinux2010', or else the string 'no' to disallow.",
         )
         register(
             "--resolver-jobs",
             type=int,
-            default=2,
+            default=multiprocessing.cpu_count() // 2,
             advanced=True,
             help=(
                 "The maximum number of concurrent jobs to build wheels with. Because Pants "
-                "can run multiple subprocesses in parallel, the total parallelism will be "
+                "can run multiple subprocesses in parallel, the maximum total parallelism will be "
                 "`--process-execution-{local,remote}-parallelism x --python-setup-resolver-jobs`. "
                 "Setting this option higher may result in better parallelism, but, if set too "
                 "high, may result in starvation and Out of Memory errors."
+            ),
+        )
+        register(
+            "--resolver-http-cache-ttl",
+            type=int,
+            default=3_600,  # This matches PEX's default.
+            advanced=True,
+            help=(
+                "The maximum time (in seconds) for items in the HTTP cache. When the cache expires,"
+                "the PEX resolver will make network requests to see if new versions of your "
+                "requirements are available."
             ),
         )
 
@@ -204,6 +169,10 @@ class PythonSetup(Subsystem):
     @property
     def resolver_jobs(self) -> int:
         return cast(int, self.options.resolver_jobs)
+
+    @property
+    def resolver_http_cache_ttl(self) -> int:
+        return cast(int, self.options.resolver_http_cache_ttl)
 
     @property
     def scratch_dir(self):
@@ -295,15 +264,17 @@ class PythonSetup(Subsystem):
         pyenv_root = pyenv_root_func()
         if pyenv_root is None:
             return []
+
         versions_dir = Path(pyenv_root, "versions")
+        if not versions_dir.is_dir():
+            return []
 
         if pyenv_local:
-
             local_version_file = Path(get_buildroot(), ".python-version")
             if not local_version_file.exists():
-                logger.info(
+                logger.warning(
                     "No `.python-version` file found in the build root, "
-                    "but <PYENV_LOCAL> was set in `--python-setup-interpreter-constraints`."
+                    "but <PYENV_LOCAL> was set in `[python-setup].interpreter_search_paths`."
                 )
                 return []
 

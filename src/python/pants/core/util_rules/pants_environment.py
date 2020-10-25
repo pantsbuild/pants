@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
 import re
 from dataclasses import dataclass
 from typing import Dict, Mapping, Optional, Sequence
 
-from pants.engine.rules import side_effecting
+from pants.engine.internals.session import SessionValues
+from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
@@ -17,19 +17,11 @@ name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
 shorthand_re = re.compile(r"([A-Za-z_]\w*)")
 
 
-@side_effecting
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PantsEnvironment:
     """PantsEnvironment is a representation of the environment variables the currently-executing
-    pants process was invoked with.
-
-    Since the exact contents of the environment are very specific to a given invocation of pants,
-    this type is marked as side-effecting, and can only be requested as an input to an uncacheable
-    rule. An uncacheable rule should accept this type as an input, and use `get_subset` to filter
-    the environment rules down to only the ones other rules care about as inputs, in order to avoid
-    a lot of cache invalidation if the environment changes spuriously.
-    """
+    Pants process was invoked with."""
 
     env: FrozenDict[str, str]
 
@@ -39,10 +31,10 @@ class PantsEnvironment:
         Explicitly specify the env argument to create a mock environment for testing.
         """
 
-        self.env = FrozenDict(env if env else os.environ)
+        self.env = FrozenDict(env or {})
 
     def get_subset(
-        self, requested: Sequence[str], allowed: Optional[Sequence[str]] = None
+        self, requested: Sequence[str], *, allowed: Optional[Sequence[str]] = None
     ) -> FrozenDict[str, str]:
         """Extract a subset of named env vars.
 
@@ -53,7 +45,8 @@ class PantsEnvironment:
         In the former case, the value for that name is taken from this env. In the latter
         case the specified value overrides the value in this env.
 
-        If `allowed` is specified, variable names must be in that list, or an error will be raised.
+        If `allowed` is specified, the requested variable names must be in that list, or an error
+        will be raised.
         """
         allowed_set = None if allowed is None else set(allowed)
         env_var_subset: Dict[str, str] = {}
@@ -80,3 +73,12 @@ class PantsEnvironment:
                 )
 
         return FrozenDict(env_var_subset)
+
+
+@rule
+async def pants_environment(session_values: SessionValues) -> PantsEnvironment:
+    return session_values[PantsEnvironment]
+
+
+def rules():
+    return collect_rules()

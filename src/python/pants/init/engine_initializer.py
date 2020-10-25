@@ -8,10 +8,10 @@ from typing import Any, ClassVar, Iterable, List, Optional, Set, Tuple, Type, ca
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine import desktop, fs, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
@@ -21,10 +21,10 @@ from pants.engine.internals.native import Native
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
+from pants.engine.internals.session import SessionValues
 from pants.engine.platform import create_platform_rules
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule, collect_rules, rule
-from pants.engine.session import SessionValues
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
@@ -32,8 +32,8 @@ from pants.init.options_initializer import BuildConfigInitializer, OptionsInitia
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
-from pants.scm.subsystems.changed import rules as changed_rules
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.vcs.changed import rules as changed_rules
 
 logger = logging.getLogger(__name__)
 
@@ -69,13 +69,7 @@ class GraphSession:
     goal_map: Any
 
     # NB: Keep this in sync with the method `run_goal_rules`.
-    goal_param_types: ClassVar[Tuple[Type, ...]] = (
-        Specs,
-        Console,
-        InteractiveRunner,
-        Workspace,
-        PantsEnvironment,
-    )
+    goal_param_types: ClassVar[Tuple[Type, ...]] = (Specs, Console, InteractiveRunner, Workspace)
 
     def goal_consumed_subsystem_scopes(self, goal_name: str) -> Tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
@@ -98,7 +92,6 @@ class GraphSession:
     def run_goal_rules(
         self,
         *,
-        options_bootstrapper: OptionsBootstrapper,
         union_membership: UnionMembership,
         goals: Iterable[str],
         specs: Specs,
@@ -115,7 +108,6 @@ class GraphSession:
 
         workspace = Workspace(self.scheduler_session)
         interactive_runner = InteractiveRunner(self.scheduler_session)
-        pants_environment = PantsEnvironment()
 
         for goal in goals:
             goal_product = self.goal_map[goal]
@@ -128,14 +120,7 @@ class GraphSession:
             if not is_implemented:
                 continue
             # NB: Keep this in sync with the property `goal_param_types`.
-            params = Params(
-                specs,
-                options_bootstrapper,
-                self.console,
-                workspace,
-                interactive_runner,
-                pants_environment,
-            )
+            params = Params(specs, self.console, workspace, interactive_runner)
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
                 exit_code = self.scheduler_session.run_goal_rule(
@@ -180,6 +165,14 @@ class EngineInitializer:
         native = Native()
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        print_stacktrace = resolve_conflicting_options(
+            old_option="print_exception_stacktrace",
+            new_option="print_stacktrace",
+            old_scope="",
+            new_scope="",
+            old_container=bootstrap_options,
+            new_container=bootstrap_options,
+        )
         return EngineInitializer.setup_graph_extended(
             options_bootstrapper,
             build_configuration,
@@ -194,7 +187,7 @@ class EngineInitializer:
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
             native=native,
-            include_trace_on_error=bootstrap_options.print_exception_stacktrace,
+            include_trace_on_error=print_stacktrace,
         )
 
     @staticmethod

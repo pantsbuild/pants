@@ -5,7 +5,7 @@ import collections.abc
 import dataclasses
 import itertools
 import os.path
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
@@ -28,9 +28,11 @@ from typing import (
 
 from typing_extensions import final
 
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import Spec
-from pants.engine.addresses import Address, AddressInput, assert_single_address
+from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
@@ -57,17 +59,26 @@ class Field(ABC):
     default: ClassVar[ImmutableValue]
     # Subclasses may define these.
     required: ClassVar[bool] = False
+    deprecated_removal_version: ClassVar[Optional[str]] = None
+    deprecated_removal_hint: ClassVar[Optional[str]] = None
 
-    # This is a little weird to have an abstract __init__(). We do this to ensure that all
-    # subclasses have this exact type signature for their constructor.
-    #
-    # Normally, with dataclasses, each constructor parameter would instead be specified via a
-    # dataclass field declaration. But, we don't want to declare either `address` or `raw_value` as
-    # attributes because we make no assumptions whether the subclasses actually store those values
-    # on each instance. All that we care about is a common constructor interface.
-    @abstractmethod
+    # NB: We still expect `PrimitiveField` and `AsyncField` to define their own constructors. This
+    # is only implemented so that we have a common deprecation mechanism.
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        pass
+        if self.deprecated_removal_version and address.is_base_target and raw_value is not None:
+            if not self.deprecated_removal_hint:
+                raise ValueError(
+                    f"You specified `deprecated_removal_version` for {self.__class__}, but not "
+                    "the class property `deprecated_removal_hint`."
+                )
+            warn_or_error(
+                removal_version=self.deprecated_removal_version,
+                deprecated_entity_description=f"the {repr(self.alias)} field",
+                hint=(
+                    f"Using the `{self.alias}` field in the target {address}. "
+                    f"{self.deprecated_removal_hint}"
+                ),
+            )
 
 
 @frozen_after_init
@@ -91,8 +102,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
 
     Subclasses should also override the type hints for `value` and `raw_value` to be more precise
     than `Any`. The type hint for `raw_value` is used to generate documentation, e.g. for
-    `./pants target-types`. If the field is required, do not use `Optional` for the type hint of
-    `raw_value`.
+    `./pants help $target_type`.
 
     Example:
 
@@ -122,6 +132,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         #   this Field could not be passed around in the engine.
         # * Don't store `address` to avoid the cost in memory of storing `Address` on every single
         #   field encountered by Pants in a run.
+        super().__init__(raw_value, address=address)
         self.value = self.compute_value(raw_value, address=address)
 
     @classmethod
@@ -213,6 +224,7 @@ class AsyncField(Field, metaclass=ABCMeta):
 
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
+        super().__init__(raw_value, address=address)
         self.address = address
         self.sanitized_raw_value = self.sanitize_raw_value(raw_value, address=address)
 
@@ -259,6 +271,10 @@ class Target(ABC):
     alias: ClassVar[str]
     core_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    # Subclasses may define these.
+    deprecated_removal_version: ClassVar[Optional[str]] = None
+    deprecated_removal_hint: ClassVar[Optional[str]] = None
+
     # These get calculated in the constructor
     address: Address
     plugin_fields: Tuple[Type[Field], ...]
@@ -275,6 +291,21 @@ class Target(ABC):
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: Optional[UnionMembership] = None,
     ) -> None:
+        if self.deprecated_removal_version and address.is_base_target:
+            if not self.deprecated_removal_hint:
+                raise ValueError(
+                    f"You specified `deprecated_removal_version` for {self.__class__}, but not "
+                    "the class property `deprecated_removal_hint`."
+                )
+            warn_or_error(
+                removal_version=self.deprecated_removal_version,
+                deprecated_entity_description=f"the {repr(self.alias)} target type",
+                hint=(
+                    f"Using the `{self.alias}` target type for {address}. "
+                    f"{self.deprecated_removal_hint}"
+                ),
+            )
+
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
 
@@ -603,6 +634,41 @@ class TransitiveTargets:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
+class TransitiveTargetsRequest:
+    """A request to get the transitive dependencies of the input roots.
+
+    Resolve the transitive targets with `await Get(TransitiveTargets,
+    TransitiveTargetsRequest([addr1, addr2])`.
+    """
+
+    roots: Tuple[Address, ...]
+    include_special_cased_deps: bool
+
+    def __init__(
+        self, roots: Iterable[Address], *, include_special_cased_deps: bool = False
+    ) -> None:
+        self.roots = tuple(roots)
+        self.include_special_cased_deps = include_special_cased_deps
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class TransitiveTargetsRequestLite:
+    """A request to get the transitive dependencies of the input roots, but without considering
+    dependency inference.
+
+    This solely exists due to graph ambiguity with codegen implementations. Use
+    `TransitiveTargetsRequest` everywhere other than codegen.
+    """
+
+    roots: Tuple[Address, ...]
+
+    def __init__(self, roots: Iterable[Address]) -> None:
+        self.roots = tuple(roots)
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class RegisteredTargetTypes:
     aliases_to_types: FrozenDict[str, Type[Target]]
 
@@ -712,7 +778,7 @@ def generate_subtarget(
 
 
 @dataclass(frozen=True)
-class _AbstractFieldSet(ABC):
+class _AbstractFieldSet(EngineAwareParameter, ABC):
     required_fields: ClassVar[Tuple[Type[Field], ...]]
 
     address: Address
@@ -732,6 +798,14 @@ class _AbstractFieldSet(ABC):
             for target_type in target_types
             if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
         )
+
+    def debug_hint(self) -> str:
+        return self.address.spec
+
+    def __repr__(self) -> str:
+        # We use a short repr() because this often shows up in stack traces. We don't need any of
+        # the field information because we can ask a user to send us their BUILD file.
+        return f"{self.__class__.__name__}(address={self.address})"
 
 
 def _get_field_set_fields_from_target(
@@ -1008,7 +1082,7 @@ class BoolField(PrimitiveField, metaclass=ABCMeta):
         return value_or_default
 
 
-class IntField(ScalarField, metaclass=ABCMeta):
+class IntField(ScalarField[int], metaclass=ABCMeta):
     expected_type = int
     expected_type_description = "an integer"
 
@@ -1017,7 +1091,7 @@ class IntField(ScalarField, metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class FloatField(ScalarField, metaclass=ABCMeta):
+class FloatField(ScalarField[float], metaclass=ABCMeta):
     expected_type = float
     expected_type_description = "a float"
 
@@ -1026,7 +1100,7 @@ class FloatField(ScalarField, metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class StringField(ScalarField, metaclass=ABCMeta):
+class StringField(ScalarField[str], metaclass=ABCMeta):
     """A field whose value is a string.
 
     If you expect the string to only be one of several values, set the class property
@@ -1096,10 +1170,7 @@ class SequenceField(Generic[T], PrimitiveField, metaclass=ABCMeta):
         return tuple(value_or_default)
 
 
-class StringSequenceField(SequenceField, metaclass=ABCMeta):
-    value: Optional[Tuple[str, ...]]
-    default: ClassVar[Optional[Tuple[str, ...]]] = None
-
+class StringSequenceField(SequenceField[str], metaclass=ABCMeta):
     expected_element_type = str
     expected_type_description = "an iterable of strings (e.g. a list of strings)"
 
@@ -1110,7 +1181,7 @@ class StringSequenceField(SequenceField, metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class StringOrStringSequenceField(SequenceField, metaclass=ABCMeta):
+class StringOrStringSequenceField(SequenceField[str], metaclass=ABCMeta):
     """The raw_value may either be a string or be an iterable of strings.
 
     This is syntactic sugar that we use for certain fields to make BUILD files simpler when the user
@@ -1118,9 +1189,6 @@ class StringOrStringSequenceField(SequenceField, metaclass=ABCMeta):
 
     Generally, this should not be used by any new Fields. This mechanism is a misfeature.
     """
-
-    value: Optional[Tuple[str, ...]]
-    default: ClassVar[Optional[Tuple[str, ...]]] = None
 
     expected_element_type = str
     expected_type_description = (
@@ -1187,23 +1255,9 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
         return FrozenDict(result)
 
 
-# -----------------------------------------------------------------------------------------------
-# Sources and codegen
-# -----------------------------------------------------------------------------------------------
-
-
-class Sources(AsyncField):
-    """A list of files and globs that belong to this target.
-
-    Paths are relative to the BUILD file's directory. You can ignore files/globs by prefixing them
-    with `!`. Example: `sources=['example.py', 'test_*.py', '!test_ignore.py']`.
-    """
-
-    alias = "sources"
+class AsyncStringSequenceField(AsyncField):
     sanitized_raw_value: Optional[Tuple[str, ...]]
     default: ClassVar[Optional[Tuple[str, ...]]] = None
-    expected_file_extensions: ClassVar[Optional[Tuple[str, ...]]] = None
-    expected_num_files: ClassVar[Optional[Union[int, range]]] = None
 
     @classmethod
     def sanitize_raw_value(
@@ -1222,6 +1276,23 @@ class Sources(AsyncField):
                 expected_type="an iterable of strings (e.g. a list of strings)",
             )
         return tuple(sorted(value_or_default))
+
+
+# -----------------------------------------------------------------------------------------------
+# Sources and codegen
+# -----------------------------------------------------------------------------------------------
+
+
+class Sources(AsyncStringSequenceField):
+    """A list of files and globs that belong to this target.
+
+    Paths are relative to the BUILD file's directory. You can ignore files/globs by prefixing them
+    with `!`. Example: `sources=['example.py', 'test_*.py', '!test_ignore.py']`.
+    """
+
+    alias = "sources"
+    expected_file_extensions: ClassVar[Optional[Tuple[str, ...]]] = None
+    expected_num_files: ClassVar[Optional[Union[int, range]]] = None
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         """Perform any additional validation on the resulting source files, e.g. ensuring that
@@ -1278,11 +1349,8 @@ class Sources(AsyncField):
         return str(PurePath(self.address.spec_path, glob))
 
     @final
-    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> Optional[PathGlobs]:
-        globs = self.sanitized_raw_value
-        if globs is None:
-            return None
-
+    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
+        globs = self.sanitized_raw_value or ()
         error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
         conjunction = (
             GlobExpansionConjunction.all_match
@@ -1352,7 +1420,7 @@ class Sources(AsyncField):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class HydrateSourcesRequest:
+class HydrateSourcesRequest(EngineAwareParameter):
     field: Sources
     for_sources_types: Tuple[Type[Sources], ...]
     enable_codegen: bool
@@ -1389,6 +1457,9 @@ class HydrateSourcesRequest:
                 "generate Python files."
             )
 
+    def debug_hint(self) -> str:
+        return self.field.address.spec
+
 
 @dataclass(frozen=True)
 class HydratedSources:
@@ -1409,7 +1480,7 @@ class HydratedSources:
 
 @union
 @dataclass(frozen=True)
-class GenerateSourcesRequest:
+class GenerateSourcesRequest(EngineAwareParameter):
     """A request to go from protocol sources -> a particular language.
 
     This should be subclassed for each distinct codegen implementation. The subclasses must define
@@ -1442,6 +1513,9 @@ class GenerateSourcesRequest:
     input: ClassVar[Type[Sources]]
     output: ClassVar[Type[Sources]]
 
+    def debug_hint(self) -> str:
+        return "{self.protocol_target.address.spec}"
+
 
 @dataclass(frozen=True)
 class GeneratedSources:
@@ -1455,8 +1529,7 @@ class GeneratedSources:
 # NB: To hydrate the dependencies, use one of:
 #   await Get(Addresses, DependenciesRequest(tgt[Dependencies])
 #   await Get(Targets, DependenciesRequest(tgt[Dependencies])
-#   await Get(TransitiveTargets, DependenciesRequest(tgt[Dependencies])
-class Dependencies(AsyncField):
+class Dependencies(AsyncStringSequenceField):
     """Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib'].
 
     Alternatively, you may include file names. Pants will find which target owns that file, and
@@ -1470,45 +1543,44 @@ class Dependencies(AsyncField):
     """
 
     alias = "dependencies"
-    sanitized_raw_value: Optional[Tuple[str, ...]]
-    default: ClassVar[Optional[Tuple[str, ...]]] = None
     supports_transitive_excludes = False
 
-    @classmethod
-    def sanitize_raw_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[Address, ...]]:
-        value_or_default = super().sanitize_raw_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        try:
-            ensure_str_list(value_or_default)
-        except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                value_or_default,
-                expected_type="an iterable of strings (e.g. a list of strings)",
-            )
-        return tuple(sorted(value_or_default))
-
     @memoized_property
-    def unevaluated_transitive_excludes(self) -> Tuple[AddressInput, ...]:
+    def unevaluated_transitive_excludes(self) -> UnparsedAddressInputs:
         if not self.supports_transitive_excludes or not self.sanitized_raw_value:
-            return ()
-        return tuple(
-            AddressInput.parse(v[2:]) for v in self.sanitized_raw_value if v.startswith("!!")
+            return UnparsedAddressInputs((), owning_address=self.address)
+        return UnparsedAddressInputs(
+            (v[2:] for v in self.sanitized_raw_value if v.startswith("!!")),
+            owning_address=self.address,
         )
 
 
 @dataclass(frozen=True)
-class DependenciesRequest:
+class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
+    include_special_cased_deps: bool = False
+
+    def debug_hint(self) -> str:
+        return self.field.address.spec
+
+
+@dataclass(frozen=True)
+class DependenciesRequestLite(EngineAwareParameter):
+    """Like DependenciesRequest, but does not use dependency inference.
+
+    This solely exists due to graph ambiguity with codegen. Use `DependenciesRequest` everywhere but
+    with codegen.
+    """
+
+    field: Dependencies
+
+    def debug_hint(self) -> str:
+        return self.field.address.spec
 
 
 @union
 @dataclass(frozen=True)
-class InjectDependenciesRequest(ABC):
+class InjectDependenciesRequest(EngineAwareParameter, ABC):
     """A request to inject dependencies, in addition to those explicitly provided.
 
     To set up a new injection, subclass this class. Set the class property `inject_for` to the
@@ -1530,8 +1602,10 @@ class InjectDependenciesRequest(ABC):
         async def inject_fortran_dependencies(
             request: InjectFortranDependencies
         ) -> InjectedDependencies:
-            address = await Get(Address, AddressInput, AddressInput.parse("//:injected"))
-            return InjectedDependencies([address]]
+            addresses = await Get(
+                Addresses, UnparsedAddressInputs(["//:injected"], owning_address=None)
+            )
+            return InjectedDependencies(addresses)
 
         def rules():
             return [
@@ -1543,6 +1617,9 @@ class InjectDependenciesRequest(ABC):
     dependencies_field: Dependencies
     inject_for: ClassVar[Type[Dependencies]]
 
+    def debug_hint(self) -> str:
+        return self.dependencies_field.address.spec
+
 
 class InjectedDependencies(DeduplicatedCollection[Address]):
     sort_input = True
@@ -1550,7 +1627,7 @@ class InjectedDependencies(DeduplicatedCollection[Address]):
 
 @union
 @dataclass(frozen=True)
-class InferDependenciesRequest:
+class InferDependenciesRequest(EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property
@@ -1583,6 +1660,9 @@ class InferDependenciesRequest:
     sources_field: Sources
     infer_from: ClassVar[Type[Sources]]
 
+    def debug_hint(self) -> str:
+        return self.sources_field.address.spec
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
@@ -1608,6 +1688,27 @@ class InferredDependencies:
 
     def __iter__(self) -> Iterator[Address]:
         return iter(self.dependencies)
+
+
+class SpecialCasedDependencies(AsyncStringSequenceField):
+    """Subclass this for fields that act similarly to the `dependencies` field, but are handled
+    differently than normal dependencies.
+
+    For example, you might have a field for package/binary dependencies, which you will call
+    the equivalent of `./pants package` on. While you could put these in the normal
+    `dependencies` field, it is often clearer to the user to call out this magic through a
+    dedicated field.
+
+    This type will ensure that the dependencies show up in project introspection,
+    like `dependencies` and `dependees`, but not show up when you call `Get(TransitiveTargets,
+    TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
+
+    To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,
+    tgt.get(MyField).to_unparsed_address_inputs()`.
+    """
+
+    def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
+        return UnparsedAddressInputs(self.sanitized_raw_value or (), owning_address=self.address)
 
 
 # -----------------------------------------------------------------------------------------------

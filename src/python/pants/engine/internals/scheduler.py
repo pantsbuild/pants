@@ -22,6 +22,7 @@ from pants.engine.fs import (
     DigestSubset,
     DownloadFile,
     FileContent,
+    FileDigest,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
@@ -29,9 +30,10 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.native_engine import PyTypes  # type: ignore[import]
+from pants.engine.internals.native_engine import PyTypes
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
+from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import (
     FallibleProcessResultWithPlatform,
@@ -40,7 +42,6 @@ from pants.engine.process import (
     MultiPlatformProcess,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
-from pants.engine.session import SessionValues
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
@@ -129,7 +130,7 @@ class Scheduler:
         tasks = self._register_rules(rule_index, union_membership)
 
         types = PyTypes(
-            directory_digest=Digest,
+            file_digest=FileDigest,
             snapshot=Snapshot,
             paths=Paths,
             file_content=FileContent,
@@ -476,9 +477,9 @@ class SchedulerSession:
     def node_count(self):
         return self._scheduler.graph_len()
 
-    def metrics(self):
+    def metrics(self) -> Dict[str, int]:
         """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
-        return self._scheduler._metrics(self._session)
+        return cast(Dict[str, int], self._scheduler._metrics(self._session))
 
     def _maybe_visualize(self):
         if self._scheduler.visualize_to_dir is not None:

@@ -38,10 +38,10 @@ def create_mock_run_request(rule_runner: RuleRunner, program_text: bytes) -> Run
 
 def single_target_run(
     rule_runner: RuleRunner,
-    *,
+    address: Address,
     console: MockConsole,
+    *,
     program_text: bytes,
-    address_spec: str,
 ) -> Run:
     workspace = Workspace(rule_runner.scheduler)
     interactive_runner = InteractiveRunner(rule_runner.scheduler)
@@ -53,7 +53,6 @@ def single_target_run(
         alias = "binary"
         core_fields = ()
 
-    address = Address.parse(address_spec)
     target = TestBinaryTarget({}, address=address)
     target_with_origin = TargetWithOrigin(
         target, AddressLiteralSpec(address.spec_path, address.target_name)
@@ -91,9 +90,9 @@ def test_normal_run(rule_runner: RuleRunner) -> None:
     program_text = b'#!/usr/bin/python\nprint("hello")'
     res = single_target_run(
         rule_runner,
-        console=console,
+        Address("some/addr"),
+        console,
         program_text=program_text,
-        address_spec="some/addr",
     )
     assert res.exit_code == 0
 
@@ -114,7 +113,5 @@ def test_materialize_input_files(rule_runner: RuleRunner) -> None:
 def test_failed_run(rule_runner: RuleRunner) -> None:
     console = MockConsole(use_colors=False)
     program_text = b'#!/usr/bin/python\nraise RuntimeError("foo")'
-    res = single_target_run(
-        rule_runner, console=console, program_text=program_text, address_spec="some/addr"
-    )
+    res = single_target_run(rule_runner, Address("some/addr"), console, program_text=program_text)
     assert res.exit_code == 1

@@ -24,7 +24,6 @@ from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import SubsystemRule
 from pants.engine.target import InferredDependencies
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -51,7 +50,9 @@ def test_infer_python_imports() -> None:
         ),
     )
 
+    # If there's a `.py` and `.pyi` file for the same module, we should infer a dependency on both.
     rule_runner.create_file("src/python/str_import/subdir/f.py")
+    rule_runner.create_file("src/python/str_import/subdir/f.pyi")
     rule_runner.add_to_build_file("src/python/str_import/subdir", "python_library()")
 
     rule_runner.create_file("src/python/util/dep.py")
@@ -89,11 +90,11 @@ def test_infer_python_imports() -> None:
         args = ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"]
         if enable_string_imports:
             args.append("--python-infer-string-imports")
-        options_bootstrapper = create_options_bootstrapper(args=args)
-        target = rule_runner.get_target(address, options_bootstrapper)
+        rule_runner.set_options(args)
+        target = rule_runner.get_target(address)
         return rule_runner.request(
             InferredDependencies,
-            [InferPythonDependencies(target[PythonSources]), options_bootstrapper],
+            [InferPythonDependencies(target[PythonSources])],
         )
 
     normal_address = Address("src/python")
@@ -119,6 +120,7 @@ def test_infer_python_imports() -> None:
         [
             Address("src/python", relative_file_path="app.py", target_name="python"),
             Address("src/python/str_import/subdir", relative_file_path="f.py"),
+            Address("src/python/str_import/subdir", relative_file_path="f.pyi"),
         ],
         sibling_dependencies_inferrable=True,
     )
@@ -134,8 +136,8 @@ def test_infer_python_inits() -> None:
         ],
         target_types=[PythonLibrary],
     )
-    options_bootstrapper = create_options_bootstrapper(
-        args=[
+    rule_runner.set_options(
+        [
             "--backend-packages=pants.backend.python",
             "--python-infer-inits",
             "--source-root-patterns=src/python",
@@ -152,13 +154,13 @@ def test_infer_python_inits() -> None:
     rule_runner.add_to_build_file("src/python/root/mid/leaf", "python_library()")
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        target = rule_runner.get_target(address, options_bootstrapper)
+        target = rule_runner.get_target(address)
         return rule_runner.request(
             InferredDependencies,
-            [InferInitDependencies(target[PythonSources]), options_bootstrapper],
+            [InferInitDependencies(target[PythonSources])],
         )
 
-    assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
+    assert run_dep_inference(Address("src/python/root/mid/leaf")) == InferredDependencies(
         [
             Address("src/python/root", relative_file_path="__init__.py", target_name="root"),
             Address("src/python/root/mid", relative_file_path="__init__.py", target_name="mid"),
@@ -177,11 +179,8 @@ def test_infer_python_conftests() -> None:
         ],
         target_types=[PythonTests],
     )
-    options_bootstrapper = create_options_bootstrapper(
-        args=[
-            "--backend-packages=pants.backend.python",
-            "--source-root-patterns=src/python",
-        ]
+    rule_runner.set_options(
+        ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"]
     )
 
     rule_runner.create_file("src/python/root/conftest.py")
@@ -195,13 +194,13 @@ def test_infer_python_conftests() -> None:
     rule_runner.add_to_build_file("src/python/root/mid/leaf", "python_tests()")
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        target = rule_runner.get_target(address, options_bootstrapper)
+        target = rule_runner.get_target(address)
         return rule_runner.request(
             InferredDependencies,
-            [InferConftestDependencies(target[PythonSources]), options_bootstrapper],
+            [InferConftestDependencies(target[PythonSources])],
         )
 
-    assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
+    assert run_dep_inference(Address("src/python/root/mid/leaf")) == InferredDependencies(
         [
             Address("src/python/root", relative_file_path="conftest.py", target_name="root"),
             Address("src/python/root/mid", relative_file_path="conftest.py", target_name="mid"),

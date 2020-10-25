@@ -1,6 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import dataclasses
 from textwrap import dedent
 from typing import List, Optional, Sequence, Tuple
 
@@ -11,12 +11,10 @@ from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Target
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -26,9 +24,9 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *black_rules(),
-            QueryRule(LintResults, (BlackRequest, PantsEnvironment)),
-            QueryRule(FmtResult, (BlackRequest, PantsEnvironment)),
-            QueryRule(SourceFiles, (SourceFilesRequest, PantsEnvironment)),
+            QueryRule(LintResults, (BlackRequest,)),
+            QueryRule(FmtResult, (BlackRequest,)),
+            QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonLibrary],
     )
@@ -73,26 +71,19 @@ def run_black(
         args.append(f"--black-args='{passthrough_args}'")
     if skip:
         args.append("--black-skip")
-    options_bootstrapper = create_options_bootstrapper(args=args)
+    rule_runner.set_options(args)
     field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
-    pants_env = PantsEnvironment()
-    lint_results = rule_runner.request(
-        LintResults, [BlackRequest(field_sets), options_bootstrapper, pants_env]
-    )
+    lint_results = rule_runner.request(LintResults, [BlackRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
         [
             SourceFilesRequest(field_set.sources for field_set in field_sets),
-            options_bootstrapper,
-            pants_env,
         ],
     )
     fmt_result = rule_runner.request(
         FmtResult,
         [
             BlackRequest(field_sets, prior_formatter_result=input_sources.snapshot),
-            options_bootstrapper,
-            pants_env,
         ],
     )
     return lint_results.results, fmt_result
@@ -211,3 +202,31 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == get_digest(rule_runner, [py38_sources])
     assert fmt_result.did_change is False
+
+
+def test_stub_files(rule_runner: RuleRunner) -> None:
+    good_stub = dataclasses.replace(GOOD_SOURCE, path="good.pyi")
+    bad_stub = dataclasses.replace(BAD_SOURCE, path="bad.pyi")
+    fixed_bad_stub = dataclasses.replace(FIXED_BAD_SOURCE, path="bad.pyi")
+
+    good_files = [GOOD_SOURCE, good_stub]
+    target = make_target(rule_runner, good_files)
+    lint_results, fmt_result = run_black(rule_runner, [target])
+    assert len(lint_results) == 1 and lint_results[0].exit_code == 0
+    assert (
+        "2 files would be left unchanged" in lint_results[0].stderr
+        and "2 files left unchanged" in fmt_result.stderr
+    )
+    assert fmt_result.output == get_digest(rule_runner, good_files)
+    assert not fmt_result.did_change
+
+    target = make_target(rule_runner, [BAD_SOURCE, bad_stub], name="failing_target")
+    lint_results, fmt_result = run_black(rule_runner, [target])
+    assert len(lint_results) == 1 and lint_results[0].exit_code == 1
+    assert (
+        "2 files would be reformatted" in lint_results[0].stderr
+        and "2 files reformatted" in fmt_result.stderr
+    )
+    fixed_bad_files = [FIXED_BAD_SOURCE, fixed_bad_stub]
+    assert fmt_result.output == get_digest(rule_runner, [*fixed_bad_files, *good_files])
+    assert fmt_result.did_change

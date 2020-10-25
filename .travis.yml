@@ -20,10 +20,10 @@ env:
   - AWS_BUCKET=ci-public.pantsbuild.org
   - BOOTSTRAPPED_PEX_KEY_PREFIX=daily/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
   - NATIVE_ENGINE_SO_KEY_PREFIX=monthly/native_engine_so
-  - PYENV_PY27_VERSION=2.7.18
-  - PYENV_PY36_VERSION=3.6.10
-  - PYENV_PY37_VERSION=3.7.7
-  - PYENV_PY38_VERSION=3.8.3
+  - MACOS_PYENV_PY27_VERSION=2.7.18
+  - MACOS_PYENV_PY36_VERSION=3.6.10
+  - MACOS_PYENV_PY37_VERSION=3.7.7
+  - MACOS_PYENV_PY38_VERSION=3.8.3
   - PYENV_ROOT_OSX=${HOME}/.pants_pyenv
   - PYENV_ROOT="${PYENV_ROOT:-${PYENV_ROOT_OSX}}"
   - PATH="${PYENV_ROOT}/shims:${PATH}"
@@ -54,7 +54,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -63,7 +63,7 @@ jobs:
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - CACHE_NAME=bootstrap.linux.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
@@ -85,7 +85,6 @@ jobs:
     services:
     - docker
     stage: Bootstrap Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -107,7 +106,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -116,7 +115,7 @@ jobs:
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - CACHE_NAME=bootstrap.linux.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
@@ -138,7 +137,6 @@ jobs:
     services:
     - docker
     stage: Bootstrap Pants (Cron)
-    sudo: required
   - after_failure:
     - ./build-support/bin/ci-failure.sh
     before_cache:
@@ -150,7 +148,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY36_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY27_VERSION} ${MACOS_PYENV_PY36_VERSION}
     before_script:
     - ulimit -n 8192
     cache:
@@ -165,14 +163,14 @@ jobs:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     language: generic
-    name: Build OSX native engine and pants.pex (Python 3.6)
+    name: Build macOS native engine and pants.pex (Python 3.6)
     os: osx
     osx_image: xcode8
     script:
@@ -191,7 +189,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY37_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY27_VERSION} ${MACOS_PYENV_PY37_VERSION}
     before_script:
     - ulimit -n 8192
     cache:
@@ -206,14 +204,14 @@ jobs:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     language: generic
-    name: Build OSX native engine and pants.pex (Python 3.7)
+    name: Build macOS native engine and pants.pex (Python 3.7)
     os: osx
     osx_image: xcode8
     script:
@@ -238,17 +236,12 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -258,15 +251,10 @@ jobs:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=lint.py36
     language: python
     name: Self-checks and lint (Python 3.6)
@@ -281,7 +269,6 @@ jobs:
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --lint --python-version 3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -299,17 +286,12 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -319,15 +301,10 @@ jobs:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=lint.py37
     language: python
     name: Self-checks and lint (Python 3.7)
@@ -342,14 +319,11 @@ jobs:
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --lint --python-version 3.7
     stage: Test Pants (Cron)
-    sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
@@ -396,17 +370,12 @@ jobs:
     - ./build-support/bin/upload_coverage.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -416,15 +385,10 @@ jobs:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=python_tests.py36
     language: python
     name: Python tests (Python 3.6)
@@ -437,7 +401,6 @@ jobs:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --integration-tests --python-version 3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -457,17 +420,12 @@ jobs:
     - ./build-support/bin/upload_coverage.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -477,15 +435,10 @@ jobs:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=python_tests.py37
     language: python
     name: Python tests (Python 3.7)
@@ -498,14 +451,11 @@ jobs:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --integration-tests --python-version 3.7
     stage: Test Pants (Cron)
-    sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
@@ -539,7 +489,7 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${MACOS_PYENV_PY36_VERSION}"
     - brew cask install osxfuse
     before_script:
     - ulimit -n 8192
@@ -555,10 +505,10 @@ jobs:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=rust_tests.osx
     if: commit_message !~ /\[ci skip-rust\]/
     name: Rust tests - OSX
@@ -584,32 +534,22 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.linux
     if: commit_message !~ /\[ci skip-build-wheels\]/ OR type NOT IN (pull_request,
@@ -632,7 +572,6 @@ jobs:
     services:
     - docker
     stage: Test Pants
-    sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
@@ -642,8 +581,8 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY36_VERSION} ${PYENV_PY37_VERSION}
-      ${PYENV_PY38_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY36_VERSION} ${MACOS_PYENV_PY37_VERSION}
+      ${MACOS_PYENV_PY38_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -659,10 +598,10 @@ jobs:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.osx
@@ -683,7 +622,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY36_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY27_VERSION} ${MACOS_PYENV_PY36_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -691,14 +630,14 @@ jobs:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_platform_tests.py36
     language: generic
-    name: OSX platform-specific tests (Python 3.6)
+    name: macOS platform-specific tests (Python 3.6)
     os: osx
     script:
     - ./build-support/bin/ci.py --platform-specific-tests --python-version 3.6
@@ -708,7 +647,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY37_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY27_VERSION} ${MACOS_PYENV_PY37_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -716,14 +655,14 @@ jobs:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_platform_tests.py37
     language: generic
-    name: OSX platform-specific tests (Python 3.7)
+    name: macOS platform-specific tests (Python 3.7)
     os: osx
     script:
     - ./build-support/bin/ci.py --platform-specific-tests --python-version 3.7
@@ -733,7 +672,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY36_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY27_VERSION} ${MACOS_PYENV_PY36_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -741,14 +680,14 @@ jobs:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_smoke_tests.10_12.py36
     language: generic
-    name: OSX 10.12 smoke test (Python 3.6)
+    name: macOS 10.12 smoke test (Python 3.6)
     os: osx
     osx_image: xcode9.2
     script:
@@ -759,7 +698,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY37_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY27_VERSION} ${MACOS_PYENV_PY37_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -767,14 +706,14 @@ jobs:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_smoke_tests.10_12.py37
     language: generic
-    name: OSX 10.12 smoke test (Python 3.7)
+    name: macOS 10.12 smoke test (Python 3.7)
     os: osx
     osx_image: xcode9.2
     script:
@@ -785,7 +724,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY36_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY27_VERSION} ${MACOS_PYENV_PY36_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -793,14 +732,14 @@ jobs:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_smoke_tests.10_13.py36
     language: generic
-    name: OSX 10.13 smoke test (Python 3.6)
+    name: macOS 10.13 smoke test (Python 3.6)
     os: osx
     osx_image: xcode10.1
     script:
@@ -811,7 +750,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY37_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY27_VERSION} ${MACOS_PYENV_PY37_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -819,14 +758,14 @@ jobs:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_smoke_tests.10_13.py37
     language: generic
-    name: OSX 10.13 smoke test (Python 3.7)
+    name: macOS 10.13 smoke test (Python 3.7)
     os: osx
     osx_image: xcode10.1
     script:
@@ -849,27 +788,18 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
     deploy:
       api_key:
@@ -881,10 +811,9 @@ jobs:
         tags: true
       provider: releases
       skip_cleanup: true
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - RUN_PANTS_FROM_PEX=1
     - PANTS_PEX_RELEASE=stable
     - CACHE_NAME=deploy.stable
@@ -898,7 +827,6 @@ jobs:
     script:
     - ./build-support/bin/release.sh -p
     stage: Deploy Pants Pex
-    sudo: required
   - addons:
       apt:
         packages:
@@ -916,32 +844,22 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - RUN_PANTS_FROM_PEX=1
     - PREPARE_DEPLOY=1
     - CACHE_NAME=deploy.unstable
@@ -957,7 +875,6 @@ jobs:
     - mkdir -p dist/deploy/pex/
     - mv dist/pants*.pex dist/deploy/pex/
     stage: Deploy Pants Pex Unstable
-    sudo: required
 stages:
 - if: type != cron
   name: Bootstrap Pants

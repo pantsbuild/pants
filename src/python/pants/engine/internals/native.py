@@ -10,7 +10,7 @@ from typing_extensions import Protocol
 from pants.base.exiter import ExitCode
 from pants.engine.fs import PathGlobs
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import (  # type: ignore[import]
+from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutionStrategyOptions,
     PyExecutor,
@@ -24,8 +24,8 @@ from pants.engine.internals.native_engine import (  # type: ignore[import]
     PyTasks,
     PyTypes,
 )
+from pants.engine.internals.session import SessionValues
 from pants.engine.rules import Get
-from pants.engine.session import SessionValues
 from pants.engine.unions import union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -55,10 +55,6 @@ class Externs:
         """Given a utf8 message string, create an Exception object."""
         return Exception(msg)
 
-    def val_to_str(self, val):
-        """Given a `obj`, return str(obj)."""
-        return "" if val is None else str(val)
-
     def generator_send(
         self, func, arg
     ) -> Union[PyGeneratorResponseGet, PyGeneratorResponseGetMulti, PyGeneratorResponseBreak]:
@@ -71,18 +67,18 @@ class Externs:
             if isinstance(res, Get):
                 # Get.
                 return PyGeneratorResponseGet(
-                    res.output_type,
-                    res.input_type,
-                    res.input,
+                    product=res.output_type,
+                    declared_subject=res.input_type,
+                    subject=res.input,
                 )
             elif type(res) in (tuple, list):
                 # GetMulti.
                 return PyGeneratorResponseGetMulti(
-                    tuple(
+                    gets=tuple(
                         PyGeneratorResponseGet(
-                            get.output_type,
-                            get.input_type,
-                            get.input,
+                            product=get.output_type,
+                            declared_subject=get.input_type,
+                            subject=get.input,
                         )
                         for get in res
                     )
@@ -94,7 +90,7 @@ class Externs:
                 raise
             # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
             # by calling `next()` on an empty iterator.
-            return PyGeneratorResponseBreak(e.value)
+            return PyGeneratorResponseBreak(val=e.value)
 
 
 class RawFdRunner(Protocol):
@@ -139,6 +135,11 @@ class Native(metaclass=SingletonMetaclass):
         return self.lib.init_logging(
             level, log_show_rust_3rdparty, use_color, show_target, log_levels_as_ints
         )
+
+    def set_per_run_log_path(self, path: Optional[str]) -> None:
+        """Instructs the logging code to also write emitted logs to a run-specific log file; or
+        disables writing to any run-specific file if `None` is passed."""
+        self.lib.set_per_run_log_path(path)
 
     def default_cache_path(self) -> str:
         return cast(str, self.lib.default_cache_path())
@@ -211,11 +212,11 @@ class Native(metaclass=SingletonMetaclass):
         session_values: SessionValues,
     ) -> PySession:
         return PySession(
-            scheduler,
-            dynamic_ui,
-            build_id,
-            should_report_workunits,
-            session_values,
+            scheduler=scheduler,
+            should_render_ui=dynamic_ui,
+            build_id=build_id,
+            should_report_workunits=should_report_workunits,
+            session_values=session_values,
         )
 
     def new_scheduler(
@@ -264,22 +265,27 @@ class Native(metaclass=SingletonMetaclass):
             speculation_strategy=execution_options.process_execution_speculation_strategy,
             use_local_cache=execution_options.process_execution_use_local_cache,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
+            remote_cache_read=execution_options.remote_cache_read,
+            remote_cache_write=execution_options.remote_cache_write,
         )
 
-        return self.lib.scheduler_create(
-            self._executor,
-            tasks,
-            types,
-            # Project tree.
-            build_root,
-            local_store_dir,
-            local_execution_root_dir,
-            named_caches_dir,
-            ca_certs_path,
-            ignore_patterns,
-            use_gitignore,
-            remoting_options,
-            exec_stategy_opts,
+        return cast(
+            PyScheduler,
+            self.lib.scheduler_create(
+                self._executor,
+                tasks,
+                types,
+                # Project tree.
+                build_root,
+                local_store_dir,
+                local_execution_root_dir,
+                named_caches_dir,
+                ca_certs_path,
+                ignore_patterns,
+                use_gitignore,
+                remoting_options,
+                exec_stategy_opts,
+            ),
         )
 
     def set_panic_handler(self):

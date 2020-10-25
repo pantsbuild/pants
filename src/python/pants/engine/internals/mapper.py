@@ -5,13 +5,17 @@ import re
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, Mapping, Optional, Pattern, Tuple
 
-from pants.base.exceptions import DuplicateNameError, MappingError
+from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.filtering import and_filters, create_filters
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
+
+
+class DuplicateNameError(MappingError):
+    """Indicates more than one top-level object was found with the same name."""
 
 
 @dataclass(frozen=True)

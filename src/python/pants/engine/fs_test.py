@@ -11,6 +11,7 @@ import tarfile
 import time
 import unittest
 from contextlib import contextmanager
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Callable, List
@@ -18,6 +19,7 @@ from typing import Callable, List
 import pytest
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -29,17 +31,21 @@ from pants.engine.fs import (
     Directory,
     DownloadFile,
     FileContent,
+    FileDigest,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
     RemovePrefix,
     Snapshot,
+    Workspace,
 )
 from pants.engine.fs import rules as fs_rules
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
-from pants.testutil.rule_runner import QueryRule
+from pants.engine.rules import Get, goal_rule, rule
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
@@ -792,7 +798,7 @@ class FSTest(FSTestBase):
 
 
 class DownloadsTest(FSTestBase):
-    file_digest = Digest("8fcbc50cda241aee7238c71e87c27804e7abc60675974eaf6567aa16366bc105", 14)
+    file_digest = FileDigest("8fcbc50cda241aee7238c71e87c27804e7abc60675974eaf6567aa16366bc105", 14)
 
     expected_snapshot_digest = Digest(
         "4c9cf91fcd7ba1abbf7f9a0a1c8175556a82bee6a398e34db3284525ac24a3ad", 84
@@ -837,7 +843,7 @@ class DownloadsTest(FSTestBase):
                         [
                             DownloadFile(
                                 f"http://localhost:{port}/file.txt",
-                                Digest(
+                                FileDigest(
                                     self.file_digest.fingerprint,
                                     self.file_digest.serialized_bytes_length + 1,
                                 ),
@@ -856,7 +862,9 @@ class DownloadsTest(FSTestBase):
                 # so we shouldn't see an error...
                 url = DownloadFile(
                     f"http://localhost:{port}/roland",
-                    Digest("693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16),
+                    FileDigest(
+                        "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16
+                    ),
                 )
                 snapshot = self.request(Snapshot, [url])
                 self.assert_snapshot_equals(
@@ -915,3 +923,58 @@ class StubHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/utf-8")
         self.send_header("Content-Length", f"{len(self.response_text)}")
         self.end_headers()
+
+
+def test_workspace_in_goal_rule() -> None:
+    class WorkspaceGoalSubsystem(GoalSubsystem):
+        name = "workspace-goal"
+
+    class WorkspaceGoal(Goal):
+        subsystem_cls = WorkspaceGoalSubsystem
+
+    @dataclass(frozen=True)
+    class DigestRequest:
+        create_digest: CreateDigest
+
+    @rule
+    def digest_request_singleton() -> DigestRequest:
+        fc = FileContent(path="a.txt", content=b"hello")
+        return DigestRequest(CreateDigest([fc]))
+
+    @goal_rule
+    async def workspace_goal_rule(
+        console: Console, workspace: Workspace, digest_request: DigestRequest
+    ) -> WorkspaceGoal:
+        snapshot = await Get(Snapshot, CreateDigest, digest_request.create_digest)
+        workspace.write_digest(snapshot.digest)
+        console.print_stdout(snapshot.files[0], end="")
+        return WorkspaceGoal(exit_code=0)
+
+    rule_runner = RuleRunner(rules=[workspace_goal_rule, digest_request_singleton])
+    result = rule_runner.run_goal_rule(WorkspaceGoal)
+    assert result.exit_code == 0
+    assert result.stdout == "a.txt"
+    assert Path(rule_runner.build_root, "a.txt").read_text() == "hello"
+
+
+def test_write_digest() -> None:
+    rule_runner = RuleRunner()
+
+    workspace = Workspace(rule_runner.scheduler)
+    digest = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("a.txt", b"hello"), FileContent("subdir/b.txt", b"goodbye")])],
+    )
+
+    path1 = Path(rule_runner.build_root, "a.txt")
+    path2 = Path(rule_runner.build_root, "subdir/b.txt")
+    assert not path1.is_file()
+    assert not path2.is_file()
+
+    workspace.write_digest(digest)
+    assert path1.is_file()
+    assert path2.is_file()
+
+    workspace.write_digest(digest, path_prefix="prefix")
+    assert Path(rule_runner.build_root, "prefix", path1).is_file()
+    assert Path(rule_runner.build_root, "prefix", path2).is_file()

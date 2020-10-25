@@ -6,6 +6,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 
 from pants.engine.collection import Collection
+from pants.engine.internals.native_engine import PyDigest
 from pants.engine.rules import QueryRule, side_effecting
 from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.util.meta import frozen_after_init
@@ -14,16 +15,12 @@ if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
 
 
-@dataclass(frozen=True)
-class Digest:
-    """A Digest is a lightweight reference to a set of files known about by the engine.
+"""A Digest is a lightweight reference to a set of files known about by the engine.
 
-    You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use `await
-    Get(DigestContents, Digest)` to see the actual file content.
-    """
-
-    fingerprint: str
-    serialized_bytes_length: int
+You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use `await
+Get(DigestContents, Digest)` to see the actual file content.
+"""
+Digest = PyDigest
 
 
 @dataclass(frozen=True)
@@ -49,6 +46,14 @@ class Paths:
 
     files: Tuple[str, ...]
     dirs: Tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class FileDigest:
+    """A FileDigest is a digest that refers to a file's content, without its name."""
+
+    fingerprint: str
+    serialized_bytes_length: int
 
 
 @dataclass(frozen=True)
@@ -251,7 +256,7 @@ class DownloadFile:
     """
 
     url: str
-    expected_digest: Digest
+    expected_digest: FileDigest
 
 
 @side_effecting
@@ -272,6 +277,7 @@ class Workspace:
 
 _EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 EMPTY_DIGEST = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
+EMPTY_FILE_DIGEST = FileDigest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
 EMPTY_SNAPSHOT = Snapshot(EMPTY_DIGEST, files=(), dirs=())
 
 

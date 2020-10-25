@@ -109,9 +109,7 @@ def load_build_configuration_from_source(
     :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
       the build configuration.
     """
-    backend_packages = FrozenOrderedSet(
-        ["pants.core", "pants.backend.pants_info", "pants.backend.project_info", *backends]
-    )
+    backend_packages = FrozenOrderedSet(["pants.core", "pants.backend.project_info", *backends])
     for backend_package in backend_packages:
         load_backend(build_configuration, backend_package)
 

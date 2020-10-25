@@ -5,7 +5,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.base.exceptions import DuplicateNameError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.mapper import (
@@ -13,6 +12,7 @@ from pants.engine.internals.mapper import (
     AddressMap,
     AddressSpecsFilter,
     DifferingFamiliesError,
+    DuplicateNameError,
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -69,8 +69,8 @@ def test_address_family_create_single() -> None:
     )
     assert "" == address_family.namespace
     assert {
-        Address.parse("//:one"): TargetAdaptor(type_alias="thing", name="one", age=42),
-        Address.parse("//:two"): TargetAdaptor(type_alias="thing", name="two", age=37),
+        Address("", target_name="one"): TargetAdaptor(type_alias="thing", name="one", age=42),
+        Address("", target_name="two"): TargetAdaptor(type_alias="thing", name="two", age=37),
     } == dict(address_family.addresses_to_target_adaptors.items())
 
 
@@ -89,8 +89,12 @@ def test_address_family_create_multiple() -> None:
 
     assert "name/space" == address_family.namespace
     assert {
-        Address.parse("name/space:one"): TargetAdaptor(type_alias="thing", name="one", age=42),
-        Address.parse("name/space:two"): TargetAdaptor(type_alias="thing", name="two", age=37),
+        Address("name/space", target_name="one"): TargetAdaptor(
+            type_alias="thing", name="one", age=42
+        ),
+        Address("name/space", target_name="two"): TargetAdaptor(
+            type_alias="thing", name="two", age=37
+        ),
     } == dict(address_family.addresses_to_target_adaptors.items())
 
 

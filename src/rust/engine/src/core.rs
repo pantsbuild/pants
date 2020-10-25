@@ -3,6 +3,7 @@
 
 use fnv::FnvHasher;
 
+use std::convert::AsRef;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, hash};
@@ -156,11 +157,11 @@ impl Function {
   pub fn name(&self) -> String {
     let Function(key) = self;
     let val = externs::val_for(&key);
-    let module = externs::project_str(&val, "__module__");
-    let name = externs::project_str(&val, "__name__");
+    let module = externs::getattr_as_string(&val, "__module__");
+    let name = externs::getattr_as_string(&val, "__name__");
     // NB: this is a custom dunder method that Python code should populate before sending the
     // function (e.g. an `@rule`) through FFI.
-    let line_number = externs::project_u64(&val, "__line_number__");
+    let line_number: u64 = externs::getattr(&val, "__line_number__").unwrap();
     format!("{}:{}:{}", module, line_number, name)
   }
 }
@@ -209,7 +210,7 @@ impl hash::Hash for Key {
 
 impl fmt::Display for Key {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::type_to_str(self.type_id))
+    write!(f, "{}", externs::key_to_str(self))
   }
 }
 
@@ -246,6 +247,14 @@ impl Value {
       Err(arc_handle) => arc_handle.clone_ref(py),
     }
   }
+
+  pub fn new_from_arc(handle: Arc<PyObject>) -> Value {
+    Value(handle)
+  }
+
+  pub fn consume_into_arc(self) -> Arc<PyObject> {
+    self.0
+  }
 }
 
 impl PartialEq for Value {
@@ -264,9 +273,21 @@ impl Deref for Value {
   }
 }
 
+impl AsRef<PyObject> for Value {
+  fn as_ref(&self) -> &PyObject {
+    &self.0
+  }
+}
+
 impl fmt::Debug for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::val_to_str(&self))
+    write!(f, "{}", externs::val_to_str(&self.as_ref()))
+  }
+}
+
+impl fmt::Display for Value {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", externs::val_to_str(&self.as_ref()))
   }
 }
 
@@ -341,7 +362,12 @@ impl Failure {
 }
 
 impl Failure {
-  pub fn from_py_err(py: Python, mut py_err: PyErr) -> Failure {
+  pub fn from_py_err(py_err: PyErr) -> Failure {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    Failure::from_py_err_with_gil(py, py_err)
+  }
+  pub fn from_py_err_with_gil(py: Python, mut py_err: PyErr) -> Failure {
     let val = Value::from(py_err.instance(py));
     let python_traceback = if let Some(tb) = py_err.ptraceback.as_ref() {
       let locals = PyDict::new(py);
@@ -359,7 +385,7 @@ impl Failure {
       .extract::<String>(py)
       .unwrap()
     } else {
-      Self::native_traceback(&externs::val_to_str(&val))
+      Self::native_traceback(&externs::val_to_str(val.as_ref()))
     };
     Failure::Throw {
       val,
@@ -380,7 +406,7 @@ impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
-      Failure::Throw { val, .. } => write!(f, "{}", externs::val_to_str(val)),
+      Failure::Throw { val, .. } => write!(f, "{}", externs::val_to_str(val.as_ref())),
     }
   }
 }

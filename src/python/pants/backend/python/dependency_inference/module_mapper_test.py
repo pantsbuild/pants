@@ -1,23 +1,22 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Optional
+from typing import List
 
 import pytest
 
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyModuleToAddressMapping,
     PythonModule,
-    PythonModuleOwner,
+    PythonModuleOwners,
     ThirdPartyModuleToAddressMapping,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -39,24 +38,24 @@ def test_create_module_from_path(stripped_path: PurePath, expected: str) -> None
 
 
 def test_first_party_modules_mapping() -> None:
-    util_addr = Address.parse("src/python/util:strutil")
-    test_addr = Address.parse("tests/python/project_test:test")
+    util_addr = Address("src/python/util", relative_file_path="strutil.py")
+    test_addr = Address("tests/python/project_test", relative_file_path="test.py")
     mapping = FirstPartyModuleToAddressMapping(
-        FrozenDict({"util.strutil": util_addr, "project_test.test": test_addr})
+        FrozenDict({"util.strutil": (util_addr,), "project_test.test": (test_addr,)})
     )
-    assert mapping.address_for_module("util.strutil") == util_addr
-    assert mapping.address_for_module("util.strutil.ensure_text") == util_addr
-    assert mapping.address_for_module("util") is None
-    assert mapping.address_for_module("project_test.test") == test_addr
-    assert mapping.address_for_module("project_test.test.TestDemo") == test_addr
-    assert mapping.address_for_module("project_test.test.TestDemo.method") is None
-    assert mapping.address_for_module("project_test") is None
-    assert mapping.address_for_module("project.test") is None
+    assert mapping.addresses_for_module("util.strutil") == (util_addr,)
+    assert mapping.addresses_for_module("util.strutil.ensure_text") == (util_addr,)
+    assert not mapping.addresses_for_module("util")
+    assert mapping.addresses_for_module("project_test.test") == (test_addr,)
+    assert mapping.addresses_for_module("project_test.test.TestDemo") == (test_addr,)
+    assert not mapping.addresses_for_module("project_test.test.TestDemo.method")
+    assert not mapping.addresses_for_module("project_test")
+    assert not mapping.addresses_for_module("project.test")
 
 
 def test_third_party_modules_mapping() -> None:
-    colors_addr = Address.parse("//:ansicolors")
-    pants_addr = Address.parse("//:pantsbuild")
+    colors_addr = Address("", target_name="ansicolors")
+    pants_addr = Address("", target_name="pantsbuild")
     mapping = ThirdPartyModuleToAddressMapping(
         FrozenDict({"colors": colors_addr, "pants": pants_addr})
     )
@@ -76,15 +75,15 @@ def rule_runner() -> RuleRunner:
             *module_mapper_rules(),
             QueryRule(FirstPartyModuleToAddressMapping, ()),
             QueryRule(ThirdPartyModuleToAddressMapping, ()),
-            QueryRule(PythonModuleOwner, (PythonModule,)),
+            QueryRule(PythonModuleOwners, (PythonModule,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )
 
 
 def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
-    options_bootstrapper = create_options_bootstrapper(
-        args=["--source-root-patterns=['src/python', 'tests/python', 'build-support']"]
+    rule_runner.set_options(
+        ["--source-root-patterns=['src/python', 'tests/python', 'build-support']"]
     )
     # Two modules belonging to the same target. We should generate subtargets for each file.
     rule_runner.create_files("src/python/project/util", ["dirutil.py", "tarutil.py"])
@@ -98,23 +97,25 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     # not generate subtargets.
     rule_runner.create_file("tests/python/project_test/demo_test/__init__.py")
     rule_runner.add_to_build_file("tests/python/project_test/demo_test", "python_library()")
-    result = rule_runner.request(FirstPartyModuleToAddressMapping, [options_bootstrapper])
+    # A module with both an implementation and a type stub.
+    rule_runner.create_files("src/python/stubs", ["stub.py", "stub.pyi"])
+    rule_runner.add_to_build_file("src/python/stubs", "python_library()")
+
+    result = rule_runner.request(FirstPartyModuleToAddressMapping, [])
     assert result.mapping == FrozenDict(
         {
-            "project.util.dirutil": Address(
-                "src/python/project/util",
-                relative_file_path="dirutil.py",
-                target_name="util",
+            "project.util.dirutil": (
+                Address("src/python/project/util", relative_file_path="dirutil.py"),
             ),
-            "project.util.tarutil": Address(
-                "src/python/project/util",
-                relative_file_path="tarutil.py",
-                target_name="util",
+            "project.util.tarutil": (
+                Address("src/python/project/util", relative_file_path="tarutil.py"),
             ),
-            "project_test.demo_test": Address(
-                "tests/python/project_test/demo_test",
-                relative_file_path="__init__.py",
-                target_name="demo_test",
+            "project_test.demo_test": (
+                Address("tests/python/project_test/demo_test", relative_file_path="__init__.py"),
+            ),
+            "stubs.stub": (
+                Address("src/python/stubs", relative_file_path="stub.py"),
+                Address("src/python/stubs", relative_file_path="stub.pyi"),
             ),
         }
     )
@@ -150,7 +151,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    result = rule_runner.request(ThirdPartyModuleToAddressMapping, [create_options_bootstrapper()])
+    result = rule_runner.request(ThirdPartyModuleToAddressMapping, [])
     assert result.mapping == FrozenDict(
         {
             "colors": Address("3rdparty/python", target_name="ansicolors"),
@@ -163,14 +164,10 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
 
 
 def test_map_module_to_address(rule_runner: RuleRunner) -> None:
-    options_bootstrapper = create_options_bootstrapper(
-        args=["--source-root-patterns=['source_root1', 'source_root2', '/']"]
-    )
+    rule_runner.set_options(["--source-root-patterns=['source_root1', 'source_root2', '/']"])
 
-    def get_owner(module: str) -> Optional[Address]:
-        return rule_runner.request(
-            PythonModuleOwner, [PythonModule(module), options_bootstrapper]
-        ).address
+    def get_owners(module: str) -> List[Address]:
+        return list(rule_runner.request(PythonModuleOwners, [PythonModule(module)]))
 
     # First check that we can map 3rd-party modules.
     rule_runner.add_to_build_file(
@@ -185,33 +182,56 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    assert get_owner("colors.red") == Address.parse("3rdparty/python:ansicolors")
+    assert get_owners("colors.red") == [Address("3rdparty/python", target_name="ansicolors")]
+
+    # Now test that we can handle first-party type stubs that go along with that third party
+    # requirement. Note that `colors.pyi` is at the top-level of the source root so that it strips
+    # to the module `colors`.
+    rule_runner.create_file("source_root1/colors.pyi")
+    rule_runner.add_to_build_file("source_root1", "python_library()")
+    assert get_owners("colors.red") == [
+        Address("3rdparty/python", target_name="ansicolors"),
+        Address("source_root1", relative_file_path="colors.pyi"),
+    ]
+
+    # But don't allow a first-party implementation with the same module name.
+    Path(rule_runner.build_root, "source_root1/colors.pyi").unlink()
+    rule_runner.create_file("source_root1/colors.py")
+    assert not get_owners("colors.red")
 
     # Check a first party module using a module path.
     rule_runner.create_file("source_root1/project/app.py")
     rule_runner.create_file("source_root1/project/file2.py")
     rule_runner.add_to_build_file("source_root1/project", "python_library()")
-    assert get_owner("project.app") == Address(
-        "source_root1/project", relative_file_path="app.py", target_name="project"
-    )
+    assert get_owners("project.app") == [
+        Address("source_root1/project", relative_file_path="app.py")
+    ]
+
+    # Now check with a type stub.
+    rule_runner.create_file("source_root1/project/app.pyi")
+    assert get_owners("project.app") == [
+        Address("source_root1/project", relative_file_path="app.py"),
+        Address("source_root1/project", relative_file_path="app.pyi"),
+    ]
 
     # Check a package path
     rule_runner.create_file("source_root2/project/subdir/__init__.py")
     rule_runner.add_to_build_file("source_root2/project/subdir", "python_library()")
-    assert get_owner("project.subdir") == Address(
-        "source_root2/project/subdir",
-        relative_file_path="__init__.py",
-        target_name="subdir",
-    )
+    assert get_owners("project.subdir") == [
+        Address(
+            "source_root2/project/subdir",
+            relative_file_path="__init__.py",
+        )
+    ]
 
-    # Test a module with no owner (stdlib). This also sanity checks that we can handle when
+    # Test a module with no owner (stdlib). This also smoke tests that we can handle when
     # there is no parent module.
-    assert get_owner("typing") is None
+    assert not get_owners("typing")
 
     # Test a module with a single owner with a top-level source root of ".". Also confirm we
     # can handle when the module includes a symbol (like a class name) at the end.
     rule_runner.create_file("script.py")
     rule_runner.add_to_build_file("", "python_library(name='script')")
-    assert get_owner("script.Demo") == Address(
-        "", relative_file_path="script.py", target_name="script"
-    )
+    assert get_owners("script.Demo") == [
+        Address("", relative_file_path="script.py", target_name="script")
+    ]

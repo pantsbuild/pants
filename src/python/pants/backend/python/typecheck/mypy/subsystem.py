@@ -4,7 +4,7 @@
 from typing import Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.engine.addresses import AddressInput
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.option.custom_types import file_option, shell_str, target_option
 
 
@@ -14,9 +14,11 @@ class MyPy(PythonToolBase):
     options_scope = "mypy"
     default_version = "mypy==0.782"
     default_entry_point = "mypy"
-    # See `mypy/rules.py`. We only use these default constraints in some situations.
+    # See `mypy/rules.py`. We only use these default constraints in some situations. Technically,
+    # MyPy only requires 3.5+, but some popular plugins like `django-stubs` require 3.6+. Because
+    # 3.5 is EOL, and users can tweak this back, this seems like a more sensible default.
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.5"]
+    default_interpreter_constraints = ["CPython>=3.6"]
 
     @classmethod
     def register_options(cls, register):
@@ -49,9 +51,8 @@ class MyPy(PythonToolBase):
             advanced=True,
             help=(
                 "An optional list of `mypy_source_plugin` target addresses. This allows you to "
-                "load custom plugins defined in source code. Run the goal `target-types "
-                "--details=mypy_source_plugin` for instructions, including how to load "
-                "third-party plugins."
+                "load custom plugins defined in source code. Run `./pants help mypy_source_plugin` "
+                "for instructions, including how to load third-party plugins."
             ),
         )
 
@@ -68,5 +69,5 @@ class MyPy(PythonToolBase):
         return cast(Optional[str], self.options.config)
 
     @property
-    def source_plugins(self) -> Tuple[AddressInput, ...]:
-        return tuple(AddressInput.parse(v) for v in self.options.source_plugins)
+    def source_plugins(self) -> UnparsedAddressInputs:
+        return UnparsedAddressInputs(self.options.source_plugins, owning_address=None)

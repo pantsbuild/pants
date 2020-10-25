@@ -8,7 +8,6 @@ import typing
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Set
 from enum import Enum
-from pathlib import Path
 from typing import Any, Optional, Type, Union
 
 from pants.util.ordered_set import OrderedSet
@@ -23,18 +22,6 @@ def hash_all(strs: typing.Iterable[Union[bytes, str]]) -> str:
     for s in strs:
         s = ensure_binary(s)
         digest.update(s)
-    return digest.hexdigest()
-
-
-def hash_file(path: Union[str, Path]) -> str:
-    """Hashes the contents of the file at the given path and returns the hash digest in hex form
-    using sha1."""
-    digest = hashlib.sha1()
-    with open(path, "rb") as fd:
-        s = fd.read(8192)
-        while s:
-            digest.update(s)
-            s = fd.read(8192)
     return digest.hexdigest()
 
 

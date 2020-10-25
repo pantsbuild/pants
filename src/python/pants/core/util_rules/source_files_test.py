@@ -13,7 +13,6 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
 from pants.engine.target import Sources as SourcesField
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -50,7 +49,7 @@ def mock_sources_field(
 ) -> SourcesField:
     sources_field = sources_field_cls(
         sources.source_files if include_sources else [],
-        address=Address.parse(f"{sources.source_root}:lib"),
+        address=Address(sources.source_root, target_name="lib"),
     )
     rule_runner.create_files(path=sources.source_root, files=sources.source_files)
     return sources_field
@@ -63,10 +62,7 @@ def assert_sources_resolved(
     expected: Iterable[TargetSources],
     expected_unrooted: Iterable[str] = (),
 ) -> None:
-    result = rule_runner.request(
-        SourceFiles,
-        [SourceFilesRequest(sources_fields), create_options_bootstrapper()],
-    )
+    result = rule_runner.request(SourceFiles, [SourceFilesRequest(sources_fields)])
     assert list(result.snapshot.files) == sorted(
         set(itertools.chain.from_iterable(sources.full_paths for sources in expected))
     )

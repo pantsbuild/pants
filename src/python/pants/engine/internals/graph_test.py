@@ -5,7 +5,7 @@ import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Optional, Set, Tuple, Type
+from typing import Iterable, List, Set, Tuple, Type
 
 import pytest
 
@@ -24,6 +24,7 @@ from pants.engine.addresses import (
     AddressesWithOrigins,
     AddressInput,
     AddressWithOrigin,
+    UnparsedAddressInputs,
 )
 from pants.engine.fs import (
     CreateDigest,
@@ -49,6 +50,7 @@ from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    DependenciesRequestLite,
     FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
@@ -59,6 +61,7 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     Sources,
+    SpecialCasedDependencies,
     Tags,
     Target,
     TargetRootsToFieldSets,
@@ -67,10 +70,11 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
     TransitiveTargets,
+    TransitiveTargetsRequest,
+    TransitiveTargetsRequestLite,
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.testutil.test_base import TestBase
@@ -81,9 +85,17 @@ class MockDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
+class SpecialCasedDeps1(SpecialCasedDependencies):
+    alias = "special_cased_deps1"
+
+
+class SpecialCasedDeps2(SpecialCasedDependencies):
+    alias = "special_cased_deps2"
+
+
 class MockTarget(Target):
     alias = "target"
-    core_fields = (MockDependencies, Sources)
+    core_fields = (MockDependencies, Sources, SpecialCasedDeps1, SpecialCasedDeps2)
 
 
 @pytest.fixture
@@ -91,7 +103,9 @@ def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(Targets, (DependenciesRequest,)),
-            QueryRule(TransitiveTargets, (Addresses,)),
+            QueryRule(Targets, (DependenciesRequestLite,)),
+            QueryRule(TransitiveTargets, (TransitiveTargetsRequest,)),
+            QueryRule(TransitiveTargets, (TransitiveTargetsRequestLite,)),
         ],
         target_types=[MockTarget],
     )
@@ -111,12 +125,9 @@ def test_transitive_targets(transitive_targets_rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    bootstrapper = create_options_bootstrapper()
 
     def get_target(name: str) -> Target:
-        return transitive_targets_rule_runner.get_target(
-            Address("", target_name=name), bootstrapper
-        )
+        return transitive_targets_rule_runner.get_target(Address("", target_name=name))
 
     t1 = get_target("t1")
     t2 = get_target("t2")
@@ -126,15 +137,27 @@ def test_transitive_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     root = get_target("root")
 
     direct_deps = transitive_targets_rule_runner.request(
-        Targets, [DependenciesRequest(root[Dependencies]), bootstrapper]
+        Targets, [DependenciesRequest(root[Dependencies])]
     )
     assert direct_deps == Targets([d1, d2, d3])
 
     transitive_targets = transitive_targets_rule_runner.request(
-        TransitiveTargets, [Addresses([root.address, d2.address]), bootstrapper]
+        TransitiveTargets, [TransitiveTargetsRequest([root.address, d2.address])]
     )
     assert transitive_targets.roots == (root, d2)
     # NB: `//:d2` is both a target root and a dependency of `//:root`.
+    assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
+    assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
+
+    # Now test with TransitiveTargetsLite.
+    direct_deps = transitive_targets_rule_runner.request(
+        Targets, [DependenciesRequestLite(root[Dependencies])]
+    )
+    assert direct_deps == Targets([d1, d2, d3])
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets, [TransitiveTargetsRequestLite([root.address, d2.address])]
+    )
+    assert transitive_targets.roots == (root, d2)
     assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
     assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
 
@@ -151,28 +174,93 @@ def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: R
         ),
     )
 
-    bootstrapper = create_options_bootstrapper()
-
     def get_target(name: str) -> Target:
-        return transitive_targets_rule_runner.get_target(
-            Address("", target_name=name), bootstrapper
-        )
+        return transitive_targets_rule_runner.get_target(Address("", target_name=name))
 
     base = get_target("base")
     intermediate = get_target("intermediate")
     root = get_target("root")
 
     intermediate_direct_deps = transitive_targets_rule_runner.request(
-        Targets, [DependenciesRequest(intermediate[Dependencies]), bootstrapper]
+        Targets, [DependenciesRequest(intermediate[Dependencies])]
     )
     assert intermediate_direct_deps == Targets([base])
 
     transitive_targets = transitive_targets_rule_runner.request(
-        TransitiveTargets, [Addresses([root.address, intermediate.address]), bootstrapper]
+        TransitiveTargets, [TransitiveTargetsRequest([root.address, intermediate.address])]
     )
     assert transitive_targets.roots == (root, intermediate)
     assert transitive_targets.dependencies == FrozenOrderedSet([intermediate])
     assert transitive_targets.closure == FrozenOrderedSet([root, intermediate])
+
+    # Test with TransitiveTargetsLite.
+    intermediate_direct_deps = transitive_targets_rule_runner.request(
+        Targets, [DependenciesRequestLite(intermediate[Dependencies])]
+    )
+    assert intermediate_direct_deps == Targets([base])
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets, [TransitiveTargetsRequestLite([root.address, intermediate.address])]
+    )
+    assert transitive_targets.roots == (root, intermediate)
+    assert transitive_targets.dependencies == FrozenOrderedSet([intermediate])
+    assert transitive_targets.closure == FrozenOrderedSet([root, intermediate])
+
+
+def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) -> None:
+    """Test that subclasses of `SpecialCasedDependencies` show up if requested, but otherwise are
+    left off.
+
+    This uses the same test setup as `test_transitive_targets`, but does not use the `dependencies`
+    field like normal.
+    """
+    transitive_targets_rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            target(name='t1')
+            target(name='t2', special_cased_deps1=[':t1'])
+            target(name='d1', special_cased_deps1=[':t1'])
+            target(name='d2', special_cased_deps2=[':t2'])
+            target(name='d3')
+            target(name='root', special_cased_deps1=[':d1', ':d2'], special_cased_deps2=[':d3'])
+            """
+        ),
+    )
+
+    def get_target(name: str) -> Target:
+        return transitive_targets_rule_runner.get_target(Address("", target_name=name))
+
+    t1 = get_target("t1")
+    t2 = get_target("t2")
+    d1 = get_target("d1")
+    d2 = get_target("d2")
+    d3 = get_target("d3")
+    root = get_target("root")
+
+    direct_deps = transitive_targets_rule_runner.request(
+        Targets, [DependenciesRequest(root[Dependencies])]
+    )
+    assert direct_deps == Targets()
+
+    direct_deps = transitive_targets_rule_runner.request(
+        Targets, [DependenciesRequest(root[Dependencies], include_special_cased_deps=True)]
+    )
+    assert direct_deps == Targets([d1, d2, d3])
+
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets, [TransitiveTargetsRequest([root.address, d2.address])]
+    )
+    assert transitive_targets.roots == (root, d2)
+    assert transitive_targets.dependencies == FrozenOrderedSet()
+    assert transitive_targets.closure == FrozenOrderedSet([root, d2])
+
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets,
+        [TransitiveTargetsRequest([root.address, d2.address], include_special_cased_deps=True)],
+    )
+    assert transitive_targets.roots == (root, d2)
+    assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
+    assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
 
 
 def test_transitive_targets_tolerates_subtarget_cycles(
@@ -195,7 +283,7 @@ def test_transitive_targets_tolerates_subtarget_cycles(
     )
     result = transitive_targets_rule_runner.request(
         TransitiveTargets,
-        [Addresses([Address("", target_name="t2")]), create_options_bootstrapper()],
+        [TransitiveTargetsRequest([Address("", target_name="t2")])],
     )
     assert len(result.roots) == 1
     assert result.roots[0].address == Address("", relative_file_path="t2.txt", target_name="t2")
@@ -216,10 +304,7 @@ def assert_failed_cycle(
     with pytest.raises(ExecutionError) as e:
         rule_runner.request(
             TransitiveTargets,
-            [
-                Addresses([Address("", target_name=root_target_name)]),
-                create_options_bootstrapper(),
-            ],
+            [TransitiveTargetsRequest([Address("", target_name=root_target_name)])],
         )
     (cycle_exception,) = e.value.wrapped_exceptions
     assert isinstance(cycle_exception, CycleException)
@@ -306,7 +391,7 @@ def test_dep_nocycle_indirect(transitive_targets_rule_runner: RuleRunner) -> Non
     )
     result = transitive_targets_rule_runner.request(
         TransitiveTargets,
-        [Addresses([Address("", target_name="t1")]), create_options_bootstrapper()],
+        [TransitiveTargetsRequest([Address("", target_name="t1")])],
     )
     assert len(result.roots) == 1
     assert result.roots[0].address == Address("", target_name="t1")
@@ -320,9 +405,7 @@ def test_resolve_generated_subtarget() -> None:
     rule_runner = RuleRunner(target_types=[MockTarget])
     rule_runner.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
     generated_target_address = Address("demo", relative_file_path="f1.txt", target_name="demo")
-    generated_target = rule_runner.get_target(
-        generated_target_address, create_options_bootstrapper()
-    )
+    generated_target = rule_runner.get_target(generated_target_address)
     assert generated_target == MockTarget(
         {Sources.alias: ["f1.txt"]}, address=generated_target_address
     )
@@ -345,7 +428,7 @@ def test_resolve_sources_snapshot() -> None:
     specs = SpecsParser(rule_runner.build_root).parse_specs(
         ["demo:demo", "demo/f1.txt", "demo/BUILD"]
     )
-    result = rule_runner.request(SourcesSnapshot, [specs, create_options_bootstrapper()])
+    result = rule_runner.request(SourcesSnapshot, [specs])
     assert result.snapshot.files == ("demo/BUILD", "demo/f1.txt", "demo/f2.txt")
 
 
@@ -357,9 +440,7 @@ def owners_rule_runner() -> RuleRunner:
 def assert_owners(
     rule_runner: RuleRunner, requested: Iterable[str], *, expected: Set[Address]
 ) -> None:
-    result = rule_runner.request(
-        Owners, [OwnersRequest(tuple(requested)), create_options_bootstrapper()]
-    )
+    result = rule_runner.request(Owners, [OwnersRequest(tuple(requested))])
     assert set(result) == expected
 
 
@@ -455,13 +536,8 @@ def specs_rule_runner() -> RuleRunner:
 def resolve_filesystem_specs(
     rule_runner: RuleRunner,
     specs: Iterable[FilesystemSpec],
-    *,
-    bootstrapper: Optional[OptionsBootstrapper] = None,
 ) -> Set[AddressWithOrigin]:
-    result = rule_runner.request(
-        AddressesWithOrigins,
-        [FilesystemSpecs(specs), bootstrapper or create_options_bootstrapper()],
-    )
+    result = rule_runner.request(AddressesWithOrigins, [FilesystemSpecs(specs)])
     return set(result)
 
 
@@ -509,11 +585,8 @@ def test_filesystem_specs_nonexistent_file(specs_rule_runner: RuleRunner) -> Non
         resolve_filesystem_specs(specs_rule_runner, [spec])
     assert 'Unmatched glob from file arguments: "demo/fake.txt"' in str(exc.value)
 
-    assert not resolve_filesystem_specs(
-        specs_rule_runner,
-        [spec],
-        bootstrapper=create_options_bootstrapper(args=["--owners-not-found-behavior=ignore"]),
-    )
+    specs_rule_runner.set_options(["--owners-not-found-behavior=ignore"])
+    assert not resolve_filesystem_specs(specs_rule_runner, [spec])
 
 
 def test_filesystem_specs_no_owner(specs_rule_runner: RuleRunner) -> None:
@@ -550,7 +623,7 @@ def test_resolve_addresses_from_specs() -> None:
     specs = SpecsParser(rule_runner.build_root).parse_specs(
         [*no_interaction_specs, *multiple_files_specs]
     )
-    result = rule_runner.request(AddressesWithOrigins, [specs, create_options_bootstrapper()])
+    result = rule_runner.request(AddressesWithOrigins, [specs])
     assert set(result) == {
         AddressWithOrigin(
             Address("fs_spec", relative_file_path="f.txt"),
@@ -695,7 +768,7 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
     )
     sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], address=addr)
     hydrated_sources = sources_rule_runner.request(
-        HydratedSources, [HydrateSourcesRequest(sources), create_options_bootstrapper()]
+        HydratedSources, [HydrateSourcesRequest(sources)]
     )
     assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
@@ -716,15 +789,11 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
 
     addr = Address("", target_name=":lib")
     sources_rule_runner.create_files("", files=["f1.f95"])
-    bootstrapper = create_options_bootstrapper()
 
     valid_sources = SourcesSubclass(["*"], address=addr)
     hydrated_valid_sources = sources_rule_runner.request(
         HydratedSources,
-        [
-            HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass]),
-            bootstrapper,
-        ],
+        [HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass])],
     )
     assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
     assert hydrated_valid_sources.sources_type == SourcesSubclass
@@ -732,26 +801,18 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     invalid_sources = Sources(["*"], address=addr)
     hydrated_invalid_sources = sources_rule_runner.request(
         HydratedSources,
-        [
-            HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass]),
-            bootstrapper,
-        ],
+        [HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass])],
     )
     assert hydrated_invalid_sources.snapshot.files == ()
     assert hydrated_invalid_sources.sources_type is None
 
 
 def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
+    sources_rule_runner.set_options(["--files-not-found-behavior=error"])
     sources_rule_runner.create_files("", files=["f1.f95"])
     sources = Sources(["non_existent.f95"], address=Address("", target_name="lib"))
     with pytest.raises(ExecutionError) as exc:
-        sources_rule_runner.request(
-            HydratedSources,
-            [
-                HydrateSourcesRequest(sources),
-                create_options_bootstrapper(args=["--files-not-found-behavior=error"]),
-            ],
-        )
+        sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
     assert "Unmatched glob" in str(exc.value)
     assert "//:lib" in str(exc.value)
     assert "non_existent.f95" in str(exc.value)
@@ -770,7 +831,7 @@ def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
     assert set(sources.sanitized_raw_value or ()) == set(DefaultSources.default)
 
     hydrated_sources = sources_rule_runner.request(
-        HydratedSources, [HydrateSourcesRequest(sources), create_options_bootstrapper()]
+        HydratedSources, [HydrateSourcesRequest(sources)]
     )
     assert hydrated_sources.snapshot.files == ("src/fortran/default.f95", "src/fortran/f1.f08")
 
@@ -779,19 +840,18 @@ def test_sources_expected_file_extensions(sources_rule_runner: RuleRunner) -> No
     class ExpectedExtensionsSources(Sources):
         expected_file_extensions = (".f95", ".f03")
 
-    bootstrapper = create_options_bootstrapper()
     addr = Address("src/fortran", target_name="lib")
     sources_rule_runner.create_files("src/fortran", files=["s.f95", "s.f03", "s.f08"])
     sources = ExpectedExtensionsSources(["s.f*"], address=addr)
     with pytest.raises(ExecutionError) as exc:
-        sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources), bootstrapper])
+        sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
     assert "s.f08" in str(exc.value)
     assert str(addr) in str(exc.value)
 
     # Also check that we support valid sources
     valid_sources = ExpectedExtensionsSources(["s.f95"], address=addr)
     assert sources_rule_runner.request(
-        HydratedSources, [HydrateSourcesRequest(valid_sources), bootstrapper]
+        HydratedSources, [HydrateSourcesRequest(valid_sources)]
     ).snapshot.files == ("src/fortran/s.f95",)
 
 
@@ -812,7 +872,6 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
                 HydrateSourcesRequest(
                     sources_cls(sources, address=Address("", target_name=":example"))
                 ),
-                create_options_bootstrapper(),
             ],
         )
 
@@ -859,7 +918,7 @@ async def generate_smalltalk_from_avro(
 
     # Many codegen implementations will need to look up a protocol target's dependencies in their
     # rule. We add this here to ensure that this does not result in rule graph issues.
-    _ = await Get(TransitiveTargets, Addresses([request.protocol_target.address]))
+    _ = await Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address]))
 
     def generate_fortran(fp: str) -> FileContent:
         parent = str(PurePath(fp).parent).replace("src/avro", "src/smalltalk")
@@ -1120,6 +1179,7 @@ def dependencies_rule_runner() -> RuleRunner:
             inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
             QueryRule(Addresses, (DependenciesRequest,)),
+            QueryRule(Addresses, (DependenciesRequestLite,)),
             UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
@@ -1133,13 +1193,11 @@ def assert_dependencies_resolved(
     *,
     requested_address: Address,
     expected: Iterable[Address],
+    lite: bool = False,
 ) -> None:
-    bootstrapper = create_options_bootstrapper()
-    target = rule_runner.get_target(requested_address, bootstrapper)
-    result = rule_runner.request(
-        Addresses,
-        [DependenciesRequest(target[Dependencies]), bootstrapper],
-    )
+    target = rule_runner.get_target(requested_address)
+    request_cls = DependenciesRequestLite if lite else DependenciesRequest
+    result = rule_runner.request(Addresses, [request_cls(target[Dependencies])])
     assert sorted(result) == sorted(expected)
 
 
@@ -1156,11 +1214,24 @@ def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
             Address("src/smalltalk", target_name="sibling"),
         ],
     )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        requested_address=Address("src/smalltalk"),
+        expected=[
+            Address("", target_name="dep1"),
+            Address("", target_name="dep2"),
+            Address("src/smalltalk", target_name="sibling"),
+        ],
+        lite=True,
+    )
 
     # Also test that we handle no dependencies.
     dependencies_rule_runner.add_to_build_file("no_deps", "smalltalk()")
     assert_dependencies_resolved(
         dependencies_rule_runner, requested_address=Address("no_deps"), expected=[]
+    )
+    assert_dependencies_resolved(
+        dependencies_rule_runner, requested_address=Address("no_deps"), expected=[], lite=True
     )
 
     # An ignore should override an include.
@@ -1169,6 +1240,9 @@ def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
     )
     assert_dependencies_resolved(
         dependencies_rule_runner, requested_address=Address("ignore"), expected=[]
+    )
+    assert_dependencies_resolved(
+        dependencies_rule_runner, requested_address=Address("ignore"), expected=[], lite=True
     )
 
 
@@ -1202,6 +1276,15 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
             Address("src/smalltalk/util", relative_file_path="f2.st", target_name="util"),
         ],
     )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        requested_address=Address("src/smalltalk"),
+        expected=[
+            Address("src/smalltalk/util", relative_file_path="f1.st", target_name="util"),
+            Address("src/smalltalk/util", relative_file_path="f2.st", target_name="util"),
+        ],
+        lite=True,
+    )
 
 
 def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
@@ -1212,9 +1295,7 @@ def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
         if injected:
             provided_deps.append("!//:injected2")
         deps_field = deps_cls(provided_deps, address=Address("", target_name="target"))
-        result = dependencies_rule_runner.request(
-            Addresses, [DependenciesRequest(deps_field), create_options_bootstrapper()]
-        )
+        result = dependencies_rule_runner.request(Addresses, [DependenciesRequest(deps_field)])
         assert result == Addresses(sorted([*injected, Address("", target_name="provided")]))
 
     assert_injected(Dependencies, injected=[])
@@ -1356,6 +1437,15 @@ def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
             Address("src/smalltalk", relative_file_path="f2.st"),
         ],
     )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        requested_address=Address("src/smalltalk"),
+        expected=[
+            Address("src/smalltalk", relative_file_path="f1.st"),
+            Address("src/smalltalk", relative_file_path="f2.st"),
+        ],
+        lite=True,
+    )
 
     # Test that a file address depends on its siblings if it has no dependency inference rule,
     # or those inference rules do not claim to infer dependencies on siblings.
@@ -1363,6 +1453,12 @@ def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
         dependencies_rule_runner,
         requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
         expected=[Address("src/smalltalk", relative_file_path="f2.st")],
+    )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
+        expected=[Address("src/smalltalk", relative_file_path="f2.st")],
+        lite=True,
     )
 
     # Now we recreate the files so that the mock dependency inference will have results, which
@@ -1375,3 +1471,31 @@ def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
         # We only expect the inferred address, not any dependencies on sibling files.
         expected=[Address("src/smalltalk/util")],
     )
+
+
+def test_resolve_unparsed_address_inputs() -> None:
+    rule_runner = RuleRunner(
+        rules=[QueryRule(Addresses, [UnparsedAddressInputs])], target_types=[MockTarget]
+    )
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            target(name="t1")
+            target(name="t2")
+            target(name="t3")
+            """
+        ),
+    )
+    addresses = rule_runner.request(
+        Addresses,
+        [
+            UnparsedAddressInputs(
+                ["project:t1", ":t2"], owning_address=Address("project", target_name="t3")
+            )
+        ],
+    )
+    assert set(addresses) == {
+        Address("project", target_name="t1"),
+        Address("project", target_name="t2"),
+    }

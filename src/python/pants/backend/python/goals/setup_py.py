@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import enum
 import io
 import itertools
 import logging
@@ -14,11 +15,13 @@ from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
-    PythonEntryPoint,
+    PexBinarySources,
+    PexEntryPointField,
     PythonInterpreterCompatibility,
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
+    SetupPyCommandsField,
 )
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -38,9 +41,10 @@ from pants.base.specs import (
     AscendantAddresses,
     FilesystemLiteralSpec,
 )
+from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
     AddPrefix,
@@ -52,6 +56,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     RemovePrefix,
+    Snapshot,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -65,9 +70,11 @@ from pants.engine.target import (
     Targets,
     TargetsWithOrigins,
     TransitiveTargets,
+    TransitiveTargetsRequest,
 )
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.custom_types import shell_str
+from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -160,6 +167,13 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
     """
 
     sort_input = True
+
+
+@dataclass(frozen=True)
+class PythonDistributionFieldSet(PackageFieldSet):
+    required_fields = (PythonProvidesField,)
+
+    provides: PythonProvidesField
 
 
 @dataclass(frozen=True)
@@ -285,6 +299,7 @@ class RunSetupPyRequest:
     """A request to run a setup.py command."""
 
     exported_target: ExportedTarget
+    interpreter_constraints: PexInterpreterConstraints
     chroot: SetupPyChroot
     args: Tuple[str, ...]
 
@@ -296,15 +311,47 @@ class RunSetupPyResult:
     output: Digest  # The state of the chroot after running setup.py.
 
 
-@dataclass(frozen=True)
-class SetuptoolsSetup:
-    """The setuptools tool."""
+@enum.unique
+class FirstPartyDependencyVersionScheme(enum.Enum):
+    EXACT = "exact"  # i.e., ==
+    COMPATIBLE = "compatible"  # i.e., ~=
+    ANY = "any"  # i.e., no specifier
 
-    requirements_pex: Pex
+
+class SetupPyGeneration(Subsystem):
+    """Options to control how setup.py is generated from a `python_distribution` target."""
+
+    options_scope = "setup-py-generation"
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--first-party-dependency-version-scheme",
+            type=FirstPartyDependencyVersionScheme,
+            default=FirstPartyDependencyVersionScheme.EXACT,
+            help=(
+                "What version to set in `install_requires` when a `python_distribution` depends on "
+                "other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will "
+                "use `~=`. If `any`, will leave off the version. See "
+                "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
+            ),
+        )
+
+    def first_party_dependency_version(self, version: str) -> str:
+        """Return the version string (e.g. '~=4.0') for a first-party dependency.
+
+        If the user specified to use "any" version, then this will return an empty string.
+        """
+        scheme = self.options.first_party_dependency_version_scheme
+        if scheme == FirstPartyDependencyVersionScheme.ANY:
+            return ""
+        specifier = "==" if scheme == FirstPartyDependencyVersionScheme.EXACT else "~="
+        return f"{specifier}{version}"
 
 
 class SetupPySubsystem(GoalSubsystem):
-    """Run setup.py commands."""
+    """Deprecated in favor of the `package` goal."""
 
     name = "setup-py"
 
@@ -344,9 +391,9 @@ class SetupPy(Goal):
     subsystem_cls = SetupPySubsystem
 
 
-def validate_args(args: Tuple[str, ...]):
+def validate_commands(commands: Tuple[str, ...]):
     # We rely on the dist dir being the default, so we know where to find the created dists.
-    if "--dist-dir" in args or "-d" in args:
+    if "--dist-dir" in commands or "-d" in commands:
         raise InvalidSetupPyArgs(
             "Cannot set --dist-dir/-d in setup.py args. To change where dists "
             "are written, use the global --pants-distdir option."
@@ -358,8 +405,47 @@ def validate_args(args: Tuple[str, ...]):
     # the default version used by our Setuptools subsystem.
     # TODO: A `publish` rule, that can invoke Twine to do the actual uploading.
     #  See https://github.com/pantsbuild/pants/issues/8935.
-    if "upload" in args or "register" in args:
+    if "upload" in commands or "register" in commands:
         raise InvalidSetupPyArgs("Cannot use the `upload` or `register` setup.py commands")
+
+
+@rule
+async def package_python_dist(
+    field_set: PythonDistributionFieldSet,
+    python_setup: PythonSetup,
+) -> BuiltPackage:
+    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
+    exported_target = ExportedTarget(transitive_targets.roots[0])
+    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+        (
+            tgt[PythonInterpreterCompatibility]
+            for tgt in transitive_targets.dependencies
+            if tgt.has_field(PythonInterpreterCompatibility)
+        ),
+        python_setup,
+    )
+    chroot = await Get(
+        SetupPyChroot,
+        SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
+    )
+
+    # If commands were provided, run setup.py with them; Otherwise just dump chroots.
+    commands = exported_target.target.get(SetupPyCommandsField).value or ()
+    if commands:
+        validate_commands(commands)
+        setup_py_result = await Get(
+            RunSetupPyResult,
+            RunSetupPyRequest(exported_target, interpreter_constraints, chroot, commands),
+        )
+        dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
+        return BuiltPackage(
+            setup_py_result.output,
+            tuple(BuiltPackageArtifact(path) for path in dist_snapshot.files),
+        )
+    else:
+        dirname = f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}"
+        rel_chroot = await Get(Digest, AddPrefix(chroot.digest, dirname))
+        return BuiltPackage(rel_chroot, (BuiltPackageArtifact(dirname),))
 
 
 @goal_rule
@@ -371,8 +457,15 @@ async def run_setup_pys(
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> SetupPy:
+    logger.warning(
+        "The `setup_py` goal is deprecated in favor of the `package` goal, which behaves "
+        "similarly, except that you specify setup.py commands using the `setup_py_commands` "
+        "field on your `python_distribution` targets, instead of on the command line. "
+        "`setup_py` will be removed in 2.1.0.dev0."
+    )
+
     """Run setup.py commands on all exported targets addressed."""
-    validate_args(setup_py_subsystem.args)
+    validate_commands(setup_py_subsystem.args)
 
     # Get all exported targets, ignoring any non-exported targets that happened to be
     # globbed over, but erroring on any explicitly-requested non-exported targets.
@@ -392,32 +485,50 @@ async def run_setup_pys(
             f'{", ".join(so.address.spec for so in explicit_nonexported_targets)}'
         )
 
+    transitive_targets_per_exported_target = await MultiGet(
+        Get(TransitiveTargets, TransitiveTargetsRequest([et.target.address]))
+        for et in exported_targets
+    )
+
     if setup_py_subsystem.transitive:
-        # Expand out to all owners of the entire dep closure.
-        transitive_targets = await Get(
-            TransitiveTargets, Addresses(et.target.address for et in exported_targets)
+        closure = FrozenOrderedSet(
+            itertools.chain.from_iterable(
+                tt.closure for tt in transitive_targets_per_exported_target
+            )
         )
         owners = await MultiGet(
             Get(ExportedTarget, OwnedDependency(tgt))
-            for tgt in transitive_targets.closure
+            for tgt in closure
             if is_ownable_target(tgt, union_membership)
         )
         exported_targets = list(FrozenOrderedSet(owners))
+        # We must recalculate the transitive targets because it's possible the exported_targets
+        # have changed. Any prior results will be memoized.
+        transitive_targets_per_exported_target = await MultiGet(
+            Get(TransitiveTargets, TransitiveTargetsRequest([et.target.address]))
+            for et in exported_targets
+        )
 
-    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (
-            target_with_origin.target[PythonInterpreterCompatibility]
-            for target_with_origin in targets_with_origins
-            if target_with_origin.target.has_field(PythonInterpreterCompatibility)
-        ),
-        python_setup,
+    interpreter_constraints_per_exported_target = tuple(
+        PexInterpreterConstraints.create_from_compatibility_fields(
+            (
+                tgt[PythonInterpreterCompatibility]
+                for tgt in transitive_targets.dependencies
+                if tgt.has_field(PythonInterpreterCompatibility)
+            ),
+            python_setup,
+        )
+        for transitive_targets in transitive_targets_per_exported_target
     )
+
     chroots = await MultiGet(
         Get(
             SetupPyChroot,
             SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
         )
-        for exported_target in exported_targets
+        for exported_target, interpreter_constraints in zip(
+            exported_targets, interpreter_constraints_per_exported_target
+        )
     )
 
     # If args were provided, run setup.py with them; Otherwise just dump chroots.
@@ -425,9 +536,13 @@ async def run_setup_pys(
         setup_py_results = await MultiGet(
             Get(
                 RunSetupPyResult,
-                RunSetupPyRequest(exported_target, chroot, setup_py_subsystem.args),
+                RunSetupPyRequest(
+                    exported_target, interpreter_constraints, chroot, setup_py_subsystem.args
+                ),
             )
-            for exported_target, chroot in zip(exported_targets, chroots)
+            for exported_target, interpreter_constraints, chroot in zip(
+                exported_targets, interpreter_constraints_per_exported_target, chroots
+            )
         )
 
         for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
@@ -462,26 +577,38 @@ setup(**{setup_kwargs_str})
 
 
 @rule
-async def run_setup_py(
-    req: RunSetupPyRequest, setuptools_setup: SetuptoolsSetup
-) -> RunSetupPyResult:
+async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
-    input_digest = await Get(
-        Digest, MergeDigests((req.chroot.digest, setuptools_setup.requirements_pex.digest))
+    # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
+    # in turn imports from and invokes setuptools.
+    setuptools_pex = await Get(
+        Pex,
+        PexRequest(
+            output_filename="setuptools.pex",
+            internal_only=True,
+            requirements=PexRequirements(setuptools.all_requirements),
+            interpreter_constraints=(
+                req.interpreter_constraints
+                if setuptools.options.is_default("interpreter_constraints")
+                else PexInterpreterConstraints(setuptools.interpreter_constraints)
+            ),
+        ),
     )
+    input_digest = await Get(Digest, MergeDigests((req.chroot.digest, setuptools_pex.digest)))
     # The setuptools dist dir, created by it under the chroot (not to be confused with
     # pants's own dist dir, at the buildroot).
     dist_dir = "dist/"
     result = await Get(
         ProcessResult,
         PexProcess(
-            setuptools_setup.requirements_pex,
+            setuptools_pex,
             argv=("setup.py", *req.args),
             input_digest=input_digest,
             # setuptools commands that create dists write them to the distdir.
             # TODO: Could there be other useful files to capture?
             output_directories=(dist_dir,),
             description=f"Run setuptools for {req.exported_target.target.address}",
+            level=LogLevel.DEBUG,
         ),
     )
     output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
@@ -518,10 +645,11 @@ async def determine_setup_kwargs(
 @rule
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     exported_target = request.exported_target
+    exported_addr = exported_target.target.address
 
     owned_deps, transitive_targets = await MultiGet(
         Get(OwnedDependencies, DependencyOwner(exported_target)),
-        Get(TransitiveTargets, Addresses([exported_target.target.address])),
+        Get(TransitiveTargets, TransitiveTargetsRequest([exported_target.target.address])),
     )
 
     # files() targets aren't owned by a single exported target - they aren't code, so
@@ -556,23 +684,39 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             "install_requires": (*requirements, *setup_kwargs.get("install_requires", [])),
         }
     )
+
+    # Add any `pex_binary` targets from `setup_py().with_binaries()` to the dist's entry points.
     key_to_binary_spec = exported_target.provides.binaries
-    keys = list(key_to_binary_spec.keys())
-    addresses = await MultiGet(
-        Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(key_to_binary_spec[key], relative_to=target.address.spec_path),
-        )
-        for key in keys
+    binaries = await Get(
+        Targets, UnparsedAddressInputs(key_to_binary_spec.values(), owning_address=target.address)
     )
-    binaries = await Get(Targets, Addresses(addresses))
-    for key, binary in zip(keys, binaries):
-        binary_entry_point = binary.get(PythonEntryPoint).value
-        if not binary_entry_point:
+    binary_entry_points = []
+    for binary in binaries:
+        if not binary.has_fields([PexEntryPointField, PexBinarySources]):
             raise InvalidEntryPoint(
-                f"The binary {key} exported by {target.address} is not a valid entry point."
+                "Expected addresses to `pex_binary` targets in `.with_binaries()` for the "
+                f"`provides` field for {exported_addr}, but found {binary.address} with target "
+                f"type {binary.alias}."
             )
+        entry_point = binary[PexEntryPointField].value
+        if not entry_point:
+            raise InvalidEntryPoint(
+                "Every `pex_binary` used in `.with_binaries()` for the `provides` field for "
+                f"{exported_addr} must explicitly set the `entry_point` field, but "
+                f"{binary.address} left the field off. Set `entry_point` to "
+                "`path.to.module:func`, e.g. `project.app:main`."
+            )
+        if ":" not in entry_point:
+            raise InvalidEntryPoint(
+                "Every `pex_binary` used in `with_binaries()` for the `provides()` field for "
+                f"{exported_addr} must set the `entry_point` field in the format "
+                f"`path.to.module:func`, but {binary.address} set it to {repr(entry_point)} "
+                f"without the `:func` suffix. For example, set `entry_point='{entry_point}:main'. "
+                "See https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html#"
+                "the-console-scripts-entry-point."
+            )
+        binary_entry_points.append(entry_point)
+    for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
         entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
         console_scripts.append(f"{key}={binary_entry_point}")
@@ -636,10 +780,12 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
 
 @rule(desc="Compute distribution's 3rd party requirements")
 async def get_requirements(
-    dep_owner: DependencyOwner, union_membership: UnionMembership
+    dep_owner: DependencyOwner,
+    union_membership: UnionMembership,
+    setup_py_generation: SetupPyGeneration,
 ) -> ExportedTargetRequirements:
     transitive_targets = await Get(
-        TransitiveTargets, Addresses([dep_owner.exported_target.target.address])
+        TransitiveTargets, TransitiveTargetsRequest([dep_owner.exported_target.target.address])
     )
 
     ownable_tgts = [
@@ -658,13 +804,6 @@ async def get_requirements(
     # if U is in the owned deps then we'll pick up R through U. And if U is not in the owned deps
     # then it's owned by an exported target ET, and so R will be in the requirements for ET, and we
     # will require ET.
-    #
-    # TODO: Note that this logic doesn't account for indirection via dep aggregator targets, of type
-    #  `target`. But we don't have those in v2 (yet) anyway. Plus, as we move towards buildgen and/or
-    #  stricter build graph hygiene, it makes sense to require that targets directly declare their
-    #  true dependencies. Plus, in the specific realm of setup-py, since we must exclude indirect
-    #  deps across exported target boundaries, it's not a big stretch to just insist that
-    #  requirements must be direct deps.
     direct_deps_tgts = await MultiGet(
         Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
@@ -680,14 +819,14 @@ async def get_requirements(
         Get(SetupKwargs, OwnedDependency(tgt)) for tgt in owned_by_others
     )
     req_strs.extend(
-        f"{kwargs.name}=={kwargs.version}"
+        f"{kwargs.name}{setup_py_generation.first_party_dependency_version(kwargs.version)}"
         for kwargs in set(kwargs_for_exported_targets_we_depend_on)
     )
 
     return ExportedTargetRequirements(req_strs)
 
 
-@rule(desc="Find all code to be published in the distribution", level=LogLevel.INFO)
+@rule(desc="Find all code to be published in the distribution", level=LogLevel.DEBUG)
 async def get_owned_dependencies(
     dependency_owner: DependencyOwner, union_membership: UnionMembership
 ) -> OwnedDependencies:
@@ -696,7 +835,8 @@ async def get_owned_dependencies(
     Includes dependency_owner itself.
     """
     transitive_targets = await Get(
-        TransitiveTargets, Addresses([dependency_owner.exported_target.target.address])
+        TransitiveTargets,
+        TransitiveTargetsRequest([dependency_owner.exported_target.target.address]),
     )
     ownable_targets = [
         tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
@@ -736,7 +876,9 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     )
     exported_ancestor_iter = iter(exported_ancestor_tgts)
     for exported_ancestor in exported_ancestor_iter:
-        transitive_targets = await Get(TransitiveTargets, Addresses([exported_ancestor.address]))
+        transitive_targets = await Get(
+            TransitiveTargets, TransitiveTargetsRequest([exported_ancestor.address])
+        )
         if target in transitive_targets.closure:
             owner = exported_ancestor
             # Find any exported siblings of owner that also depend on target. They have the
@@ -744,7 +886,9 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
             sibling_owners = []
             sibling = next(exported_ancestor_iter, None)
             while sibling and sibling.address.spec_path == owner.address.spec_path:
-                transitive_targets = await Get(TransitiveTargets, Addresses([sibling.address]))
+                transitive_targets = await Get(
+                    TransitiveTargets, TransitiveTargetsRequest([sibling.address])
+                )
                 if target in transitive_targets.closure:
                     sibling_owners.append(sibling)
                 sibling = next(exported_ancestor_iter, None)
@@ -761,24 +905,6 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
         f"No python_distribution target found to own {target.address}. Note that "
         f"the owner must be in or above the owned target's directory, and must "
         f"depend on it (directly or indirectly)."
-    )
-
-
-@rule(desc="Set up setuptools")
-async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
-    # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
-    # in turn imports from and invokes setuptools.
-    requirements_pex = await Get(
-        Pex,
-        PexRequest(
-            output_filename="setuptools.pex",
-            internal_only=True,
-            requirements=PexRequirements(setuptools.all_requirements),
-            interpreter_constraints=PexInterpreterConstraints(setuptools.interpreter_constraints),
-        ),
-    )
-    return SetuptoolsSetup(
-        requirements_pex=requirements_pex,
     )
 
 
@@ -966,4 +1092,5 @@ def rules():
     return [
         *python_sources_rules(),
         *collect_rules(),
+        UnionRule(PackageFieldSet, PythonDistributionFieldSet),
     ]

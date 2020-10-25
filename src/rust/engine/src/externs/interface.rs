@@ -110,6 +110,13 @@ py_module_initializer!(native_engine, |py, m| {
     "write_log",
     py_fn!(py, write_log(a: String, b: u64, c: String)),
   )?;
+
+  m.add(
+    py,
+    "set_per_run_log_path",
+    py_fn!(py, set_per_run_log_path(a: Option<String>)),
+  )?;
+
   m.add(
     py,
     "write_stdout",
@@ -381,6 +388,8 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::PyGeneratorResponseGet>(py)?;
   m.add_class::<externs::PyGeneratorResponseGetMulti>(py)?;
 
+  m.add_class::<externs::fs::PyDigest>(py)?;
+
   Ok(())
 });
 
@@ -396,7 +405,7 @@ py_class!(class PyTypes |py| {
 
   def __new__(
       _cls,
-      directory_digest: PyType,
+      file_digest: PyType,
       snapshot: PyType,
       paths: PyType,
       file_content: PyType,
@@ -419,7 +428,8 @@ py_class!(class PyTypes |py| {
     Self::create_instance(
         py,
         RefCell::new(Some(Types {
-        directory_digest: externs::type_for(directory_digest),
+        directory_digest: externs::type_for(py.get_type::<externs::fs::PyDigest>()),
+        file_digest: externs::type_for(file_digest),
         snapshot: externs::type_for(snapshot),
         paths: externs::type_for(paths),
         file_content: externs::type_for(file_content),
@@ -471,7 +481,9 @@ py_class!(class PyExecutionStrategyOptions |py| {
     speculation_delay: f64,
     speculation_strategy: String,
     use_local_cache: bool,
-    local_enable_nailgun: bool
+    local_enable_nailgun: bool,
+    remote_cache_read: bool,
+    remote_cache_write: bool
   ) -> CPyResult<Self> {
     Self::create_instance(py,
       ExecutionStrategyOptions {
@@ -482,6 +494,8 @@ py_class!(class PyExecutionStrategyOptions |py| {
         speculation_strategy,
         use_local_cache,
         local_enable_nailgun,
+        remote_cache_read,
+        remote_cache_write,
       }
     )
   }
@@ -537,14 +551,14 @@ py_class!(class PyRemotingOptions |py| {
 py_class!(class PySession |py| {
     data session: Session;
     def __new__(_cls,
-          scheduler_ptr: PyScheduler,
+          scheduler: PyScheduler,
           should_render_ui: bool,
           build_id: String,
           should_report_workunits: bool,
           session_values: PyObject
     ) -> CPyResult<Self> {
       Self::create_instance(py, Session::new(
-          scheduler_ptr.scheduler(py),
+          scheduler.scheduler(py),
           should_render_ui,
           build_id,
           should_report_workunits,
@@ -689,11 +703,12 @@ fn nailgun_server_create(
           stdout_fd,
           stderr_fd,
         ];
-        match externs::call(&runner, &runner_args) {
-          Ok(exit_code_val) => {
-            // TODO: We don't currently expose a "project_i32", but it will not be necessary with
-            // https://github.com/pantsbuild/pants/pull/9593.
-            nailgun::ExitCode(externs::val_to_str(&exit_code_val).parse().unwrap())
+        match externs::call_function(&runner, &runner_args) {
+          Ok(exit_code) => {
+            let gil = Python::acquire_gil();
+            let py = gil.python();
+            let code: i32 = exit_code.extract(py).unwrap();
+            nailgun::ExitCode(code)
           }
           Err(e) => {
             error!("Uncaught exception in nailgun handler: {:#?}", e);
@@ -875,17 +890,30 @@ async fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResul
     ))
   }
 
+  let mut user_metadata_entries = Vec::new();
+  for (user_metadata_key, value_arc) in workunit.metadata.user_metadata.iter() {
+    user_metadata_entries.push((
+      externs::store_utf8(user_metadata_key.as_str()),
+      Value::new_from_arc(value_arc.clone()),
+    ));
+  }
+
+  dict_entries.push((
+    externs::store_utf8("metadata"),
+    externs::store_dict(user_metadata_entries)?,
+  ));
+
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stdout_digest"),
-      crate::nodes::Snapshot::store_directory_digest(core, stdout_digest),
+      crate::nodes::Snapshot::store_file_digest(core, stdout_digest),
     ));
   }
 
   if let Some(stderr_digest) = &workunit.metadata.stderr.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stderr_digest"),
-      crate::nodes::Snapshot::store_directory_digest(core, stderr_digest),
+      crate::nodes::Snapshot::store_file_digest(core, stderr_digest),
     ));
   }
 
@@ -1330,7 +1358,7 @@ fn match_path_globs(
 ) -> CPyResult<Vec<String>> {
   let matches = py
     .allow_threads(|| {
-      let path_globs = nodes::Snapshot::lift_path_globs(&path_globs.into())?;
+      let path_globs = nodes::Snapshot::lift_prepared_path_globs(&path_globs.into())?;
 
       Ok(
         paths
@@ -1358,31 +1386,36 @@ fn capture_snapshots(
   session_ptr: PySession,
   path_globs_and_root_tuple_wrapper: PyObject,
 ) -> CPyResult<PyObject> {
-  let values = externs::project_iterable(&path_globs_and_root_tuple_wrapper.into());
-  let path_globs_and_roots = values
-    .iter()
-    .map(|value| {
-      let root = PathBuf::from(externs::project_str(&value, "root"));
-      let path_globs =
-        nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
-      let digest_hint = {
-        let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
-        if maybe_digest == Value::from(externs::none()) {
-          None
-        } else {
-          Some(nodes::lift_digest(&maybe_digest)?)
-        }
-      };
-      path_globs.map(|path_globs| (path_globs, root, digest_hint))
-    })
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
-
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       // TODO: A parent_id should be an explicit argument.
       session.workunit_store().init_thread_state(None);
       let core = scheduler.core.clone();
+
+      let values = externs::collect_iterable(&path_globs_and_root_tuple_wrapper).unwrap();
+      let path_globs_and_roots = values
+        .iter()
+        .map(|value| {
+          let root = PathBuf::from(externs::getattr_as_string(&value, "root"));
+          let path_globs = nodes::Snapshot::lift_prepared_path_globs(
+            &externs::getattr(&value, "path_globs").unwrap(),
+          );
+          let digest_hint = {
+            let maybe_digest: PyObject = externs::getattr(&value, "digest_hint").unwrap();
+            if maybe_digest == externs::none() {
+              None
+            } else {
+              Some(nodes::lift_directory_digest(
+                &core.types,
+                &Value::new(maybe_digest),
+              )?)
+            }
+          };
+          path_globs.map(|path_globs| (path_globs, root, digest_hint))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
+
       let snapshot_futures = path_globs_and_roots
         .into_iter()
         .map(|(path_globs, root, digest_hint)| {
@@ -1420,9 +1453,14 @@ fn ensure_remote_has_recursive(
     let core = scheduler.core.clone();
     let store = core.store();
 
+    // NB: Supports either a FileDigest or Digest as input.
     let digests: Vec<Digest> = py_digests
       .iter(py)
-      .map(|item| crate::nodes::lift_digest(&item.into()))
+      .map(|item| {
+        let value = item.into();
+        crate::nodes::lift_directory_digest(&core.types, &value)
+          .or_else(|_| crate::nodes::lift_file_digest(&core.types, &value))
+      })
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
@@ -1442,14 +1480,14 @@ fn ensure_remote_has_recursive(
 fn single_file_digests_to_bytes(
   py: Python,
   scheduler_ptr: PyScheduler,
-  py_digests: PyList,
+  py_file_digests: PyList,
 ) -> CPyResult<PyList> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
 
-    let digests: Vec<Digest> = py_digests
+    let digests: Vec<Digest> = py_file_digests
       .iter(py)
-      .map(|item| crate::nodes::lift_digest(&item.into()))
+      .map(|item| crate::nodes::lift_file_digest(&core.types, &item.into()))
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
@@ -1498,20 +1536,20 @@ fn run_local_interactive_process(
 
           let value: Value = request.into();
 
-          let argv: Vec<String> = externs::project_multi_strs(&value, "argv");
+          let argv: Vec<String> = externs::getattr(&value, "argv").unwrap();
           if argv.is_empty() {
             return Err("Empty argv list not permitted".to_string());
           }
 
-          let run_in_workspace = externs::project_bool(&value, "run_in_workspace");
+          let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
           let maybe_tempdir = if run_in_workspace {
             None
           } else {
             Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
           };
 
-          let input_digest_value = externs::project_ignoring_type(&value, "input_digest");
-          let digest: Digest = nodes::lift_digest(&input_digest_value)?;
+          let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
+          let digest: Digest = nodes::lift_directory_digest(types, &input_digest_value)?;
           if digest != EMPTY_DIGEST {
             if run_in_workspace {
               warn!("Local interactive process should not attempt to materialize files when run in workspace");
@@ -1548,11 +1586,11 @@ fn run_local_interactive_process(
             command.current_dir(tempdir.path());
           }
 
-          let hermetic_env = externs::project_bool(&value, "hermetic_env");
+          let hermetic_env: bool = externs::getattr(&value, "hermetic_env").unwrap();
           if hermetic_env {
             command.env_clear();
           }
-          let env = externs::project_frozendict(&value, "env");
+          let env = externs::getattr_from_frozendict(&value, "env");
           command.envs(env);
 
           let mut subprocess = command.spawn().map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
@@ -1579,12 +1617,13 @@ fn write_digest(
   digest: PyObject,
   path_prefix: String,
 ) -> PyUnitResult {
-  let lifted_digest =
-    nodes::lift_digest(&digest.into()).map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       // TODO: A parent_id should be an explicit argument.
       session.workunit_store().init_thread_state(None);
+
+      let lifted_digest = nodes::lift_directory_digest(&scheduler.core.types, &digest.into())
+        .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
 
       // Python will have already validated that path_prefix is a relative path.
       let mut destination = PathBuf::new();
@@ -1672,6 +1711,13 @@ fn setup_pantsd_logger(py: Python, log_file: String) -> CPyResult<i64> {
 fn setup_stderr_logger(_: Python) -> PyUnitResult {
   logging::set_thread_destination(Destination::Stderr);
   Ok(None)
+}
+
+fn set_per_run_log_path(py: Python, log_path: Option<String>) -> PyUnitResult {
+  py.allow_threads(|| {
+    PANTS_LOGGER.set_per_run_logs(log_path.map(PathBuf::from));
+    Ok(None)
+  })
 }
 
 fn write_log(py: Python, msg: String, level: u64, path: String) -> PyUnitResult {

@@ -11,7 +11,13 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Dependencies as DependenciesField
-from pants.engine.target import DependenciesRequest, Targets, TransitiveTargets, UnexpandedTargets
+from pants.engine.target import (
+    DependenciesRequest,
+    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    UnexpandedTargets,
+)
 
 
 class DependencyType(Enum):
@@ -21,7 +27,7 @@ class DependencyType(Enum):
 
 
 class DependenciesSubsystem(LineOriented, GoalSubsystem):
-    """List the dependencies of the input targets."""
+    """List the dependencies of the input files/targets."""
 
     name = "dependencies"
 
@@ -42,7 +48,7 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
             default=DependencyType.SOURCE,
             help=(
                 "Which types of dependencies to list, where `source` means source code "
-                "dependencies and `3rdparty` means third-party requirements."
+                "dependencies and `3rdparty` means third-party requirement strings."
             ),
         )
 
@@ -64,12 +70,18 @@ async def dependencies(
     console: Console, addresses: Addresses, dependencies_subsystem: DependenciesSubsystem
 ) -> Dependencies:
     if dependencies_subsystem.transitive:
-        transitive_targets = await Get(TransitiveTargets, Addresses, addresses)
+        transitive_targets = await Get(
+            TransitiveTargets, TransitiveTargetsRequest(addresses, include_special_cased_deps=True)
+        )
         targets = Targets(transitive_targets.dependencies)
     else:
         target_roots = await Get(UnexpandedTargets, Addresses, addresses)
         dependencies_per_target_root = await MultiGet(
-            Get(Targets, DependenciesRequest(tgt.get(DependenciesField))) for tgt in target_roots
+            Get(
+                Targets,
+                DependenciesRequest(tgt.get(DependenciesField), include_special_cased_deps=True),
+            )
+            for tgt in target_roots
         )
         targets = Targets(itertools.chain.from_iterable(dependencies_per_target_root))
 

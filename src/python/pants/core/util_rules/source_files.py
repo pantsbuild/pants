@@ -50,7 +50,7 @@ class SourceFilesRequest:
         self.enable_codegen = enable_codegen
 
 
-@rule
+@rule(desc="Get all relevant source files")
 async def determine_source_files(request: SourceFilesRequest) -> SourceFiles:
     """Merge all `Sources` fields into one Snapshot."""
     unrooted_files: Set[str] = set()

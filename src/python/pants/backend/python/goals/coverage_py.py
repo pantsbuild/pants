@@ -28,7 +28,7 @@ from pants.core.goals.test import (
     CoverageReports,
     FilesystemCoverageReport,
 )
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -42,7 +42,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets
+from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option
 from pants.util.logging import LogLevel
@@ -270,9 +270,10 @@ async def generate_coverage_reports(
     coverage_setup: CoverageSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
-    transitive_targets: TransitiveTargets,
+    all_used_addresses: Addresses,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
+    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(all_used_addresses))
     sources = await Get(
         PythonSourceFiles,
         PythonSourceFilesRequest(transitive_targets.closure, include_resources=False),

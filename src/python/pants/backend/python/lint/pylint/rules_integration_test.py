@@ -3,7 +3,7 @@
 
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional, Sequence
+from typing import Any, List, Optional, Sequence
 
 import pytest
 
@@ -12,11 +12,9 @@ from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.target import Target
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -26,7 +24,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pylint_rules(),
-            QueryRule(LintResults, (PylintRequest, PantsEnvironment)),
+            QueryRule(LintResults, (PylintRequest,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary, PylintSourcePlugin],
     )
@@ -73,9 +71,8 @@ def make_target(
             """
         ),
     )
-    return rule_runner.get_target(
-        Address(package, target_name=name), create_options_bootstrapper(args=GLOBAL_ARGS)
-    )
+    rule_runner.set_options(GLOBAL_ARGS)
+    return rule_runner.get_target(Address(package, target_name=name))
 
 
 def run_pylint(
@@ -97,23 +94,24 @@ def run_pylint(
         args.append("--pylint-skip")
     if additional_args:
         args.extend(additional_args)
+    rule_runner.set_options(args)
     results = rule_runner.request(
         LintResults,
-        [
-            PylintRequest(PylintFieldSet.create(tgt) for tgt in targets),
-            create_options_bootstrapper(args=args),
-            PantsEnvironment(),
-        ],
+        [PylintRequest(PylintFieldSet.create(tgt) for tgt in targets)],
     )
     return results.results
 
 
+def assert_success(rule_runner: RuleRunner, target: Target, **kwargs: Any) -> None:
+    result = run_pylint(rule_runner, [target], **kwargs)
+    assert len(result) == 1
+    assert "Your code has been rated at 10.00/10" in result[0].stdout
+    assert result[0].exit_code == 0
+
+
 def test_passing_source(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [GOOD_SOURCE])
-    result = run_pylint(rule_runner, [target])
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
+    assert_success(rule_runner, target)
 
 
 def test_failing_source(rule_runner: RuleRunner) -> None:
@@ -189,18 +187,12 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
 
 def test_respects_config_file(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    result = run_pylint(rule_runner, [target], config="[pylint]\ndisable = C0103\n")
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
+    assert_success(rule_runner, target, config="[pylint]\ndisable = C0103\n")
 
 
 def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    result = run_pylint(rule_runner, [target], passthrough_args="--disable=C0103")
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
+    assert_success(rule_runner, target, passthrough_args="--disable=C0103")
 
 
 def test_includes_direct_dependencies(rule_runner: RuleRunner) -> None:
@@ -263,11 +255,7 @@ def test_includes_direct_dependencies(rule_runner: RuleRunner) -> None:
             Address("", target_name="direct_req"),
         ],
     )
-
-    result = run_pylint(rule_runner, [target])
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
+    assert_success(rule_runner, target)
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
@@ -295,13 +283,35 @@ def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
             rule_runner,
             [test_fc],
             package="tests/python/project",
-            dependencies=[Address.parse(f"{PACKAGE}:target")],
+            dependencies=[Address(PACKAGE, target_name="target")],
         ),
     ]
     result = run_pylint(rule_runner, targets)
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
+
+
+def test_type_stubs(rule_runner: RuleRunner) -> None:
+    """Ensure that running over a type stub file doesn't cause issues."""
+    type_stub = FileContent(
+        f"{PACKAGE}/good.pyi",
+        dedent(
+            """\
+            '''Docstring.'''
+
+            def add(arg1: int, arg2: int) -> int:
+                '''Docstring.'''
+                return arg1 + arg2
+            """
+        ).encode(),
+    )
+    # First check when the stub has no sibling `.py` file.
+    target = make_target(rule_runner, [type_stub])
+    assert_success(rule_runner, target)
+    # Then check with a sibling `.py`.
+    target = make_target(rule_runner, [GOOD_SOURCE, type_stub], name="new_tgt")
+    assert_success(rule_runner, target)
 
 
 def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:

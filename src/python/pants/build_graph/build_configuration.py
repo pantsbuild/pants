@@ -3,18 +3,37 @@
 
 import logging
 import typing
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Dict, Type, Union
+from enum import Enum
+from typing import Any, DefaultDict, Dict, Set, Type, Union, cast
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.goal.run_tracker import RunTracker
+from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
+from pants.option.scope import normalize_scope
+from pants.reporting.reporting import Reporting
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.vcs.changed import Changed
 
 logger = logging.getLogger(__name__)
+
+
+# No goal or target_type can have a name from this set, so that `./pants help <name>`
+# is unambiguous.
+_RESERVED_NAMES = {"global", "targets", "goals"}
+
+
+# Subsystems used outside of any rule.
+_GLOBAL_SUBSYSTEMS: FrozenOrderedSet[Type[Optionable]] = FrozenOrderedSet(
+    {GlobalOptions, Reporting, RunTracker, Changed}
+)
 
 
 @dataclass(frozen=True)
@@ -22,10 +41,51 @@ class BuildConfiguration:
     """Stores the types and helper functions exposed to BUILD files."""
 
     registered_aliases: BuildFileAliases
-    optionables: FrozenOrderedSet[Optionable]
+    optionables: FrozenOrderedSet[Type[Optionable]]
     rules: FrozenOrderedSet[Rule]
     union_rules: FrozenOrderedSet[UnionRule]
     target_types: FrozenOrderedSet[Type[Target]]
+
+    @property
+    def all_optionables(self) -> FrozenOrderedSet[Type[Optionable]]:
+        """Return all optionables in the system: global and those registered via rule usage."""
+        return _GLOBAL_SUBSYSTEMS | self.optionables
+
+    def __post_init__(self) -> None:
+        class Category(Enum):
+            goal = "goal"
+            reserved_name = "reserved name"
+            subsystem = "subsystem"
+            target_type = "target type"
+
+        name_to_categories: DefaultDict[str, Set[Category]] = defaultdict(set)
+        normalized_to_orig_name: Dict[str, str] = {}
+
+        for opt in self.all_optionables:
+            scope = cast(str, opt.options_scope)
+            normalized_scope = normalize_scope(scope)
+            name_to_categories[normalized_scope].add(
+                Category.goal if issubclass(opt, GoalSubsystem) else Category.subsystem
+            )
+            normalized_to_orig_name[normalized_scope] = scope
+        for tgt_type in self.target_types:
+            name_to_categories[normalize_scope(tgt_type.alias)].add(Category.target_type)
+        for reserved_name in _RESERVED_NAMES:
+            name_to_categories[normalize_scope(reserved_name)].add(Category.reserved_name)
+
+        found_collision = False
+        for name, cats in name_to_categories.items():
+            if len(cats) > 1:
+                scats = sorted(cat.value for cat in cats)
+                cats_str = ", ".join(f"a {cat}" for cat in scats[:-1]) + f" and a {scats[-1]}."
+                colliding_names = "`/`".join(
+                    sorted({name, normalized_to_orig_name.get(name, name)})
+                )
+                logger.error(f"Naming collision: `{colliding_names}` is registered as {cats_str}")
+                found_collision = True
+
+        if found_collision:
+            raise TypeError("Found naming collisions. See log for details.")
 
     @dataclass
     class Builder:
@@ -42,8 +102,8 @@ class BuildConfiguration:
             These returned aliases aren't so useful for actually parsing BUILD files.
             They are useful for generating online documentation.
 
-            :returns: A new BuildFileAliases instance containing this BuildConfiguration's registered alias
-                      mappings.
+            :returns: A new BuildFileAliases instance containing this BuildConfiguration's
+                      registered alias mappings.
             """
             return BuildFileAliases(
                 objects=self._exposed_object_by_alias.copy(),
@@ -94,13 +154,12 @@ class BuildConfiguration:
                 alias
             ] = context_aware_object_factory
 
-        def register_optionables(self, optionables):
-            """Registers the given subsystem types.
-
-            :param optionables: The Optionable types to register.
-            :type optionables: :class:`collections.Iterable` containing
-                               :class:`pants.option.optionable.Optionable` subclasses.
-            """
+        # NB: We expect the parameter to be Iterable[Type[Optionable]], but we can't be confident
+        # in this because we pass whatever people put in their `register.py`s to this function;
+        # I.e., this is an impure function that reads from the outside world. So, we use the type
+        # hint `Any` and perform runtime type checking.
+        def register_optionables(self, optionables: Union[typing.Iterable[Type[Optionable]], Any]):
+            """Registers the given subsystem types."""
             if not isinstance(optionables, Iterable):
                 raise TypeError("The optionables must be an iterable, given {}".format(optionables))
             optionables = tuple(optionables)
@@ -137,17 +196,18 @@ class BuildConfiguration:
                 rule.output_type for rule in self._rules if issubclass(rule.output_type, Optionable)
             )
 
-        # NB: We expect the parameter to be Iterable[Type[Target]], but we can't be confident in this
-        # because we pass whatever people put in their `register.py`s to this function; i.e., this is
-        # an impure function that reads from the outside world. So, we use the type hint `Any` and
-        # perform runtime type checking.
+        # NB: We expect the parameter to be Iterable[Type[Target]], but we can't be confident in
+        # this because we pass whatever people put in their `register.py`s to this function;
+        # I.e., this is an impure function that reads from the outside world. So, we use the type
+        # hint `Any` and perform runtime type checking.
         def register_target_types(
             self, target_types: Union[typing.Iterable[Type[Target]], Any]
         ) -> None:
             """Registers the given target types."""
             if not isinstance(target_types, Iterable):
                 raise TypeError(
-                    f"The entrypoint `target_types` must return an iterable. Given {repr(target_types)}"
+                    f"The entrypoint `target_types` must return an iterable. "
+                    f"Given {repr(target_types)}"
                 )
             bad_elements = [
                 tgt_type

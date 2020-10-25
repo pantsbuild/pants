@@ -17,9 +17,8 @@ use std::time::Duration;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use testutil::owned_string_vec;
 use testutil::path::find_bash;
-use tokio::runtime::Handle;
+use testutil::{owned_string_vec, relative_paths};
 
 #[derive(PartialEq, Debug)]
 struct LocalTestResult {
@@ -158,7 +157,7 @@ async fn output_files_one() {
       "-c".to_owned(),
       format!("echo -n {} > {}", TestData::roland().string(), "roland"),
     ])
-    .output_files(vec![PathBuf::from("roland")].into_iter().collect()),
+    .output_files(relative_paths(&["roland"]).collect()),
   )
   .await
   .unwrap();
@@ -186,8 +185,8 @@ async fn output_dirs() {
         TestData::catnip().string()
       ),
     ])
-    .output_files(vec![PathBuf::from("treats")].into_iter().collect())
-    .output_directories(vec![PathBuf::from("cats")].into_iter().collect()),
+    .output_files(relative_paths(&["treats"]).collect())
+    .output_directories(relative_paths(&["cats"]).collect()),
   )
   .await
   .unwrap();
@@ -214,11 +213,7 @@ async fn output_files_many() {
         TestData::catnip().string()
       ),
     ])
-    .output_files(
-      vec![PathBuf::from("cats/roland"), PathBuf::from("treats")]
-        .into_iter()
-        .collect(),
-    ),
+    .output_files(relative_paths(&["cats/roland", "treats"]).collect()),
   )
   .await
   .unwrap();
@@ -245,7 +240,7 @@ async fn output_files_execution_failure() {
         "roland"
       ),
     ])
-    .output_files(vec![PathBuf::from("roland")].into_iter().collect()),
+    .output_files(relative_paths(&["roland"]).collect()),
   )
   .await
   .unwrap();
@@ -269,7 +264,7 @@ async fn output_files_partial_output() {
       format!("echo -n {} > {}", TestData::roland().string(), "roland"),
     ])
     .output_files(
-      vec![PathBuf::from("roland"), PathBuf::from("susannah")]
+      relative_paths(&["roland", "susannah"])
         .into_iter()
         .collect(),
     ),
@@ -295,8 +290,8 @@ async fn output_overlapping_file_and_dir() {
       "-c".to_owned(),
       format!("echo -n {} > cats/roland", TestData::roland().string()),
     ])
-    .output_files(vec![PathBuf::from("cats/roland")].into_iter().collect())
-    .output_directories(vec![PathBuf::from("cats")].into_iter().collect()),
+    .output_files(relative_paths(&["cats/roland"]).collect())
+    .output_directories(relative_paths(&["cats"]).collect()),
   )
   .await
   .unwrap();
@@ -361,7 +356,7 @@ async fn test_directory_preservation() {
   let argv = vec![find_bash(), "-c".to_owned(), bash_contents.clone()];
 
   let result = run_command_locally_in_dir(
-    Process::new(argv.clone()).output_files(vec![PathBuf::from("roland")].into_iter().collect()),
+    Process::new(argv.clone()).output_files(relative_paths(&["roland"]).collect()),
     preserved_work_root.clone(),
     false,
     None,
@@ -434,8 +429,8 @@ async fn all_containing_directories_for_outputs_are_created() {
         TestData::roland().string()
       ),
     ])
-    .output_files(vec![PathBuf::from("cats/roland")].into_iter().collect())
-    .output_directories(vec![PathBuf::from("birds/falcons")].into_iter().collect()),
+    .output_files(relative_paths(&["cats/roland"]).collect())
+    .output_directories(relative_paths(&["birds/falcons"]).collect()),
   )
   .await
   .unwrap();
@@ -458,7 +453,7 @@ async fn output_empty_dir() {
       "-c".to_owned(),
       "/bin/mkdir falcons".to_string(),
     ])
-    .output_directories(vec![PathBuf::from("falcons")].into_iter().collect()),
+    .output_directories(relative_paths(&["falcons"]).collect()),
   )
   .await
   .unwrap();
@@ -496,7 +491,7 @@ async fn timeout() {
 #[tokio::test]
 async fn working_directory() {
   let store_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
   // Prepare the store to contain /cats/roland, because the EPR needs to materialize it and then run
@@ -554,7 +549,7 @@ async fn run_command_locally_in_dir(
 ) -> Result<LocalTestResult, String> {
   let store_dir = TempDir::new().unwrap();
   let named_cache_dir = TempDir::new().unwrap();
-  let executor = executor.unwrap_or_else(|| task_executor::Executor::new(Handle::current()));
+  let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let runner = crate::local::CommandRunner::new(

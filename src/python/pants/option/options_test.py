@@ -4,7 +4,6 @@
 import json
 import os
 import shlex
-import unittest
 import unittest.mock
 import warnings
 from collections import defaultdict
@@ -49,7 +48,6 @@ from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
-from pants.util.strutil import safe_shlex_join
 
 _FAKE_CUR_VERSION = "1.0.0.dev0"
 
@@ -1602,122 +1600,6 @@ class OptionsTest(unittest.TestCase):
         self.assertEqual(3, options.for_scope("compile.java").a)
         self.assertEqual(2, options.for_scope("compile.java").b)
         self.assertEqual(4, options.for_scope("compile.java").c)
-
-    def test_invalid_option_errors(self) -> None:
-        def parse_joined_command_line(*args):
-            bootstrap_options = create_options(
-                {
-                    GLOBAL_SCOPE: {
-                        # Set the Levenshtein edit distance to search for misspelled options.
-                        "option_name_check_distance": 2,
-                        # If bootstrap option values are provided, this option is accessed and must be provided.
-                        "spec_files": [],
-                        "spec_file": RankedValue(Rank.HARDCODED, []),
-                    },
-                }
-            )
-            return self._parse(
-                flags=safe_shlex_join(list(args)),
-                bootstrap_option_values=bootstrap_options.for_global_scope(),
-            )
-
-        with pytest.raises(ParseError) as exc:
-            parse_joined_command_line("--aasdf").for_global_scope()
-        assert (
-            "Unrecognized command line flag '--aasdf' on global scope.\n\n(Run `./pants "
-            "help-advanced` for all available options.)"
-        ) in str(exc.value)
-
-        with pytest.raises(ParseError) as exc:
-            parse_joined_command_line("--aasdf", "--aasdy").for_global_scope()
-        assert (
-            "Unrecognized command line flags on global scope: --aasdf, --aasdy.\n\n(Run "
-            "`./pants help-advanced` for all available options.)"
-        ) in str(exc.value)
-
-        with pytest.raises(ParseError) as exc:
-            parse_joined_command_line(
-                # A nonexistent short-form option -- other short-form options should be displayed.
-                "-vd",
-                # An incorrect form of `--config-override=val` (`ridden` instead of `ride`) should
-                # show the correct option name.
-                "--config-overridden=val",
-                # An option name without the correct prefix scope should match all flags with the
-                # same or similar unscoped option names.
-                "--c=[]",
-            ).for_global_scope()
-        assert (
-            dedent(
-                """\
-                Unrecognized command line flags on global scope: -v, --config-overridden, --c.
-                Suggestions:
-                -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
-                --config-overridden: [--config-override]
-                --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --compile-scala-modifypassthrough, --config-override, --a, --b, --y, -n, -z, --v2]
-
-                (Run `./pants help-advanced` for all available options.)"""
-            )
-            in str(exc.value)
-        )
-
-        # Test when only some flags have suggestsions.
-        with pytest.raises(ParseError) as exc:
-            parse_joined_command_line("--aasdf", "--config-overridden").for_global_scope()
-        assert (
-            "Unrecognized command line flags on global scope: --aasdf, --config-overridden.\n"
-            "Suggestions:\n"
-            "--config-overridden: [--config-override]\n\n"
-            "(Run `./pants help-advanced` for all available options.)"
-        ) in str(exc.value)
-
-        with pytest.raises(ParseError) as exc:
-            parse_joined_command_line(
-                # Verify that misspelling searches work for options in non-global scopes.
-                "--simple-sam=val",
-            ).for_scope("simple")
-        assert (
-            dedent(
-                """\
-                Unrecognized command line flag '--sam' on scope 'simple'. Suggestions:
-                --simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam
-
-                (Run `./pants help-advanced simple` for all available options.)"""
-            )
-            in str(exc.value)
-        )
-
-        with pytest.raises(ParseError) as exc:
-            parse_joined_command_line(
-                # Verify that options with too shallow scoping match the correct option.
-                "--compile-modifylogs=val",
-            ).for_scope("compile")
-        assert (
-            dedent(
-                """\
-                Unrecognized command line flag '--modifylogs' on scope 'compile'. Suggestions:
-                --compile-scala-modifylogs
-
-                (Run `./pants help-advanced compile` for all available options.)"""
-            )
-            in str(exc.value)
-        )
-
-        with pytest.raises(ParseError) as exc:
-            parse_joined_command_line(
-                # Verify that options with too deep scoping match the correct option.
-                "--cache-compile-scala-modifylogs=val",
-            ).for_scope("cache.compile.scala")
-        assert (
-            dedent(
-                """\
-                Unrecognized command line flag '--modifylogs' on scope 'cache.compile.scala'.
-                Suggestions:
-                --compile-scala-modifylogs
-
-                (Run `./pants help-advanced cache.compile.scala` for all available options.)"""
-            )
-            in str(exc.value)
-        )
 
     def test_pants_global_with_default(self) -> None:
         """This test makes sure values under [DEFAULT] still gets read."""

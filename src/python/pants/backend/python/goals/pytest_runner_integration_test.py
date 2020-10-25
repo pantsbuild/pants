@@ -5,29 +5,28 @@ import os
 import re
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional
+from typing import List, Mapping, Optional
 
 import pytest
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import create_python_binary, pytest_runner
+from pants.backend.python.goals import package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_coverage_config
 from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import (
-    PythonBinary,
+    PexBinary,
     PythonLibrary,
     PythonRequirementLibrary,
     PythonTests,
+    resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals import binary
 from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
 from pants.core.util_rules import distdir
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -42,12 +41,13 @@ def rule_runner() -> RuleRunner:
             *dependency_inference_rules.rules(),  # For conftest detection.
             *distdir.rules(),
             *binary.rules(),
-            *create_python_binary.rules(),
+            *package_pex_binary.rules(),
             get_filtered_environment,
-            QueryRule(TestResult, (PythonTestFieldSet, PantsEnvironment)),
-            QueryRule(TestDebugRequest, (PythonTestFieldSet, PantsEnvironment)),
+            resolve_pex_entry_point,
+            QueryRule(TestResult, (PythonTestFieldSet,)),
+            QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
         ],
-        target_types=[PythonBinary, PythonLibrary, PythonTests, PythonRequirementLibrary],
+        target_types=[PexBinary, PythonLibrary, PythonTests, PythonRequirementLibrary],
     )
 
 
@@ -112,13 +112,13 @@ def create_test_target(
     return tgt
 
 
-def create_python_binary_target(rule_runner: RuleRunner, source_file: FileContent) -> None:
+def create_pex_binary_target(rule_runner: RuleRunner, source_file: FileContent) -> None:
     rule_runner.create_file(source_file.path, source_file.content.decode())
     rule_runner.add_to_build_file(
         relpath=PACKAGE,
         target=dedent(
             f"""\
-            python_binary(
+            pex_binary(
               name='bin',
               sources=['{PurePath(source_file.path).name}'],
             )
@@ -145,7 +145,7 @@ def run_pytest(
     use_coverage: bool = False,
     execution_slot_var: Optional[str] = None,
     extra_env_vars: Optional[str] = None,
-    pants_environment: PantsEnvironment = PantsEnvironment(),
+    env: Optional[Mapping[str, str]] = None,
 ) -> TestResult:
     args = [
         "--backend-packages=pants.backend.python",
@@ -164,13 +164,11 @@ def run_pytest(
         args.append("--test-use-coverage")
     if execution_slot_var:
         args.append(f"--pytest-execution-slot-var={execution_slot_var}")
-    subjects = [
-        PythonTestFieldSet.create(test_target),
-        pants_environment,
-        create_options_bootstrapper(args=args),
-    ]
-    test_result = rule_runner.request(TestResult, subjects)
-    debug_request = rule_runner.request(TestDebugRequest, subjects)
+    rule_runner.set_options(args, env=env)
+
+    inputs = [PythonTestFieldSet.create(test_target)]
+    test_result = rule_runner.request(TestResult, inputs)
+    debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:
         debug_result = InteractiveRunner(rule_runner.scheduler).run(debug_request.process)
         assert test_result.exit_code == debug_result.exit_code
@@ -436,27 +434,46 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
         ).encode(),
     )
     tgt = create_test_target(rule_runner, [source])
-    mock_env = PantsEnvironment({"OTHER_VAR": "other_value"})
-    extra_env_vars = '["SOME_VAR=some_value", "OTHER_VAR"]'
-    result = run_pytest(rule_runner, tgt, extra_env_vars=extra_env_vars, pants_environment=mock_env)
+    result = run_pytest(
+        rule_runner,
+        tgt,
+        extra_env_vars='["SOME_VAR=some_value", "OTHER_VAR"]',
+        env={"OTHER_VAR": "other_value"},
+    )
     assert result.exit_code == 0
 
 
-def test_runtime_binary_dependency(rule_runner: RuleRunner) -> None:
-    create_python_binary_target(rule_runner, BINARY_SOURCE)
+def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
+    create_pex_binary_target(rule_runner, BINARY_SOURCE)
     rule_runner.create_file(
         f"{PACKAGE}/test_binary_call.py",
         dedent(
-            """\
+            f"""\
+            import os.path
             import subprocess
 
             def test_embedded_binary():
                 assert  b"Hello, test!" in subprocess.check_output(args=['./bin.pex'])
+
+                # Ensure that we didn't accidentally pull in the binary's sources. This is a
+                # special type of dependency that should not be included with the rest of the
+                # normal dependencies.
+                assert os.path.exists("{BINARY_SOURCE.path}") is False
             """
         ),
     )
-    rule_runner.add_to_build_file(PACKAGE, "python_tests(runtime_binary_dependencies=[':bin'])")
+    rule_runner.add_to_build_file(PACKAGE, "python_tests(runtime_package_dependencies=[':bin'])")
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_binary_call.py"))
     assert isinstance(tgt, PythonTests)
     result = run_pytest(rule_runner, tgt, passthrough_args="-s")
     assert result.exit_code == 0
+
+
+def test_skip_type_stubs(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file(f"{PACKAGE}/test_foo.pyi", "def test_foo() -> None:\n    ...\n")
+    rule_runner.add_to_build_file(PACKAGE, "python_tests()")
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_foo.pyi"))
+    assert isinstance(tgt, PythonTests)
+
+    result = run_pytest(rule_runner, tgt)
+    assert result.exit_code is None

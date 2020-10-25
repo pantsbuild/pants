@@ -57,6 +57,10 @@ pub mod remote;
 #[cfg(test)]
 pub mod remote_tests;
 
+pub mod remote_cache;
+#[cfg(test)]
+mod remote_cache_tests;
+
 pub mod speculate;
 #[cfg(test)]
 mod speculate_tests;
@@ -180,9 +184,9 @@ pub struct Process {
 
   pub input_files: hashing::Digest,
 
-  pub output_files: BTreeSet<PathBuf>,
+  pub output_files: BTreeSet<RelativePath>,
 
-  pub output_directories: BTreeSet<PathBuf>,
+  pub output_directories: BTreeSet<RelativePath>,
 
   pub timeout: Option<std::time::Duration>,
 
@@ -267,7 +271,7 @@ impl Process {
   ///
   /// Replaces the output files for this process.
   ///
-  pub fn output_files(mut self, output_files: BTreeSet<PathBuf>) -> Process {
+  pub fn output_files(mut self, output_files: BTreeSet<RelativePath>) -> Process {
     self.output_files = output_files;
     self
   }
@@ -275,7 +279,7 @@ impl Process {
   ///
   /// Replaces the output directories for this process.
   ///
-  pub fn output_directories(mut self, output_directories: BTreeSet<PathBuf>) -> Process {
+  pub fn output_directories(mut self, output_directories: BTreeSet<RelativePath>) -> Process {
     self.output_directories = output_directories;
     self
   }
@@ -488,7 +492,12 @@ impl CommandRunner for BoundedCommandRunner {
     let name = format!("{}-waiting", req.workunit_name());
     let desc = req.user_facing_name();
     let mut outer_metadata = WorkunitMetadata::with_level(Level::Debug);
-    outer_metadata.desc = Some(desc.clone());
+
+    outer_metadata.desc = Some(format!("(Waiting) {}", desc));
+    // We don't want to display the workunit associated with processes waiting on a
+    // BoundedCommandRunner to show in the dynamic UI, so set the `blocked` flag
+    // on the workunit metadata in order to prevent this.
+    outer_metadata.blocked = true;
     let bounded_fut = {
       let inner = self.inner.clone();
       let semaphore = self.inner.1.clone();

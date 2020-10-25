@@ -28,6 +28,7 @@ lazy_static! {
 }
 
 pub struct PantsLogger {
+  per_run_logs: Mutex<Option<File>>,
   log_file: Mutex<Option<File>>,
   global_level: Mutex<RefCell<LevelFilter>>,
   use_color: AtomicBool,
@@ -40,6 +41,7 @@ pub struct PantsLogger {
 impl PantsLogger {
   pub fn new() -> PantsLogger {
     PantsLogger {
+      per_run_logs: Mutex::new(None),
       log_file: Mutex::new(None),
       global_level: Mutex::new(RefCell::new(LevelFilter::Off)),
       show_rust_3rdparty_logs: AtomicBool::new(true),
@@ -90,6 +92,23 @@ impl PantsLogger {
         }
       }
       Err(err) => panic!("Unrecognised log level from Python: {}: {}", max_level, err),
+    };
+  }
+
+  pub fn set_per_run_logs(&self, per_run_log_path: Option<PathBuf>) {
+    match per_run_log_path {
+      None => {
+        *self.per_run_logs.lock() = None;
+      }
+      Some(path) => {
+        let file = OpenOptions::new()
+          .create(true)
+          .append(true)
+          .open(path)
+          .map_err(|err| format!("Error opening per-run logfile: {}", err))
+          .unwrap();
+        *self.per_run_logs.lock() = Some(file);
+      }
     };
   }
 
@@ -215,6 +234,14 @@ impl Log for PantsLogger {
     } else {
       format!("{} {} {}", time_str, level_marker, record.args())
     };
+
+    {
+      let mut maybe_per_run_file = self.per_run_logs.lock();
+      if let Some(ref mut file) = *maybe_per_run_file {
+        // deliberately ignore errors writing to per-run log file
+        let _ = writeln!(file, "{}", log_string);
+      }
+    }
 
     match destination {
       Destination::Stderr => {

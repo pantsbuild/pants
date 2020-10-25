@@ -291,7 +291,7 @@ impl<R: Rule> Builder<R> {
       }
       iteration += 1;
       if iteration % 1000 == 0 {
-        log::debug!(
+        log::trace!(
           "initial_polymorphic iteration {}: {} nodes",
           iteration,
           graph.node_count()
@@ -540,7 +540,7 @@ impl<R: Rule> Builder<R> {
             !node_ref.weight().is_deleted() && minimal_in_set.contains(&node_ref.id())
           })
           .count();
-        log::debug!(
+        log::trace!(
           "rule_graph monomorphize: iteration {}: live: {}, minimal: {}, to_visit: {}, total: {}",
           iteration,
           live_count,
@@ -596,7 +596,7 @@ impl<R: Rule> Builder<R> {
       };
       let had_dependees = !dependees_by_out_set.is_empty();
 
-      let debug_str = if looping {
+      let trace_str = if looping {
         format!(
           "creating monomorphizations (from {} dependee sets and {:?} dependencies) for {:?}: {} with {:#?} and {:#?}",
           dependees_by_out_set.len(),
@@ -670,7 +670,7 @@ impl<R: Rule> Builder<R> {
             // has a minimal in_set.
             maybe_mark_minimal_in_set(&mut minimal_in_set, &graph, node_id);
             if looping {
-              log::debug!(
+              log::trace!(
                 "not able to reduce {:?}: {} (had {} monomorphizations)",
                 node_id,
                 graph[node_id],
@@ -688,7 +688,7 @@ impl<R: Rule> Builder<R> {
         };
 
       if looping {
-        log::debug!("{}", debug_str);
+        log::trace!("{}", trace_str);
 
         maybe_in_loop.insert(node_id);
         if maybe_in_loop.len() > 5 {
@@ -742,7 +742,7 @@ impl<R: Rule> Builder<R> {
         };
 
         if looping {
-          log::debug!(
+          log::trace!(
             "   generating {:#?}, with {} dependees and {} dependencies ({} minimal) which consumes: {:#?}",
             new_node,
             dependees.len(),
@@ -763,7 +763,7 @@ impl<R: Rule> Builder<R> {
         }
 
         if looping {
-          log::debug!("node: creating: {:?}", replacement_id);
+          log::trace!("node: creating: {:?}", replacement_id);
         }
 
         // Give all dependees edges to the new node.
@@ -778,7 +778,7 @@ impl<R: Rule> Builder<R> {
             }
           }
           if looping {
-            log::debug!("dependee edge: adding: ({:?}, {})", dependee_id, edge);
+            log::trace!("dependee edge: adding: ({:?}, {})", dependee_id, edge);
           }
           graph.add_edge(*dependee_id, replacement_id, edge);
         }
@@ -793,7 +793,7 @@ impl<R: Rule> Builder<R> {
             dependency_id
           };
           if looping {
-            log::debug!(
+            log::trace!(
               "dependency edge: adding: {:?}",
               (dependency_key, dependency_id)
             );
@@ -1015,11 +1015,13 @@ impl<R: Rule> Builder<R> {
               to_visit.extend(
                 edge_refs
                   .iter()
-                  .filter(|edge_ref| match graph[edge_ref.target()].deleted_reason() {
-                    Some(NodePrunedReason::Ambiguous)
-                    | Some(NodePrunedReason::NoSourceOfParam)
-                    | Some(NodePrunedReason::NoValidCombinationsOfDependencies) => true,
-                    _ => false,
+                  .filter(|edge_ref| {
+                    matches!(
+                      graph[edge_ref.target()].deleted_reason(),
+                      Some(NodePrunedReason::Ambiguous)
+                        | Some(NodePrunedReason::NoSourceOfParam)
+                        | Some(NodePrunedReason::NoValidCombinationsOfDependencies)
+                    )
                   })
                   .map(|edge_ref| edge_ref.target()),
               );
@@ -1170,7 +1172,7 @@ impl<R: Rule> Builder<R> {
       |_, edge_weight| Some(edge_weight.clone()),
     );
 
-    log::debug!(
+    log::trace!(
       "// errored subgraph:\n{}",
       petgraph::dot::Dot::with_config(&subgraph, &[])
     );

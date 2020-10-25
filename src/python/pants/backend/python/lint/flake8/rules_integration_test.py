@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Sequence
+from typing import Any, List, Optional, Sequence
 
 import pytest
 
@@ -9,11 +9,9 @@ from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.target import Target
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -23,14 +21,14 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *flake8_rules(),
-            QueryRule(LintResults, (Flake8Request, PantsEnvironment)),
+            QueryRule(LintResults, (Flake8Request,)),
         ]
     )
 
 
-GOOD_SOURCE = FileContent(path="good.py", content=b"print('Nothing suspicious here..')\n")
-BAD_SOURCE = FileContent(path="bad.py", content=b"import typing\n")  # unused import
-PY3_ONLY_SOURCE = FileContent(path="py3.py", content=b"version: str = 'Py3 > Py2'\n")
+GOOD_SOURCE = FileContent("good.py", b"print('Nothing suspicious here..')\n")
+BAD_SOURCE = FileContent("bad.py", b"import typing\n")  # unused import
+PY3_ONLY_SOURCE = FileContent("py3.py", b"version: str = 'Py3 > Py2'\n")
 
 
 def make_target(
@@ -43,7 +41,7 @@ def make_target(
         rule_runner.create_file(source_file.path, source_file.content.decode())
     return PythonLibrary(
         {PythonInterpreterCompatibility.alias: interpreter_constraints},
-        address=Address.parse(":target"),
+        address=Address("", target_name="target"),
     )
 
 
@@ -66,24 +64,27 @@ def run_flake8(
         args.append("--flake8-skip")
     if additional_args:
         args.extend(additional_args)
+    rule_runner.set_options(args)
     results = rule_runner.request(
         LintResults,
         [
             Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
-            create_options_bootstrapper(args=args),
-            PantsEnvironment(),
         ],
     )
     return results.results
 
 
-def test_passing_source(rule_runner: RuleRunner) -> None:
-    target = make_target(rule_runner, [GOOD_SOURCE])
-    result = run_flake8(rule_runner, [target])
+def assert_success(rule_runner: RuleRunner, target: Target, **kwargs: Any) -> None:
+    result = run_flake8(rule_runner, [target], **kwargs)
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert result[0].stdout.strip() == ""
     assert result[0].report is None
+
+
+def test_passing_source(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [GOOD_SOURCE])
+    assert_success(rule_runner, target)
 
 
 def test_failing_source(rule_runner: RuleRunner) -> None:
@@ -150,18 +151,12 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
 
 def test_respects_config_file(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    result = run_flake8(rule_runner, [target], config="[flake8]\nignore = F401\n")
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert result[0].stdout.strip() == ""
+    assert_success(rule_runner, target, config="[flake8]\nignore = F401\n")
 
 
 def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    result = run_flake8(rule_runner, [target], passthrough_args="--ignore=F401")
-    assert len(result) == 1
-    assert result[0].exit_code == 0
-    assert result[0].stdout.strip() == ""
+    assert_success(rule_runner, target, passthrough_args="--ignore=F401")
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
@@ -192,3 +187,14 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     report_files = rule_runner.request(DigestContents, [result[0].report.digest])
     assert len(report_files) == 1
     assert "bad.py:1:1: F401" in report_files[0].content.decode()
+
+
+def test_type_stubs(rule_runner: RuleRunner) -> None:
+    """Ensure that running over a type stub file doesn't cause issues."""
+    type_stub = FileContent("good.pyi", b"def add(x: int, y: int) -> int:\n    return x + y\n")
+    # First check when the stub has no sibling `.py` file.
+    target = make_target(rule_runner, [type_stub])
+    assert_success(rule_runner, target)
+    # Then check with a sibling `.py`.
+    target = make_target(rule_runner, [GOOD_SOURCE, type_stub])
+    assert_success(rule_runner, target)

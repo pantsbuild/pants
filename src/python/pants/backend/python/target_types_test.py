@@ -11,32 +11,36 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     InjectPythonDistributionDependencies,
-    PythonBinary,
-    PythonBinarySources,
+    PexBinary,
+    PexBinarySources,
+    PexEntryPointField,
     PythonDistribution,
     PythonDistributionDependencies,
     PythonRequirementsField,
     PythonTestsTimeout,
+    ResolvedPexEntryPoint,
+    ResolvePexEntryPointRequest,
+    resolve_pex_entry_point,
 )
 from pants.backend.python.target_types import rules as target_type_rules
 from pants.engine.addresses import Address
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
     InjectedDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
 )
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.python.python_requirement import PythonRequirement
-from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 def test_timeout_validation() -> None:
     with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(-100, address=Address.parse(":tests"))
+        PythonTestsTimeout(-100, address=Address("", target_name="tests"))
     with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(0, address=Address.parse(":tests"))
-    assert PythonTestsTimeout(5, address=Address.parse(":tests")).value == 5
+        PythonTestsTimeout(0, address=Address("", target_name="tests"))
+    assert PythonTestsTimeout(5, address=Address("", target_name="tests")).value == 5
 
 
 def test_timeout_calculation() -> None:
@@ -48,7 +52,7 @@ def test_timeout_calculation() -> None:
         global_max: Optional[int] = None,
         timeouts_enabled: bool = True,
     ) -> None:
-        field = PythonTestsTimeout(field_value, address=Address.parse(":tests"))
+        field = PythonTestsTimeout(field_value, address=Address("", target_name="tests"))
         pytest = create_subsystem(
             PyTest,
             timeouts=timeouts_enabled,
@@ -65,15 +69,32 @@ def test_timeout_calculation() -> None:
     assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
 
 
-def test_translate_source_file_to_entry_point() -> None:
-    assert (
-        PythonBinarySources.translate_source_file_to_entry_point("example/app.py") == "example.app"
+def test_resolve_pex_binary_entry_point() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            resolve_pex_entry_point,
+            QueryRule(ResolvedPexEntryPoint, [ResolvePexEntryPointRequest]),
+        ]
     )
-    # NB: the onus is on the call site to strip the source roots before calling this method.
-    assert (
-        PythonBinarySources.translate_source_file_to_entry_point("src/python/app.py")
-        == "src.python.app"
+
+    def assert_resolved(
+        *, entry_point: Optional[str], source: Optional[str], expected: str
+    ) -> None:
+        addr = Address("src/python/project")
+        rule_runner.create_file("src/python/project/app.py")
+        ep_field = PexEntryPointField(entry_point, address=addr)
+        sources = PexBinarySources([source] if source else None, address=addr)
+        result = rule_runner.request(
+            ResolvedPexEntryPoint, [ResolvePexEntryPointRequest(ep_field, sources)]
+        )
+        assert result.val == expected
+
+    assert_resolved(
+        entry_point="custom.entry_point:func", source="app.py", expected="custom.entry_point:func"
     )
+    assert_resolved(entry_point=None, source="app.py", expected="project.app")
+    with pytest.raises(ExecutionError):
+        assert_resolved(entry_point=None, source=None, expected="doesnt matter")
 
 
 def test_requirements_field() -> None:
@@ -125,17 +146,17 @@ def test_python_distribution_dependency_injection() -> None:
             *target_type_rules(),
             QueryRule(
                 InjectedDependencies,
-                (InjectPythonDistributionDependencies, OptionsBootstrapper),
+                (InjectPythonDistributionDependencies,),
             ),
         ],
-        target_types=[PythonDistribution, PythonBinary],
+        target_types=[PythonDistribution, PexBinary],
         objects={"setup_py": PythonArtifact},
     )
     rule_runner.add_to_build_file(
         "project",
         dedent(
             """\
-            python_binary(name="my_binary")
+            pex_binary(name="my_binary")
             python_distribution(
                 name="dist",
                 provides=setup_py(
@@ -148,9 +169,6 @@ def test_python_distribution_dependency_injection() -> None:
     tgt = rule_runner.get_target(Address("project", target_name="dist"))
     injected = rule_runner.request(
         InjectedDependencies,
-        [
-            InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies]),
-            create_options_bootstrapper(),
-        ],
+        [InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies])],
     )
     assert injected == InjectedDependencies([Address("project", target_name="my_binary")])

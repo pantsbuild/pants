@@ -25,7 +25,7 @@ from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -140,7 +140,7 @@ class LintRequest(StyleRequest):
 
 
 class LintSubsystem(GoalSubsystem):
-    """Lint source code."""
+    """Run all linters and/or formatters in check mode."""
 
     name = "lint"
 
@@ -242,6 +242,12 @@ async def lint(
             for request in valid_requests
             for field_set in request.field_sets
         )
+
+        def key_fn(results: LintResults):
+            return results.linter_name
+
+        # NB: We must pre-sort the data for itertools.groupby() to work properly.
+        sorted_all_per_files_results = sorted(all_per_file_results, key=key_fn)
         # We consolidate all results for each linter into a single `LintResults`.
         all_results = tuple(
             LintResults(
@@ -251,7 +257,7 @@ async def lint(
                 linter_name=linter_name,
             )
             for linter_name, all_linter_results in itertools.groupby(
-                all_per_file_results, key=lambda results: results.linter_name
+                sorted_all_per_files_results, key=key_fn
             )
         )
     else:

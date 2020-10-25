@@ -5,6 +5,7 @@ import dataclasses
 import functools
 import itertools
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import (
@@ -23,9 +24,11 @@ from typing import (
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
-from pants.backend.python.target_types import PythonInterpreterCompatibility
-from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
-from pants.backend.python.target_types import PythonRequirementsField
+from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
+from pants.backend.python.target_types import (
+    PythonInterpreterCompatibility,
+    PythonRequirementsField,
+)
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_environment import (
@@ -35,6 +38,7 @@ from pants.backend.python.util_rules.pex_environment import (
 )
 from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -92,11 +96,11 @@ _FS = TypeVar("_FS", bound=FieldSetWithCompatibility)
 
 
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
-class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
+class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter):
     def __init__(self, constraints: Iterable[Union[str, Requirement]] = ()) -> None:
         super().__init__(
             v if isinstance(v, Requirement) else self.parse_constraint(v)
-            for v in sorted(constraints)
+            for v in sorted(constraints, key=lambda c: str(c))
         )
 
     @staticmethod
@@ -136,22 +140,28 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
             merged_specs: Set[Tuple[str, str]] = set()
             expected_interpreter = parsed_constraints[0].project_name
             for parsed_constraint in parsed_constraints:
-                if parsed_constraint.project_name != expected_interpreter:
-                    attempted_interpreters = {
-                        interp: sorted(
-                            str(parsed_constraint) for parsed_constraint in parsed_constraints
-                        )
-                        for interp, parsed_constraints in itertools.groupby(
-                            parsed_constraints,
-                            key=lambda pc: pc.project_name,
-                        )
-                    }
-                    raise ValueError(
-                        "Tried ANDing Python interpreter constraints with different interpreter "
-                        "types. Please use only one interpreter type. Got "
-                        f"{attempted_interpreters}."
+                if parsed_constraint.project_name == expected_interpreter:
+                    merged_specs.update(parsed_constraint.specs)
+                    continue
+
+                def key_fn(req: Requirement):
+                    return req.project_name
+
+                # NB: We must pre-sort the data for itertools.groupby() to work properly.
+                sorted_constraints = sorted(parsed_constraints, key=key_fn)
+                attempted_interpreters = {
+                    interp: sorted(
+                        str(parsed_constraint) for parsed_constraint in parsed_constraints
                     )
-                merged_specs.update(parsed_constraint.specs)
+                    for interp, parsed_constraints in itertools.groupby(
+                        sorted_constraints, key=key_fn
+                    )
+                }
+                raise ValueError(
+                    "Tried ANDing Python interpreter constraints with different interpreter "
+                    "types. Please use only one interpreter type. Got "
+                    f"{attempted_interpreters}."
+                )
 
             formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
             return Requirement.parse(f"{expected_interpreter}{formatted_specs}")
@@ -184,16 +194,19 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
     def group_field_sets_by_constraints(
         cls, field_sets: Iterable[_FS], python_setup: PythonSetup
     ) -> FrozenDict["PexInterpreterConstraints", Tuple[_FS, ...]]:
-        constraints_to_field_sets = {
-            constraints: tuple(sorted(fs_collection, key=lambda fs: fs.address))
-            for constraints, fs_collection in itertools.groupby(
-                field_sets,
-                key=lambda fs: cls.create_from_compatibility_fields(
-                    [fs.compatibility], python_setup
-                ),
-            )
-        }
-        return FrozenDict(sorted(constraints_to_field_sets.items()))
+
+        results = defaultdict(set)
+
+        for fs in field_sets:
+            constraints = cls.create_from_compatibility_fields([fs.compatibility], python_setup)
+            results[constraints].add(fs)
+
+        return FrozenDict(
+            {
+                constraints: tuple(sorted(field_sets, key=lambda fs: fs.address))
+                for constraints, field_sets in sorted(results.items())
+            }
+        )
 
     def generate_pex_arg_list(self) -> List[str]:
         args = []
@@ -201,21 +214,37 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
             args.extend(["--interpreter-constraint", str(constraint)])
         return args
 
+    def _includes_version(self, major_minor: str, last_patch: int) -> bool:
+        patch_versions = list(reversed(range(0, last_patch + 1)))
+        for req in self:
+            if any(
+                req.specifier.contains(f"{major_minor}.{p}") for p in patch_versions  # type: ignore[attr-defined]
+            ):
+                return True
+        return False
+
     def includes_python2(self) -> bool:
         """Checks if any of the constraints include Python 2.
 
         This will return True even if the code works with Python 3 too, so long as at least one of
         the constraints works with Python 2.
         """
-        py27_patch_versions = list(
-            reversed(range(0, 18))
-        )  # The last python 2.7 version was 2.7.18.
-        for req in self:
-            if any(
-                req.specifier.contains(f"2.7.{p}") for p in py27_patch_versions  # type: ignore[attr-defined]
-            ):
-                return True
-        return False
+        last_py27_patch_version = 18
+        return self._includes_version("2.7", last_patch=last_py27_patch_version)
+
+    def minimum_python_version(self) -> Optional[str]:
+        """Find the lowest major.minor Python version that will work with these constraints.
+
+        The constraints may also be compatible with later versions; this is the lowest version that
+        still works.
+        """
+        if self.includes_python2():
+            return "2.7"
+        max_expected_py3_patch_version = 12  # The current max is 9.
+        for major_minor in ("3.5", "3.6", "3.7", "3.8", "3.9", "3.10"):
+            if self._includes_version(major_minor, last_patch=max_expected_py3_patch_version):
+                return major_minor
+        return None
 
     def _requires_python3_version_or_newer(
         self, *, allowed_versions: Iterable[str], prior_version: str
@@ -242,26 +271,6 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
                 return False
         return True
 
-    def requires_python36_or_newer(self) -> bool:
-        """Checks if the constraints are all for Python 3.6+.
-
-        This will return False if Python 3.6 is allowed, but prior versions like 3.5 are also
-        allowed.
-        """
-        return self._requires_python3_version_or_newer(
-            allowed_versions=["3.6", "3.7", "3.8", "3.9"], prior_version="3.5"
-        )
-
-    def requires_python37_or_newer(self) -> bool:
-        """Checks if the constraints are all for Python 3.7+.
-
-        This will return False if Python 3.7 is allowed, but prior versions like 3.6 are also
-        allowed.
-        """
-        return self._requires_python3_version_or_newer(
-            allowed_versions=["3.7", "3.8", "3.9"], prior_version="3.6"
-        )
-
     def requires_python38_or_newer(self) -> bool:
         """Checks if the constraints are all for Python 3.8+.
 
@@ -271,6 +280,9 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement]):
         return self._requires_python3_version_or_newer(
             allowed_versions=["3.8", "3.9"], prior_version="3.7"
         )
+
+    def debug_hint(self) -> str:
+        return " OR ".join(str(constraint) for constraint in self)
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
@@ -289,7 +301,7 @@ class PexPlatforms(DeduplicatedCollection[str]):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class PexRequest:
+class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
     requirements: PexRequirements
@@ -357,6 +369,9 @@ class PexRequest:
                 f"{self}."
             )
 
+    def debug_hint(self) -> str:
+        return self.output_filename
+
 
 @dataclass(frozen=True)
 class TwoStepPexRequest:
@@ -414,20 +429,19 @@ async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -
                 "-c",
                 # N.B.: The following code snippet must be compatible with Python 2.7 and
                 # Python 3.5+.
+                #
+                # When hashing, we pick 8192 for efficiency of reads and fingerprint updates
+                # (writes) since it's a common OS buffer size and an even multiple of the
+                # hash block size.
                 dedent(
                     """\
-                    import hashlib
-                    import os
-                    import sys
+                    import hashlib, os, sys
 
                     python = os.path.realpath(sys.executable)
                     print(python)
 
                     hasher = hashlib.sha256()
                     with open(python, "rb") as fp:
-                      # We pick 8192 for efficiency of reads and fingerprint updates
-                      # (writes) since it's a common OS buffer size and an even
-                      # multiple of the hash block size.
                       for chunk in iter(lambda: fp.read(8192), b""):
                           hasher.update(chunk)
                     print(hasher.hexdigest())
@@ -464,6 +478,8 @@ async def create_pex(
         "--no-pypi",
         *(f"--index={index}" for index in python_repos.indexes),
         *(f"--repo={repo}" for repo in python_repos.repos),
+        "--cache-ttl",
+        str(python_setup.resolver_http_cache_ttl),
         *request.additional_args,
     ]
 

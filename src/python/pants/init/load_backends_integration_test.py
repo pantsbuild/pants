@@ -13,7 +13,7 @@ def discover_backends() -> List[str]:
         str(register_py.parent).replace("src/python/", "").replace("/", ".")
         for register_py in register_pys
     }
-    always_activated = {"pants.core", "pants.backend.project_info", "pants.backend.pants_info"}
+    always_activated = {"pants.core", "pants.backend.project_info"}
     return sorted(backends - always_activated)
 
 
