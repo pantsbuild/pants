@@ -87,6 +87,8 @@ class RunTracker(Subsystem):
             advanced=True,
             type=dict,
             default={},
+            removal_version="2.1.0.dev0",
+            removal_hint="RunTracker no longer directly supports uploading run stats to urls.",
             help="Upload stats to these URLs on run completion.  Value is a map from URL to the "
             "name of the auth provider the user must auth against in order to upload stats "
             "to that URL, or None/empty string if no auth is required.  Currently the "
@@ -96,6 +98,8 @@ class RunTracker(Subsystem):
             "--stats-upload-timeout",
             advanced=True,
             type=int,
+            removal_version="2.1.0.dev0",
+            removal_hint="RunTracker no longer directly supports uploading run stats to urls.",
             default=2,
             help="Wait at most this many seconds for the stats upload to complete.",
         )
@@ -105,12 +109,16 @@ class RunTracker(Subsystem):
             type=int,
             default=1,
             choices=cls.SUPPORTED_STATS_VERSIONS,
+            removal_version="2.1.0.dev0",
+            removal_hint="RunTracker no longer directly supports uploading run stats to urls.",
             help="Format of stats JSON for uploads and local json file.",
         )
         register(
             "--num-foreground-workers",
             advanced=True,
             type=int,
+            removal_version="2.1.0.dev0",
+            removal_hint="RunTracker no longer uses foreground workers.",
             default=multiprocessing.cpu_count(),
             help="Number of threads for foreground work.",
         )
@@ -118,6 +126,8 @@ class RunTracker(Subsystem):
             "--num-background-workers",
             advanced=True,
             type=int,
+            removal_version="2.1.0.dev0",
+            removal_hint="RunTracker no longer uses background workers.",
             default=multiprocessing.cpu_count(),
             help="Number of threads for background work.",
         )
