@@ -122,7 +122,7 @@ class HelpFormatter(MaybeColor):
             *description_lines,
         ]
         if ohi.deprecated_message:
-            lines.append(self.maybe_red(f"{indent}{ohi.deprecated_message}."))
+            lines.append(self.maybe_red(f"{indent}{ohi.deprecated_message}"))
             if ohi.removal_hint:
                 lines.append(self.maybe_red(f"{indent}{ohi.removal_hint}"))
         return lines
