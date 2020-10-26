@@ -21,7 +21,6 @@ from pants.backend.python.target_types import (
     resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import pex_from_targets
-from pants.core.goals import binary
 from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
 from pants.core.util_rules import distdir
 from pants.engine.addresses import Address
@@ -40,7 +39,6 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *dependency_inference_rules.rules(),  # For conftest detection.
             *distdir.rules(),
-            *binary.rules(),
             *package_pex_binary.rules(),
             get_filtered_environment,
             resolve_pex_entry_point,

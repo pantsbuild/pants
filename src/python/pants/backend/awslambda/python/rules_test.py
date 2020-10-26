@@ -8,7 +8,6 @@ from zipfile import ZipFile
 
 import pytest
 
-from pants.backend.awslambda.common.rules import CreatedAWSLambda
 from pants.backend.awslambda.python.rules import PythonAwsLambdaFieldSet
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
@@ -25,7 +24,6 @@ def rule_runner() -> RuleRunner:
         rules=[
             *awslambda_python_rules(),
             QueryRule(BuiltPackage, (PythonAwsLambdaFieldSet,)),
-            QueryRule(CreatedAWSLambda, (PythonAwsLambdaFieldSet,)),
         ],
         target_types=[PythonAWSLambda, PythonLibrary],
     )
@@ -40,21 +38,14 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: Address) -> Tuple[str
         ]
     )
     target = rule_runner.get_target(addr)
-    created_awslambda = rule_runner.request(
-        CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target)]
-    )
     built_asset = rule_runner.request(BuiltPackage, [PythonAwsLambdaFieldSet.create(target)])
-    assert created_awslambda.digest == built_asset.digest
-    assert created_awslambda.zip_file_relpath == built_asset.artifacts[0].relpath
     assert (
         "    Runtime: python3.7",
         "    Handler: lambdex_handler.handler",
     ) == built_asset.artifacts[0].extra_log_lines
-    created_awslambda_digest_contents = rule_runner.request(
-        DigestContents, [created_awslambda.digest]
-    )
-    assert len(created_awslambda_digest_contents) == 1
-    return created_awslambda.zip_file_relpath, created_awslambda_digest_contents[0].content
+    digest_contents = rule_runner.request(DigestContents, [built_asset.digest])
+    assert len(digest_contents) == 1
+    return built_asset.artifacts[0].relpath, digest_contents[0].content
 
 
 def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
