@@ -106,6 +106,11 @@ class SourceRootConfig(Subsystem):
             help="Configures the behavior when sources are defined outside of any configured "
             "source root. `create` will cause a source root to be implicitly created at "
             "the definition location of the sources; `fail` will trigger an error.",
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "The option `--source-unmatched` does not do anything. Pants will always fail if "
+                "the source root does not exist."
+            ),
         )
 
         register(
