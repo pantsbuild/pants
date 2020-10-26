@@ -18,12 +18,12 @@ use crate::nodes::{NodeKey, Select, Visualizer};
 use cpython::Python;
 use graph::{InvalidationResult, LastObserved};
 use log::{debug, info, warn};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use task_executor::Executor;
 use ui::ConsoleUI;
 use uuid::Uuid;
 use watch::Invalidatable;
-use workunit_store::WorkunitStore;
+use workunit_store::{UserMetadataItem, WorkunitStore};
 
 pub enum ExecutionTermination {
   // Raised as a vanilla keyboard interrupt on the python side.
@@ -92,6 +92,7 @@ struct InnerSession {
   // Session/build_id would be stable.
   run_id: Mutex<Uuid>,
   should_report_workunits: bool,
+  workunit_metadata_map: RwLock<HashMap<UserMetadataItem, Value>>,
 }
 
 #[derive(Clone)]
@@ -129,8 +130,16 @@ impl Session {
       session_values: Mutex::new(session_values),
       run_id: Mutex::new(Uuid::new_v4()),
       should_report_workunits,
+      workunit_metadata_map: RwLock::new(HashMap::new()),
     };
     Session(Arc::new(inner_session))
+  }
+
+  pub fn with_metadata_map<F, T>(&self, f: F) -> T
+  where
+    F: Fn(&mut HashMap<UserMetadataItem, Value>) -> T,
+  {
+    f(&mut self.0.workunit_metadata_map.write())
   }
 
   fn extend(&self, new_roots: Vec<(Root, Option<LastObserved>)>) {

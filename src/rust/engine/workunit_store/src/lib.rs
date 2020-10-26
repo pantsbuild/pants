@@ -28,7 +28,6 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
-use cpython::PyObject;
 use log::log;
 pub use log::Level;
 use parking_lot::Mutex;
@@ -129,7 +128,7 @@ pub struct WorkunitMetadata {
   pub stdout: Option<hashing::Digest>,
   pub stderr: Option<hashing::Digest>,
   pub artifacts: Vec<(String, hashing::Digest)>,
-  pub user_metadata: Vec<(String, Arc<PyObject>)>,
+  pub user_metadata: Vec<(String, UserMetadataItem)>,
 }
 
 impl WorkunitMetadata {
@@ -150,6 +149,16 @@ impl WorkunitMetadata {
     let mut metadata = WorkunitMetadata::new();
     metadata.level = level;
     metadata
+  }
+}
+
+/// Abstract id for passing user metadata items around
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct UserMetadataItem(uuid::Uuid);
+
+impl UserMetadataItem {
+  pub fn new() -> UserMetadataItem {
+    UserMetadataItem(uuid::Uuid::new_v4())
   }
 }
 

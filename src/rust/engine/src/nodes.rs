@@ -36,7 +36,7 @@ use process_execution::{
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
 use store::{self, StoreFileByDigest};
-use workunit_store::{with_workunit, Level, WorkunitMetadata};
+use workunit_store::{with_workunit, Level, UserMetadataItem, WorkunitMetadata};
 
 pub type NodeResult<T> = Result<T, Failure>;
 
@@ -1289,6 +1289,7 @@ impl Node for NodeKey {
       let mut artifacts = Vec::new();
       let mut user_metadata = Vec::new();
 
+      let context2 = context.clone();
       let mut result = match self {
         NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::DownloadedFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
@@ -1337,13 +1338,22 @@ impl Node for NodeKey {
         }
       }
 
+      let session = context2.session;
       let final_metadata = WorkunitMetadata {
         level,
         message,
         artifacts,
         user_metadata: user_metadata
           .into_iter()
-          .map(|(key, val)| (key, val.consume_into_arc()))
+          .map(|(key, val)| {
+            let umi = UserMetadataItem::new();
+            session.with_metadata_map(|map| {
+              let val = val.clone();
+              let umi = umi.clone();
+              map.insert(umi, val);
+            });
+            (key, umi)
+          })
           .collect(),
         ..metadata
       };
