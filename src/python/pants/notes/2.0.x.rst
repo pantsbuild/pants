@@ -21,11 +21,11 @@ User API Changes
 Bugfixes
 ~~~~~~~~
 
-* Eagerly validate entry points for `setup_py().with_binaries()` (Cherry-pick of #11034) (#11036)
-  `PR #11036 <https://github.com/pantsbuild/pants/pull/11036>`_
-
 * Fix PEX to always write to `named_caches_dir`, rather than `~/.pex` (Cherry-pick of #11040) (#11042)
   `PR #11042 <https://github.com/pantsbuild/pants/pull/11042>`_
+
+* Eagerly validate entry points for `setup_py().with_binaries()` (Cherry-pick of #11034) (#11036)
+  `PR #11036 <https://github.com/pantsbuild/pants/pull/11036>`_
 
 Documentation
 ~~~~~~~~~~~~~
