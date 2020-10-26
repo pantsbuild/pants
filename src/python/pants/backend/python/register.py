@@ -22,7 +22,6 @@ from pants.backend.python.macros.python_requirements import PythonRequirements
 from pants.backend.python.subsystems import python_native_code
 from pants.backend.python.target_types import (
     PexBinary,
-    PythonBinary,
     PythonDistribution,
     PythonLibrary,
     PythonRequirementLibrary,
@@ -82,7 +81,6 @@ def rules():
 def target_types():
     return [
         PexBinary,
-        PythonBinary,
         PythonDistribution,
         PythonLibrary,
         PythonRequirementLibrary,

@@ -12,7 +12,7 @@ from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.base.deprecated import resolve_conflicting_options, warn_or_error
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import PathGlobs, Paths
@@ -89,25 +89,10 @@ class PexBinaryDefaults(Subsystem):
     """Default settings for creating PEX executables."""
 
     options_scope = "pex-binary-defaults"
-    deprecated_options_scope = "python-binary"
-    deprecated_options_scope_removal_version = "2.1.0.dev0"
 
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--pex-emit-warnings",
-            advanced=True,
-            type=bool,
-            default=True,
-            help=(
-                "Whether built PEX binaries should emit pex warnings at runtime by default. "
-                "Can be overridden by specifying the `emit_warnings` parameter of individual "
-                "`pex_binary` targets"
-            ),
-            removal_version="2.1.0.dev0",
-            removal_hint="Use `emit_warnings` rather than `pex_emit_warnings`.",
-        )
         register(
             "--emit-warnings",
             advanced=True,
@@ -122,17 +107,7 @@ class PexBinaryDefaults(Subsystem):
 
     @property
     def emit_warnings(self) -> bool:
-        return cast(
-            bool,
-            resolve_conflicting_options(
-                old_option="pex_emit_warnings",
-                new_option="emit_warnings",
-                old_scope=self.options_scope,
-                new_scope=self.deprecated_options_scope,
-                old_container=self.options,
-                new_container=self.options,
-            ),
-        )
+        return cast(bool, self.options.emit_warnings)
 
 
 class PexBinarySources(PythonSources):
@@ -314,23 +289,6 @@ class PexBinary(Target):
         PexIgnoreErrorsField,
         PexShebangField,
         PexEmitWarningsField,
-    )
-
-
-class PythonBinary(PexBinary):
-    """A Python target that can be converted into an executable PEX file.
-
-    PEX files are self-contained executable files that contain a complete Python environment capable
-    of running the target. For more information, see https://www.pantsbuild.org/docs/pex-files.
-    """
-
-    alias = "python_binary"
-    deprecated_removal_version = "2.1.0.dev0"
-    deprecated_removal_hint = (
-        "Use `pex_binary` instead, which behaves identically.\n\nTo fix this globally, run the "
-        "below command:\n\tmacOS: for f in $(find . -name BUILD); do sed -i '' -Ee "
-        "'s#^python_binary\\(#pex_binary(#g' $f ; done\n\tLinux: for f in $(find . -name BUILD); "
-        "do sed -i -Ee 's#^python_binary\\(#pex_binary(#g' $f ; done"
     )
 
 
