@@ -992,7 +992,6 @@ pub struct PythonRuleOutput {
   new_level: Option<log::Level>,
   message: Option<String>,
   new_artifacts: Vec<(String, hashing::Digest)>,
-  new_metadata: Vec<(String, Value)>,
 }
 
 #[async_trait]
@@ -1035,24 +1034,21 @@ impl WrappedNode for Task {
     }
 
     if result_type == product {
-      let (new_level, message, new_artifacts, new_metadata) = if can_modify_workunit {
+      let (new_level, message, new_artifacts) = if can_modify_workunit {
         (
           engine_aware::EngineAwareLevel::retrieve(&context.core.types, &result_val),
           engine_aware::Message::retrieve(&context.core.types, &result_val),
           engine_aware::Artifacts::retrieve(&context.core.types, &result_val)
             .unwrap_or_else(Vec::new),
-          engine_aware::Metadata::retrieve(&context.core.types, &result_val)
-            .unwrap_or_else(Vec::new),
         )
       } else {
-        (None, None, Vec::new(), Vec::new())
+        (None, None, Vec::new())
       };
       Ok(PythonRuleOutput {
         value: result_val,
         new_level,
         message,
         new_artifacts,
-        new_metadata,
       })
     } else {
       Err(throw(&format!(
@@ -1262,7 +1258,6 @@ impl Node for NodeKey {
       stdout: None,
       stderr: None,
       artifacts: Vec::new(),
-      user_metadata: Vec::new(),
     };
     let metadata2 = metadata.clone();
 
@@ -1287,8 +1282,6 @@ impl Node for NodeKey {
       let mut level = metadata.level;
       let mut message = None;
       let mut artifacts = Vec::new();
-      let mut user_metadata = Vec::new();
-
       let mut result = match self {
         NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::DownloadedFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
@@ -1319,7 +1312,6 @@ impl Node for NodeKey {
               }
               message = python_rule_output.message;
               artifacts = python_rule_output.new_artifacts;
-              user_metadata = python_rule_output.new_metadata;
               NodeOutput::Value(python_rule_output.value)
             })
             .await
@@ -1341,10 +1333,6 @@ impl Node for NodeKey {
         level,
         message,
         artifacts,
-        user_metadata: user_metadata
-          .into_iter()
-          .map(|(key, val)| (key, val.consume_into_arc()))
-          .collect(),
         ..metadata
       };
       (result, final_metadata)
@@ -1465,7 +1453,6 @@ impl TryFrom<NodeOutput> for PythonRuleOutput {
         new_level: None,
         message: None,
         new_artifacts: Vec::new(),
-        new_metadata: Vec::new(),
       }),
       _ => Err(()),
     }

@@ -890,19 +890,6 @@ async fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResul
     ))
   }
 
-  let mut user_metadata_entries = Vec::new();
-  for (user_metadata_key, value_arc) in workunit.metadata.user_metadata.iter() {
-    user_metadata_entries.push((
-      externs::store_utf8(user_metadata_key.as_str()),
-      Value::new_from_arc(value_arc.clone()),
-    ));
-  }
-
-  dict_entries.push((
-    externs::store_utf8("metadata"),
-    externs::store_dict(user_metadata_entries)?,
-  ));
-
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stdout_digest"),
