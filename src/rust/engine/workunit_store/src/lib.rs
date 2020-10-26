@@ -28,7 +28,6 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
-use cpython::PyObject;
 use log::log;
 pub use log::Level;
 use parking_lot::Mutex;
@@ -62,7 +61,7 @@ impl std::fmt::Display for SpanId {
 
 type WorkunitGraph = DiGraph<SpanId, (), u32>;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Workunit {
   pub name: String,
   pub span_id: SpanId,
@@ -120,7 +119,7 @@ pub enum WorkunitState {
   Completed { time_span: TimeSpan },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub message: Option<String>,
@@ -129,7 +128,6 @@ pub struct WorkunitMetadata {
   pub stdout: Option<hashing::Digest>,
   pub stderr: Option<hashing::Digest>,
   pub artifacts: Vec<(String, hashing::Digest)>,
-  pub user_metadata: Vec<(String, Arc<PyObject>)>,
 }
 
 impl WorkunitMetadata {
@@ -154,7 +152,6 @@ impl Default for WorkunitMetadata {
       stdout: None,
       stderr: None,
       artifacts: Vec::new(),
-      user_metadata: Vec::new(),
     }
   }
 }
