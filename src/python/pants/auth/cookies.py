@@ -28,7 +28,7 @@ class Cookies(Subsystem):
             removal_hint=(
                 "The option `--cookies-path` does not do anything and the `[cookies]` subsystem "
                 "will be removed."
-            )
+            ),
         )
 
     def update(self, cookies):

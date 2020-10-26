@@ -110,7 +110,7 @@ class SourceRootConfig(Subsystem):
             removal_hint=(
                 "The option `--source-unmatched` does not do anything. Pants will always fail if "
                 "the source root does not exist."
-            )
+            ),
         )
 
         register(

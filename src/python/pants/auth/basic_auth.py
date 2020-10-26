@@ -59,7 +59,7 @@ class BasicAuth(Subsystem):
             removal_hint=(
                 "The option `--basicauth-provides` does not do anything and the `[basicauth]` "
                 "subsystem will be removed."
-            )
+            ),
         )
         register(
             "--allow-insecure-urls",
@@ -71,7 +71,7 @@ class BasicAuth(Subsystem):
             removal_hint=(
                 "The option `--basicauth-allow-insecure-urls` does not do anything and the "
                 "`[basicauth]` subsystem will be removed."
-            )
+            ),
         )
 
     @classmethod
