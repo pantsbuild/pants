@@ -62,7 +62,7 @@ impl std::fmt::Display for SpanId {
 
 type WorkunitGraph = DiGraph<SpanId, (), u32>;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Workunit {
   pub name: String,
   pub span_id: SpanId,
@@ -120,7 +120,7 @@ pub enum WorkunitState {
   Completed { time_span: TimeSpan },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub message: Option<String>,
