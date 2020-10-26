@@ -45,7 +45,9 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: Address) -> Tuple[str
     ) == built_asset.artifacts[0].extra_log_lines
     digest_contents = rule_runner.request(DigestContents, [built_asset.digest])
     assert len(digest_contents) == 1
-    return built_asset.artifacts[0].relpath, digest_contents[0].content
+    relpath = built_asset.artifacts[0].relpath
+    assert relpath is not None
+    return relpath, digest_contents[0].content
 
 
 def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
