@@ -6,6 +6,33 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release, and
 https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
 
+2.0.0rc3 (10/25/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Deprecate several unused options (Cherry-pick of #11041) #11043
+  `PR #11043 <https://github.com/pantsbuild/pants/pull/11043>`_
+
+* Deprecate unused `run-tracker` options (Cherry-pick of #11038) (#11039)
+  `PR #11039 <https://github.com/pantsbuild/pants/pull/11039>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix PEX to always write to `named_caches_dir`, rather than `~/.pex` (Cherry-pick of #11040) (#11042)
+  `PR #11042 <https://github.com/pantsbuild/pants/pull/11042>`_
+
+* Eagerly validate entry points for `setup_py().with_binaries()` (Cherry-pick of #11034) (#11036)
+  `PR #11036 <https://github.com/pantsbuild/pants/pull/11036>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Improve several help messages (Cherry-pick of #11029) (#11035)
+  `PR #11035 <https://github.com/pantsbuild/pants/pull/11035>`_
+
 2.0.0rc2 (10/22/2020)
 ---------------------
 
