@@ -37,8 +37,7 @@
 use std::borrow::Cow;
 
 use cpython::{
-  exc, py_class, py_class_call_slot_impl_with_ref, py_class_prop_getter, CompareOp, PyErr,
-  PyObject, PyResult, Python, PythonObject, ToPyObject,
+  exc, py_class, CompareOp, PyErr, PyObject, PyResult, Python, PythonObject, ToPyObject,
 };
 use hashing::{Digest, Fingerprint};
 
