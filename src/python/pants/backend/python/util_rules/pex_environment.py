@@ -3,6 +3,7 @@
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from textwrap import dedent
 from typing import Mapping, Optional, Tuple, cast
 
@@ -12,6 +13,7 @@ from pants.engine import process
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.process import BinaryPath, BinaryPathRequest, BinaryPaths, BinaryPathTest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.option.global_options import GlobalOptions
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
@@ -102,6 +104,7 @@ class PexEnvironment(EngineAwareReturnType):
     path: Tuple[str, ...]
     interpreter_search_paths: Tuple[str, ...]
     subprocess_environment_dict: FrozenDict[str, str]
+    named_caches_dir: str
     bootstrap_python: Optional[PythonExecutable] = None
 
     def create_argv(
@@ -123,6 +126,7 @@ class PexEnvironment(EngineAwareReturnType):
             PATH=create_path_env_var(self.path),
             PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
+            PEX_ROOT=os.path.join(self.named_caches_dir, "pex_root"),
             **self.subprocess_environment_dict,
         )
         # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
@@ -150,6 +154,7 @@ async def find_pex_python(
     python_setup: PythonSetup,
     pex_runtime_env: PexRuntimeEnvironment,
     subprocess_env_vars: SubprocessEnvironmentVars,
+    global_options: GlobalOptions,
 ) -> PexEnvironment:
     # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+. The bootstrap
     # code will then re-exec itself if the underlying PEX user code needs a more specific python
@@ -214,6 +219,9 @@ async def find_pex_python(
         path=pex_runtime_env.path,
         interpreter_search_paths=tuple(python_setup.interpreter_search_paths),
         subprocess_environment_dict=subprocess_env_vars.vars,
+        # TODO: This path normalization is duplicated with `engine_initializer.py`. How can we do
+        #  the normalization only once, via the options system?
+        named_caches_dir=Path(global_options.options.named_caches_dir).resolve().as_posix(),
         bootstrap_python=first_python_binary(),
     )
 
