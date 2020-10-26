@@ -101,9 +101,12 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
         TargetRootsToFieldSetsRequest(
             PackageFieldSet,
             goal_description="the `package` goal",
-            error_if_no_applicable_targets=True,
+            error_if_no_applicable_targets=False,
         ),
     )
+    if not target_roots_to_field_sets.field_sets:
+        return Package(exit_code=0)
+
     packages = await MultiGet(
         Get(BuiltPackage, PackageFieldSet, field_set)
         for field_set in target_roots_to_field_sets.field_sets
