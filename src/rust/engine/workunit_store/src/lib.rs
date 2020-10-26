@@ -134,19 +134,7 @@ pub struct WorkunitMetadata {
 
 impl WorkunitMetadata {
   pub fn new() -> Self {
-    WorkunitMetadata::default()
-  }
-
-  pub fn with_level(level: Level) -> Self {
-    let mut metadata = WorkunitMetadata::default();
-    metadata.level = level;
-    metadata
-  }
-}
-
-impl Default for WorkunitMetadata {
-  fn default() -> Self {
-    Self {
+    WorkunitMetadata {
       level: Level::Info,
       desc: None,
       message: None,
@@ -156,6 +144,12 @@ impl Default for WorkunitMetadata {
       artifacts: Vec::new(),
       user_metadata: Vec::new(),
     }
+  }
+
+  pub fn with_level(level: Level) -> Self {
+    let mut metadata = WorkunitMetadata::new();
+    metadata.level = level;
+    metadata
   }
 }
 
