@@ -256,6 +256,12 @@ impl CommandRunner {
       .ok_or_else(|| format!("File {:?} did not exist locally.", file_path))
   }
 
+  /// Converts a REAPI `Command` and a `FallibleProcessResultWithPlatform` produced from executing
+  /// that Command into a REAPI `ActionResult` suitable for upload to the REAPI Action Cache.
+  ///
+  /// This function also returns a vector of all `Digest`s referenced directly and indirectly by
+  /// the `ActionResult` suitable for passing to `Store::ensure_remote_has_recursive`. (The
+  /// digests may include both File and Tree digests.)
   pub(crate) async fn make_action_result(
     &self,
     command: &Command,
