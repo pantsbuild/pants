@@ -632,6 +632,8 @@ class Parser:
                                 return json.loads(s)
                             elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
                                 return yaml.safe_load(s)
+                            elif fromfile.endswith(".toml"):
+                                raise Exception("TODO: Add TOML support!")
                             else:
                                 return s
                     except (IOError, ValueError, yaml.YAMLError) as e:

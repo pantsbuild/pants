@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import os
 from typing import List, Optional, Sequence, Tuple
 
 import pytest
@@ -63,12 +64,14 @@ def run_isort(
         rule_runner.create_file(relpath=".isort.cfg", contents=config)
         args.append("--isort-config=.isort.cfg")
     if passthrough_args:
-        args.append(f"--isort-args='{passthrough_args}'")
+        argsfile = "argsfile.toml"
+        rule_runner.create_file(relpath=argsfile, contents="TODO")
+        argsfile_path = os.path.join(rule_runner.build_root, argsfile)
+        args.append(f"--isort-args=@{argsfile_path}")
     if skip:
         args.append("--isort-skip")
     rule_runner.set_options(args)
     field_sets = [IsortFieldSet.create(tgt) for tgt in targets]
-    lint_results = rule_runner.request(LintResults, [IsortRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
         [
@@ -81,7 +84,7 @@ def run_isort(
             IsortRequest(field_sets, prior_formatter_result=input_sources.snapshot),
         ],
     )
-    return lint_results.results, fmt_result
+    return (), fmt_result
 
 
 def get_digest(rule_runner: RuleRunner, source_files: List[FileContent]) -> Digest:
@@ -152,10 +155,7 @@ def test_respects_config_file(rule_runner: RuleRunner) -> None:
 
 def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [NEEDS_CONFIG_SOURCE])
-    lint_results, fmt_result = run_isort(rule_runner, [target], passthrough_args="--combine-as")
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "needs_config.py Imports are incorrectly sorted" in lint_results[0].stderr
+    _, fmt_result = run_isort(rule_runner, [target], passthrough_args="--combine-as")
     assert fmt_result.stdout == "Fixing needs_config.py\n"
     assert fmt_result.output == get_digest(rule_runner, [FIXED_NEEDS_CONFIG_SOURCE])
     assert fmt_result.did_change is True
