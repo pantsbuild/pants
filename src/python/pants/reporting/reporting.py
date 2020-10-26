@@ -20,7 +20,10 @@ class Reporting(Subsystem):
                 advanced=True,
                 help="DEPRECATED: This option is no longer applicable.",
                 removal_version="2.1.0.dev0",
-                removal_hint="This option is no longer applicable.",
+                removal_hint=(
+                    "This option is no longer applicable. The `[reporting]` subsystem will be "
+                    "removed."
+                ),
             )
 
         register_deprecated("--reports-dir")
