@@ -325,7 +325,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             metavar="<dir>",
             default=os.path.join(buildroot, "dist"),
-            help="Write end-product artifacts to this dir, like the results of `./pants package`.",
+            help="Write end products, such as the results of `./pants package`, to this dir.",
         )
         # TODO: Change the default to false in 2.1, deprecate the option in 2.2 and remove in 2.3.
         register(
