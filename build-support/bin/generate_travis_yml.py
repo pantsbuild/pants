@@ -299,7 +299,7 @@ def linux_shard(
         raise ValueError("Must provide the Python version if using a test config.")
     setup = {
         "os": "linux",
-        "dist": "bionic",
+        "dist": "xenial",
         "python": ["2.7", "3.6", "3.7"],
         "addons": {
             "apt": {
@@ -319,7 +319,9 @@ def linux_shard(
         },
         "language": "python",
         "before_install": _linux_before_install(
-            include_test_config=load_test_config, install_travis_wait=install_travis_wait
+            include_test_config=load_test_config,
+            install_travis_wait=install_travis_wait,
+            xenial=True,
         ),
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage().value,
