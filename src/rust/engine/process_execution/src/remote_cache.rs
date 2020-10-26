@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::convert::TryInto;
 use std::path::Component;
 use std::sync::Arc;
@@ -256,19 +256,24 @@ impl CommandRunner {
       .ok_or_else(|| format!("File {:?} did not exist locally.", file_path))
   }
 
-  async fn make_action_result(
+  pub(crate) async fn make_action_result(
     &self,
     command: &Command,
     result: &FallibleProcessResultWithPlatform,
     store: &Store,
-  ) -> Result<ActionResult, String> {
+  ) -> Result<(ActionResult, Vec<Digest>), String> {
+    // Keep track of digests that need to be uploaded.
+    let mut digests = HashSet::new();
+
     let mut action_result = ActionResult::new();
     action_result.set_exit_code(result.exit_code);
 
     action_result.set_stdout_digest(result.stdout_digest.into());
-    action_result.set_stderr_digest(result.stderr_digest.into());
+    digests.insert(result.stdout_digest);
 
-    let mut tree_digests = Vec::new();
+    action_result.set_stderr_digest(result.stderr_digest.into());
+    digests.insert(result.stderr_digest);
+
     for output_directory in &command.output_directories {
       let tree = Self::make_tree_for_output_directory(
         result.output_directory,
@@ -278,7 +283,7 @@ impl CommandRunner {
       .await?;
 
       let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
-      tree_digests.push(tree_digest);
+      digests.insert(tree_digest);
 
       action_result.mut_output_directories().push({
         let mut directory = bazel_protos::remote_execution::OutputDirectory::new();
@@ -288,12 +293,6 @@ impl CommandRunner {
       });
     }
 
-    store
-      .ensure_remote_has_recursive(tree_digests)
-      .compat()
-      .await?;
-
-    let mut file_digests = Vec::new();
     for output_file in &command.output_files {
       let file_node = Self::extract_output_file(
         result.output_directory,
@@ -302,7 +301,7 @@ impl CommandRunner {
       )
       .await?;
 
-      file_digests.push(file_node.get_digest().try_into()?);
+      digests.insert(file_node.get_digest().try_into()?);
 
       action_result.mut_output_files().push({
         let mut file = bazel_protos::remote_execution::OutputFile::new();
@@ -314,12 +313,7 @@ impl CommandRunner {
       })
     }
 
-    store
-      .ensure_remote_has_recursive(file_digests)
-      .compat()
-      .await?;
-
-    Ok(action_result)
+    Ok((action_result, digests.into_iter().collect::<Vec<_>>()))
   }
 
   /// Stores an execution result into the remote Action Cache.
@@ -350,8 +344,16 @@ impl CommandRunner {
     .await?;
 
     // Create an ActionResult from the process result.
-    let action_result = self
+    let (action_result, digests_for_action_result) = self
       .make_action_result(command, result, &self.store)
+      .await?;
+
+    // Ensure that all digests referenced by directly and indirectly by the ActionResult
+    // have been uploaded to the remote cache.
+    self
+      .store
+      .ensure_remote_has_recursive(digests_for_action_result)
+      .compat()
       .await?;
 
     let mut update_action_cache_request = UpdateActionResultRequest::new();
