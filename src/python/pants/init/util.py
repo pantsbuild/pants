@@ -52,14 +52,10 @@ def init_workdir(global_options: OptionValueContainer) -> str:
     return workdir_src
 
 
-def clean_global_runtime_state(reset_subsystem=False):
-    """Resets the global runtime state of a pants runtime for cleaner forking.
+def clean_global_runtime_state() -> None:
+    """Resets the global runtime state of a pants runtime."""
 
-    :param bool reset_subsystem: Whether or not to clean Subsystem global state.
-    """
-    if reset_subsystem:
-        # Reset subsystem state.
-        Subsystem.reset()
+    Subsystem.reset()
 
     # Reset global plugin state.
     BuildConfigInitializer.reset()

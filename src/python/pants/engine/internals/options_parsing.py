@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import cast
 
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.session import SessionValues
@@ -34,11 +33,8 @@ class _Options:
 
     @memoized_property
     def options(self) -> Options:
-        return cast(
-            Options,
-            OptionsInitializer.create(
-                self.options_bootstrapper, self.build_config, init_subsystems=False
-            ),
+        return OptionsInitializer.create(
+            self.options_bootstrapper, self.build_config, init_subsystems=False
         )
 
 

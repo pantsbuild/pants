@@ -131,7 +131,7 @@ class DaemonPantsRunner(RawFdRunner):
         # of a local run: once we allow for concurrent runs, this information should be
         # propagated down from the caller.
         #   see https://github.com/pantsbuild/pants/issues/7654
-        clean_global_runtime_state(reset_subsystem=True)
+        clean_global_runtime_state()
         options_bootstrapper = OptionsBootstrapper.create(
             env=os.environ, args=sys.argv, allow_pantsrc=True
         )
