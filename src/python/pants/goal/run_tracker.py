@@ -58,7 +58,6 @@ class RunTracker(Subsystem):
 
     # The name of the tracking root for the background worker threads.
     BACKGROUND_ROOT_NAME = "background"
-    SUPPORTED_STATS_VERSIONS = [1, 2]
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -92,7 +91,7 @@ class RunTracker(Subsystem):
             advanced=True,
             type=int,
             default=1,
-            choices=cls.SUPPORTED_STATS_VERSIONS,
+            choices=[1, 2],
             removal_version="2.1.0.dev0",
             removal_hint="RunTracker no longer directly supports uploading run stats to urls.",
             help="Format of stats JSON for uploads and local json file.",
@@ -268,18 +267,6 @@ class RunTracker(Subsystem):
     def pantsd_scheduler_metrics(self) -> Dict[str, int]:
         return dict(self._pantsd_metrics)  # defensive copy
 
-    @property
-    def _stats_version(self) -> int:
-        stats_version: int = self.options.stats_version
-        return stats_version
-
-    @classmethod
-    def _get_headers(cls, stats_version: int) -> Dict[str, str]:
-        return {
-            "User-Agent": f"pants/v{VERSION}",
-            "X-Pants-Stats-Version": str(stats_version),
-        }
-
     @classmethod
     def post_stats(
         cls,
@@ -287,7 +274,6 @@ class RunTracker(Subsystem):
         stats: Dict[str, Any],
         timeout: int = 2,
         auth_provider: Optional[str] = None,
-        stats_version: int = 1,
     ):
         """POST stats to the given url.
 
@@ -299,21 +285,13 @@ class RunTracker(Subsystem):
             print(f"WARNING: Failed to upload stats to {stats_url} due to {msg}", file=sys.stderr)
             return False
 
-        if stats_version not in cls.SUPPORTED_STATS_VERSIONS:
-            raise ValueError("Invalid stats version")
-
         auth_data = BasicAuth.global_instance().get_auth_for_provider(auth_provider)
-        headers = cls._get_headers(stats_version=stats_version)
+        headers = {
+            "User-Agent": f"pants/v{VERSION}",
+        }
         headers.update(auth_data.headers)
-
-        if stats_version == 2:
-            params = cls._json_dump_options({"builds": [stats]})
-            headers["Content-Type"] = "application/json"
-        else:
-            # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
-            # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
-            # But this will first require changing the upload receiver at every shop that uses this.
-            params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}  # type: ignore[assignment]
+        params = cls._json_dump_options({"builds": [stats]})
+        headers["Content-Type"] = "application/json"
 
         # We can't simply let requests handle redirects, as we only allow them for specific codes:
         # 307 and 308 indicate that the redirected request must use the same method, POST in this case.
@@ -380,14 +358,6 @@ class RunTracker(Subsystem):
             "cumulative_timings": self.cumulative_timings.get_all(),
             "recorded_options": self.get_options_to_record(),
         }
-        if self._stats_version != 2:
-            stats.update(
-                {
-                    "self_timings": self.self_timings.get_all(),
-                    "critical_path_timings": self.get_critical_path_timings().get_all(),
-                    "outcomes": self.outcomes,
-                }
-            )
         return stats
 
     def store_stats(self):
@@ -408,7 +378,6 @@ class RunTracker(Subsystem):
                 stats,
                 timeout=timeout,
                 auth_provider=auth_provider,
-                stats_version=self._stats_version,
             )
 
     def has_ended(self) -> bool:
