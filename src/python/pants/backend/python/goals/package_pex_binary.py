@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple, cast
+from typing import Tuple
 
 from pants.backend.python.target_types import (
     PexAlwaysWriteCacheField,
@@ -25,7 +25,6 @@ from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
-from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -40,7 +39,7 @@ from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
-class PexBinaryFieldSet(PackageFieldSet, BinaryFieldSet, RunFieldSet):
+class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (PexEntryPointField, PexBinarySources)
 
     sources: PexBinarySources
@@ -102,15 +101,5 @@ async def package_pex_binary(
     return BuiltPackage(two_step_pex.pex.digest, (BuiltPackageArtifact(output_filename),))
 
 
-@rule(level=LogLevel.DEBUG)
-async def create_pex_binary(field_set: PexBinaryFieldSet) -> CreatedBinary:
-    pex = await Get(BuiltPackage, PackageFieldSet, field_set)
-    return CreatedBinary(pex.digest, cast(str, pex.artifacts[0].relpath))
-
-
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(PackageFieldSet, PexBinaryFieldSet),
-        UnionRule(BinaryFieldSet, PexBinaryFieldSet),
-    ]
+    return [*collect_rules(), UnionRule(PackageFieldSet, PexBinaryFieldSet)]

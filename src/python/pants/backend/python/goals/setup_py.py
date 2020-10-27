@@ -35,15 +35,9 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
-from pants.base.specs import (
-    AddressLiteralSpec,
-    AddressSpecs,
-    AscendantAddresses,
-    FilesystemLiteralSpec,
-)
+from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FilesSources, ResourcesSources
-from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
@@ -57,29 +51,24 @@ from pants.engine.fs import (
     PathGlobs,
     RemovePrefix,
     Snapshot,
-    Workspace,
 )
-from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     Sources,
     Target,
     Targets,
-    TargetsWithOrigins,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.custom_types import shell_str
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
 
 logger = logging.getLogger(__name__)
@@ -350,47 +339,6 @@ class SetupPyGeneration(Subsystem):
         return f"{specifier}{version}"
 
 
-class SetupPySubsystem(GoalSubsystem):
-    """Deprecated in favor of the `package` goal."""
-
-    name = "setup-py"
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            passthrough=True,
-            help=(
-                "Arguments to pass directly to setup.py, e.g. `--setup-py-args='bdist_wheel "
-                "--python-tag py36.py37'`. If unspecified, Pants will dump the setup.py chroot."
-            ),
-        )
-        register(
-            "--transitive",
-            type=bool,
-            default=False,
-            help=(
-                "If specified, will run the setup.py command recursively on all exported targets "
-                "that the specified targets depend on, in dependency order."
-            ),
-        )
-
-    @property
-    def args(self) -> Tuple[str, ...]:
-        return tuple(self.options.args)
-
-    @property
-    def transitive(self) -> bool:
-        return cast(bool, self.options.transitive)
-
-
-class SetupPy(Goal):
-    subsystem_cls = SetupPySubsystem
-
-
 def validate_commands(commands: Tuple[str, ...]):
     # We rely on the dist dir being the default, so we know where to find the created dists.
     if "--dist-dir" in commands or "-d" in commands:
@@ -446,120 +394,6 @@ async def package_python_dist(
         dirname = f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}"
         rel_chroot = await Get(Digest, AddPrefix(chroot.digest, dirname))
         return BuiltPackage(rel_chroot, (BuiltPackageArtifact(dirname),))
-
-
-@goal_rule
-async def run_setup_pys(
-    targets_with_origins: TargetsWithOrigins,
-    setup_py_subsystem: SetupPySubsystem,
-    python_setup: PythonSetup,
-    distdir: DistDir,
-    workspace: Workspace,
-    union_membership: UnionMembership,
-) -> SetupPy:
-    logger.warning(
-        "The `setup_py` goal is deprecated in favor of the `package` goal, which behaves "
-        "similarly, except that you specify setup.py commands using the `setup_py_commands` "
-        "field on your `python_distribution` targets, instead of on the command line. "
-        "`setup_py` will be removed in 2.1.0.dev0."
-    )
-
-    """Run setup.py commands on all exported targets addressed."""
-    validate_commands(setup_py_subsystem.args)
-
-    # Get all exported targets, ignoring any non-exported targets that happened to be
-    # globbed over, but erroring on any explicitly-requested non-exported targets.
-
-    exported_targets: List[ExportedTarget] = []
-    explicit_nonexported_targets: List[Target] = []
-
-    for target_with_origin in targets_with_origins:
-        tgt = target_with_origin.target
-        if tgt.has_field(PythonProvidesField):
-            exported_targets.append(ExportedTarget(tgt))
-        elif isinstance(target_with_origin.origin, (AddressLiteralSpec, FilesystemLiteralSpec)):
-            explicit_nonexported_targets.append(tgt)
-    if explicit_nonexported_targets:
-        raise TargetNotExported(
-            "Cannot run setup.py on these targets, because they have no `provides=` clause: "
-            f'{", ".join(so.address.spec for so in explicit_nonexported_targets)}'
-        )
-
-    transitive_targets_per_exported_target = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest([et.target.address]))
-        for et in exported_targets
-    )
-
-    if setup_py_subsystem.transitive:
-        closure = FrozenOrderedSet(
-            itertools.chain.from_iterable(
-                tt.closure for tt in transitive_targets_per_exported_target
-            )
-        )
-        owners = await MultiGet(
-            Get(ExportedTarget, OwnedDependency(tgt))
-            for tgt in closure
-            if is_ownable_target(tgt, union_membership)
-        )
-        exported_targets = list(FrozenOrderedSet(owners))
-        # We must recalculate the transitive targets because it's possible the exported_targets
-        # have changed. Any prior results will be memoized.
-        transitive_targets_per_exported_target = await MultiGet(
-            Get(TransitiveTargets, TransitiveTargetsRequest([et.target.address]))
-            for et in exported_targets
-        )
-
-    interpreter_constraints_per_exported_target = tuple(
-        PexInterpreterConstraints.create_from_compatibility_fields(
-            (
-                tgt[PythonInterpreterCompatibility]
-                for tgt in transitive_targets.dependencies
-                if tgt.has_field(PythonInterpreterCompatibility)
-            ),
-            python_setup,
-        )
-        for transitive_targets in transitive_targets_per_exported_target
-    )
-
-    chroots = await MultiGet(
-        Get(
-            SetupPyChroot,
-            SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
-        )
-        for exported_target, interpreter_constraints in zip(
-            exported_targets, interpreter_constraints_per_exported_target
-        )
-    )
-
-    # If args were provided, run setup.py with them; Otherwise just dump chroots.
-    if setup_py_subsystem.args:
-        setup_py_results = await MultiGet(
-            Get(
-                RunSetupPyResult,
-                RunSetupPyRequest(
-                    exported_target, interpreter_constraints, chroot, setup_py_subsystem.args
-                ),
-            )
-            for exported_target, interpreter_constraints, chroot in zip(
-                exported_targets, interpreter_constraints_per_exported_target, chroots
-            )
-        )
-
-        for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
-            addr = exported_target.target.address.spec
-            logger.info(f"Writing dist for {addr} under {distdir.relpath}/.")
-            workspace.write_digest(setup_py_result.output, path_prefix=str(distdir.relpath))
-    else:
-        # Just dump the chroot.
-        for exported_target, chroot in zip(exported_targets, chroots):
-            addr = exported_target.target.address.spec
-            setup_py_dir = (
-                distdir.relpath / f"{chroot.setup_kwargs.name}-{chroot.setup_kwargs.version}"
-            )
-            logger.info(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
-            workspace.write_digest(chroot.digest, path_prefix=str(setup_py_dir))
-
-    return SetupPy(0)
 
 
 # We write .py sources into the chroot under this dir.
