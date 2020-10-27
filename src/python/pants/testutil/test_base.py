@@ -258,7 +258,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         super().setUp()
         # Avoid resetting the Runtracker here, as that is specific to fork'd process cleanup.
-        clean_global_runtime_state(reset_subsystem=True)
+        clean_global_runtime_state()
 
         self.addCleanup(self._reset_engine)
 
