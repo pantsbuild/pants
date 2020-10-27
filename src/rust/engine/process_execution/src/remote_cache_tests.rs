@@ -1,23 +1,26 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
+use fs::RelativePath;
+use hashing::Digest;
+use maplit::hashset;
 use mock::{StubActionCache, StubCAS};
 use store::{BackoffConfig, Store};
 use tempfile::TempDir;
-use testutil::data::{TestData, TestDirectory};
+use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::relative_paths;
 use workunit_store::WorkunitStore;
 
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
-  Platform, Process, ProcessMetadata,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
+  MultiPlatformProcess, NamedCaches, Platform, Process, ProcessMetadata,
 };
-use fs::RelativePath;
-use hashing::Digest;
 
 struct RoundtripResults {
   uncached: Result<FallibleProcessResultWithPlatform, String>,
@@ -273,4 +276,115 @@ async fn extract_output_file() {
   assert_eq!(file_node.get_name(), "roland");
   let file_digest: Digest = file_node.get_digest().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
+}
+
+#[tokio::test]
+async fn make_action_result_basic() {
+  struct MockCommandRunner;
+
+  #[async_trait]
+  impl CommandRunnerTrait for MockCommandRunner {
+    async fn run(
+      &self,
+      _req: MultiPlatformProcess,
+      _context: Context,
+    ) -> Result<FallibleProcessResultWithPlatform, String> {
+      unimplemented!()
+    }
+
+    fn extract_compatible_request(&self, _req: &MultiPlatformProcess) -> Option<Process> {
+      None
+    }
+  }
+
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
+
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+
+  store
+    .store_file_bytes(TestData::robin().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  store
+    .record_directory(&TestDirectory::nested().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let directory_digest = store
+    .record_directory(&TestDirectory::double_nested().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let mock_command_runner = Arc::new(MockCommandRunner);
+
+  let metadata = ProcessMetadata {
+    instance_name: None,
+    cache_key_gen_version: None,
+    platform_properties: vec![],
+  };
+
+  let action_cache = StubActionCache::new().unwrap();
+
+  let runner = crate::remote_cache::CommandRunner::new(
+    mock_command_runner.clone(),
+    metadata,
+    store.clone(),
+    &action_cache.address(),
+    None,
+    None,
+    BTreeMap::default(),
+    Platform::current().unwrap(),
+    true,
+    true,
+  )
+  .expect("caching command runner");
+
+  let mut command = bazel_protos::remote_execution::Command::new();
+  command.mut_arguments().push("this is a test".into());
+  command.mut_output_files().push("pets/cats/roland".into());
+  command.mut_output_directories().push("pets/cats".into());
+
+  let process_result = FallibleProcessResultWithPlatform {
+    stdout_digest: TestData::roland().digest(),
+    stderr_digest: TestData::robin().digest(),
+    exit_code: 102,
+    platform: Platform::Linux,
+    output_directory: directory_digest,
+    execution_attempts: Vec::new(),
+  };
+
+  let (action_result, digests) = runner
+    .make_action_result(&command, &process_result, &store)
+    .await
+    .unwrap();
+
+  assert_eq!(action_result.get_exit_code(), process_result.exit_code);
+
+  let stdout_digest: Digest = action_result.get_stdout_digest().try_into().unwrap();
+  assert_eq!(stdout_digest, process_result.stdout_digest);
+
+  let stderr_digest: Digest = action_result.get_stderr_digest().try_into().unwrap();
+  assert_eq!(stderr_digest, process_result.stderr_digest);
+
+  let actual_digests_set = digests.into_iter().collect::<HashSet<_>>();
+  let expected_digests_set = hashset! {
+    TestData::roland().digest(),
+    TestData::robin().digest(),
+    TestTree::roland_at_root().digest(),
+  };
+  assert_eq!(expected_digests_set, actual_digests_set);
 }
