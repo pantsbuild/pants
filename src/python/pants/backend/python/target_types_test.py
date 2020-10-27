@@ -92,7 +92,10 @@ def test_resolve_pex_binary_entry_point() -> None:
     assert_resolved(
         entry_point="custom.entry_point:func", source="app.py", expected="custom.entry_point:func"
     )
+    assert_resolved(entry_point=":func", source="app.py", expected="project.app:func")
     assert_resolved(entry_point=None, source="app.py", expected="project.app")
+    with pytest.raises(ExecutionError):
+        assert_resolved(entry_point=":func", source=None, expected="doesnt matter")
     with pytest.raises(ExecutionError):
         assert_resolved(entry_point=None, source=None, expected="doesnt matter")
 

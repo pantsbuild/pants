@@ -144,8 +144,15 @@ class ResolvedPexEntryPoint:
 
 @dataclass(frozen=True)
 class ResolvePexEntryPointRequest:
-    """Determine the entry_point by using the `PexEntryPointField` and falling back to the sources
-    field."""
+    """Determine the entry_point by looking at both `PexEntryPointField` and and the sources field.
+
+    In order of precedence, this can be calculated by:
+
+    1. The `entry_point` field having a well-formed value.
+    2. The `entry_point` using a shorthand `:my_func`, and the `sources` field being set. We
+        combine these into `path.to.module:my_func`.
+    3. The `entry_point` being left off, but `sources` defined. We will use `path.to.module`.
+    """
 
     entry_point_field: PexEntryPointField
     sources: PexBinarySources
@@ -153,17 +160,30 @@ class ResolvePexEntryPointRequest:
 
 @rule
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
-    if request.entry_point_field.value:
-        return ResolvedPexEntryPoint(request.entry_point_field.value)
+    entry_point_value = request.entry_point_field.value
+    if entry_point_value and not entry_point_value.startswith(":"):
+        return ResolvedPexEntryPoint(entry_point_value)
     binary_source_paths = await Get(
         Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
     )
     if len(binary_source_paths.files) != 1:
-        raise InvalidFieldException(
-            "No `entry_point` was set for the target "
-            f"{repr(request.sources.address)}, so it must have exactly one source, but it has "
-            f"{len(binary_source_paths.files)}."
-        )
+        instructions_url = "https://www.pantsbuild.org/v2.1/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
+        if not entry_point_value:
+            raise InvalidFieldException(
+                f"Both the `entry_point` and `sources` fields are not set for the target "
+                f"{request.sources.address}, so Pants cannot determine an entry point. Please "
+                "either explicitly set the `entry_point` field and/or the `sources` field to "
+                f"exactly one file. See {instructions_url}."
+            )
+        else:
+            raise InvalidFieldException(
+                f"The `entry_point` field for the target {request.sources.address} is set to "
+                f"the short-hand value {repr(entry_point_value)}, but the `sources` field is not "
+                "set. Pants requires the `sources` field to expand the entry point to the "
+                f"normalized form `path.to.module:{entry_point_value}`. Please either set the "
+                "`sources` field to exactly one file or use a full value for `entry_point`. See "
+                f"{instructions_url}."
+            )
     entry_point_path = binary_source_paths.files[0]
     source_root = await Get(
         SourceRoot,
@@ -172,7 +192,10 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     )
     stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
     module_base, _ = os.path.splitext(stripped_source_path)
-    return ResolvedPexEntryPoint(module_base.replace(os.path.sep, "."))
+    normalized_path = module_base.replace(os.path.sep, ".")
+    return ResolvedPexEntryPoint(
+        f"{normalized_path}{entry_point_value}" if entry_point_value else normalized_path
+    )
 
 
 class PexPlatformsField(StringOrStringSequenceField):
