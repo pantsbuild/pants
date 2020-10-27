@@ -101,7 +101,7 @@ class OptionsInitializer:
         Combines --pythonpath and --pants-config-files files that are in {buildroot} dir with those
         invalidation_globs provided by users.
         """
-        invalidation_globs: OrderedSet = OrderedSet()
+        invalidation_globs: OrderedSet[str] = OrderedSet()
 
         # Globs calculated from the sys.path and other file-like configuration need to be sanitized
         # to relative globs (where possible).
