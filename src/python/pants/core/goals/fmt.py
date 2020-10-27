@@ -6,7 +6,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
 
-from pants.base.deprecated import resolve_conflicting_options
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -153,30 +152,10 @@ class FmtSubsystem(GoalSubsystem):
                 "faster than `--no-per-file-caching` for your use case."
             ),
         )
-        register(
-            "--per-target-caching",
-            advanced=True,
-            type=bool,
-            default=False,
-            help="See `--per-file-caching`.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "Use the renamed `--per-file-caching` option instead. If this option is set, Pants "
-                "will now run per every file, rather than per target."
-            ),
-        )
 
     @property
     def per_file_caching(self) -> bool:
-        val = resolve_conflicting_options(
-            old_option="per_target_caching",
-            new_option="per_file_caching",
-            old_container=self.options,
-            new_container=self.options,
-            old_scope=self.name,
-            new_scope=self.name,
-        )
-        return cast(bool, val)
+        return cast(bool, self.options.per_file_caching)
 
 
 class Fmt(Goal):
