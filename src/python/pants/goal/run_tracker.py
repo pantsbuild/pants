@@ -93,8 +93,6 @@ class RunTracker(Subsystem):
             type=int,
             default=1,
             choices=cls.SUPPORTED_STATS_VERSIONS,
-            removal_version="2.1.0.dev0",
-            removal_hint="RunTracker no longer directly supports uploading run stats to urls.",
             help="Format of stats JSON for uploads and local json file.",
         )
         register(
