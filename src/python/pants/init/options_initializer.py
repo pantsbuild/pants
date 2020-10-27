@@ -4,7 +4,7 @@
 import logging
 import os
 import sys
-from typing import Optional
+from typing import Optional, Tuple
 
 import pkg_resources
 
@@ -14,6 +14,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.init.extension_loader import load_backends_and_plugins
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.global_options import GlobalOptions
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
@@ -92,13 +93,15 @@ class OptionsInitializer:
         return pants_ignore
 
     @staticmethod
-    def compute_pantsd_invalidation_globs(buildroot, bootstrap_options):
+    def compute_pantsd_invalidation_globs(
+        buildroot: str, bootstrap_options: OptionValueContainer
+    ) -> Tuple[str, ...]:
         """Computes the merged value of the `--pantsd-invalidation-globs` option.
 
         Combines --pythonpath and --pants-config-files files that are in {buildroot} dir with those
         invalidation_globs provided by users.
         """
-        invalidation_globs = OrderedSet()
+        invalidation_globs: OrderedSet = OrderedSet()
 
         # Globs calculated from the sys.path and other file-like configuration need to be sanitized
         # to relative globs (where possible).
@@ -131,7 +134,7 @@ class OptionsInitializer:
             )
         )
 
-        return list(invalidation_globs)
+        return tuple(x for x in invalidation_globs)
 
     @classmethod
     def create(

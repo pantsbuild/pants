@@ -3,7 +3,7 @@
 
 import logging
 import time
-from typing import List, Optional, Tuple, cast
+from typing import Optional, Tuple, cast
 
 import psutil
 
@@ -32,7 +32,7 @@ class SchedulerService(PantsService):
         *,
         graph_scheduler: GraphScheduler,
         build_root: str,
-        invalidation_globs: List[str],
+        invalidation_globs: Tuple[str, ...],
         pidfile: str,
         pid: int,
         max_memory_usage_in_bytes: int,
@@ -40,7 +40,7 @@ class SchedulerService(PantsService):
         """
         :param graph_scheduler: The GraphScheduler instance for graph construction.
         :param build_root: The current build root.
-        :param invalidation_globs: A list of `globs` that when encountered in filesystem event
+        :param invalidation_globs: A tuple of `globs` that when encountered in filesystem event
                                    subscriptions will tear down the daemon.
         :param pidfile: A pidfile which should contain this processes' pid in order for the daemon
                         to remain valid.
@@ -62,7 +62,7 @@ class SchedulerService(PantsService):
 
         # NB: We declare these as a single field so that they can be changed atomically.
         self._invalidation_globs_and_snapshot: Tuple[Tuple[str, ...], Optional[Snapshot]] = (
-            tuple(invalidation_globs),
+            invalidation_globs,
             None,
         )
 
