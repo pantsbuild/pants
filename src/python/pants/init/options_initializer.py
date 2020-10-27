@@ -33,7 +33,7 @@ class BuildConfigInitializer:
     _cached_build_config: Optional[BuildConfiguration] = None
 
     @classmethod
-    def get(cls, options_bootstrapper):
+    def get(cls, options_bootstrapper: OptionsBootstrapper) -> BuildConfiguration:
         if cls._cached_build_config is None:
             cls._cached_build_config = cls(options_bootstrapper).setup()
         return cls._cached_build_config
@@ -43,11 +43,12 @@ class BuildConfigInitializer:
         cls._cached_build_config = None
 
     def __init__(self, options_bootstrapper: OptionsBootstrapper) -> None:
-        self._options_bootstrapper = options_bootstrapper
         self._bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-        self._working_set = PluginResolver(self._options_bootstrapper).resolve()
+        self._working_set = PluginResolver(options_bootstrapper).resolve()
 
-    def _load_plugins(self) -> BuildConfiguration:
+    def setup(self) -> BuildConfiguration:
+        """Loads backends and plugins."""
+
         # Add any extra paths to python path (e.g., for loading extra source backends).
         for path in self._bootstrap_options.pythonpath:
             if path not in sys.path:
@@ -60,13 +61,6 @@ class BuildConfigInitializer:
             self._working_set,
             self._bootstrap_options.backend_packages,
         )
-
-    def setup(self) -> BuildConfiguration:
-        """Load backends and plugins.
-
-        :returns: A `BuildConfiguration` object constructed during backend/plugin loading.
-        """
-        return self._load_plugins()
 
 
 class OptionsInitializer:
