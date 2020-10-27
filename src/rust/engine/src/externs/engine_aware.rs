@@ -43,7 +43,7 @@ impl EngineAwareInformation for Message {
   }
 }
 
-pub struct Metadata {}
+pub struct Metadata;
 
 impl EngineAwareInformation for Metadata {
   type MaybeOutput = Vec<(String, Value)>;
