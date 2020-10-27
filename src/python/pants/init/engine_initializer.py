@@ -28,7 +28,7 @@ from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
-from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
@@ -208,9 +208,6 @@ class EngineInitializer:
     ) -> GraphScheduler:
         build_root = build_root or get_buildroot()
 
-        build_configuration = build_configuration or BuildConfigInitializer.get(
-            options_bootstrapper
-        )
         rules = build_configuration.rules
         union_membership = UnionMembership.from_rules(build_configuration.union_rules)
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
