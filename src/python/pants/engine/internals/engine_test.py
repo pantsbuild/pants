@@ -571,6 +571,79 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         artifacts = workunit["artifacts"]
         assert artifacts["some_arbitrary_key"] == EMPTY_SNAPSHOT
 
+    def test_metadata_on_engine_aware_type(self) -> None:
+        @dataclass(frozen=True)
+        class Output(EngineAwareReturnType):
+            val: int
+
+            def metadata(self):
+                return {"k1": 1, "k2": "a string", "k3": [1, 2, 3]}
+
+        @rule(desc="a_rule")
+        def a_rule(n: int) -> Output:
+            return Output(val=n)
+
+        rules = [a_rule, QueryRule(Output, (int,))]
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+
+        tracker = WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.TRACE,
+        )
+        with handler.session():
+            scheduler.product_request(Output, subjects=[0])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunit = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+        )
+
+        metadata = workunit["metadata"]
+        assert metadata == {"k1": 1, "k2": "a string", "k3": [1, 2, 3]}
+
+    def test_metadata_non_string_key_behavior(self) -> None:
+        # If someone passes a non-string key in a metadata() method,
+        # this should fail to produce a meaningful metadata entry on
+        # the workunit (with a warning), but not fail.
+
+        @dataclass(frozen=True)
+        class Output(EngineAwareReturnType):
+            val: int
+
+            def metadata(self):
+                return {10: "foo", "other_key": "other value"}
+
+        @rule(desc="a_rule")
+        def a_rule(n: int) -> Output:
+            return Output(val=n)
+
+        rules = [a_rule, QueryRule(Output, (int,))]
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+
+        tracker = WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.TRACE,
+        )
+        with handler.session():
+            scheduler.product_request(Output, subjects=[0])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunit = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+        )
+
+        assert workunit["metadata"] == {}
+
 
 @dataclass(frozen=True)
 class ComplicatedInput:

@@ -3705,6 +3705,7 @@ dependencies = [
  "petgraph",
  "rand 0.6.5",
  "tokio",
+ "uuid 0.7.4",
 ]
 
 [[package]]

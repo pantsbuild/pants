@@ -800,7 +800,11 @@ fn scheduler_create(
   )
 }
 
-async fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResult<Value> {
+async fn workunit_to_py_value(
+  workunit: &Workunit,
+  core: &Arc<Core>,
+  session: &Session,
+) -> CPyResult<Value> {
   use std::time::UNIX_EPOCH;
 
   let mut dict_entries = vec![
@@ -890,6 +894,24 @@ async fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResul
     ))
   }
 
+  let mut user_metadata_entries = Vec::new();
+  for (user_metadata_key, user_metadata_item) in workunit.metadata.user_metadata.iter() {
+    match session.with_metadata_map(|map| map.get(user_metadata_item).cloned()) {
+      None => log::warn!(
+        "Workunit metadata() value not found for key: {}",
+        user_metadata_key
+      ),
+      Some(v) => {
+        user_metadata_entries.push((externs::store_utf8(user_metadata_key.as_str()), v));
+      }
+    }
+  }
+
+  dict_entries.push((
+    externs::store_utf8("metadata"),
+    externs::store_dict(user_metadata_entries)?,
+  ));
+
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stdout_digest"),
@@ -915,10 +937,11 @@ async fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResul
 async fn workunits_to_py_tuple_value<'a>(
   workunits: impl Iterator<Item = &'a Workunit>,
   core: &Arc<Core>,
+  session: &Session,
 ) -> CPyResult<Value> {
   let mut workunit_values = Vec::new();
   for workunit in workunits {
-    let py_value = workunit_to_py_value(workunit, core).await?;
+    let py_value = workunit_to_py_value(workunit, core, session).await?;
     workunit_values.push(py_value);
   }
   Ok(externs::store_tuple(workunit_values))
@@ -944,12 +967,14 @@ fn poll_session_workunits(
             let started = core.executor.block_on(workunits_to_py_tuple_value(
               &mut started_iter,
               &scheduler.core,
+              &session,
             ))?;
 
             let mut completed_iter = completed.iter();
             let completed = core.executor.block_on(workunits_to_py_tuple_value(
               &mut completed_iter,
               &scheduler.core,
+              &session,
             ))?;
 
             Ok(externs::store_tuple(vec![started, completed]).into())

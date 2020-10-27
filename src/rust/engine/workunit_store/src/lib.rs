@@ -61,7 +61,7 @@ impl std::fmt::Display for SpanId {
 
 type WorkunitGraph = DiGraph<SpanId, (), u32>;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct Workunit {
   pub name: String,
   pub span_id: SpanId,
@@ -119,7 +119,7 @@ pub enum WorkunitState {
   Completed { time_span: TimeSpan },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub message: Option<String>,
@@ -128,23 +128,12 @@ pub struct WorkunitMetadata {
   pub stdout: Option<hashing::Digest>,
   pub stderr: Option<hashing::Digest>,
   pub artifacts: Vec<(String, hashing::Digest)>,
+  pub user_metadata: Vec<(String, UserMetadataItem)>,
 }
 
 impl WorkunitMetadata {
   pub fn new() -> Self {
-    WorkunitMetadata::default()
-  }
-
-  pub fn with_level(level: Level) -> Self {
-    let mut metadata = WorkunitMetadata::default();
-    metadata.level = level;
-    metadata
-  }
-}
-
-impl Default for WorkunitMetadata {
-  fn default() -> Self {
-    Self {
+    WorkunitMetadata {
       level: Level::Info,
       desc: None,
       message: None,
@@ -152,7 +141,24 @@ impl Default for WorkunitMetadata {
       stdout: None,
       stderr: None,
       artifacts: Vec::new(),
+      user_metadata: Vec::new(),
     }
+  }
+
+  pub fn with_level(level: Level) -> Self {
+    let mut metadata = WorkunitMetadata::new();
+    metadata.level = level;
+    metadata
+  }
+}
+
+/// Abstract id for passing user metadata items around
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct UserMetadataItem(uuid::Uuid);
+
+impl UserMetadataItem {
+  pub fn new() -> UserMetadataItem {
+    UserMetadataItem(uuid::Uuid::new_v4())
   }
 }
 

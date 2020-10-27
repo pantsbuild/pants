@@ -43,6 +43,46 @@ impl EngineAwareInformation for Message {
   }
 }
 
+pub struct Metadata;
+
+impl EngineAwareInformation for Metadata {
+  type MaybeOutput = Vec<(String, Value)>;
+
+  fn retrieve(_types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
+    let metadata_val = match externs::call_method(&value, "metadata", &[]) {
+      Ok(value) => value,
+      Err(py_err) => {
+        let failure = Failure::from_py_err(py_err);
+        log::error!("Error calling `metadata` method: {}", failure);
+        return None;
+      }
+    };
+
+    let metadata_val = externs::check_for_python_none(metadata_val)?;
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+
+    let mut output = Vec::new();
+    let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).ok()?;
+
+    for (key, value) in metadata_dict.items(py).into_iter() {
+      let key_name: String = match key.extract(py) {
+        Ok(s) => s,
+        Err(e) => {
+          log::error!(
+            "Error in EngineAware.metadata() implementation - non-string key: {:?}",
+            e
+          );
+          return None;
+        }
+      };
+
+      output.push((key_name, Value::from(value)));
+    }
+    Some(output)
+  }
+}
+
 pub struct Artifacts {}
 
 impl EngineAwareInformation for Artifacts {
