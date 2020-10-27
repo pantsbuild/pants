@@ -58,19 +58,6 @@ class LocalPantsRunner:
     profile_path: Optional[str]
 
     @classmethod
-    def parse_options(
-        cls,
-        options_bootstrapper: OptionsBootstrapper,
-    ) -> Tuple[Options, BuildConfiguration]:
-        build_config = BuildConfigInitializer.get(options_bootstrapper)
-        try:
-            options = OptionsInitializer.create(options_bootstrapper, build_config)
-        except UnknownFlagsError as err:
-            cls._handle_unknown_flags(err, options_bootstrapper)
-            raise
-        return options, build_config
-
-    @classmethod
     def _init_graph_session(
         cls,
         options_bootstrapper: OptionsBootstrapper,
@@ -131,7 +118,13 @@ class LocalPantsRunner:
         """
         build_root = get_buildroot()
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        options, build_config = cls.parse_options(options_bootstrapper)
+
+        build_config = BuildConfigInitializer.get(options_bootstrapper)
+        try:
+            options = OptionsInitializer.create(options_bootstrapper, build_config)
+        except UnknownFlagsError as err:
+            cls._handle_unknown_flags(err, options_bootstrapper)
+            raise
 
         union_membership = UnionMembership.from_rules(build_config.union_rules)
 

@@ -14,6 +14,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.init.extension_loader import load_backends_and_plugins
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.global_options import GlobalOptions
+from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
@@ -65,19 +66,6 @@ class BuildConfigInitializer:
 
 class OptionsInitializer:
     """Initializes options."""
-
-    @staticmethod
-    def _construct_options(options_bootstrapper, build_configuration):
-        """Parse and register options.
-
-        :returns: An Options object representing the full set of runtime options.
-        """
-        known_scope_infos = [
-            si
-            for optionable in build_configuration.all_optionables
-            for si in optionable.known_scope_infos()
-        ]
-        return options_bootstrapper.get_full_options(known_scope_infos)
 
     @staticmethod
     def compute_pants_ignore(buildroot, global_options):
@@ -146,7 +134,12 @@ class OptionsInitializer:
         return list(invalidation_globs)
 
     @classmethod
-    def create(cls, options_bootstrapper, build_configuration, init_subsystems=True):
+    def create(
+        cls,
+        options_bootstrapper: OptionsBootstrapper,
+        build_configuration: BuildConfiguration,
+        init_subsystems: bool = True,
+    ) -> Options:
         global_bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
 
         if global_bootstrap_options.pants_version != pants_version():
@@ -156,7 +149,13 @@ class OptionsInitializer:
             )
 
         # Parse and register options.
-        options = cls._construct_options(options_bootstrapper, build_configuration)
+
+        known_scope_infos = [
+            si
+            for optionable in build_configuration.all_optionables
+            for si in optionable.known_scope_infos()
+        ]
+        options = options_bootstrapper.get_full_options(known_scope_infos)
 
         GlobalOptions.validate_instance(options.for_global_scope())
 
