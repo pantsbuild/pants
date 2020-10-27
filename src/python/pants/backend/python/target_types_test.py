@@ -30,7 +30,6 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidFieldTypeException,
 )
-from pants.python.python_requirement import PythonRequirement
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -130,14 +129,6 @@ def test_requirements_field() -> None:
             ["git+https://github.com/pypa/pip.git#egg=pip"], address=Address("demo")
         )
     assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
-
-    # Check that we still support the deprecated `pants_requirement` object.
-    assert (
-        PythonRequirementsField(
-            [PythonRequirement(v) for v in raw_value], address=Address("demo")
-        ).value
-        == parsed_value
-    )
 
 
 def test_python_distribution_dependency_injection() -> None:
