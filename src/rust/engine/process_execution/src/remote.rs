@@ -1166,7 +1166,6 @@ pub fn extract_output_files(
     .get_output_files()
     .iter()
     .map(|output_file| {
-      log::info!("processing output_file={:?}", output_file);
       let output_file_path_buf = PathBuf::from(output_file.get_path());
       let digest: Result<Digest, String> = output_file.get_digest().try_into();
       path_map.insert(output_file_path_buf.clone(), digest?);
