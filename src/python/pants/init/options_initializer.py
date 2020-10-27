@@ -134,7 +134,7 @@ class OptionsInitializer:
             )
         )
 
-        return tuple(x for x in invalidation_globs)
+        return tuple(invalidation_globs)
 
     @classmethod
     def create(
