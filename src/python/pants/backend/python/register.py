@@ -39,16 +39,11 @@ from pants.backend.python.util_rules import (
     python_sources,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.python.python_requirement import PythonRequirement
 
 
 def build_file_aliases():
     return BuildFileAliases(
-        objects={
-            "python_requirement": PythonRequirement,
-            "python_artifact": PythonArtifact,
-            "setup_py": PythonArtifact,
-        },
+        objects={"python_artifact": PythonArtifact, "setup_py": PythonArtifact},
         context_aware_object_factories={
             "python_requirements": PythonRequirements,
             "pipenv_requirements": PipenvRequirements,

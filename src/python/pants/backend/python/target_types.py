@@ -12,7 +12,6 @@ from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import PathGlobs, Paths
@@ -40,7 +39,6 @@ from pants.engine.target import (
 )
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.option.subsystem import Subsystem
-from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRoot, SourceRootRequest
 
@@ -468,9 +466,7 @@ class PythonRequirementsField(PrimitiveField):
             value,
             expected_type="an iterable of pip-style requirement strings (e.g. a list)",
         )
-        if isinstance(value, (str, PythonRequirement)) or not isinstance(
-            value, collections.abc.Iterable
-        ):
+        if isinstance(value, str) or not isinstance(value, collections.abc.Iterable):
             raise invalid_type_error
         result = []
         for v in value:
@@ -492,22 +488,6 @@ class PythonRequirementsField(PrimitiveField):
                         )
                     )
                 result.append(parsed)
-            elif isinstance(v, PythonRequirement):
-                extra_suggestions = ""
-                if v.repository:
-                    extra_suggestions += (
-                        f"\n\nInstead of setting 'repository={v.repository}`, add this to the "
-                        "option `repos` in the `[python-repos]` options scope."
-                    )
-                warn_or_error(
-                    removal_version="2.1.0.dev0",
-                    deprecated_entity_description="Using `pants_requirement`",
-                    hint=(
-                        f"In the '{cls.alias}' field for {address}, use '{str(v.requirement)}' "
-                        f"instead of 'pants_requirement('{str(v.requirement)}').{extra_suggestions}"
-                    ),
-                )
-                result.append(v.requirement)
             else:
                 raise invalid_type_error
         return tuple(result)
