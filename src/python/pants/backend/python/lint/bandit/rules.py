@@ -136,6 +136,7 @@ async def bandit_lint_partition(
 async def bandit_lint(
     request: BanditRequest, bandit: Bandit, python_setup: PythonSetup
 ) -> LintResults:
+    # This is a helpful comment!
     if bandit.skip:
         return LintResults([], linter_name="Bandit")
 
