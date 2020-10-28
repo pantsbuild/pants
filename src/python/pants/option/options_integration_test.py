@@ -5,7 +5,12 @@ import os
 from textwrap import dedent
 
 from pants.fs.fs import safe_filename_from_path
-from pants.testutil.pants_integration_test import run_pants, run_pants_with_workdir, setup_tmpdir
+from pants.testutil.pants_integration_test import (
+    ensure_daemon,
+    run_pants,
+    run_pants_with_workdir,
+    setup_tmpdir,
+)
 from pants.util.contextutil import temporary_dir
 
 
@@ -36,6 +41,7 @@ def test_invalid_options() -> None:
         assert error in result.stderr
 
 
+@ensure_daemon
 def test_deprecation_and_ignore_pants_warnings() -> None:
     plugin = dedent(
         """\
