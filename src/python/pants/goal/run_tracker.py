@@ -15,7 +15,6 @@ from typing import Dict, List, Optional, Tuple
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
-from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.internals.native import Native
 from pants.goal.aggregated_timings import AggregatedTimings
@@ -169,10 +168,6 @@ class RunTracker(Subsystem):
         # For background work.  Created lazily if needed.
         self._background_root_workunit = None
 
-        # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring).
-        SubprocPool.set_num_processes(self._num_foreground_workers)
-        SubprocPool.foreground()
-
         self._aborted = False
 
         self._end_memoized_result: Optional[ExitCode] = None
@@ -310,8 +305,6 @@ class RunTracker(Subsystem):
         if self._end_memoized_result is not None:
             return self._end_memoized_result
 
-        self.shutdown_worker_pool()
-
         self.end_workunit(self._main_root_workunit)
 
         outcome = self._main_root_workunit.outcome()
@@ -374,13 +367,6 @@ class RunTracker(Subsystem):
                 add_to_timings(goal, dep)
 
         return critical_path_timings
-
-    def shutdown_worker_pool(self):
-        """Shuts down the SubprocPool.
-
-        N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
-        """
-        SubprocPool.shutdown(self._aborted)
 
     def get_options_to_record(self) -> dict:
         recorded_options = {}
