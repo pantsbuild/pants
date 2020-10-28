@@ -26,6 +26,7 @@ from typing import (
     Union,
 )
 
+import toml
 import yaml
 
 from pants.base.build_environment import get_buildroot
