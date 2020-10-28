@@ -16,6 +16,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Target
+from pants.option.config import TomlSerializer
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -65,7 +66,10 @@ def run_isort(
         args.append("--isort-config=.isort.cfg")
     if passthrough_args:
         argsfile = "argsfile.toml"
-        rule_runner.create_file(relpath=argsfile, contents="TODO")
+        rule_runner.create_file(
+            relpath=argsfile,
+            contents=TomlSerializer({"atfile": {"args": passthrough_args}}).serialize(),
+        )
         argsfile_path = os.path.join(rule_runner.build_root, argsfile)
         args.append(f"--isort-args=@{argsfile_path}")
     if skip:
