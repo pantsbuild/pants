@@ -13,7 +13,6 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from pants.auth.basic_auth import BasicAuth
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool
@@ -54,10 +53,6 @@ class RunTracker(Subsystem):
 
     # The name of the tracking root for the background worker threads.
     BACKGROUND_ROOT_NAME = "background"
-
-    @classmethod
-    def subsystem_dependencies(cls):
-        return super().subsystem_dependencies() + (BasicAuth,)
 
     @classmethod
     def register_options(cls, register):
