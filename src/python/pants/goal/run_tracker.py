@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import copy
 import json
 import logging
 import multiprocessing
@@ -12,11 +11,8 @@ import time
 import uuid
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-import requests
-
-from pants.auth.basic_auth import BasicAuth
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool
@@ -30,7 +26,6 @@ from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.subsystem import Subsystem
 from pants.reporting.report import Report
 from pants.util.dirutil import relative_symlink, safe_file_dump
-from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +53,6 @@ class RunTracker(Subsystem):
 
     # The name of the tracking root for the background worker threads.
     BACKGROUND_ROOT_NAME = "background"
-
-    @classmethod
-    def subsystem_dependencies(cls):
-        return super().subsystem_dependencies() + (BasicAuth,)
 
     @classmethod
     def register_options(cls, register):
@@ -268,69 +259,6 @@ class RunTracker(Subsystem):
         return dict(self._pantsd_metrics)  # defensive copy
 
     @classmethod
-    def post_stats(
-        cls,
-        stats_url: str,
-        stats: Dict[str, Any],
-        timeout: int = 2,
-        auth_provider: Optional[str] = None,
-    ):
-        """POST stats to the given url.
-
-        :return: True if upload was successful, False otherwise.
-        """
-
-        def error(msg):
-            # Report already closed, so just print error.
-            print(f"WARNING: Failed to upload stats to {stats_url} due to {msg}", file=sys.stderr)
-            return False
-
-        auth_data = BasicAuth.global_instance().get_auth_for_provider(auth_provider)
-        headers = {
-            "User-Agent": f"pants/v{VERSION}",
-        }
-        headers.update(auth_data.headers)
-        params = cls._json_dump_options({"builds": [stats]})
-        headers["Content-Type"] = "application/json"
-
-        # We can't simply let requests handle redirects, as we only allow them for specific codes:
-        # 307 and 308 indicate that the redirected request must use the same method, POST in this case.
-        # So they indicate a true redirect of the POST itself, and we allow them.
-        # The other redirect codes either must, or in practice do, cause the user agent to switch the
-        # method to GET. So when they are encountered on a POST, it indicates an auth problem (a
-        # redirection to a login page).
-        def do_post(url, num_redirects_allowed):
-            if num_redirects_allowed < 0:
-                return error("too many redirects.")
-            res = requests.post(
-                url,
-                data=params,
-                timeout=timeout,
-                headers=headers,
-                allow_redirects=False,
-                **auth_data.request_args,
-            )
-            if res.status_code in {307, 308}:
-                return do_post(res.headers["location"], num_redirects_allowed - 1)
-            elif 300 <= res.status_code < 400 or res.status_code == 401:
-                error(f"HTTP error code: {res.status_code}. Reason: {res.reason}.")
-                print(
-                    f"Use `path/to/pants login --to={auth_provider}` to authenticate "
-                    "against the stats upload service.",
-                    file=sys.stderr,
-                )
-                return False
-            elif not res.ok:
-                error(f"HTTP error code: {res.status_code}. Reason: {res.reason}.")
-                return False
-            return True
-
-        try:
-            return do_post(stats_url, num_redirects_allowed=6)
-        except Exception as e:  # Broad catch - we don't want to fail the build over upload errors.
-            return error(f"Error: {e!r}")
-
-    @classmethod
     def _json_dump_options(cls, stats: dict) -> str:
         return json.dumps(stats, cls=RunTrackerOptionEncoder)
 
@@ -368,17 +296,6 @@ class RunTracker(Subsystem):
         stats_json_file_name = self.options.stats_local_json_file
         if stats_json_file_name:
             self.write_stats_to_json(stats_json_file_name, stats)
-
-        # Upload to remote stats db.
-        stats_upload_urls = copy.copy(self.options.stats_upload_urls)
-        timeout = self.options.stats_upload_timeout
-        for stats_url, auth_provider in stats_upload_urls.items():
-            self.post_stats(
-                stats_url,
-                stats,
-                timeout=timeout,
-                auth_provider=auth_provider,
-            )
 
     def has_ended(self) -> bool:
         return self._end_memoized_result is not None
