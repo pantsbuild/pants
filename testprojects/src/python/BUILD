@@ -27,11 +27,6 @@ files(
 )
 
 files(
-  name = 'plugins_directory',
-  sources = ['plugins/**/*'],
-)
-
-files(
   name = 'print_env_directory',
   sources = ['print_env/**/*'],
 )
