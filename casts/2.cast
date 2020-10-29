@@ -1,0 +1,6 @@
+{"version": 2, "width": 124, "height": 36, "timestamp": 1604009972, "env": {"SHELL": "/bin/bash", "TERM": "xterm-256color"}}
+[0.02427, "o", "\r\n# Does the library depend on TOML?\r\n$ ./pants dependencies src/python/pants/option/parser.py\r\n"]
+[1.085714, "o", "3rdparty/python:PyYAML\r\n3rdparty/python:dataclasses\r\n"]
+[1.085903, "o", "src/python/pants/base/build_environment.py\r\nsrc/python/pants/base/deprecated.py\r\nsrc/python/pants/option/config.py\r\nsrc/python/pants/option/custom_types.py\r\nsrc/python/pants/option/errors.py\r\nsrc/python/pants/option/option_util.py\r\nsrc/python/pants/option/option_value_container.py\r\nsrc/python/pants/option/ranked_value.py\r\n"]
+[1.086074, "o", "src/python/pants/option/scope.py\r\nsrc/python/pants/util/meta.py\r\n"]
+[3.154211, "o", "\r\n# Doesn't look like it!\r\n"]
