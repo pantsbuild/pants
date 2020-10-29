@@ -407,15 +407,6 @@ class GlobalOptions(Subsystem):
             ),
         )
         register(
-            "--spec-file",
-            type=list,
-            removal_version="2.1.0.dev0",
-            removal_hint="Use --spec-files",
-            fingerprint=False,
-            help="Read additional specs from this file (e.g. target addresses or file names). "
-            "Each spec should be one per line.",
-        )
-        register(
             "--verify-config",
             type=bool,
             default=True,
