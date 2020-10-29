@@ -24,7 +24,9 @@ from pants.engine.internals.engine_testutil import (
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
-from pants.engine.process import Process, ProcessResult
+from pants.engine.platform import PlatformConstraint, create_platform_rules
+from pants.engine.process import MultiPlatformProcess, Process, ProcessResult
+from pants.engine.process import rules as process_rules
 from pants.engine.rules import Get, MultiGet, rule
 from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
@@ -643,6 +645,44 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
 
         assert workunit["metadata"] == {}
+
+    def test_counters(self) -> None:
+        @dataclass(frozen=True)
+        class TrueResult:
+            pass
+
+        @rule(desc="a_rule")
+        async def a_rule() -> TrueResult:
+            proc = Process(
+                ["/bin/sh", "-c", "true"],
+                description="always true",
+            )
+            _ = await Get(
+                ProcessResult,
+                MultiPlatformProcess({(PlatformConstraint.none, PlatformConstraint.none): proc}),
+            )
+            return TrueResult()
+
+        rules = [a_rule, QueryRule(TrueResult, tuple()), *process_rules(), *create_platform_rules()]
+
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+
+        tracker = WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.TRACE,
+        )
+        with handler.session():
+            scheduler.product_request(TrueResult, subjects=[0])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunits_with_counters = [item for item in finished if "counters" in item]
+        assert len(workunits_with_counters) == 1
+        assert workunits_with_counters[0]["counters"]["local_execution_requests"] == 1
 
 
 @dataclass(frozen=True)
