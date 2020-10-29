@@ -448,7 +448,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
         ),
     )
     rule_runner.add_to_build_file(
-        f"{PACKAGE}/py2", "python_library(interpreter_constraints='==2.7.*')"
+        f"{PACKAGE}/py2", "python_library(interpreter_constraints=['==2.7.*'])"
     )
 
     rule_runner.create_file(f"{PACKAGE}/py3/__init__.py")
@@ -462,7 +462,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
         ),
     )
     rule_runner.add_to_build_file(
-        f"{PACKAGE}/py3", "python_library(interpreter_constraints='>=3.6')"
+        f"{PACKAGE}/py3", "python_library(interpreter_constraints=['>=3.6'])"
     )
 
     # Our input files belong to the same target, which is compatible with both Py2 and Py3.

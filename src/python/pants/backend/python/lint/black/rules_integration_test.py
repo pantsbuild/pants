@@ -55,7 +55,7 @@ def make_target(
             f"""\
             python_library(
                 name='{name}',
-                interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None}),
+                interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
             )
             """
         ),
