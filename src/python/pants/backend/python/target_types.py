@@ -167,7 +167,7 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
         Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
     )
     if len(binary_source_paths.files) != 1:
-        instructions_url = "https://www.pantsbuild.org/v2.1/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
+        instructions_url = "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
         if not entry_point_value:
             raise InvalidFieldException(
                 f"Both the `entry_point` and `sources` fields are not set for the target "
