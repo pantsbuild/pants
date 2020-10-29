@@ -683,6 +683,10 @@ impl crate::CommandRunner for CommandRunner {
     request: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    context
+      .workunit_store
+      .increment_counter(Metric::RemoteExecutionRequests, 1);
+
     // Retrieve capabilities for this server.
     let capabilities = self.get_capabilities().await?;
     trace!("RE capabilities: {:?}", &capabilities);
@@ -736,14 +740,7 @@ impl crate::CommandRunner for CommandRunner {
       &build_id, action_digest, cached_response_opt
     );
     if let Some(cached_response) = cached_response_opt {
-      context
-        .workunit_store
-        .increment_counter(Metric::RemoteExecutionActionCacheUncached, 1);
       return Ok(cached_response);
-    } else {
-      context
-        .workunit_store
-        .increment_counter(Metric::RemoteExecutionActionCacheUncached, 1);
     }
 
     // Upload the action (and related data, i.e. the embedded command and input files).
@@ -1257,6 +1254,10 @@ pub async fn check_action_cache(
   headers: &BTreeMap<String, String>,
   store: Store,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
+  context
+    .workunit_store
+    .increment_counter(Metric::RemoteCacheRequests, 1);
+
   let mut request = bazel_protos::remote_execution::GetActionResultRequest::new();
   if let Some(ref instance_name) = metadata.instance_name {
     request.set_instance_name(instance_name.clone());
@@ -1277,12 +1278,18 @@ pub async fn check_action_cache(
         populate_fallible_execution_result(store.clone(), &action_result, vec![], platform, false)
           .compat()
           .await?;
+      context
+        .workunit_store
+        .increment_counter(Metric::RemoteCacheRequestsCached, 1);
       Ok(Some(response))
     }
     Err(err) => match err {
       grpcio::Error::RpcFailure(rpc_status)
         if rpc_status.status == grpcio::RpcStatusCode::NOT_FOUND =>
       {
+        context
+          .workunit_store
+          .increment_counter(Metric::RemoteCacheRequestsUncached, 1);
         Ok(None)
       }
       _ => Err(rpcerror_to_string(err)),

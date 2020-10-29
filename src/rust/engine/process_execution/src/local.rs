@@ -249,7 +249,7 @@ impl super::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     context
       .workunit_store
-      .increment_counter(Metric::LocalExecutionRuns, 1);
+      .increment_counter(Metric::LocalExecutionRequests, 1);
 
     let req = self.extract_compatible_request(&req).unwrap();
     let req_debug_repr = format!("{:#?}", req);

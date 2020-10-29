@@ -29,9 +29,11 @@ clippy::too_many_arguments
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Metric {
-  LocalExecutionRuns,
-  RemoteExecutionActionCacheCached,
-  RemoteExecutionActionCacheUncached,
+  LocalExecutionRequests,
+  RemoteExecutionRequests,
+  RemoteCacheRequests,
+  RemoteCacheRequestsCached,
+  RemoteCacheRequestsUncached,
 }
 
 impl Metric {
@@ -39,9 +41,11 @@ impl Metric {
     use Metric::*;
 
     match *self {
-      LocalExecutionRuns => "local_execution_runs",
-      RemoteExecutionActionCacheCached => "remote_execution_action_cache_cached",
-      RemoteExecutionActionCacheUncached => "remote_execution_action_cache_uncached",
+      LocalExecutionRequests => "local_execution_requests",
+      RemoteExecutionRequests => "remote_execution_requests",
+      RemoteCacheRequests => "remote_cache_requests",
+      RemoteCacheRequestsCached => "remote_cache_requests_cached",
+      RemoteCacheRequestsUncached => "remote_cache_requests_uncached",
     }
   }
 }

@@ -10,8 +10,7 @@ use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use grpcio;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
-use maplit::btreemap;
-use mock;
+use maplit::{btreemap, hashset};
 use mock::execution_server::{ExpectedAPICall, MockOperation};
 use protobuf::well_known_types::Timestamp;
 use protobuf::{self, Message, ProtobufEnum};
@@ -1841,7 +1840,6 @@ async fn remote_workunits_are_stored() {
   use concrete_time::Duration;
   use concrete_time::TimeSpan;
 
-  use maplit::hashset;
   let wanted_workunit_items = hashset! {
     (String::from("remote execution action scheduling"),
      WorkunitState::Completed {
