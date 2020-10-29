@@ -1,0 +1,23 @@
+commit e497fd556de3deafd23a69011e3cec986cf2b2a9
+Author: Stu Hood <stuhood@gmail.com>
+Date:   Wed Oct 28 14:09:34 2020 -0700
+
+    Use TOML. The test still fails, because the config is empty.
+    
+    [ci skip-rust]
+    
+    [ci skip-build-wheels]
+
+diff --git a/src/python/pants/option/parser.py b/src/python/pants/option/parser.py
+index fed5b2f21..33425a223 100644
+--- a/src/python/pants/option/parser.py
++++ b/src/python/pants/option/parser.py
+@@ -634,7 +634,7 @@ class Parser:
+                             elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
+                                 return yaml.safe_load(s)
+                             elif fromfile.endswith(".toml"):
+-                                raise Exception("TODO: Add TOML support!")
++                                return toml.loads(s).get('atfile', []).get('args', [])
+                             else:
+                                 return s
+                     except (IOError, ValueError, yaml.YAMLError) as e:
