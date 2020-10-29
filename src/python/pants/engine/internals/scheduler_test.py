@@ -261,15 +261,13 @@ class SchedulerWithNestedRaiseTest(TestBase):
         )
 
     def test_get_type_match_failure(self):
-        """Test that Get(...)s are now type-checked during rule execution, to allow for union
-        types."""
-
         with self.assertRaises(ExecutionError) as cm:
             # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
             self.request(A, [TypeCheckFailWrapper(A())])
-
-        expected_regex = "WithDeps.*did not declare a dependency on JustGet"
-        self.assertRegex(str(cm.exception), expected_regex)
+        assert (
+            "Invalid input to `Get(A, B)`. Expected an object with type `B`, but got `A()` with "
+            "type `A` instead."
+        ) in str(cm.exception)
 
     def test_unhashable_root_params_failure(self):
         """Test that unhashable root params result in a structured error."""

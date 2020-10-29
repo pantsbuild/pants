@@ -902,7 +902,7 @@ impl Task {
           .core
           .rule_graph
           .edges_for_inner(&entry)
-          .ok_or_else(|| throw(&format!("no edges for task {:?} exist!", entry)))
+          .ok_or_else(|| throw(&format!("No edges for task {:?} exist!", entry)))
           .and_then(|edges| {
             edges.entry_for(&dependency_key).cloned().ok_or_else(|| {
               if externs::is_union(get.input_type) {
@@ -922,9 +922,26 @@ impl Task {
                   )),
                 }
               } else {
+                let parent_rule_func = match &*entry {
+                  rule_graph::Entry::WithDeps(entry_with_deps) => match entry_with_deps.rule() {
+                    Some(ref rule) => match rule {
+                      tasks::Rule::Task(ref task) => Some(task.func),
+                      _ => None,
+                    },
+                    None => None,
+                  },
+                  _ => None
+                };
+                let rule_context = match parent_rule_func {
+                  Some(func) => format!(
+                    " See the rule {}() in {} (line {}).",
+                    func.name(), func.module(), func.line_number()
+                  ),
+                  _ => "".to_string()
+                };
                 throw(&format!(
-                  "{:?} did not declare a dependency on {:?}",
-                  entry, dependency_key
+                  "Invalid input to `Get({}, {})`. Expected an object with type `{}`, but got `{:?}` with type `{}` instead.{}",
+                  get.output, get.input_type, get.input_type, get.input, get.input.type_id(), rule_context
                 ))
               }
             })
