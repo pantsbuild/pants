@@ -106,7 +106,7 @@ def make_target(
             python_library(
                 name={repr(name)},
                 sources={source_globs},
-                interpreter_constraints={repr(interpreter_constraints)},
+                interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
             )
             """
         ),

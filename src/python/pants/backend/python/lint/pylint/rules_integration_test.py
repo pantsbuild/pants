@@ -66,7 +66,7 @@ def make_target(
                 name={repr(name)},
                 sources={source_globs},
                 dependencies={[str(dep) for dep in dependencies or ()]},
-                interpreter_constraints={repr(interpreter_constraints)},
+                interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
             )
             """
         ),

@@ -224,7 +224,9 @@ class MockFieldSet(FieldSet):
     def create_for_test(cls, address: Address, compat: Optional[str]) -> "MockFieldSet":
         return cls(
             address=address,
-            interpreter_constraints=InterpreterConstraintsField(compat, address=address),
+            interpreter_constraints=InterpreterConstraintsField(
+                [compat] if compat else None, address=address
+            ),
             compatibility=PythonInterpreterCompatibility(None, address=address),
         )
 
