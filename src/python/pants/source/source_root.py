@@ -93,31 +93,14 @@ class SourceRootConfig(Subsystem):
 
     options_scope = "source"
 
-    DEFAULT_ROOT_PATTERNS = ["/", "src", "src/python", "src/py"]
-
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--unmatched",
-            choices=["create", "fail"],
-            default="create",
-            advanced=True,
-            help="Configures the behavior when sources are defined outside of any configured "
-            "source root. `create` will cause a source root to be implicitly created at "
-            "the definition location of the sources; `fail` will trigger an error.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "The option `--source-unmatched` does not do anything. Pants will always fail if "
-                "the source root does not exist."
-            ),
-        )
-
-        register(
             "--root-patterns",
             metavar='["pattern1", "pattern2", ...]',
             type=list,
-            default=cls.DEFAULT_ROOT_PATTERNS,
+            default=["/", "src", "src/python", "src/py"],
             advanced=True,
             help="A list of source root suffixes. A directory with this suffix will be considered "
             "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
@@ -128,7 +111,6 @@ class SourceRootConfig(Subsystem):
             "Use `/` to signify that the buildroot itself is a source root. "
             "See https://www.pantsbuild.org/docs/source-roots.",
         )
-
         register(
             "--marker-filenames",
             metavar="filename",
