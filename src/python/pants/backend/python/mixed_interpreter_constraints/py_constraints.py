@@ -47,9 +47,9 @@ async def py_constraints(
             continue
         constraints_to_addresses[constraints].add(tgt.address)
 
-    for constraint, addresses in sorted(constraints_to_addresses.items()):
+    for constraint, addrs in sorted(constraints_to_addresses.items()):
         console.print_stdout(f"\n{constraint}")
-        for addr in sorted(addresses):
+        for addr in sorted(addrs):
             console.print_stdout(f"  {addr}")
 
     return PyConstraintsGoal(exit_code=0)
