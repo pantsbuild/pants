@@ -10,10 +10,7 @@ from typing import Iterable, Optional, Tuple
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement, parse_requirements
 
-from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonRequirementsField,
-)
+from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules.pex import (
     PexInterpreterConstraints,
     PexPlatforms,
@@ -208,13 +205,8 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     if request.hardcoded_interpreter_constraints:
         interpreter_constraints = request.hardcoded_interpreter_constraints
     else:
-        calculated_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-            (
-                tgt[PythonInterpreterCompatibility]
-                for tgt in all_targets
-                if tgt.has_field(PythonInterpreterCompatibility)
-            ),
-            python_setup,
+        calculated_constraints = PexInterpreterConstraints.create_from_targets(
+            all_targets, python_setup
         )
         # If there are no targets, we fall back to the global constraints. This is relevant,
         # for example, when running `./pants repl` with no specs.

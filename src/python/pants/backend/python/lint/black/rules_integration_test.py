@@ -50,7 +50,8 @@ def make_target(
     for source_file in source_files:
         rule_runner.create_file(source_file.path, source_file.content.decode())
     rule_runner.add_to_build_file(
-        "", f"python_library(name='{name}', compatibility={repr(interpreter_constraints)})\n"
+        "",
+        f"python_library(name='{name}', interpreter_constraints={repr(interpreter_constraints)})\n",
     )
     return rule_runner.get_target(Address("", target_name=name))
 

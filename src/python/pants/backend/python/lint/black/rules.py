@@ -8,7 +8,11 @@ from typing import Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
+from pants.backend.python.target_types import (
+    InterpreterConstraintsField,
+    PythonInterpreterCompatibility,
+    PythonSources,
+)
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -36,7 +40,8 @@ class BlackFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
-    interpreter_constraints: PythonInterpreterCompatibility
+    interpreter_constraints: InterpreterConstraintsField
+    deprecated_interpreter_constraints: PythonInterpreterCompatibility
 
 
 class BlackRequest(PythonFmtRequest, LintRequest):
@@ -82,7 +87,14 @@ async def setup_black(
     # `>=3.6` to result in requiring Python 3.8, which would error if 3.8 is not installed on the
     # machine.
     all_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (field_set.interpreter_constraints for field_set in setup_request.request.field_sets),
+        (
+            PexInterpreterConstraints.resolve_conflicting_fields(
+                field_set.deprecated_interpreter_constraints,
+                field_set.interpreter_constraints,
+                field_set.address,
+            )
+            for field_set in setup_request.request.field_sets
+        ),
         python_setup,
     )
     tool_interpreter_constraints = PexInterpreterConstraints(

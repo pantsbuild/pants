@@ -14,7 +14,6 @@ from pants.backend.python.goals.coverage_py import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
     PythonRuntimeBinaryDependencies,
     PythonRuntimePackageDependencies,
     PythonTestsSources,
@@ -109,13 +108,8 @@ async def setup_pytest_for_target(
     )
     all_targets = transitive_targets.closure
 
-    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (
-            tgt[PythonInterpreterCompatibility]
-            for tgt in all_targets
-            if tgt.has_field(PythonInterpreterCompatibility)
-        ),
-        python_setup,
+    interpreter_constraints = PexInterpreterConstraints.create_from_targets(
+        all_targets, python_setup
     )
 
     # Defaults to zip_safe=False.

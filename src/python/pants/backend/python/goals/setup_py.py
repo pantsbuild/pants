@@ -17,7 +17,6 @@ from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
     PexBinarySources,
     PexEntryPointField,
-    PythonInterpreterCompatibility,
     PythonProvidesField,
     PythonRequirementsField,
     PythonSources,
@@ -364,13 +363,8 @@ async def package_python_dist(
 ) -> BuiltPackage:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
-    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (
-            tgt[PythonInterpreterCompatibility]
-            for tgt in transitive_targets.dependencies
-            if tgt.has_field(PythonInterpreterCompatibility)
-        ),
-        python_setup,
+    interpreter_constraints = PexInterpreterConstraints.create_from_targets(
+        transitive_targets.closure, python_setup
     )
     chroot = await Get(
         SetupPyChroot,
