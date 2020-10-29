@@ -391,15 +391,6 @@ class PythonRuntimePackageDependencies(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
 
 
-class PythonRuntimeBinaryDependencies(SpecialCasedDependencies):
-    """Deprecated in favor of the `runtime_build_dependencies` field, which works with more target
-    types like `archive` and `python_awslambda`."""
-
-    alias = "runtime_binary_dependencies"
-    deprecated_removal_version = "2.1.0dev0"
-    deprecated_removal_hint = "Use the more flexible `runtime_package_dependencies` field instead."
-
-
 class PythonTestsTimeout(IntField):
     """A timeout (in seconds) which covers the total runtime of all tests in this target.
 
@@ -450,7 +441,6 @@ class PythonTests(Target):
         PythonTestsSources,
         PythonTestsDependencies,
         PythonRuntimePackageDependencies,
-        PythonRuntimeBinaryDependencies,
         PythonTestsTimeout,
     )
 
