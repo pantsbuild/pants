@@ -328,8 +328,11 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
             allowed_versions=["3.8", "3.9"], prior_version="3.7"
         )
 
-    def debug_hint(self) -> str:
+    def __str__(self) -> str:
         return " OR ".join(str(constraint) for constraint in self)
+
+    def debug_hint(self) -> str:
+        return str(self)
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
