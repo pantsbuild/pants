@@ -54,19 +54,22 @@ class PythonSources(Sources):
     expected_file_extensions = (".py", ".pyi")
 
 
-class PythonInterpreterCompatibility(StringOrStringSequenceField):
-    """A string for Python interpreter constraints on this target.
+class InterpreterConstraintsField(StringSequenceField):
+    """The Python interpreters this code is compatible with.
 
-    This should be written in Requirement-style format, e.g. `CPython==2.7.*` or `CPython>=3.6,<4`.
-    As a shortcut, you can leave off `CPython`, e.g. `>=2.7` will be expanded to `CPython>=2.7`.
+    Each element should be written in pip-style format, e.g. 'CPython==2.7.*' or 'CPython>=3.6,<4'.
+    You can leave off `CPython` as a shorthand, e.g. '>=2.7' will be expanded to 'CPython>=2.7'.
 
-    If this is left off, this will default to the option `interpreter_constraints` in the
-    [python-setup] scope.
+    Specify more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']`
+    means either PyPy 3.7 _or_ CPython 3.7.
+
+    If the field is not set, it will default to the option
+    `[python-setup].interpreter_constraints]`.
 
     See https://www.pantsbuild.org/docs/python-interpreter-compatibility.
     """
 
-    alias = "compatibility"
+    alias = "interpreter_constraints"
 
     def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
@@ -76,7 +79,30 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
         return python_setup.compatibility_or_constraints(self.value)
 
 
-COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, PythonInterpreterCompatibility)
+class PythonInterpreterCompatibility(StringOrStringSequenceField):
+    """Deprecated in favor of the `interpreter_constraints` field."""
+
+    alias = "compatibility"
+    deprecated_removal_version = "2.2.0.dev0"
+    deprecated_removal_hint = (
+        "Use the field `interpreter_constraints`. The field does not work with bare strings "
+        "and expects a list of strings, so replace `compatibility='>3.6'` with "
+        "interpreter_constraints=['>3.6']`."
+    )
+
+    def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
+        """Return either the given `compatibility` field or the global interpreter constraints.
+
+        If interpreter constraints are supplied by the CLI flag, return those only.
+        """
+        return python_setup.compatibility_or_constraints(self.value)
+
+
+COMMON_PYTHON_FIELDS = (
+    *COMMON_TARGET_FIELDS,
+    InterpreterConstraintsField,
+    PythonInterpreterCompatibility,
+)
 
 
 # -----------------------------------------------------------------------------------------------

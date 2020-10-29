@@ -106,7 +106,7 @@ def make_target(
             python_library(
                 name={repr(name)},
                 sources={source_globs},
-                compatibility={repr(interpreter_constraints)},
+                interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
             )
             """
         ),
@@ -447,7 +447,9 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    rule_runner.add_to_build_file(f"{PACKAGE}/py2", "python_library(compatibility='==2.7.*')")
+    rule_runner.add_to_build_file(
+        f"{PACKAGE}/py2", "python_library(interpreter_constraints=['==2.7.*'])"
+    )
 
     rule_runner.create_file(f"{PACKAGE}/py3/__init__.py")
     rule_runner.create_file(
@@ -459,7 +461,9 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    rule_runner.add_to_build_file(f"{PACKAGE}/py3", "python_library(compatibility='>=3.6')")
+    rule_runner.add_to_build_file(
+        f"{PACKAGE}/py3", "python_library(interpreter_constraints=['>=3.6'])"
+    )
 
     # Our input files belong to the same target, which is compatible with both Py2 and Py3.
     rule_runner.create_file(f"{PACKAGE}/__init__.py")
@@ -469,7 +473,9 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     rule_runner.create_file(
         f"{PACKAGE}/uses_py3.py", "from project.py3.lib import add\nassert add(2, 2) == 4\n"
     )
-    rule_runner.add_to_build_file(PACKAGE, "python_library(compatibility=['==2.7.*', '>=3.6'])")
+    rule_runner.add_to_build_file(
+        PACKAGE, "python_library(interpreter_constraints=['==2.7.*', '>=3.6'])"
+    )
     py2_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
     py3_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py3.py"))
 

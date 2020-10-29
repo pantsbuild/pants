@@ -24,6 +24,7 @@ from typing import (
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
+from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
@@ -57,6 +58,7 @@ from pants.engine.process import (
     UncacheableProcess,
 )
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import InvalidFieldException, Target
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
@@ -89,6 +91,10 @@ class FieldSetWithCompatibility(Protocol):
 
     @property
     def compatibility(self) -> PythonInterpreterCompatibility:
+        ...
+
+    @property
+    def interpreter_constraints(self) -> InterpreterConstraintsField:
         ...
 
 
@@ -182,8 +188,49 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
         )
 
     @classmethod
+    def resolve_conflicting_fields(
+        cls,
+        deprecated: PythonInterpreterCompatibility,
+        new: InterpreterConstraintsField,
+        address: Address,
+    ) -> Union[PythonInterpreterCompatibility, InterpreterConstraintsField]:
+        if deprecated.value and new.value:
+            raise InvalidFieldException(
+                f"Specified both the deprecated `{deprecated.alias}` field and the new "
+                f"`{new.alias}` field for the target {address}. Please use only one "
+                f"(preferably {new.alias})"
+            )
+        if deprecated.value:
+            return deprecated
+        return new
+
+    @classmethod
+    def create_from_targets(
+        cls, targets: Iterable[Target], python_setup: PythonSetup
+    ) -> "PexInterpreterConstraints":
+        fields = []
+        for tgt in targets:
+            has_deprecated = tgt.has_field(PythonInterpreterCompatibility)
+            has_new = tgt.has_field(InterpreterConstraintsField)
+            if has_deprecated and has_new:
+                fields.append(
+                    cls.resolve_conflicting_fields(
+                        tgt[PythonInterpreterCompatibility],
+                        tgt[InterpreterConstraintsField],
+                        tgt.address,
+                    )
+                )
+            elif has_deprecated:
+                fields.append(tgt[PythonInterpreterCompatibility])
+            elif has_new:
+                fields.append(tgt[InterpreterConstraintsField])
+        return cls.create_from_compatibility_fields(fields, python_setup)
+
+    @classmethod
     def create_from_compatibility_fields(
-        cls, fields: Iterable[PythonInterpreterCompatibility], python_setup: PythonSetup
+        cls,
+        fields: Iterable[Union[InterpreterConstraintsField, PythonInterpreterCompatibility]],
+        python_setup: PythonSetup,
     ) -> "PexInterpreterConstraints":
         constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
         # This will OR within each field and AND across fields.
@@ -194,13 +241,13 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
     def group_field_sets_by_constraints(
         cls, field_sets: Iterable[_FS], python_setup: PythonSetup
     ) -> FrozenDict["PexInterpreterConstraints", Tuple[_FS, ...]]:
-
         results = defaultdict(set)
-
         for fs in field_sets:
-            constraints = cls.create_from_compatibility_fields([fs.compatibility], python_setup)
+            constraints_field = cls.resolve_conflicting_fields(
+                fs.compatibility, fs.interpreter_constraints, fs.address
+            )
+            constraints = cls.create_from_compatibility_fields([constraints_field], python_setup)
             results[constraints].add(fs)
-
         return FrozenDict(
             {
                 constraints: tuple(sorted(field_sets, key=lambda fs: fs.address))

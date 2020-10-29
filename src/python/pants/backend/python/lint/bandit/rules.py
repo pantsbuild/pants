@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
+from pants.backend.python.target_types import (
+    InterpreterConstraintsField,
+    PythonInterpreterCompatibility,
+    PythonSources,
+)
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -33,6 +37,7 @@ class BanditFieldSet(FieldSet):
 
     sources: PythonSources
     compatibility: PythonInterpreterCompatibility
+    interpreter_constraints: InterpreterConstraintsField
 
 
 class BanditRequest(LintRequest):

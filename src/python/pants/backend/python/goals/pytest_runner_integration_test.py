@@ -100,7 +100,7 @@ def create_test_target(
             python_tests(
               name={repr(name)},
               dependencies={dependencies or []},
-              compatibility={[interpreter_constraints] if interpreter_constraints else []},
+              interpreter_constraints={[interpreter_constraints] if interpreter_constraints else []},
             )
             """
         ),

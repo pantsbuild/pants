@@ -9,11 +9,7 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import Iterable, Optional, Tuple
 
-from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonRequirementsField,
-    PythonSources,
-)
+from pants.backend.python.target_types import PythonRequirementsField, PythonSources
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.util_rules import extract_pex, pex_from_targets
 from pants.backend.python.util_rules.extract_pex import ExtractedPexDistributions
@@ -357,17 +353,9 @@ async def mypy_typecheck(
 
     interpreter_constraints_to_transitive_targets = defaultdict(set)
     for transitive_targets in transitive_targets_per_field_set:
-        interpreter_constraints = (
-            PexInterpreterConstraints.create_from_compatibility_fields(
-                (
-                    tgt[PythonInterpreterCompatibility]
-                    for tgt in transitive_targets.closure
-                    if tgt.has_field(PythonInterpreterCompatibility)
-                ),
-                python_setup,
-            )
-            or PexInterpreterConstraints(mypy.interpreter_constraints)
-        )
+        interpreter_constraints = PexInterpreterConstraints.create_from_targets(
+            transitive_targets.closure, python_setup
+        ) or PexInterpreterConstraints(mypy.interpreter_constraints)
         interpreter_constraints_to_transitive_targets[interpreter_constraints].add(
             transitive_targets
         )
