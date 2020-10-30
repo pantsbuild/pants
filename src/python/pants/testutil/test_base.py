@@ -24,7 +24,6 @@ from typing import (
 )
 
 from pants.base.build_root import BuildRoot
-from pants.base.deprecated import warn_or_error
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -268,18 +267,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
         BuildRoot().path = self.build_root
         self.addCleanup(BuildRoot().reset)
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        warn_or_error(
-            removal_version="2.1.0.dev0",
-            deprecated_entity_description="pants.testutil.test_base.TestBase",
-            hint=(
-                "Use `pants.testutil.rule_runner.RuleRunner` instead, which uses a Pytest fixture "
-                "style. See https://www.pantsbuild.org/v2.0/docs/rules-api-testing."
-            ),
-        )
 
     def _reset_engine(self):
         if self._scheduler is not None:
