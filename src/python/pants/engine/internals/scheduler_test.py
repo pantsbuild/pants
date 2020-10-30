@@ -236,7 +236,7 @@ def test_trace_includes_rule_exception_traceback() -> None:
            File LOCATION-INFO, in nested_raise
              fn_raises()
            File LOCATION-INFO, in fn_raises
-             raise Exception(f"An exception!")
+             raise Exception("An exception!")
          Exception: An exception!
          """
     )
