@@ -1,21 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import (
-    COMMON_TARGET_FIELDS,
-    BoolField,
-    Dependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
-    Sources,
-    Target,
-)
-from pants.engine.unions import UnionRule
+from pants.engine.target import COMMON_TARGET_FIELDS, BoolField, Dependencies, Sources, Target
 
 
+# NB: We subclass Dependencies so that specific backends can add dependency injection rules to
+# Protobuf targets.
 class ProtobufDependencies(Dependencies):
     pass
 
@@ -40,24 +30,3 @@ class ProtobufLibrary(Target):
 
     alias = "protobuf_library"
     core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources, ProtobufGrcpToggle)
-
-
-class InjectProtobufDependencies(InjectDependenciesRequest):
-    inject_for = ProtobufDependencies
-
-
-@rule
-async def inject_dependencies(
-    _: InjectProtobufDependencies, protoc: Protoc
-) -> InjectedDependencies:
-    addresses = await Get(
-        Addresses, UnparsedAddressInputs(protoc.runtime_targets, owning_address=None)
-    )
-    return InjectedDependencies(addresses)
-
-
-def rules():
-    return [
-        *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectProtobufDependencies),
-    ]
