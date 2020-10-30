@@ -122,22 +122,6 @@ async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
     raise AssertionError("The statement above this one should have failed!")
 
 
-class TypeCheckFailWrapper:
-    """This object wraps another object which will be used to demonstrate a type check failure when
-    the engine processes an `await Get(...)` statement."""
-
-    def __init__(self, inner):
-        self.inner = inner
-
-
-@rule
-async def a_typecheck_fail_test(wrapper: TypeCheckFailWrapper) -> A:
-    # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
-    # the type check will fail at the Get.
-    _ = await Get(A, B, wrapper.inner)  # noqa: F841
-    return A()
-
-
 @dataclass(frozen=True)
 class CollectionType:
     # NB: We pass an unhashable type when we want this to fail at the root, and a hashable type
@@ -252,22 +236,11 @@ class SchedulerWithNestedRaiseTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            a_typecheck_fail_test,
             c_unhashable,
             nested_raise,
-            QueryRule(A, (TypeCheckFailWrapper,)),
             QueryRule(A, (B,)),
             QueryRule(C, (CollectionType,)),
         )
-
-    def test_get_type_match_failure(self):
-        with self.assertRaises(ExecutionError) as cm:
-            # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
-            self.request(A, [TypeCheckFailWrapper(A())])
-        assert (
-            "Invalid input to `Get(A, B)`. Expected an object with type `B`, but got `A()` with "
-            "type `A` instead."
-        ) in str(cm.exception)
 
     def test_unhashable_root_params_failure(self):
         """Test that unhashable root params result in a structured error."""

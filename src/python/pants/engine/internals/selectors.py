@@ -21,6 +21,7 @@ from typing import (
     overload,
 )
 
+from pants.engine.unions import union
 from pants.util.meta import frozen_after_init
 
 _Output = TypeVar("_Output")
@@ -149,33 +150,57 @@ class Get(GetConstraints, Generic[_Output, _Input]):
         input_arg0: Union[Type[_Input], _Input],
         input_arg1: Optional[_Input] = None,
     ) -> None:
-        self.output_type = output_type
-        self.input_type = self._validate_input_type(
-            input_arg0 if input_arg1 is not None else type(input_arg0)
-        )
-        self.input = self._validate_input(input_arg1 if input_arg1 is not None else input_arg0)
-
-        self._validate_output_type()
-
-    def _validate_output_type(self) -> None:
-        if not isinstance(self.output_type, type):
-            raise TypeError(
-                f"The output type must be a type, but given {self.output_type} of type "
-                f"{type(self.output_type)}."
-            )
+        self.output_type = self._validate_output_type(output_type)
+        if input_arg1 is None:
+            self.input_type = type(input_arg0)
+            self.input = self._validate_input(input_arg0, shorthand_form=True)
+        else:
+            self.input_type = self._validate_explicit_input_type(input_arg0)
+            self.input = self._validate_input(input_arg1, shorthand_form=False)
 
     @staticmethod
-    def _validate_input_type(input_type: Any) -> Type[_Input]:
+    def _validate_output_type(output_type: Any) -> Type[_Output]:
+        if not isinstance(output_type, type):
+            raise TypeError(
+                "Invalid Get. The first argument (the output type) must be a type, but given "
+                f"`{output_type}` with type {type(output_type)}."
+            )
+        return cast(Type[_Output], output_type)
+
+    @staticmethod
+    def _validate_explicit_input_type(input_type: Any) -> Type[_Input]:
         if not isinstance(input_type, type):
             raise TypeError(
-                f"The input type must be a type, but given {input_type} of type {type(input_type)}."
+                "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, "
+                f"input), the second argument must be a type, but given `{input_type}` of type "
+                f"{type(input_type)}."
             )
         return cast(Type[_Input], input_type)
 
-    @staticmethod
-    def _validate_input(input_: Any) -> _Input:
+    def _validate_input(self, input_: Any, *, shorthand_form: bool) -> _Input:
         if isinstance(input_, type):
-            raise TypeError(f"The input argument cannot be a type, but given {input_}.")
+            if shorthand_form:
+                raise TypeError(
+                    "Invalid Get. Because you are using the shorthand form "
+                    "Get(OutputType, InputType(constructor args)), the second argument should be "
+                    f"a constructor call, rather than a type, but given {input_}."
+                )
+            else:
+                raise TypeError(
+                    "Invalid Get. Because you are using the longhand form "
+                    "Get(OutputType, InputType, input), the third argument should be "
+                    f"an object, rather than a type, but given {input_}."
+                )
+        # If the input_type is not annotated with `@union`, then we validate that the input is
+        # exactly the same type as the input_type. (Why not check unions? We don't have access to
+        # `UnionMembership` to know if it's a valid union member. The engine will check that.)
+        if not union.is_instance(self.input_type) and type(input_) != self.input_type:
+            # We can assume we're using the longhand form because the shorthand form guarantees
+            # that the `input_type` is the same as `input`.
+            raise TypeError(
+                f"Invalid Get. The third argument `{input_}` must have the exact same type as the "
+                f"second argument, {self.input_type}, but had the type {type(input_)}."
+            )
         return cast(_Input, input_)
 
     def __await__(

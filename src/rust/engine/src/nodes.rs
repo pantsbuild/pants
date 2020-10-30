@@ -922,26 +922,11 @@ impl Task {
                   )),
                 }
               } else {
-                let parent_rule_func = match &*entry {
-                  rule_graph::Entry::WithDeps(entry_with_deps) => match entry_with_deps.rule() {
-                    Some(ref rule) => match rule {
-                      tasks::Rule::Task(ref task) => Some(task.func),
-                      _ => None,
-                    },
-                    None => None,
-                  },
-                  _ => None
-                };
-                let rule_context = match parent_rule_func {
-                  Some(func) => format!(
-                    " See the rule {}() in {} (line {}).",
-                    func.name(), func.module(), func.line_number()
-                  ),
-                  _ => "".to_string()
-                };
+                // NB: The Python constructor for `Get()` will have already errored if
+                // `type(input) != input_type`.
                 throw(&format!(
-                  "Invalid input to `Get({}, {})`. Expected an object with type `{}`, but got `{:?}` with type `{}` instead.{}",
-                  get.output, get.input_type, get.input_type, get.input, get.input.type_id(), rule_context
+                  "Could not find a rule to satisfy Get({}, {}, {}).",
+                  get.output, get.input_type, get.input
                 ))
               }
             })
