@@ -1,0 +1,9 @@
+2.1.x Stable Releases
+=====================
+
+This document describes releases leading up to the ``2.1.x`` ``stable`` series.
+
+See https://www.pantsbuild.org/v2.0/docs/release-notes-2-1 for an overview of the changes in this release, and
+
+2.1.0.dev0 (10/30/2020)
+----------------------
