@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import resolve_conflicting_options, warn_or_error
+from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
 from pants.option.option_util import is_list_option
@@ -139,17 +139,7 @@ class Options:
             )
 
         if bootstrap_option_values:
-            spec_files = resolve_conflicting_options(
-                old_option="spec_file",
-                new_option="spec_files",
-                old_scope="",
-                new_scope="",
-                old_container=bootstrap_option_values,
-                new_container=bootstrap_option_values,
-            )
-            # TODO: After --spec-file is removed, replace the above with:
-            # spec_files = bootstrap_option_values.spec_files
-
+            spec_files = bootstrap_option_values.spec_files
             if spec_files:
                 for spec_file in spec_files:
                     with open(spec_file, "r") as f:
