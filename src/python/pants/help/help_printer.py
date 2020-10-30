@@ -96,6 +96,8 @@ class HelpPrinter(MaybeColor):
                     self._print_goals_help()
                 elif thing == "targets":
                     self._print_targets_help()
+                elif thing == "subsystems":
+                    print("Subsystems")
                 elif thing == "global":
                     self._print_options_help(GLOBAL_SCOPE, help_request.advanced)
                 elif thing in self._all_help_info.scope_to_help_info:
@@ -149,6 +151,7 @@ class HelpPrinter(MaybeColor):
         print_cmd("help", "Display this usage message.")
         print_cmd("help goals", "List all installed goals.")
         print_cmd("help targets", "List all installed target types.")
+        print_cmd("help subsystems", "List all installed subsystems.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
         print_cmd("help [target_type/goal/subsystem]", "Help for a target type, goal or subsystem.")
