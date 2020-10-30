@@ -59,7 +59,7 @@ def test_render_constraints(rule_runner: RuleRunner) -> None:
     assert result.stdout == dedent(
         """\
         Final merged constraints: CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6
-        
+
         CPython==3.7.*
           app
 
