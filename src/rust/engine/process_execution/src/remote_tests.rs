@@ -11,7 +11,6 @@ use futures::compat::Future01CompatExt;
 use grpcio;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use maplit::{btreemap, hashset};
-use mock;
 use mock::execution_server::{ExpectedAPICall, MockOperation};
 use protobuf::well_known_types::Timestamp;
 use protobuf::{self, Message, ProtobufEnum};
