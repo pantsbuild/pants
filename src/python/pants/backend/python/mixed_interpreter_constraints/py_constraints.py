@@ -3,6 +3,7 @@
 
 import logging
 from collections import defaultdict
+from textwrap import fill, indent
 
 from pants.backend.python.util_rules.pex import PexInterpreterConstraints
 from pants.engine.addresses import Addresses
@@ -39,6 +40,13 @@ async def py_constraints(
         return PyConstraintsGoal(exit_code=0)
 
     console.print_stdout(f"Final merged constraints: {final_constraints}")
+    if len(addresses) > 1:
+        merged_constraints_warning = (
+            "(These are the constraints used if you were to depend on all of the input "
+            "files/targets together, even though they may end up never being used together in the "
+            "real world. Consider using a more precise query.)"
+        )
+        console.print_stdout(indent(fill(merged_constraints_warning, 80), "  "))
 
     constraints_to_addresses = defaultdict(set)
     for tgt in transitive_targets.closure:

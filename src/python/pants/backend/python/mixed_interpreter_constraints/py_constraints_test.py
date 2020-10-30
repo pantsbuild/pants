@@ -71,3 +71,7 @@ def test_render_constraints(rule_runner: RuleRunner) -> None:
           lib1
         """
     )
+
+    # If we run on >1 input, we include a warning about what the "final merged constraints" mean.
+    result = rule_runner.run_goal_rule(PyConstraintsGoal, args=["app", "lib1"])
+    assert "Consider using a more precise query" in result.stdout
