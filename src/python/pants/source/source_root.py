@@ -93,6 +93,8 @@ class SourceRootConfig(Subsystem):
 
     options_scope = "source"
 
+    DEFAULT_ROOT_PATTERNS = ["/", "src", "src/python", "src/py"]
+
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -100,7 +102,7 @@ class SourceRootConfig(Subsystem):
             "--root-patterns",
             metavar='["pattern1", "pattern2", ...]',
             type=list,
-            default=["/", "src", "src/python", "src/py"],
+            default=cls.DEFAULT_ROOT_PATTERNS,
             advanced=True,
             help="A list of source root suffixes. A directory with this suffix will be considered "
             "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
