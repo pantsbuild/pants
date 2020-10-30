@@ -36,7 +36,9 @@ use process_execution::{
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
 use store::{self, StoreFileByDigest};
-use workunit_store::{with_workunit, Level, UserMetadataItem, WorkunitMetadata};
+use workunit_store::{
+  with_workunit, Level, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
+};
 
 pub type NodeResult<T> = Result<T, Failure>;
 
@@ -1348,11 +1350,11 @@ impl Node for NodeKey {
         user_metadata: user_metadata
           .into_iter()
           .map(|(key, val)| {
-            let umi = UserMetadataItem::new();
+            let py_value_handle = UserMetadataPyValue::new();
+            let umi = UserMetadataItem::PyValue(py_value_handle.clone());
             session.with_metadata_map(|map| {
               let val = val.clone();
-              let umi = umi.clone();
-              map.insert(umi, val);
+              map.insert(py_value_handle.clone(), val);
             });
             (key, umi)
           })

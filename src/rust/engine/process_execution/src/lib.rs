@@ -40,7 +40,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
-use workunit_store::{with_workunit, WorkunitMetadata, WorkunitStore};
+use workunit_store::{with_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
 use hashing::Digest;
@@ -519,10 +519,15 @@ impl CommandRunner for BoundedCommandRunner {
           Ok(FallibleProcessResultWithPlatform {
             stdout_digest,
             stderr_digest,
+            exit_code,
             ..
           }) => WorkunitMetadata {
             stdout: Some(*stdout_digest),
             stderr: Some(*stderr_digest),
+            user_metadata: vec![(
+              "exit_code".to_string(),
+              UserMetadataItem::ImmediateId(*exit_code as i64),
+            )],
             ..old_metadata
           },
         };
