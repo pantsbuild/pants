@@ -7,14 +7,13 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any
 
-from pants.engine.internals.engine_testutil import (
-    assert_equal_with_printing,
-    remove_locations_from_traceback,
-)
+import pytest
+
+from pants.engine.internals.engine_testutil import remove_locations_from_traceback
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, rule
 from pants.engine.unions import UnionRule, union
-from pants.testutil.rule_runner import QueryRule
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.testutil.test_base import TestBase
 
 
@@ -26,16 +25,6 @@ class A:
 @dataclass(frozen=True)
 class B:
     pass
-
-
-def fn_raises(x):
-    raise Exception(f"An exception for {type(x).__name__}")
-
-
-@rule(desc="Nested raise")
-def nested_raise(b: B) -> A:
-    fn_raises(b)
-    return A()
 
 
 @rule
@@ -120,21 +109,6 @@ async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
     # inner value, which is _not_ registered.
     _ = await Get(A, UnionWithNonMemberErrorMsg, union_wrapper.inner)
     raise AssertionError("The statement above this one should have failed!")
-
-
-@dataclass(frozen=True)
-class CollectionType:
-    # NB: We pass an unhashable type when we want this to fail at the root, and a hashable type
-    # when we'd like it to succeed.
-    items: Any
-
-
-@rule
-async def c_unhashable(_: CollectionType) -> C:
-    # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
-    # the hashability check will fail.
-    _result = await Get(A, B, list())  # noqa: F841
-    return C()
 
 
 @rule
@@ -231,54 +205,81 @@ class SchedulerTest(TestBase):
             self.request(UnionX, [UnionWrapper(UnionA())])
 
 
-class SchedulerWithNestedRaiseTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            c_unhashable,
-            nested_raise,
-            QueryRule(A, (B,)),
-            QueryRule(C, (CollectionType,)),
-        )
+# -----------------------------------------------------------------------------------------------
+# Test tracebacks.
+# -----------------------------------------------------------------------------------------------
 
-    def test_unhashable_root_params_failure(self):
-        """Test that unhashable root params result in a structured error."""
-        # This will fail at the rust boundary, before even entering the engine.
-        with self.assertRaisesRegex(TypeError, "unhashable type: 'list'"):
-            self.request(C, [CollectionType([1, 2, 3])])
 
-    def test_unhashable_get_params_failure(self):
-        """Test that unhashable Get(...) params result in a structured error."""
-        # This will fail inside of `c_unhashable_dataclass`.
-        with self.assertRaisesRegex(ExecutionError, "unhashable type: 'list'"):
-            self.request(C, [CollectionType(tuple())])
+def fn_raises():
+    raise Exception("An exception!")
 
-    def test_trace_includes_rule_exception_traceback(self):
-        # Execute a request that will trigger the nested raise, and then directly inspect its trace.
-        request = self.scheduler.execution_request([A], [B()])
-        _, throws = self.scheduler.execute(request)
 
-        with self.assertRaises(ExecutionError) as cm:
-            self.scheduler._raise_on_error([t for _, t in throws])
+@rule(desc="Nested raise")
+def nested_raise() -> A:
+    fn_raises()
+    return A()
 
-        trace = remove_locations_from_traceback(str(cm.exception))
-        assert_equal_with_printing(
-            self,
-            dedent(
-                f"""\
-                 1 Exception encountered:
 
-                 Engine traceback:
-                   in select
-                   in {self.__module__}.{nested_raise.__name__}
-                 Traceback (most recent call last):
-                   File LOCATION-INFO, in nested_raise
-                     fn_raises(b)
-                   File LOCATION-INFO, in fn_raises
-                     raise Exception(f"An exception for {{type(x).__name__}}")
-                 Exception: An exception for B
-                 """
-            ),
-            trace,
-        )
+def test_trace_includes_rule_exception_traceback() -> None:
+    rule_runner = RuleRunner(rules=[nested_raise, QueryRule(A, [])])
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(A, [])
+    normalized_traceback = remove_locations_from_traceback(str(exc.value))
+    assert normalized_traceback == dedent(
+        f"""\
+         1 Exception encountered:
+
+         Engine traceback:
+           in select
+           in {__name__}.{nested_raise.__name__}
+         Traceback (most recent call last):
+           File LOCATION-INFO, in nested_raise
+             fn_raises()
+           File LOCATION-INFO, in fn_raises
+             raise Exception(f"An exception!")
+         Exception: An exception!
+         """
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# Test unhashable types.
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MaybeHashableWrapper:
+    maybe_hashable: Any
+
+
+@rule
+async def unhashable(_: MaybeHashableWrapper) -> B:
+    return B()
+
+
+@rule
+async def call_unhashable_with_invalid_input() -> C:
+    _ = await Get(B, MaybeHashableWrapper([1, 2]))
+    return C()
+
+
+def test_unhashable_types_failure() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            unhashable,
+            call_unhashable_with_invalid_input,
+            QueryRule(B, [MaybeHashableWrapper]),
+            QueryRule(C, []),
+        ]
+    )
+
+    # Succeed if an argument to a rule is hashable.
+    assert rule_runner.request(B, [MaybeHashableWrapper((1, 2))]) == B()
+    # But fail if an argument to a rule is unhashable. This is a TypeError because it fails while
+    # hashing as part of FFI.
+    with pytest.raises(TypeError, match="unhashable type: 'list'"):
+        rule_runner.request(B, [MaybeHashableWrapper([1, 2])])
+
+    # Fail if the `input` in a `Get` is not hashable.
+    with pytest.raises(ExecutionError, match="unhashable type: 'list'"):
+        rule_runner.request(C, [])
