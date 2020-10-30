@@ -544,15 +544,6 @@ class GlobalOptions(Subsystem):
             "signal to the remote pantsd process before killing it.",
         )
         register(
-            "--pantsd-log-dir",
-            advanced=True,
-            default=None,
-            daemon=True,
-            help="The directory to log pantsd output to.",
-            removal_version="2.1.0.dev0",
-            removal_hint="The global option `pantsd_log_dir` does not do anything.",
-        )
-        register(
             "--pantsd-invalidation-globs",
             advanced=True,
             type=list,
@@ -892,17 +883,6 @@ class GlobalOptions(Subsystem):
             default=2 ** 32,
             advanced=True,
             help=f"The maximum number of times to loop when `{loop_flag}` is specified.",
-        )
-
-        register(
-            "--lock",
-            advanced=True,
-            type=bool,
-            default=True,
-            help="Use a global lock to exclude other versions of Pants from running during "
-            "critical operations.",
-            removal_version="2.1.0.dev0",
-            removal_hint="The global option `lock` does not do anything.",
         )
 
         register(
