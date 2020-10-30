@@ -5,7 +5,6 @@ from typing import List, cast
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.custom_types import target_option
 
 
 class Protoc(TemplatedExternalTool):
@@ -25,27 +24,6 @@ class Protoc(TemplatedExternalTool):
         "darwin": "osx",
         "linux": "linux",
     }
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--runtime-targets",
-            type=list,
-            member_type=target_option,
-            advanced=True,
-            help=(
-                "A list of addresses to targets for Protobuf runtime libraries. For example, a "
-                "`python_requirement_library` for the `protobuf` Python library. These targets "
-                "will be automatically injected into the `dependencies` field of every "
-                "`protobuf_library`."
-            ),
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "Use the option `runtime_dependencies` in the new `[python-protobuf]` scope, which "
-                "behaves identically."
-            ),
-        )
 
     def generate_exe(self, plat: Platform) -> str:
         return "./bin/protoc"
