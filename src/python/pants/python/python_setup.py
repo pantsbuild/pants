@@ -51,11 +51,13 @@ class PythonSetup(Subsystem):
             type=list,
             default=["CPython>=3.6"],
             metavar="<requirement>",
-            help="Constrain the selected Python interpreter. Specify with requirement syntax, "
-            "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
-            "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
-            "be ORed together. These constraints are used as the default value for the "
-            "`compatibility` field of Python targets.",
+            help=(
+                "The Python interpreters your codebase is compatible with. Specify with "
+                "requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with version "
+                ">=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple "
+                "constraint strings will be ORed together. These constraints are used as the "
+                "default value for the `interpreter_constraints` field of Python targets."
+            ),
         )
         register(
             "--requirement-constraints",
