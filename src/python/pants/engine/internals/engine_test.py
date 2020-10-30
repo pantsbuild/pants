@@ -837,6 +837,8 @@ class StreamingWorkunitProcessTests(TestBase):
         assert stdout_digest == EMPTY_FILE_DIGEST
         assert stderr_digest.serialized_bytes_length == len(result.stderr)
 
+        assert process_workunit["metadata"]["exit_code"] == 0
+
         try:
             self._scheduler.ensure_remote_has_recursive([stdout_digest, stderr_digest])
         except Exception as e:

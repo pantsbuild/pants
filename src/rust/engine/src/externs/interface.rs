@@ -68,7 +68,7 @@ use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
 use tempfile::TempDir;
-use workunit_store::{Workunit, WorkunitState};
+use workunit_store::{UserMetadataItem, Workunit, WorkunitState};
 
 use crate::{
   externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
@@ -896,13 +896,23 @@ async fn workunit_to_py_value(
 
   let mut user_metadata_entries = Vec::new();
   for (user_metadata_key, user_metadata_item) in workunit.metadata.user_metadata.iter() {
-    match session.with_metadata_map(|map| map.get(user_metadata_item).cloned()) {
-      None => log::warn!(
-        "Workunit metadata() value not found for key: {}",
-        user_metadata_key
-      ),
-      Some(v) => {
-        user_metadata_entries.push((externs::store_utf8(user_metadata_key.as_str()), v));
+    match user_metadata_item {
+      UserMetadataItem::ImmediateId(n) => {
+        user_metadata_entries.push((
+          externs::store_utf8(user_metadata_key.as_str()),
+          externs::store_i64(*n),
+        ));
+      }
+      UserMetadataItem::PyValue(py_val_handle) => {
+        match session.with_metadata_map(|map| map.get(py_val_handle).cloned()) {
+          None => log::warn!(
+            "Workunit metadata() value not found for key: {}",
+            user_metadata_key
+          ),
+          Some(v) => {
+            user_metadata_entries.push((externs::store_utf8(user_metadata_key.as_str()), v));
+          }
+        }
       }
     }
   }

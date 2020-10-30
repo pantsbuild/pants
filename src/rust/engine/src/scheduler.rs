@@ -23,7 +23,7 @@ use task_executor::Executor;
 use ui::ConsoleUI;
 use uuid::Uuid;
 use watch::Invalidatable;
-use workunit_store::{UserMetadataItem, WorkunitStore};
+use workunit_store::{UserMetadataPyValue, WorkunitStore};
 
 pub enum ExecutionTermination {
   // Raised as a vanilla keyboard interrupt on the python side.
@@ -92,7 +92,7 @@ struct InnerSession {
   // Session/build_id would be stable.
   run_id: Mutex<Uuid>,
   should_report_workunits: bool,
-  workunit_metadata_map: RwLock<HashMap<UserMetadataItem, Value>>,
+  workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
 }
 
 #[derive(Clone)]
@@ -137,7 +137,7 @@ impl Session {
 
   pub fn with_metadata_map<F, T>(&self, f: F) -> T
   where
-    F: Fn(&mut HashMap<UserMetadataItem, Value>) -> T,
+    F: Fn(&mut HashMap<UserMetadataPyValue, Value>) -> T,
   {
     f(&mut self.0.workunit_metadata_map.write())
   }

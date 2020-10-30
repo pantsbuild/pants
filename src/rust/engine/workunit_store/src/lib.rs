@@ -159,11 +159,17 @@ impl WorkunitMetadata {
 
 /// Abstract id for passing user metadata items around
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct UserMetadataItem(uuid::Uuid);
+pub enum UserMetadataItem {
+  PyValue(UserMetadataPyValue),
+  ImmediateId(i64),
+}
 
-impl UserMetadataItem {
-  pub fn new() -> UserMetadataItem {
-    UserMetadataItem(uuid::Uuid::new_v4())
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct UserMetadataPyValue(uuid::Uuid);
+
+impl UserMetadataPyValue {
+  pub fn new() -> UserMetadataPyValue {
+    UserMetadataPyValue(uuid::Uuid::new_v4())
   }
 }
 
