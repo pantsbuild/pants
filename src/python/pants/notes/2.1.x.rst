@@ -3,7 +3,156 @@
 
 This document describes releases leading up to the ``2.1.x`` ``stable`` series.
 
-See https://www.pantsbuild.org/v2.0/docs/release-notes-2-1 for an overview of the changes in this release, and
+See https://www.pantsbuild.org/v2.1/docs/release-notes-2-1 for an overview of the changes in this release.
 
 2.1.0.dev0 (10/30/2020)
 ----------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Do not error if `./pants package` does not match any targets (#11051)
+  `PR #11051 <https://github.com/pantsbuild/pants/pull/11051>`_
+
+* Deprecate the `compatibility` field in favor of `interpreter_constraints` (#11074)
+  `PR #11074 <https://github.com/pantsbuild/pants/pull/11074>`_
+
+* Remove deprecated `awslambda`, `binary`, and `setup-py` goals in favor of `package` (#11048)
+  `PR #11048 <https://github.com/pantsbuild/pants/pull/11048>`_
+
+* Rename pex-binary/python-distribution to avoid naming collisions. (#11007)
+  `PR #11007 <https://github.com/pantsbuild/pants/pull/11007>`_
+
+* Remove deprecated `--{fmt,lint}-per-target-caching` in favor of `--per-file-caching` (#11062)
+  `PR #11062 <https://github.com/pantsbuild/pants/pull/11062>`_
+
+* Remove post_stats from RunTracker (#11068)
+  `PR #11068 <https://github.com/pantsbuild/pants/pull/11068>`_
+
+* Remove stats_version in runtracker (#11065)
+  `PR #11065 <https://github.com/pantsbuild/pants/pull/11065>`_
+
+* Remove deprecated `--lang` and `--lc-all` options in favor of `--env-vars` (#11066)
+  `PR #11066 <https://github.com/pantsbuild/pants/pull/11066>`_
+
+* Remove deprecated `--protoc-runtime-targets` option (#11083)
+  `PR #11083 <https://github.com/pantsbuild/pants/pull/11083>`_
+
+* Remove deprecated `--interpreter-constraints` option for some Python tools (#11082)
+  `PR #11082 <https://github.com/pantsbuild/pants/pull/11082>`_
+
+* Remove deprecated `runtime_binary_dependencies` field (#11079)
+  `PR #11079 <https://github.com/pantsbuild/pants/pull/11079>`_
+
+* Remove deprecated `--spec-file` option in favor of `--spec-files` (#11076)
+  `PR #11076 <https://github.com/pantsbuild/pants/pull/11076>`_
+
+* Remove deprecated `[basic-auth]`, `[reporter]`, and `[run-tracker]` options (#11078)
+  `PR #11078 <https://github.com/pantsbuild/pants/pull/11078>`_
+
+* Remove deprecated `--print-exception-stacktrace` in favor of `--print-stacktrace` (#11085)
+  `PR #11085 <https://github.com/pantsbuild/pants/pull/11085>`_
+
+* Remove unused global options (#11077)
+  `PR #11077 <https://github.com/pantsbuild/pants/pull/11077>`_
+
+* Remove deprecated `python_requirement` BUILD file symbol (#11055)
+  `PR #11055 <https://github.com/pantsbuild/pants/pull/11055>`_
+
+* Deprecate the `platforms` field allowing a bare string (#11073)
+  `PR #11073 <https://github.com/pantsbuild/pants/pull/11073>`_
+
+* Deprecate several unused options (#11041)
+  `PR #11041 <https://github.com/pantsbuild/pants/pull/11041>`_
+
+* Deprecate unused `run-tracker` options (#11038)
+  `PR #11038 <https://github.com/pantsbuild/pants/pull/11038>`_
+
+* Remove deprecated `python-setup` options (#10984)
+  `PR #10984 <https://github.com/pantsbuild/pants/pull/10984>`_
+
+* Remove deprecated `Subsystem.get_options()` in favor of `Subsystem.options` (#10986)
+  `PR #10986 <https://github.com/pantsbuild/pants/pull/10986>`_
+
+* Remove deprecated global options like `--v2` and `--backend-packages2` (#10985)
+  `PR #10985 <https://github.com/pantsbuild/pants/pull/10985>`_
+
+* Remove deprecated `--changed-*` options (#10982)
+  `PR #10982 <https://github.com/pantsbuild/pants/pull/10982>`_
+
+* Remove deprecated `./pants filter` options (#10983)
+  `PR #10983 <https://github.com/pantsbuild/pants/pull/10983>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `[python-setup].resolver_http_cache_ttl` option (#10997)
+  `PR #10997 <https://github.com/pantsbuild/pants/pull/10997>`_
+
+* Add new `py-constraints` goal through new `pants.backend.python.mixed_interpreter_constraints` backend (#11075)
+  `PR #11075 <https://github.com/pantsbuild/pants/pull/11075>`_
+
+* Add `:my_func` shorthand for the `entry_point` field (#11064)
+  `PR #11064 <https://github.com/pantsbuild/pants/pull/11064>`_
+
+* Add new EngineAware method metadata() (#11030)
+  `PR #11030 <https://github.com/pantsbuild/pants/pull/11030>`_
+
+* remote caching support (#10960)
+  `PR #10960 <https://github.com/pantsbuild/pants/pull/10960>`_
+
+* Store per-run logs on RunTracker (#11025)
+  `PR #11025 <https://github.com/pantsbuild/pants/pull/11025>`_
+
+* Allow changing the URL to download tools like PEX and Protoc (#11013)
+  `PR #11013 <https://github.com/pantsbuild/pants/pull/11013>`_
+
+* Add mechanism to deprecate target types and fields (#10966)
+  `PR #10966 <https://github.com/pantsbuild/pants/pull/10966>`_
+
+Bugfixes
+~~~~~~~~
+
+* remote caching: upload stdout/stderr content to remote cache (#11049)
+  `PR #11049 <https://github.com/pantsbuild/pants/pull/11049>`_
+
+* Fix PEX to always write to `named_caches_dir`, rather than `~/.pex` (#11040)
+  `PR #11040 <https://github.com/pantsbuild/pants/pull/11040>`_
+
+* Fix `setup_py().with_binaries()` to use the default entry point (#11021)
+  `PR #11021 <https://github.com/pantsbuild/pants/pull/11021>`_
+
+* Fix resource leak warning with stdio (#10995)
+  `PR #10995 <https://github.com/pantsbuild/pants/pull/10995>`_
+
+* Fix `./pants repl` to use global constrains when no targets specified (#10991)
+  `PR #10991 <https://github.com/pantsbuild/pants/pull/10991>`_
+
+* Fix overly verbose `FieldSet` in stack traces (#10978)
+  `PR #10978 <https://github.com/pantsbuild/pants/pull/10978>`_
+
+* Fix several bad usages of `itertools.groupby()` (#10976)
+  `PR #10976 <https://github.com/pantsbuild/pants/pull/10976>`_
+  `PR #10974 <https://github.com/pantsbuild/pants/pull/10974>`_
+
+* Fix bug with linter targets being skipped (#10974)
+  `PR #10974 <https://github.com/pantsbuild/pants/pull/10974>`_
+
+* Fix config validation not erroring on global options in wrong scope (#10950)
+  `PR #10950 <https://github.com/pantsbuild/pants/pull/10950>`_
+
+* Automatically set setuptools interpreter constraints if unspecified (#10951)
+  `PR #10951 <https://github.com/pantsbuild/pants/pull/10951>`_
+
+
+Documentation
+~~~~~~~~~~~~~
+
+* Improve error message for invalid input in `Get()`s (#11081)
+  `PR #11081 <https://github.com/pantsbuild/pants/pull/11081>`_
+
+* Improve several help messages (#11029)
+  `PR #11029 <https://github.com/pantsbuild/pants/pull/11029>`_
+
+* Fold target help into the help system. (#11022)
+  `PR #11022 <https://github.com/pantsbuild/pants/pull/11022>`_
