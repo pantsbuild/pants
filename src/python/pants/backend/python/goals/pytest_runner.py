@@ -14,7 +14,6 @@ from pants.backend.python.goals.coverage_py import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
-    PythonRuntimeBinaryDependencies,
     PythonRuntimePackageDependencies,
     PythonTestsSources,
     PythonTestsTimeout,
@@ -65,7 +64,6 @@ class PythonTestFieldSet(TestFieldSet):
 
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
-    runtime_binary_dependencies: PythonRuntimeBinaryDependencies
     runtime_package_dependencies: PythonRuntimePackageDependencies
 
     def is_conftest_or_type_stub(self) -> bool:
@@ -154,20 +152,13 @@ async def setup_pytest_for_target(
     unparsed_runtime_packages = (
         request.field_set.runtime_package_dependencies.to_unparsed_address_inputs()
     )
-    unparsed_runtime_binaries = (
-        request.field_set.runtime_binary_dependencies.to_unparsed_address_inputs()
-    )
-    if unparsed_runtime_packages.values or unparsed_runtime_binaries.values:
-        runtime_package_targets, runtime_binary_dependencies = await MultiGet(
-            Get(Targets, UnparsedAddressInputs, unparsed_runtime_packages),
-            Get(Targets, UnparsedAddressInputs, unparsed_runtime_binaries),
+    if unparsed_runtime_packages.values:
+        runtime_package_targets = await Get(
+            Targets, UnparsedAddressInputs, unparsed_runtime_packages
         )
         field_sets_per_target = await Get(
             FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(
-                PackageFieldSet,
-                itertools.chain(runtime_package_targets, runtime_binary_dependencies),
-            ),
+            FieldSetsPerTargetRequest(PackageFieldSet, runtime_package_targets),
         )
         assets = await MultiGet(
             Get(BuiltPackage, PackageFieldSet, field_set)
