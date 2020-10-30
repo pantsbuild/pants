@@ -389,19 +389,21 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<ProcessResult> {
     let request = self.process;
-    let execution_context = process_execution::Context::new(
-      context.session.workunit_store(),
-      context.session.build_id().to_string(),
-    );
+
     if context
       .core
       .command_runner
       .extract_compatible_request(&request)
       .is_some()
     {
-      let res = context
-        .core
-        .command_runner
+      let command_runner = &context.core.command_runner;
+
+      let execution_context = process_execution::Context::new(
+        context.session.workunit_store(),
+        context.session.build_id().to_string(),
+      );
+
+      let res = command_runner
         .run(request, execution_context)
         .await
         .map_err(|e| throw(&e))?;
