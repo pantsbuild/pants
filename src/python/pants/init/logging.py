@@ -9,7 +9,6 @@ from logging import Formatter, Handler, LogRecord, StreamHandler
 from typing import Dict, Iterable, Optional, Tuple
 
 import pants.util.logging as pants_logging
-from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.internals.native import Native
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir
@@ -136,16 +135,8 @@ def setup_logging(global_bootstrap_options: OptionValueContainer, stderr_logging
         global_level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
     )
 
-    print_stacktrace = resolve_conflicting_options(
-        old_option="print_exception_stacktrace",
-        new_option="print_stacktrace",
-        old_scope="",
-        new_scope="",
-        old_container=global_bootstrap_options,
-        new_container=global_bootstrap_options,
-    )
     if stderr_logging:
-        setup_logging_to_stderr(global_level, print_stacktrace)
+        setup_logging_to_stderr(global_level, global_bootstrap_options.print_stacktrace)
 
     if log_dir:
         setup_logging_to_file(global_level, log_dir=log_dir)

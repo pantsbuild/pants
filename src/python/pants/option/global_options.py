@@ -508,15 +508,6 @@ class GlobalOptions(Subsystem):
             help="Print the full exception stack trace for any errors.",
         )
         register(
-            "--print-exception-stacktrace",
-            advanced=True,
-            type=bool,
-            default=False,
-            help="Print to console the full exception stack trace if encountered.",
-            removal_version="2.1.0.dev0",
-            removal_hint="Use `--print-stacktrace` instead of `--print-exception-stacktrace`.",
-        )
-        register(
             "--native-engine-visualize-to",
             advanced=True,
             default=None,
