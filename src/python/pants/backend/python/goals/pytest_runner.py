@@ -153,15 +153,12 @@ async def setup_pytest_for_target(
         request.field_set.runtime_package_dependencies.to_unparsed_address_inputs()
     )
     if unparsed_runtime_packages.values:
-        runtime_package_targets, runtime_binary_dependencies = await Get(
+        runtime_package_targets = await Get(
             Targets, UnparsedAddressInputs, unparsed_runtime_packages
         )
         field_sets_per_target = await Get(
             FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(
-                PackageFieldSet,
-                itertools.chain(runtime_package_targets, runtime_binary_dependencies),
-            ),
+            FieldSetsPerTargetRequest(PackageFieldSet, runtime_package_targets),
         )
         assets = await MultiGet(
             Get(BuiltPackage, PackageFieldSet, field_set)
