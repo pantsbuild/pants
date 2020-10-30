@@ -931,8 +931,9 @@ async fn workunit_to_py_value(
     externs::store_dict(artifact_entries)?,
   ));
 
-  if let Some(counters) = &workunit.counters {
-    let counters_entries = counters
+  if !workunit.counters.is_empty() {
+    let counters_entries = workunit
+      .counters
       .iter()
       .map(|(counter_name, counter_value)| {
         (

@@ -72,7 +72,7 @@ pub struct Workunit {
   pub parent_id: Option<SpanId>,
   pub state: WorkunitState,
   pub metadata: WorkunitMetadata,
-  pub counters: Option<HashMap<Metric, u64>>,
+  pub counters: HashMap<Metric, u64>,
 }
 
 impl Workunit {
@@ -173,7 +173,7 @@ enum StoreMsg {
     SpanId,
     Option<WorkunitMetadata>,
     SystemTime,
-    Option<HashMap<Metric, u64>>,
+    HashMap<Metric, u64>,
   ),
   Canceled(SpanId),
 }
@@ -320,7 +320,7 @@ impl HeavyHittersData {
     span_id: SpanId,
     new_metadata: Option<WorkunitMetadata>,
     end_time: SystemTime,
-    new_counters: Option<HashMap<Metric, u64>>,
+    new_counters: HashMap<Metric, u64>,
     inner_store: &mut HeavyHittersInnerStore,
   ) {
     match inner_store.workunit_records.entry(span_id) {
@@ -548,7 +548,7 @@ impl WorkunitStore {
         start_time: std::time::SystemTime::now(),
       },
       metadata,
-      counters: None,
+      counters: HashMap::new(),
     };
 
     self
@@ -592,8 +592,8 @@ impl WorkunitStore {
     let workunit_counters = {
       let mut counters = self.metrics_data.counters.lock();
       match counters.entry(span_id) {
-        Entry::Vacant(_) => None,
-        Entry::Occupied(entry) => Some(entry.remove()),
+        Entry::Vacant(_) => HashMap::new(),
+        Entry::Occupied(entry) => entry.remove(),
       }
     };
     workunit.counters = workunit_counters.clone();
@@ -648,7 +648,7 @@ impl WorkunitStore {
       parent_id,
       state: WorkunitState::Started { start_time },
       metadata,
-      counters: None,
+      counters: HashMap::new(),
     };
 
     self
