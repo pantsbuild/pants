@@ -128,13 +128,6 @@ def run_pants_with_workdir_without_waiting(
     print_stacktrace: bool = True,
     **kwargs: Any,
 ) -> PantsJoinHandle:
-    if "print_exception_stacktrace" in kwargs:
-        warn_or_error(
-            removal_version="2.1.0.dev0",
-            deprecated_entity_description="the kwarg `print_exception_stacktrace`",
-            hint="Use the kwarg `print_stacktrace` instead",
-        )
-        print_stacktrace = kwargs["print_exception_stacktrace"]
     args = [
         "--no-pantsrc",
         f"--pants-workdir={workdir}",
