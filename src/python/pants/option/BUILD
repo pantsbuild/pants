@@ -17,8 +17,4 @@ python_tests(
 python_integration_tests(
   name='integration',
   uses_pants_run=True,
-  dependencies=[
-    'testprojects/src/python:plugins_directory',
-  ],
-  timeout=300,
 )
