@@ -148,33 +148,47 @@ impl fmt::Display for TypeId {
   }
 }
 
-// An identifier for a python function.
+/// An identifier for a Python function.
 #[repr(C)]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Function(pub Key);
 
 impl Function {
+  /// A Python function's module, e.g. `project.app`.
+  pub fn module(&self) -> String {
+    let val = externs::val_for(&self.0);
+    externs::getattr_as_string(&val, "__module__")
+  }
+
+  /// A Python function's name, without its module.
   pub fn name(&self) -> String {
-    let Function(key) = self;
-    let val = externs::val_for(&key);
-    let module = externs::getattr_as_string(&val, "__module__");
-    let name = externs::getattr_as_string(&val, "__name__");
+    let val = externs::val_for(&self.0);
+    externs::getattr_as_string(&val, "__name__")
+  }
+
+  /// The line number of a Python function's first line.
+  pub fn line_number(&self) -> u64 {
+    let val = externs::val_for(&self.0);
     // NB: this is a custom dunder method that Python code should populate before sending the
     // function (e.g. an `@rule`) through FFI.
-    let line_number: u64 = externs::getattr(&val, "__line_number__").unwrap();
-    format!("{}:{}:{}", module, line_number, name)
+    externs::getattr(&val, "__line_number__").unwrap()
+  }
+
+  /// The function represented as `path.to.module:lineno:func_name`.
+  pub fn full_name(&self) -> String {
+    format!("{}:{}:{}", self.module(), self.line_number(), self.name())
   }
 }
 
 impl fmt::Display for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}()", self.name())
+    write!(f, "{}()", self.full_name())
   }
 }
 
 impl fmt::Debug for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}()", self.name())
+    write!(f, "{}()", self.full_name())
   }
 }
 

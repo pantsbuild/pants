@@ -452,7 +452,7 @@ py_class!(pub class PyGeneratorResponseGetMulti |py| {
 pub struct Get {
   pub output: TypeId,
   pub input: Key,
-  pub input_type: Option<TypeId>,
+  pub input_type: TypeId,
 }
 
 impl Get {
@@ -462,7 +462,7 @@ impl Get {
       input: interns
         .key_insert(py, get.subject(py).clone_ref(py).into())
         .map_err(|e| Failure::from_py_err_with_gil(py, e))?,
-      input_type: Some(interns.type_insert(py, get.declared_subject(py).clone_ref(py))),
+      input_type: interns.type_insert(py, get.declared_subject(py).clone_ref(py)),
     })
   }
 }

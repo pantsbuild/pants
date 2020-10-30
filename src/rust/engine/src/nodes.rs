@@ -902,34 +902,34 @@ impl Task {
           .core
           .rule_graph
           .edges_for_inner(&entry)
-          .ok_or_else(|| throw(&format!("no edges for task {:?} exist!", entry)))
+          .ok_or_else(|| throw(&format!("No edges for task {:?} exist!", entry)))
           .and_then(|edges| {
-            edges
-              .entry_for(&dependency_key)
-              .cloned()
-              .ok_or_else(|| match get.input_type {
-                Some(ty) if externs::is_union(ty) => {
-                  let value = externs::type_for_type_id(ty).into_object();
-                  match externs::call_method(
-                    &value,
-                    "non_member_error_message",
-                    &[externs::val_for(&get.input)],
-                  ) {
-                    Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
-                    // If the non_member_error_message() call failed for any reason,
-                    // fall back to a generic message.
-                    Err(_e) => throw(&format!(
-                      "Type {} is not a member of the {} @union",
-                      get.input.type_id(),
-                      ty
-                    )),
-                  }
+            edges.entry_for(&dependency_key).cloned().ok_or_else(|| {
+              if externs::is_union(get.input_type) {
+                let value = externs::type_for_type_id(get.input_type).into_object();
+                match externs::call_method(
+                  &value,
+                  "non_member_error_message",
+                  &[externs::val_for(&get.input)],
+                ) {
+                  Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
+                  // If the non_member_error_message() call failed for any reason,
+                  // fall back to a generic message.
+                  Err(_e) => throw(&format!(
+                    "Type {} is not a member of the {} @union",
+                    get.input.type_id(),
+                    get.input_type
+                  )),
                 }
-                _ => throw(&format!(
-                  "{:?} did not declare a dependency on {:?}",
-                  entry, dependency_key
-                )),
-              })
+              } else {
+                // NB: The Python constructor for `Get()` will have already errored if
+                // `type(input) != input_type`.
+                throw(&format!(
+                  "Could not find a rule to satisfy Get({}, {}, {}).",
+                  get.output, get.input_type, get.input
+                ))
+              }
+            })
           });
         // The subject of the get is a new parameter that replaces an existing param of the same
         // type.
