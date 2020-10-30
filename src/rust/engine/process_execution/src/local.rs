@@ -36,7 +36,7 @@ use crate::{
 };
 
 use bytes::{Bytes, BytesMut};
-use workunit_store::{Metric, MetricsLike};
+use workunit_store::Metric;
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 

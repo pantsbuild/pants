@@ -45,7 +45,7 @@ use rand::Rng;
 use tokio::task_local;
 
 mod metrics;
-pub use metrics::{Metric, MetricsLike};
+pub use metrics::Metric;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct SpanId(u64);
@@ -675,6 +675,26 @@ impl WorkunitStore {
       .streaming_workunit_data
       .with_latest_workunits(max_verbosity, f)
   }
+
+  pub fn increment_counter(&self, counter_name: Metric, change: u64) {
+    let workunit_state = expect_workunit_state();
+    if let Some(span_id) = workunit_state.parent_id {
+      let mut counters = self.metrics_data.counters.lock();
+      counters
+        .entry(span_id)
+        .and_modify(|entry_for_map| {
+          entry_for_map
+            .entry(counter_name)
+            .and_modify(|e| *e += change)
+            .or_insert(change);
+        })
+        .or_insert_with(|| {
+          let mut m = HashMap::new();
+          m.insert(counter_name, change);
+          m
+        });
+    }
+  }
 }
 
 pub fn format_workunit_duration(duration: Duration) -> String {
@@ -786,28 +806,6 @@ impl Default for MetricsData {
   fn default() -> MetricsData {
     MetricsData {
       counters: Arc::new(Mutex::new(HashMap::new())),
-    }
-  }
-}
-
-impl MetricsLike for WorkunitStore {
-  fn increment_counter(&self, counter_name: Metric, change: u64) {
-    let workunit_state = expect_workunit_state();
-    if let Some(span_id) = workunit_state.parent_id {
-      let mut counters = self.metrics_data.counters.lock();
-      counters
-        .entry(span_id)
-        .and_modify(|entry_for_map| {
-          entry_for_map
-            .entry(counter_name)
-            .and_modify(|e| *e += change)
-            .or_insert(change);
-        })
-        .or_insert_with(|| {
-          let mut m = HashMap::new();
-          m.insert(counter_name, change);
-          m
-        });
     }
   }
 }

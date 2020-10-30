@@ -49,7 +49,3 @@ impl Metric {
     }
   }
 }
-
-pub trait MetricsLike {
-  fn increment_counter(&self, counter_name: Metric, change: u64);
-}

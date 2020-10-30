@@ -27,7 +27,7 @@ use log::{debug, trace, warn, Level};
 use protobuf::{self, Message, ProtobufEnum};
 use rand::{thread_rng, Rng};
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
-use workunit_store::{with_workunit, Metric, MetricsLike, SpanId, WorkunitMetadata, WorkunitStore};
+use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
 
 use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
