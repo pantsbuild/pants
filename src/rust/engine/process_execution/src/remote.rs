@@ -31,6 +31,7 @@ use store::{MergeBehavior, Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use tokio::time::delay_for;
 use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
+use store::{MergeBehavior, Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use workunit_store::{with_workunit, SpanId, WorkunitMetadata, WorkunitStore};
 
 use crate::{

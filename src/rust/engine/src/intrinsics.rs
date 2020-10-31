@@ -391,13 +391,15 @@ fn create_digest_to_digest(
 
   let store = context.core.store();
   async move {
-    let digests = future::try_join_all(digests).await?;
+    let digests = future::try_join_all(digests)
+      .await
+      .map_err(|e| throw(&format!("{:?}", e)))?;
     let digest = store
       .merge(digests, MergeBehavior::NoDuplicates)
       .await
-      .map_err(|e| format!("{:?}", e))?;
-    let res: Result<_, String> = Ok(Snapshot::store_directory(&context.core, &digest));
-    res
+      .map_err(|e| throw(&format!("{:?}", e)))?;
+    let res = Snapshot::store_directory_digest(&digest).map_err(|e| throw(&format!("{:?}", e)))?;
+    Ok(res)
   }
   .boxed()
 }

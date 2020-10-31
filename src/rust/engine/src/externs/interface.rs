@@ -1491,16 +1491,19 @@ fn merge_directories(
   session_ptr: PySession,
   directories_value: PyObject,
 ) -> CPyResult<PyObject> {
-  let digests = externs::project_multi(&directories_value.into(), "dependencies")
-    .iter()
-    .map(|v| nodes::lift_digest(v))
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
+  let digests: Vec<Value> = externs::project_multi(&directories_value.into(), "dependencies")
+    .into_iter()
+    .collect::<Vec<_>>();
 
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       // TODO: A parent_id should be an explicit argument.
       session.workunit_store().init_thread_state(None);
+      let digests: Vec<Digest> = digests
+        .iter()
+        .map(|v| nodes::lift_directory_digest(&scheduler.core.types, v))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
       py.allow_threads(|| {
         scheduler
           .core
@@ -1511,9 +1514,10 @@ fn merge_directories(
               .store()
               .merge(digests, MergeBehavior::NoDuplicates),
           )
-          .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir).into())
-          .map_err(|e| format!("{:?}", e))
+          .and_then(|dir| Ok(nodes::Snapshot::store_directory_digest(&dir)?))
       })
+      .map_err(|e| format!("{:?}", e))
+      .map(|val| val.consume_into_py_object(py))
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
     })
   })

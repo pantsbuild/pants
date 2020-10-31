@@ -36,7 +36,7 @@ mod snapshot_ops_tests;
 #[cfg(test)]
 mod snapshot_tests;
 pub use crate::snapshot_ops::{
-  MergeBehavior, SnapshotOps, SnapshotOps, SnapshotOpsError, StoreWrapper, SubsetParams,
+  MergeBehavior, SnapshotOps, SnapshotOpsError, StoreWrapper, SubsetParams,
 };
 
 use async_trait::async_trait;
