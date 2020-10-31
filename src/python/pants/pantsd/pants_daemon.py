@@ -170,24 +170,20 @@ class PantsDaemon(PantsDaemonProcessManager):
             self._logger.debug("Logging reinitialized in pantsd context")
             yield
 
-    def _write_nailgun_port(self):
-        """Write the nailgun port to a well known file."""
-        self.write_socket(self._server.port())
+    def _initialize_metadata(self):
+        """Writes out our pid and other metadata.
 
-    def _initialize_pid(self):
-        """Writes out our pid and metadata.
-
-        Once written, does a one-time read of the pid to confirm that we haven't raced another
-        process starting.
+        Order matters a bit here, because technically all that is necessary to connect is the port,
+        and Services are lazily initialized by the core when a connection is established. Our pid
+        needs to be on disk before that happens.
         """
 
         # Write the pidfile. The SchedulerService will monitor it after a grace period.
-        pid = os.getpid()
-        self._logger.debug(f"pantsd running with PID: {pid}")
-        self.write_pid(pid=pid)
-        self.write_metadata_by_name(
-            "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)
-        )
+        self.write_pid()
+        self.write_process_name()
+        self.write_fingerprint(ensure_text(self.options_fingerprint))
+        self._logger.debug(f"pantsd running with PID: {self.pid}")
+        self.write_socket(self._server.port())
 
     def run_sync(self):
         """Synchronously run pantsd."""
@@ -208,12 +204,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
             set_process_title(f"pantsd [{self._build_root}]")
 
-            # Write our pid and the server's port to .pids. Order matters a bit here, because
-            # technically all that is necessary to connect is the port, and Services are lazily
-            # initialized by the core when a connection is established. Our pid needs to be on
-            # disk before that happens.
-            self._initialize_pid()
-            self._write_nailgun_port()
+            self._initialize_metadata()
 
             # Check periodically whether the core is valid, and exit if it is not.
             while self._core.is_valid():
