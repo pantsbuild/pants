@@ -28,20 +28,6 @@ class ListSubsystem(LineOriented, GoalSubsystem):
             ),
         )
         register(
-            "--provides-columns",
-            default="address,artifact_id",
-            help=(
-                "Display these columns when --provides is specified. Available columns are: "
-                "address, artifact_id, repo_name, repo_url, push_db_basedir"
-            ),
-            removal_version="2.0.1.dev0",
-            removal_hint=(
-                "The option `--provides-columns` no longer does anything. It was specific to the "
-                "JVM backend, so no longer makes sense with Pants 2.0 initially only supporting "
-                "Python."
-            ),
-        )
-        register(
             "--documented",
             type=bool,
             default=False,
