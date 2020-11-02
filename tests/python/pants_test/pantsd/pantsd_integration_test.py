@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import datetime
+import glob
 import os
 import re
 import signal
@@ -14,7 +15,7 @@ import pytest
 
 from pants.testutil.pants_integration_test import read_pantsd_log, temporary_workdir
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
-from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
+from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
@@ -284,7 +285,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             ctx.checker.assert_running()
             subprocess_dir = ctx.pantsd_config["GLOBAL"]["pants_subprocessdir"]
-            os.unlink(os.path.join(subprocess_dir, "pantsd", "pid"))
+            safe_rmtree(subprocess_dir)
 
             ctx.checker.assert_stopped()
 
@@ -298,7 +299,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             ctx.checker.assert_running()
             subprocess_dir = ctx.pantsd_config["GLOBAL"]["pants_subprocessdir"]
-            pidpath = os.path.join(subprocess_dir, "pantsd", "pid")
+            (pidpath,) = glob.glob(os.path.join(subprocess_dir, "*", "pantsd", "pid"))
             with open(pidpath, "w") as f:
                 f.write("9")
 
