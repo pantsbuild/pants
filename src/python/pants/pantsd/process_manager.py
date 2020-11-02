@@ -8,6 +8,7 @@ import sys
 import time
 import traceback
 from abc import ABCMeta
+from hashlib import sha256
 from typing import Callable, Optional, cast
 
 import psutil
@@ -18,13 +19,18 @@ from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_classproperty, memoized_property
 
 logger = logging.getLogger(__name__)
 
 
 class ProcessMetadataManager:
-    """"Manages contextual, on-disk process metadata."""
+    """Manages contextual, on-disk process metadata.
+
+    Metadata is stored under a per-host fingerprinted directory, and a nested per-named-process
+    directory. The per-host directory defends against attempting to use process metadata that has
+    been mounted into virtual machines or docker images.
+    """
 
     class MetadataError(Exception):
         pass
@@ -39,6 +45,25 @@ class ProcessMetadataManager:
     def __init__(self, metadata_base_dir: str) -> None:
         super().__init__()
         self._metadata_base_dir = metadata_base_dir
+
+    @memoized_classproperty
+    def host_fingerprint(cls) -> str:
+        """A fingerprint that attempts to identify the potential scope of a live process.
+
+        See the class pydoc.
+
+        In the absence of kernel hotswapping, a new uname means a restart or virtual machine, both
+        of which mean that process metadata is invalid. Additionally, docker generates a random
+        hostname per instance, which improves the reliability of this hash.
+
+        TODO: It would be nice to be able to use `uptime` (e.g. https://crates.io/crates/uptime_lib)
+        to identify reboots, but it's more challenging than it should be because it would involve
+        subtracting from the current time, which might hit aliasing issues.
+        """
+        hasher = sha256()
+        for component in os.uname():
+            hasher.update(component.encode())
+        return hasher.hexdigest()[:12]
 
     @staticmethod
     def _maybe_cast(item, caster):
@@ -126,17 +151,13 @@ class ProcessMetadataManager:
 
         return cls._deadline_until(file_waiter, ongoing_msg, completed_msg, timeout=timeout)
 
-    @staticmethod
-    def _get_metadata_dir_by_name(name, metadata_base_dir):
+    @classmethod
+    def _get_metadata_dir_by_name(cls, name: str, metadata_base_dir: str):
         """Retrieve the metadata dir by name.
 
         This should always live outside of the workdir to survive a clean-all.
         """
-        return os.path.join(metadata_base_dir, name)
-
-    def _maybe_init_metadata_dir_by_name(self, name):
-        """Initialize the metadata directory for a named identity if it doesn't exist."""
-        safe_mkdir(self.__class__._get_metadata_dir_by_name(name, self._metadata_base_dir))
+        return os.path.join(metadata_base_dir, cls.host_fingerprint, name)
 
     def _metadata_file_path(self, name, metadata_key):
         return self.metadata_file_path(name, metadata_key, self._metadata_base_dir)
@@ -166,7 +187,7 @@ class ProcessMetadataManager:
         :param string metadata_key: The metadata key (e.g. 'pid').
         :param string metadata_value: The metadata value (e.g. '1729').
         """
-        self._maybe_init_metadata_dir_by_name(name)
+        safe_mkdir(self._get_metadata_dir_by_name(name, self._metadata_base_dir))
         file_path = self._metadata_file_path(name, metadata_key)
         safe_file_dump(file_path, metadata_value)
 
