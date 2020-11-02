@@ -8,7 +8,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterator, Optional, Tuple
 
-import psutil
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
@@ -47,21 +46,22 @@ def attempts(
 class PantsDaemonMonitor(ProcessManager):
     def __init__(self, metadata_base_dir: str):
         super().__init__(name="pantsd", metadata_base_dir=metadata_base_dir)
+        self._started = False
 
     def _log(self):
-        print(magenta(f"PantsDaemonMonitor: pid is {self._pid} is_alive={self.is_alive()}"))
+        print(magenta(f"PantsDaemonMonitor: pid is {self.pid} is_alive={self.is_alive()}"))
 
     def assert_started_and_stopped(self, timeout: int = 30) -> None:
         """Asserts that pantsd was alive (it wrote a pid file), but that it stops afterward."""
-        self._process = None
-        self._pid = self.await_pid(timeout)
+        self.await_pid(timeout)
+        self._started = True
         self.assert_stopped()
 
     def assert_started(self, timeout=30):
-        self._process = None
-        self._pid = self.await_pid(timeout)
+        self.await_pid(timeout)
+        self._started = True
         self._check_pantsd_is_alive()
-        return self._pid
+        return self.pid
 
     def assert_pantsd_runner_started(self, client_pid, timeout=12):
         return self.await_metadata_by_name(
@@ -76,10 +76,10 @@ class PantsDaemonMonitor(ProcessManager):
     def _check_pantsd_is_alive(self):
         self._log()
         assert (
-            self._pid is not None
+            self._started
         ), "cannot assert that pantsd is running. Try calling assert_started before calling this method."
         assert self.is_alive(), "pantsd was not alive."
-        return self._pid
+        return self.pid
 
     def current_memory_usage(self):
         """Return the current memory usage of the pantsd process (which must be running)
@@ -87,10 +87,10 @@ class PantsDaemonMonitor(ProcessManager):
         :return: memory usage in bytes
         """
         self.assert_running()
-        return psutil.Process(self._pid).memory_info()[0]
+        return self._as_process().memory_info()[0]
 
     def assert_running(self):
-        if not self._pid:
+        if not self._started:
             return self.assert_started()
         else:
             return self._check_pantsd_is_alive()
@@ -98,12 +98,11 @@ class PantsDaemonMonitor(ProcessManager):
     def assert_stopped(self):
         self._log()
         assert (
-            self._pid is not None
+            self._started
         ), "cannot assert pantsd stoppage. Try calling assert_started before calling this method."
         for _ in attempts("pantsd should be stopped!"):
             if self.is_dead():
                 break
-        return self._pid
 
 
 @dataclass(frozen=True)
