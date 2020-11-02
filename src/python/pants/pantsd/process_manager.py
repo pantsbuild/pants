@@ -152,18 +152,18 @@ class ProcessMetadataManager:
         return cls._deadline_until(file_waiter, ongoing_msg, completed_msg, timeout=timeout)
 
     @classmethod
-    def _get_metadata_dir_by_name(cls, name: str, metadata_base_dir: str):
+    def _get_metadata_dir_by_name(cls, name: str, metadata_base_dir: str) -> str:
         """Retrieve the metadata dir by name.
 
         This should always live outside of the workdir to survive a clean-all.
         """
         return os.path.join(metadata_base_dir, cls.host_fingerprint, name)
 
-    def _metadata_file_path(self, name, metadata_key):
+    def _metadata_file_path(self, name, metadata_key) -> str:
         return self.metadata_file_path(name, metadata_key, self._metadata_base_dir)
 
     @classmethod
-    def metadata_file_path(cls, name, metadata_key, metadata_base_dir):
+    def metadata_file_path(cls, name, metadata_key, metadata_base_dir) -> str:
         return os.path.join(cls._get_metadata_dir_by_name(name, metadata_base_dir), metadata_key)
 
     def read_metadata_by_name(self, name, metadata_key, caster=None):
@@ -180,7 +180,7 @@ class ProcessMetadataManager:
         except (IOError, OSError):
             return None
 
-    def write_metadata_by_name(self, name, metadata_key, metadata_value):
+    def write_metadata_by_name(self, name, metadata_key, metadata_value) -> None:
         """Write process metadata using a named identity.
 
         :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
@@ -209,7 +209,7 @@ class ProcessMetadataManager:
         self._wait_for_file(file_path, ongoing_msg, completed_msg, timeout=timeout)
         return self.read_metadata_by_name(name, metadata_key, caster)
 
-    def purge_metadata_by_name(self, name):
+    def purge_metadata_by_name(self, name) -> None:
         """Purge a processes metadata directory.
 
         :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.

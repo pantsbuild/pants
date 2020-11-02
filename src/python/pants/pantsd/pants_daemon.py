@@ -170,7 +170,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             self._logger.debug("Logging reinitialized in pantsd context")
             yield
 
-    def _initialize_metadata(self):
+    def _initialize_metadata(self) -> None:
         """Writes out our pid and other metadata.
 
         Order matters a bit here, because technically all that is necessary to connect is the port,
