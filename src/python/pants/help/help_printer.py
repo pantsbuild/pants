@@ -171,7 +171,7 @@ class HelpPrinter(MaybeColor):
         print_cmd("help", "Display this usage message.")
         print_cmd("help goals", "List all installed goals.")
         print_cmd("help targets", "List all installed target types.")
-        print_cmd("help subsystems", "List all installed subsystems.")
+        print_cmd("help subsystems", "List all configurable subsystems.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
         print_cmd("help [target_type/goal/subsystem]", "Help for a target type, goal or subsystem.")
