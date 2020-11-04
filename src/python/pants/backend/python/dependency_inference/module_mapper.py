@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -12,12 +13,13 @@ from pants.backend.python.target_types import (
     PythonSources,
 )
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
+from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets
+from pants.option.global_options import GlobalOptions
+from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -67,19 +69,51 @@ class FirstPartyModuleToAddressMapping:
         return self.mapping.get(parent_module, ())
 
 
+@dataclass(frozen=True)
+class _StrippedFileNamesRequest:
+    sources: PythonSources
+
+
+class _StrippedFileNames(Collection[str]):
+    pass
+
+
+@rule
+async def _stripped_file_names(
+    request: _StrippedFileNamesRequest, global_options: GlobalOptions
+) -> _StrippedFileNames:
+    sources_field_path_globs = request.sources.path_globs(
+        global_options.options.files_not_found_behavior
+    )
+    source_root, paths = await MultiGet(
+        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.sources.address)),
+        Get(Paths, PathGlobs, sources_field_path_globs),
+    )
+    if source_root == ".":
+        return _StrippedFileNames(paths.files)
+    # NB: `os.path` is faster than `PurePath()`.
+    return _StrippedFileNames(os.path.relpath(f, source_root.path) for f in paths.files)
+
+
 @rule(desc="Creating map of first party targets to Python modules", level=LogLevel.DEBUG)
 async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMapping:
     all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     candidate_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
+    # NB: We use a custom implementation to resolve the stripped source paths, rather than
+    # `StrippedSourceFiles`, so that we can use `Get(Paths, PathGlobs)` instead of
+    # `Get(Snapshot, PathGlobs)`, which is much faster.
+    #
+    # This implementation is kept private because it's not fully comprehensive, such as not looking
+    # at codegen. That's fine for dep inference, but not in other contexts.
     stripped_sources_per_explicit_target = await MultiGet(
-        Get(StrippedSourceFiles, SourceFilesRequest([tgt[PythonSources]]))
+        Get(_StrippedFileNames, _StrippedFileNamesRequest(tgt[PythonSources]))
         for tgt in candidate_targets
     )
 
     modules_to_addresses: DefaultDict[str, List[Address]] = defaultdict(list)
     modules_with_multiple_implementations: Set[str] = set()
     for tgt, stripped_sources in zip(candidate_targets, stripped_sources_per_explicit_target):
-        for stripped_f in stripped_sources.snapshot.files:
+        for stripped_f in stripped_sources:
             module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
             if module in modules_to_addresses:
                 # We check if one of the targets is an implementation (.py file) and the other is a type stub (.pyi
