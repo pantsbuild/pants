@@ -26,6 +26,6 @@ PyYAML>=5.3.1,<5.4
 requests[security]>=2.20.1
 setproctitle==1.1.10
 setuptools>=50.3.0,<50.4
-toml==0.10.1
+toml==0.10.2
 typed-ast>=1.4.1,<1.5
 typing-extensions==3.7.4.2
