@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
+import re
 import textwrap
 
 from pants.testutil.pants_integration_test import run_pants
@@ -42,7 +43,7 @@ def test_help_subsystems() -> None:
         "pex                     How Pants uses Pex to run Python subprocesses" in pants_run.stdout
     )
     assert "to get help for a specific subsystem" in pants_run.stdout
-    assert "test            Run tests." not in pants_run.stdout
+    assert not re.search(r"^test\s+", pants_run.stdout)
 
 
 def test_help_specific_target() -> None:
