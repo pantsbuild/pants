@@ -94,6 +94,8 @@ class HelpPrinter(MaybeColor):
             for thing in sorted(things):
                 if thing == "goals":
                     self._print_goals_help()
+                elif thing == "subsystems":
+                    self._print_subsystems_help()
                 elif thing == "targets":
                     self._print_targets_help()
                 elif thing == "global":
@@ -135,6 +137,26 @@ class HelpPrinter(MaybeColor):
         specific_help_cmd = f"{self._bin_name} help $goal"
         print(f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal.\n")
 
+    def _print_subsystems_help(self) -> None:
+        self._print_title("Subsystems")
+
+        subsystem_description: Dict[str, str] = {}
+        for alias, help_info in self._all_help_info.scope_to_help_info.items():
+            if not help_info.is_goal and alias:
+                subsystem_description[alias] = help_info.description
+
+        longest_subsystem_alias = max(len(alias) for alias in subsystem_description.keys())
+        chars_before_description = longest_subsystem_alias + 2
+        for alias, description in sorted(subsystem_description.items()):
+            alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
+            print(f"{alias_str}{description}\n")
+
+        specific_help_cmd = f"{self._bin_name} help $subsystem"
+        print(
+            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a "
+            f"specific subsystem.\n"
+        )
+
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
             cmd = self.maybe_green(f"{self._bin_name} {args}".ljust(50))
@@ -149,6 +171,7 @@ class HelpPrinter(MaybeColor):
         print_cmd("help", "Display this usage message.")
         print_cmd("help goals", "List all installed goals.")
         print_cmd("help targets", "List all installed target types.")
+        print_cmd("help subsystems", "List all configurable subsystems.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
         print_cmd("help [target_type/goal/subsystem]", "Help for a target type, goal or subsystem.")
