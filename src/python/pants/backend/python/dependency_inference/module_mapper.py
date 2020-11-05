@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -20,6 +19,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets
 from pants.option.global_options import GlobalOptions
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -89,10 +89,9 @@ async def _stripped_file_names(
         Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.sources.address)),
         Get(Paths, PathGlobs, sources_field_path_globs),
     )
-    if source_root == ".":
+    if source_root.path == ".":
         return _StrippedFileNames(paths.files)
-    # NB: `os.path` is faster than `PurePath()`.
-    return _StrippedFileNames(os.path.relpath(f, source_root.path) for f in paths.files)
+    return _StrippedFileNames(fast_relpath(f, source_root.path) for f in paths.files)
 
 
 @rule(desc="Creating map of first party targets to Python modules", level=LogLevel.DEBUG)
