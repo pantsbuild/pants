@@ -151,7 +151,7 @@ class HelpPrinter(MaybeColor):
             alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
             print(f"{alias_str}{description}\n")
 
-        specific_help_cmd = f"{self._bin_name} help $subsystem_type"
+        specific_help_cmd = f"{self._bin_name} help $subsystem"
         print(
             f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a "
             f"specific subsystem.\n"
