@@ -35,6 +35,16 @@ def test_help_targets() -> None:
     assert "to get help for a specific target" in pants_run.stdout
 
 
+def test_help_subsystems() -> None:
+    pants_run = run_pants(["--backend-packages=pants.backend.python", "help", "subsystems"])
+    pants_run.assert_success()
+    assert (
+        "pex                     How Pants uses Pex to run Python subprocesses" in pants_run.stdout
+    )
+    assert "to get help for a specific subsystem" in pants_run.stdout
+    assert "test            Run tests." not in pants_run.stdout
+
+
 def test_help_specific_target() -> None:
     pants_run = run_pants(["help", "archive"])
     pants_run.assert_success()
