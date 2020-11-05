@@ -40,8 +40,8 @@ from pants.backend.python.target_types import (
     PythonDistribution,
     PythonLibrary,
     PythonRequirementLibrary,
-    resolve_pex_entry_point,
 )
+from pants.backend.python.target_types import rules as target_types_rules
 from pants.backend.python.util_rules import python_sources
 from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
@@ -95,8 +95,8 @@ def chroot_rule_runner() -> RuleRunner:
             get_owned_dependencies,
             get_exporting_owner,
             *python_sources.rules(),
+            *target_types_rules(),
             setup_kwargs_plugin,
-            resolve_pex_entry_point,
             SubsystemRule(SetupPyGeneration),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
             QueryRule(SetupPyChroot, (SetupPyChrootRequest,)),
@@ -270,6 +270,40 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
         chroot_rule_runner,
         Address("src/python/invalid_binary", target_name="invalid_bin3"),
         InvalidEntryPoint,
+    )
+
+
+def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
+    chroot_rule_runner.create_file("src/python/project/app.py")
+    chroot_rule_runner.add_to_build_file(
+        "src/python/project",
+        textwrap.dedent(
+            """
+            pex_binary(name='bin', sources=["app.py"], entry_point=':func')
+            python_distribution(
+                name='dist',
+                provides=setup_py(
+                    name='bin', version='1.1.1'
+                ).with_binaries(foo=':bin')
+            )
+            """
+        ),
+    )
+    assert_chroot(
+        chroot_rule_runner,
+        ["src/project/app.py", "setup.py", "MANIFEST.in"],
+        {
+            "name": "bin",
+            "version": "1.1.1",
+            "plugin_demo": "hello world",
+            "package_dir": {"": "src"},
+            "packages": ("project",),
+            "namespace_packages": (),
+            "install_requires": (),
+            "package_data": {},
+            "entry_points": {"console_scripts": ["foo=project.app:func"]},
+        },
+        Address("src/python/project", target_name="dist"),
     )
 
 

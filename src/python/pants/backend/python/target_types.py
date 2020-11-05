@@ -38,6 +38,7 @@ from pants.engine.target import (
     Target,
     WrappedTarget,
 )
+from pants.engine.unions import UnionRule
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
@@ -652,7 +653,7 @@ class InjectPythonDistributionDependencies(InjectDependenciesRequest):
 
 
 @rule
-async def inject_dependencies(
+async def inject_python_distribution_dependencies(
     request: InjectPythonDistributionDependencies,
 ) -> InjectedDependencies:
     """Inject any `.with_binaries()` values, as it would be redundant to have to include in the
@@ -673,4 +674,7 @@ async def inject_dependencies(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
+    )
