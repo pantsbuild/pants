@@ -3,8 +3,9 @@
 
 # Like Hello world, but built with Pants.
 pex_binary(
+    sources=['main.py'],
   dependencies=[
-    'examples/src/python/example/hello/greet:greet',
+    'testprojects/src/python/hello/greet:greet',
     ':lib',
   ],
 )

@@ -20,7 +20,8 @@ class TestHashUtils(unittest.TestCase):
 
 
 class CoercingJsonEncodingTest(unittest.TestCase):
-    def _coercing_json_encode(self, o):
+    @staticmethod
+    def _coercing_json_encode(o):
         return json.dumps(o, cls=CoercingEncoder)
 
     def test_normal_object_encoding(self):
@@ -32,7 +33,7 @@ class CoercingJsonEncodingTest(unittest.TestCase):
         self.assertEqual(self._coercing_json_encode([("a", 3)]), '[["a", 3]]')
         self.assertEqual(self._coercing_json_encode({"a": 3}), '{"a": 3}')
         self.assertEqual(self._coercing_json_encode([{"a": 3}]), '[{"a": 3}]')
-        self.assertEqual(self._coercing_json_encode(set([1])), "[1]")
+        self.assertEqual(self._coercing_json_encode({1}), "[1]")
 
     def test_rejects_ordered_dict(self):
         with self.assertRaisesRegex(

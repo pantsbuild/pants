@@ -12,9 +12,8 @@ python_integration_tests(
   name='integration',
   uses_pants_run=True,
   dependencies=[
-    'examples/src/python/example:hello_directory',
+    'testprojects/src/python:hello_directory',
     '//:pyproject',
-    'examples:isort_cfg',
   ],
   timeout=240,
 )

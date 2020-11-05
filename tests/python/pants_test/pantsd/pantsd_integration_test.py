@@ -566,7 +566,7 @@ Interrupted by user over pailgun client!
         with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
             # Run a repl, so that any other run waiting to acquire the daemon lock waits forever.
             first_run_handle = self.run_pants_with_workdir_without_waiting(
-                command=["repl", "examples/src/python/example/hello::"],
+                command=["repl", "testprojects/src/python/hello::"],
                 workdir=workdir,
                 config=config,
             )

@@ -17,7 +17,7 @@ def test_visualize_to():
                 f"--native-engine-visualize-to={destdir}",
                 "--backend-packages=pants.backend.python",
                 "list",
-                "examples/src/python/example/hello/greet",
+                "testprojects/src/python/hello/greet",
             ]
         ).assert_success()
         destdir_files = list(Path(destdir).iterdir())
@@ -30,9 +30,9 @@ def test_graceful_termination():
         [
             "--backend-packages=['pants.backend.python', 'internal_plugins.rules_for_testing']",
             "list-and-die-for-testing",
-            "examples/src/python/example/hello/greet",
+            "testprojects/src/python/hello/greet",
         ]
     )
     result.assert_failure()
-    assert result.stdout == "examples/src/python/example/hello/greet\n"
+    assert result.stdout == "testprojects/src/python/hello/greet\n"
     assert result.exit_code == 42
