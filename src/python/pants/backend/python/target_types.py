@@ -16,7 +16,7 @@ from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import PathGlobs, Paths
-from pants.engine.rules import Get, UnionRule, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -38,6 +38,7 @@ from pants.engine.target import (
     Target,
     WrappedTarget,
 )
+from pants.engine.unions import UnionRule
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
