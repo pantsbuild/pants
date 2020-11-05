@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from contextlib import contextmanager
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any
@@ -53,74 +53,9 @@ async def transitive_coroutine_rule(c: C) -> D:
     return D(b)
 
 
-@union
-class UnionBase:
-    pass
-
-
-@union
-class UnionWithNonMemberErrorMsg:
-    @staticmethod
-    def non_member_error_message(subject):
-        return f"specific error message for {type(subject).__name__} instance"
-
-
-class UnionWrapper:
-    def __init__(self, inner):
-        self.inner = inner
-
-
-class UnionA:
-    @staticmethod
-    def a() -> A:
-        return A()
-
-
-@rule
-def select_union_a(union_a: UnionA) -> A:
-    return union_a.a()
-
-
-class UnionB:
-    @staticmethod
-    def a() -> A:
-        return A()
-
-
-@rule
-def select_union_b(union_b: UnionB) -> A:
-    return union_b.a()
-
-
-# TODO: add MultiGet testing for unions!
-@rule
-async def a_union_test(union_wrapper: UnionWrapper) -> A:
-    union_a = await Get(A, UnionBase, union_wrapper.inner)
-    return union_a
-
-
-class UnionX:
-    pass
-
-
-@rule
-async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
-    # NB: We install a UnionRule to make UnionWrapper a member of this union, but then we pass the
-    # inner value, which is _not_ registered.
-    _ = await Get(A, UnionWithNonMemberErrorMsg, union_wrapper.inner)
-    raise AssertionError("The statement above this one should have failed!")
-
-
 @rule
 def boolean_and_int(i: int, b: bool) -> A:
     return A()
-
-
-@contextmanager
-def assert_execution_error(test_case, expected_msg):
-    with test_case.assertRaises(ExecutionError) as cm:
-        yield
-    test_case.assertIn(expected_msg, remove_locations_from_traceback(str(cm.exception)))
 
 
 class SchedulerTest(TestBase):
@@ -134,15 +69,6 @@ class SchedulerTest(TestBase):
             QueryRule(str, (A, C)),
             transitive_coroutine_rule,
             QueryRule(D, (C,)),
-            UnionRule(UnionBase, UnionA),
-            UnionRule(UnionWithNonMemberErrorMsg, UnionWrapper),
-            select_union_a,
-            UnionRule(union_base=UnionBase, union_member=UnionB),
-            select_union_b,
-            a_union_test,
-            QueryRule(A, (UnionWrapper,)),
-            error_msg_test_rule,
-            QueryRule(UnionX, (UnionWrapper,)),
             boolean_and_int,
             QueryRule(A, (int, bool)),
         )
@@ -188,25 +114,76 @@ class SchedulerTest(TestBase):
         # type of a value in equality.
         assert A() == self.request(A, [1, True])
 
-    @contextmanager
-    def _assert_execution_error(self, expected_msg):
-        with assert_execution_error(self, expected_msg):
-            yield
 
-    def test_union_rules(self):
-        self.request(A, [UnionWrapper(UnionA())])
-        self.request(A, [UnionWrapper(UnionB())])
-        # Fails due to no union relationship from A -> UnionBase.
-        with self._assert_execution_error("Type A is not a member of the UnionBase @union"):
-            self.request(A, [UnionWrapper(A())])
+# -----------------------------------------------------------------------------------------------
+# Test unions
+# -----------------------------------------------------------------------------------------------
 
-    def test_union_rules_no_docstring(self):
-        with self._assert_execution_error("specific error message for UnionA instance"):
-            self.request(UnionX, [UnionWrapper(UnionA())])
+
+@union
+class Vehicle(ABC):
+    @abstractmethod
+    def num_wheels(self) -> int:
+        pass
+
+
+class Car(Vehicle):
+    def num_wheels(self) -> int:
+        return 4
+
+
+class Motorcycle(Vehicle):
+    def num_wheels(self) -> int:
+        return 2
+
+
+@rule
+def car_num_wheels(car: Car) -> int:
+    return car.num_wheels()
+
+
+@rule
+def motorcycle_num_wheels(motorcycle: Motorcycle) -> int:
+    return motorcycle.num_wheels()
+
+
+# We want to test that using a union in a `Get` works correctly, so we
+@dataclass(frozen=True)
+class WrappedVehicle:
+    vehicle: Vehicle
+
+
+@rule
+async def generic_num_wheels(wrapped_vehicle: WrappedVehicle) -> int:
+    return await Get(int, Vehicle, wrapped_vehicle.vehicle)
+
+
+def test_union_rules() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            car_num_wheels,
+            motorcycle_num_wheels,
+            UnionRule(Vehicle, Car),
+            UnionRule(Vehicle, Motorcycle),
+            generic_num_wheels,
+            QueryRule(int, [WrappedVehicle]),
+        ],
+    )
+    assert rule_runner.request(int, [WrappedVehicle(Car())]) == 4
+    assert rule_runner.request(int, [WrappedVehicle(Motorcycle())]) == 2
+
+    # Fails due to no union relationship between Vehicle -> str.
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(int, [WrappedVehicle("not a vehicle")])  # type: ignore[arg-type]
+    assert (
+        "Invalid Get. Because the second argument to `Get(int, Vehicle, not a vehicle)` is "
+        "annotated with `@union`, the third argument should be a member of that union. Did you "
+        "intend to register `UnionRule(Vehicle, str)`?"
+    ) in str(exc.value.args[0])
 
 
 # -----------------------------------------------------------------------------------------------
-# Test tracebacks.
+# Test tracebacks
 # -----------------------------------------------------------------------------------------------
 
 

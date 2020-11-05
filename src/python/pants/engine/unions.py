@@ -12,41 +12,22 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 @decorated_type_checkable
 def union(cls):
-    """A class decorator which other classes can specify that they can resolve to with `UnionRule`.
+    """A class decorator to allow a class to be a union base in the engine's mechanism for
+    polymorphism.
 
-    Annotating a class with @union allows other classes to use a UnionRule() instance to indicate
-    that they can be resolved to this base union class. This class will never be instantiated, and
-    should have no members -- it is used as a tag only, and will be replaced with whatever object is passed
-    in as the subject of a `await Get(...)`. See the following example:
+    Annotating a class with @union allows other classes to register a `UnionRule(BaseClass,
+    MemberClass)`. Then, you can use `await Get(Output, UnionBase, concrete_union_member)`. This
+    would be similar to writing `UnionRule(Output, ConcreteUnionMember,
+    concrete_union_member_instance)`, but allows you to write generic code without knowing at the
+    time of writing that.
 
-    @union
-    class UnionBase: pass
+    Often, union bases are abstract classes, but they need not be.
 
-    @rule
-    async def get_some_union_type(x: X) -> B:
-      result = await Get(ResultType, UnionBase, x.f())
-      # ...
-
-    If there exists a single path from (whatever type the expression `x.f()` returns) -> `ResultType`
-    in the rule graph, the engine will retrieve and execute that path to produce a `ResultType` from
-    `x.f()`. This requires also that whatever type `x.f()` returns was registered as a union member of
-    `UnionBase` with a `UnionRule`.
-
-    Unions allow @rule bodies to be written without knowledge of what types may eventually be provided
-    as input -- rather, they let the engine check that there is a valid path to the desired result.
+    See https://www.pantsbuild.org/docs/rules-api-unions.
     """
     # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
     assert isinstance(cls, type)
-
-    def non_member_error_message(subject):
-        if hasattr(cls, "non_member_error_message"):
-            return cls.non_member_error_message(subject)
-        desc = f' ("{cls.__doc__}")' if cls.__doc__ else ""
-        return f"Type {type(subject).__name__} is not a member of the {cls.__name__} @union{desc}"
-
-    return union.define_instance_of(
-        cls, non_member_error_message=staticmethod(non_member_error_message)
-    )
+    return union.define_instance_of(cls)
 
 
 @dataclass(frozen=True)
@@ -59,10 +40,16 @@ class UnionRule:
 
     def __post_init__(self) -> None:
         if not union.is_instance(self.union_base):
-            raise ValueError(
-                f"union_base must be a type annotated with @union: was {self.union_base} "
-                f"(type {type(self.union_base).__name__})"
+            msg = (
+                f"The first argument must be a class annotated with @union "
+                f"(from pants.engine.unions), but was {self.union_base}."
             )
+            if union.is_instance(self.union_member):
+                msg += (
+                    "\n\nHowever, the second argument was annotated with `@union`. Did you "
+                    "switch the first and second arguments to `UnionRule()`?"
+                )
+            raise ValueError(msg)
 
 
 _T = TypeVar("_T")
