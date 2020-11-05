@@ -16,6 +16,7 @@ from pants.base.build_environment import (
     get_pants_configdir,
     pants_version,
 )
+from pants.base.deprecated import resolve_conflicting_options
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE
@@ -74,11 +75,11 @@ class ExecutionOptions:
     remote_store_connection_limit: Any
     process_execution_local_parallelism: Any
     process_execution_remote_parallelism: Any
+    process_execution_cache_namespace: Any
     process_execution_cleanup_local_dirs: Any
     process_execution_speculation_delay: Any
     process_execution_speculation_strategy: Any
     process_execution_use_local_cache: Any
-    remote_execution_process_cache_namespace: Any
     remote_instance_name: Any
     remote_ca_certs_path: Any
     remote_oauth_bearer_token_path: Any
@@ -106,7 +107,14 @@ class ExecutionOptions:
             process_execution_speculation_delay=bootstrap_options.process_execution_speculation_delay,
             process_execution_speculation_strategy=bootstrap_options.process_execution_speculation_strategy,
             process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
-            remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
+            process_execution_cache_namespace=resolve_conflicting_options(
+                old_option="remote_execution_process_cache_namespace",
+                new_option="process_execution_cache_namespace",
+                old_scope=GLOBAL_SCOPE,
+                new_scope=GLOBAL_SCOPE,
+                old_container=bootstrap_options,
+                new_container=bootstrap_options,
+            ),
             remote_instance_name=bootstrap_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
@@ -130,11 +138,11 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_connection_limit=5,
     process_execution_local_parallelism=multiprocessing.cpu_count(),
     process_execution_remote_parallelism=128,
+    process_execution_cache_namespace=None,
     process_execution_cleanup_local_dirs=True,
     process_execution_speculation_delay=1,
     process_execution_speculation_strategy="none",
     process_execution_use_local_cache=True,
-    remote_execution_process_cache_namespace=None,
     remote_instance_name=None,
     remote_ca_certs_path=None,
     remote_oauth_bearer_token_path=None,
@@ -616,6 +624,17 @@ class GlobalOptions(Subsystem):
             help="Number of concurrent processes that may be executed remotely.",
         )
         register(
+            "--process-execution-cache-namespace",
+            advanced=True,
+            type=str,
+            default="",
+            help=(
+                "The cache namespace for process execution. "
+                "Change this value to invalidate every artifact's execution, or to prevent "
+                "process cache entries from being (re)used for different usecases or users."
+            ),
+        )
+        register(
             "--process-execution-speculation-delay",
             type=float,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_speculation_delay,
@@ -717,6 +736,8 @@ class GlobalOptions(Subsystem):
         register(
             "--remote-execution-process-cache-namespace",
             advanced=True,
+            removal_version="2.2.0.dev0",
+            removal_hint="Use the `--process-execution-cache-namespace` option instead.",
             help="The cache namespace for remote process execution. "
             "Bump this to invalidate every artifact's remote execution. "
             "This is the remote execution equivalent of the legacy cache-key-gen-version "
