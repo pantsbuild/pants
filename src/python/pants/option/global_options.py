@@ -626,6 +626,8 @@ class GlobalOptions(Subsystem):
         register(
             "--process-execution-cache-namespace",
             advanced=True,
+            type=str,
+            default="",
             help=(
                 "The cache namespace for process execution. "
                 "Change this value to invalidate every artifact's execution, or to prevent "
@@ -734,7 +736,7 @@ class GlobalOptions(Subsystem):
         register(
             "--remote-execution-process-cache-namespace",
             advanced=True,
-            removal_version="2.2.0dev0",
+            removal_version="2.2.0.dev0",
             removal_hint="Use the `--process-execution-cache-namespace` option instead.",
             help="The cache namespace for remote process execution. "
             "Bump this to invalidate every artifact's remote execution. "
