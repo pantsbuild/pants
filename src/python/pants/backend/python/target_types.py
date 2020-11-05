@@ -38,6 +38,7 @@ from pants.engine.target import (
     Target,
     WrappedTarget,
 )
+from pants.engine.unions import UnionRule
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.option.subsystem import Subsystem
 from pants.python.python_requirement import PythonRequirement
@@ -715,4 +716,7 @@ async def inject_dependencies(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
+    )
