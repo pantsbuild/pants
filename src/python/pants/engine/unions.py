@@ -18,8 +18,8 @@ def union(cls):
     Annotating a class with @union allows other classes to register a `UnionRule(BaseClass,
     MemberClass)`. Then, you can use `await Get(Output, UnionBase, concrete_union_member)`. This
     would be similar to writing `UnionRule(Output, ConcreteUnionMember,
-    concrete_union_member_instance)`, but allows you to write generic code without knowing at the
-    time of writing that.
+    concrete_union_member_instance)`, but allows you to write generic code without knowing what
+    concrete classes might later implement that union.
 
     Often, union bases are abstract classes, but they need not be.
 
