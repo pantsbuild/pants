@@ -147,7 +147,6 @@ def motorcycle_num_wheels(motorcycle: Motorcycle) -> int:
     return motorcycle.num_wheels()
 
 
-# We want to test that using a union in a `Get` works correctly, so we
 @dataclass(frozen=True)
 class WrappedVehicle:
     vehicle: Vehicle
