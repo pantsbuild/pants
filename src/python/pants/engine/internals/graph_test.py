@@ -205,6 +205,49 @@ def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: R
     assert transitive_targets.dependencies == FrozenOrderedSet([intermediate])
     assert transitive_targets.closure == FrozenOrderedSet([root, intermediate])
 
+    # Regression test that we work with deeply nested levels of excludes.
+    transitive_targets_rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            target(name='t1')
+            target(name='t2', dependencies=[':t1'])
+            target(name='t3', dependencies=[':t2'])
+            target(name='t4', dependencies=[':t3'])
+            target(name='t5', dependencies=[':t4'])
+            target(name='t6', dependencies=[':t5'])
+            target(name='t7', dependencies=[':t6'])
+            target(name='t8', dependencies=[':t7'])
+            target(name='t9', dependencies=[':t8'])
+            target(name='t10', dependencies=[':t9'])
+            target(name='t11', dependencies=[':t10'])
+            target(name='t12', dependencies=[':t11'])
+            target(name='t13', dependencies=[':t12'])
+            target(name='t14', dependencies=[':t13'])
+            target(name='t15', dependencies=[':t14', '!!:t1', '!!:t5'])
+            """
+        ),
+    )
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets, [TransitiveTargetsRequest([get_target("t15").address])]
+    )
+    assert transitive_targets.dependencies == FrozenOrderedSet(
+        [
+            get_target("t14"),
+            get_target("t13"),
+            get_target("t12"),
+            get_target("t11"),
+            get_target("t10"),
+            get_target("t9"),
+            get_target("t8"),
+            get_target("t7"),
+            get_target("t6"),
+            get_target("t4"),
+            get_target("t3"),
+            get_target("t2"),
+        ]
+    )
+
 
 def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) -> None:
     """Test that subclasses of `SpecialCasedDependencies` show up if requested, but otherwise are
