@@ -343,9 +343,12 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
     for t in (*roots_as_targets, *visited):
         unparsed = t.get(Dependencies).unevaluated_transitive_excludes
         if unparsed.values:
-            unevaluated_transitive_excludes.append(Get(Targets, UnparsedAddressInputs, unparsed))
+            unevaluated_transitive_excludes.append(unparsed)
     if unevaluated_transitive_excludes:
-        nested_transitive_excludes = await MultiGet(*unevaluated_transitive_excludes)
+        nested_transitive_excludes = await MultiGet(
+            Get(Targets, UnparsedAddressInputs, unparsed)
+            for unparsed in unevaluated_transitive_excludes
+        )
         transitive_excludes = FrozenOrderedSet(
             itertools.chain.from_iterable(excludes for excludes in nested_transitive_excludes)
         )
