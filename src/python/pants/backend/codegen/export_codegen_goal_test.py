@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from pants.backend.codegen.write_codegen_goal import WriteCodegen
-from pants.backend.codegen.write_codegen_goal import rules as write_codegen_rules
+from pants.backend.codegen.export_codegen_goal import ExportCodegen
+from pants.backend.codegen.export_codegen_goal import rules as write_codegen_rules
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules import distdir
 from pants.engine.fs import CreateDigest, FileContent, Snapshot
@@ -72,15 +72,15 @@ def rule_runner() -> RuleRunner:
 
 
 def test_no_codegen_targets(rule_runner: RuleRunner, caplog) -> None:
-    result = rule_runner.run_goal_rule(WriteCodegen)
+    result = rule_runner.run_goal_rule(ExportCodegen)
     assert result.exit_code == 0
     assert len(caplog.records) == 1
     assert "No codegen files/targets matched. All codegen target types: gen1, gen2" in caplog.text
 
 
-def test_write_codegen(rule_runner: RuleRunner) -> None:
+def test_export_codegen(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file("", "gen1(name='gen1')\ngen2(name='gen2')\n")
-    result = rule_runner.run_goal_rule(WriteCodegen, args=["::"])
+    result = rule_runner.run_goal_rule(ExportCodegen, args=["::"])
     assert result.exit_code == 0
     parent_dir = Path(rule_runner.build_root, "dist", "codegen")
     assert (parent_dir / "assets" / "README.md").read_text() == "Hello!"

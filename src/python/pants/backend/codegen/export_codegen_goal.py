@@ -20,26 +20,26 @@ from pants.engine.unions import UnionMembership
 logger = logging.getLogger(__name__)
 
 
-class WriteCodegenSubsystem(GoalSubsystem):
+class ExportCodegenSubsystem(GoalSubsystem):
     """Write generated files to `dist/codegen` for use outside of Pants."""
 
-    name = "write-codegen"
+    name = "export-codegen"
 
     required_union_implementations = (GenerateSourcesRequest,)
 
 
-class WriteCodegen(Goal):
-    subsystem_cls = WriteCodegenSubsystem
+class ExportCodegen(Goal):
+    subsystem_cls = ExportCodegenSubsystem
 
 
 @goal_rule
-async def write_codegen(
+async def export_codegen(
     targets: Targets,
     union_membership: UnionMembership,
     workspace: Workspace,
     dist_dir: DistDir,
     registered_target_types: RegisteredTargetTypes,
-) -> WriteCodegen:
+) -> ExportCodegen:
     # We run all possible code generators. Running codegen requires specifying the expected
     # output_type, so we must inspect what is possible to generate.
     all_generate_request_types = union_membership.get(GenerateSourcesRequest)
@@ -67,7 +67,7 @@ async def write_codegen(
             "No codegen files/targets matched. All codegen target types: "
             f"{', '.join(codegen_targets)}"
         )
-        return WriteCodegen(exit_code=0)
+        return ExportCodegen(exit_code=0)
 
     all_hydrated_sources = await MultiGet(
         Get(
@@ -89,7 +89,7 @@ async def write_codegen(
     dest = str(dist_dir.relpath / "codegen")
     logger.info(f"Writing generated files to {dest}")
     workspace.write_digest(merged_digest, path_prefix=dest)
-    return WriteCodegen(exit_code=0)
+    return ExportCodegen(exit_code=0)
 
 
 def rules():
