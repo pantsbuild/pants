@@ -121,6 +121,7 @@ def create_pex_binary_target(rule_runner: RuleRunner, source_file: FileContent) 
             pex_binary(
               name='bin',
               sources=['{PurePath(source_file.path).name}'],
+              output_path="bin.pex",
             )
             """
         ),
