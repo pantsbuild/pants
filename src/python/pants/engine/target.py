@@ -492,31 +492,29 @@ class Target(ABC):
 
     @final
     @classmethod
-    def class_has_field(cls, field: Type[Field], *, union_membership: UnionMembership) -> bool:
+    def class_has_field(cls, field: Type[Field], union_membership: UnionMembership) -> bool:
         """Behaves like `Target.has_field()`, but works as a classmethod rather than an instance
         method."""
-        return cls.class_has_fields([field], union_membership=union_membership)
+        return cls.class_has_fields([field], union_membership)
 
     @final
     @classmethod
     def class_has_fields(
-        cls, fields: Iterable[Type[Field]], *, union_membership: UnionMembership
+        cls, fields: Iterable[Type[Field]], union_membership: UnionMembership
     ) -> bool:
         """Behaves like `Target.has_fields()`, but works as a classmethod rather than an instance
         method."""
-        return cls._has_fields(
-            fields, registered_fields=cls.class_field_types(union_membership=union_membership)
-        )
+        return cls._has_fields(fields, registered_fields=cls.class_field_types(union_membership))
 
     @final
     @classmethod
-    def class_get_field(cls, field: Type[_F], *, union_membership: UnionMembership) -> Type[_F]:
+    def class_get_field(cls, field: Type[_F], union_membership: UnionMembership) -> Type[_F]:
         """Get the requested Field type registered with this target type.
 
         This will error if the field is not registered, so you should call Target.class_has_field()
         first.
         """
-        class_fields = cls.class_field_types(union_membership=union_membership)
+        class_fields = cls.class_field_types(union_membership)
         result = next(
             (
                 registered_field

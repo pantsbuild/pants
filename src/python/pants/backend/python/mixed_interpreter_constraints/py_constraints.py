@@ -19,11 +19,13 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
+    RegisteredTargetTypes,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
 )
+from pants.engine.unions import UnionMembership
 from pants.python.python_setup import PythonSetup
 
 logger = logging.getLogger(__name__)
@@ -42,13 +44,14 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
             type=bool,
             default=False,
             help=(
-                "Output a CSV with each per-target information about interpreter constraints. The "
+                "Output a CSV summary of interpreter constraints for your whole repository. The "
                 "headers are `Target`, `Constraints`, `Transitive Constraints`, `# Dependencies`, "
-                "and `# Dependees`.\n\nThis information can be useful when prioritizing a Python "
-                "migration, such as Python 3 migrations. Use `# Dependencies` and `# Dependees` to "
-                "help prioritize which targets are easiest to port (low # dependencies) and "
-                "highest impact to port (high # dependees).\n\nYou may want to import into Excel "
-                "or Google Sheets to post-process/filter the data."
+                "and `# Dependees`.\n\nThis information can be useful when prioritizing a "
+                "migration from one Python version to another (e.g. to Python 3). Use "
+                "`# Dependencies` and `# Dependees` to help prioritize which targets are easiest "
+                "to port (low # dependencies) and highest impact to port (high # dependees).\n\n"
+                "Use a tool like Pandas or Excel to process the CSV. Use the option "
+                "`--py-constraints-output-file=summary.csv` to write directly to a file."
             ),
         )
 
@@ -67,13 +70,14 @@ async def py_constraints(
     console: Console,
     py_constraints_subsystem: PyConstraintsSubsystem,
     python_setup: PythonSetup,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
 ) -> PyConstraintsGoal:
     if py_constraints_subsystem.summary:
         if addresses:
             console.print_stderr(
-                "The `py-constraints --summary` goal does not take file/target arguments. It will "
-                "generate a summary of your entire repository. You can then use Google "
-                "Sheets/Excel to post-process/filter the data."
+                "The `py-constraints --summary` goal does not take file/target arguments. Run "
+                "`help py-constraints` for more details."
             )
             return PyConstraintsGoal(exit_code=1)
 
@@ -150,7 +154,16 @@ async def py_constraints(
     )
 
     if not final_constraints:
-        logger.warning("No Python files/targets matched for the `py-constraints` goal.")
+        target_types_with_constraints = sorted(
+            tgt_type.alias
+            for tgt_type in registered_target_types.types
+            if tgt_type.class_has_field(InterpreterConstraintsField, union_membership)
+            or tgt_type.class_has_field(PythonInterpreterCompatibility, union_membership)
+        )
+        logger.warning(
+            "No Python files/targets matched for the `py-constraints` goal. All target types with "
+            f"Python interpreter constraints: {', '.join(target_types_with_constraints)}"
+        )
         return PyConstraintsGoal(exit_code=0)
 
     constraints_to_addresses = defaultdict(set)

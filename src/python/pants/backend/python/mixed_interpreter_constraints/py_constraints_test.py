@@ -9,14 +9,16 @@ from pants.backend.python.mixed_interpreter_constraints.py_constraints import Py
 from pants.backend.python.mixed_interpreter_constraints.py_constraints import (
     rules as py_constraints_rules,
 )
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonTests
 from pants.core.target_types import Files
 from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=py_constraints_rules(), target_types=[Files, PythonLibrary])
+    return RuleRunner(
+        rules=py_constraints_rules(), target_types=[Files, PythonLibrary, PythonTests]
+    )
 
 
 def setup_project(rule_runner: RuleRunner) -> None:
@@ -53,7 +55,10 @@ def test_no_matches(rule_runner: RuleRunner, caplog) -> None:
     result = rule_runner.run_goal_rule(PyConstraintsGoal, args=["f.txt"])
     assert result.exit_code == 0
     assert len(caplog.records) == 1
-    assert "No Python files/targets matched" in caplog.text
+    assert (
+        "No Python files/targets matched for the `py-constraints` goal. All target types with "
+        "Python interpreter constraints: python_library, python_tests"
+    ) in caplog.text
 
 
 def test_render_constraints(rule_runner: RuleRunner) -> None:
