@@ -537,12 +537,9 @@ class _SingleFileConfig(Config):
 
 @dataclass(frozen=True)
 class _ChainedConfig(Config):
-    """Config read from multiple sources.
+    """Config read from multiple sources."""
 
-    :param chained_configs: A tuple of Config instances to chain. Later instances take precedence
-                            over earlier ones.
-    """
-
+    # Config instances to chain. Later instances take precedence over earlier ones.
     chained_configs: Tuple[_SingleFileConfig, ...]
 
     @property
@@ -616,7 +613,7 @@ class TomlSerializer:
       }
     """
 
-    parsed: Dict[str, Dict[str, Union[int, float, str, bool, List, Dict]]]
+    parsed: Mapping[str, Dict[str, Union[int, float, str, bool, List, Dict]]]
 
     def normalize(self) -> Dict:
         result: Dict = {}

@@ -75,7 +75,7 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
 
 
 def test_logs_unhandled_exception() -> None:
-    directory = "examples/src/python/example/hello/main"
+    directory = "testprojects/src/python/hello/main"
     with temporary_dir() as tmpdir:
         pants_run = run_pants_with_workdir(
             ["--no-pantsd", "list", f"{directory}:this-target-does-not-exist"],

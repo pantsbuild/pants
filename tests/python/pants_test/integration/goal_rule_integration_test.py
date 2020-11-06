@@ -36,7 +36,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
         with self.pantsd_successful_run_context() as ctx:
 
             def run_list():
-                result = ctx.runner(["list", "examples/src/python/example/hello::"])
+                result = ctx.runner(["list", "testprojects/src/python/hello::"])
                 ctx.checker.assert_started()
                 return result
 

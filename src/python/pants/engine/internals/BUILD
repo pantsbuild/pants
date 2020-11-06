@@ -15,8 +15,8 @@ python_integration_tests(
   name='integration',
   uses_pants_run=True,
   dependencies=[
-    'examples/src/python/example:hello_directory',
     'pants-plugins/internal_plugins/rules_for_testing',
+    'testprojects/src/python:hello_directory',
   ],
   timeout=180,
 )

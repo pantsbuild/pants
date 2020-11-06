@@ -14,7 +14,7 @@ from pants.util.dirutil import read_file
 
 @ensure_daemon
 def test_fmt_then_edit():
-    f = "examples/src/python/example/hello/greet/greet.py"
+    f = "testprojects/src/python/hello/greet/greet.py"
     with temporary_workdir() as workdir:
 
         def run() -> None:

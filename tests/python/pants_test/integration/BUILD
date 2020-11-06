@@ -15,7 +15,7 @@ python_integration_tests(
   name = 'goal_rule_integration',
   sources = ['goal_rule_integration_test.py'],
   dependencies = [
-    'examples/src/python/example:hello_directory',
+    'testprojects/src/python:hello_directory',
     'testprojects/tests/python/pants:dummies_directory',
   ],
   uses_pants_run=True,

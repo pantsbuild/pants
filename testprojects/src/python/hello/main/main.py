@@ -3,7 +3,7 @@
 
 import sys
 
-from example.hello.greet.greet import greet
+from hello.greet.greet import greet
 
 if __name__ == "__main__":
     greetees = sys.argv[1:] or ["world"]

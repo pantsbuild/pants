@@ -145,7 +145,7 @@ def run_pants_with_workdir_without_waiting(
     if config:
         toml_file_name = os.path.join(workdir, "pants.toml")
         with safe_open(toml_file_name, mode="w") as fp:
-            fp.write(TomlSerializer(config).serialize())  # type: ignore[arg-type]
+            fp.write(TomlSerializer(config).serialize())
         args.append(f"--pants-config-files={toml_file_name}")
 
     pants_script = [sys.executable, "-m", "pants"]
@@ -242,6 +242,8 @@ def run_pants(
     :param use_pantsd: If True, the Pants process will use pantsd.
     :param config: Optional data for a generated TOML file. A map of <section-name> ->
         map of key -> value.
+    :param extra_env: Set these env vars in the Pants process's environment.
+    :param stdin_data: Make this data available to be read from the process's stdin.
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     """
     with temporary_workdir() as workdir:

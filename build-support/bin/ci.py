@@ -307,7 +307,7 @@ def run_smoke_tests() -> None:
 
 
 def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
-    targets = ["build-support::", "examples::", "src::", "tests::"]
+    targets = ["build-support::", "src::", "tests::"]
     command = ["./pants.pex", "--tag=-nolint", "lint", "typecheck", *targets]
     if oauth_token_path:
         command.extend(_use_remote_execution(oauth_token_path))

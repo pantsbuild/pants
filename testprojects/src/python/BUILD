@@ -22,6 +22,11 @@ files(
 )
 
 files(
+  name = 'hello_directory',
+  sources = ['hello/**/*'],
+)
+
+files(
   name = 'no_build_file_directory',
   sources = ['no_build_file/**/*'],
 )
