@@ -412,7 +412,9 @@ logger = logging.getLogger(__name__)
 
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
-async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -> PythonExecutable:
+async def find_interpreter(
+    interpreter_constraints: PexInterpreterConstraints, pex_runtime_env: PexRuntimeEnvironment
+) -> PythonExecutable:
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
     process = await Get(
         Process,
@@ -455,6 +457,12 @@ async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -
         ProcessResult, UncacheableProcess(process=process, scope=ProcessScope.PER_SESSION)
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
+
+    if pex_runtime_env.verbosity > 0:
+        log_output = result.stderr.decode()
+        if log_output:
+            logger.info("%s", log_output)
+
     return PythonExecutable(path=path, fingerprint=fingerprint)
 
 
@@ -464,7 +472,7 @@ async def create_pex(
     python_setup: PythonSetup,
     python_repos: PythonRepos,
     platform: Platform,
-    pex_runtime_environment: PexRuntimeEnvironment,
+    pex_runtime_env: PexRuntimeEnvironment,
 ) -> Pex:
     """Returns a PEX with the given settings."""
 
@@ -505,9 +513,6 @@ async def create_pex(
             argv.extend(request.interpreter_constraints.generate_pex_arg_list())
 
     argv.append("--no-emit-warnings")
-    verbosity = pex_runtime_environment.verbosity
-    if verbosity > 0:
-        argv.append(f"-{'v' * verbosity}")
 
     if python_setup.resolver_jobs:
         argv.extend(["--jobs", str(python_setup.resolver_jobs)])
@@ -588,7 +593,7 @@ async def create_pex(
         ),
     )
 
-    if verbosity > 0:
+    if pex_runtime_env.verbosity > 0:
         log_output = result.stderr.decode()
         if log_output:
             logger.info("%s", log_output)
