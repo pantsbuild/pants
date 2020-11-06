@@ -4,7 +4,6 @@
 import csv
 import logging
 from collections import defaultdict
-from io import StringIO
 from textwrap import fill, indent
 from typing import cast
 
@@ -128,23 +127,21 @@ async def py_constraints(
             )
         ]
 
-        output_stream = StringIO()
-        writer = csv.DictWriter(
-            output_stream,
-            fieldnames=[
-                "Target",
-                "Constraints",
-                "Transitive Constraints",
-                "# Dependencies",
-                "# Dependees",
-            ],
-        )
-        writer.writeheader()
-        for entry in data:
-            writer.writerow(entry)
+        with py_constraints_subsystem.output_sink(console) as stdout:
+            writer = csv.DictWriter(
+                stdout,
+                fieldnames=[
+                    "Target",
+                    "Constraints",
+                    "Transitive Constraints",
+                    "# Dependencies",
+                    "# Dependees",
+                ],
+            )
+            writer.writeheader()
+            for entry in data:
+                writer.writerow(entry)
 
-        with py_constraints_subsystem.output(console) as output_stdout:
-            output_stdout(output_stream.getvalue())
         return PyConstraintsGoal(exit_code=0)
 
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
