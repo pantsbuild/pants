@@ -12,7 +12,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule
 from pants.engine.target import Field, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
@@ -20,7 +20,7 @@ from pants.util.strutil import strip_v2_chroot_path
 
 
 @dataclass(frozen=True)
-class FmtResult(EngineAwareReturnType):
+class FmtResult:
     input: Digest
     output: Digest
     stdout: str
@@ -70,6 +70,9 @@ class FmtResult(EngineAwareReturnType):
     def did_change(self) -> bool:
         return self.output != self.input
 
+
+@dataclass(frozen=True)
+class EnrichedFmtResult(FmtResult, EngineAwareReturnType):
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
@@ -77,7 +80,7 @@ class FmtResult(EngineAwareReturnType):
 
     def message(self) -> Optional[str]:
         if self.skipped:
-            return "skipped."
+            return f"{self.formatter_name} skipped."
         message = "made changes." if self.did_change else "made no changes."
         output = ""
         if self.stdout:
@@ -86,7 +89,18 @@ class FmtResult(EngineAwareReturnType):
             output += f"\n{self.stderr}"
         if output:
             output = f"{output.rstrip()}\n\n"
-        return f"{message}{output}"
+        return f"{self.formatter_name} {message}{output}"
+
+
+@_uncacheable_rule(desc="fmt")
+async def enrich_fmt_result(result: FmtResult) -> EnrichedFmtResult:
+    return EnrichedFmtResult(
+        input=result.input,
+        output=result.output,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        formatter_name=result.formatter_name,
+    )
 
 
 @union
