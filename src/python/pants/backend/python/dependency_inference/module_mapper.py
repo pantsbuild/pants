@@ -95,8 +95,8 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
     # `StrippedSourceFiles`, so that we can use `Get(SourcesPaths, SourcesPathsRequest)` instead of
     # `Get(HydratedSources, HydrateSourcesRequest)`, which is much faster.
     #
-    # This implementation is kept private because it's not fully comprehensive, such as not looking
-    # at codegen. That's fine for dep inference, but not in other contexts.
+    # This implementation is kept private because we don't yet want to add an abstraction to get
+    # the stripped source file names, until we have another use.
     stripped_sources_per_explicit_target = await MultiGet(
         Get(_StrippedFileNames, _StrippedFileNamesRequest(tgt[PythonSources]))
         for tgt in candidate_targets
