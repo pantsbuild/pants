@@ -92,6 +92,8 @@ class EnrichedFmtResult(FmtResult, EngineAwareReturnType):
         return f"{self.formatter_name} {message}{output}"
 
 
+# NB: We mark this uncachable to ensure that the results are always streamed, even if the
+# underlying FmtResult is memoized. This rule is very cheap, so there's little performance hit.
 @_uncacheable_rule(desc="fmt")
 async def enrich_fmt_result(result: FmtResult) -> EnrichedFmtResult:
     return EnrichedFmtResult(

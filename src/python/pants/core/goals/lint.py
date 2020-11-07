@@ -79,6 +79,10 @@ class LintResults:
     results: Tuple[LintResult, ...]
     linter_name: str
 
+    def __init__(self, results: Iterable[LintResult], *, linter_name: str) -> None:
+        self.results = tuple(results)
+        self.linter_name = linter_name
+
     @property
     def skipped(self) -> bool:
         return bool(self.results) is False
@@ -90,10 +94,6 @@ class LintResults:
     @memoized_property
     def reports(self) -> Tuple[LintReport, ...]:
         return tuple(result.report for result in self.results if result.report)
-
-    def __init__(self, results: Iterable[LintResult], *, linter_name: str) -> None:
-        self.results = tuple(results)
-        self.linter_name = linter_name
 
 
 class EnrichedLintResults(LintResults, EngineAwareReturnType):
