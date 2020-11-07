@@ -4,7 +4,7 @@
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
+from typing import ClassVar, Iterable, List, Optional, Tuple, Type, TypeVar, cast
 
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
@@ -18,6 +18,8 @@ from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
 
+_F = TypeVar("_F", bound="FmtResult")
+
 
 @dataclass(frozen=True)
 class FmtResult:
@@ -28,7 +30,7 @@ class FmtResult:
     formatter_name: str
 
     @classmethod
-    def skip(cls, *, formatter_name: str) -> "FmtResult":
+    def skip(cls: Type[_F], *, formatter_name: str) -> _F:
         return cls(
             input=EMPTY_DIGEST,
             output=EMPTY_DIGEST,
