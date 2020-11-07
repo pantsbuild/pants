@@ -593,7 +593,7 @@ async def MultiGet(  # noqa: F811
                     map(str, likely_args_exlicitly_passed)
                 )}
 
-                When constructing a MultiGet from individual Gets all leading arguments must be
+                When constructing a MultiGet from individual Gets, all leading arguments must be
                 Gets.
                 """
             )
@@ -609,8 +609,8 @@ async def MultiGet(  # noqa: F811
             2. MultiGet(Get[T1], Get[T2], ...) -> Tuple[T1, T2, ...]
 
             The 1st form is intended for homogenous collections of Gets and emulates an
-            async for ... comprehension used to iterate over the collection in parallel and collect
-            the results in a homogenous Tuple when all are complete.
+            async `for ...` comprehension used to iterate over the collection in parallel and
+            collect the results in a homogenous tuple when all are complete.
 
             The 2nd form supports executing heterogeneous Gets in parallel and collecting them in a
             heterogenous tuple when all are complete. Currently up to 10 heterogenous Gets can be

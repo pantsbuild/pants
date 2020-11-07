@@ -910,21 +910,18 @@ impl Task {
           .and_then(|edges| {
             edges.entry_for(&dependency_key).cloned().ok_or_else(|| {
               if externs::is_union(get.input_type) {
-                let value = externs::type_for_type_id(get.input_type).into_object();
-                match externs::call_method(
-                  &value,
-                  "non_member_error_message",
-                  &[externs::val_for(&get.input)],
-                ) {
-                  Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
-                  // If the non_member_error_message() call failed for any reason,
-                  // fall back to a generic message.
-                  Err(_e) => throw(&format!(
-                    "Type {} is not a member of the {} @union",
-                    get.input.type_id(),
-                    get.input_type
-                  )),
-                }
+                throw(&format!(
+                  "Invalid Get. Because the second argument to `Get({}, {}, {:?})` is annotated \
+                    with `@union`, the third argument should be a member of that union. Did you \
+                    intend to register `UnionRule({}, {})`? If not, you may be using the wrong \
+                    type ({}) for the third argument.",
+                  get.output,
+                  get.input_type,
+                  get.input,
+                  get.input_type,
+                  get.input.type_id(),
+                  get.input.type_id(),
+                ))
               } else {
                 // NB: The Python constructor for `Get()` will have already errored if
                 // `type(input) != input_type`.
