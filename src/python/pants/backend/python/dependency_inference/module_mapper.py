@@ -14,10 +14,8 @@ from pants.backend.python.target_types import (
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
-from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Targets
-from pants.option.global_options import GlobalOptions
+from pants.engine.target import SourcesPaths, SourcesPathsRequest, Targets
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
@@ -79,15 +77,10 @@ class _StrippedFileNames(Collection[str]):
 
 
 @rule
-async def _stripped_file_names(
-    request: _StrippedFileNamesRequest, global_options: GlobalOptions
-) -> _StrippedFileNames:
-    sources_field_path_globs = request.sources.path_globs(
-        global_options.options.files_not_found_behavior
-    )
+async def _stripped_file_names(request: _StrippedFileNamesRequest) -> _StrippedFileNames:
     source_root, paths = await MultiGet(
         Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.sources.address)),
-        Get(Paths, PathGlobs, sources_field_path_globs),
+        Get(SourcesPaths, SourcesPathsRequest(request.sources)),
     )
     if source_root.path == ".":
         return _StrippedFileNames(paths.files)
@@ -99,8 +92,8 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
     all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     candidate_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
     # NB: We use a custom implementation to resolve the stripped source paths, rather than
-    # `StrippedSourceFiles`, so that we can use `Get(Paths, PathGlobs)` instead of
-    # `Get(Snapshot, PathGlobs)`, which is much faster.
+    # `StrippedSourceFiles`, so that we can use `Get(SourcesPaths, SourcesPathsRequest)` instead of
+    # `Get(HydratedSources, HydrateSourcesRequest)`, which is much faster.
     #
     # This implementation is kept private because it's not fully comprehensive, such as not looking
     # at codegen. That's fine for dep inference, but not in other contexts.

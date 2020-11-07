@@ -11,9 +11,9 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
-    HydratedSources,
-    HydrateSourcesRequest,
     Sources,
+    SourcesPaths,
+    SourcesPathsRequest,
     Target,
     Targets,
     TransitiveTargets,
@@ -103,12 +103,12 @@ async def file_deps(
             itertools.chain.from_iterable(tgt.get(Sources).filespec["includes"] for tgt in targets)
         )
     else:
-        all_hydrated_sources = await MultiGet(
-            Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources))) for tgt in targets
+        all_sources_paths = await MultiGet(
+            Get(SourcesPaths, SourcesPathsRequest(tgt.get(Sources))) for tgt in targets
         )
         unique_rel_paths.update(
             itertools.chain.from_iterable(
-                hydrated_sources.snapshot.files for hydrated_sources in all_hydrated_sources
+                sources_paths.files for sources_paths in all_sources_paths
             )
         )
 
