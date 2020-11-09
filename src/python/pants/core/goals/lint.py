@@ -97,6 +97,12 @@ class LintResults:
 
 
 class EnrichedLintResults(LintResults, EngineAwareReturnType):
+    """`LintResults` that are enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `LintResults`, and a rule will upcast those into
+    `EnrichedLintResults`.
+    """
+
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG

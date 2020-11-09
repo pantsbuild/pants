@@ -75,6 +75,12 @@ class FmtResult:
 
 @dataclass(frozen=True)
 class EnrichedFmtResult(FmtResult, EngineAwareReturnType):
+    """A `FmtResult` that is enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `FmtResult`, and a rule will upcast those into
+    `EnrichedFmtResult`.
+    """
+
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG

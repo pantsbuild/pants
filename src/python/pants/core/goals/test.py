@@ -104,6 +104,12 @@ class ShowOutput(Enum):
 
 @dataclass(frozen=True)
 class EnrichedTestResult(TestResult, EngineAwareReturnType):
+    """A `TestResult` that is enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `TestResult`, and a rule will upcast those into
+    `EnrichedTestResult`.
+    """
+
     output_setting: ShowOutput = ShowOutput.ALL
 
     def artifacts(self) -> Optional[Dict[str, Snapshot]]:

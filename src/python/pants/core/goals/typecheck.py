@@ -74,6 +74,12 @@ class TypecheckResults:
 
 
 class EnrichedTypecheckResults(TypecheckResults, EngineAwareReturnType):
+    """`TypecheckResults` that are enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `TypecheckResults`, and a rule will upcast those into
+    `TypecheckResults`.
+    """
+
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
