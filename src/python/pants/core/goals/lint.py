@@ -17,7 +17,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
@@ -69,7 +69,7 @@ class LintResult:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class LintResults(EngineAwareReturnType):
+class LintResults:
     """Zero or more LintResult objects for a single linter.
 
     Typically, linters will return one result. If they no-oped, they will return zero results.
@@ -96,6 +96,14 @@ class LintResults(EngineAwareReturnType):
     def reports(self) -> Tuple[LintReport, ...]:
         return tuple(result.report for result in self.results if result.report)
 
+
+class EnrichedLintResults(LintResults, EngineAwareReturnType):
+    """`LintResults` that are enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `LintResults`, and a rule will upcast those into
+    `EnrichedLintResults`.
+    """
+
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
@@ -103,8 +111,11 @@ class LintResults(EngineAwareReturnType):
 
     def message(self) -> Optional[str]:
         if self.skipped:
-            return "skipped."
-        message = "succeeded." if self.exit_code == 0 else f"failed (exit code {self.exit_code})."
+            return f"{self.linter_name} skipped."
+        message = self.linter_name
+        message += (
+            " succeeded." if self.exit_code == 0 else f" failed (exit code {self.exit_code})."
+        )
 
         def msg_for_result(result: LintResult) -> str:
             msg = ""
@@ -238,19 +249,19 @@ async def lint(
 
     if lint_subsystem.per_file_caching:
         all_per_file_results = await MultiGet(
-            Get(LintResults, LintRequest, request.__class__([field_set]))
+            Get(EnrichedLintResults, LintRequest, request.__class__([field_set]))
             for request in valid_requests
             for field_set in request.field_sets
         )
 
-        def key_fn(results: LintResults):
+        def key_fn(results: EnrichedLintResults):
             return results.linter_name
 
         # NB: We must pre-sort the data for itertools.groupby() to work properly.
         sorted_all_per_files_results = sorted(all_per_file_results, key=key_fn)
         # We consolidate all results for each linter into a single `LintResults`.
         all_results = tuple(
-            LintResults(
+            EnrichedLintResults(
                 itertools.chain.from_iterable(
                     per_file_results.results for per_file_results in all_linter_results
                 ),
@@ -262,7 +273,7 @@ async def lint(
         )
     else:
         all_results = await MultiGet(
-            Get(LintResults, LintRequest, lint_request) for lint_request in valid_requests
+            Get(EnrichedLintResults, LintRequest, lint_request) for lint_request in valid_requests
         )
 
     all_results = tuple(sorted(all_results, key=lambda results: results.linter_name))
@@ -308,6 +319,13 @@ async def lint(
         console.print_stderr(f"{sigil} {results.linter_name} {status}.")
 
     return Lint(exit_code)
+
+
+# NB: We mark this uncachable to ensure that the results are always streamed, even if the
+# underlying LintResults is memoized. This rule is very cheap, so there's little performance hit.
+@_uncacheable_rule(desc="lint")
+def enrich_lint_results(results: LintResults) -> EnrichedLintResults:
+    return EnrichedLintResults(results=results.results, linter_name=results.linter_name)
 
 
 def rules():

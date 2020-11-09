@@ -4,7 +4,7 @@
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
+from typing import ClassVar, Iterable, List, Optional, Tuple, Type, TypeVar, cast
 
 from pants.base.deprecated import resolve_conflicting_options
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
@@ -13,15 +13,17 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule
 from pants.engine.target import Field, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
 
+_F = TypeVar("_F", bound="FmtResult")
+
 
 @dataclass(frozen=True)
-class FmtResult(EngineAwareReturnType):
+class FmtResult:
     input: Digest
     output: Digest
     stdout: str
@@ -29,7 +31,7 @@ class FmtResult(EngineAwareReturnType):
     formatter_name: str
 
     @classmethod
-    def skip(cls, *, formatter_name: str) -> "FmtResult":
+    def skip(cls: Type[_F], *, formatter_name: str) -> _F:
         return cls(
             input=EMPTY_DIGEST,
             output=EMPTY_DIGEST,
@@ -71,6 +73,15 @@ class FmtResult(EngineAwareReturnType):
     def did_change(self) -> bool:
         return self.output != self.input
 
+
+@dataclass(frozen=True)
+class EnrichedFmtResult(FmtResult, EngineAwareReturnType):
+    """A `FmtResult` that is enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `FmtResult`, and a rule will upcast those into
+    `EnrichedFmtResult`.
+    """
+
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
@@ -78,7 +89,7 @@ class FmtResult(EngineAwareReturnType):
 
     def message(self) -> Optional[str]:
         if self.skipped:
-            return "skipped."
+            return f"{self.formatter_name} skipped."
         message = "made changes." if self.did_change else "made no changes."
         output = ""
         if self.stdout:
@@ -87,7 +98,20 @@ class FmtResult(EngineAwareReturnType):
             output += f"\n{self.stderr}"
         if output:
             output = f"{output.rstrip()}\n\n"
-        return f"{message}{output}"
+        return f"{self.formatter_name} {message}{output}"
+
+
+# NB: We mark this uncachable to ensure that the results are always streamed, even if the
+# underlying FmtResult is memoized. This rule is very cheap, so there's little performance hit.
+@_uncacheable_rule(desc="fmt")
+async def enrich_fmt_result(result: FmtResult) -> EnrichedFmtResult:
+    return EnrichedFmtResult(
+        input=result.input,
+        output=result.output,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        formatter_name=result.formatter_name,
+    )
 
 
 @union

@@ -13,7 +13,7 @@ from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, QueryRule, _uncacheable_rule, collect_rules, goal_rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
@@ -49,7 +49,7 @@ class TypecheckResult:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TypecheckResults(EngineAwareReturnType):
+class TypecheckResults:
     """Zero or more TypecheckResult objects for a single type checker.
 
     Typically, type checkers will return one result. If they no-oped, they will return zero results.
@@ -72,6 +72,14 @@ class TypecheckResults(EngineAwareReturnType):
     def exit_code(self) -> int:
         return next((result.exit_code for result in self.results if result.exit_code != 0), 0)
 
+
+class EnrichedTypecheckResults(TypecheckResults, EngineAwareReturnType):
+    """`TypecheckResults` that are enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `TypecheckResults`, and a rule will upcast those into
+    `TypecheckResults`.
+    """
+
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
@@ -79,8 +87,11 @@ class TypecheckResults(EngineAwareReturnType):
 
     def message(self) -> Optional[str]:
         if self.skipped:
-            return "skipped."
-        message = "succeeded." if self.exit_code == 0 else f"failed (exit code {self.exit_code})."
+            return f"{self.typechecker_name} skipped."
+        message = self.typechecker_name
+        message += (
+            " succeeded." if self.exit_code == 0 else f" failed (exit code {self.exit_code})."
+        )
 
         def msg_for_result(result: TypecheckResult) -> str:
             msg = ""
@@ -150,7 +161,7 @@ async def typecheck(
         if request
     )
     all_results = await MultiGet(
-        Get(TypecheckResults, TypecheckRequest, request) for request in valid_requests
+        Get(EnrichedTypecheckResults, TypecheckRequest, request) for request in valid_requests
     )
 
     exit_code = 0
@@ -170,6 +181,16 @@ async def typecheck(
         console.print_stderr(f"{sigil} {results.typechecker_name} {status}.")
 
     return Typecheck(exit_code)
+
+
+# NB: We mark this uncachable to ensure that the results are always streamed, even if the
+# underlying TypecheckResults is memoized. This rule is very cheap, so there's little performance
+# hit.
+@_uncacheable_rule(desc="typecheck")
+def enrich_typecheck_results(results: TypecheckResults) -> EnrichedTypecheckResults:
+    return EnrichedTypecheckResults(
+        results=results.results, typechecker_name=results.typechecker_name
+    )
 
 
 def rules():

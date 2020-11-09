@@ -6,10 +6,10 @@ from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
 from pants.core.goals.typecheck import (
+    EnrichedTypecheckResults,
     Typecheck,
     TypecheckRequest,
     TypecheckResult,
-    TypecheckResults,
     typecheck,
 )
 from pants.core.util_rules.filter_empty_sources import (
@@ -42,9 +42,9 @@ class MockTypecheckRequest(TypecheckRequest, metaclass=ABCMeta):
         pass
 
     @property
-    def typecheck_results(self) -> TypecheckResults:
+    def typecheck_results(self) -> EnrichedTypecheckResults:
         addresses = [config.address for config in self.field_sets]
-        return TypecheckResults(
+        return EnrichedTypecheckResults(
             [
                 TypecheckResult(
                     self.exit_code(addresses),
@@ -88,8 +88,8 @@ class SkippedRequest(MockTypecheckRequest):
         return 0
 
     @property
-    def typecheck_results(self) -> TypecheckResults:
-        return TypecheckResults([], typechecker_name="SkippedTypechecker")
+    def typecheck_results(self) -> EnrichedTypecheckResults:
+        return EnrichedTypecheckResults([], typechecker_name="SkippedTypechecker")
 
 
 class InvalidField(Sources):
@@ -128,7 +128,7 @@ def run_typecheck_rule(
         rule_args=[console, Targets(targets), union_membership],
         mock_gets=[
             MockGet(
-                output_type=TypecheckResults,
+                output_type=EnrichedTypecheckResults,
                 input_type=TypecheckRequest,
                 mock=lambda field_set_collection: field_set_collection.typecheck_results,
             ),
@@ -183,19 +183,19 @@ def test_summary() -> None:
 
 
 def test_streaming_output_skip() -> None:
-    results = TypecheckResults([], typechecker_name="typchecker")
+    results = EnrichedTypecheckResults([], typechecker_name="typechecker")
     assert results.level() == LogLevel.DEBUG
-    assert results.message() == "skipped."
+    assert results.message() == "typechecker skipped."
 
 
 def test_streaming_output_success() -> None:
-    results = TypecheckResults(
-        [TypecheckResult(0, "stdout", "stderr")], typechecker_name="typchecker"
+    results = EnrichedTypecheckResults(
+        [TypecheckResult(0, "stdout", "stderr")], typechecker_name="typechecker"
     )
     assert results.level() == LogLevel.INFO
     assert results.message() == dedent(
         """\
-        succeeded.
+        typechecker succeeded.
         stdout
         stderr
 
@@ -204,13 +204,13 @@ def test_streaming_output_success() -> None:
 
 
 def test_streaming_output_failure() -> None:
-    results = TypecheckResults(
-        [TypecheckResult(18, "stdout", "stderr")], typechecker_name="typchecker"
+    results = EnrichedTypecheckResults(
+        [TypecheckResult(18, "stdout", "stderr")], typechecker_name="typechecker"
     )
     assert results.level() == LogLevel.WARN
     assert results.message() == dedent(
         """\
-        failed (exit code 18).
+        typechecker failed (exit code 18).
         stdout
         stderr
 
@@ -219,17 +219,17 @@ def test_streaming_output_failure() -> None:
 
 
 def test_streaming_output_partitions() -> None:
-    results = TypecheckResults(
+    results = EnrichedTypecheckResults(
         [
             TypecheckResult(21, "", "", partition_description="ghc8.1"),
             TypecheckResult(0, "stdout", "stderr", partition_description="ghc9.2"),
         ],
-        typechecker_name="typchecker",
+        typechecker_name="typechecker",
     )
     assert results.level() == LogLevel.WARN
     assert results.message() == dedent(
         """\
-        failed (exit code 21).
+        typechecker failed (exit code 21).
         Partition #1 - ghc8.1:
 
         Partition #2 - ghc9.2:
