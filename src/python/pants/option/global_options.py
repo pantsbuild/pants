@@ -294,14 +294,14 @@ class GlobalOptions(Subsystem):
             advanced=True,
             metavar="<dir>",
             default=get_pants_cachedir(),
-            help="Unused. Will be deprecated in 2.1.0.",
+            help="Unused. Will be deprecated in 2.2.0.",
         )
         register(
             "--pants-configdir",
             advanced=True,
             metavar="<dir>",
             default=get_pants_configdir(),
-            help="Unused. Will be deprecated in 2.1.0.",
+            help="Unused. Will be deprecated in 2.2.0.",
         )
         register(
             "--pants-workdir",
@@ -326,7 +326,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             metavar="<dir>",
             default=os.path.join(buildroot, "build-support"),
-            help="Unused. Will be deprecated in 2.1.0.",
+            help="Unused. Will be deprecated in 2.2.0.",
         )
         register(
             "--pants-distdir",

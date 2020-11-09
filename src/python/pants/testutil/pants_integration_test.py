@@ -38,7 +38,7 @@ class PantsResult:
     @property
     def returncode(self) -> int:
         warn_or_error(
-            removal_version="2.1.0.dev1",
+            removal_version="2.2.0.dev0",
             deprecated_entity_description="the property PantsResult.returncode",
             hint="Use `PantsResult.exit_code` instead.",
         )
@@ -47,7 +47,7 @@ class PantsResult:
     @property
     def stdout_data(self) -> str:
         warn_or_error(
-            removal_version="2.1.0.dev1",
+            removal_version="2.2.0.dev0",
             deprecated_entity_description="the property PantsResult.stdout_data",
             hint="Use `PantsResult.stdout` instead.",
         )
@@ -56,7 +56,7 @@ class PantsResult:
     @property
     def stderr_data(self) -> str:
         warn_or_error(
-            removal_version="2.1.0.dev1",
+            removal_version="2.2.0.dev0",
             deprecated_entity_description="the property PantsResult.stderr_data",
             hint="Use `PantsResult.stderr` instead.",
         )
@@ -383,7 +383,7 @@ class PantsIntegrationTest(unittest.TestCase):
         **kwargs: Any,
     ) -> PantsJoinHandle:
         warn_or_error(
-            removal_version="2.1.0.dev1",
+            removal_version="2.2.0.dev0",
             deprecated_entity_description="PantsIntegrationTest.run_pants_with_workdir_without_waiting()",
             hint=(
                 "Use the top-level function `run_pants_with_workdir_without_waiting()`. "
@@ -411,7 +411,7 @@ class PantsIntegrationTest(unittest.TestCase):
         **kwargs: Any,
     ) -> PantsResult:
         warn_or_error(
-            removal_version="2.1.0.dev1",
+            removal_version="2.2.0.dev0",
             deprecated_entity_description="PantsIntegrationTest.run_pants_with_workdir()",
             hint=(
                 "Use the top-level function `run_pants_with_workdir()`. "
@@ -439,7 +439,7 @@ class PantsIntegrationTest(unittest.TestCase):
         **kwargs: Any,
     ) -> PantsResult:
         warn_or_error(
-            removal_version="2.1.0.dev1",
+            removal_version="2.2.0.dev0",
             deprecated_entity_description="PantsIntegrationTest.run_pants()",
             hint=(
                 "Use the top-level function `run_pants()`. `PantsIntegrationTest` is deprecated."
@@ -458,7 +458,7 @@ class PantsIntegrationTest(unittest.TestCase):
     @staticmethod
     def assert_success(pants_run: PantsResult, msg: Optional[str] = None) -> None:
         warn_or_error(
-            removal_version="2.1.0.dev1",
+            removal_version="2.2.0.dev0",
             deprecated_entity_description="PantsIntegrationTest.assert_success()",
             hint="Use `PantsResult.assert_success()`. `PantsIntegrationTest` is deprecated.",
         )
@@ -467,7 +467,7 @@ class PantsIntegrationTest(unittest.TestCase):
     @staticmethod
     def assert_failure(pants_run: PantsResult, msg: Optional[str] = None) -> None:
         warn_or_error(
-            removal_version="2.1.0.dev1",
+            removal_version="2.2.0.dev0",
             deprecated_entity_description="PantsIntegrationTest.assert_failure()",
             hint="Use `PantsResult.assert_failure()`. `PantsIntegrationTest` is deprecated.",
         )
@@ -476,7 +476,7 @@ class PantsIntegrationTest(unittest.TestCase):
     @staticmethod
     def temporary_workdir(cleanup: bool = True):
         warn_or_error(
-            removal_version="2.1.0.dev1",
+            removal_version="2.2.0.dev0",
             deprecated_entity_description="PantsIntegrationTest.temporary_workdir()",
             hint=(
                 "Use the top-level function `temporary_workdir`. `PantsIntegrationTest` is "
