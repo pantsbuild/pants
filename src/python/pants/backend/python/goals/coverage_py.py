@@ -186,8 +186,8 @@ def _validate_and_update_config(
         )
     coverage_config.set("run", "relative_files", "True")
     omit_elements = [em for em in run_section.get("omit", "").split("\n")] or ["\n"]
-    if "test_runner.pex/*" not in omit_elements:
-        omit_elements.append("test_runner.pex/*")
+    if "pytest.pex/*" not in omit_elements:
+        omit_elements.append("pytest.pex/*")
     run_section["omit"] = "\n".join(omit_elements)
 
 
@@ -314,9 +314,7 @@ async def generate_coverage_reports(
         pex_processes.append(
             PexProcess(
                 coverage_setup.pex,
-                # We pass `--ignore-errors` because Pants dynamically injects missing `__init__.py`
-                # files and this will cause Coverage to fail.
-                argv=(report_type.report_name, "--ignore-errors"),
+                argv=(report_type.report_name,),
                 input_digest=input_digest,
                 output_directories=("htmlcov",) if report_type == CoverageReportType.HTML else None,
                 output_files=(output_file,) if output_file else None,
