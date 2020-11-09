@@ -991,7 +991,7 @@ def setup_codegen_protocol_tgt(rule_runner: RuleRunner) -> Address:
     return Address("src/avro", target_name="lib")
 
 
-def test_generate_sources(codegen_rule_runner: RuleRunner) -> None:
+def test_codegen_generates_sources(codegen_rule_runner: RuleRunner) -> None:
     addr = setup_codegen_protocol_tgt(codegen_rule_runner)
     protocol_sources = AvroSources(["*.avro"], address=addr)
     assert (
@@ -1026,7 +1026,7 @@ def test_generate_sources(codegen_rule_runner: RuleRunner) -> None:
     assert generated_via_hydrate_sources.sources_type == SmalltalkSources
 
 
-def test_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> None:
+def test_codegen_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> None:
     addr = setup_codegen_protocol_tgt(codegen_rule_runner)
 
     class CustomAvroSources(AvroSources):
@@ -1048,7 +1048,7 @@ def test_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> None:
     assert generated.snapshot.files == ("src/smalltalk/f.st",)
 
 
-def test_cannot_generate_language(codegen_rule_runner: RuleRunner) -> None:
+def test_codegen_cannot_generate_language(codegen_rule_runner: RuleRunner) -> None:
     addr = setup_codegen_protocol_tgt(codegen_rule_runner)
 
     class AdaSources(Sources):
