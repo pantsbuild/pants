@@ -10,7 +10,7 @@ from typing import Any, Dict, Set, Tuple, cast
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DigestContents, SourcesSnapshot
+from pants.engine.fs import Digest, DigestContents, SpecsSnapshot
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.option.subsystem import Subsystem
@@ -280,12 +280,12 @@ class MultiMatcher:
 @goal_rule
 async def validate(
     console: Console,
-    sources_snapshot: SourcesSnapshot,
+    specs_snapshot: SpecsSnapshot,
     validate_subsystem: ValidateSubsystem,
     source_file_validation: SourceFileValidation,
 ) -> Validate:
     multi_matcher = source_file_validation.get_multi_matcher()
-    digest_contents = await Get(DigestContents, Digest, sources_snapshot.snapshot.digest)
+    digest_contents = await Get(DigestContents, Digest, specs_snapshot.snapshot.digest)
     regex_match_results = RegexMatchResults(
         multi_matcher.check_source_file(file_content.path, file_content.content)
         for file_content in sorted(digest_contents, key=lambda fc: fc.path)

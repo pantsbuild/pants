@@ -32,7 +32,7 @@ from pants.engine.fs import (
     DigestContents,
     FileContent,
     Snapshot,
-    SourcesSnapshot,
+    SpecsSnapshot,
 )
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
@@ -454,7 +454,7 @@ def test_resolve_generated_subtarget() -> None:
     )
 
 
-def test_resolve_sources_snapshot() -> None:
+def test_resolve_specs_snapshot() -> None:
     """This tests that convert filesystem specs and/or address specs into a single snapshot.
 
     Some important edge cases:
@@ -463,15 +463,13 @@ def test_resolve_sources_snapshot() -> None:
     - If a file is covered both by an address spec and by a filesystem spec, we should merge it
       so that the file only shows up once.
     """
-    rule_runner = RuleRunner(
-        rules=[QueryRule(SourcesSnapshot, (Specs,))], target_types=[MockTarget]
-    )
+    rule_runner = RuleRunner(rules=[QueryRule(SpecsSnapshot, (Specs,))], target_types=[MockTarget])
     rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
     rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
     specs = SpecsParser(rule_runner.build_root).parse_specs(
         ["demo:demo", "demo/f1.txt", "demo/BUILD"]
     )
-    result = rule_runner.request(SourcesSnapshot, [specs])
+    result = rule_runner.request(SpecsSnapshot, [specs])
     assert result.snapshot.files == ("demo/BUILD", "demo/f1.txt", "demo/f2.txt")
 
 

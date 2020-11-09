@@ -282,8 +282,8 @@ EMPTY_SNAPSHOT = Snapshot(EMPTY_DIGEST, files=(), dirs=())
 
 
 @dataclass(frozen=True)
-class SourcesSnapshot:
-    """Sources matched by command line specs.
+class SpecsSnapshot:
+    """All files matched by command line specs.
 
     `@goal_rule`s may request this when they only need source files to operate and do not need any
     target information. This allows running on files with no owning targets.

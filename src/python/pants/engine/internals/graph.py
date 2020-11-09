@@ -35,7 +35,7 @@ from pants.engine.fs import (
     PathGlobs,
     Paths,
     Snapshot,
-    SourcesSnapshot,
+    SpecsSnapshot,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -589,8 +589,8 @@ async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
 
 
 @rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
-async def resolve_sources_snapshot(specs: Specs, global_options: GlobalOptions) -> SourcesSnapshot:
-    """Request a snapshot for the given specs.
+async def resolve_specs_snapshot(specs: Specs, global_options: GlobalOptions) -> SpecsSnapshot:
+    """Resolve all files matching the given specs.
 
     Address specs will use their `Sources` field, and Filesystem specs will use whatever args were
     given. Filesystem specs may safely refer to files with no owning target.
@@ -620,7 +620,7 @@ async def resolve_sources_snapshot(specs: Specs, global_options: GlobalOptions) 
     if filesystem_specs_digest:
         digests.append(filesystem_specs_digest)
     result = await Get(Snapshot, MergeDigests(digests))
-    return SourcesSnapshot(result)
+    return SpecsSnapshot(result)
 
 
 # -----------------------------------------------------------------------------------------------
