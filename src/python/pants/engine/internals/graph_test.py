@@ -72,10 +72,8 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
     TransitiveTargetsRequestLite,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -979,7 +977,6 @@ def codegen_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             generate_smalltalk_from_avro,
-            QueryRule(UnionMembership, []),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateSmalltalkFromAvroRequest]),
             UnionRule(GenerateSourcesRequest, GenerateSmalltalkFromAvroRequest),
@@ -996,24 +993,23 @@ def setup_codegen_protocol_tgt(rule_runner: RuleRunner) -> Address:
 
 def test_generate_sources(codegen_rule_runner: RuleRunner) -> None:
     addr = setup_codegen_protocol_tgt(codegen_rule_runner)
-    bootstrapper = create_options_bootstrapper()
     protocol_sources = AvroSources(["*.avro"], address=addr)
-    assert protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership) is True
+    assert (
+        protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
+        is True
+    )
 
     # First, get the original protocol sources.
     hydrated_protocol_sources = codegen_rule_runner.request(
-        HydratedSources, [HydrateSourcesRequest(protocol_sources), bootstrapper]
+        HydratedSources, [HydrateSourcesRequest(protocol_sources)]
     )
     assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
 
     # Test directly feeding the protocol sources into the codegen rule.
-    tgt = codegen_rule_runner.request(WrappedTarget, [addr, bootstrapper]).target
+    tgt = codegen_rule_runner.get_target(addr)
     generated_sources = codegen_rule_runner.request(
         GeneratedSources,
-        [
-            GenerateSmalltalkFromAvroRequest(hydrated_protocol_sources.snapshot, tgt),
-            bootstrapper,
-        ],
+        [GenerateSmalltalkFromAvroRequest(hydrated_protocol_sources.snapshot, tgt)],
     )
     assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
 
@@ -1023,8 +1019,7 @@ def test_generate_sources(codegen_rule_runner: RuleRunner) -> None:
         [
             HydrateSourcesRequest(
                 protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
-            ),
-            bootstrapper,
+            )
         ],
     )
     assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
@@ -1038,14 +1033,16 @@ def test_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> None:
         pass
 
     protocol_sources = CustomAvroSources(["*.avro"], address=addr)
-    assert protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership) is True
+    assert (
+        protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
+        is True
+    )
     generated = codegen_rule_runner.request(
         HydratedSources,
         [
             HydrateSourcesRequest(
                 protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
-            ),
-            create_options_bootstrapper(),
+            )
         ],
     )
     assert generated.snapshot.files == ("src/smalltalk/f.st",)
@@ -1064,8 +1061,7 @@ def test_cannot_generate_language(codegen_rule_runner: RuleRunner) -> None:
         [
             HydrateSourcesRequest(
                 protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
-            ),
-            create_options_bootstrapper(),
+            )
         ],
     )
     assert generated.snapshot.files == ()
