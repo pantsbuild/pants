@@ -22,6 +22,14 @@ class InvalidTargetName(ValueError):
     """Indicate an invalid target name for `Address`."""
 
 
+class AmbiguousTargetName(ValueError):
+    """A specific error for the case where a target name contains a slash.
+
+    Target names containing slashes used to be supported, but slashes are now used to support file
+    addresses, and so we specifically enrich the error.
+    """
+
+
 @dataclass(frozen=True)
 class AddressInput:
     """A string that has been parsed and normalized using the Address syntax.
@@ -171,10 +179,12 @@ class AddressInput:
 
         expected_prefix = f"..{os.path.sep}" * parent_count
         if self.target_component[: self.target_component.rfind(os.path.sep) + 1] != expected_prefix:
-            raise InvalidTargetName(
-                "A target may only be defined in a directory containing a file that it owns in "
-                f"the filesystem: `{self.target_component}` is not at-or-above the file "
-                f"`{self.path_component}`."
+            raise AmbiguousTargetName(
+                "The target component `{self.target_component}` is ambiguous, because it might "
+                "represent either a target with a slash (`/`) in the name, or a target nested "
+                "inside of a directory.\n\nIf there is a target with a slash in its name, "
+                "consider replacing the slash with another separator character like `_`, or "
+                "moving the target closer to the file(s) that it owns."
             )
 
         # Split the path_component into a spec_path and relative_file_path at the appropriate

@@ -5,7 +5,13 @@ from typing import Optional
 
 import pytest
 
-from pants.build_graph.address import Address, AddressInput, InvalidSpecPath, InvalidTargetName
+from pants.build_graph.address import (
+    Address,
+    AddressInput,
+    AmbiguousTargetName,
+    InvalidSpecPath,
+    InvalidTargetName,
+)
 
 
 def assert_address_input_parsed(
@@ -177,11 +183,11 @@ def test_address_input_from_file() -> None:
     ).file_to_address() == Address("", target_name="original", relative_file_path="a/b/c.txt")
 
     # These refer to targets "below" the file, which is illegal.
-    with pytest.raises(InvalidTargetName):
+    with pytest.raises(AmbiguousTargetName):
         AddressInput("f.txt", target_component="subdir/tgt").file_to_address()
-    with pytest.raises(InvalidTargetName):
+    with pytest.raises(AmbiguousTargetName):
         AddressInput("f.txt", target_component="subdir../tgt").file_to_address()
-    with pytest.raises(InvalidTargetName):
+    with pytest.raises(AmbiguousTargetName):
         AddressInput("a/f.txt", target_component="../a/original").file_to_address()
 
     # Top-level files must include a target_name.
