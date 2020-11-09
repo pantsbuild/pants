@@ -14,7 +14,10 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, rule
 from pants.engine.unions import UnionRule, union
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.testutil.test_base import TestBase
+
+# -----------------------------------------------------------------------------------------------
+# Test params
+# -----------------------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -30,6 +33,23 @@ class B:
 @rule
 def consumes_a_and_b(a: A, b: B) -> str:
     return str(f"{a} and {b}")
+
+
+def test_use_params() -> None:
+    rule_runner = RuleRunner(rules=[consumes_a_and_b, QueryRule(str, [A, B])])
+    # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
+    a, b = A(), B()
+    result_str = rule_runner.request(str, [a, b])
+    assert result_str == consumes_a_and_b(a, b)
+
+    # And confirm that a superset of Params is also accepted.
+    result_str = rule_runner.request(str, [a, b, b"bytes aren't used by any rules"])
+    assert result_str == consumes_a_and_b(a, b)
+
+    # But not a subset.
+    expected_msg = "No installed QueryRules can compute str given input Params(A), but"
+    with pytest.raises(Exception, match=re.escape(expected_msg)):
+        rule_runner.request(str, [a])
 
 
 @dataclass(frozen=True)
@@ -53,66 +73,52 @@ async def transitive_coroutine_rule(c: C) -> D:
     return D(b)
 
 
+@pytest.fixture
+def transitive_params_rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            consumes_a_and_b,
+            QueryRule(str, [A, B]),
+            transitive_b_c,
+            QueryRule(str, [A, C]),
+            transitive_coroutine_rule,
+            QueryRule(D, [C]),
+        ]
+    )
+
+
+def test_transitive_params(transitive_params_rule_runner: RuleRunner) -> None:
+    # Test that C can be provided and implicitly converted into a B with transitive_b_c() to satisfy
+    # the selectors of consumes_a_and_b().
+    a, c = A(), C()
+    result_str = transitive_params_rule_runner.request(str, [a, c])
+    assert remove_locations_from_traceback(result_str) == remove_locations_from_traceback(
+        consumes_a_and_b(a, transitive_b_c(c))
+    )
+
+    # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to
+    # the existence of transitive_b_c().
+    transitive_params_rule_runner.request(D, [c])
+
+
+def test_consumed_types(transitive_params_rule_runner: RuleRunner) -> None:
+    assert {A, B, C, str} == set(
+        transitive_params_rule_runner.scheduler.scheduler.rule_graph_consumed_types([A, C], str)
+    )
+
+
 @rule
 def boolean_and_int(i: int, b: bool) -> A:
     return A()
 
 
-class SchedulerTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            consumes_a_and_b,
-            QueryRule(str, (A, B)),
-            transitive_b_c,
-            QueryRule(str, (A, C)),
-            transitive_coroutine_rule,
-            QueryRule(D, (C,)),
-            boolean_and_int,
-            QueryRule(A, (int, bool)),
-        )
-
-    def test_use_params(self):
-        # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
-        a, b = A(), B()
-        result_str = self.request(str, [a, b])
-        self.assertEqual(result_str, consumes_a_and_b(a, b))
-
-        # And confirm that a superset of Params is also accepted.
-        result_str = self.request(str, [a, b, self])
-        self.assertEqual(result_str, consumes_a_and_b(a, b))
-
-        # But not a subset.
-        expected_msg = "No installed QueryRules can compute str given input Params(A), but"
-        with self.assertRaisesRegex(Exception, re.escape(expected_msg)):
-            self.request(str, [a])
-
-    def test_transitive_params(self):
-        # Test that C can be provided and implicitly converted into a B with transitive_b_c() to satisfy
-        # the selectors of consumes_a_and_b().
-        a, c = A(), C()
-        result_str = self.request(str, [a, c])
-        self.assertEqual(
-            remove_locations_from_traceback(result_str),
-            remove_locations_from_traceback(consumes_a_and_b(a, transitive_b_c(c))),
-        )
-
-        # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to
-        # the existence of transitive_b_c().
-        self.request(D, [c])
-
-    def test_consumed_types(self):
-        assert {A, B, C, str} == set(
-            self.scheduler.scheduler.rule_graph_consumed_types([A, C], str)
-        )
-
-    def test_strict_equals(self):
-        # With the default implementation of `__eq__` for boolean and int, `1 == True`. But in the
-        # engine that behavior would be surprising, and would cause both of these Params to intern
-        # to the same value, triggering an error. Instead, the engine additionally includes the
-        # type of a value in equality.
-        assert A() == self.request(A, [1, True])
+def test_strict_equals() -> None:
+    rule_runner = RuleRunner(rules=[boolean_and_int, QueryRule(A, [int, bool])])
+    # With the default implementation of `__eq__` for boolean and int, `1 == True`. But in the
+    # engine, that behavior would be surprising and would cause both of these Params to intern
+    # to the same value, triggering an error. Instead, the engine additionally includes the
+    # type of a value in equality.
+    assert A() == rule_runner.request(A, [1, True])
 
 
 # -----------------------------------------------------------------------------------------------
@@ -219,7 +225,7 @@ def test_trace_includes_rule_exception_traceback() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test unhashable types.
+# Test unhashable types
 # -----------------------------------------------------------------------------------------------
 
 

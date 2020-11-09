@@ -97,7 +97,8 @@ class RuleRunner:
             *(rules or ()),
             *source_root.rules(),
             *pants_environment.rules(),
-            QueryRule(WrappedTarget, (Address,)),
+            QueryRule(WrappedTarget, [Address]),
+            QueryRule(UnionMembership, []),
         )
         build_config_builder = BuildConfiguration.Builder()
         build_config_builder.register_aliases(
@@ -149,6 +150,11 @@ class RuleRunner:
     @property
     def target_types(self) -> FrozenOrderedSet[Type[Target]]:
         return self.build_config.target_types
+
+    @property
+    def union_membership(self) -> UnionMembership:
+        """An instance of `UnionMembership` with all the test's registered `UnionRule`s."""
+        return self.request(UnionMembership, [])
 
     def request(self, output_type: Type[_O], inputs: Iterable[Any]) -> _O:
         result = assert_single_element(
