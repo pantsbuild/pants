@@ -22,7 +22,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     Sources,
@@ -70,17 +70,6 @@ class TestResult:
             xml_results=xml_results,
         )
 
-
-@dataclass(frozen=True)
-class EnrichedTestResult(EngineAwareReturnType):
-    exit_code: Optional[int]
-    stdout: str
-    stderr: str
-    address: Address
-    output_setting: "ShowOutput"
-    coverage_data: Optional["CoverageData"] = None
-    xml_results: Optional[Snapshot] = None
-
     @property
     def skipped(self) -> bool:
         return (
@@ -90,6 +79,38 @@ class EnrichedTestResult(EngineAwareReturnType):
             and not self.coverage_data
             and not self.xml_results
         )
+
+    def __lt__(self, other: Union[Any, "EnrichedTestResult"]) -> bool:
+        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
+        each group."""
+        if not isinstance(other, EnrichedTestResult):
+            return NotImplemented
+        if self.exit_code == other.exit_code:
+            return self.address.spec < other.address.spec
+        if self.exit_code is None:
+            return True
+        if other.exit_code is None:
+            return False
+        return self.exit_code < other.exit_code
+
+
+class ShowOutput(Enum):
+    """Which tests to emit detailed output for."""
+
+    ALL = "all"
+    FAILED = "failed"
+    NONE = "none"
+
+
+@dataclass(frozen=True)
+class EnrichedTestResult(TestResult, EngineAwareReturnType):
+    """A `TestResult` that is enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `TestResult`, and a rule will upcast those into
+    `EnrichedTestResult`.
+    """
+
+    output_setting: ShowOutput = ShowOutput.ALL
 
     def artifacts(self) -> Optional[Dict[str, Snapshot]]:
         if not self.xml_results:
@@ -118,19 +139,6 @@ class EnrichedTestResult(EngineAwareReturnType):
         if output:
             output = f"{output.rstrip()}\n\n"
         return f"{message}{output}"
-
-    def __lt__(self, other: Union[Any, "EnrichedTestResult"]) -> bool:
-        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
-        each group."""
-        if not isinstance(other, EnrichedTestResult):
-            return NotImplemented
-        if self.exit_code == other.exit_code:
-            return self.address.spec < other.address.spec
-        if self.exit_code is None:
-            return True
-        if other.exit_code is None:
-            return False
-        return self.exit_code < other.exit_code
 
 
 @dataclass(frozen=True)
@@ -238,14 +246,6 @@ class CoverageReports(EngineAwareReturnType):
         return artifacts or None
 
 
-class ShowOutput(Enum):
-    """Which tests to emit detailed output for."""
-
-    ALL = "all"
-    FAILED = "failed"
-    NONE = "none"
-
-
 class TestSubsystem(GoalSubsystem):
     """Run tests."""
 
@@ -330,11 +330,6 @@ class TestSubsystem(GoalSubsystem):
     @property
     def open_coverage(self) -> bool:
         return cast(bool, self.options.open_coverage)
-
-
-@dataclass(frozen=True)
-class TestExtraEnv:
-    env: FrozenDict[str, str]
 
 
 class Test(Goal):
@@ -448,6 +443,11 @@ async def run_tests(
     return Test(exit_code)
 
 
+@dataclass(frozen=True)
+class TestExtraEnv:
+    env: FrozenDict[str, str]
+
+
 @rule
 def get_filtered_environment(
     test_subsystem: TestSubsystem, pants_env: PantsEnvironment
@@ -460,7 +460,9 @@ def get_filtered_environment(
     return TestExtraEnv(env)
 
 
-@rule(desc="Run tests")
+# NB: We mark this uncachable to ensure that the results are always streamed, even if the
+# underlying TestResult is memoized. This rule is very cheap, so there's little performance hit.
+@_uncacheable_rule(desc="test")
 def enrich_test_result(
     test_result: TestResult, test_subsystem: TestSubsystem
 ) -> EnrichedTestResult:

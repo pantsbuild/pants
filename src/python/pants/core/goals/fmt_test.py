@@ -7,6 +7,7 @@ from textwrap import dedent
 from typing import ClassVar, List, Optional, Type, cast
 
 from pants.core.goals.fmt import (
+    EnrichedFmtResult,
     Fmt,
     FmtResult,
     FmtSubsystem,
@@ -266,14 +267,14 @@ class FmtTest(TestBase):
 
 
 def test_streaming_output_skip() -> None:
-    result = FmtResult.skip(formatter_name="formatter")
+    result = EnrichedFmtResult.skip(formatter_name="formatter")
     assert result.level() == LogLevel.DEBUG
-    assert result.message() == "skipped."
+    assert result.message() == "formatter skipped."
 
 
 def test_streaming_output_changed() -> None:
     changed_digest = Digest(EMPTY_DIGEST.fingerprint, 2)
-    result = FmtResult(
+    result = EnrichedFmtResult(
         input=EMPTY_DIGEST,
         output=changed_digest,
         stdout="stdout",
@@ -283,7 +284,7 @@ def test_streaming_output_changed() -> None:
     assert result.level() == LogLevel.WARN
     assert result.message() == dedent(
         """\
-        made changes.
+        formatter made changes.
         stdout
         stderr
 
@@ -292,7 +293,7 @@ def test_streaming_output_changed() -> None:
 
 
 def test_streaming_output_not_changed() -> None:
-    result = FmtResult(
+    result = EnrichedFmtResult(
         input=EMPTY_DIGEST,
         output=EMPTY_DIGEST,
         stdout="stdout",
@@ -302,7 +303,7 @@ def test_streaming_output_not_changed() -> None:
     assert result.level() == LogLevel.INFO
     assert result.message() == dedent(
         """\
-        made no changes.
+        formatter made no changes.
         stdout
         stderr
 
