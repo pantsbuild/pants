@@ -44,16 +44,16 @@ echo "We do not include internal-only changes. However, in the release prep PR, 
 echo "----------------------------------------------------------------------------------------------------"
 cat <<EOF
 
+New Features
+~~~~~~~~~~~~
+
+
 User API Changes
 ~~~~~~~~~~~~~~~~
 
 
 Plugin API Changes
 ~~~~~~~~~~~~~~~~~~
-
-
-New Features
-~~~~~~~~~~~~
 
 
 Bugfixes

@@ -273,7 +273,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def setUpClass(cls) -> None:
         super().setUpClass()
         warn_or_error(
-            removal_version="2.1.0.dev1",
+            removal_version="2.2.0.dev0",
             deprecated_entity_description="pants.testutil.test_base.TestBase",
             hint=(
                 "Use `pants.testutil.rule_runner.RuleRunner` instead, which uses a Pytest fixture "

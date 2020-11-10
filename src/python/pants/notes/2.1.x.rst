@@ -5,6 +5,69 @@ This document describes releases leading up to the ``2.1.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.1/docs/release-notes-2-1 for an overview of the changes in this release.
 
+2.1.0rc0 (11/9/2020)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add `export-codegen` goal (#11107)
+  `PR #11107 <https://github.com/pantsbuild/pants/pull/11107>`_
+
+* Add `./pants py-constraints --summary` for project overview (#11099)
+  `PR #11099 <https://github.com/pantsbuild/pants/pull/11099>`_
+
+* Add `./pants help subsystems` (#11088)
+  `PR #11088 <https://github.com/pantsbuild/pants/pull/11088>`_
+
+* Improve performance of dependency inference (#11094)
+  `PR #11094 <https://github.com/pantsbuild/pants/pull/11094>`_
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Change default for `--pants-distdir-legacy-paths` and deprecate it (#11096)
+  `PR #11096 <https://github.com/pantsbuild/pants/pull/11096>`_
+
+* Clarify that process cache namespacing works for all runners (#11095)
+  `PR #11095 <https://github.com/pantsbuild/pants/pull/11095>`_
+
+* Deprecate target names containing slashes and colons (#11115)
+  `PR #11115 <https://github.com/pantsbuild/pants/pull/11115>`_
+
+Plugin API Changes
+~~~~~~~~~~~~~~~~~~
+
+* Rename `SourcesSnapshot` to `SpecsSnapshot` (#11114)
+  `PR #11114 <https://github.com/pantsbuild/pants/pull/11114>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix logs for `test`, `lint`, `fmt`, and `typecheck` to always print, even if cached (#11111)
+  `PR #11111 <https://github.com/pantsbuild/pants/pull/11111>`_
+
+* Fix `pytest.pex` leaking into coverage data (#11110)
+  `PR #11110 <https://github.com/pantsbuild/pants/pull/11110>`_
+
+* Fix `--pex-verbosity` to work with the interpreter selection PEX (#11108)
+  `PR #11108 <https://github.com/pantsbuild/pants/pull/11108>`_
+
+* Fix `!!` transitive excludes when used multiple times in a repo (#11103)
+  `PR #11103 <https://github.com/pantsbuild/pants/pull/11103>`_
+
+* Fix `setup_py.with_provides()` to respect the `:func` entry-point shorthand (#11093)
+  `PR #11093 <https://github.com/pantsbuild/pants/pull/11093>`_
+
+* Include a host fingerprint in pantsd's identity (#11092)
+  `PR #11092 <https://github.com/pantsbuild/pants/pull/11092>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Improve error message for invalid unions in `Get()`s (#11102)
+  `PR #11102 <https://github.com/pantsbuild/pants/pull/11102>`_
+
 2.1.0.dev0 (10/30/2020)
 -----------------------
 
