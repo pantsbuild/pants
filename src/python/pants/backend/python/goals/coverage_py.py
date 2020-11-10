@@ -276,7 +276,12 @@ async def generate_coverage_reports(
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(all_used_addresses))
     sources = await Get(
         PythonSourceFiles,
-        PythonSourceFilesRequest(transitive_targets.closure, include_resources=False),
+        # Coverage sometimes includes non-Python files in its `.coverage` data. We need to
+        # ensure that they're present when generating the report. We include all the files included
+        # by `pytest_runner.py`.
+        PythonSourceFilesRequest(
+            transitive_targets.closure, include_files=True, include_resources=True
+        ),
     )
     input_digest = await Get(
         Digest,
