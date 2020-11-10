@@ -236,17 +236,21 @@ class Address(EngineAwareParameter):
             if deprecated_banned_chars:
                 warn_or_error(
                     removal_version="2.2.0.dev1",
-                    deprecated_entity_description=r"Using any of the `\`, `/`, or `:` characters in a target name.",
+                    deprecated_entity_description=(
+                        r"Using any of the `\`, `/`, or `:` characters in a target name."
+                    ),
                     hint=(
-                        "The target name {target_name}, defined in directory {self.spec_path} "
-                        "contains deprecated characters (`{banned_chars}`). Please replace these "
-                        "characters with another separator character like `_` or `-`."
+                        f"The target name {target_name} (defined in directory {self.spec_path}) "
+                        f"contains deprecated characters (`{deprecated_banned_chars}`), which will "
+                        "cause some usecases to fail. Please replace these characters with another "
+                        "separator character like `_` or `-`."
                     ),
                 )
             elif banned_chars:
                 raise InvalidTargetName(
-                    f"Banned chars found in target name. {banned_chars} not allowed in target "
-                    f"name: {target_name}"
+                    f"The target name {target_name} (defined in directory {self.spec_path}) "
+                    f"contains banned characters (`{banned_chars}`). Please replace these "
+                    "characters with another separator character like `_` or `-`."
                 )
             self._target_name = target_name
         else:
