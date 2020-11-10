@@ -17,19 +17,12 @@ from pants.base.specs import (
     SiblingAddresses,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.addresses import (
-    Address,
-    AddressesWithOrigins,
-    AddressInput,
-    AddressWithOrigin,
-    BuildFileAddress,
-)
+from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
     evaluate_preludes,
     parse_address_family,
-    strip_address_origins,
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
@@ -104,15 +97,6 @@ def test_prelude_parsing_illegal_import() -> None:
         match="Import used in /dev/null/prelude at line 1\\. Import statements are banned",
     ):
         run_prelude_parsing_rule(prelude_content)
-
-
-def test_strip_address_origin() -> None:
-    addr = Address("", target_name="demo")
-    result = run_rule_with_mocks(
-        strip_address_origins,
-        rule_args=[AddressesWithOrigins([AddressWithOrigin(addr, AddressLiteralSpec("", "demo"))])],
-    )
-    assert list(result) == [addr]
 
 
 class MockTgt(Target):
@@ -224,7 +208,7 @@ def test_build_file_address() -> None:
 @pytest.fixture
 def address_specs_rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(AddressesWithOrigins, (AddressSpecs,))],
+        rules=[QueryRule(Addresses, (AddressSpecs,))],
         target_types=[MockTgt],
     )
 
@@ -232,23 +216,13 @@ def address_specs_rule_runner() -> RuleRunner:
 def resolve_address_specs(
     rule_runner: RuleRunner,
     specs: Iterable[AddressSpec],
-) -> Set[AddressWithOrigin]:
-    result = rule_runner.request(
-        AddressesWithOrigins,
-        [
-            AddressSpecs(specs, filter_by_global_options=True),
-        ],
-    )
+) -> Set[Address]:
+    result = rule_runner.request(Addresses, [AddressSpecs(specs, filter_by_global_options=True)])
     return set(result)
 
 
 def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> None:
-    """When multiple specs cover the same address, we should deduplicate to one single
-    AddressWithOrigin.
-
-    We should use the most specific origin spec possible, such as AddressLiteralSpec >
-    SiblingAddresses.
-    """
+    """When multiple specs cover the same address, we should deduplicate to one single Address."""
     address_specs_rule_runner.create_file("demo/f.txt")
     address_specs_rule_runner.add_to_build_file("demo", "mock_tgt(sources=['f.txt'])")
     # We also include a file address to ensure that that is included in the result.
@@ -260,11 +234,8 @@ def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> N
         AscendantAddresses("demo"),
     ]
     assert resolve_address_specs(address_specs_rule_runner, specs) == {
-        AddressWithOrigin(Address("demo"), AddressLiteralSpec("demo", "demo")),
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f.txt"),
-            AddressLiteralSpec("demo/f.txt", "demo"),
-        ),
+        Address("demo"),
+        Address("demo", relative_file_path="f.txt"),
     }
 
 
@@ -282,7 +253,7 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
         ),
     )
     assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
-        AddressWithOrigin(Address("demo", target_name="b"), SiblingAddresses("demo"))
+        Address("demo", target_name="b")
     }
 
     # The same filtering should work when given literal addresses, including file addresses.
@@ -299,11 +270,8 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
         ],
     )
     assert literals_result == {
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f.txt", target_name="b"),
-            AddressLiteralSpec("demo/f.txt", "b"),
-        ),
-        AddressWithOrigin(Address("demo", target_name="b"), AddressLiteralSpec("demo", "b")),
+        Address("demo", relative_file_path="f.txt", target_name="b"),
+        Address("demo", target_name="b"),
     }
 
 
@@ -321,7 +289,7 @@ def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: Rule
     )
 
     assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
-        AddressWithOrigin(Address("demo", target_name="not_me"), SiblingAddresses("demo"))
+        Address("demo", target_name="not_me")
     }
 
     # The same filtering should work when given literal addresses, including file addresses.
@@ -337,13 +305,8 @@ def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: Rule
     )
 
     assert literals_result == {
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f.txt", target_name="not_me"),
-            AddressLiteralSpec("demo/f.txt", "not_me"),
-        ),
-        AddressWithOrigin(
-            Address("demo", target_name="not_me"), AddressLiteralSpec("demo", "not_me")
-        ),
+        Address("demo", relative_file_path="f.txt", target_name="not_me"),
+        Address("demo", target_name="not_me"),
     }
 
 

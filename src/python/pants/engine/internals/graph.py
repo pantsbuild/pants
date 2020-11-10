@@ -14,16 +14,13 @@ from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
     FilesystemLiteralSpec,
-    FilesystemSpec,
     FilesystemSpecs,
     Specs,
 )
 from pants.engine.addresses import (
     Address,
     Addresses,
-    AddressesWithOrigins,
     AddressInput,
-    AddressWithOrigin,
     BuildFileAddress,
     UnparsedAddressInputs,
 )
@@ -62,8 +59,6 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
-    TargetsWithOrigins,
-    TargetWithOrigin,
     TransitiveTargets,
     TransitiveTargetsRequest,
     TransitiveTargetsRequestLite,
@@ -85,6 +80,12 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 # Address -> Target(s)
 # -----------------------------------------------------------------------------------------------
+
+
+@rule
+async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
+    wrapped_targets = await MultiGet(Get(WrappedTarget, Address, a) for a in addresses)
+    return UnexpandedTargets(wrapped_target.target for wrapped_target in wrapped_targets)
 
 
 @rule
@@ -145,13 +146,7 @@ async def resolve_target(
 
 @rule
 async def resolve_targets(targets: UnexpandedTargets) -> Targets:
-    # TODO: This method duplicates `resolve_targets_with_origins`, because direct expansion of
-    # `Addresses` to `Targets` is common in a few places: we can't always assume that we
-    # have `AddressesWithOrigins`. One way to dedupe these two methods would be to fake some
-    # origins, and then strip them afterward.
-
     # Split out and expand any base targets.
-    # TODO: Should recursively expand alias targets here as well.
     other_targets = []
     base_targets = []
     for target in targets:
@@ -172,56 +167,6 @@ async def resolve_targets(targets: UnexpandedTargets) -> Targets:
         for target in (subtargets.subtargets if subtargets.subtargets else (subtargets.base,))
     )
     return Targets(expanded_targets)
-
-
-@rule
-async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
-    wrapped_targets = await MultiGet(Get(WrappedTarget, Address, a) for a in addresses)
-    return UnexpandedTargets(wrapped_target.target for wrapped_target in wrapped_targets)
-
-
-# -----------------------------------------------------------------------------------------------
-# AddressWithOrigin(s) -> TargetWithOrigin(s)
-# -----------------------------------------------------------------------------------------------
-
-
-@rule
-async def resolve_target_with_origin(address_with_origin: AddressWithOrigin) -> TargetWithOrigin:
-    wrapped_target = await Get(WrappedTarget, Address, address_with_origin.address)
-    return TargetWithOrigin(wrapped_target.target, address_with_origin.origin)
-
-
-@rule
-async def resolve_targets_with_origins(
-    addresses_with_origins: AddressesWithOrigins,
-) -> TargetsWithOrigins:
-    # TODO: See `resolve_targets`.
-    targets_with_origins = await MultiGet(
-        Get(TargetWithOrigin, AddressWithOrigin, address_with_origin)
-        for address_with_origin in addresses_with_origins
-    )
-    # Split out and expand any base targets.
-    # TODO: Should recursively expand alias targets here as well.
-    other_targets_with_origins = []
-    base_targets_with_origins = []
-    for to in targets_with_origins:
-        if to.target.address.is_base_target:
-            base_targets_with_origins.append(to)
-        else:
-            other_targets_with_origins.append(to)
-
-    base_targets_subtargets = await MultiGet(
-        Get(Subtargets, Address, to.target.address) for to in base_targets_with_origins
-    )
-    # Zip the subtargets back to the base targets and replace them while maintaining origins.
-    # NB: If a target had no subtargets, we use the base.
-    expanded_targets_with_origins = set(other_targets_with_origins)
-    expanded_targets_with_origins.update(
-        TargetWithOrigin(target, bto.origin)
-        for bto, subtargets in zip(base_targets_with_origins, base_targets_subtargets)
-        for target in (subtargets.subtargets if subtargets.subtargets else [bto.target])
-    )
-    return TargetsWithOrigins(expanded_targets_with_origins)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -519,12 +464,10 @@ def _log_or_raise_unmatched_owners(
 
 
 @rule
-async def addresses_with_origins_from_filesystem_specs(
-    filesystem_specs: FilesystemSpecs,
-    global_options: GlobalOptions,
-) -> AddressesWithOrigins:
-    """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
-    owners come from.
+async def addresses_from_filesystem_specs(
+    filesystem_specs: FilesystemSpecs, global_options: GlobalOptions
+) -> Addresses:
+    """Find the owner(s) for each FilesystemSpec.
 
     Every returned address will be a generated subtarget, meaning that each address will have
     exactly one file in its `sources` field.
@@ -543,7 +486,7 @@ async def addresses_with_origins_from_filesystem_specs(
     owners_per_include = await MultiGet(
         Get(Owners, OwnersRequest(sources=paths.files)) for paths in paths_per_include
     )
-    addresses_to_specs: Dict[Address, FilesystemSpec] = {}
+    addresses: Set[Address] = set()
     for spec, owners in zip(filesystem_specs.includes, owners_per_include):
         if (
             owners_not_found_behavior != OwnersNotFoundBehavior.ignore
@@ -555,32 +498,19 @@ async def addresses_with_origins_from_filesystem_specs(
                 global_options.options.owners_not_found_behavior,
                 ignore_option="--owners-not-found-behavior=ignore",
             )
-        for address in owners:
-            # A target might be covered by multiple specs, so we take the most specific one.
-            addresses_to_specs[address] = FilesystemSpecs.more_specific(
-                addresses_to_specs.get(address), spec
-            )
-    return AddressesWithOrigins(
-        AddressWithOrigin(address, spec) for address, spec in addresses_to_specs.items()
-    )
+        addresses.update(owners)
+    return Addresses(sorted(addresses))
 
 
 @rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
-async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
+async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
     from_address_specs, from_filesystem_specs = await MultiGet(
-        Get(AddressesWithOrigins, AddressSpecs, specs.address_specs),
-        Get(AddressesWithOrigins, FilesystemSpecs, specs.filesystem_specs),
+        Get(Addresses, AddressSpecs, specs.address_specs),
+        Get(Addresses, FilesystemSpecs, specs.filesystem_specs),
     )
-    # It's possible to resolve the same address both with filesystem specs and address specs. We
-    # dedupe, but must go through some ceremony for the equality check because the OriginSpec will
-    # differ.
-    address_spec_addresses = FrozenOrderedSet(awo.address for awo in from_address_specs)
-    return AddressesWithOrigins(
-        (
-            *from_address_specs,
-            *(awo for awo in from_filesystem_specs if awo.address not in address_spec_addresses),
-        )
-    )
+    # We use a set to dedupe because it's possible to have the same address from both an address
+    # and filesystem spec.
+    return Addresses(sorted({*from_address_specs, *from_filesystem_specs}))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -992,7 +922,7 @@ async def resolve_unparsed_address_inputs(
 class NoApplicableTargetsException(Exception):
     def __init__(
         self,
-        targets_with_origins: TargetsWithOrigins,
+        targets: Targets,
         *,
         applicable_target_types: Iterable[Type[Target]],
         goal_description: str,
@@ -1000,22 +930,25 @@ class NoApplicableTargetsException(Exception):
         applicable_target_aliases = sorted(
             {target_type.alias for target_type in applicable_target_types}
         )
-        inapplicable_target_aliases = sorted({tgt.alias for tgt in targets_with_origins.targets})
-        specs = sorted(
-            {str(target_with_origin.origin) for target_with_origin in targets_with_origins}
-        )
+        inapplicable_target_aliases = sorted({tgt.alias for tgt in targets})
         bulleted_list_sep = "\n  * "
-        super().__init__(
-            f"{goal_description.capitalize()} only works with the following target types:"
+        msg = (
+            f"{goal_description.capitalize()} only works with these target types:"
             f"{bulleted_list_sep}{bulleted_list_sep.join(applicable_target_aliases)}\n\n"
-            f"You specified `{' '.join(specs)}`, which only included the following target types:"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(inapplicable_target_aliases)}"
         )
+        if inapplicable_target_aliases:
+            msg += (
+                "However, you only specified files/targets with these target types:"
+                f"{bulleted_list_sep}{bulleted_list_sep.join(inapplicable_target_aliases)}"
+            )
+        else:
+            msg += "However, you did not specify any files/targets."
+        super().__init__(msg)
 
     @classmethod
     def create_from_field_sets(
         cls,
-        targets_with_origins: TargetsWithOrigins,
+        targets: Targets,
         *,
         field_set_types: Iterable[Type[_AbstractFieldSet]],
         goal_description: str,
@@ -1030,7 +963,7 @@ class NoApplicableTargetsException(Exception):
             )
         }
         return cls(
-            targets_with_origins,
+            targets,
             applicable_target_types=applicable_target_types,
             goal_description=goal_description,
         )
@@ -1072,23 +1005,20 @@ class AmbiguousImplementationsException(Exception):
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
-    targets_with_origins: TargetsWithOrigins,
+    targets: Targets,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> TargetRootsToFieldSets:
     field_sets_per_target = await Get(
-        FieldSetsPerTarget,
-        FieldSetsPerTargetRequest(
-            request.field_set_superclass, (two.target for two in targets_with_origins)
-        ),
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
     )
     targets_to_valid_field_sets = {}
-    for tgt_with_origin, field_sets in zip(targets_with_origins, field_sets_per_target.collection):
+    for tgt, field_sets in zip(targets, field_sets_per_target.collection):
         if field_sets:
-            targets_to_valid_field_sets[tgt_with_origin] = field_sets
+            targets_to_valid_field_sets[tgt] = field_sets
     if request.error_if_no_applicable_targets and not targets_to_valid_field_sets:
         raise NoApplicableTargetsException.create_from_field_sets(
-            TargetsWithOrigins(targets_with_origins),
+            targets,
             field_set_types=union_membership.union_rules[request.field_set_superclass],
             goal_description=request.goal_description,
             union_membership=union_membership,

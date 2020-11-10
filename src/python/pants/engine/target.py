@@ -29,7 +29,6 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.deprecated import warn_or_error
-from pants.base.specs import Spec
 from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
@@ -562,12 +561,6 @@ class WrappedTarget:
     target: Target
 
 
-@dataclass(frozen=True)
-class TargetWithOrigin:
-    target: Target
-    origin: Spec
-
-
 class Targets(Collection[Target]):
     """A heterogeneous collection of instances of Target subclasses.
 
@@ -594,23 +587,6 @@ class UnexpandedTargets(Collection[Target]):
     def expect_single(self) -> Target:
         assert_single_address([tgt.address for tgt in self])
         return self[0]
-
-
-class TargetsWithOrigins(Collection[TargetWithOrigin]):
-    """A heterogeneous collection of instances of Target subclasses with the original Spec used to
-    resolve the target.
-
-    See the docstring for `Targets` for an explanation of the `Target`s being heterogeneous and how
-    you should filter out the targets you care about.
-    """
-
-    def expect_single(self) -> TargetWithOrigin:
-        assert_single_address([tgt_with_origin.target.address for tgt_with_origin in self])
-        return self[0]
-
-    @memoized_property
-    def targets(self) -> Tuple[Target, ...]:
-        return tuple(tgt_with_origin.target for tgt_with_origin in self)
 
 
 @dataclass(frozen=True)
@@ -871,12 +847,10 @@ _AFS = TypeVar("_AFS", bound=_AbstractFieldSet)
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSets(Generic[_AFS]):
-    mapping: FrozenDict[TargetWithOrigin, Tuple[_AFS, ...]]
+    mapping: FrozenDict[Target, Tuple[_AFS, ...]]
 
-    def __init__(self, mapping: Mapping[TargetWithOrigin, Iterable[_AFS]]) -> None:
-        self.mapping = FrozenDict(
-            {tgt_with_origin: tuple(field_sets) for tgt_with_origin, field_sets in mapping.items()}
-        )
+    def __init__(self, mapping: Mapping[Target, Iterable[_AFS]]) -> None:
+        self.mapping = FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()})
 
     @memoized_property
     def field_sets(self) -> Tuple[_AFS, ...]:
@@ -888,10 +862,6 @@ class TargetRootsToFieldSets(Generic[_AFS]):
 
     @memoized_property
     def targets(self) -> Tuple[Target, ...]:
-        return tuple(tgt_with_origin.target for tgt_with_origin in self.targets_with_origins)
-
-    @memoized_property
-    def targets_with_origins(self) -> Tuple[TargetWithOrigin, ...]:
         return tuple(self.mapping.keys())
 
 

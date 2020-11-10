@@ -10,7 +10,6 @@ from typing import Iterable, List, Set, Tuple, Type
 import pytest
 
 from pants.base.specs import (
-    AddressLiteralSpec,
     FilesystemGlobSpec,
     FilesystemLiteralSpec,
     FilesystemSpec,
@@ -18,14 +17,7 @@ from pants.base.specs import (
     Specs,
 )
 from pants.base.specs_parser import SpecsParser
-from pants.engine.addresses import (
-    Address,
-    Addresses,
-    AddressesWithOrigins,
-    AddressInput,
-    AddressWithOrigin,
-    UnparsedAddressInputs,
-)
+from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -67,8 +59,6 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
-    TargetsWithOrigins,
-    TargetWithOrigin,
     TransitiveTargets,
     TransitiveTargetsRequest,
     TransitiveTargetsRequestLite,
@@ -566,7 +556,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
 @pytest.fixture
 def specs_rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(AddressesWithOrigins, (FilesystemSpecs,))],
+        rules=[QueryRule(Addresses, (FilesystemSpecs,))],
         target_types=[MockTarget],
     )
 
@@ -574,46 +564,33 @@ def specs_rule_runner() -> RuleRunner:
 def resolve_filesystem_specs(
     rule_runner: RuleRunner,
     specs: Iterable[FilesystemSpec],
-) -> Set[AddressWithOrigin]:
-    result = rule_runner.request(AddressesWithOrigins, [FilesystemSpecs(specs)])
+) -> Set[Address]:
+    result = rule_runner.request(Addresses, [FilesystemSpecs(specs)])
     return set(result)
 
 
 def test_filesystem_specs_literal_file(specs_rule_runner: RuleRunner) -> None:
     specs_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
     specs_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
-    spec = FilesystemLiteralSpec("demo/f1.txt")
-    assert resolve_filesystem_specs(specs_rule_runner, [spec]) == {
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f1.txt", target_name="demo"), origin=spec
-        )
+    assert resolve_filesystem_specs(specs_rule_runner, [FilesystemLiteralSpec("demo/f1.txt")]) == {
+        Address("demo", relative_file_path="f1.txt", target_name="demo")
     }
 
 
 def test_filesystem_specs_glob(specs_rule_runner: RuleRunner) -> None:
     specs_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
     specs_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
-    spec = FilesystemGlobSpec("demo/*.txt")
-    assert resolve_filesystem_specs(specs_rule_runner, [spec]) == {
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f1.txt", target_name="demo"), origin=spec
-        ),
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f2.txt", target_name="demo"), origin=spec
-        ),
+    assert resolve_filesystem_specs(specs_rule_runner, [FilesystemGlobSpec("demo/*.txt")]) == {
+        Address("demo", relative_file_path="f1.txt", target_name="demo"),
+        Address("demo", relative_file_path="f2.txt", target_name="demo"),
     }
 
-    # If a glob and a literal spec both resolve to the same file, the literal spec should be
-    # used as it's more precise.
-    literal_spec = FilesystemLiteralSpec("demo/f1.txt")
-    assert resolve_filesystem_specs(specs_rule_runner, [spec, literal_spec]) == {
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f1.txt", target_name="demo"),
-            origin=literal_spec,
-        ),
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f2.txt", target_name="demo"), origin=spec
-        ),
+    # We should deduplicate between glob and literal specs.
+    assert resolve_filesystem_specs(
+        specs_rule_runner, [FilesystemGlobSpec("demo/*.txt"), FilesystemLiteralSpec("demo/f1.txt")]
+    ) == {
+        Address("demo", relative_file_path="f1.txt", target_name="demo"),
+        Address("demo", relative_file_path="f2.txt", target_name="demo"),
     }
 
 
@@ -641,7 +618,7 @@ def test_filesystem_specs_no_owner(specs_rule_runner: RuleRunner) -> None:
 def test_resolve_addresses_from_specs() -> None:
     """This tests that we correctly handle resolving from both address and filesystem specs."""
     rule_runner = RuleRunner(
-        rules=[QueryRule(AddressesWithOrigins, (Specs,))],
+        rules=[QueryRule(Addresses, (Specs,))],
         target_types=[MockTarget],
     )
     rule_runner.create_file("fs_spec/f.txt")
@@ -661,24 +638,12 @@ def test_resolve_addresses_from_specs() -> None:
     specs = SpecsParser(rule_runner.build_root).parse_specs(
         [*no_interaction_specs, *multiple_files_specs]
     )
-    result = rule_runner.request(AddressesWithOrigins, [specs])
+    result = rule_runner.request(Addresses, [specs])
     assert set(result) == {
-        AddressWithOrigin(
-            Address("fs_spec", relative_file_path="f.txt"),
-            origin=FilesystemLiteralSpec("fs_spec/f.txt"),
-        ),
-        AddressWithOrigin(
-            Address("address_spec"),
-            origin=AddressLiteralSpec("address_spec", "address_spec"),
-        ),
-        AddressWithOrigin(
-            Address("multiple_files"),
-            origin=AddressLiteralSpec("multiple_files", "multiple_files"),
-        ),
-        AddressWithOrigin(
-            Address("multiple_files", relative_file_path="f2.txt"),
-            origin=FilesystemLiteralSpec(file="multiple_files/f2.txt"),
-        ),
+        Address("fs_spec", relative_file_path="f.txt"),
+        Address("address_spec"),
+        Address("multiple_files"),
+        Address("multiple_files", relative_file_path="f2.txt"),
     }
 
 
@@ -717,22 +682,19 @@ def test_find_valid_field_sets() -> None:
 
     rule_runner = RuleRunner(
         rules=[
-            QueryRule(TargetRootsToFieldSets, (TargetRootsToFieldSetsRequest, TargetsWithOrigins)),
+            QueryRule(TargetRootsToFieldSets, (TargetRootsToFieldSetsRequest, Targets)),
             UnionRule(FieldSetSuperclass, FieldSetSubclass1),
             UnionRule(FieldSetSuperclass, FieldSetSubclass2),
         ],
         target_types=[FortranTarget, InvalidTarget],
     )
 
-    origin = FilesystemLiteralSpec("f.txt")
-    valid_tgt = FortranTarget({}, address=Address("", target_name=":valid"))
-    valid_tgt_with_origin = TargetWithOrigin(valid_tgt, origin)
-    invalid_tgt = InvalidTarget({}, address=Address("", target_name=":invalid"))
-    invalid_tgt_with_origin = TargetWithOrigin(invalid_tgt, origin)
+    valid_tgt = FortranTarget({}, address=Address("", target_name="valid"))
+    invalid_tgt = InvalidTarget({}, address=Address("", target_name="invalid"))
 
     def find_valid_field_sets(
         superclass: Type,
-        targets_with_origins: Iterable[TargetWithOrigin],
+        targets: Iterable[Target],
         *,
         error_if_no_applicable_targets: bool = False,
         expect_single_config: bool = False,
@@ -745,46 +707,35 @@ def test_find_valid_field_sets() -> None:
         )
         return rule_runner.request(
             TargetRootsToFieldSets,
-            [request, TargetsWithOrigins(targets_with_origins)],
+            [request, Targets(targets)],
         )
 
-    valid = find_valid_field_sets(
-        FieldSetSuperclass, [valid_tgt_with_origin, invalid_tgt_with_origin]
-    )
+    valid = find_valid_field_sets(FieldSetSuperclass, [valid_tgt, invalid_tgt])
     assert valid.targets == (valid_tgt,)
-    assert valid.targets_with_origins == (valid_tgt_with_origin,)
     assert valid.field_sets == (
         FieldSetSubclass1.create(valid_tgt),
         FieldSetSubclass2.create(valid_tgt),
     )
 
     with pytest.raises(ExecutionError) as exc:
-        find_valid_field_sets(
-            FieldSetSuperclass, [valid_tgt_with_origin], expect_single_config=True
-        )
+        find_valid_field_sets(FieldSetSuperclass, [valid_tgt], expect_single_config=True)
     assert AmbiguousImplementationsException.__name__ in str(exc.value)
 
     with pytest.raises(ExecutionError) as exc:
         find_valid_field_sets(
             FieldSetSuperclass,
-            [
-                valid_tgt_with_origin,
-                TargetWithOrigin(
-                    FortranTarget({}, address=Address("", target_name=":valid2")), origin
-                ),
-            ],
+            [valid_tgt, FortranTarget({}, address=Address("", target_name="valid2"))],
             expect_single_config=True,
         )
     assert TooManyTargetsException.__name__ in str(exc.value)
 
-    no_valid_targets = find_valid_field_sets(FieldSetSuperclass, [invalid_tgt_with_origin])
+    no_valid_targets = find_valid_field_sets(FieldSetSuperclass, [invalid_tgt])
     assert no_valid_targets.targets == ()
-    assert no_valid_targets.targets_with_origins == ()
     assert no_valid_targets.field_sets == ()
 
     with pytest.raises(ExecutionError) as exc:
         find_valid_field_sets(
-            FieldSetSuperclass, [invalid_tgt_with_origin], error_if_no_applicable_targets=True
+            FieldSetSuperclass, [invalid_tgt], error_if_no_applicable_targets=True
         )
     assert NoApplicableTargetsException.__name__ in str(exc.value)
 
@@ -800,7 +751,7 @@ def sources_rule_runner() -> RuleRunner:
 
 
 def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
-    addr = Address("src/fortran", target_name=":lib")
+    addr = Address("src/fortran", target_name="lib")
     sources_rule_runner.create_files(
         "src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"]
     )
@@ -825,7 +776,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     class SourcesSubclass(Sources):
         pass
 
-    addr = Address("", target_name=":lib")
+    addr = Address("", target_name="lib")
     sources_rule_runner.create_files("", files=["f1.f95"])
 
     valid_sources = SourcesSubclass(["*"], address=addr)
@@ -908,7 +859,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
             HydratedSources,
             [
                 HydrateSourcesRequest(
-                    sources_cls(sources, address=Address("", target_name=":example"))
+                    sources_cls(sources, address=Address("", target_name="example"))
                 ),
             ],
         )
