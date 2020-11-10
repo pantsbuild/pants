@@ -15,6 +15,7 @@ from pants.engine.target import (
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
 )
+from pants.util.enums import match
 from pants.util.filtering import and_filters, create_filters
 
 
@@ -105,13 +106,14 @@ def filter_targets(
         return lambda tgt: any(bool(regex.search(tag)) for tag in tgt.get(Tags).value or ())
 
     def filter_granularity(granularity: TargetGranularity) -> TargetFilter:
-        if granularity == TargetGranularity.all_targets:
-            return lambda _: True
-        elif granularity == TargetGranularity.file_targets:
-            return lambda tgt: not tgt.address.is_base_target
-        else:
-            assert granularity == TargetGranularity.base_targets
-            return lambda tgt: tgt.address.is_base_target
+        return match(
+            granularity,
+            {
+                TargetGranularity.all_targets: lambda _: True,
+                TargetGranularity.file_targets: lambda tgt: not tgt.address.is_base_target,
+                TargetGranularity.base_targets: lambda tgt: tgt.address.is_base_target,
+            },
+        )
 
     anded_filter: TargetFilter = and_filters(
         [
