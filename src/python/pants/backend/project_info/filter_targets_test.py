@@ -7,7 +7,11 @@ from typing import List, Optional, Sequence, cast
 
 import pytest
 
-from pants.backend.project_info.filter_targets import FilterSubsystem, filter_targets
+from pants.backend.project_info.filter_targets import (
+    FilterSubsystem,
+    TargetGranularity,
+    filter_targets,
+)
 from pants.engine.addresses import Address
 from pants.engine.target import (
     RegisteredTargetTypes,
@@ -31,6 +35,7 @@ def run_goal(
     target_type: Optional[List[str]] = None,
     address_regex: Optional[List[str]] = None,
     tag_regex: Optional[List[str]] = None,
+    granularity: Optional[TargetGranularity] = None,
 ) -> str:
     console = MockConsole(use_colors=False)
     run_rule_with_mocks(
@@ -44,6 +49,7 @@ def run_goal(
                 target_type=target_type or [],
                 address_regex=address_regex or [],
                 tag_regex=tag_regex or [],
+                granularity=granularity or TargetGranularity.all_targets,
                 # Deprecated.
                 type=[],
                 target=[],
@@ -145,3 +151,13 @@ def test_filter_by_tag_regex() -> None:
     # Invalid regex.
     with pytest.raises(re.error):
         run_goal(targets, tag_regex=["("])
+
+
+def test_filter_by_granularity() -> None:
+    targets = [
+        MockTarget({}, address=Address("p1")),
+        MockTarget({}, address=Address("p1", relative_file_path="file.txt")),
+    ]
+    assert run_goal(targets, granularity=TargetGranularity.all_targets).strip() == "p1\np1/file.txt"
+    assert run_goal(targets, granularity=TargetGranularity.base_targets).strip() == "p1"
+    assert run_goal(targets, granularity=TargetGranularity.file_targets).strip() == "p1/file.txt"
