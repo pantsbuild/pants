@@ -89,6 +89,9 @@ class ExecutionOptions:
     process_execution_local_enable_nailgun: bool
     remote_cache_read: bool
     remote_cache_write: bool
+    remote_store_initial_timeout: int
+    remote_store_timeout_multiplier: float
+    remote_store_maximum_timeout: int
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
@@ -124,6 +127,9 @@ class ExecutionOptions:
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             remote_cache_read=bootstrap_options.remote_cache_read,
             remote_cache_write=bootstrap_options.remote_cache_write,
+            remote_store_initial_timeout=bootstrap_options.remote_store_initial_timeout,
+            remote_store_timeout_multiplier=bootstrap_options.remote_store_timeout_multiplier,
+            remote_store_maximum_timeout=bootstrap_options.remote_store_maximum_timeout,
         )
 
 
@@ -152,6 +158,9 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_enable_nailgun=False,
     remote_cache_read=False,
     remote_cache_write=False,
+    remote_store_initial_timeout=10,
+    remote_store_timeout_multiplier=1.0,
+    remote_store_maximum_timeout=10,
 )
 
 
@@ -743,6 +752,27 @@ class GlobalOptions(Subsystem):
             help="Number of remote stores to concurrently allow connections to.",
         )
         register(
+            "--remote-store-initial-timeout",
+            type=int,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_initial_timeout,
+            help="Initial timeout (in milliseconds) when there is a failure in accessing a remote store.",
+        )
+        register(
+            "--remote-store-timeout-multiplier",
+            type=float,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_timeout_multiplier,
+            help="Multiplier used to increase the timeout (starting with value of --remote-store-initial-timeout) between retry attempts in accessing a remote store.",
+        )
+        register(
+            "--remote-store-maximum-timeout",
+            type=int,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_maximum_timeout,
+            help="Maximum timeout (in millseconds) to allow between retry attempts in accessing a remote store.",
+        )
+        register(
             "--remote-execution-process-cache-namespace",
             advanced=True,
             removal_version="2.2.0.dev0",
@@ -955,4 +985,18 @@ class GlobalOptions(Subsystem):
             raise OptionsError(
                 "The `--remote-cache-write` option requires also setting "
                 "`--remote-store-server` to work properly."
+            )
+
+        # Ensure tha timeout values are non-zero.
+        if opts.remote_store_initial_timeout <= 0:
+            raise OptionsError(
+                "The --remote-store-initial-timeout option requires a positive number of milliseconds."
+            )
+        if opts.remote_store_timeout_multiplier <= 0.0:
+            raise OptionsError(
+                "The --remote-store-timeout-multiplier option requires a positive number for the multiplier."
+            )
+        if opts.remote_store_maximum_timeout <= 0:
+            raise OptionsError(
+                "The --remote-store-initial-timeout option requires a positive number of milliseconds."
             )
