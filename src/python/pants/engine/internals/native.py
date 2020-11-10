@@ -247,6 +247,9 @@ class Native(metaclass=SingletonMetaclass):
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,
             store_connection_limit=execution_options.remote_store_connection_limit,
+            store_initial_timeout=execution_options.remote_store_initial_timeout,
+            store_timeout_multiplier=execution_options.remote_store_timeout_multiplier,
+            store_maximum_timeout=execution_options.remote_store_maximum_timeout,
             execution_extra_platform_properties=tuple(
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties
