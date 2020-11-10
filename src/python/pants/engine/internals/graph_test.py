@@ -72,12 +72,9 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
     TransitiveTargetsRequestLite,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -793,7 +790,7 @@ def test_find_valid_field_sets() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test the Sources field, including codegen. Also see `engine/target_test.py`.
+# Test the Sources field. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------
 
 
@@ -933,6 +930,11 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# Test codegen. Also see `engine/target_test.py`.
+# -----------------------------------------------------------------------------------------------
+
+
 class SmalltalkSources(Sources):
     pass
 
@@ -970,97 +972,100 @@ async def generate_smalltalk_from_avro(
     return GeneratedSources(result)
 
 
-class TestCodegen(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
+@pytest.fixture
+def codegen_rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
             generate_smalltalk_from_avro,
-            QueryRule(UnionMembership, ()),
-            QueryRule(HydratedSources, (HydrateSourcesRequest,)),
-            QueryRule(GeneratedSources, (GenerateSmalltalkFromAvroRequest,)),
+            QueryRule(HydratedSources, [HydrateSourcesRequest]),
+            QueryRule(GeneratedSources, [GenerateSmalltalkFromAvroRequest]),
             UnionRule(GenerateSourcesRequest, GenerateSmalltalkFromAvroRequest),
-        )
+        ],
+        target_types=[AvroLibrary],
+    )
 
-    @classmethod
-    def target_types(cls):
-        return [AvroLibrary]
 
-    def setUp(self) -> None:
-        self.address = Address("src/avro", target_name="lib")
-        self.create_files("src/avro", files=["f.avro"])
-        self.add_to_build_file("src/avro", "avro_library(name='lib', sources=['*.avro'])")
-        self.union_membership = self.request(UnionMembership, [])
+def setup_codegen_protocol_tgt(rule_runner: RuleRunner) -> Address:
+    rule_runner.create_files("src/avro", files=["f.avro"])
+    rule_runner.add_to_build_file("src/avro", "avro_library(name='lib', sources=['*.avro'])")
+    return Address("src/avro", target_name="lib")
 
-    def test_generate_sources(self) -> None:
-        bootstrapper = create_options_bootstrapper()
-        protocol_sources = AvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
 
-        # First, get the original protocol sources.
-        hydrated_protocol_sources = self.request(
-            HydratedSources, [HydrateSourcesRequest(protocol_sources), bootstrapper]
-        )
-        assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
+def test_codegen_generates_sources(codegen_rule_runner: RuleRunner) -> None:
+    addr = setup_codegen_protocol_tgt(codegen_rule_runner)
+    protocol_sources = AvroSources(["*.avro"], address=addr)
+    assert (
+        protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
+        is True
+    )
 
-        # Test directly feeding the protocol sources into the codegen rule.
-        tgt = self.request(WrappedTarget, [self.address, bootstrapper]).target
-        generated_sources = self.request(
-            GeneratedSources,
-            [
-                GenerateSmalltalkFromAvroRequest(hydrated_protocol_sources.snapshot, tgt),
-                bootstrapper,
-            ],
-        )
-        assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
+    # First, get the original protocol sources.
+    hydrated_protocol_sources = codegen_rule_runner.request(
+        HydratedSources, [HydrateSourcesRequest(protocol_sources)]
+    )
+    assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
 
-        # Test that HydrateSourcesRequest can also be used.
-        generated_via_hydrate_sources = self.request(
-            HydratedSources,
-            [
-                HydrateSourcesRequest(
-                    protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
-                ),
-                bootstrapper,
-            ],
-        )
-        assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
-        assert generated_via_hydrate_sources.sources_type == SmalltalkSources
+    # Test directly feeding the protocol sources into the codegen rule.
+    tgt = codegen_rule_runner.get_target(addr)
+    generated_sources = codegen_rule_runner.request(
+        GeneratedSources,
+        [GenerateSmalltalkFromAvroRequest(hydrated_protocol_sources.snapshot, tgt)],
+    )
+    assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
 
-    def test_works_with_subclass_fields(self) -> None:
-        class CustomAvroSources(AvroSources):
-            pass
+    # Test that HydrateSourcesRequest can also be used.
+    generated_via_hydrate_sources = codegen_rule_runner.request(
+        HydratedSources,
+        [
+            HydrateSourcesRequest(
+                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+            )
+        ],
+    )
+    assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
+    assert generated_via_hydrate_sources.sources_type == SmalltalkSources
 
-        protocol_sources = CustomAvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
-        generated = self.request(
-            HydratedSources,
-            [
-                HydrateSourcesRequest(
-                    protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
-                ),
-                create_options_bootstrapper(),
-            ],
-        )
-        assert generated.snapshot.files == ("src/smalltalk/f.st",)
 
-    def test_cannot_generate_language(self) -> None:
-        class AdaSources(Sources):
-            pass
+def test_codegen_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> None:
+    addr = setup_codegen_protocol_tgt(codegen_rule_runner)
 
-        protocol_sources = AvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(AdaSources, self.union_membership) is False
-        generated = self.request(
-            HydratedSources,
-            [
-                HydrateSourcesRequest(
-                    protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
-                ),
-                create_options_bootstrapper(),
-            ],
-        )
-        assert generated.snapshot.files == ()
-        assert generated.sources_type is None
+    class CustomAvroSources(AvroSources):
+        pass
+
+    protocol_sources = CustomAvroSources(["*.avro"], address=addr)
+    assert (
+        protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
+        is True
+    )
+    generated = codegen_rule_runner.request(
+        HydratedSources,
+        [
+            HydrateSourcesRequest(
+                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+            )
+        ],
+    )
+    assert generated.snapshot.files == ("src/smalltalk/f.st",)
+
+
+def test_codegen_cannot_generate_language(codegen_rule_runner: RuleRunner) -> None:
+    addr = setup_codegen_protocol_tgt(codegen_rule_runner)
+
+    class AdaSources(Sources):
+        pass
+
+    protocol_sources = AvroSources(["*.avro"], address=addr)
+    assert protocol_sources.can_generate(AdaSources, codegen_rule_runner.union_membership) is False
+    generated = codegen_rule_runner.request(
+        HydratedSources,
+        [
+            HydrateSourcesRequest(
+                protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
+            )
+        ],
+    )
+    assert generated.snapshot.files == ()
+    assert generated.sources_type is None
 
 
 def test_ambiguous_codegen_implementations_exception() -> None:
