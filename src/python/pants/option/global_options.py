@@ -159,7 +159,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_cache_read=False,
     remote_cache_write=False,
     remote_store_initial_timeout=10,
-    remote_store_timeout_multiplier=1.0,
+    remote_store_timeout_multiplier=2.0,
     remote_store_maximum_timeout=10,
 )
 
@@ -987,7 +987,7 @@ class GlobalOptions(Subsystem):
                 "`--remote-store-server` to work properly."
             )
 
-        # Ensure tha timeout values are non-zero.
+        # Ensure that timeout values are non-zero.
         if opts.remote_store_initial_timeout <= 0:
             raise OptionsError(
                 "The --remote-store-initial-timeout option requires a positive number of milliseconds."
