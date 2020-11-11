@@ -6,6 +6,39 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release, and
 https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
 
+2.0.1rc0 (11/11/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Add a specific error for target names containing slashes (cherrypick of #11115) (#11122)
+  `PR #11122 <https://github.com/pantsbuild/pants/pull/11122>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix logs for `test`, `lint`, `fmt`, and `typecheck` to always print, even if cached (Cherry-pick of #11111) (#11116)
+  `PR #11116 <https://github.com/pantsbuild/pants/pull/11116>`_
+
+* Fix `pytest.pex` leaking into coverage data (Cherry-pick of  #11110) (#11112)
+  `PR #11112 <https://github.com/pantsbuild/pants/pull/11112>`_
+
+* Fix Coverage not finding resource files when generating a report (Cherry-pick of #11129) #11139
+  `PR #11139 <https://github.com/pantsbuild/pants/pull/11139>`_
+
+* Fix `!!` transitive excludes when used multiple times in a repo (Cherry-pick of #11103) (#11104)
+  `PR #11104 <https://github.com/pantsbuild/pants/pull/11104>`_
+
+* Fix `setup_py().with_binaries()` to properly inject dependencies (#11098)
+  `PR #11098 <https://github.com/pantsbuild/pants/pull/11098>`_
+
+* Upgrade to Pex 2.1.21 to fix interpreter selection and race condition (Cherry-pick of #11131) (#11133)
+  `PR #11133 <https://github.com/pantsbuild/pants/pull/11133>`_
+
+* Fix `--pex-verbosity` to work with the interpreter selection PEX (Cherry-pick of #11108) (#11120)
+  `PR #11120 <https://github.com/pantsbuild/pants/pull/11120>`_
+
 2.0.0 (10/27/2020)
 ------------------
 
