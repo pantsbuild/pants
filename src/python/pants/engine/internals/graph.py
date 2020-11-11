@@ -92,16 +92,16 @@ async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
 async def generate_subtargets(address: Address, global_options: GlobalOptions) -> Subtargets:
     if address.is_file_target:
         raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
-    wrapped_base_target = await Get(WrappedTarget, Address, address)
-    base_target = wrapped_base_target.target
+    wrapped_build_target = await Get(WrappedTarget, Address, address)
+    build_target = wrapped_build_target.target
 
-    if not base_target.has_field(Dependencies) or not base_target.has_field(Sources):
+    if not build_target.has_field(Dependencies) or not build_target.has_field(Sources):
         # If a target type does not support dependencies, we do not split it, as that would prevent
         # the base target from depending on its splits.
-        return Subtargets(base_target, ())
+        return Subtargets(build_target, ())
 
     # Create subtargets for matched sources.
-    sources_field = base_target[Sources]
+    sources_field = build_target[Sources]
     sources_field_path_globs = sources_field.path_globs(
         global_options.options.files_not_found_behavior
     )
@@ -118,7 +118,7 @@ async def generate_subtargets(address: Address, global_options: GlobalOptions) -
         for subtarget_file in paths.files
     )
 
-    return Subtargets(base_target, tuple(wt.target for wt in wrapped_subtargets))
+    return Subtargets(build_target, tuple(wt.target for wt in wrapped_subtargets))
 
 
 @rule
@@ -128,9 +128,9 @@ async def resolve_target(
     union_membership: UnionMembership,
 ) -> WrappedTarget:
     if address.is_file_target:
-        base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_build_target())
+        build_target = await Get(WrappedTarget, Address, address.maybe_convert_to_build_target())
         subtarget = generate_subtarget(
-            base_target.target, full_file_name=address.filename, union_membership=union_membership
+            build_target.target, full_file_name=address.filename, union_membership=union_membership
         )
         return WrappedTarget(subtarget)
 
@@ -148,22 +148,22 @@ async def resolve_target(
 async def resolve_targets(targets: UnexpandedTargets) -> Targets:
     # Split out and expand any base targets.
     other_targets = []
-    base_targets = []
+    build_targets = []
     for target in targets:
         if not target.address.is_file_target:
-            base_targets.append(target)
+            build_targets.append(target)
         else:
             other_targets.append(target)
 
-    base_targets_subtargets = await MultiGet(
-        Get(Subtargets, Address, bt.address) for bt in base_targets
+    build_targets_subtargets = await MultiGet(
+        Get(Subtargets, Address, bt.address) for bt in build_targets
     )
     # Zip the subtargets back to the base targets and replace them.
     # NB: If a target had no subtargets, we use the base.
     expanded_targets = OrderedSet(other_targets)
     expanded_targets.update(
         target
-        for subtargets in base_targets_subtargets
+        for subtargets in build_targets_subtargets
         for target in (subtargets.subtargets if subtargets.subtargets else (subtargets.base,))
     )
     return Targets(expanded_targets)
@@ -791,8 +791,8 @@ async def resolve_dependencies(
             for inference_request_type in relevant_inference_request_types
         )
 
-    # If this is a base target, or no dependency inference implementation can infer dependencies on
-    # a file address's sibling files, then we inject dependencies on all the base target's
+    # If this is a BUILD target, or no dependency inference implementation can infer dependencies on
+    # a file address's sibling files, then we inject dependencies on all the BUILD target's
     # generated subtargets.
     subtarget_addresses: Tuple[Address, ...] = ()
     no_sibling_file_deps_inferrable = not inferred or all(
@@ -875,7 +875,7 @@ async def resolve_dependencies_lite(
         if isinstance(request.field, inject_request_type.inject_for)
     )
 
-    # Inject dependencies on all the base target's generated subtargets.
+    # Inject dependencies on all the BUILD target's generated file targets.
     subtargets = await Get(
         Subtargets, Address, request.field.address.maybe_convert_to_build_target()
     )
