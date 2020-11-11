@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use hashing::Fingerprint;
 use sharded_lmdb::ShardedLmdb;
 use store::Store;
+use workunit_store::Metric;
 
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
@@ -59,33 +60,51 @@ impl crate::CommandRunner for CommandRunner {
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    context
+      .workunit_store
+      .increment_counter(Metric::LocalCacheRequests, 1);
+
     let digest = crate::digest(req.clone(), &self.metadata);
     let key = digest.0;
 
     let command_runner = self.clone();
     match self.lookup(key).await {
-      Ok(Some(result)) => return Ok(result),
+      Ok(Some(result)) => {
+        context
+          .workunit_store
+          .increment_counter(Metric::LocalCacheRequestsCached, 1);
+        return Ok(result);
+      }
       Err(err) => {
         debug!(
           "Error loading process execution result from local cache: {} - continuing to execute",
           err
         );
+        context
+          .workunit_store
+          .increment_counter(Metric::LocalCacheReadErrors, 1);
         // Falling through to re-execute.
       }
       Ok(None) => {
+        context
+          .workunit_store
+          .increment_counter(Metric::LocalCacheRequestsUncached, 1);
         // Falling through to execute.
       }
     }
 
     let cache_failures = req.0.values().any(|process| process.cache_failures);
 
-    let result = command_runner.underlying.run(req, context).await?;
+    let result = command_runner.underlying.run(req, context.clone()).await?;
     if result.exit_code == 0 || cache_failures {
       if let Err(err) = command_runner.store(key, &result).await {
         warn!(
           "Error storing process execution result to local cache: {} - ignoring and continuing",
           err
         );
+        context
+          .workunit_store
+          .increment_counter(Metric::LocalCacheWriteErrors, 1);
       }
     }
     Ok(result)
