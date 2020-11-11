@@ -174,7 +174,7 @@ async def addresses_from_address_specs(
         for addr in literal_addresses
     )
     # We convert to targets for the side effect of validating that any file addresses actually
-    # belong to the specified base targets.
+    # belong to the specified BUILD targets.
     await Get(
         UnexpandedTargets, Addresses(addr for addr in literal_addresses if addr.is_file_target)
     )

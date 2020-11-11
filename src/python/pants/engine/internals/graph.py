@@ -97,7 +97,7 @@ async def generate_subtargets(address: Address, global_options: GlobalOptions) -
 
     if not build_target.has_field(Dependencies) or not build_target.has_field(Sources):
         # If a target type does not support dependencies, we do not split it, as that would prevent
-        # the base target from depending on its splits.
+        # the BUILD target from depending on its splits.
         return Subtargets(build_target, ())
 
     # Create subtargets for matched sources.
@@ -146,7 +146,7 @@ async def resolve_target(
 
 @rule
 async def resolve_targets(targets: UnexpandedTargets) -> Targets:
-    # Split out and expand any base targets.
+    # Split out and expand any BUILD targets.
     other_targets = []
     build_targets = []
     for target in targets:
@@ -158,8 +158,8 @@ async def resolve_targets(targets: UnexpandedTargets) -> Targets:
     build_targets_subtargets = await MultiGet(
         Get(Subtargets, Address, bt.address) for bt in build_targets
     )
-    # Zip the subtargets back to the base targets and replace them.
-    # NB: If a target had no subtargets, we use the base.
+    # Zip the subtargets back to the BUILD targets and replace them.
+    # NB: If a target had no subtargets, we use the original.
     expanded_targets = OrderedSet(other_targets)
     expanded_targets.update(
         target

@@ -41,8 +41,7 @@ class FirstPartyModuleToAddressMapping:
     """A mapping of module names to owning addresses.
 
     All mapped addresses will be file addresses, aka generated subtargets. That is, each target
-    will own no more than one single source file. Its metadata will be copied from the original
-    base target.
+    will own no more than one single source file.
 
     If there are >1 original owning targets that refer to the same module—such as `//:a` and `//:b` both owning module
     `foo`—then we will not add any of the targets to the mapping because there is ambiguity. (We make an exception if

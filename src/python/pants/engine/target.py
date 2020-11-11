@@ -544,9 +544,9 @@ class Target(ABC):
 
 @dataclass(frozen=True)
 class Subtargets:
-    # The base target from which the subtargets were extracted.
+    # The BUILD target from which the subtargets were extracted.
     base: Target
-    # The subtargets, one per file that was owned by the base target.
+    # The subtargets, one per file that was owned by the BUILD target.
     subtargets: Tuple[Target, ...]
 
 
