@@ -22,7 +22,7 @@ from pants.util.filtering import and_filters, create_filters
 class TargetGranularity(Enum):
     all_targets = "all"
     file_targets = "file"
-    base_targets = "base"
+    build_targets = "BUILD"
 
 
 class FilterSubsystem(LineOriented, GoalSubsystem):
@@ -53,8 +53,8 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
             type=TargetGranularity,
             default=TargetGranularity.all_targets,
             help=(
-                "Filter to rendering only base targets (those declared in BUILD files), "
-                "only file-level targets, or all targets."
+                "Filter to rendering only targets declared in BUILD files, only file-level "
+                "targets, or all targets."
             ),
         )
         register(
@@ -111,7 +111,7 @@ def filter_targets(
             {
                 TargetGranularity.all_targets: lambda _: True,
                 TargetGranularity.file_targets: lambda tgt: not tgt.address.is_base_target,
-                TargetGranularity.base_targets: lambda tgt: tgt.address.is_base_target,
+                TargetGranularity.build_targets: lambda tgt: tgt.address.is_base_target,
             },
         )
 

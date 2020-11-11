@@ -159,5 +159,5 @@ def test_filter_by_granularity() -> None:
         MockTarget({}, address=Address("p1", relative_file_path="file.txt")),
     ]
     assert run_goal(targets, granularity=TargetGranularity.all_targets).strip() == "p1\np1/file.txt"
-    assert run_goal(targets, granularity=TargetGranularity.base_targets).strip() == "p1"
+    assert run_goal(targets, granularity=TargetGranularity.build_targets).strip() == "p1"
     assert run_goal(targets, granularity=TargetGranularity.file_targets).strip() == "p1/file.txt"
