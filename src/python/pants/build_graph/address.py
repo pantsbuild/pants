@@ -330,13 +330,10 @@ class Address(EngineAwareParameter):
             target_portion = f"{parent_prefix}{target_name}"
         return f"{self.spec_path.replace(os.path.sep, '.')}{file_portion}{target_portion}"
 
-    def maybe_convert_to_base_target(self) -> "Address":
-        """If this address is a generated subtarget, convert it back into its original base target.
+    def maybe_convert_to_build_target(self) -> "Address":
+        """If this address is for a file target, convert it back into its BUILD target.
 
         Otherwise, return itself unmodified.
-
-        TODO: This is not correct: we don't know the owning BUILD file of the base target without
-        resolving. But it's possible that this method can be removed.
         """
         if not self.is_file_target:
             return self

@@ -128,7 +128,7 @@ async def resolve_target(
     union_membership: UnionMembership,
 ) -> WrappedTarget:
     if address.is_file_target:
-        base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
+        base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_build_target())
         subtarget = generate_subtarget(
             base_target.target, full_file_name=address.filename, union_membership=union_membership
         )
@@ -800,7 +800,7 @@ async def resolve_dependencies(
     )
     if not request.field.address.is_file_target or no_sibling_file_deps_inferrable:
         subtargets = await Get(
-            Subtargets, Address, request.field.address.maybe_convert_to_base_target()
+            Subtargets, Address, request.field.address.maybe_convert_to_build_target()
         )
         subtarget_addresses = tuple(
             t.address for t in subtargets.subtargets if t.address != request.field.address
@@ -877,7 +877,7 @@ async def resolve_dependencies_lite(
 
     # Inject dependencies on all the base target's generated subtargets.
     subtargets = await Get(
-        Subtargets, Address, request.field.address.maybe_convert_to_base_target()
+        Subtargets, Address, request.field.address.maybe_convert_to_build_target()
     )
     subtarget_addresses = tuple(
         t.address for t in subtargets.subtargets if t.address != request.field.address

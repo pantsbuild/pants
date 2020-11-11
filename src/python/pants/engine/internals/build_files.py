@@ -115,7 +115,7 @@ async def parse_address_family(
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
-    owning_address = address.maybe_convert_to_base_target()
+    owning_address = address.maybe_convert_to_build_target()
     if address_family.get_target_adaptor(owning_address) is None:
         raise ResolveError.did_you_mean(
             bad_name=owning_address.target_name,
@@ -170,7 +170,7 @@ async def addresses_from_address_specs(
         for spec in address_specs.literals
     )
     literal_target_adaptors = await MultiGet(
-        Get(TargetAdaptor, Address, addr.maybe_convert_to_base_target())
+        Get(TargetAdaptor, Address, addr.maybe_convert_to_build_target())
         for addr in literal_addresses
     )
     # We convert to targets for the side effect of validating that any file addresses actually
