@@ -12,7 +12,7 @@ use fs::RelativePath;
 use futures::compat::Future01CompatExt;
 use hashing::Digest;
 use store::Store;
-use workunit_store::{with_workunit, Level, WorkunitMetadata};
+use workunit_store::{with_workunit, Level, Metric, WorkunitMetadata};
 
 use crate::remote::make_execute_request;
 use crate::{
@@ -374,7 +374,7 @@ impl CommandRunner {
     self
       .action_cache_client
       .update_action_result_async_opt(&update_action_cache_request, call_opt)
-      .unwrap()
+      .map_err(crate::remote::rpcerror_to_string)?
       .compat()
       .await
       .map_err(crate::remote::rpcerror_to_string)?;
@@ -391,7 +391,9 @@ impl crate::CommandRunner for CommandRunner {
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let request = self.extract_compatible_request(&req).unwrap();
+    let request = self
+      .extract_compatible_request(&req)
+      .ok_or_else(|| "No compatible Process found for checking remote cache.".to_owned())?;
     let (action, command, _execute_request) =
       make_execute_request(&request, self.metadata.clone())?;
 
@@ -438,6 +440,9 @@ impl crate::CommandRunner for CommandRunner {
         }
         Err(err) => {
           log::warn!("Failed to read from remote cache: {}", err);
+          context
+            .workunit_store
+            .increment_counter(Metric::RemoteCacheReadErrors, 1);
         }
       };
     }
@@ -457,7 +462,10 @@ impl crate::CommandRunner for CommandRunner {
         )
         .await
       {
-        log::warn!("Failed to update remote cache: {}", err)
+        log::warn!("Failed to write to remote cache: {}", err);
+        context
+          .workunit_store
+          .increment_counter(Metric::RemoteCacheWriteErrors, 1);
       }
     }
 
