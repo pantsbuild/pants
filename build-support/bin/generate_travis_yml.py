@@ -548,7 +548,6 @@ def python_tests(python_version: PythonVersion) -> Dict:
 def _build_wheels_command() -> List[str]:
     return [
         "./build-support/bin/release.sh -n",
-        "USE_PY37=true ./build-support/bin/release.sh -n",
         "USE_PY38=true ./build-support/bin/release.sh -n",
         # NB: We also build `fs_util` in this shard to leverage having had compiled the engine.
         "./build-support/bin/release.sh -f",
@@ -579,7 +578,7 @@ def build_wheels_osx() -> Dict:
         "name": "Build macOS wheels and fs_util",
         "script": _build_wheels_command(),
         "before_install": _osx_before_install(
-            python_versions=[PythonVersion.py36, PythonVersion.py37, PythonVersion.py38],
+            python_versions=[PythonVersion.py37, PythonVersion.py38],
             install_py27=False,
         ),
         "if": SKIP_WHEELS_CONDITION,
