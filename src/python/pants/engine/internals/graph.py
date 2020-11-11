@@ -90,7 +90,7 @@ async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
 
 @rule
 async def generate_subtargets(address: Address, global_options: GlobalOptions) -> Subtargets:
-    if not address.is_base_target:
+    if address.is_file_target:
         raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
     wrapped_base_target = await Get(WrappedTarget, Address, address)
     base_target = wrapped_base_target.target
@@ -127,7 +127,7 @@ async def resolve_target(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
 ) -> WrappedTarget:
-    if not address.is_base_target:
+    if address.is_file_target:
         base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
         subtarget = generate_subtarget(
             base_target.target, full_file_name=address.filename, union_membership=union_membership
@@ -150,7 +150,7 @@ async def resolve_targets(targets: UnexpandedTargets) -> Targets:
     other_targets = []
     base_targets = []
     for target in targets:
-        if target.address.is_base_target:
+        if not target.address.is_file_target:
             base_targets.append(target)
         else:
             other_targets.append(target)
@@ -200,14 +200,14 @@ def _detect_cycles(
 
     def maybe_report_cycle(address: Address) -> None:
         # NB: File-level dependencies are cycle tolerant.
-        if not address.is_base_target or address not in path_stack:
+        if address.is_file_target or address not in path_stack:
             return
 
         # The path of the cycle is shorter than the entire path to the cycle: if the suffix of
         # the path representing the cycle contains a file dep, it is ignored.
         in_cycle = False
         for path_address in path_stack:
-            if in_cycle and not path_address.is_base_target:
+            if in_cycle and path_address.is_file_target:
                 # There is a file address inside the cycle: do not report it.
                 return
             elif in_cycle:
@@ -798,7 +798,7 @@ async def resolve_dependencies(
     no_sibling_file_deps_inferrable = not inferred or all(
         inferred_deps.sibling_dependencies_inferrable is False for inferred_deps in inferred
     )
-    if request.field.address.is_base_target or no_sibling_file_deps_inferrable:
+    if not request.field.address.is_file_target or no_sibling_file_deps_inferrable:
         subtargets = await Get(
             Subtargets, Address, request.field.address.maybe_convert_to_base_target()
         )

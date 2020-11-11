@@ -110,8 +110,8 @@ def filter_targets(
             granularity,
             {
                 TargetGranularity.all_targets: lambda _: True,
-                TargetGranularity.file_targets: lambda tgt: not tgt.address.is_base_target,
-                TargetGranularity.build_targets: lambda tgt: tgt.address.is_base_target,
+                TargetGranularity.file_targets: lambda tgt: tgt.address.is_file_target,
+                TargetGranularity.build_targets: lambda tgt: not tgt.address.is_file_target,
             },
         )
 

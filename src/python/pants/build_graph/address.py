@@ -265,8 +265,8 @@ class Address(EngineAwareParameter):
             )
 
     @property
-    def is_base_target(self) -> bool:
-        return self._relative_file_path is None
+    def is_file_target(self) -> bool:
+        return self._relative_file_path is not None
 
     @property
     def is_default_target(self) -> bool:
@@ -279,7 +279,7 @@ class Address(EngineAwareParameter):
     @property
     def filename(self) -> str:
         if self._relative_file_path is None:
-            raise ValueError("Only a file Address (`not self.is_base_target`) has a filename.")
+            raise ValueError("Only a file Address (`self.is_file_target`) has a filename.")
         return os.path.join(self.spec_path, self._relative_file_path)
 
     @property
@@ -338,7 +338,7 @@ class Address(EngineAwareParameter):
         TODO: This is not correct: we don't know the owning BUILD file of the base target without
         resolving. But it's possible that this method can be removed.
         """
-        if self.is_base_target:
+        if not self.is_file_target:
             return self
         return self.__class__(self.spec_path, relative_file_path=None, target_name=self.target_name)
 

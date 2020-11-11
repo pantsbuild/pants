@@ -128,14 +128,14 @@ async def find_build_file(address: Address) -> BuildFileAddress:
         if build_file_address.address == owning_address
     )
     return (
-        bfa if address.is_base_target else BuildFileAddress(rel_path=bfa.rel_path, address=address)
+        BuildFileAddress(rel_path=bfa.rel_path, address=address) if address.is_file_target else bfa
     )
 
 
 @rule
 async def find_target_adaptor(address: Address) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
-    if not address.is_base_target:
+    if address.is_file_target:
         raise ValueError(
             f"Subtargets are not resident in BUILD files, and so do not have TargetAdaptors: {address}"
         )
@@ -176,7 +176,7 @@ async def addresses_from_address_specs(
     # We convert to targets for the side effect of validating that any file addresses actually
     # belong to the specified base targets.
     await Get(
-        UnexpandedTargets, Addresses(addr for addr in literal_addresses if not addr.is_base_target)
+        UnexpandedTargets, Addresses(addr for addr in literal_addresses if addr.is_file_target)
     )
     for literal_spec, addr, target_adaptor in zip(
         address_specs.literals, literal_addresses, literal_target_adaptors

@@ -64,7 +64,7 @@ class Field(ABC):
     # NB: We still expect `PrimitiveField` and `AsyncField` to define their own constructors. This
     # is only implemented so that we have a common deprecation mechanism.
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        if self.deprecated_removal_version and address.is_base_target and raw_value is not None:
+        if self.deprecated_removal_version and not address.is_file_target and raw_value is not None:
             if not self.deprecated_removal_hint:
                 raise ValueError(
                     f"You specified `deprecated_removal_version` for {self.__class__}, but not "
@@ -290,7 +290,7 @@ class Target(ABC):
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: Optional[UnionMembership] = None,
     ) -> None:
-        if self.deprecated_removal_version and address.is_base_target:
+        if self.deprecated_removal_version and not address.is_file_target:
             if not self.deprecated_removal_hint:
                 raise ValueError(
                     f"You specified `deprecated_removal_version` for {self.__class__}, but not "
@@ -680,7 +680,7 @@ def generate_subtarget_address(base_target_address: Address, *, full_file_name: 
 
     See generate_subtarget().
     """
-    if not base_target_address.is_base_target:
+    if base_target_address.is_file_target:
         raise ValueError(f"Cannot generate file targets for a file Address: {base_target_address}")
     original_spec_path = base_target_address.spec_path
     relative_file_path = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
