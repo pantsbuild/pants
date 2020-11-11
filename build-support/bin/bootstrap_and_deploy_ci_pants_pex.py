@@ -124,7 +124,7 @@ def native_engine_so_in_s3_cache(*, aws_bucket: str, native_engine_so_aws_key: s
     if not ls_output:
         return False
     versions = json.loads(ls_output).get("Versions")
-    if versions is None:
+    if not versions:
         return False
     if len(versions) > 1:
         die(
@@ -133,6 +133,10 @@ def native_engine_so_in_s3_cache(*, aws_bucket: str, native_engine_so_aws_key: s
             "in Slack so that we may investigate how this happened and delete the duplicate "
             "copy from S3."
         )
+    if not versions[0]["IsLatest"]:
+        # If the single version is not the latest, it means there is a delete marker that
+        # supersedes it.
+        return False
     return True
 
 
