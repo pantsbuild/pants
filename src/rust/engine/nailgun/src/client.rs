@@ -99,10 +99,8 @@ async fn client_execute_helper(
   };
 
   let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
-  let (stdin_write, stdin_read) = child_channel::<ChildInput>();
 
   let output_handler = tokio::spawn(handle_client_output(stdio_read));
-  let _input_handler = tokio::spawn(handle_client_input(stdin_write));
 
   let localhost = Ipv4Addr::new(127, 0, 0, 1);
   let addr = (localhost, port);
@@ -115,9 +113,13 @@ async fn client_execute_helper(
   })?;
 
   let exit_code: ExitCode =
-    nails::client_handle_connection(config, socket, command, stdio_write, stdin_read)
-      .await
-      .map_err(|err| NailgunClientError::PostConnect(format!("Nailgun client error: {}", err)))?;
+    nails::client_handle_connection(config, socket, command, stdio_write, async {
+      let (stdin_write, stdin_read) = child_channel::<ChildInput>();
+      let _input_handler = tokio::spawn(handle_client_input(stdin_write));
+      stdin_read
+    })
+    .await
+    .map_err(|err| NailgunClientError::PostConnect(format!("Nailgun client error: {}", err)))?;
 
   let () = output_handler
     .await

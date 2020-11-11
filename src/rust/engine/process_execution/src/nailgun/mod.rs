@@ -230,7 +230,6 @@ impl CapturedWorkdir for CommandRunner {
 
     // Streams to read child output from
     let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
-    let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
 
     let nails_command = self
       .async_semaphore
@@ -275,7 +274,10 @@ impl CapturedWorkdir for CommandRunner {
               stream,
               cmd,
               stdio_write,
-              stdin_read,
+              async {
+                let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
+                stdin_read
+              },
             )
           })
           .map_err(|e| format!("Error communicating with server: {}", e))
