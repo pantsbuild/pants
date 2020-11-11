@@ -5,8 +5,20 @@ This document describes releases leading up to the ``2.1.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.1/docs/release-notes-2-1 for an overview of the changes in this release.
 
+2.1.0rc1 (11/11/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Upgrade to Pex 2.1.21 (Cherry-pick of #11131) (#11134)
+  `PR #11134 <https://github.com/pantsbuild/pants/pull/11134>`_
+
+* Fix Coverage not finding resource files when generating a report (Cherry-pick of #11129) (#11138)
+  `PR #11138 <https://github.com/pantsbuild/pants/pull/11138>`_
+
 2.1.0rc0 (11/9/2020)
------------------------
+--------------------
 
 New Features
 ~~~~~~~~~~~~
