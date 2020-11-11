@@ -244,10 +244,10 @@ pub struct MultiPlatformExecuteProcess {
 }
 
 impl MultiPlatformExecuteProcess {
-  fn lift_execute_process(
+  fn lift_process(
     types: &Types,
     value: &Value,
-    target_platform: PlatformConstraint,
+    platform_constraint: PlatformConstraint,
   ) -> Result<Process, String> {
     let env = externs::getattr_from_frozendict(&value, "env");
 
@@ -327,7 +327,7 @@ impl MultiPlatformExecuteProcess {
       level,
       append_only_caches,
       jdk_home,
-      target_platform,
+      target_platform: platform_constraint,
       is_nailgunnable,
       execution_slot_variable,
       cache_failures,
@@ -354,7 +354,7 @@ impl MultiPlatformExecuteProcess {
     let mut request_by_constraint: BTreeMap<PlatformConstraint, Process> = BTreeMap::new();
     for (constraint, execute_process) in constraints.iter().zip(processes.iter()) {
       let underlying_req =
-        MultiPlatformExecuteProcess::lift_execute_process(types, execute_process, *constraint)?;
+        MultiPlatformExecuteProcess::lift_process(types, execute_process, *constraint)?;
       if !underlying_req.cache_failures {
         cache_failures = false;
       }
