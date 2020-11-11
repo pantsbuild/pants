@@ -657,10 +657,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
                 ["/bin/sh", "-c", "true"],
                 description="always true",
             )
-            _ = await Get(
-                ProcessResult,
-                MultiPlatformProcess({(PlatformConstraint.none, PlatformConstraint.none): proc}),
-            )
+            _ = await Get(ProcessResult, MultiPlatformProcess({PlatformConstraint.none: proc}))
             return TrueResult()
 
         rules = [a_rule, QueryRule(TrueResult, tuple()), *process_rules(), *create_platform_rules()]
