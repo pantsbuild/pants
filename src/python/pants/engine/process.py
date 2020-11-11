@@ -117,26 +117,17 @@ class Process:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class MultiPlatformProcess:
-    # args collects a set of tuples representing platform constraints mapped to a req,
-    # just like a dict constructor can.
     platform_constraints: Tuple[str, ...]
     processes: Tuple[Process, ...]
 
-    def __init__(
-        self,
-        request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], Process],
-    ) -> None:
+    def __init__(self, request_dict: Dict[PlatformConstraint, Process]) -> None:
         if len(request_dict) == 0:
             raise ValueError("At least one platform constrained Process must be passed.")
-        validated_constraints = tuple(
-            constraint.value
-            for pair in request_dict.keys()
-            for constraint in pair
-            if PlatformConstraint(constraint.value)
-        )
-        if len({req.description for req in request_dict.values()}) != 1:
+        validated_constraints = tuple(constraint.value for constraint in request_dict)
+        if len([req.description for req in request_dict.values()]) != 1:
             raise ValueError(
-                f"The `description` of all processes in a {MultiPlatformProcess.__name__} must be identical."
+                f"The `description` of all processes in a {MultiPlatformProcess.__name__} must "
+                f"be identical, but got: {list(request_dict.values())}."
             )
 
         self.platform_constraints = validated_constraints
@@ -144,9 +135,6 @@ class MultiPlatformProcess:
 
     @property
     def product_description(self) -> ProductDescription:
-        # we can safely extract the first description because we guarantee that at
-        # least one request exists and that all of their descriptions are the same
-        # in __new__
         return ProductDescription(self.processes[0].description)
 
 
@@ -223,7 +211,7 @@ def get_multi_platform_request_description(req: MultiPlatformProcess) -> Product
 @rule
 def upcast_process(req: Process) -> MultiPlatformProcess:
     """This rule allows an Process to be run as a platform compatible MultiPlatformProcess."""
-    return MultiPlatformProcess({(PlatformConstraint.none, PlatformConstraint.none): req})
+    return MultiPlatformProcess({PlatformConstraint.none: req})
 
 
 @rule

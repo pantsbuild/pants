@@ -637,10 +637,7 @@ async def create_pex(
     # without cross-building, we specify that our PEX command should be run on the current local
     # platform.
     result = await Get(
-        ProcessResult,
-        MultiPlatformProcess(
-            {(PlatformConstraint(platform.value), PlatformConstraint(platform.value)): process}
-        ),
+        ProcessResult, MultiPlatformProcess({PlatformConstraint(platform.value): process})
     )
 
     if pex_runtime_env.verbosity > 0:

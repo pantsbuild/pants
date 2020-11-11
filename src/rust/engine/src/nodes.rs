@@ -244,10 +244,10 @@ pub struct MultiPlatformExecuteProcess {
 }
 
 impl MultiPlatformExecuteProcess {
-  fn lift_execute_process(
+  fn lift_process(
     types: &Types,
     value: &Value,
-    target_platform: PlatformConstraint,
+    platform_constraint: PlatformConstraint,
   ) -> Result<Process, String> {
     let env = externs::getattr_from_frozendict(&value, "env");
 
@@ -327,7 +327,7 @@ impl MultiPlatformExecuteProcess {
       level,
       append_only_caches,
       jdk_home,
-      target_platform,
+      target_platform: platform_constraint,
       is_nailgunnable,
       execution_slot_variable,
       cache_failures,
@@ -335,42 +335,30 @@ impl MultiPlatformExecuteProcess {
   }
 
   pub fn lift(types: &Types, value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
-    let constraint_parts: Vec<String> = externs::getattr(&value, "platform_constraints").unwrap();
-    if constraint_parts.len() % 2 != 0 {
-      return Err("Error parsing platform_constraints: odd number of parts".to_owned());
-    }
-    let constraint_key_pairs: Vec<_> = constraint_parts
-      .chunks_exact(2)
-      .map(|constraint_key_pair| {
-        (
-          PlatformConstraint::try_from(&constraint_key_pair[0]).unwrap(),
-          PlatformConstraint::try_from(&constraint_key_pair[1]).unwrap(),
-        )
-      })
-      .collect();
-    let processes: Vec<Value> = externs::getattr(&value, "processes").unwrap();
-    if constraint_parts.len() / 2 != processes.len() {
+    let raw_constraints = externs::getattr::<Vec<String>>(&value, "platform_constraints")?;
+    let constraints = raw_constraints
+      .into_iter()
+      .map(|constraint| PlatformConstraint::try_from(&constraint))
+      .collect::<Result<Vec<_>, _>>()?;
+    let processes = externs::getattr::<Vec<Value>>(&value, "processes")?;
+    if constraints.len() != processes.len() {
       return Err(format!(
         "Sizes of constraint keys and processes do not match: {} vs. {}",
-        constraint_parts.len() / 2,
+        constraints.len(),
         processes.len()
       ));
     }
 
     let mut cache_failures = true;
 
-    let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
-      BTreeMap::new();
-    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
-      let underlying_req = MultiPlatformExecuteProcess::lift_execute_process(
-        types,
-        execute_process,
-        constraint_key.1,
-      )?;
+    let mut request_by_constraint: BTreeMap<PlatformConstraint, Process> = BTreeMap::new();
+    for (constraint, execute_process) in constraints.iter().zip(processes.iter()) {
+      let underlying_req =
+        MultiPlatformExecuteProcess::lift_process(types, execute_process, *constraint)?;
       if !underlying_req.cache_failures {
         cache_failures = false;
       }
-      request_by_constraint.insert(*constraint_key, underlying_req.clone());
+      request_by_constraint.insert(*constraint, underlying_req.clone());
     }
     Ok(MultiPlatformExecuteProcess {
       cache_failures,
