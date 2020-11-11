@@ -37,7 +37,7 @@ class PexBinary(TemplatedExternalTool):
 
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.20"
+    default_version = "v2.1.21"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
 
     @classproperty
@@ -47,8 +47,8 @@ class PexBinary(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "885970ed8dfbbe25abb39eac2b6f1a0feb1f6eefc4d0d5631ac67870f60e9511",
-                    "2681620",
+                    "461cef14d92efba56572215fddf7dcd95560a4d2e8aa97a69e09db68d809dd87",
+                    "2712034",
                 )
             )
             for plat in ["darwin", "linux"]
