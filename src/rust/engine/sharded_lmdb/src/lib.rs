@@ -121,7 +121,7 @@ impl ShardedLmdb {
   // of pants on one schema version will not conflict with data stored
   // with a different version of pants on a different schema version.
   pub fn schema_version() -> u8 {
-    1
+    2
   }
 
   // max_size is the maximum size the databases together will be allowed to grow to.
