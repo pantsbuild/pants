@@ -34,6 +34,8 @@ pub enum Metric {
   RemoteCacheRequests,
   RemoteCacheRequestsCached,
   RemoteCacheRequestsUncached,
+  RemoteCacheReadErrors,
+  RemoteCacheWriteErrors,
 }
 
 impl Metric {
@@ -46,6 +48,8 @@ impl Metric {
       RemoteCacheRequests => "remote_cache_requests",
       RemoteCacheRequestsCached => "remote_cache_requests_cached",
       RemoteCacheRequestsUncached => "remote_cache_requests_uncached",
+      RemoteCacheReadErrors => "remote_cache_read_errors",
+      RemoteCacheWriteErrors => "remote_cache_write_errors",
     }
   }
 }
