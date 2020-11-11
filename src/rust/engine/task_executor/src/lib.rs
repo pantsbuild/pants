@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -26,17 +28,57 @@
 #![allow(clippy::mutex_atomic)]
 
 use std::future::Future;
+use std::sync::Arc;
 
-use tokio::runtime::{Handle, Runtime};
+use futures::future::FutureExt;
+use tokio::runtime::{Builder, Handle, Runtime};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Executor {
+  runtime: Option<Arc<Runtime>>,
   handle: Handle,
 }
 
 impl Executor {
-  pub fn new(handle: Handle) -> Executor {
-    Executor { handle }
+  ///
+  /// Creates an Executor for an existing tokio::Runtime (generally provided by tokio's macros).
+  ///
+  /// The returned Executor will have a lifecycle independent of the Runtime, meaning that dropping
+  /// all clones of the Executor will not cause the Runtime to be shut down. Likewise, the owner of
+  /// the Runtime must ensure that it is kept alive longer than all Executor instances, because
+  /// existence of a Handle does not prevent a Runtime from shutting down. This is guaranteed by
+  /// the scope of the tokio::{test, main} macros.
+  ///
+
+  pub fn new() -> Executor {
+    Executor {
+      runtime: None,
+      handle: Handle::current(),
+    }
+  }
+
+  ///
+  /// Creates an Executor with an owned tokio::Runtime.
+  ///
+  /// Dropping all clones of the Executor will cause the Runtime to shut down.
+  ///
+  pub fn new_owned() -> Result<Executor, String> {
+    let runtime = Builder::new()
+      // This use of Builder (rather than just Runtime::new()) is to allow us to lower the
+      // max_threads setting. As of tokio `0.2.13`, the core threads default to num_cpus, and
+      // the max threads default to a fixed value of 512. In practice, it appears to be slower
+      // to allow 512 threads (although we should re-evaluate that periodically).
+      .core_threads(num_cpus::get())
+      .max_threads(num_cpus::get() * 4)
+      .threaded_scheduler()
+      .enable_all()
+      .build()
+      .map_err(|e| format!("Failed to start the runtime: {}", e))?;
+    let handle = runtime.handle().clone();
+    Ok(Executor {
+      runtime: Some(Arc::new(runtime)),
+      handle,
+    })
   }
 
   ///
@@ -51,46 +93,21 @@ impl Executor {
   }
 
   ///
-  /// Drive running of a Future on a tokio Runtime as a new Task.
-  ///
-  /// The future will be driven to completion, but the result can't be accessed directly.
-  ///
-  /// This may be useful e.g. if you want to kick off a potentially long-running task, which will
-  /// notify dependees of its completion over an mpsc channel.
-  ///
-  pub fn spawn_and_ignore<F: Future<Output = ()> + Send + 'static>(&self, future: F) {
-    tokio::spawn(Self::future_with_correct_context(future));
-  }
-
-  ///
   /// Run a Future on a tokio Runtime as a new Task, and return a Future handle to it.
   ///
-  /// If the returned Future is dropped, the computation will still continue to completion: see the
-  /// tokio::task::JoinHandle docs.
+  /// Unlike tokio::spawn, if the background Task panics, the returned Future will too.
   ///
-  /// This may be useful for tokio tasks which use the tokio blocking feature (unrelated to the
-  /// Executor::block_on method). When tokio blocking tasks run, they prevent progress on any
-  /// futures running in the same task. e.g. if you run f1.select(f2) and f1 and f2 are
-  /// tokio blocking futures, f1 and f2 will not run in parallel, defeating the point of select.
+  /// If the returned Future is dropped, the computation will still continue to completion: see
+  /// https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html
   ///
-  /// On the other hand, if you run:
-  /// spawn_oneshot(f1).select(spawn_oneshot(f2))
-  /// those futures will run in parallel.
-  ///
-  /// Using spawn_oneshot allows for selecting the granularity when using tokio blocking.
-  ///
-  /// See https://docs.rs/tokio-threadpool/0.1.15/tokio_threadpool/fn.blocking.html for details of
-  /// tokio blocking.
-  ///
-  pub async fn spawn_oneshot<O: Send + 'static, F: Future<Output = O> + Send + 'static>(
+  pub fn spawn<O: Send + 'static, F: Future<Output = O> + Send + 'static>(
     &self,
     future: F,
-  ) -> O {
-    // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
-    // panic, in which case we want to propagate that.
-    tokio::spawn(Self::future_with_correct_context(future))
-      .await
-      .unwrap()
+  ) -> impl Future<Output = O> {
+    self
+      .handle
+      .spawn(Self::future_with_correct_context(future))
+      .map(|r| r.expect("Background task exited unsafely."))
   }
 
   ///
@@ -99,17 +116,15 @@ impl Executor {
   /// This should never be called from in a Future context, and should only ever be called in
   /// something that resembles a main method.
   ///
-  /// This method makes a new Runtime every time it runs, to ensure that the caller doesn't
-  /// accidentally deadlock by using this when a Future attempts to itself call
-  /// Executor::spawn_and_ignore or Executor::spawn_oneshot. Because it should be used only in very
-  /// limited situations, this overhead is viewed to be acceptable.
+  /// Even after this method returns, work `spawn`ed into the background may continue to run on the
+  /// threads owned by this Executor.
   ///
-  pub fn block_on<F: Future + Send + 'static>(&self, future: F) -> F::Output {
+  pub fn block_on<F: Future>(&self, future: F) -> F::Output {
     // Make sure to copy our (thread-local) logging destination into the task.
     // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
     // for a user-facing thread).
-    Runtime::new()
-      .unwrap()
+    self
+      .handle
       .block_on(Self::future_with_correct_context(future))
   }
 
@@ -117,15 +132,16 @@ impl Executor {
   /// Spawn a Future on a threadpool specifically reserved for I/O tasks which are allowed to be
   /// long-running.
   ///
-  /// At some point in the future we may want to migrate to use tokio-threadpool's blocking
-  /// functionality instead of this threadpool, but we've run into teething issues where introducing
-  /// it has caused significant performance regressions, so for how we continue to use our legacy
-  /// I/O CpuPool. Hopefully we can delete this method at some point.
+  /// Unlike tokio::task::spawn_blocking, If the background Task panics, the returned Future will
+  /// too.
   ///
-  pub async fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
+  /// If the returned Future is dropped, the computation will still continue to completion: see
+  /// https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html
+  ///
+  pub fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
     &self,
     f: F,
-  ) -> R {
+  ) -> impl Future<Output = R> {
     let logging_destination = logging::get_destination();
     let workunit_state = workunit_store::get_workunit_state();
     // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
@@ -135,8 +151,7 @@ impl Executor {
       workunit_store::set_thread_workunit_state(workunit_state);
       f()
     })
-    .await
-    .unwrap()
+    .map(|r| r.expect("Background task exited unsafely."))
   }
 
   ///

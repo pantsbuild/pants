@@ -1,9 +1,4 @@
-use bazel_protos;
-use bytes;
-use digest::FixedOutput;
-use hashing;
 use protobuf::Message;
-use sha2::{self, Digest};
 
 #[derive(Clone)]
 pub struct TestData {
@@ -27,7 +22,7 @@ impl TestData {
     TestData::new("Pug")
   }
 
-  pub fn fourty_chars() -> TestData {
+  pub fn forty_chars() -> TestData {
     TestData::new(
       "0123456789012345678901234567890123456789\
        0123456789012345678901234567890123456789",
@@ -45,11 +40,11 @@ impl TestData {
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
-    hash(&self.bytes())
+    self.digest().0
   }
 
   pub fn digest(&self) -> hashing::Digest {
-    hashing::Digest(self.fingerprint(), self.string.len())
+    hashing::Digest::of_bytes(&self.bytes())
   }
 
   pub fn string(&self) -> String {
@@ -307,16 +302,46 @@ impl TestDirectory {
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
-    hash(&self.bytes())
+    self.digest().0
   }
 
   pub fn digest(&self) -> hashing::Digest {
-    hashing::Digest(self.fingerprint(), self.bytes().len())
+    hashing::Digest::of_bytes(&self.bytes())
   }
 }
 
-fn hash(bytes: &bytes::Bytes) -> hashing::Fingerprint {
-  let mut hasher = sha2::Sha256::default();
-  hasher.input(bytes);
-  hashing::Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
+pub struct TestTree {
+  pub tree: bazel_protos::remote_execution::Tree,
+}
+
+impl TestTree {
+  pub fn roland_at_root() -> TestTree {
+    TestDirectory::containing_roland().into()
+  }
+
+  pub fn robin_at_root() -> TestTree {
+    TestDirectory::containing_robin().into()
+  }
+}
+
+impl TestTree {
+  pub fn bytes(&self) -> bytes::Bytes {
+    bytes::Bytes::from(self.tree.write_to_bytes().expect("Error serializing proto"))
+  }
+
+  pub fn fingerprint(&self) -> hashing::Fingerprint {
+    self.digest().0
+  }
+
+  pub fn digest(&self) -> hashing::Digest {
+    hashing::Digest::of_bytes(&self.bytes())
+  }
+}
+
+impl From<TestDirectory> for TestTree {
+  fn from(dir: TestDirectory) -> Self {
+    let mut tree = bazel_protos::remote_execution::Tree::new();
+    tree.set_root(dir.directory);
+    TestTree { tree }
+  }
 }

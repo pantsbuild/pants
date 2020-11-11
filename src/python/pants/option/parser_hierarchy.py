@@ -5,7 +5,6 @@ import re
 from typing import Dict, Iterable, Iterator, Mapping
 
 from pants.option.config import Config
-from pants.option.option_tracker import OptionTracker
 from pants.option.parser import Parser
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
@@ -58,7 +57,6 @@ class ParserHierarchy:
         env: Mapping[str, str],
         config: Config,
         scope_infos: Iterable[ScopeInfo],
-        option_tracker: OptionTracker,
     ) -> None:
         # Sorting ensures that ancestors precede descendants.
         scope_infos = sorted(set(list(scope_infos)), key=lambda si: si.scope)
@@ -68,9 +66,7 @@ class ParserHierarchy:
             parent_parser = (
                 None if scope == GLOBAL_SCOPE else self._parser_by_scope[enclosing_scope(scope)]
             )
-            self._parser_by_scope[scope] = Parser(
-                env, config, scope_info, parent_parser, option_tracker=option_tracker
-            )
+            self._parser_by_scope[scope] = Parser(env, config, scope_info, parent_parser)
 
     def get_parser_by_scope(self, scope: str) -> Parser:
         try:

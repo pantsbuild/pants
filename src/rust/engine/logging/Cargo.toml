@@ -6,15 +6,14 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+colored = "1.9.0"
 chrono = "0.4.10"
 lazy_static = "1"
 log = "0.4"
 num_enum = "0.4"
-parking_lot = "0.6"
-simplelog = "0.7.4"
-tokio = { version = "0.2", features = ["rt-util"] }
-ui = { path = "../ui" }
+parking_lot = "0.11"
+tokio = { version = "0.2.22", features = ["rt-util"] }
 uuid = { version = "0.7", features = ["v4"] }
 
 [build-dependencies]
-cargo = "0.34"
+cargo_metadata = "0.10"

@@ -20,8 +20,7 @@ use hashing::{Digest, Fingerprint};
 use lazy_static::lazy_static;
 
 use crate::Process;
-use digest::Digest as DigestTrait;
-use sha2::Sha256;
+use sha2::{Digest as Sha256Digest, Sha256};
 use store::Store;
 
 lazy_static! {
@@ -57,7 +56,7 @@ impl NailgunPool {
     // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
     store.materialize_directory(workdir_for_server.clone(), input_files)
     .and_then(move |_metadata| {
-      let jdk_home_in_workdir = &workdir_for_server.clone().join(".jdk");
+      let jdk_home_in_workdir = &workdir_for_server.join(".jdk");
       let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
       let jdk_home_in_workdir3 = jdk_home_in_workdir.clone();
       if jdk_home_in_workdir.exists() {
@@ -243,10 +242,10 @@ impl NailgunPool {
       nailgun_server_fingerprint,
       build_id,
     )
-    .and_then(move |process| {
+    .map(move |process| {
       let port = process.port;
       processes.insert(name.clone(), process);
-      Ok(port)
+      port
     })
   }
 }
@@ -317,19 +316,19 @@ impl NailgunProcess {
         let port = read_port(&mut child);
         port.map(|port| (child, port))
       })
-      .and_then(|(child, port)| {
+      .map(|(child, port)| {
         debug!(
           "Created nailgun server process with pid {} and port {}",
           child.id(),
           port
         );
-        Ok(NailgunProcess {
-          port: port,
+        NailgunProcess {
+          port,
           fingerprint: nailgun_server_fingerprint,
-          name: name,
+          name,
           handle: Arc::new(Mutex::new(child)),
-          build_id: build_id,
-        })
+          build_id,
+        }
       })
   }
 }
@@ -356,10 +355,10 @@ impl NailgunProcessFingerprint {
       .map_err(|err| format!("Error getting the realpath of the jdk home: {}", err))?;
 
     let mut hasher = Sha256::default();
-    hasher.input(nailgun_server_req_digest.0);
-    hasher.input(jdk_realpath.to_string_lossy().as_bytes());
-    Ok(NailgunProcessFingerprint(Fingerprint::from_bytes_unsafe(
-      &hasher.result(),
+    hasher.update(nailgun_server_req_digest.0);
+    hasher.update(jdk_realpath.to_string_lossy().as_bytes());
+    Ok(NailgunProcessFingerprint(Fingerprint::from_bytes(
+      hasher.finalize(),
     )))
   }
 }

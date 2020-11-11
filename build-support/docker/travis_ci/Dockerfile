@@ -1,8 +1,8 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# Use our custom Centos6 image for binary compatibility with old linux distros.
-ARG BASE_IMAGE=pantsbuild/centos6:latest
+# Use our custom Centos7 image for binary compatibility with other Linux distros.
+ARG BASE_IMAGE=pantsbuild/centos7:latest
 FROM ${BASE_IMAGE}
 
 ARG TRAVIS_HOME_DIR_PATH=/travis/home

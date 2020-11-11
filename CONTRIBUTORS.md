@@ -22,6 +22,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Bruno Bieth
 + Caitie McCaffrey
 + Chris Aniszczyk
++ Chris Borckholder
 + Chris Burroughs
 + Chris Chen
 + Chris Heisterkamp
@@ -30,6 +31,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Christopher Livingston
 + Cody Gibb
 + Craig Schertz
++ Cristian Matache
 + Damon Revoe
 + Dan Davydov
 + Dan Fabulich
@@ -83,6 +85,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + James Bench
 + James Koch
 + James Mouradian
++ Jan Paul Erkelens
 + Jason Jackson
 + Jason Song
 + Jeff Jenkins
@@ -103,6 +106,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Jonathan Coveney
 + Jonathan D. Simms
 + Jonathan Sokolowski
++ Josh Soref
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
@@ -169,6 +173,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Peter Seibel
 + Pierre Chevalier
 + Qicheng Ma
++ Raúl Cuza
 + Robert Stapenhurst
 + Roger Jiang
 + Roman Andriadi
@@ -190,6 +195,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai
++ Thales Menato
 + Tianshuo Deng
 + Tien Nguyen
 + Tim Treptow
@@ -202,6 +208,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tomasz Pasternak
 + Travis Crawford
 + Troy Howard
++ Tushar Singh
 + Ugo Di Girolamo
 + Wei An
 + Wilhelmina Drengwitz
@@ -209,6 +216,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Wolfram Arnold
 + Xaelias
 + Yi Cheng
++ Yuhan GUO
 + Yujie Chen
 + billybecker
 + Ólafur Páll Geirsson

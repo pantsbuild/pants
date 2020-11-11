@@ -1,14 +1,20 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Tuple, cast
+
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.option.custom_types import file_option, shell_str
 
 
 class Isort(PythonToolBase):
+    """The Python import sorter tool (https://timothycrosley.github.io/isort/)."""
+
     options_scope = "isort"
-    default_version = "isort>=4.3.21,<4.4"
-    default_extra_requirements = ["setuptools<45"]  # NB: `<45` is for Python 2 support
+    default_version = "isort[pyproject]>=5.5.1,<5.6"
+    default_extra_requirements = ["setuptools"]
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.6"]
     default_entry_point = "isort.main"
 
     @classmethod
@@ -18,21 +24,36 @@ class Isort(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            fingerprint=True,
-            help="Don't use isort when running `./pants fmt` and `./pants lint`",
+            help=(
+                f"Don't use isort when running `{register.bootstrap.pants_bin_name} fmt` and "
+                f"`{register.bootstrap.pants_bin_name} lint`."
+            ),
         )
         register(
             "--args",
             type=list,
             member_type=shell_str,
-            fingerprint=True,
-            help="Arguments to pass directly to isort, e.g. "
-            '`--isort-args="--case-sensitive --trailing-comma"`',
+            help=(
+                "Arguments to pass directly to isort, e.g. "
+                f'`--{cls.options_scope}-args="--case-sensitive --trailing-comma"`.'
+            ),
         )
         register(
             "--config",
             type=list,
             member_type=file_option,
-            fingerprint=True,
-            help="Path to `isort.cfg` or alternative isort config file(s)",
+            advanced=True,
+            help="Path to `isort.cfg` or alternative isort config file(s).",
         )
+
+    @property
+    def skip(self) -> bool:
+        return cast(bool, self.options.skip)
+
+    @property
+    def args(self) -> Tuple[str, ...]:
+        return tuple(self.options.args)
+
+    @property
+    def config(self) -> Tuple[str, ...]:
+        return tuple(self.options.config)

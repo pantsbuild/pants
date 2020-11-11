@@ -188,7 +188,7 @@ Refactoring, Improvements, and Tooling
 * Statically link openssl for reqwest (#6816)
   `PR #6816 <https://github.com/pantsbuild/pants/pull/6816>`_
 
-* Use pantsbuild.org not example.com (#6826)
+* Use www.pantsbuild.org not example.com (#6826)
   `PR #6826 <https://github.com/pantsbuild/pants/pull/6826>`_
 
 * Leverage default target globs. (#6819)

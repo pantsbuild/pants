@@ -4,15 +4,12 @@
 import http.client
 import logging
 import os
-import sys
 import warnings
-from dataclasses import dataclass
-from logging import Handler, Logger, LogRecord, StreamHandler
-from typing import List, Optional, TextIO, overload
+from logging import Formatter, Handler, LogRecord, StreamHandler
+from typing import Dict, Iterable, Optional, Tuple
 
 import pants.util.logging as pants_logging
-from pants.base.exception_sink import ExceptionSink
-from pants.engine.native import Native
+from pants.engine.internals.native import Native
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir
 from pants.util.logging import LogLevel
@@ -24,203 +21,175 @@ logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(pants_logging.TRACE, "TRACE")
 
 
-@dataclass(frozen=True)
-class FileLoggingSetupResult:
-    """A structured result for file logging setup."""
-
-    log_filename: str
-    log_handler: Handler
-
-
-def _configure_requests_debug_logging() -> None:
-    http.client.HTTPConnection.debuglevel = 1  # type: ignore[attr-defined]
-    requests_logger = logging.getLogger("requests.packages.urllib3")
-    LogLevel.TRACE.set_level_for(requests_logger)
-    requests_logger.propagate = True
-
-
-def _maybe_configure_extended_logging(logger: Logger) -> None:
-    if logger.isEnabledFor(LogLevel.TRACE.level):
-        _configure_requests_debug_logging()
-
-
-def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool) -> None:
-    native = Native()
-    native.init_rust_logging(log_level.level, log_show_rust_3rdparty)
-
-
-def setup_logging_to_stderr(python_logger: Logger, log_level: LogLevel) -> None:
-    """We setup logging as loose as possible from the Python side, and let Rust do the filtering."""
-    native = Native()
-    handler = create_native_stderr_log_handler(log_level, native, stream=sys.stderr)
-    python_logger.addHandler(handler)
-    # Let the rust side filter levels; try to have the python side send everything to the rust logger.
-    LogLevel.TRACE.set_level_for(python_logger)
-
-
-def setup_logging_from_options(
-    bootstrap_options: OptionValueContainer,
-) -> Optional[FileLoggingSetupResult]:
-    # N.B. quiet help says 'Squelches all console output apart from errors'.
-    level = (
-        LogLevel.ERROR if getattr(bootstrap_options, "quiet", False) else bootstrap_options.level
+def init_rust_logger(
+    log_level: LogLevel,
+    log_show_rust_3rdparty: bool,
+    use_color: bool,
+    show_target: bool,
+    log_levels_by_target: Dict[str, LogLevel] = {},
+) -> None:
+    Native().init_rust_logging(
+        log_level.level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
     )
-    native = Native()
-    log_dir: Optional[str] = bootstrap_options.logdir
-    return setup_logging(
-        level,
-        native=native,
-        log_dir=log_dir,
-        console_stream=sys.stderr,
-        warnings_filter_regexes=bootstrap_options.ignore_pants_warnings,
-    )
+
+
+def setup_warning_filtering(warnings_filter_regexes: Iterable[str]) -> None:
+    """Sets up regex-based ignores for messages using the Python warnings system."""
+
+    warnings.resetwarnings()
+    for message_regexp in warnings_filter_regexes or ():
+        warnings.filterwarnings(action="ignore", message=message_regexp)
 
 
 class NativeHandler(StreamHandler):
-    def __init__(
-        self,
-        log_level: LogLevel,
-        native: Native,
-        stream: Optional[TextIO] = None,
-        native_filename: Optional[str] = None,
-    ):
-        super().__init__(stream)
-        self.native = native
+    """This class is installed as a Python logging module handler (using the logging.addHandler
+    method) and proxies logs to the Rust logging infrastructure."""
+
+    def __init__(self, log_level: LogLevel, native_filename: Optional[str] = None) -> None:
+        super().__init__(None)
+        self.native = Native()
         self.native_filename = native_filename
-        self.setLevel(log_level.level)
+        self.setLevel(pants_logging.TRACE)
+        if not self.native_filename:
+            self.native.setup_stderr_logger()
 
     def emit(self, record: LogRecord) -> None:
-        self.native.write_log(
-            self.format(record), record.levelno, f"{record.name}:pid={os.getpid()}"
-        )
+        self.native.write_log(msg=self.format(record), level=record.levelno, target=record.name)
 
     def flush(self) -> None:
         self.native.flush_log()
 
     def __repr__(self) -> str:
-        return (
-            f"NativeHandler(id={id(self)}, level={self.level}, filename={self.native_filename}, "
-            f"stream={self.stream})"
-        )
+        return f"NativeHandler(id={id(self)}, level={self.level}, filename={self.native_filename}"
 
 
-def create_native_pantsd_file_log_handler(
-    log_level: LogLevel, native: Native, native_filename: str
-) -> NativeHandler:
-    fd = native.setup_pantsd_logger(native_filename, log_level.level)
-    ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
-    return NativeHandler(log_level, native, native_filename=native_filename)
+class ExceptionFormatter(Formatter):
+    """Uses the `--print-stacktrace` option to decide whether to render stacktraces."""
+
+    def __init__(self, print_stacktrace: bool):
+        super().__init__(None)
+        self.print_stacktrace = print_stacktrace
+
+    def formatException(self, exc_info):
+        if self.print_stacktrace:
+            return super().formatException(exc_info)
+        return "\n(Use --print-stacktrace to see more error details.)"
 
 
-@overload
-def setup_logging(
-    log_level: LogLevel,
-    *,
-    native: Native,
-    log_dir: str,
-    console_stream: Optional[TextIO] = None,
-    scope: Optional[str] = None,
-    log_name: Optional[str] = None,
-    warnings_filter_regexes: Optional[List[str]] = None,
-) -> FileLoggingSetupResult:
-    ...
+def clear_logging_handlers():
+    logger = logging.getLogger(None)
+    for handler in get_logging_handlers():
+        logger.removeHandler(handler)
 
 
-@overload
-def setup_logging(
-    log_level: LogLevel,
-    *,
-    native: Native,
-    log_dir: None = None,
-    console_stream: Optional[TextIO] = None,
-    scope: Optional[str] = None,
-    log_name: Optional[str] = None,
-    warnings_filter_regexes: Optional[List[str]] = None,
-) -> None:
-    ...
+def get_logging_handlers() -> Tuple[Handler, ...]:
+    logger = logging.getLogger(None)
+    return tuple(logger.handlers)
 
 
-def setup_logging(
-    log_level: LogLevel,
-    *,
-    native: Native,
-    console_stream: Optional[TextIO] = None,
-    log_dir: Optional[str] = None,
-    scope: Optional[str] = None,
-    log_name: Optional[str] = None,
-    warnings_filter_regexes: Optional[List[str]] = None,
-) -> Optional[FileLoggingSetupResult]:
-    """Configures logging for a given scope, by default the global scope.
+def set_logging_handlers(handlers: Tuple[Handler, ...]):
+    clear_logging_handlers()
+    logger = logging.getLogger(None)
+    for handler in handlers:
+        logger.addHandler(handler)
 
-    :param log_level: The logging level to enable.
-    :param native: An instance of the Native FFI lib, to register rust logging.
-    :param console_stream: The stream to use for default (console) logging. If None (default), this
-                           will disable console logging.
-    :param log_dir: An optional directory to emit logs files in.  If unspecified, no disk logging
-                    will occur.  If supplied, the directory will be created if it does not already
-                    exist and all logs will be tee'd to a rolling set of log files in that
-                    directory.
-    :param scope: A logging scope to configure.  The scopes are hierarchichal logger names, with
-                  The '.' separator providing the scope hierarchy.  By default the root logger is
-                  configured.
-    :param log_name: The base name of the log file (defaults to 'pants.log').
 
-    :param warnings_filter_regexes: A series of regexes to ignore warnings for, typically from the
-                                    `ignore_pants_warnings` option.
-    :returns: The file logging setup configured if any.
-    """
-
-    # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
-    # context/work-unit logging and standard python logging doesn't buy us anything.
-
-    # TODO(John Sirois): Support logging.config.fileConfig so a site can setup fine-grained
-    # logging control and we don't need to be the middleman plumbing an option for each python
-    # standard logging knob.
-
-    # A custom log handler for sub-debug trace logging.
-    def trace(self, message, *args, **kwargs):
+def _common_logging_setup(level: LogLevel) -> None:
+    def trace_fn(self, message, *args, **kwargs):
         if self.isEnabledFor(LogLevel.TRACE.level):
             self._log(LogLevel.TRACE.level, message, *args, **kwargs)
 
-    logging.Logger.trace = trace  # type: ignore[attr-defined]
+    logging.Logger.trace = trace_fn  # type: ignore[attr-defined]
+    logger = logging.getLogger(None)
 
-    logger = logging.getLogger(scope)
-    for handler in logger.handlers:
-        logger.removeHandler(handler)
-
-    if console_stream:
-        native_handler = create_native_stderr_log_handler(log_level, native, stream=console_stream)
-        logger.addHandler(native_handler)
-
-    log_level.set_level_for(logger)
-
+    level.set_level_for(logger)
     # This routes warnings through our loggers instead of straight to raw stderr.
     logging.captureWarnings(True)
 
-    for message_regexp in warnings_filter_regexes or ():
-        warnings.filterwarnings(action="ignore", message=message_regexp)
+    if logger.isEnabledFor(LogLevel.TRACE.level):
+        http.client.HTTPConnection.debuglevel = 1  # type: ignore[attr-defined]
+        requests_logger = logging.getLogger("requests.packages.urllib3")
+        LogLevel.TRACE.set_level_for(requests_logger)
+        requests_logger.propagate = True
 
-    _maybe_configure_extended_logging(logger)
 
-    if not log_dir:
-        return None
+def setup_logging(global_bootstrap_options: OptionValueContainer, stderr_logging: bool) -> None:
+    """Sets up logging for a Pants run.
+
+    This is called in two contexts: 1) PantsRunner, 2) DaemonPantsRunner. In the latter case, the
+    loggers are saved and restored around this call, so in both cases it runs with no handlers
+    configured (and asserts so!).
+    """
+    if get_logging_handlers():
+        raise AssertionError("setup_logging should not be called while Handlers are installed.")
+
+    global_level = global_bootstrap_options.level
+    log_dir = global_bootstrap_options.logdir
+
+    log_show_rust_3rdparty = global_bootstrap_options.log_show_rust_3rdparty
+    use_color = global_bootstrap_options.colors
+    show_target = global_bootstrap_options.show_log_target
+    log_levels_by_target = get_log_levels_by_target(global_bootstrap_options)
+
+    init_rust_logger(
+        global_level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
+    )
+
+    if stderr_logging:
+        setup_logging_to_stderr(global_level, global_bootstrap_options.print_stacktrace)
+
+    if log_dir:
+        setup_logging_to_file(global_level, log_dir=log_dir)
+
+
+def get_log_levels_by_target(global_bootstrap_options: OptionValueContainer) -> Dict[str, LogLevel]:
+    raw_levels = global_bootstrap_options.log_levels_by_target
+    levels: Dict[str, LogLevel] = {}
+    for key, value in raw_levels.items():
+        if not isinstance(key, str):
+            raise ValueError(
+                "Keys for log_domain_levels must be strings, but was given the key: {key} with type {type(key)}."
+            )
+        if not isinstance(value, str):
+            raise ValueError(
+                "Values for log_domain_levels must be strings, but was given the value: {value} with type {type(value)}."
+            )
+        log_level = LogLevel[value.upper()]
+        levels[key] = log_level
+    return levels
+
+
+def setup_logging_to_stderr(level: LogLevel, print_stacktrace: bool) -> None:
+    """Sets up Python logging to stderr, proxied to Rust via a NativeHandler.
+
+    We deliberately set the most verbose logging possible (i.e. the TRACE log level), here, and let
+    the Rust logging faculties take care of filtering.
+    """
+    _common_logging_setup(level)
+
+    python_logger = logging.getLogger(None)
+    handler = NativeHandler(level)
+    handler.setFormatter(ExceptionFormatter(print_stacktrace))
+    python_logger.addHandler(handler)
+    LogLevel.TRACE.set_level_for(python_logger)
+
+
+def setup_logging_to_file(
+    level: LogLevel,
+    *,
+    log_dir: str,
+    log_filename: str = "pants.log",
+) -> NativeHandler:
+    native = Native()
+    logger = logging.getLogger(None)
+
+    _common_logging_setup(level)
 
     safe_mkdir(log_dir)
-    log_filename = os.path.join(log_dir, log_name or "pants.log")
+    log_path = os.path.join(log_dir, log_filename)
 
-    native_handler = create_native_pantsd_file_log_handler(log_level, native, log_filename)
-    file_handler = native_handler
-    logger.addHandler(native_handler)
-    return FileLoggingSetupResult(log_filename, file_handler)
+    native.setup_pantsd_logger(log_path)
+    handler = NativeHandler(level, native_filename=log_path)
 
-
-def create_native_stderr_log_handler(
-    log_level: LogLevel, native: Native, stream: Optional[TextIO] = None
-) -> NativeHandler:
-    try:
-        native.setup_stderr_logger(log_level.level)
-    except Exception as e:
-        print(f"Error setting up pantsd logger: {e!r}", file=sys.stderr)
-        raise e
-
-    return NativeHandler(log_level, native, stream)
+    logger.addHandler(handler)
+    return handler

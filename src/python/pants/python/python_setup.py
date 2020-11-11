@@ -2,25 +2,45 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import multiprocessing
 import os
 import subprocess
-from typing import Iterable, Optional, Tuple, cast
+from enum import Enum
+from pathlib import Path
+from typing import Callable, Iterable, List, Optional, Tuple, cast
 
 from pex.variables import Variables
 
-from pants.option.custom_types import UnsetBool, file_option
-from pants.subsystem.subsystem import Subsystem
+from pants.base.build_environment import get_buildroot
+from pants.option.custom_types import file_option
+from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
 
 
+class ResolveAllConstraintsOption(Enum):
+    """When to allow re-using a resolve of an entire constraints file.
+
+    This helps avoid many repeated resolves of overlapping requirement subsets,
+    at the expense of using a larger requirement set that may be strictly necessary.
+
+    Note that use of any value other than NEVER requires --requirement-constraints to be set.
+    """
+
+    # Use the strict requirement subset always.
+    NEVER = "never"
+    # Use the strict requirement subset when building deployable binaries, but use
+    # the entire constraints file otherwise (e.g., when running tests).
+    NONDEPLOYABLES = "nondeployables"
+    # Always use the entire constraints file.
+    ALWAYS = "always"
+
+
 class PythonSetup(Subsystem):
-    """A python environment."""
+    """A Python environment."""
 
     options_scope = "python-setup"
-
-    _DEFAULT_MANYLINUX_UPPER_BOUND = "manylinux2014"
 
     @classmethod
     def register_options(cls, register):
@@ -28,130 +48,97 @@ class PythonSetup(Subsystem):
         register(
             "--interpreter-constraints",
             advanced=True,
-            fingerprint=True,
             type=list,
             default=["CPython>=3.6"],
             metavar="<requirement>",
-            help="Constrain the selected Python interpreter. Specify with requirement syntax, "
-            "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
-            "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
-            "be ORed together. These constraints are applied in addition to any "
-            "compatibilities required by the relevant targets.",
+            help=(
+                "The Python interpreters your codebase is compatible with. Specify with "
+                "requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with version "
+                ">=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple "
+                "constraint strings will be ORed together. These constraints are used as the "
+                "default value for the `interpreter_constraints` field of Python targets."
+            ),
         )
         register(
             "--requirement-constraints",
             advanced=True,
-            fingerprint=True,
             type=file_option,
             help=(
                 "When resolving third-party requirements, use this "
-                "constraint file to determine which versions to use. See "
+                "constraints file to determine which versions to use. See "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
-                "on the format of constraint files and how constraints are applied in Pex and Pip."
+                "on the format of constraint files and how constraints are applied in Pex and pip."
             ),
         )
         register(
-            "--platforms",
+            "--resolve-all-constraints",
             advanced=True,
-            type=list,
-            metavar="<platform>",
-            default=["current"],
-            fingerprint=True,
-            help="A list of platforms to be supported by this Python environment. Each platform"
-            "is a string, as returned by pkg_resources.get_supported_platform().",
-        )
-        register(
-            "--interpreter-cache-dir",
-            advanced=True,
-            default=None,
-            metavar="<dir>",
-            help="The parent directory for the interpreter cache. "
-            "If unspecified, a standard path under the workdir is used.",
-        )
-        register(
-            "--chroot-cache-dir",
-            advanced=True,
-            default=None,
-            metavar="<dir>",
-            removal_version="1.28.0.dev2",
-            removal_hint="This option is now unused, please remove configuration of it.",
-            help="DEPRECATED: This option is unused.",
-        )
-        register(
-            "--resolver-cache-dir",
-            advanced=True,
-            default=None,
-            metavar="<dir>",
-            help="The parent directory for the requirement resolver cache. "
-            "If unspecified, a standard path under the workdir is used.",
-        )
-        register(
-            "--resolver-cache-ttl",
-            advanced=True,
-            type=int,
-            metavar="<seconds>",
-            default=10 * 365 * 86400,  # 10 years.
-            removal_version="1.28.0.dev2",
-            removal_hint="This option is now unused, please remove configuration of it.",
-            help="DEPRECATED: This option is unused.",
-        )
-        register(
-            "--resolver-allow-prereleases",
-            advanced=True,
-            type=bool,
-            default=UnsetBool,
-            fingerprint=True,
-            help="Whether to include pre-releases when resolving requirements.",
-        )
-        register(
-            "--artifact-cache-dir",
-            advanced=True,
-            default=None,
-            metavar="<dir>",
-            removal_version="1.28.0.dev2",
-            removal_hint="This option is now unused, please remove configuration of it.",
-            help="DEPRECATED: This option is unused.",
+            default=ResolveAllConstraintsOption.NONDEPLOYABLES,
+            type=ResolveAllConstraintsOption,
+            help=(
+                "If set, and the requirements of the code being operated on are a subset of the "
+                "constraints file, then the entire constraints file will be used instead of the "
+                "subset. If unset, or any requirement of the code being operated on is not in the "
+                "constraints file, each subset will be independently resolved as needed, which is "
+                "more correct - work is only invalidated if a requirement it actually depends on "
+                "changes - but also a lot slower, due to the extra resolving. "
+                "\n\n* `never` will always use proper subsets, regardless of the goal being "
+                "run.\n* `nondeployables` will use proper subsets for `./pants package`, but "
+                "otherwise attempt to use a single resolve.\n* `always` will always attempt to use "
+                "a single resolve."
+                "\n\nRequires [python-setup].requirement_constraints to be set."
+            ),
         )
         register(
             "--interpreter-search-paths",
             advanced=True,
             type=list,
-            default=["<PEXRC>", "<PATH>"],
+            default=["<PYENV>", "<PATH>"],
             metavar="<binary-paths>",
-            help="A list of paths to search for python interpreters. The following special "
-            "strings are supported: "
-            '"<PATH>" (the contents of the PATH env var), '
-            '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
-            '"<PYENV>" (all python versions under $(pyenv root)/versions).',
-        )
-        register(
-            "--resolver-use-manylinux",
-            advanced=True,
-            type=bool,
-            default=False,
-            fingerprint=True,
-            removal_version="1.28.0.dev2",
-            removal_hint="Use --resolver-manylinux=<manylinux spec upper bound> instead.",
-            help="Whether to consider manylinux wheels when resolving requirements for foreign"
-            "linux platforms.",
+            help=(
+                "A list of paths to search for Python interpreters that match your project's "
+                "interpreter constraints. You can specify absolute paths to interpreter binaries "
+                "and/or to directories containing interpreter binaries. The order of entries does "
+                "not matter. The following special strings are supported:\n\n"
+                '* "<PATH>", the contents of the PATH env var\n'
+                '* "<PYENV>", all Python versions under $(pyenv root)/versions\n'
+                '* "<PYENV_LOCAL>", the Pyenv interpreter with the version in '
+                "BUILD_ROOT/.python-version\n"
+                '* "<PEXRC>", paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc'
+            ),
         )
         register(
             "--resolver-manylinux",
             advanced=True,
             type=str,
-            default=cls._DEFAULT_MANYLINUX_UPPER_BOUND,
-            fingerprint=True,
+            default="manylinux2014",
             help="Whether to allow resolution of manylinux wheels when resolving requirements for "
             "foreign linux platforms. The value should be a manylinux platform upper bound, "
-            "e.g.: manylinux2010, or else [Ff]alse, [Nn]o or [Nn]one to disallow.",
+            "e.g.: 'manylinux2010', or else the string 'no' to disallow.",
         )
         register(
             "--resolver-jobs",
             type=int,
-            default=None,
+            default=multiprocessing.cpu_count() // 2,
             advanced=True,
-            fingerprint=True,
-            help="The maximum number of concurrent jobs to resolve wheels with.",
+            help=(
+                "The maximum number of concurrent jobs to build wheels with. Because Pants "
+                "can run multiple subprocesses in parallel, the maximum total parallelism will be "
+                "`--process-execution-{local,remote}-parallelism x --python-setup-resolver-jobs`. "
+                "Setting this option higher may result in better parallelism, but, if set too "
+                "high, may result in starvation and Out of Memory errors."
+            ),
+        )
+        register(
+            "--resolver-http-cache-ttl",
+            type=int,
+            default=3_600,  # This matches PEX's default.
+            advanced=True,
+            help=(
+                "The maximum time (in seconds) for items in the HTTP cache. When the cache expires,"
+                "the PEX resolver will make network requests to see if new versions of your "
+                "requirements are available."
+            ),
         )
 
     @property
@@ -163,56 +150,35 @@ class PythonSetup(Subsystem):
         """Path to constraint file."""
         return cast(Optional[str], self.options.requirement_constraints)
 
+    @property
+    def resolve_all_constraints(self) -> ResolveAllConstraintsOption:
+        return cast(ResolveAllConstraintsOption, self.options.resolve_all_constraints)
+
+    def resolve_all_constraints_was_set_explicitly(self) -> bool:
+        return not self.options.is_default("resolve_all_constraints")
+
     @memoized_property
     def interpreter_search_paths(self):
-        return self.expand_interpreter_search_paths(self.get_options().interpreter_search_paths)
+        return self.expand_interpreter_search_paths(self.options.interpreter_search_paths)
 
     @property
-    def platforms(self):
-        return self.get_options().platforms
-
-    @property
-    def interpreter_cache_dir(self):
-        return self.get_options().interpreter_cache_dir or os.path.join(
-            self.scratch_dir, "interpreters"
-        )
-
-    @property
-    def resolver_cache_dir(self):
-        return self.get_options().resolver_cache_dir or os.path.join(
-            self.scratch_dir, "resolved_requirements"
-        )
-
-    @property
-    def resolver_allow_prereleases(self):
-        return self.get_options().resolver_allow_prereleases
-
-    @property
-    def manylinux(self):
-        if self.get_options().resolver_manylinux:
-            manylinux = self.get_options().resolver_manylinux
-            if manylinux.lower() in ("false", "no", "none"):
-                if self.get_options().resolver_use_manylinux:
-                    logger.warning(
-                        "The [{scope}] manylinux option is explicitly set to {manylinux} "
-                        "over-riding the [{scope}] use_manylinux option.".format(
-                            scope=self.options_scope, manylinux=manylinux
-                        )
-                    )
-                return None
-            return manylinux
-        elif self.get_options().resolver_use_manylinux:
-            return self._DEFAULT_MANYLINUX_UPPER_BOUND
-        else:
+    def manylinux(self) -> Optional[str]:
+        manylinux = cast(Optional[str], self.options.resolver_manylinux)
+        if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
+        return manylinux
 
     @property
-    def resolver_jobs(self):
-        return self.get_options().resolver_jobs
+    def resolver_jobs(self) -> int:
+        return cast(int, self.options.resolver_jobs)
+
+    @property
+    def resolver_http_cache_ttl(self) -> int:
+        return cast(int, self.options.resolver_http_cache_ttl)
 
     @property
     def scratch_dir(self):
-        return os.path.join(self.get_options().pants_workdir, *self.options_scope.split("."))
+        return os.path.join(self.options.pants_workdir, *self.options_scope.split("."))
 
     def compatibility_or_constraints(
         self, compatibility: Optional[Iterable[str]]
@@ -221,9 +187,18 @@ class PythonSetup(Subsystem):
 
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
-        if self.get_options().is_flagged("interpreter_constraints"):
+        if self.options.is_flagged("interpreter_constraints"):
             return self.interpreter_constraints
         return tuple(compatibility or self.interpreter_constraints)
+
+    def compatibilities_or_constraints(
+        self, compatibilities: Iterable[Optional[Iterable[str]]]
+    ) -> Tuple[str, ...]:
+        return tuple(
+            constraint
+            for compatibility in compatibilities
+            for constraint in self.compatibility_or_constraints(compatibility)
+        )
 
     @classmethod
     def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):
@@ -231,6 +206,9 @@ class PythonSetup(Subsystem):
             "<PEXRC>": cls.get_pex_python_paths,
             "<PATH>": cls.get_environment_paths,
             "<PYENV>": lambda: cls.get_pyenv_paths(pyenv_root_func=pyenv_root_func),
+            "<PYENV_LOCAL>": lambda: cls.get_pyenv_paths(
+                pyenv_root_func=pyenv_root_func, pyenv_local=True
+            ),
         }
         expanded = []
         from_pexrc = None
@@ -274,22 +252,45 @@ class PythonSetup(Subsystem):
             return []
 
     @staticmethod
-    def get_pyenv_paths(pyenv_root_func=None):
+    def get_pyenv_paths(
+        *, pyenv_root_func: Optional[Callable] = None, pyenv_local: bool = False
+    ) -> List[str]:
         """Returns a list of paths to Python interpreters managed by pyenv.
 
         :param pyenv_root_func: A no-arg function that returns the pyenv root. Defaults to
                                 running `pyenv root`, but can be overridden for testing.
+        :param bool pyenv_local: If True, only use the interpreter specified by
+                                 '.python-version' file under `build_root`.
         """
         pyenv_root_func = pyenv_root_func or get_pyenv_root
         pyenv_root = pyenv_root_func()
         if pyenv_root is None:
             return []
-        versions_dir = os.path.join(pyenv_root, "versions")
+
+        versions_dir = Path(pyenv_root, "versions")
+        if not versions_dir.is_dir():
+            return []
+
+        if pyenv_local:
+            local_version_file = Path(get_buildroot(), ".python-version")
+            if not local_version_file.exists():
+                logger.warning(
+                    "No `.python-version` file found in the build root, "
+                    "but <PYENV_LOCAL> was set in `[python-setup].interpreter_search_paths`."
+                )
+                return []
+
+            local_version = local_version_file.read_text().strip()
+            path = Path(versions_dir, local_version, "bin")
+            if path.is_dir():
+                return [str(path)]
+            return []
+
         paths = []
-        for version in sorted(os.listdir(versions_dir)):
-            path = os.path.join(versions_dir, version, "bin")
-            if os.path.isdir(path):
-                paths.append(path)
+        for version in sorted(versions_dir.iterdir()):
+            path = Path(versions_dir, version, "bin")
+            if path.is_dir():
+                paths.append(str(path))
         return paths
 
 

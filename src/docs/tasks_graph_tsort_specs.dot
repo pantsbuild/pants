@@ -1,6 +1,0 @@
-digraph G {
-  rankdir=RL;
-  node [shape=box];
-  specs [color=red];
-  specs -> junit -> checkstyle -> ivy -> protoc -> scrooge;
-}

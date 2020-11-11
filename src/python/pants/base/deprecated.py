@@ -2,18 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-import sys
 import warnings
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import Any, Callable, Optional
 
 from packaging.version import InvalidVersion, Version
 
 from pants.util.memo import memoized_method
 from pants.version import PANTS_SEMVER
-
-if TYPE_CHECKING:
-    from pants.option.option_value_container import OptionValueContainer
 
 
 class DeprecationApplicationError(Exception):
@@ -122,7 +118,6 @@ def warn_or_error(
     deprecation_start_version: Optional[str] = None,
     stacklevel: int = 3,
     frame_info: Optional[inspect.FrameInfo] = None,
-    ensure_stderr: bool = False,
     print_warning: bool = True,
 ) -> None:
     """Check the removal_version against the current pants version.
@@ -141,8 +136,6 @@ def warn_or_error(
     :param stacklevel: The stacklevel to pass to warnings.warn, which determines the file name and
                        line number of the error message.
     :param frame_info: If provided, use this frame info instead of getting one from `stacklevel`.
-    :param ensure_stderr: Whether use warnings.warn, or use warnings.showwarning to print
-                          directly to stderr.
     :param print_warning: Whether to print a warning for deprecations *before* their removal.
                           If this flag is off, an exception will still be raised for options
                           past their deprecation date.
@@ -176,14 +169,13 @@ def warn_or_error(
     _, filename, line_number, _, _, _ = frame_info
 
     if removal_semver > PANTS_SEMVER:
-        if ensure_stderr:
-            # No warning filters can stop us from printing this message directly to stderr.
-            warning_msg = warnings.formatwarning(msg, DeprecationWarning, filename, line_number,)
-            print(warning_msg, file=sys.stderr)
-        elif print_warning:
+        if print_warning:
             # This output is filtered by warning filters.
             warnings.warn_explicit(
-                message=msg, category=DeprecationWarning, filename=filename, lineno=line_number,
+                message=msg,
+                category=DeprecationWarning,
+                filename=filename,
+                lineno=line_number,
             )
         return
     else:
@@ -225,7 +217,6 @@ def deprecated(
     removal_version: str,
     hint_message: Optional[str] = None,
     subject: Optional[str] = None,
-    ensure_stderr: bool = False,
 ):
     """Marks a function or method as deprecated.
 
@@ -244,7 +235,6 @@ def deprecated(
     :param hint_message: An optional hint pointing to alternatives to the deprecation.
     :param subject: The name of the subject that has been deprecated for logging clarity. Defaults
                         to the name of the decorated function/method.
-    :param ensure_stderr: Forwarded to `ensure_stderr` in warn_or_error().
     :raises DeprecationApplicationError if the @deprecation is applied improperly.
     """
     validate_deprecation_semver(removal_version, "removal version")
@@ -263,7 +253,6 @@ def deprecated(
                 removal_version,
                 subject or func_full_name,
                 hint_message,
-                ensure_stderr=ensure_stderr,
             )
             return func(*args, **kwargs)
 
@@ -298,25 +287,32 @@ def deprecated_module(
     )
 
 
+# TODO: old_container and new_container are both `OptionValueContainer`, but that causes a dep
+#  cycle.
 def resolve_conflicting_options(
     *,
     old_option: str,
     new_option: str,
     old_scope: str,
     new_scope: str,
-    old_container: "OptionValueContainer",
-    new_container: "OptionValueContainer",
-):
+    old_container: Any,
+    new_container: Any,
+) -> Any:
     """Utility for resolving an option that's been migrated to a new location.
 
-    This ensures that the user does not try to specify both options.
+    This will check if either option was explicitly configured, and if so, use that. If both were
+    configured, it will error. Otherwise, it will use the default value for the new, preferred
+    option.
+
+    The option names should use snake_case, rather than --kebab-case.
     """
     old_configured = not old_container.is_default(old_option)
     new_configured = not new_container.is_default(new_option)
     if old_configured and new_configured:
 
         def format_option(*, scope: str, option: str) -> str:
-            return f"`--{scope}-{option}`".replace("_", "-")
+            scope_preamble = "--" if scope == "" else f"--{scope}-"
+            return f"`{scope_preamble}{option}`".replace("_", "-")
 
         old_display = format_option(scope=old_scope, option=old_option)
         new_display = format_option(scope=new_scope, option=new_option)
@@ -328,16 +324,3 @@ def resolve_conflicting_options(
     if old_configured:
         return old_container.get(old_option)
     return new_container.get(new_option)
-
-
-def _deprecated_contrib_plugin(plugin_name: str) -> None:
-    warn_or_error(
-        removal_version="1.29.0.dev0",
-        deprecated_entity_description=f"the {plugin_name} plugin",
-        hint=(
-            f"The {repr(plugin_name)} plugin is being removed due to low usage.\n\nTo prepare for "
-            f"this change, please remove {repr(plugin_name)} from 'plugins' in `pants.toml` or "
-            "`pants.ini`.\n\nIf you still depend on this plugin, please email pants-devel "
-            "<pants-devel@googlegroups.com> or message us on Slack and we will keep this plugin."
-        ),
-    )

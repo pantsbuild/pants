@@ -5,6 +5,6 @@ files(
   name = 'pants_plugins_directory',
   sources = ['pants-plugins/**/*'],
   dependencies = [
-    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil',
   ],
 )

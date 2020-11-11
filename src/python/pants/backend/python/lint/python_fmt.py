@@ -4,18 +4,13 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Type
 
-from pants.backend.python.rules.targets import PythonSources
+from pants.backend.python.target_types import PythonSources
+from pants.core.goals.fmt import EnrichedFmtResult, LanguageFmtResults, LanguageFmtTargets
+from pants.core.goals.style_request import StyleRequest
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, Snapshot
-from pants.engine.objects import union
-from pants.engine.rules import UnionMembership, UnionRule, rule
-from pants.engine.selectors import Get
-from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.rules.core.fmt import (
-    FmtConfigurations,
-    FmtResult,
-    LanguageFmtResults,
-    LanguageFmtTargets,
-)
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.unions import UnionMembership, UnionRule, union
 
 
 @dataclass(frozen=True)
@@ -24,7 +19,7 @@ class PythonFmtTargets(LanguageFmtTargets):
 
 
 @union
-class PythonFmtConfigurations:
+class PythonFmtRequest(StyleRequest):
     pass
 
 
@@ -32,37 +27,37 @@ class PythonFmtConfigurations:
 async def format_python_target(
     python_fmt_targets: PythonFmtTargets, union_membership: UnionMembership
 ) -> LanguageFmtResults:
-    targets_with_origins = python_fmt_targets.targets_with_origins
-    original_sources = await Get[SourceFiles](
-        AllSourceFilesRequest(
-            target_with_origin.target[PythonSources]
-            for target_with_origin in python_fmt_targets.targets_with_origins
-        )
+    original_sources = await Get(
+        SourceFiles,
+        SourceFilesRequest(target[PythonSources] for target in python_fmt_targets.targets),
     )
     prior_formatter_result = original_sources.snapshot
 
-    results: List[FmtResult] = []
-    config_collection_types: Iterable[Type[FmtConfigurations]] = union_membership.union_rules[
-        PythonFmtConfigurations
+    results: List[EnrichedFmtResult] = []
+    fmt_request_types: Iterable[Type[PythonFmtRequest]] = union_membership.union_rules[
+        PythonFmtRequest
     ]
-    for config_collection_type in config_collection_types:
-        result = await Get[FmtResult](
-            PythonFmtConfigurations,
-            config_collection_type(
+    for fmt_request_type in fmt_request_types:
+        result = await Get(
+            EnrichedFmtResult,
+            PythonFmtRequest,
+            fmt_request_type(
                 (
-                    config_collection_type.config_type.create(target_with_origin)
-                    for target_with_origin in targets_with_origins
+                    fmt_request_type.field_set_type.create(target)
+                    for target in python_fmt_targets.targets
                 ),
                 prior_formatter_result=prior_formatter_result,
             ),
         )
-        if result != FmtResult.noop():
-            results.append(result)
-            prior_formatter_result = await Get[Snapshot](Digest, result.digest)
+        results.append(result)
+        if result.did_change:
+            prior_formatter_result = await Get(Snapshot, Digest, result.output)
     return LanguageFmtResults(
-        tuple(results), combined_digest=prior_formatter_result.directory_digest
+        tuple(results),
+        input=original_sources.snapshot.digest,
+        output=prior_formatter_result.digest,
     )
 
 
 def rules():
-    return [format_python_target, UnionRule(LanguageFmtTargets, PythonFmtTargets)]
+    return [*collect_rules(), UnionRule(LanguageFmtTargets, PythonFmtTargets)]

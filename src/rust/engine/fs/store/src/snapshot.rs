@@ -1,26 +1,24 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::Store;
-use bazel_protos;
-use boxfuture::{BoxFuture, Boxable};
-use fs::{
-  Dir, File, GitignoreStyleExcludes, GlobMatching, PathGlobs, PathStat, PosixFS, SymlinkBehavior,
-};
-use futures::compat::Future01CompatExt;
-use futures::future::{self as future03, FutureExt, TryFutureExt};
-use futures01::future;
-use hashing::{Digest, EMPTY_DIGEST};
-use indexmap::{self, IndexMap};
-use itertools::Itertools;
-use protobuf;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
-use std::pin::Pin;
 use std::sync::Arc;
+
+use crate::Store;
+use boxfuture::{BoxFuture, Boxable};
+use fs::{
+  Dir, File, GitignoreStyleExcludes, GlobMatching, PathStat, PosixFS, PreparedPathGlobs,
+  SymlinkBehavior,
+};
+use futures::compat::Future01CompatExt;
+use futures::future::{self as future03, FutureExt, TryFutureExt};
+use futures01::future;
+use hashing::{Digest, EMPTY_DIGEST};
+use itertools::Itertools;
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Snapshot {
@@ -42,24 +40,11 @@ impl Snapshot {
   >(
     store: Store,
     file_digester: S,
-    mut path_stats: Vec<PathStat>,
+    path_stats: Vec<PathStat>,
   ) -> Result<Snapshot, String> {
-    path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-
-    // The helper assumes that if a Path has multiple children, it must be a directory.
-    // Proactively error if we run into identically named files, because otherwise we will treat
-    // them like empty directories.
-    let pre_dedupe_len = path_stats.len();
-    path_stats.dedup_by(|a, b| a.path() == b.path());
-    if path_stats.len() != pre_dedupe_len {
-      return Err(format!(
-        "Snapshots must be constructed from unique path stats; got duplicates in {:?}",
-        path_stats
-      ));
-    }
+    let path_stats = PathStat::normalize_path_stats(path_stats)?;
     let digest =
       Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &path_stats).await?;
-
     Ok(Snapshot { digest, path_stats })
   }
 
@@ -86,10 +71,10 @@ impl Snapshot {
       .compat()
       .await?;
 
-    let mut path_stats =
-      Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter))
-        .collect::<Vec<_>>();
-    path_stats.sort_by(|l, r| l.path().cmp(&r.path()));
+    let path_stats = Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter))
+      .collect::<Vec<_>>();
+    // The path stats should already be normalized; this is an assertion that they're valid.
+    let path_stats = PathStat::normalize_path_stats(path_stats)?;
     Ok(Snapshot { digest, path_stats })
   }
 
@@ -99,17 +84,14 @@ impl Snapshot {
   >(
     store: Store,
     file_digester: S,
-    path_stats: &[PathStat],
+    path_stats: Vec<PathStat>,
   ) -> Result<Digest, String> {
-    let mut sorted_path_stats = path_stats.to_owned();
-    sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
-      .await
+    let path_stats = PathStat::normalize_path_stats(path_stats)?;
+    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &path_stats).await
   }
 
-  ///
-  /// NB: This function is recursive, and so cannot be directly marked async.
-  ///
+  // NB: This function is recursive, and so cannot be directly marked async:
+  //   https://rust-lang.github.io/async-book/07_workarounds/05_recursion.html
   fn ingest_directory_from_sorted_path_stats<
     S: StoreFileByDigest<Error> + Sized + Clone + Send + 'static,
     Error: fmt::Debug + 'static + Send,
@@ -117,7 +99,7 @@ impl Snapshot {
     store: Store,
     file_digester: S,
     path_stats: &[PathStat],
-  ) -> Pin<Box<dyn std::future::Future<Output = Result<Digest, String>> + Send>> {
+  ) -> future03::BoxFuture<Result<Digest, String>> {
     let mut file_futures = Vec::new();
     let mut dir_futures: Vec<
       future03::BoxFuture<Result<bazel_protos::remote_execution::DirectoryNode, String>>,
@@ -189,7 +171,7 @@ impl Snapshot {
       }
     }
 
-    Box::pin(async move {
+    async move {
       let (dirs, files) = future03::try_join(
         future03::try_join_all(dir_futures),
         future03::try_join_all(file_futures),
@@ -200,255 +182,11 @@ impl Snapshot {
       directory.set_directories(protobuf::RepeatedField::from_vec(dirs));
       directory.set_files(protobuf::RepeatedField::from_vec(files));
       store.record_directory(&directory, true).await
-    })
-  }
-
-  ///
-  /// Given N Snapshots, returns a new Snapshot that merges them.
-  ///
-  /// Any files that exist in multiple Snapshots will cause this method to fail: the assumption
-  /// behind this behaviour is that almost any colliding file would represent a Rule implementation
-  /// error, and in cases where overwriting a file is desirable, explicitly removing a duplicated
-  /// copy should be straightforward.
-  ///
-  pub async fn merge(store: Store, snapshots: &[Snapshot]) -> Result<Snapshot, String> {
-    // We dedupe PathStats by their symbolic names, as those will be their names within the
-    // `Directory` structure. Only `Dir+Dir` collisions are legal.
-    let path_stats = {
-      let mut uniq_paths: IndexMap<PathBuf, PathStat> = IndexMap::new();
-      for path_stat in Iterator::flatten(snapshots.iter().map(|s| s.path_stats.iter().cloned())) {
-        match uniq_paths.entry(path_stat.path().to_owned()) {
-          indexmap::map::Entry::Occupied(e) => match (&path_stat, e.get()) {
-            (&PathStat::Dir { .. }, &PathStat::Dir { .. }) => (),
-            (x, y) => {
-              return Err(format!(
-                "Snapshots contained duplicate path: {:?} vs {:?}",
-                x, y
-              ));
-            }
-          },
-          indexmap::map::Entry::Vacant(v) => {
-            v.insert(path_stat);
-          }
-        }
-      }
-      uniq_paths.into_iter().map(|(_, v)| v).collect()
-    };
-    // Recursively merge the Digests in the Snapshots.
-    let root_digest =
-      Self::merge_directories(store, snapshots.iter().map(|s| s.digest).collect()).await?;
-    Ok(Snapshot {
-      digest: root_digest,
-      path_stats: path_stats,
-    })
-  }
-
-  ///
-  /// Given Digest(s) representing Directory instances, merge them recursively into a single
-  /// output Directory Digest.
-  ///
-  /// If a file is present with the same name and contents multiple times, it will appear once.
-  /// If a file is present with the same name, but different contents, an error will be returned.
-  ///
-  /// NB: This function is recursive, and so cannot be directly marked async.
-  ///
-  pub fn merge_directories(
-    store: Store,
-    dir_digests: Vec<Digest>,
-  ) -> Pin<Box<dyn std::future::Future<Output = Result<Digest, String>> + Send + 'static>> {
-    Box::pin(async move {
-      if dir_digests.is_empty() {
-        return Ok(EMPTY_DIGEST);
-      } else if dir_digests.len() == 1 {
-        let mut dir_digests = dir_digests;
-        return Ok(dir_digests.pop().unwrap());
-      }
-
-      let mut directories = future03::try_join_all(
-        dir_digests
-          .into_iter()
-          .map(|digest| {
-            store
-              .load_directory(digest)
-              .and_then(move |maybe_directory| {
-                future03::ready(
-                  maybe_directory
-                    .map(|(dir, _metadata)| dir)
-                    .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest)),
-                )
-              })
-          })
-          .collect::<Vec<_>>(),
-      )
-      .await?;
-
-      let mut out_dir = bazel_protos::remote_execution::Directory::new();
-
-      // Merge FileNodes.
-      let file_nodes = Iterator::flatten(
-        directories
-          .iter_mut()
-          .map(|directory| directory.take_files().into_iter()),
-      )
-      .sorted_by(|a, b| a.name.cmp(&b.name));
-
-      out_dir.set_files(protobuf::RepeatedField::from_vec(
-        file_nodes.into_iter().dedup().collect(),
-      ));
-      let unique_count = out_dir
-        .get_files()
-        .iter()
-        .map(bazel_protos::remote_execution::FileNode::get_name)
-        .dedup()
-        .count();
-      if unique_count != out_dir.get_files().len() {
-        let groups = out_dir
-          .get_files()
-          .iter()
-          .group_by(|f| f.get_name().to_owned());
-        for (file_name, group) in &groups {
-          if group.count() > 1 {
-            return Err(format!(
-              "Can only merge Directories with no duplicates, but found duplicate files: {}",
-              file_name
-            ));
-          }
-        }
-      }
-
-      // Group and recurse for DirectoryNodes.
-      let child_directory_futures = {
-        let store = store.clone();
-        let mut directories_to_merge = Iterator::flatten(
-          directories
-            .iter_mut()
-            .map(|directory| directory.take_directories().into_iter()),
-        )
-        .collect::<Vec<_>>();
-        directories_to_merge.sort_by(|a, b| a.name.cmp(&b.name));
-        directories_to_merge
-          .into_iter()
-          .group_by(|d| d.name.clone())
-          .into_iter()
-          .map(move |(child_name, group)| {
-            let store = store.clone();
-            let digests_result = group
-              .map(|d| d.get_digest().into())
-              .collect::<Result<Vec<_>, String>>();
-            async move {
-              let digests = digests_result?;
-              let merged_digest = Self::merge_directories(store, digests).await?;
-              let mut child_dir = bazel_protos::remote_execution::DirectoryNode::new();
-              child_dir.set_name(child_name);
-              child_dir.set_digest((&merged_digest).into());
-              let res: Result<_, String> = Ok(child_dir);
-              res
-            }
-          })
-          .collect::<Vec<_>>()
-      };
-
-      let child_directories = future03::try_join_all(child_directory_futures).await?;
-
-      out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
-      store.record_directory(&out_dir, true).await
-    })
-  }
-
-  pub async fn add_prefix(store: Store, digest: Digest, prefix: PathBuf) -> Result<Digest, String> {
-    let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
-    dir_node.set_name(osstring_as_utf8(prefix.into_os_string())?);
-    dir_node.set_digest((&digest).into());
-
-    let mut out_dir = bazel_protos::remote_execution::Directory::new();
-    out_dir.set_directories(protobuf::RepeatedField::from_vec(vec![dir_node]));
-
-    store.record_directory(&out_dir, true).await
-  }
-
-  pub async fn strip_prefix(
-    store: Store,
-    root_digest: Digest,
-    prefix: PathBuf,
-  ) -> Result<Digest, String> {
-    let store2 = store.clone();
-    let mut dir = Self::get_directory_or_err(store.clone(), root_digest).await?;
-    let mut already_stripped = PathBuf::new();
-    let mut prefix = prefix;
-    loop {
-      let has_already_stripped_any = already_stripped.components().next().is_some();
-
-      let mut components = prefix.components();
-      let component_to_strip = components.next();
-      if let Some(component_to_strip) = component_to_strip {
-        let remaining_prefix = components.collect();
-        let component_to_strip_str = component_to_strip.as_os_str().to_string_lossy();
-
-        let mut saw_matching_dir = false;
-        let extra_directories: Vec<_> = dir
-          .get_directories()
-          .iter()
-          .filter_map(|subdir| {
-            if subdir.get_name() == component_to_strip_str {
-              saw_matching_dir = true;
-              None
-            } else {
-              Some(subdir.get_name().to_owned())
-            }
-          })
-          .collect();
-        let files: Vec<_> = dir
-          .get_files()
-          .iter()
-          .map(|file| file.get_name().to_owned())
-          .collect();
-
-        match (saw_matching_dir, extra_directories.is_empty() && files.is_empty()) {
-          (false, true) => {
-            dir = bazel_protos::remote_execution::Directory::new();
-            break;
-          },
-          (false, false) => {
-            // Prefer "No subdirectory found" error to "had extra files" error.
-            return Err(format!(
-              "Cannot strip prefix {} from root directory {:?} - {}directory{} didn't contain a directory named {}{}",
-              already_stripped.join(&prefix).display(),
-              root_digest,
-              if has_already_stripped_any { "sub" } else { "root " },
-              if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
-              component_to_strip_str,
-              if !extra_directories.is_empty() || !files.is_empty() { format!(" but did contain {}", Self::directories_and_files(&extra_directories, &files)) } else { String::new() },
-            ))
-          },
-          (true, false) => {
-            return Err(format!(
-              "Cannot strip prefix {} from root directory {:?} - {}directory{} contained non-matching {}",
-              already_stripped.join(&prefix).display(),
-              root_digest,
-              if has_already_stripped_any { "sub" } else { "root " },
-              if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
-              Self::directories_and_files(&extra_directories, &files),
-            ))
-          },
-          (true, true) => {
-            // Must be 0th index, because we've checked that we saw a matching directory, and no others.
-            let maybe_digest: Result<Digest, String> = dir.get_directories()[0]
-                .get_digest()
-                .into();
-            already_stripped = already_stripped.join(component_to_strip);
-            dir = Self::get_directory_or_err(store.clone(), maybe_digest?).await?;
-            prefix = remaining_prefix;
-          }
-        }
-      } else {
-        break;
-      }
     }
-
-    store2.record_directory(&dir, true).await
+    .boxed()
   }
 
-  fn directories_and_files(directories: &[String], files: &[String]) -> String {
+  pub fn directories_and_files(directories: &[String], files: &[String]) -> String {
     format!(
       "{}{}{}",
       if directories.is_empty() {
@@ -477,7 +215,7 @@ impl Snapshot {
     )
   }
 
-  async fn get_directory_or_err(
+  pub async fn get_directory_or_err(
     store: Store,
     digest: Digest,
   ) -> Result<bazel_protos::remote_execution::Directory, String> {
@@ -504,7 +242,7 @@ impl Snapshot {
     store: Store,
     executor: task_executor::Executor,
     root_path: P,
-    path_globs: PathGlobs,
+    path_globs: PreparedPathGlobs,
     digest_hint: Option<Digest>,
   ) -> Result<Snapshot, String> {
     // Attempt to use the digest hint to load a Snapshot without expanding the globs; otherwise,
@@ -520,13 +258,13 @@ impl Snapshot {
     } else {
       let posix_fs = Arc::new(PosixFS::new_with_symlink_behavior(
         root_path,
-        GitignoreStyleExcludes::create(&[])?,
+        GitignoreStyleExcludes::create(vec![])?,
         executor,
         SymlinkBehavior::Oblivious,
       )?);
 
       let path_stats = posix_fs
-        .expand(path_globs)
+        .expand_globs(path_globs)
         .await
         .map_err(|err| format!("Error expanding globs: {}", err))?;
       Snapshot::from_path_stats(
@@ -536,76 +274,6 @@ impl Snapshot {
       )
       .await
     }
-  }
-
-  pub async fn get_snapshot_subset(
-    store: Store,
-    digest: Digest,
-    path_globs: PathGlobs,
-  ) -> Result<Snapshot, String> {
-    use bazel_protos::remote_execution::{Directory, DirectoryNode, FileNode};
-
-    let traverser = move |_: &Store,
-                          path_so_far: &PathBuf,
-                          _: Digest,
-                          directory: &Directory|
-          -> BoxFuture<(Vec<PathStat>, StoreManyFileDigests), String> {
-      let subdir_paths: Vec<PathBuf> = directory
-        .get_directories()
-        .iter()
-        .map(move |node: &DirectoryNode| path_so_far.join(node.get_name()))
-        .filter(|path: &PathBuf| path_globs.matches(&[path.clone()]))
-        .collect();
-
-      let file_paths: Vec<(PathBuf, Result<Digest, String>, bool)> = directory
-        .get_files()
-        .iter()
-        .map(|node: &FileNode| {
-          (
-            path_so_far.join(node.get_name()),
-            node.get_digest().into(),
-            node.is_executable,
-          )
-        })
-        .filter(|(path, _, _)| path_globs.matches(&[path.clone()]))
-        .collect();
-
-      let mut path_stats: Vec<PathStat> = vec![];
-      for path in subdir_paths.into_iter() {
-        path_stats.push(PathStat::dir(path.clone(), Dir(path)));
-      }
-
-      let mut hash = HashMap::new();
-      for (path, maybe_digest, is_executable) in file_paths.into_iter() {
-        let digest = match maybe_digest {
-          Ok(d) => d,
-          Err(err) => return future::err(err).to_boxed(),
-        };
-        hash.insert(path.clone(), digest);
-        path_stats.push(PathStat::file(
-          path.clone(),
-          File {
-            path,
-            is_executable,
-          },
-        ));
-      }
-
-      future::ok((path_stats, StoreManyFileDigests { hash })).to_boxed()
-    };
-
-    let path_stats_and_stores_per_directory: Vec<(Vec<PathStat>, StoreManyFileDigests)> =
-      store.walk(digest, traverser).compat().await?;
-
-    let mut final_store = StoreManyFileDigests::new();
-    let mut path_stats: Vec<PathStat> = vec![];
-    for (per_dir_path_stats, per_dir_store) in path_stats_and_stores_per_directory.into_iter() {
-      final_store.merge(per_dir_store);
-      path_stats.extend(per_dir_path_stats.into_iter());
-    }
-
-    path_stats.sort_by(|l, r| l.path().cmp(&r.path()));
-    Snapshot::from_path_stats(store, final_store, path_stats).await
   }
 }
 
@@ -630,18 +298,18 @@ fn paths_of_child_dir(paths: Vec<PathStat>) -> Vec<PathStat> {
       Some(match s {
         PathStat::File { path, stat } => PathStat::File {
           path: path.iter().skip(1).collect(),
-          stat: stat,
+          stat,
         },
         PathStat::Dir { path, stat } => PathStat::Dir {
           path: path.iter().skip(1).collect(),
-          stat: stat,
+          stat,
         },
       })
     })
     .collect()
 }
 
-fn osstring_as_utf8(path: OsString) -> Result<String, String> {
+pub fn osstring_as_utf8(path: OsString) -> Result<String, String> {
   path
     .into_string()
     .map_err(|p| format!("{:?}'s file_name is not representable in UTF8", p))
@@ -686,20 +354,8 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
 }
 
 #[derive(Clone)]
-struct StoreManyFileDigests {
+pub struct StoreManyFileDigests {
   pub hash: HashMap<PathBuf, Digest>,
-}
-
-impl StoreManyFileDigests {
-  fn new() -> StoreManyFileDigests {
-    StoreManyFileDigests {
-      hash: HashMap::new(),
-    }
-  }
-
-  fn merge(&mut self, other: StoreManyFileDigests) {
-    self.hash.extend(other.hash);
-  }
 }
 
 impl StoreFileByDigest<String> for StoreManyFileDigests {

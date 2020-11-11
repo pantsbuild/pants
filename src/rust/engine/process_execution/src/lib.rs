@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -24,24 +26,21 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-
+#![type_length_limit = "43757804"]
 #[macro_use]
 extern crate derivative;
 
-use boxfuture::{BoxFuture, Boxable};
-use bytes::Bytes;
+use async_trait::async_trait;
+pub use log::Level;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::ops::AddAssign;
-use std::path::{Component, Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
-use workunit_store::WorkUnitStore;
-
-use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
+use workunit_store::{with_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
 use hashing::Digest;
@@ -58,13 +57,22 @@ pub mod remote;
 #[cfg(test)]
 pub mod remote_tests;
 
+pub mod remote_cache;
+#[cfg(test)]
+mod remote_cache_tests;
+
 pub mod speculate;
 #[cfg(test)]
 mod speculate_tests;
 
 pub mod nailgun;
 
+pub mod named_caches;
+
 extern crate uname;
+
+pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
+use fs::RelativePath;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Platform {
@@ -145,48 +153,6 @@ impl From<PlatformConstraint> for String {
   }
 }
 
-#[derive(Derivative, Clone, Debug, Eq)]
-#[derivative(PartialEq, Hash)]
-pub struct RelativePath(PathBuf);
-
-impl RelativePath {
-  pub fn new<P: AsRef<Path>>(path: P) -> Result<RelativePath, String> {
-    let mut relative_path = PathBuf::new();
-    let candidate = path.as_ref();
-    for component in candidate.components() {
-      match component {
-        Component::Prefix(_) => {
-          return Err(format!("Windows paths are not allowed: {:?}", candidate))
-        }
-        Component::RootDir => {
-          return Err(format!("Absolute paths are not allowed: {:?}", candidate))
-        }
-        Component::CurDir => continue,
-        Component::ParentDir => {
-          if !relative_path.pop() {
-            return Err(format!(
-              "Relative paths that escape the root are not allowed: {:?}",
-              candidate
-            ));
-          }
-        }
-        Component::Normal(path) => relative_path.push(path),
-      }
-    }
-    Ok(RelativePath(relative_path))
-  }
-
-  pub fn to_str(&self) -> Option<&str> {
-    self.0.to_str()
-  }
-}
-
-impl AsRef<Path> for RelativePath {
-  fn as_ref(&self) -> &Path {
-    self.0.as_path()
-  }
-}
-
 ///
 /// A process to be executed.
 ///
@@ -218,22 +184,35 @@ pub struct Process {
 
   pub input_files: hashing::Digest,
 
-  pub output_files: BTreeSet<PathBuf>,
+  pub output_files: BTreeSet<RelativePath>,
 
-  pub output_directories: BTreeSet<PathBuf>,
+  pub output_directories: BTreeSet<RelativePath>,
 
-  pub timeout: std::time::Duration,
+  pub timeout: Option<std::time::Duration>,
+
+  /// If not None, then if a BoundedCommandRunner executes this Process
+  pub execution_slot_variable: Option<String>,
 
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
-  // This will be materialized for local Process only.
-  // Eventually we want to remove this.
-  // Context: https://github.com/pantsbuild/pants/issues/8314
-  // Think twice before using it.
-  #[derivative(PartialEq = "ignore", Hash = "ignore")]
-  pub unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-    hashing::Digest,
+  pub level: log::Level,
+
+  ///
+  /// Declares that this process uses the given named caches (which might have associated config
+  /// in the future) at the associated relative paths within its workspace. Cache names must
+  /// contain only lowercase ascii characters or underscores.
+  ///
+  /// Caches are exposed to processes within their workspaces at the relative paths represented
+  /// by the values of the dict. A process may optionally check for the existence of the relevant
+  /// directory, and disable use of that cache if it has not been created by the executor
+  /// (indicating a lack of support for this feature).
+  ///
+  /// These caches are globally shared and so must be concurrency safe: a consumer of the cache
+  /// must never assume that it has exclusive access to the provided directory.
+  ///
+  pub append_only_caches: BTreeMap<CacheName, CacheDest>,
+
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
   /// execution, or a system-installed JDK (ignoring the value of the present Some) for remote
@@ -246,6 +225,75 @@ pub struct Process {
   pub target_platform: PlatformConstraint,
 
   pub is_nailgunnable: bool,
+
+  pub cache_failures: bool,
+}
+
+impl Process {
+  ///
+  /// Constructs a Process with default values for most fields, after which the builder pattern can
+  /// be used to set values.
+  ///
+  /// We use the more ergonomic (but possibly slightly slower) "move self for each builder method"
+  /// pattern, so this method is only enabled for test usage: production usage should construct the
+  /// Process struct wholesale. We can reconsider this if we end up with more production callsites
+  /// that require partial options.
+  ///
+  #[cfg(test)]
+  pub fn new(argv: Vec<String>) -> Process {
+    Process {
+      argv,
+      env: BTreeMap::new(),
+      working_directory: None,
+      input_files: hashing::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
+      timeout: None,
+      description: "".to_string(),
+      level: log::Level::Info,
+      append_only_caches: BTreeMap::new(),
+      jdk_home: None,
+      target_platform: PlatformConstraint::None,
+      is_nailgunnable: false,
+      execution_slot_variable: None,
+      cache_failures: false,
+    }
+  }
+
+  ///
+  /// Replaces the environment for this process.
+  ///
+  pub fn env(mut self, env: BTreeMap<String, String>) -> Process {
+    self.env = env;
+    self
+  }
+
+  ///
+  /// Replaces the output files for this process.
+  ///
+  pub fn output_files(mut self, output_files: BTreeSet<RelativePath>) -> Process {
+    self.output_files = output_files;
+    self
+  }
+
+  ///
+  /// Replaces the output directories for this process.
+  ///
+  pub fn output_directories(mut self, output_directories: BTreeSet<RelativePath>) -> Process {
+    self.output_directories = output_directories;
+    self
+  }
+
+  ///
+  /// Replaces the append only caches for this process.
+  ///
+  pub fn append_only_caches(
+    mut self,
+    append_only_caches: BTreeMap<CacheName, CacheDest>,
+  ) -> Process {
+    self.append_only_caches = append_only_caches;
+    self
+  }
 }
 
 impl TryFrom<MultiPlatformProcess> for Process {
@@ -268,12 +316,26 @@ impl TryFrom<MultiPlatformProcess> for Process {
 pub struct MultiPlatformProcess(pub BTreeMap<PlatformConstraint, Process>);
 
 impl MultiPlatformProcess {
-  pub fn user_facing_name(&self) -> Option<String> {
+  pub fn user_facing_name(&self) -> String {
     self
       .0
       .iter()
       .next()
-      .map(|(_platforms, epr)| format!("Executing process: {}", epr.description))
+      .map(|(_platforms, process)| process.description.clone())
+      .unwrap_or_else(|| "<Unnamed process>".to_string())
+  }
+
+  pub fn workunit_level(&self) -> log::Level {
+    self
+      .0
+      .iter()
+      .next()
+      .map(|(_platforms, process)| process.level)
+      .unwrap_or(Level::Info)
+  }
+
+  pub fn workunit_name(&self) -> String {
+    "multi_platform_process".to_string()
   }
 }
 
@@ -300,8 +362,8 @@ pub struct ProcessMetadata {
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FallibleProcessResultWithPlatform {
-  pub stdout: Bytes,
-  pub stderr: Bytes,
+  pub stdout_digest: Digest,
+  pub stderr_digest: Digest,
   pub exit_code: i32,
   pub platform: Platform,
 
@@ -310,14 +372,6 @@ pub struct FallibleProcessResultWithPlatform {
   pub output_directory: hashing::Digest,
 
   pub execution_attempts: Vec<ExecutionStats>,
-}
-
-#[cfg(test)]
-impl FallibleProcessResultWithPlatform {
-  pub fn without_execution_attempts(mut self) -> Self {
-    self.execution_attempts = vec![];
-    self
-  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -340,22 +394,41 @@ impl AddAssign<UploadSummary> for ExecutionStats {
   }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Context {
-  pub workunit_store: WorkUnitStore,
-  pub build_id: String,
+  workunit_store: WorkunitStore,
+  build_id: String,
 }
 
+impl Default for Context {
+  fn default() -> Self {
+    Context {
+      workunit_store: WorkunitStore::new(false),
+      build_id: String::default(),
+    }
+  }
+}
+
+impl Context {
+  pub fn new(workunit_store: WorkunitStore, build_id: String) -> Context {
+    Context {
+      workunit_store,
+      build_id,
+    }
+  }
+}
+
+#[async_trait]
 pub trait CommandRunner: Send + Sync {
   ///
   /// Submit a request for execution on the underlying runtime, and return
   /// a future for it.
   ///
-  fn run(
+  async fn run(
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleProcessResultWithPlatform, String>;
+  ) -> Result<FallibleProcessResultWithPlatform, String>;
 
   ///
   /// Given a multi platform request which may have some platform
@@ -364,10 +437,6 @@ pub trait CommandRunner: Send + Sync {
   /// first candidate that will be run if the multi platform request is submitted to
   /// `fn run(..)`
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process>;
-
-  fn num_waiters(&self) -> usize {
-    panic!("This method is abstract and not implemented for this type")
-  }
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
@@ -375,7 +444,7 @@ pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
   let mut hashes: Vec<String> = req
     .0
     .values()
-    .map(|ref epr| crate::remote::make_execute_request(epr, metadata.clone()).unwrap())
+    .map(|ref process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
     .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
     .collect();
   hashes.sort();
@@ -406,25 +475,83 @@ impl BoundedCommandRunner {
   }
 }
 
+#[async_trait]
 impl CommandRunner for BoundedCommandRunner {
-  fn num_waiters(&self) -> usize {
-    self.inner.1.num_waiters()
-  }
-
-  fn run(
+  async fn run(
     &self,
-    req: MultiPlatformProcess,
+    mut req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
-    let inner = self.inner.clone();
-    self
-      .inner
-      .1
-      .clone()
-      .with_acquired(move || inner.0.run(req, context).compat())
-      .boxed()
-      .compat()
-      .to_boxed()
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let name = format!("{}-waiting", req.workunit_name());
+    let desc = req.user_facing_name();
+    let mut outer_metadata = WorkunitMetadata::with_level(Level::Debug);
+
+    outer_metadata.desc = Some(format!("(Waiting) {}", desc));
+    // We don't want to display the workunit associated with processes waiting on a
+    // BoundedCommandRunner to show in the dynamic UI, so set the `blocked` flag
+    // on the workunit metadata in order to prevent this.
+    outer_metadata.blocked = true;
+    let bounded_fut = {
+      let inner = self.inner.clone();
+      let semaphore = self.inner.1.clone();
+      let context = context.clone();
+      let name = format!("{}-running", req.workunit_name());
+
+      semaphore.with_acquired(move |concurrency_id| {
+        log::debug!(
+          "Running {} under semaphore with concurrency id: {}",
+          desc,
+          concurrency_id
+        );
+        let mut metadata = WorkunitMetadata::with_level(req.workunit_level());
+        metadata.desc = Some(desc);
+
+        let metadata_updater = |result: &Result<FallibleProcessResultWithPlatform, String>,
+                                old_metadata| match result {
+          Err(_) => old_metadata,
+          Ok(FallibleProcessResultWithPlatform {
+            stdout_digest,
+            stderr_digest,
+            exit_code,
+            ..
+          }) => WorkunitMetadata {
+            stdout: Some(*stdout_digest),
+            stderr: Some(*stderr_digest),
+            user_metadata: vec![(
+              "exit_code".to_string(),
+              UserMetadataItem::ImmediateId(*exit_code as i64),
+            )],
+            ..old_metadata
+          },
+        };
+
+        for (_, process) in req.0.iter_mut() {
+          if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
+            let execution_slot = format!("{}", concurrency_id);
+            process
+              .env
+              .insert(execution_slot_env_var.clone(), execution_slot);
+          }
+        }
+
+        with_workunit(
+          context.workunit_store.clone(),
+          name,
+          metadata,
+          async move { inner.0.run(req, context).await },
+          metadata_updater,
+        )
+      })
+    };
+
+    with_workunit(
+      context.workunit_store,
+      name,
+      outer_metadata,
+      bounded_fut,
+      |_, metadata| metadata,
+    )
+    .await
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {

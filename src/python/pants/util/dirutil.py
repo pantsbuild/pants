@@ -11,13 +11,10 @@ import threading
 import uuid
 from collections import defaultdict
 from contextlib import contextmanager
-from pathlib import Path
 from typing import (
     Any,
     Callable,
     DefaultDict,
-    FrozenSet,
-    Iterable,
     Iterator,
     List,
     Optional,
@@ -75,17 +72,6 @@ def fast_relpath_optional(path: str, start: str) -> Optional[str]:
     return None
 
 
-def ensure_relative_file_name(path: Path) -> str:
-    """Return a string representing the `path`, with a leading './'.
-
-    This ensures that the returned string can be used as the executable file when executing a
-    subprocess, without putting the executable file on the PATH.
-    """
-    if path.is_absolute():
-        raise ValueError(f"path {path} is expected to be relative!")
-    return f"./{path}"
-
-
 def safe_mkdir(directory: str, clean: bool = False) -> None:
     """Ensure a directory is present.
 
@@ -108,20 +94,6 @@ def safe_mkdir_for(path: str, clean: bool = False) -> None:
     If it's not there, create it. If it is, no-op.
     """
     safe_mkdir(os.path.dirname(path), clean=clean)
-
-
-def safe_mkdir_for_all(paths: Sequence[str]) -> None:
-    """Make directories which would contain all of the passed paths.
-
-    This avoids attempting to re-make the same directories, which may be noticeably expensive if
-    many paths mostly fall in the same set of directories.
-    """
-    created_dirs: Set[str] = set()
-    for path in paths:
-        dir_to_make = os.path.dirname(path)
-        if dir_to_make not in created_dirs:
-            safe_mkdir(dir_to_make)
-            created_dirs.add(dir_to_make)
 
 
 def safe_file_dump(
@@ -230,89 +202,6 @@ def safe_walk(path: Union[bytes, str], **kwargs: Any) -> Iterator[Tuple[str, Lis
     return os.walk(ensure_text(path), **kwargs)
 
 
-class ExistingFileError(ValueError):
-    """Indicates a copy operation would over-write a file with a directory."""
-
-
-class ExistingDirError(ValueError):
-    """Indicates a copy operation would over-write a directory with a file."""
-
-
-def mergetree(src: str, dst: str, symlinks: bool = False, ignore=None, file_filter=None) -> None:
-    """Just like `shutil.copytree`, except the `dst` dir may exist.
-
-    The `src` directory will be walked and its contents copied into `dst`. If `dst` already exists
-    the `src` tree will be overlayed in it; ie: existing files in `dst` will be over-written with
-    files from `src` when they have the same subtree path.
-    """
-    safe_mkdir(dst)
-
-    if not file_filter:
-        file_filter = lambda _: True
-
-    for src_path, dirnames, filenames in safe_walk(src, topdown=True, followlinks=True):
-        ignorenames: FrozenSet[str] = frozenset()
-        if ignore:
-            to_ignore = ignore(src_path, dirnames + filenames)
-            if to_ignore:
-                ignorenames = frozenset(to_ignore)
-
-        src_relpath = os.path.relpath(src_path, src)
-        dst_path = os.path.join(dst, src_relpath)
-
-        visit_dirs = []
-        for dirname in dirnames:
-            if dirname in ignorenames:
-                continue
-
-            src_dir = os.path.join(src_path, dirname)
-            dst_dir = os.path.join(dst_path, dirname)
-            if os.path.exists(dst_dir):
-                if not os.path.isdir(dst_dir):
-                    raise ExistingFileError(
-                        "While copying the tree at {} to {}, encountered directory {} in "
-                        "the source tree that already exists in the destination as a "
-                        "non-directory.".format(src, dst, dst_dir)
-                    )
-                visit_dirs.append(dirname)
-            elif symlinks and os.path.islink(src_dir):
-                link = os.readlink(src_dir)
-                os.symlink(link, dst_dir)
-                # We need to halt the walk at a symlink dir; so we do not place dirname in visit_dirs
-                # here.
-            else:
-                os.makedirs(dst_dir)
-                visit_dirs.append(dirname)
-
-        # In-place mutate dirnames to halt the walk when the dir is ignored by the caller.
-        dirnames[:] = visit_dirs
-
-        for filename in filenames:
-            if filename in ignorenames:
-                continue
-            src_file_relpath = os.path.join(src_relpath, filename)
-            if not file_filter(src_file_relpath):
-                continue
-
-            dst_filename = os.path.join(dst_path, filename)
-            if os.path.exists(dst_filename):
-                if not os.path.isfile(dst_filename):
-                    raise ExistingDirError(
-                        "While copying the tree at {} to {}, encountered file {} in the "
-                        "source tree that already exists in the destination as a non-file.".format(
-                            src, dst, dst_filename
-                        )
-                    )
-                else:
-                    os.unlink(dst_filename)
-            src_filename = os.path.join(src_path, filename)
-            if symlinks and os.path.islink(src_filename):
-                link = os.readlink(src_filename)
-                os.symlink(link, dst_filename)
-            else:
-                shutil.copy2(src_filename, dst_filename)
-
-
 _MkdtempCleanerType = Callable[[], None]
 _MKDTEMP_CLEANER: Optional[_MkdtempCleanerType] = None
 _MKDTEMP_DIRS: DefaultDict[int, Set[str]] = defaultdict(set)
@@ -410,27 +299,6 @@ def safe_concurrent_rename(src: str, dst: str) -> None:
             raise
 
 
-def safe_rm_oldest_items_in_dir(
-    root_dir: str, num_of_items_to_keep: int, excludes: Iterable[str] = frozenset()
-) -> None:
-    """Keep `num_of_items_to_keep` newly modified items besides `excludes` in `root_dir` then remove
-    the rest.
-
-    :param root_dir: the folder to examine
-    :param num_of_items_to_keep: number of files/folders/symlinks to keep after the cleanup
-    :param excludes: absolute paths excluded from removal (must be prefixed with `root_dir`)
-    """
-    if os.path.isdir(root_dir):
-        found_files = []
-        for old_file in os.listdir(root_dir):
-            full_path = os.path.join(root_dir, old_file)
-            if full_path not in excludes:
-                found_files.append((full_path, os.path.getmtime(full_path)))
-        found_files = sorted(found_files, key=lambda x: x[1], reverse=True)
-        for cur_file, _ in found_files[num_of_items_to_keep:]:
-            rm_rf(cur_file)
-
-
 @contextmanager
 def safe_concurrent_creation(target_path: str) -> Iterator[str]:
     """A contextmanager that yields a temporary path and renames it to a final target path when the
@@ -524,36 +392,6 @@ def relative_symlink(source_path: str, link_path: str) -> None:
             raise
 
 
-def symlink_is_correct(source_path, target_path):
-    return (
-        os.path.exists(source_path)
-        and os.path.exists(target_path)
-        and os.path.islink(target_path)
-        and os.readlink(target_path) == source_path
-    )
-
-
-def relativize_path(path: str, rootdir: str) -> str:
-    """
-    :API: public
-    """
-    # Note that we can't test for length and return the shorter of the two, because we need these
-    # paths to be stable across systems (e.g., because they get embedded in analysis files),
-    # and this choice might be inconsistent across systems. So we assume the relpath is always
-    # shorter. We relativize because of a known case of very long full path prefixes on Mesos,
-    # so this seems like the right heuristic.
-    # Note also that we mustn't call realpath on the path - we need to preserve the symlink structure.
-    return os.path.relpath(path, rootdir)
-
-
-# When running pants under mesos/aurora, the sandbox pathname can be very long. Since it gets
-# prepended to most components in the classpath (some from ivy, the rest from the build),
-# in some runs the classpath gets too big and exceeds ARG_MAX.
-# We prevent this by using paths relative to the current working directory.
-def relativize_paths(paths: Sequence[str], rootdir: str) -> List[str]:
-    return [relativize_path(path, rootdir) for path in paths]
-
-
 def touch(path: str, times: Optional[Union[int, Tuple[int, int]]] = None):
     """Equivalent of unix `touch path`.
 
@@ -590,17 +428,6 @@ def recursive_dirname(f: str) -> Iterator[str]:
     yield ""
 
 
-def get_basedir(path: str) -> str:
-    """Returns the base directory of a path.
-
-    Examples:
-      get_basedir('foo/bar/baz') --> 'foo'
-      get_basedir('/foo/bar/baz') --> ''
-      get_basedir('foo') --> 'foo'
-    """
-    return path[: path.index(os.sep)] if os.sep in path else path
-
-
 def rm_rf(name: str) -> None:
     """Remove a file or a directory similarly to running `rm -rf <name>` in a UNIX shell.
 
@@ -620,41 +447,3 @@ def rm_rf(name: str) -> None:
         elif e.errno != errno.ENOENT:
             # Pass on 'No such file or directory', otherwise re-raise OSError to surface perm issues etc.
             raise
-
-
-def split_basename_and_dirname(path: str) -> Tuple[str, str]:
-    if not os.path.isfile(path):
-        raise ValueError(f"{path} does not exist or is not a regular file.")
-    return os.path.dirname(path), os.path.basename(path)
-
-
-def check_no_overlapping_paths(paths: Iterable[str]) -> None:
-    """Given a list of paths, ensure that all are unique and do not have the same prefix."""
-    for path in paths:
-        list_copy_without_path = list(paths)
-        list_copy_without_path.remove(path)
-        if path in list_copy_without_path:
-            raise ValueError(f"{path} appeared more than once. All paths must be unique.")
-        for p in list_copy_without_path:
-            if path in p:
-                raise ValueError(
-                    f"{path} and {p} have the same prefix. All paths must be unique and cannot overlap."
-                )
-
-
-def is_executable(path: str) -> bool:
-    """Returns whether a path names an existing executable file."""
-    return os.path.isfile(path) and os.access(path, os.X_OK)
-
-
-def is_readable_dir(path: str) -> bool:
-    """Returns whether a path names an existing directory we can list and read files from."""
-    return os.path.isdir(path) and os.access(path, os.R_OK) and os.access(path, os.X_OK)
-
-
-def is_writable_dir(path: str) -> bool:
-    """Returns whether a path names an existing directory that we can create and modify files in.
-
-    We call is_readable_dir(), so this definition of "writable" is a superset of that.
-    """
-    return is_readable_dir(path) and os.access(path, os.W_OK)

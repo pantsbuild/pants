@@ -1,11 +1,14 @@
 use crate::local::ByteStore;
 use crate::{EntryType, ShrinkBehavior};
+
+use std::path::Path;
+use std::time::Duration;
+
 use bytes::{BufMut, Bytes, BytesMut};
 use hashing::{Digest, Fingerprint};
-use std::path::Path;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use tokio::runtime::Handle;
+use tokio::time::delay_for;
 use walkdir::WalkDir;
 
 #[tokio::test]
@@ -149,7 +152,8 @@ async fn garbage_collect_nothing_to_do_with_lease() {
   .unwrap();
   let file_digest = Digest(file_fingerprint, 10);
   store
-    .lease_all(vec![file_digest].iter())
+    .lease_all(vec![(file_digest, EntryType::File)].into_iter())
+    .await
     .expect("Error leasing");
   store
     .shrink(10, ShrinkBehavior::Fast)
@@ -157,6 +161,46 @@ async fn garbage_collect_nothing_to_do_with_lease() {
   assert_eq!(
     load_bytes(&store, EntryType::File, file_digest).await,
     Ok(Some(bytes))
+  );
+}
+
+#[tokio::test]
+async fn garbage_collect_expired() {
+  let lease_time = Duration::from_secs(1);
+  let dir = TempDir::new().unwrap();
+  let store = new_store_with_lease_time(dir.path(), lease_time);
+  let bytes = Bytes::from("0123456789");
+  let file_fingerprint = Fingerprint::from_hex_string(
+    "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
+  )
+  .unwrap();
+  let file_len = 10;
+  let file_digest = Digest(file_fingerprint, file_len);
+
+  // Store something (in a store with a shortened lease). Confirm that it hasn't immediately
+  // expired, and then wait for it to expire.
+  store
+    .store_bytes(EntryType::File, bytes.clone(), true)
+    .await
+    .expect("Error storing");
+  assert_eq!(
+    file_len,
+    store
+      .shrink(0, ShrinkBehavior::Fast)
+      .expect("Error shrinking"),
+  );
+  assert_eq!(
+    load_bytes(&store, EntryType::File, file_digest).await,
+    Ok(Some(bytes))
+  );
+
+  // Wait for it to expire.
+  delay_for(lease_time * 2).await;
+  assert_eq!(
+    0,
+    store
+      .shrink(0, ShrinkBehavior::Fast)
+      .expect("Should have cleared expired lease")
   );
 }
 
@@ -291,7 +335,7 @@ async fn garbage_collect_remove_file_with_leased_directory() {
   let store = new_store(dir.path());
 
   let testdir = TestDirectory::containing_roland();
-  let testdata = TestData::fourty_chars();
+  let testdata = TestData::forty_chars();
 
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), true)
@@ -330,9 +374,9 @@ async fn garbage_collect_remove_file_while_leased_file() {
     .store_bytes(EntryType::Directory, testdir.bytes(), false)
     .await
     .expect("Error storing");
-  let fourty_chars = TestData::fourty_chars();
+  let forty_chars = TestData::forty_chars();
   store
-    .store_bytes(EntryType::File, fourty_chars.bytes(), true)
+    .store_bytes(EntryType::File, forty_chars.bytes(), true)
     .await
     .expect("Error storing");
 
@@ -341,8 +385,8 @@ async fn garbage_collect_remove_file_while_leased_file() {
     .expect("Error shrinking");
 
   assert_eq!(
-    load_bytes(&store, EntryType::File, fourty_chars.digest()).await,
-    Ok(Some(fourty_chars.bytes())),
+    load_bytes(&store, EntryType::File, forty_chars.digest()).await,
+    Ok(Some(forty_chars.bytes())),
     "File was missing despite lease"
   );
   assert_eq!(
@@ -358,14 +402,14 @@ async fn garbage_collect_fail_because_too_many_leases() {
   let store = new_store(dir.path());
 
   let testdir = TestDirectory::containing_roland();
-  let fourty_chars = TestData::fourty_chars();
+  let forty_chars = TestData::forty_chars();
 
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), true)
     .await
     .expect("Error storing");
   store
-    .store_bytes(EntryType::File, fourty_chars.bytes(), true)
+    .store_bytes(EntryType::File, forty_chars.bytes(), true)
     .await
     .expect("Error storing");
 
@@ -377,8 +421,8 @@ async fn garbage_collect_fail_because_too_many_leases() {
   assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(160));
 
   assert_eq!(
-    load_bytes(&store, EntryType::File, fourty_chars.digest()).await,
-    Ok(Some(fourty_chars.bytes())),
+    load_bytes(&store, EntryType::File, forty_chars.digest()).await,
+    Ok(Some(forty_chars.bytes())),
     "Leased file should still be present"
   );
   assert_eq!(
@@ -440,7 +484,7 @@ async fn entry_type_for_file() {
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
   assert_eq!(
-    store.entry_type(&testdata.fingerprint()),
+    store.entry_type(testdata.fingerprint()).await,
     Ok(Some(EntryType::File))
   )
 }
@@ -457,7 +501,7 @@ async fn entry_type_for_directory() {
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
   assert_eq!(
-    store.entry_type(&testdir.fingerprint()),
+    store.entry_type(testdir.fingerprint()).await,
     Ok(Some(EntryType::Directory))
   )
 }
@@ -474,7 +518,9 @@ async fn entry_type_for_missing() {
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
   assert_eq!(
-    store.entry_type(&TestDirectory::recursive().fingerprint()),
+    store
+      .entry_type(TestDirectory::recursive().fingerprint())
+      .await,
     Ok(None)
   )
 }
@@ -486,7 +532,7 @@ async fn empty_file_is_known() {
   let empty_file = TestData::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::File, empty_file.digest(), |b| b)
+      .load_bytes_with(EntryType::File, empty_file.digest(), |b| Bytes::from(b))
       .await,
     Ok(Some(empty_file.bytes())),
   )
@@ -499,7 +545,7 @@ async fn empty_directory_is_known() {
   let empty_dir = TestDirectory::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| b)
+      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| Bytes::from(b))
       .await,
     Ok(Some(empty_dir.bytes())),
   )
@@ -514,7 +560,11 @@ async fn all_digests() {
 }
 
 pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
-  ByteStore::new(task_executor::Executor::new(Handle::current()), dir).unwrap()
+  ByteStore::new(task_executor::Executor::new(), dir).unwrap()
+}
+
+pub fn new_store_with_lease_time<P: AsRef<Path>>(dir: P, lease_time: Duration) -> ByteStore {
+  ByteStore::new_with_lease_time(task_executor::Executor::new(), dir, lease_time).unwrap()
 }
 
 pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
@@ -533,7 +583,9 @@ pub async fn load_bytes(
   entry_type: EntryType,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  store.load_bytes_with(entry_type, digest, |b| b).await
+  store
+    .load_bytes_with(entry_type, digest, |b| Bytes::from(b))
+    .await
 }
 
 async fn prime_store_with_file_bytes(store: &ByteStore, bytes: Bytes) -> Digest {

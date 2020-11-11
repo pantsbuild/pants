@@ -3,7 +3,7 @@
 
 import re
 import shlex
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
+from typing import Dict, Iterable, List, Optional, Union
 
 
 def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
@@ -22,10 +22,6 @@ def ensure_text(text_or_binary: Union[bytes, str]) -> str:
         return text_or_binary
     else:
         raise TypeError(f"Argument is neither text nor binary type ({type(text_or_binary)})")
-
-
-def is_text_or_binary(obj: Any) -> bool:
-    return isinstance(obj, (str, bytes))
 
 
 def safe_shlex_split(text_or_binary: Union[bytes, str]) -> List[str]:
@@ -63,7 +59,7 @@ def safe_shlex_join(arg_list: Iterable[str]) -> str:
 
 
 def create_path_env_var(
-    new_entries: Sequence[str],
+    new_entries: Iterable[str],
     env: Optional[Dict[str, str]] = None,
     env_var: str = "PATH",
     delimiter: str = ":",
@@ -87,16 +83,6 @@ def create_path_env_var(
         path_dirs += new_entries_list
 
     return delimiter.join(path_dirs)
-
-
-def module_dirname(module_path: str) -> str:
-    """Return the import path for the parent module of `module_path`."""
-    return ".".join(module_path.split(".")[:-1])
-
-
-def camelcase(string: str) -> str:
-    """Convert snake casing (containing - or _ characters) to camel casing."""
-    return "".join(word.capitalize() for word in re.split("[-_]", string))
 
 
 def pluralize(count: int, item_type: str) -> str:
@@ -133,3 +119,17 @@ def strip_prefix(string: str, prefix: str) -> str:
         return string[len(prefix) :]
     else:
         return string
+
+
+# NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
+def strip_v2_chroot_path(v: Union[bytes, str]) -> str:
+    """Remove all instances of the chroot tmpdir path from the str so that it only uses relative
+    paths.
+
+    This is useful when a tool that is run with the V2 engine outputs absolute paths. It is
+    confusing for the user to see the absolute path in the final output because it is an
+    implementation detail that Pants copies their source code into a chroot.
+    """
+    if isinstance(v, bytes):
+        v = v.decode()
+    return re.sub(r"/.*/process-execution[a-zA-Z0-9]+/", "", v)

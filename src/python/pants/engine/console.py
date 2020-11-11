@@ -2,37 +2,41 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from typing import Any, Callable, Optional
+from dataclasses import dataclass
+from typing import Callable, Optional, cast
 
-from colors import blue, cyan, green, magenta, red
+from colors import blue, cyan, green, magenta, red, yellow
 
-from pants.engine.native import Native
+from pants.engine.internals.native import Native
+from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.rules import side_effecting
 
 
-# TODO this needs to be a file-like object/stream
+@dataclass(frozen=True)
 class NativeWriter:
-    def __init__(self, session: Any):
-        self._native = Native()
-        self._session = session._session
+    scheduler_session: SchedulerSession
+    native: Native = Native()
 
-    def write(self, payload: str):
+    def write(self, payload: str) -> None:
         raise NotImplementedError
 
-    # TODO It's not clear yet what this function should do, it depends on how
-    # EngineDisplay in Rust ends up handling text.
     def flush(self):
+        """flush() doesn't need to do anything for NativeWriter."""
         pass
 
 
 class NativeStdOut(NativeWriter):
-    def write(self, payload):
-        self._native.write_stdout(self._session, payload)
+    def write(self, payload: str) -> None:
+        scheduler = self.scheduler_session.scheduler._scheduler
+        session = self.scheduler_session.session
+        self.native.write_stdout(scheduler, session, payload, teardown_ui=True)
 
 
 class NativeStdErr(NativeWriter):
-    def write(self, payload):
-        self._native.write_stderr(self._session, payload)
+    def write(self, payload: str) -> None:
+        scheduler = self.scheduler_session.scheduler._scheduler
+        session = self.scheduler_session.session
+        self.native.write_stderr(scheduler, session, payload, teardown_ui=True)
 
 
 @side_effecting
@@ -42,7 +46,11 @@ class Console:
     side_effecting = True
 
     def __init__(
-        self, stdout=None, stderr=None, use_colors: bool = True, session: Optional[Any] = None
+        self,
+        stdout=None,
+        stderr=None,
+        use_colors: bool = True,
+        session: Optional[SchedulerSession] = None,
     ):
         """`stdout` and `stderr` may be explicitly provided when Console is constructed.
 
@@ -50,13 +58,17 @@ class Console:
         the system stdout/stderr. If they are not defined, the effective stdout/stderr are proxied
         to Rust engine intrinsic code if there is a scheduler session provided, or just written to
         the standard Python-provided stdout/stderr if it is None. A scheduler session is provided if
-        --v2-ui is set.
+        --dynamic-ui is set.
         """
 
         has_scheduler = session is not None
 
-        self._stdout = stdout or (NativeStdOut(session) if has_scheduler else sys.stdout)
-        self._stderr = stderr or (NativeStdErr(session) if has_scheduler else sys.stderr)
+        self._stdout = stdout or (
+            NativeStdOut(cast(SchedulerSession, session)) if has_scheduler else sys.stdout
+        )
+        self._stderr = stderr or (
+            NativeStdErr(cast(SchedulerSession, session)) if has_scheduler else sys.stderr
+        )
         self._use_colors = use_colors
 
     @property
@@ -67,21 +79,25 @@ class Console:
     def stderr(self):
         return self._stderr
 
-    def write_stdout(self, payload):
+    def write_stdout(self, payload: str) -> None:
         self.stdout.write(payload)
 
-    def write_stderr(self, payload):
+    def write_stderr(self, payload: str) -> None:
         self.stderr.write(payload)
 
-    def print_stdout(self, payload, end="\n"):
-        print(payload, file=self.stdout, end=end)
+    def print_stdout(self, payload: str, end: str = "\n") -> None:
+        self.stdout.write(f"{payload}{end}")
 
-    def print_stderr(self, payload, end="\n"):
-        print(payload, file=self.stderr, end=end)
+    def print_stderr(self, payload: str, end: str = "\n") -> None:
+        self.stderr.write(f"{payload}{end}")
 
-    def flush(self):
+    def flush(self) -> None:
         self.stdout.flush()
         self.stderr.flush()
+
+    @property
+    def use_colors(self):
+        return self._use_colors
 
     def _safe_color(self, text: str, color: Callable[[str], str]) -> str:
         """We should only output color when the global flag --colors is enabled."""
@@ -101,3 +117,6 @@ class Console:
 
     def red(self, text: str) -> str:
         return self._safe_color(text, red)
+
+    def yellow(self, text: str) -> str:
+        return self._safe_color(text, yellow)

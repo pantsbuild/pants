@@ -1,14 +1,15 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
 use std::fmt;
 
 use crate::core::{Function, TypeId};
 use crate::intrinsics::Intrinsics;
 use crate::selectors::{DependencyKey, Get, Select};
 
-use rule_graph;
+use rule_graph::{DisplayForGraph, DisplayForGraphArgs, Query};
+
+use log::Level;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
@@ -18,30 +19,49 @@ pub enum Rule {
   Task(Task),
 }
 
-impl rule_graph::DisplayForGraph for Rule {
-  fn fmt_for_graph(&self) -> String {
-    let visualization_params = Some(GraphVisualizationParameters {
-      select_clause_threshold: 2,
-      get_clause_threshold: 1,
-    });
+impl DisplayForGraph for Rule {
+  fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String {
     match self {
       Rule::Task(ref task) => {
-        let FormattedTaskRuleElements {
-          rule_type,
-          task_name,
-          clause_portion,
-          product,
-          get_portion,
-        } = Self::extract_task_elements(task, visualization_params);
+        let task_name = task.func.full_name();
+        let product = format!("{}", task.product);
+
+        let clause_portion = Self::formatted_select_clause(&task.clause, display_args);
+
+        let get_clauses = task
+          .gets
+          .iter()
+          .map(::std::string::ToString::to_string)
+          .collect::<Vec<_>>();
+
+        let get_portion = if get_clauses.is_empty() {
+          "".to_string()
+        } else if get_clauses.len() > 1 {
+          format!(
+            ",{}gets=[{}{}{}]",
+            display_args.line_separator(),
+            display_args.optional_line_separator(),
+            get_clauses.join(&format!(",{}", display_args.line_separator())),
+            display_args.optional_line_separator(),
+          )
+        } else {
+          format!(", gets=[{}]", get_clauses.join(", "))
+        };
+
+        let rule_type = if task.cacheable {
+          "rule".to_string()
+        } else {
+          "goal_rule".to_string()
+        };
 
         format!(
-          "@{}({}) -> {}{}\n{}",
-          rule_type, clause_portion, product, get_portion, task_name,
+          "@{}({}({}) -> {}{})",
+          rule_type, task_name, clause_portion, product, get_portion,
         )
       }
       Rule::Intrinsic(ref intrinsic) => format!(
         "@rule(<intrinsic>({}) -> {})",
-        Self::formatted_select_clause(&intrinsic.inputs, visualization_params),
+        Self::formatted_select_clause(&intrinsic.inputs, display_args),
         intrinsic.product,
       ),
     }
@@ -51,6 +71,13 @@ impl rule_graph::DisplayForGraph for Rule {
 impl rule_graph::Rule for Rule {
   type TypeId = TypeId;
   type DependencyKey = DependencyKey;
+
+  fn product(&self) -> TypeId {
+    match self {
+      Rule::Task(t) => t.product,
+      Rule::Intrinsic(i) => i.product,
+    }
+  }
 
   fn dependency_keys(&self) -> Vec<DependencyKey> {
     match self {
@@ -85,127 +112,40 @@ impl rule_graph::Rule for Rule {
   }
 }
 
-///
-/// A helper struct to contain stringified versions of various components of the rule.
-///
-struct FormattedTaskRuleElements {
-  rule_type: String,
-  task_name: String,
-  clause_portion: String,
-  product: String,
-  get_portion: String,
-}
-
-///
-/// A struct to contain display options consumed by Rule::extract_task_elements().
-///
-#[derive(Clone, Copy)]
-struct GraphVisualizationParameters {
-  ///
-  /// The number of params in the rule to keep on the same output line before splitting by line. If
-  /// the rule uses more than this many params, each param will be formatted on its own
-  /// line. Otherwise, all of the params will be formatted on the same line.
-  ///
-  select_clause_threshold: usize,
-  ///
-  /// The number of Get clauses to keep on the same output line before splitting by line.
-  ///
-  get_clause_threshold: usize,
-}
-
 impl Rule {
-  fn formatted_select_clause(
-    clause: &[TypeId],
-    visualization_params: Option<GraphVisualizationParameters>,
-  ) -> String {
+  fn formatted_select_clause(clause: &[TypeId], display_args: DisplayForGraphArgs) -> String {
     let select_clauses = clause
       .iter()
       .map(|type_id| type_id.to_string())
       .collect::<Vec<_>>();
-    let select_clause_threshold = visualization_params.map(|p| p.select_clause_threshold);
 
-    match select_clause_threshold {
-      None => select_clauses.join(", "),
-      Some(select_clause_threshold) if select_clauses.len() <= select_clause_threshold => {
-        select_clauses.join(", ")
-      }
-      Some(_) => format!("\n{},\n", select_clauses.join(",\n")),
-    }
-  }
-
-  fn extract_task_elements(
-    task: &Task,
-    visualization_params: Option<GraphVisualizationParameters>,
-  ) -> FormattedTaskRuleElements {
-    let product = format!("{}", task.product);
-
-    let clause_portion = Self::formatted_select_clause(&task.clause, visualization_params);
-
-    let get_clauses = task
-      .gets
-      .iter()
-      .map(::std::string::ToString::to_string)
-      .collect::<Vec<_>>();
-    let get_clause_threshold = visualization_params.map(|p| p.get_clause_threshold);
-
-    let get_portion = if get_clauses.is_empty() {
-      "".to_string()
+    if select_clauses.len() > 1 {
+      format!(
+        "{}{}{}",
+        display_args.optional_line_separator(),
+        select_clauses.join(&format!(",{}", display_args.line_separator())),
+        display_args.optional_line_separator(),
+      )
     } else {
-      match get_clause_threshold {
-        None => format!(", gets=[{}]", get_clauses.join(", ")),
-        Some(get_clause_threshold) if get_clauses.len() <= get_clause_threshold => {
-          format!(",\ngets=[{}]", get_clauses.join(", "))
-        }
-        Some(_) => format!(",\ngets=[\n{},\n]", get_clauses.join("\n")),
-      }
-    };
-
-    let rule_type = if task.cacheable {
-      "rule".to_string()
-    } else {
-      "goal_rule".to_string()
-    };
-
-    FormattedTaskRuleElements {
-      rule_type,
-      task_name: task.func.name(),
-      clause_portion,
-      product,
-      get_portion,
+      select_clauses.join(", ")
     }
   }
 }
 
 impl fmt::Display for Rule {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    match self {
-      &Rule::Task(ref task) => {
-        let FormattedTaskRuleElements {
-          rule_type,
-          task_name,
-          clause_portion,
-          product,
-          get_portion,
-        } = Self::extract_task_elements(task, None);
-        write!(
-          f,
-          "@{}({}({}) -> {}{})",
-          rule_type, task_name, clause_portion, product, get_portion,
-        )
-      }
-      &Rule::Intrinsic(ref intrinsic) => write!(
-        f,
-        "@rule(<intrinsic>({}) -> {})",
-        Self::formatted_select_clause(&intrinsic.inputs, None),
-        intrinsic.product,
-      ),
-    }
+    write!(
+      f,
+      "{}",
+      self.fmt_for_graph(DisplayForGraphArgs { multiline: false })
+    )
   }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   pub product: TypeId,
+  pub can_modify_workunit: bool,
   pub clause: Vec<TypeId>,
   pub gets: Vec<Get>,
   pub func: Function,
@@ -213,10 +153,11 @@ pub struct Task {
   pub display_info: DisplayInfo,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Default)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DisplayInfo {
-  pub name: Option<String>,
+  pub name: String,
   pub desc: Option<String>,
+  pub level: Level,
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -230,10 +171,10 @@ pub struct Intrinsic {
 ///
 #[derive(Clone, Debug)]
 pub struct Tasks {
-  // output product type -> list of rules providing it
-  rules: HashMap<TypeId, Vec<Rule>>,
-  // Used during the construction of the tasks map.
+  rules: Vec<Rule>,
+  // Used during the construction of a rule.
   preparing: Option<Task>,
+  queries: Vec<Query<Rule>>,
 }
 
 ///
@@ -249,70 +190,71 @@ pub struct Tasks {
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
-      rules: HashMap::default(),
+      rules: Vec::default(),
       preparing: None,
+      queries: Vec::default(),
     }
   }
 
-  pub fn as_map(&self) -> &HashMap<TypeId, Vec<Rule>> {
+  pub fn rules(&self) -> &Vec<Rule> {
     &self.rules
+  }
+
+  pub fn queries(&self) -> &Vec<Query<Rule>> {
+    &self.queries
   }
 
   pub fn intrinsics_set(&mut self, intrinsics: &Intrinsics) {
     for intrinsic in intrinsics.keys() {
-      self.insert_rule(intrinsic.product, Rule::Intrinsic(intrinsic.clone()))
+      self.rules.push(Rule::Intrinsic(intrinsic.clone()))
     }
   }
 
   ///
   /// The following methods define the Task registration lifecycle.
   ///
-  pub fn task_begin(&mut self, func: Function, product: TypeId, cacheable: bool) {
+  pub fn task_begin(
+    &mut self,
+    func: Function,
+    product: TypeId,
+    can_modify_workunit: bool,
+    cacheable: bool,
+    name: String,
+    desc: Option<String>,
+    level: Level,
+  ) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
     );
 
     self.preparing = Some(Task {
-      cacheable: cacheable,
-      product: product,
+      cacheable,
+      product,
+      can_modify_workunit,
       clause: Vec::new(),
       gets: Vec::new(),
-      func: func,
-      display_info: DisplayInfo::default(),
+      func,
+      display_info: DisplayInfo { name, desc, level },
     });
   }
 
-  pub fn add_get(&mut self, product: TypeId, subject: TypeId) {
+  pub fn add_get(&mut self, output: TypeId, input: TypeId) {
     self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding gets!")
       .gets
-      .push(Get {
-        product: product,
-        subject: subject,
-      });
+      .push(Get { output, input });
   }
 
-  pub fn add_select(&mut self, product: TypeId) {
+  pub fn add_select(&mut self, selector: TypeId) {
     self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding clauses!")
       .clause
-      .push(product);
-  }
-
-  pub fn add_display_info(&mut self, name: String, desc: String) {
-    let mut task = self
-      .preparing
-      .as_mut()
-      .expect("Must `begin()` a task creation before adding display info!");
-    task.display_info = DisplayInfo {
-      name: Some(name),
-      desc: Some(desc),
-    };
+      .push(selector);
   }
 
   pub fn task_end(&mut self) {
@@ -321,18 +263,10 @@ impl Tasks {
       .preparing
       .take()
       .expect("Must `begin()` a task creation before ending it!");
-    self.insert_rule(task.product, Rule::Task(task))
+    self.rules.push(Rule::Task(task))
   }
 
-  fn insert_rule(&mut self, product: TypeId, rule: Rule) {
-    let rules = self.rules.entry(product).or_insert_with(Vec::new);
-    assert!(
-      !rules.contains(&rule),
-      "{:?} was double-registered for {:?}: {:?}",
-      rule,
-      product,
-      rules,
-    );
-    rules.push(rule);
+  pub fn query_add(&mut self, product: TypeId, params: Vec<TypeId>) {
+    self.queries.push(Query::new(product, params));
   }
 }

@@ -16,13 +16,13 @@ futures = "0.3"
 hashing = { path = "../../hashing" }
 libc = "0.2.39"
 log = "0.4.1"
-parking_lot = "0.6"
+parking_lot = "0.11"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 serverset = { path = "../../serverset" }
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
 time = "0.1.39"
-tokio = { version = "0.2", features = ["rt-threaded", "macros"] }
+tokio = { version = "0.2.22", features = ["rt-threaded", "macros", "signal", "stream"] }
 workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]

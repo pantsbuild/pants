@@ -13,33 +13,14 @@ if [[ -n "${GIT_DIR}" && "${GIT_DIR}" != /* ]]; then
   export GIT_DIR
 fi
 
-DIRS_TO_CHECK=(
-  src
-  tests
-  pants-plugins
-  examples
-  contrib
-  build-support/bin
-)
-
-# TODO(#7068): Fix all these checks to only act on staged files with
-# `git diff --cached --name-only`!
-
-# TODO: test all the scripts in this file in test_git_hooks.py, remove uses of `|| exit 1`, and add an
-# integration test!
 set -e
 
-# WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
-# shellcheck disable=SC2207
-ADDED_FILES=($(./build-support/bin/get_added_files.sh))
 MERGE_BASE="$(git_merge_base)"
 
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
 if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
-    echo "* Checking formatting of Rust files"
-    ./build-support/bin/check_rust_formatting.sh || exit 1
     # Clippy happens on a different Travis CI shard because of separate caching concerns.
     # The TRAVIS env var is documented here:
     #   https://docs.travis-ci.com/user/environment-variables/#default-environment-variables
@@ -47,23 +28,25 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
       echo "* Running cargo clippy"
       ./build-support/bin/check_clippy.sh || exit 1
     fi
+    echo "* Checking formatting of Rust files"
+    ./build-support/bin/check_rust_formatting.sh || exit 1
     echo "* Checking Rust target headers"
     build-support/bin/check_rust_target_headers.sh || exit 1
   fi
 
-  echo "* Checking types"
-  ./build-support/bin/mypy.py || exit 1
+  echo "* Checking MyPy"
+  ./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive --tag='-nolint' typecheck || exit 1
 
-  echo "* Checking formatting and Flake8"
-  ./v2 --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
-    die "If there were formatting errors, run \`./v2 --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
+  echo "* Checking Flake8 and formatting"
+  ./pants --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
+    die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
   if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_travis_yml.py > /dev/null; then
     echo "* Checking .travis.yml generation"
     actual_travis_yml=$(<.travis.yml)
-    expected_travis_yml=$(./pants --quiet run build-support/bin:generate_travis_yml)
+    expected_travis_yml=$(./pants run build-support/bin:generate_travis_yml)
     [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
-      die "Travis config generator changed but .travis.yml file not regenerated. See top of that file for instructions."
+      die "Travis config generator changed, but .travis.yml file was not regenerated. See the header of .travis.yml for instructions."
   fi
 else
   echo "* Skipping import/lint checks in partial working copy."
@@ -75,11 +58,11 @@ echo "* Checking shell scripts via shellcheck"
 echo "* Checking shell scripts via our custom linter"
 ./build-support/bin/check_shell.sh || exit 1
 
-echo "* Checking packages"
-./build-support/bin/check_packages.sh "${DIRS_TO_CHECK[@]}" || exit 1
+echo "* Checking __init__.py files"
+./build-support/bin/check_inits.py || exit 1
 
 echo "* Checking headers"
-./build-support/bin/check_header.py "${DIRS_TO_CHECK[@]}" --files-added "${ADDED_FILES[@]}" || exit 1
+./pants validate '**' || exit 1
 
 echo "* Checking for banned imports"
 ./build-support/bin/check_banned_imports.py || exit 1

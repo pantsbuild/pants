@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -49,14 +51,14 @@ pub mod logger;
 
 pub use logger::{get_destination, scope_task_destination, set_thread_destination, Destination};
 
-pub type Logger = logger::Logger;
+pub type Logger = logger::PantsLogger;
 
 use num_enum::TryFromPrimitive;
 
 // This is a hard-coding of constants in the standard logging python package.
 #[derive(Debug, Eq, PartialEq, TryFromPrimitive, Clone, Copy)]
 #[repr(u64)]
-enum PythonLogLevel {
+pub enum PythonLogLevel {
   NotSet = 0,
   // Trace doesn't exist in a Python world, so set it to "a bit lower than Debug".
   Trace = 5,

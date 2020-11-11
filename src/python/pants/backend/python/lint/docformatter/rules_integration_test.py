@@ -1,134 +1,165 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Tuple
+import dataclasses
+from typing import List, Optional, Sequence, Tuple
 
-from pants.backend.python.lint.docformatter.rules import (
-    DocformatterConfiguration,
-    DocformatterConfigurations,
-)
+import pytest
+
+from pants.backend.python.lint.docformatter.rules import DocformatterFieldSet, DocformatterRequest
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
-from pants.backend.python.rules.targets import PythonLibrary
-from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.build_graph.address import Address
-from pants.engine.fs import Digest, FileContent, InputFilesContent
-from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
-from pants.engine.target import TargetWithOrigin
-from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.rules.core.fmt import FmtResult
-from pants.rules.core.lint import LintResult
-from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
+from pants.backend.python.target_types import PythonLibrary
+from pants.core.goals.fmt import FmtResult
+from pants.core.goals.lint import LintResult, LintResults
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Address
+from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.target import Target
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-class DocformatterIntegrationTest(TestBase):
-
-    good_source = FileContent(path="good.py", content=b'"""Good docstring."""\n')
-    bad_source = FileContent(path="bad.py", content=b'"""Oops, missing a period"""\n')
-    fixed_bad_source = FileContent(path="bad.py", content=b'"""Oops, missing a period."""\n')
-
-    @classmethod
-    def rules(cls):
-        return (*super().rules(), *docformatter_rules(), RootRule(DocformatterConfigurations))
-
-    def make_target_with_origin(
-        self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
-    ) -> TargetWithOrigin:
-        for source_file in source_files:
-            self.create_file(f"{source_file.path}", source_file.content.decode())
-        target = PythonLibrary({}, address=Address.parse(":target"))
-        if origin is None:
-            origin = SingleAddress(directory="", name="target")
-        return TargetWithOrigin(target, origin)
-
-    def run_docformatter(
-        self,
-        targets: List[TargetWithOrigin],
-        *,
-        passthrough_args: Optional[str] = None,
-        skip: bool = False,
-    ) -> Tuple[LintResult, FmtResult]:
-        args = ["--backend-packages2=pants.backend.python.lint.docformatter"]
-        if passthrough_args:
-            args.append(f"--docformatter-args='{passthrough_args}'")
-        if skip:
-            args.append(f"--docformatter-skip")
-        options_bootstrapper = create_options_bootstrapper(args=args)
-        configs = [DocformatterConfiguration.create(tgt) for tgt in targets]
-        lint_result = self.request_single_product(
-            LintResult, Params(DocformatterConfigurations(configs), options_bootstrapper)
-        )
-        input_snapshot = self.request_single_product(
-            SourceFiles,
-            Params(
-                AllSourceFilesRequest(config.sources for config in configs), options_bootstrapper
-            ),
-        )
-        fmt_result = self.request_single_product(
-            FmtResult,
-            Params(
-                DocformatterConfigurations(configs, prior_formatter_result=input_snapshot),
-                options_bootstrapper,
-            ),
-        )
-        return lint_result, fmt_result
-
-    def get_digest(self, source_files: List[FileContent]) -> Digest:
-        return self.request_single_product(Digest, InputFilesContent(source_files))
-
-    def test_passing_source(self) -> None:
-        target = self.make_target_with_origin([self.good_source])
-        lint_result, fmt_result = self.run_docformatter([target])
-        assert lint_result == LintResult.noop()
-        assert fmt_result.digest == self.get_digest([self.good_source])
-
-    def test_failing_source(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
-        lint_result, fmt_result = self.run_docformatter([target])
-        assert lint_result.exit_code == 3
-        assert lint_result.stderr.strip() == self.bad_source.path
-        assert fmt_result.digest == self.get_digest([self.fixed_bad_source])
-
-    def test_mixed_sources(self) -> None:
-        target = self.make_target_with_origin([self.good_source, self.bad_source])
-        lint_result, fmt_result = self.run_docformatter([target])
-        assert lint_result.exit_code == 3
-        assert lint_result.stderr.strip() == self.bad_source.path
-        assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
-
-    def test_multiple_targets(self) -> None:
-        targets = [
-            self.make_target_with_origin([self.good_source]),
-            self.make_target_with_origin([self.bad_source]),
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *docformatter_rules(),
+            QueryRule(LintResults, (DocformatterRequest,)),
+            QueryRule(FmtResult, (DocformatterRequest,)),
+            QueryRule(SourceFiles, (SourceFilesRequest,)),
         ]
-        lint_result, fmt_result = self.run_docformatter(targets)
-        assert lint_result.exit_code == 3
-        assert lint_result.stderr.strip() == self.bad_source.path
-        assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
+    )
 
-    def test_precise_file_args(self) -> None:
-        target = self.make_target_with_origin(
-            [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
-        )
-        lint_result, fmt_result = self.run_docformatter([target])
-        assert lint_result == LintResult.noop()
-        assert fmt_result.digest == self.get_digest([self.good_source, self.bad_source])
 
-    def test_respects_passthrough_args(self) -> None:
-        needs_config = FileContent(
-            path="needs_config.py",
-            content=b'"""\nOne line docstring acting like it\'s multiline.\n"""\n',
-        )
-        target = self.make_target_with_origin([needs_config])
-        lint_result, fmt_result = self.run_docformatter(
-            [target], passthrough_args="--make-summary-multi-line"
-        )
-        assert lint_result == LintResult.noop()
-        assert fmt_result.digest == self.get_digest([needs_config])
+GOOD_SOURCE = FileContent("good.py", b'"""Good docstring."""\n')
+BAD_SOURCE = FileContent("bad.py", b'"""Oops, missing a period"""\n')
+FIXED_BAD_SOURCE = FileContent("bad.py", b'"""Oops, missing a period."""\n')
 
-    def test_skip(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
-        lint_result, fmt_result = self.run_docformatter([target], skip=True)
-        assert lint_result == LintResult.noop()
-        assert fmt_result == FmtResult.noop()
+
+def make_target(rule_runner: RuleRunner, source_files: List[FileContent]) -> Target:
+    for source_file in source_files:
+        rule_runner.create_file(f"{source_file.path}", source_file.content.decode())
+    return PythonLibrary({}, address=Address("", target_name="target"))
+
+
+def run_docformatter(
+    rule_runner: RuleRunner,
+    targets: List[Target],
+    *,
+    passthrough_args: Optional[str] = None,
+    skip: bool = False,
+) -> Tuple[Sequence[LintResult], FmtResult]:
+    args = ["--backend-packages=pants.backend.python.lint.docformatter"]
+    if passthrough_args:
+        args.append(f"--docformatter-args='{passthrough_args}'")
+    if skip:
+        args.append("--docformatter-skip")
+    rule_runner.set_options(args)
+    field_sets = [DocformatterFieldSet.create(tgt) for tgt in targets]
+    lint_results = rule_runner.request(LintResults, [DocformatterRequest(field_sets)])
+    input_sources = rule_runner.request(
+        SourceFiles,
+        [
+            SourceFilesRequest(field_set.sources for field_set in field_sets),
+        ],
+    )
+    fmt_result = rule_runner.request(
+        FmtResult,
+        [
+            DocformatterRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+        ],
+    )
+    return lint_results.results, fmt_result
+
+
+def get_digest(rule_runner: RuleRunner, source_files: List[FileContent]) -> Digest:
+    return rule_runner.request(Digest, [CreateDigest(source_files)])
+
+
+def test_passing_source(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [GOOD_SOURCE])
+    lint_results, fmt_result = run_docformatter(rule_runner, [target])
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 0
+    assert lint_results[0].stderr == ""
+    assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE])
+    assert fmt_result.did_change is False
+
+
+def test_failing_source(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [BAD_SOURCE])
+    lint_results, fmt_result = run_docformatter(rule_runner, [target])
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 3
+    assert lint_results[0].stderr.strip() == BAD_SOURCE.path
+    assert fmt_result.output == get_digest(rule_runner, [FIXED_BAD_SOURCE])
+    assert fmt_result.did_change is True
+
+
+def test_mixed_sources(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [GOOD_SOURCE, BAD_SOURCE])
+    lint_results, fmt_result = run_docformatter(rule_runner, [target])
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 3
+    assert lint_results[0].stderr.strip() == BAD_SOURCE.path
+    assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
+    assert fmt_result.did_change is True
+
+
+def test_multiple_targets(rule_runner: RuleRunner) -> None:
+    targets = [
+        make_target(rule_runner, [GOOD_SOURCE]),
+        make_target(rule_runner, [BAD_SOURCE]),
+    ]
+    lint_results, fmt_result = run_docformatter(rule_runner, targets)
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 3
+    assert lint_results[0].stderr.strip() == BAD_SOURCE.path
+    assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
+    assert fmt_result.did_change is True
+
+
+def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+    needs_config = FileContent(
+        path="needs_config.py",
+        content=b'"""\nOne line docstring acting like it\'s multiline.\n"""\n',
+    )
+    target = make_target(rule_runner, [needs_config])
+    lint_results, fmt_result = run_docformatter(
+        rule_runner, [target], passthrough_args="--make-summary-multi-line"
+    )
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 0
+    assert lint_results[0].stderr == ""
+    assert fmt_result.output == get_digest(rule_runner, [needs_config])
+    assert fmt_result.did_change is False
+
+
+def test_skip(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [BAD_SOURCE])
+    lint_results, fmt_result = run_docformatter(rule_runner, [target], skip=True)
+    assert not lint_results
+    assert fmt_result.skipped is True
+    assert fmt_result.did_change is False
+
+
+def test_stub_files(rule_runner: RuleRunner) -> None:
+    good_stub = dataclasses.replace(GOOD_SOURCE, path="good.pyi")
+    bad_stub = dataclasses.replace(BAD_SOURCE, path="bad.pyi")
+    fixed_bad_stub = dataclasses.replace(FIXED_BAD_SOURCE, path="bad.pyi")
+
+    good_files = [GOOD_SOURCE, good_stub]
+    target = make_target(rule_runner, good_files)
+    lint_results, fmt_result = run_docformatter(rule_runner, [target])
+    assert len(lint_results) == 1 and lint_results[0].exit_code == 0
+    assert lint_results[0].stderr == "" and fmt_result.stdout == ""
+    assert fmt_result.output == get_digest(rule_runner, good_files)
+    assert not fmt_result.did_change
+
+    target = make_target(rule_runner, [BAD_SOURCE, bad_stub])
+    lint_results, fmt_result = run_docformatter(rule_runner, [target])
+    assert len(lint_results) == 1 and lint_results[0].exit_code == 3
+    assert bad_stub.path in lint_results[0].stderr
+    assert BAD_SOURCE.path in lint_results[0].stderr
+    fixed_bad_files = [FIXED_BAD_SOURCE, fixed_bad_stub]
+    assert fmt_result.output == get_digest(rule_runner, [*fixed_bad_files, *good_files])
+    assert fmt_result.did_change

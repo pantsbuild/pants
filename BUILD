@@ -14,26 +14,8 @@ files(
 )
 
 files(
-  name = 'build_tools',
-  sources = ['BUILD.tools'],
-  dependencies = [
-    ':scalajs_3rdparty_directory',
-  ],
-)
-
-files(
   name = 'gitignore',
   sources = ['.gitignore'],
-)
-
-files(
-  name = 'isort_cfg',
-  sources = ['.isort.cfg'],
-)
-
-files(
-  name = 'scalajs_3rdparty_directory',
-  sources = ['contrib/scalajs/3rdparty/**/*'],
 )
 
 files(
@@ -44,11 +26,4 @@ files(
 files(
   name = 'pyproject',
   sources = ['pyproject.toml'],
-)
-
-# NB: This is used for integration tests. This is generated automatically via `./pants` and
-# `build-support/bin/bootstrap_pants_pex.sh`.
-files(
-  name = 'pants_pex',
-  sources = ['pants.pex'],
 )

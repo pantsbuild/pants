@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -25,7 +27,10 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+mod action_cache;
 mod cas;
-pub use crate::cas::StubCAS;
 pub mod execution_server;
+
+pub use crate::action_cache::StubActionCache;
+pub use crate::cas::StubCAS;
 pub use crate::execution_server::MockExecution;

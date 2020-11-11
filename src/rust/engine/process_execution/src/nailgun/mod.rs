@@ -1,10 +1,8 @@
-use std::collections::btree_map::BTreeMap;
-use std::collections::btree_set::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::time::Duration;
 
-use boxfuture::{try_future, BoxFuture, Boxable};
+use async_trait::async_trait;
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
@@ -15,8 +13,8 @@ use tokio::net::TcpStream;
 use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
-  Process, ProcessMetadata,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform,
+  PlatformConstraint, Process, ProcessMetadata,
 };
 
 #[cfg(test)]
@@ -59,13 +57,15 @@ fn construct_nailgun_server_request(
     input_files: hashing::EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: Duration::new(1000, 0),
+    timeout: Some(Duration::new(1000, 0)),
     description: format!("Start a nailgun server for {}", nailgun_name),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
+    level: log::Level::Info,
+    append_only_caches: BTreeMap::new(),
     jdk_home: Some(jdk),
     target_platform: platform_constraint,
     is_nailgunnable: true,
+    execution_slot_variable: None,
+    cache_failures: false,
   }
 }
 
@@ -74,34 +74,11 @@ fn construct_nailgun_client_request(
   client_main_class: String,
   mut client_args: Vec<String>,
 ) -> Process {
-  let Process {
-    argv: _argv,
-    input_files,
-    description,
-    env: original_request_env,
-    working_directory,
-    output_files,
-    output_directories,
-    timeout,
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-    jdk_home: _jdk_home,
-    target_platform,
-    is_nailgunnable,
-  } = original_req;
   client_args.insert(0, client_main_class);
   Process {
     argv: client_args,
-    input_files,
-    description,
-    env: original_request_env,
-    working_directory,
-    output_files,
-    output_directories,
-    timeout,
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
     jdk_home: None,
-    target_platform,
-    is_nailgunnable,
+    ..original_req
   }
 }
 
@@ -113,9 +90,8 @@ fn construct_nailgun_client_request(
 /// If that flag is set, it will connect to a running nailgun server and run the command there.
 /// Otherwise, it will just delegate to the regular local runner.
 ///
-#[derive(Clone)]
 pub struct CommandRunner {
-  inner: Arc<super::local::CommandRunner>,
+  inner: super::local::CommandRunner,
   nailgun_pool: NailgunPool,
   async_semaphore: async_semaphore::AsyncSemaphore,
   metadata: ProcessMetadata,
@@ -131,12 +107,12 @@ impl CommandRunner {
     executor: task_executor::Executor,
   ) -> Self {
     CommandRunner {
-      inner: Arc::new(runner),
+      inner: runner,
       nailgun_pool: NailgunPool::new(),
       async_semaphore: AsyncSemaphore::new(1),
-      metadata: metadata,
-      workdir_base: workdir_base,
-      executor: executor,
+      metadata,
+      workdir_base,
+      executor,
     }
   }
 
@@ -162,17 +138,18 @@ impl CommandRunner {
   }
 }
 
+#[async_trait]
 impl super::CommandRunner for CommandRunner {
-  fn run(
+  async fn run(
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
     let original_request = self.extract_compatible_request(&req).unwrap();
 
     if !original_request.is_nailgunnable {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
-      return self.inner.run(req, context);
+      return self.inner.run(req, context).await;
     }
     debug!("Running request under nailgun:\n {:#?}", &original_request);
 
@@ -180,21 +157,21 @@ impl super::CommandRunner for CommandRunner {
     let store = self.inner.store.clone();
     let ParsedJVMCommandLines {
       client_main_class, ..
-    } = try_future!(ParsedJVMCommandLines::parse_command_lines(
-      &original_request.argv
-    ));
+    } = ParsedJVMCommandLines::parse_command_lines(&original_request.argv)?;
     let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
-    let workdir_for_this_nailgun = try_future!(self.get_nailgun_workdir(&nailgun_name));
+    let workdir_for_this_nailgun = self.get_nailgun_workdir(&nailgun_name)?;
 
-    self.run_and_capture_workdir(
-      original_request,
-      context,
-      store,
-      executor,
-      true,
-      &workdir_for_this_nailgun,
-      Platform::current().unwrap(),
-    )
+    self
+      .run_and_capture_workdir(
+        original_request,
+        context,
+        store,
+        executor,
+        true,
+        &workdir_for_this_nailgun,
+        Platform::current().unwrap(),
+      )
+      .await
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
@@ -203,12 +180,18 @@ impl super::CommandRunner for CommandRunner {
   }
 }
 
+#[async_trait]
 impl CapturedWorkdir for CommandRunner {
-  fn run_in_workdir<'a, 'b, 'c>(
+  fn named_caches(&self) -> &NamedCaches {
+    self.inner.named_caches()
+  }
+
+  async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
     req: Process,
     context: Context,
+    _exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
     let ParsedJVMCommandLines {
@@ -252,7 +235,7 @@ impl CapturedWorkdir for CommandRunner {
     let nails_command = self
       .async_semaphore
       .clone()
-      .with_acquired(move || {
+      .with_acquired(move |_id| {
         // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
         nailgun_pool
           .connect(
@@ -287,7 +270,13 @@ impl CapturedWorkdir for CommandRunner {
         debug!("Connecting to server at {}...", addr);
         TcpStream::connect(addr)
           .and_then(move |stream| {
-            nails::client_handle_connection(stream, cmd, stdio_write, stdin_read)
+            nails::client_handle_connection(
+              nails::Config::default(),
+              stream,
+              cmd,
+              stdio_write,
+              stdin_read,
+            )
           })
           .map_err(|e| format!("Error communicating with server: {}", e))
           .map_ok(ChildOutput::Exit)

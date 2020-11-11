@@ -3,29 +3,28 @@
 
 use fnv::FnvHasher;
 
+use std::convert::AsRef;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, hash};
 
 use crate::externs;
-use crate::handles::Handle;
 
-use rule_graph;
-use smallvec::{smallvec, SmallVec};
+use cpython::{FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, Python, ToPyObject};
+use smallvec::SmallVec;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
 ///
 /// Params represent a TypeId->Key map.
 ///
-/// For efficiency and hashability, they're stored as sorted Keys (with distinct TypeIds), and
-/// wrapped in an `Arc` that allows us to copy-on-write for param contents.
+/// For efficiency and hashability, they're stored as sorted Keys (with distinct TypeIds).
 ///
 #[repr(C)]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Params(SmallVec<[Key; 4]>);
 
-impl Params {
+impl<'x> Params {
   pub fn new<I: IntoIterator<Item = Key>>(param_inputs: I) -> Result<Params, String> {
     let mut params = param_inputs.into_iter().collect::<SmallVec<[Key; 4]>>();
     params.sort_by_key(|k| *k.type_id());
@@ -48,8 +47,8 @@ impl Params {
     Ok(Params(params))
   }
 
-  pub fn new_single(param: Key) -> Params {
-    Params(smallvec![param])
+  pub fn keys(&'x self) -> impl Iterator<Item = &'x Key> {
+    self.0.iter()
   }
 
   ///
@@ -86,30 +85,28 @@ impl Params {
   pub fn type_ids<'a>(&'a self) -> impl Iterator<Item = TypeId> + 'a {
     self.0.iter().map(|k| *k.type_id())
   }
+}
 
-  ///
-  /// Given a set of either param type or param value strings: sort, join, and render as one string.
-  ///
-  pub fn display<T>(params: T) -> String
-  where
-    T: Iterator,
-    T::Item: fmt::Display,
-  {
-    let mut params: Vec<_> = params.map(|p| format!("{}", p)).collect();
-    match params.len() {
-      0 => "()".to_string(),
-      1 => params.pop().unwrap(),
-      _ => {
-        params.sort();
-        format!("({})", params.join(", "))
-      }
+///
+pub fn display_sorted_in_parens<T>(items: T) -> String
+where
+  T: Iterator,
+  T::Item: fmt::Display,
+{
+  let mut items: Vec<_> = items.map(|p| format!("{}", p)).collect();
+  match items.len() {
+    0 => "()".to_string(),
+    1 => items.pop().unwrap(),
+    _ => {
+      items.sort();
+      format!("({})", items.join(", "))
     }
   }
 }
 
 impl fmt::Display for Params {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", Self::display(self.0.iter()))
+    write!(f, "Params{}", display_sorted_in_parens(self.0.iter()))
   }
 }
 
@@ -123,11 +120,7 @@ pub struct TypeId(pub Id);
 
 impl TypeId {
   fn pretty_print(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    if self == ANY_TYPE {
-      write!(f, "Any")
-    } else {
-      write!(f, "{}", externs::type_to_str(self))
-    }
+    write!(f, "{}", externs::type_to_str(self))
   }
 }
 
@@ -139,7 +132,7 @@ impl rule_graph::TypeId for TypeId {
   where
     I: Iterator<Item = TypeId>,
   {
-    Params::display(type_ids)
+    display_sorted_in_parens(type_ids)
   }
 }
 
@@ -155,40 +148,52 @@ impl fmt::Display for TypeId {
   }
 }
 
-// On the python side, the 0th type id is used as an anonymous id
-pub const ANY_TYPE: TypeId = TypeId(0);
-
-// An identifier for a python function.
+/// An identifier for a Python function.
 #[repr(C)]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Function(pub Key);
 
 impl Function {
+  /// A Python function's module, e.g. `project.app`.
+  pub fn module(&self) -> String {
+    let val = externs::val_for(&self.0);
+    externs::getattr_as_string(&val, "__module__")
+  }
+
+  /// A Python function's name, without its module.
   pub fn name(&self) -> String {
-    let Function(key) = self;
-    let module = externs::project_str(&externs::val_for(&key), "__module__");
-    let name = externs::project_str(&externs::val_for(&key), "__name__");
+    let val = externs::val_for(&self.0);
+    externs::getattr_as_string(&val, "__name__")
+  }
+
+  /// The line number of a Python function's first line.
+  pub fn line_number(&self) -> u64 {
+    let val = externs::val_for(&self.0);
     // NB: this is a custom dunder method that Python code should populate before sending the
     // function (e.g. an `@rule`) through FFI.
-    let line_number = externs::project_str(&externs::val_for(&key), "__line_number__");
-    format!("{}:{}:{}", module, line_number, name)
+    externs::getattr(&val, "__line_number__").unwrap()
+  }
+
+  /// The function represented as `path.to.module:lineno:func_name`.
+  pub fn full_name(&self) -> String {
+    format!("{}:{}:{}", self.module(), self.line_number(), self.name())
   }
 }
 
 impl fmt::Display for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}()", self.name())
+    write!(f, "{}()", self.full_name())
   }
 }
 
 impl fmt::Debug for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}()", self.name())
+    write!(f, "{}()", self.full_name())
   }
 }
 
 ///
-/// Wraps a type id for use as a key in HashMaps and sets.
+/// An interned key for a Value for use as a key in HashMaps and sets.
 ///
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -238,46 +243,87 @@ impl Key {
 }
 
 ///
-/// A wrapper around a Arc<Handle>
+/// We wrap PyObject (which cannot be cloned without acquiring the GIL) in an Arc in order to avoid
+/// accessing the Gil in many cases.
 ///
-#[derive(Clone, Eq, PartialEq)]
-pub struct Value(Arc<Handle>);
+#[derive(Clone)]
+pub struct Value(Arc<PyObject>);
 
 impl Value {
-  pub fn new(handle: Handle) -> Value {
+  pub fn new(handle: PyObject) -> Value {
     Value(Arc::new(handle))
+  }
+
+  // NB: Longer name because overloaded in a few places.
+  pub fn consume_into_py_object(self, py: Python) -> PyObject {
+    match Arc::try_unwrap(self.0) {
+      Ok(handle) => handle,
+      Err(arc_handle) => arc_handle.clone_ref(py),
+    }
   }
 }
 
-impl Deref for Value {
-  type Target = Handle;
+impl PartialEq for Value {
+  fn eq(&self, other: &Value) -> bool {
+    externs::equals(&self.0, &other.0)
+  }
+}
 
-  fn deref(&self) -> &Handle {
+impl Eq for Value {}
+
+impl Deref for Value {
+  type Target = PyObject;
+
+  fn deref(&self) -> &PyObject {
+    &self.0
+  }
+}
+
+impl AsRef<PyObject> for Value {
+  fn as_ref(&self) -> &PyObject {
     &self.0
   }
 }
 
 impl fmt::Debug for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::val_to_str(&self))
+    write!(f, "{}", externs::val_to_str(&self.as_ref()))
   }
 }
 
-///
-/// Creates a Handle (which represents exclusive access) from a Value (which might be shared),
-/// cloning if necessary.
-///
-impl From<Value> for Handle {
+impl fmt::Display for Value {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", externs::val_to_str(&self.as_ref()))
+  }
+}
+
+impl FromPyObject<'_> for Value {
+  fn extract(py: Python, obj: &PyObject) -> PyResult<Self> {
+    Ok(obj.clone_ref(py).into())
+  }
+}
+
+impl ToPyObject for &Value {
+  type ObjectType = PyObject;
+  fn to_py_object(&self, py: Python) -> PyObject {
+    self.0.clone_ref(py)
+  }
+}
+
+impl From<Value> for PyObject {
   fn from(value: Value) -> Self {
     match Arc::try_unwrap(value.0) {
       Ok(handle) => handle,
-      Err(arc_handle) => externs::clone_val(&arc_handle),
+      Err(arc_handle) => {
+        let gil = Python::acquire_gil();
+        arc_handle.clone_ref(gil.python())
+      }
     }
   }
 }
 
-impl From<Handle> for Value {
-  fn from(handle: Handle) -> Self {
+impl From<PyObject> for Value {
+  fn from(handle: PyObject) -> Self {
     Value::new(handle)
   }
 }
@@ -287,25 +333,94 @@ pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
   /// A root requestor should usually immediately retry their request.
   Invalidated,
-  /// A rule raised an exception.
-  Throw(Value, String),
+  /// An error was thrown.
+  Throw {
+    // A python exception value, which might have a python-level stacktrace
+    val: Value,
+    // A pre-formatted python exception traceback.
+    python_traceback: String,
+    // A stack of engine-side "frame" information generated from Nodes.
+    engine_traceback: Vec<String>,
+  },
+}
+
+impl Failure {
+  ///
+  /// Consumes this Failure to produce a new Failure with an additional engine_traceback entry.
+  ///
+  pub fn with_pushed_frame(self, frame: &impl fmt::Display) -> Failure {
+    match self {
+      Failure::Invalidated => Failure::Invalidated,
+      Failure::Throw {
+        val,
+        python_traceback,
+        mut engine_traceback,
+      } => {
+        engine_traceback.push(format!("{}", frame));
+        Failure::Throw {
+          val,
+          python_traceback,
+          engine_traceback,
+        }
+      }
+    }
+  }
+}
+
+impl Failure {
+  pub fn from_py_err(py_err: PyErr) -> Failure {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    Failure::from_py_err_with_gil(py, py_err)
+  }
+  pub fn from_py_err_with_gil(py: Python, mut py_err: PyErr) -> Failure {
+    let val = Value::from(py_err.instance(py));
+    let python_traceback = if let Some(tb) = py_err.ptraceback.as_ref() {
+      let locals = PyDict::new(py);
+      locals
+        .set_item(py, "traceback", py.import("traceback").unwrap())
+        .unwrap();
+      locals.set_item(py, "tb", tb).unwrap();
+      locals.set_item(py, "val", &val).unwrap();
+      py.eval(
+        "''.join(traceback.format_exception(etype=None, value=val, tb=tb))",
+        None,
+        Some(&locals),
+      )
+      .unwrap()
+      .extract::<String>(py)
+      .unwrap()
+    } else {
+      Self::native_traceback(&externs::val_to_str(val.as_ref()))
+    };
+    Failure::Throw {
+      val,
+      python_traceback,
+      engine_traceback: Vec::new(),
+    }
+  }
+
+  pub fn native_traceback(msg: &str) -> String {
+    format!(
+      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
+      msg
+    )
+  }
 }
 
 impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
-      Failure::Throw(exc, _) => write!(f, "{}", externs::val_to_str(exc)),
+      Failure::Throw { val, .. } => write!(f, "{}", externs::val_to_str(val.as_ref())),
     }
   }
 }
 
 pub fn throw(msg: &str) -> Failure {
-  Failure::Throw(
-    externs::create_exception(msg),
-    format!(
-      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
-      msg
-    ),
-  )
+  Failure::Throw {
+    val: externs::create_exception(msg),
+    python_traceback: Failure::native_traceback(msg),
+    engine_traceback: Vec::new(),
+  }
 }

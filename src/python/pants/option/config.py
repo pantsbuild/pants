@@ -46,7 +46,10 @@ class Config(ABC):
 
     @classmethod
     def load_file_contents(
-        cls, file_contents, *, seed_values: Optional[SeedValues] = None,
+        cls,
+        file_contents,
+        *,
+        seed_values: Optional[SeedValues] = None,
     ) -> Union["_EmptyConfig", "_ChainedConfig"]:
         """Loads config from the given string payloads, with later payloads taking precedence over
         earlier ones.
@@ -65,7 +68,10 @@ class Config(ABC):
 
     @classmethod
     def load(
-        cls, config_paths: List[str], *, seed_values: Optional[SeedValues] = None,
+        cls,
+        config_paths: List[str],
+        *,
+        seed_values: Optional[SeedValues] = None,
     ) -> Union["_EmptyConfig", "_ChainedConfig"]:
         """Loads config from the given paths, with later paths taking precedence over earlier ones.
 
@@ -83,7 +89,11 @@ class Config(ABC):
 
     @classmethod
     def _meta_load(
-        cls, open_ctx, config_items: Sequence, *, seed_values: Optional[SeedValues] = None,
+        cls,
+        open_ctx,
+        config_items: Sequence,
+        *,
+        seed_values: Optional[SeedValues] = None,
     ) -> Union["_EmptyConfig", "_ChainedConfig"]:
         if not config_items:
             return _EmptyConfig()
@@ -92,35 +102,48 @@ class Config(ABC):
         for config_item in config_items:
             config_path = config_item.path if hasattr(config_item, "path") else config_item
             with open_ctx(config_item) as config_file:
-                content = config_file.read()
-            content_digest = sha1(content).hexdigest()
+                content_bytes = config_file.read()
+            content_digest = sha1(content_bytes).hexdigest()
+            content = content_bytes.decode()
             normalized_seed_values = cls._determine_seed_values(seed_values=seed_values)
 
-            config_values: _ConfigValues
             if PurePath(config_path).suffix == ".toml":
-                toml_values = cast(Dict[str, Any], toml.loads(content.decode()))
-                toml_values["DEFAULT"] = {
-                    **normalized_seed_values,
-                    **toml_values.get("DEFAULT", {}),
-                }
-                config_values = _TomlValues(toml_values)
+                config_values = cls._parse_toml(content, normalized_seed_values)
             else:
-                ini_parser = configparser.ConfigParser(defaults=normalized_seed_values)
-                ini_parser.read_string(content.decode())
-                config_values = _IniValues(ini_parser)
+                try:
+                    config_values = cls._parse_toml(content, normalized_seed_values)
+                except Exception as e:
+                    raise cls.ConfigError(
+                        f"Unsuffixed Config path {config_path} could not be parsed "
+                        f"as TOML:\n  {e}"
+                    )
 
             single_file_configs.append(
                 _SingleFileConfig(
-                    config_path=config_path, content_digest=content_digest, values=config_values,
+                    config_path=config_path,
+                    content_digest=content_digest,
+                    values=config_values,
                 ),
             )
         return _ChainedConfig(tuple(reversed(single_file_configs)))
+
+    @classmethod
+    def _parse_toml(
+        cls, config_content: str, normalized_seed_values: Dict[str, str]
+    ) -> "_ConfigValues":
+        """Attempt to parse as TOML, raising an exception on failure."""
+        toml_values = cast(Dict[str, Any], toml.loads(config_content))
+        toml_values["DEFAULT"] = {
+            **normalized_seed_values,
+            **toml_values.get("DEFAULT", {}),
+        }
+        return _ConfigValues(toml_values)
 
     @staticmethod
     def _determine_seed_values(*, seed_values: Optional[SeedValues] = None) -> Dict[str, str]:
         """We pre-populate several default values to allow %([key-name])s interpolation.
 
-        This sets up those defaults and checks if the user overrided any of the values.
+        This sets up those defaults and checks if the user overrode any of the values.
         """
         safe_seed_values = seed_values or {}
         buildroot = cast(str, safe_seed_values.get("buildroot", get_buildroot()))
@@ -202,71 +225,14 @@ class Config(ABC):
         """
 
 
-class _ConfigValues(ABC):
-    """Encapsulates resolving the actual config values specified by the user's config file.
-
-    Due to encapsulation, this allows us to support both TOML and INI config files without any of
-    the rest of the Pants codebase knowing whether the config came from TOML or INI.
-    """
-
-    @property
-    @abstractmethod
-    def sections(self) -> List[str]:
-        """Returns the sections in this config (not including DEFAULT)."""
-
-    @abstractmethod
-    def has_section(self, section: str) -> bool:
-        pass
-
-    @abstractmethod
-    def has_option(self, section: str, option: str) -> bool:
-        pass
-
-    @abstractmethod
-    def get_value(self, section: str, option: str) -> Optional[str]:
-        pass
-
-    @abstractmethod
-    def options(self, section: str) -> List[str]:
-        """All options defined for the section."""
-
-    @property
-    @abstractmethod
-    def defaults(self) -> Mapping[str, str]:
-        """All the DEFAULT values (not interpolated)."""
+_TomlPrimitive = Union[bool, int, float, str]
+_TomlValue = Union[_TomlPrimitive, List[_TomlPrimitive]]
 
 
 @dataclass(frozen=True)
-class _IniValues(_ConfigValues):
-    parser: configparser.ConfigParser
+class _ConfigValues:
+    """The parsed contents of a TOML config file."""
 
-    @property
-    def sections(self) -> List[str]:
-        return self.parser.sections()
-
-    def has_section(self, section: str) -> bool:
-        return self.parser.has_section(section)
-
-    def has_option(self, section: str, option: str) -> bool:
-        return self.parser.has_option(section, option)
-
-    def get_value(self, section: str, option: str) -> Optional[str]:
-        return self.parser.get(section, option)
-
-    def options(self, section: str) -> List[str]:
-        return self.parser.options(section)
-
-    @property
-    def defaults(self) -> Mapping[str, str]:
-        return self.parser.defaults()
-
-
-_TomlPrimitve = Union[bool, int, float, str]
-_TomlValue = Union[_TomlPrimitve, List[_TomlPrimitve]]
-
-
-@dataclass(frozen=True)
-class _TomlValues(_ConfigValues):
     values: Dict[str, Any]
 
     @staticmethod
@@ -293,12 +259,12 @@ class _TomlValues(_ConfigValues):
         that `cache` was defined even though the user never explicitly added it to their config.
         """
         at_least_one_option_defined = any(
-            _TomlValues._is_an_option(section_value) for section_value in section_values.values()
+            _ConfigValues._is_an_option(section_value) for section_value in section_values.values()
         )
-        # We also check if the section was explicitly defined but has no options. We can be confident
-        # that this is not a parent scope (e.g. `cache` when `cache.java` is really what was defined)
-        # because the parent scope would store its child scope in its values, so the values would not
-        # be empty.
+        # We also check if the section was explicitly defined but has no options. We can be
+        # confident that this is not a parent scope (e.g. `cache` when `cache.java` is really what
+        # was defined) because the parent scope would store its child scope in its values, so the
+        # values would not be empty.
         blank_section = len(section_values.values()) == 0
         return at_least_one_option_defined or blank_section
 
@@ -325,14 +291,19 @@ class _TomlValues(_ConfigValues):
         return recurse(mapping=self.values, remaining_sections=section.split("."))
 
     def _possibly_interpolate_value(
-        self, raw_value: str, *, option: str, section: str, section_values: Dict,
+        self,
+        raw_value: str,
+        *,
+        option: str,
+        section: str,
+        section_values: Dict,
     ) -> str:
         """For any values with %(foo)s, substitute it with the corresponding value from DEFAULT or
         the same section."""
 
         def format_str(value: str) -> str:
-            # Because dictionaries use the symbols `{}`, we must proactively escape the symbols so that
-            # .format() does not try to improperly interpolate.
+            # Because dictionaries use the symbols `{}`, we must proactively escape the symbols so
+            # that .format() does not try to improperly interpolate.
             escaped_str = value.replace("{", "{{").replace("}", "}}")
             new_style_format_str = re.sub(
                 pattern=r"%\((?P<interpolated>[a-zA-Z_0-9]*)\)s",
@@ -345,12 +316,15 @@ class _TomlValues(_ConfigValues):
             except KeyError as e:
                 bad_reference = e.args[0]
                 raise configparser.InterpolationMissingOptionError(
-                    option, section, raw_value, bad_reference,
+                    option,
+                    section,
+                    raw_value,
+                    bad_reference,
                 )
 
         def recursively_format_str(value: str) -> str:
-            # It's possible to interpolate with a value that itself has an interpolation. We must fully
-            # evaluate all expressions for parity with configparser.
+            # It's possible to interpolate with a value that itself has an interpolation. We must
+            # fully evaluate all expressions for parity with configparser.
             if not re.search(r"%\([a-zA-Z_0-9]*\)s", value):
                 return value
             return recursively_format_str(value=format_str(value))
@@ -384,7 +358,7 @@ class _TomlValues(_ConfigValues):
 
         if isinstance(raw_value, list):
 
-            def stringify_list_member(member: _TomlPrimitve) -> str:
+            def stringify_list_member(member: _TomlPrimitive) -> str:
                 if not isinstance(member, str):
                     return str(member)
                 interpolated_member = possibly_interpolate(member) if interpolate else member
@@ -397,7 +371,11 @@ class _TomlValues(_ConfigValues):
 
     def _stringify_val_without_interpolation(self, raw_value: _TomlValue) -> str:
         return self._stringify_val(
-            raw_value, option="", section="", section_values={}, interpolate=False,
+            raw_value,
+            option="",
+            section="",
+            section_values={},
+            interpolate=False,
         )
 
     @property
@@ -436,7 +414,10 @@ class _TomlValues(_ConfigValues):
         if section_values is None:
             raise configparser.NoSectionError(section)
         stringify = partial(
-            self._stringify_val, option=option, section=section, section_values=section_values,
+            self._stringify_val,
+            option=option,
+            section=section,
+            section_values=section_values,
         )
         if option not in section_values:
             if option not in self.defaults:
@@ -507,6 +488,9 @@ class _EmptyConfig(Config):
     def get_source_for_option(self, section: str, option: str) -> None:
         return None
 
+    def __repr__(self) -> str:
+        return "EmptyConfig()"
+
 
 @dataclass(frozen=True, eq=False)
 class _SingleFileConfig(Config):
@@ -539,6 +523,9 @@ class _SingleFileConfig(Config):
             return self.sources()[0]
         return None
 
+    def __repr__(self) -> str:
+        return f"SingleFileConfig({self.config_path})"
+
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, _SingleFileConfig):
             return NotImplemented
@@ -550,12 +537,9 @@ class _SingleFileConfig(Config):
 
 @dataclass(frozen=True)
 class _ChainedConfig(Config):
-    """Config read from multiple sources.
+    """Config read from multiple sources."""
 
-    :param chained_configs: A tuple of Config instances to chain. Later instances take precedence
-                            over earlier ones.
-    """
-
+    # Config instances to chain. Later instances take precedence over earlier ones.
     chained_configs: Tuple[_SingleFileConfig, ...]
 
     @property
@@ -603,6 +587,9 @@ class _ChainedConfig(Config):
                 return cfg.get_source_for_option(section, option)
         return None
 
+    def __repr__(self) -> str:
+        return f"ChainedConfig({self.sources()})"
+
 
 @dataclass(frozen=True)
 class TomlSerializer:
@@ -626,7 +613,7 @@ class TomlSerializer:
       }
     """
 
-    parsed: Dict[str, Dict[str, Union[int, float, str, bool, List, Dict]]]
+    parsed: Mapping[str, Dict[str, Union[int, float, str, bool, List, Dict]]]
 
     def normalize(self) -> Dict:
         result: Dict = {}

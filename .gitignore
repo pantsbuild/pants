@@ -4,6 +4,7 @@
 *.iws
 *.lock_message
 *.pyc
+__pycache__/
 *.hprof
 *.swp
 *.sublime-project

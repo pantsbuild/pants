@@ -1,1 +1,0 @@
-console.writeln("Hello World.")

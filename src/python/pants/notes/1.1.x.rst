@@ -581,7 +581,7 @@ This release has several changes to tooling, lots of documentation updates, and 
 API Changes
 ~~~~~~~~~~~
 
-* Add 'transitve' and 'scope' attributes to export of target
+* Add 'transitive' and 'scope' attributes to export of target
   `RB #3582 <https://rbcommons.com/s/twitter/r/3582>`_
   `RB #3845 <https://rbcommons.com/s/twitter/r/3845>`_
 
@@ -729,7 +729,7 @@ Refactoring, Improvements, and Tooling
 
 * remove 'staging' url from 1.0 release
 
-* Fix various hardwired links to point to pantsbuild.org.
+* Fix various hardwired links to point to www.pantsbuild.org.
   `RB #3805 <https://rbcommons.com/s/twitter/r/3805>`_
 
 * Push the docsite to benjyw.github.io as well as pantsbuild.github.io.

@@ -1,468 +1,347 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
+import logging
 import os
 from dataclasses import dataclass
-from typing import Dict, Optional, Sequence, Set, Tuple
+from pathlib import PurePath
+from typing import Dict, Iterable, Optional, Set, Tuple, Union
 
-from pants.base.build_environment import get_buildroot
-from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.objects import Collection
-from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_method, memoized_property
+from pants.build_graph.address import Address
+from pants.engine.collection import DeduplicatedCollection
+from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.fs import PathGlobs, Paths
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import Target
+from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
+from pants.util.memo import memoized_method
+from pants.util.meta import frozen_after_init
+
+logger = logging.getLogger(__name__)
 
 
-class SourceRootCategories:
-    UNKNOWN = "unknown"
-    SOURCE = "source"
-    TEST = "test"
-    THIRDPARTY = "thirdparty"
-    ALL = [UNKNOWN, SOURCE, TEST, THIRDPARTY]
+@dataclass(frozen=True, order=True)
+class SourceRoot:
+    # Relative path from the buildroot.  Note that a source root at the buildroot
+    # is represented as ".".
+    path: str
 
 
 @dataclass(frozen=True)
-class SourceRoot:
-    path: str
-    langs: Tuple[str, ...]
-    category: str
+class OptionalSourceRoot:
+    source_root: Optional[SourceRoot]
 
 
-class NoSourceRootError(Exception):
+class SourceRootError(Exception):
+    """An error related to SourceRoot computation."""
+
+    def __init__(self, msg: str):
+        super().__init__(
+            f"{msg}See https://www.pantsbuild.org/docs/source-roots for how to define source roots."
+        )
+
+
+class InvalidSourceRootPatternError(SourceRootError):
+    """Indicates an invalid pattern was provided."""
+
+
+class InvalidMarkerFileError(SourceRootError):
+    """Indicates an invalid marker file was provided."""
+
+
+class NoSourceRootError(SourceRootError):
     """Indicates we failed to map a source file to a source root."""
 
-
-class AllSourceRoots(Collection[SourceRoot]):
-    pass
-
-
-class SourceRootFactory:
-    """Creates source roots that respect language canonicalizations."""
-
-    def __init__(self, lang_canonicalizations):
-        """Creates a source root factory that enforces the given `lang_canonicalizations`.
-
-        :param dict lang_canonicalizations: a mapping from language nicknames to the canonical language
-                                            names the nickname could represent.
-        """
-        self._lang_canonicalizations = lang_canonicalizations
-
-    def _canonicalize_langs(self, langs):
-        for lang in langs or ():
-            canonicalized = self._lang_canonicalizations.get(lang, (lang,))
-            for canonical in canonicalized:
-                yield canonical
-
-    def create(self, relpath, langs, category) -> SourceRoot:
-        """Return a source root at the given `relpath` for the given `langs` and `category`."""
-        return SourceRoot(relpath, tuple(sorted(self._canonicalize_langs(langs))), category)
+    def __init__(self, path: Union[str, PurePath], extra_msg: str = ""):
+        super().__init__(f"No source root found for `{path}`. {extra_msg}")
 
 
-class SourceRoots:
-    """An interface for querying source roots."""
+# We perform pattern matching against absolute paths, where "/" represents the repo root.
+_repo_root = PurePath(os.path.sep)
 
-    def __init__(self, source_root_config: "SourceRootConfig") -> None:
-        """Create an object for querying source roots via patterns in a trie.
 
-        :param source_root_config: The SourceRootConfig for the source root patterns to query against.
+@dataclass(frozen=True)
+class SourceRootPatternMatcher:
+    root_patterns: Tuple[str, ...]
 
-        Non-test code should not instantiate directly. See SourceRootConfig.get_source_roots().
-        """
-        self._trie = source_root_config.create_trie()
-        self._source_root_factory = source_root_config.source_root_factory
-        self._options = source_root_config.get_options()
+    def __post_init__(self) -> None:
+        for root_pattern in self.root_patterns:
+            if ".." in root_pattern.split(os.path.sep):
+                raise InvalidSourceRootPatternError(
+                    f"`..` disallowed in source root pattern: {root_pattern}. "
+                )
 
-    def add_source_root(self, path, langs=tuple(), category=SourceRootCategories.UNKNOWN):
-        """Add the specified fixed source root, which must be relative to the buildroot.
+    def get_patterns(self) -> Tuple[str, ...]:
+        return tuple(self.root_patterns)
 
-        Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
-        unknown structure.  Tests should prefer to use dirs that match our source root patterns
-        instead of explicitly setting source roots here.
-        """
-        self._trie.add_fixed(path, langs, category)
-
-    def find(self, target) -> Optional[SourceRoot]:
-        """Find the source root for the given target, or None.
-
-        :param target: Find the source root for this target.
-        """
-        return self.find_by_path(target.address.spec_path)
-
-    def find_by_path(self, path: str) -> Optional[SourceRoot]:
-        """Find the source root for the given path, or None.
-
-        :param path: Find the source root for this path, relative to the buildroot.
-        :return: A SourceRoot instance, or None if the path is not located under a source root
-                 and `unmatched == fail`.
-        """
-        matched = self._trie.find(path)
-        if matched:
-            return matched
-        elif self._options.unmatched == "fail":
-            return None
-        # If no source root is found, use the path directly.
-        # TODO: Remove this logic. It should be an error to have no matching source root.
-        return SourceRoot(path, (), SourceRootCategories.UNKNOWN)
-
-    # TODO: this is how find_by_path should behave. Figure out how to deprecate the behavior of
-    # find_by_path so that this method becomes redundant.
-    def safe_find_by_path(self, path: str) -> Optional[SourceRoot]:
-        """Find the source root for the given path, if any."""
-        return self._trie.find(path)
-
-    def traverse(self) -> Set[str]:
-        return self._trie.traverse()
-
-    def all_roots(self):
-        """Return all known source roots.
-
-        Returns a generator over (source root, list of langs, category) triples.
-
-        Note: Requires a directory walk to match actual directories against patterns.
-        However we don't descend into source roots, once found, so this should be fast in practice.
-        Note: Does not follow symlinks.
-        """
-        project_tree = FileSystemProjectTree(get_buildroot(), self._options.pants_ignore)
-
-        fixed_roots = set()
-        for root, langs, category in self._trie.fixed():
-            if project_tree.exists(root):
-                yield self._source_root_factory.create(root, langs, category)
-            fixed_roots.add(root)
-
-        for relpath, dirnames, _ in project_tree.walk("", topdown=True):
-            match = self._trie.find(relpath)
-            if match:
-                if not any(fixed_root.startswith(relpath) for fixed_root in fixed_roots):
-                    yield match  # Found a source root not a prefix of any fixed roots.
-                del dirnames[:]  # Don't continue to walk into it.
+    def matches_root_patterns(self, relpath: PurePath) -> bool:
+        """Does this putative root match a pattern?"""
+        # Note: This is currently O(n) where n is the number of patterns, which
+        # we expect to be small.  We can optimize if it becomes necessary.
+        putative_root = _repo_root / relpath
+        for pattern in self.root_patterns:
+            if putative_root.match(pattern):
+                return True
+        return False
 
 
 class SourceRootConfig(Subsystem):
-    """Configuration for roots of source trees.
-
-    We detect source roots based on a list of source root patterns.  E.g., if we have src/java
-    as a pattern then any directory that ends with src/java will be considered a source root:
-    src/java, my/project/src/java etc.
-
-    A source root may be associated with one or more 'languages'. E.g., src/java can be associated
-    with java, and src/jvm can be associated with java and scala. Note that this is a generalized
-    concept of 'language'. For example 'resources' is a language in this sense.
-
-    We specify source roots in three ways:
-
-    1. We autoconstruct patterns by appending language names to parent dirs. E.g., for languages
-       'java' and 'python', and parents 'src' and 'example/src', we construct the patterns
-       'src/java', 'src/python', 'example/src/java' and 'example/src/python'.  These are of course
-       associated with the appropriate language.
-
-    2. We can explicitly specify a mapping from source root pattern to language(s). E.g.,
-       {
-         'src/jvm': ['java', 'scala'],
-         'src/py': ['python']
-       }
-
-    3. We can also bypass the pattern mechanism altogether and specify a list of fixed source roots.
-       E.g., src/java will match just <buildroot>/src/java, and not <buildroot>/some/dir/src/java.
-
-    Note that we distinguish between 'source roots' and 'test roots'. All the above holds for both.
-    We don't currently use this distinction in a useful way, but we may in the future, and we don't
-    want to then require everyone to modify their source root declarations, so we implement the
-    distinction now.
-
-    Note also that there's no harm in specifying source root patterns that don't exist in your repo,
-    within reason.  This means that in most cases the defaults below will be sufficient and repo
-    owners will not need to explicitly specify source root patterns at all.
-    """
+    """Configuration for roots of source trees."""
 
     options_scope = "source"
 
-    # TODO: When we have a proper model of the concept of a language, these should really be
-    # gathered from backends.
-    _DEFAULT_LANG_CANONICALIZATIONS = {
-        "jvm": ("java", "scala"),
-        "protobuf": ("proto",),
-        "py": ("python",),
-        "golang": ("go",),
-    }
-
-    _DEFAULT_SOURCE_ROOT_PATTERNS = [
-        "src/*",
-        "src/main/*",
-    ]
-
-    _DEFAULT_TEST_ROOT_PATTERNS = [
-        "test/*",
-        "tests/*",
-        "src/test/*",
-    ]
-
-    _DEFAULT_THIRDPARTY_ROOT_PATTERNS = [
-        "3rdparty/*",
-        "3rd_party/*",
-        "thirdparty/*",
-        "third_party/*",
-    ]
-
-    _DEFAULT_SOURCE_ROOTS = {
-        # Our default patterns will detect src/go as a go source root.
-        # However a typical repo might have src/go in the GOPATH, meaning src/go/src is the
-        # actual source root (the root of the package namespace).
-        # These fixed source roots will correct the patterns' incorrect guess.
-        "src/go/src": ("go",),
-        "src/main/go/src": ("go",),
-    }
-
-    _DEFAULT_TEST_ROOTS: Dict[str, Tuple[str, ...]] = {}
-
-    _DEFAULT_THIRDPARTY_ROOTS: Dict[str, Tuple[str, ...]] = {}
+    DEFAULT_ROOT_PATTERNS = ["/", "src", "src/python", "src/py"]
 
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--unmatched",
-            choices=["create", "fail"],
-            default="create",
-            advanced=True,
-            fingerprint=True,
-            help="Configures the behavior when sources are defined outside of any configured "
-            "source root. `create` will cause a source root to be implicitly created at "
-            "the definition location of the sources; `fail` will trigger an error.",
-        )
-        register(
-            "--lang-canonicalizations",
-            metavar="<map>",
-            type=dict,
-            fingerprint=True,
-            default=cls._DEFAULT_LANG_CANONICALIZATIONS,
-            advanced=True,
-            help="Map of language aliases to their canonical names.",
-        )
-
-        pattern_help_fmt = (
-            'A list of source root patterns for {} code. Use a "*" wildcard path '
-            "segment to match the language name, which will be canonicalized."
-        )
-        register(
-            "--source-root-patterns",
-            metavar="<list>",
+            "--root-patterns",
+            metavar='["pattern1", "pattern2", ...]',
             type=list,
-            fingerprint=True,
-            default=cls._DEFAULT_SOURCE_ROOT_PATTERNS,
+            default=cls.DEFAULT_ROOT_PATTERNS,
             advanced=True,
-            help=pattern_help_fmt.format("source"),
+            help="A list of source root suffixes. A directory with this suffix will be considered "
+            "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
+            "`<buildroot>/project1/src/python` etc. Prepend a `/` to anchor the match at the "
+            "buildroot. E.g., `/src/python` will match `<buildroot>/src/python` but not "
+            "`<buildroot>/project1/src/python`. A `*` wildcard will match a single path segment, "
+            "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
+            "Use `/` to signify that the buildroot itself is a source root. "
+            "See https://www.pantsbuild.org/docs/source-roots.",
         )
         register(
-            "--test-root-patterns",
-            metavar="<list>",
+            "--marker-filenames",
+            metavar="filename",
             type=list,
-            fingerprint=True,
-            default=cls._DEFAULT_TEST_ROOT_PATTERNS,
+            member_type=str,
+            default=None,
             advanced=True,
-            help=pattern_help_fmt.format("test"),
-        )
-        register(
-            "--thirdparty-root-patterns",
-            metavar="<list>",
-            type=list,
-            fingerprint=True,
-            default=cls._DEFAULT_THIRDPARTY_ROOT_PATTERNS,
-            advanced=True,
-            help=pattern_help_fmt.format("third-party"),
-        )
-
-        fixed_help_fmt = (
-            "A map of source roots for {} code to list of languages. "
-            "Useful when you want to enumerate fixed source roots explicitly, "
-            "instead of relying on patterns."
-        )
-        register(
-            "--source-roots",
-            metavar="<map>",
-            type=dict,
-            fingerprint=True,
-            default=cls._DEFAULT_SOURCE_ROOTS,
-            advanced=True,
-            help=fixed_help_fmt.format("source"),
-        )
-        register(
-            "--test-roots",
-            metavar="<map>",
-            type=dict,
-            fingerprint=True,
-            default=cls._DEFAULT_TEST_ROOTS,
-            advanced=True,
-            help=fixed_help_fmt.format("test"),
-        )
-        register(
-            "--thirdparty-roots",
-            metavar="<map>",
-            type=dict,
-            fingerprint=True,
-            default=cls._DEFAULT_THIRDPARTY_ROOTS,
-            advanced=True,
-            help=fixed_help_fmt.format("third-party"),
+            help="The presence of a file of this name in a directory indicates that the directory "
+            "is a source root. The content of the file doesn't matter, and may be empty. "
+            "Useful when you can't or don't wish to centrally enumerate source roots via "
+            "`root_patterns`.",
         )
 
     @memoized_method
-    def get_source_roots(self):
-        return SourceRoots(self)
-
-    def create_trie(self) -> "SourceRootTrie":
-        """Create a trie of source root patterns from options."""
-        trie = SourceRootTrie(self.source_root_factory)
-        options = self.get_options()
-
-        for category in SourceRootCategories.ALL:
-            # Add patterns.
-            for pattern in options.get("{}_root_patterns".format(category), []):
-                trie.add_pattern(pattern, category)
-            # Add fixed source roots.
-            for path, langs in options.get("{}_roots".format(category), {}).items():
-                trie.add_fixed(path, langs, category)
-
-        return trie
-
-    @memoized_property
-    def source_root_factory(self) -> SourceRootFactory:
-        """Creates source roots that respects language canonicalizations."""
-        return SourceRootFactory(self.get_options().lang_canonicalizations)
+    def get_pattern_matcher(self) -> SourceRootPatternMatcher:
+        return SourceRootPatternMatcher(self.options.root_patterns)
 
 
-class SourceRootTrie:
-    """A trie for efficiently finding the source root for a path.
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class SourceRootsRequest:
+    """Find the source roots for the given files and/or dirs."""
 
-    Finds the first outermost pattern that matches. E.g., the pattern src/* will match
-    my/project/src/python/src/java/java.py on src/python, not on src/java.
+    files: Tuple[PurePath, ...]
+    dirs: Tuple[PurePath, ...]
 
-    Implements fixed source roots by prepending a '^/' to them, and then prepending a '^' key to
-    the path we're matching. E.g., ^/src/java/foo/bar will match both the fixed root ^/src/java and
-    the pattern src/java, but ^/my/project/src/java/foo/bar will match only the pattern.
+    def __init__(self, files: Iterable[PurePath], dirs: Iterable[PurePath]) -> None:
+        self.files = tuple(sorted(files))
+        self.dirs = tuple(sorted(dirs))
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        for path in itertools.chain(self.files, self.dirs):
+            if ".." in str(path).split(os.path.sep):
+                raise ValueError(f"SourceRootRequest cannot contain `..` segment: {path}")
+            if path.is_absolute():
+                raise ValueError(f"SourceRootRequest path must be relative: {path}")
+
+    @classmethod
+    def for_files(cls, file_paths: Iterable[str]) -> "SourceRootsRequest":
+        """Create a request for the source root for the given file."""
+        return cls({PurePath(file_path) for file_path in file_paths}, ())
+
+
+@dataclass(frozen=True)
+class SourceRootRequest(EngineAwareParameter):
+    """Find the source root for the given path.
+
+    If you have multiple paths, particularly if many of them share parent directories, you'll get
+    better performance with a `SourceRootsRequest` (see above) instead.
     """
 
-    class InvalidPath(Exception):
-        def __init__(self, path, reason):
-            super().__init__(f"Invalid source root path or pattern: {path}. Reason: {reason}.")
+    path: PurePath
 
-    class Node:
-        def __init__(self):
-            self.children = {}
-            self.langs = tuple()
-            self.category = (
-                None  # One of SourceRootCategories, or None if this isn't a terminal node.
-            )
-            self.is_terminal = False
-            # We need an explicit terminal flag because not all terminals are leaf nodes,  e.g.,
-            # if we have patterns src/* and src/main/* then the '*' is a terminal (for the first pattern)
-            # but not a leaf.
+    def __post_init__(self) -> None:
+        if ".." in str(self.path).split(os.path.sep):
+            raise ValueError(f"SourceRootRequest cannot contain `..` segment: {self.path}")
+        if self.path.is_absolute():
+            raise ValueError(f"SourceRootRequest path must be relative: {self.path}")
 
-        def get_child(self, key, langs):
-            """Return the child node for the given key, or None if no such child.
+    @classmethod
+    def for_file(cls, file_path: str) -> "SourceRootRequest":
+        """Create a request for the source root for the given file."""
+        # The file itself cannot be a source root, so we may as well start the search
+        # from its enclosing directory, and save on some superfluous checking.
+        return cls(PurePath(file_path).parent)
 
-            :param key: The child to return.
-            :param langs: An output parameter which we update with any langs associated with the child.
-            """
-            # An exact match takes precedence over a wildcard match, to support situations such as
-            # src/* and src/main/*.
-            ret = self.children.get(key)
-            if ret:
-                langs.update(ret.langs)
-            elif key != "^":
-                ret = self.children.get("*")
-                if ret:
-                    langs.add(key)
-            return ret
+    @classmethod
+    def for_address(cls, address: Address) -> "SourceRootRequest":
+        # Note that we don't use for_file() here because the spec_path is a directory.
+        return cls(PurePath(address.spec_path))
 
-        def new_child(self, key):
-            child = SourceRootTrie.Node()
-            self.children[key] = child
-            return child
+    @classmethod
+    def for_target(cls, target: Target) -> "SourceRootRequest":
+        return cls.for_address(target.address)
 
-        def subpatterns(self):
-            if self.children:
-                for key, child in self.children.items():
-                    for sp, langs, category in child.subpatterns():
-                        if sp:
-                            yield os.path.join(key, sp), langs, category
-                        else:
-                            yield key, langs, category
-            else:
-                yield "", self.langs, self.category
+    def debug_hint(self) -> str:
+        return str(self.path)
 
-    def __init__(self, source_root_factory: SourceRootFactory) -> None:
-        self._source_root_factory = source_root_factory
-        self._root = SourceRootTrie.Node()
 
-    def add_pattern(self, pattern, category=SourceRootCategories.UNKNOWN):
-        """Add a pattern to the trie."""
-        self._do_add_pattern(pattern, tuple(), category)
+@dataclass(frozen=True)
+class SourceRootsResult:
+    path_to_root: FrozenDict[PurePath, SourceRoot]
 
-    def add_fixed(self, path, langs, category=SourceRootCategories.UNKNOWN):
-        """Add a fixed source root to the trie."""
-        if "*" in path:
-            raise self.InvalidPath(path, "fixed path cannot contain the * character")
-        fixed_path = os.path.join("^", path) if path else "^"
-        self._do_add_pattern(fixed_path, tuple(langs), category)
 
-    def fixed(self):
-        """Returns a list of just the fixed source roots in the trie."""
-        for key, child in self._root.children.items():
-            if key == "^":
-                return list(child.subpatterns())
-        return []
+@dataclass(frozen=True)
+class OptionalSourceRootsResult:
+    path_to_optional_root: FrozenDict[PurePath, OptionalSourceRoot]
 
-    def _do_add_pattern(self, pattern, langs, category):
-        if pattern != os.path.normpath(pattern):
-            raise self.InvalidPath(pattern, "must be a normalized path")
-        keys = pattern.split(os.path.sep)
 
-        node = self._root
-        for key in keys:
-            child = node.children.get(
-                key
-            )  # Can't use get_child, as we don't want to wildcard-match.
-            if not child:
-                child = node.new_child(key)
-            node = child
-        node.langs = langs
-        node.category = category
-        node.is_terminal = True
+@rule
+async def get_optional_source_roots(
+    source_roots_request: SourceRootsRequest,
+) -> OptionalSourceRootsResult:
+    """Rule to request source roots that may not exist."""
+    # A file cannot be a source root, so request for its parent.
+    # In the typical case, where we have multiple files with the same parent, this can
+    # dramatically cut down on the number of engine requests.
+    dirs: Set[PurePath] = set(source_roots_request.dirs)
+    file_to_dir: Dict[PurePath, PurePath] = {
+        file: file.parent for file in source_roots_request.files
+    }
+    dirs.update(file_to_dir.values())
 
-    def traverse(self) -> Set[str]:
-        source_roots: Set[str] = set()
+    dir_to_root: Dict[PurePath, OptionalSourceRoot] = {}
+    for d in dirs:
+        root = await Get(OptionalSourceRoot, SourceRootRequest(d))
+        dir_to_root[d] = root
 
-        def traverse_helper(node: SourceRootTrie.Node, path_components: Sequence[str]):
-            for name in node.children:
-                child = node.children[name]
-                if child.is_terminal:
-                    effective_path = "/".join([*path_components, name])
-                    source_roots.add(effective_path)
-                traverse_helper(node=child, path_components=[*path_components, name])
+    path_to_optional_root: Dict[PurePath, OptionalSourceRoot] = {}
+    for d in source_roots_request.dirs:
+        path_to_optional_root[d] = dir_to_root[d]
+    for f, d in file_to_dir.items():
+        path_to_optional_root[f] = dir_to_root[d]
 
-        traverse_helper(self._root, [])
-        return source_roots
+    return OptionalSourceRootsResult(path_to_optional_root=FrozenDict(path_to_optional_root))
 
-    def find(self, path) -> Optional[SourceRoot]:
-        """Find the source root for the given path."""
-        keys = ["^"] + path.split(os.path.sep)
-        for i in range(len(keys)):
-            # See if we have a match at position i.  We have such a match if following the path
-            # segments into the trie, from the root, leads us to a terminal.
-            node = self._root
-            langs: Set[str] = set()
-            j = i
-            while j < len(keys):
-                child = node.get_child(keys[j], langs)
-                if child is None:
-                    break
-                else:
-                    node = child
-                    j += 1
-            if node.is_terminal:
-                if j == 1:  # The match was on the root itself.
-                    path = ""
-                else:
-                    path = os.path.join(*keys[1:j])
-                return self._source_root_factory.create(path, langs, node.category)
-            # Otherwise, try the next value of i.
-        return None
+
+@rule
+async def get_source_roots(source_roots_request: SourceRootsRequest) -> SourceRootsResult:
+    """Convenience rule to allow callers to request SourceRoots that must exist.
+
+    That way callers don't have to unpack OptionalSourceRoots if they know they expect a SourceRoot
+    to exist and are willing to error if it doesn't.
+    """
+    osrr = await Get(OptionalSourceRootsResult, SourceRootsRequest, source_roots_request)
+    path_to_root = {}
+    for path, osr in osrr.path_to_optional_root.items():
+        if osr.source_root is None:
+            raise NoSourceRootError(path)
+        path_to_root[path] = osr.source_root
+    return SourceRootsResult(path_to_root=FrozenDict(path_to_root))
+
+
+@rule
+async def get_optional_source_root(
+    source_root_request: SourceRootRequest, source_root_config: SourceRootConfig
+) -> OptionalSourceRoot:
+    """Rule to request a SourceRoot that may not exist."""
+    pattern_matcher = source_root_config.get_pattern_matcher()
+    path = source_root_request.path
+
+    # Check if the requested path itself is a source root.
+
+    # A) Does it match a pattern?
+    if pattern_matcher.matches_root_patterns(path):
+        return OptionalSourceRoot(SourceRoot(str(path)))
+
+    # B) Does it contain a marker file?
+    marker_filenames = source_root_config.options.marker_filenames
+    if marker_filenames:
+        for marker_filename in marker_filenames:
+            if (
+                os.path.basename(marker_filename) != marker_filename
+                or "*" in marker_filename
+                or "!" in marker_filename
+            ):
+                raise InvalidMarkerFileError(
+                    f"Marker filename must be a base name: {marker_filename}"
+                )
+        paths = await Get(Paths, PathGlobs([str(path / mf) for mf in marker_filenames]))
+        if len(paths.files) > 0:
+            return OptionalSourceRoot(SourceRoot(str(path)))
+
+    # The requested path itself is not a source root, but maybe its parent is.
+    if str(path) != ".":
+        return await Get(OptionalSourceRoot, SourceRootRequest(path.parent))
+
+    # The requested path is not under a source root.
+    return OptionalSourceRoot(None)
+
+
+@rule
+async def get_source_root(source_root_request: SourceRootRequest) -> SourceRoot:
+    """Convenience rule to allow callers to request a SourceRoot directly.
+
+    That way callers don't have to unpack an OptionalSourceRoot if they know they expect a
+    SourceRoot to exist and are willing to error if it doesn't.
+    """
+    optional_source_root = await Get(OptionalSourceRoot, SourceRootRequest, source_root_request)
+    if optional_source_root.source_root is None:
+        raise NoSourceRootError(source_root_request.path)
+    return optional_source_root.source_root
+
+
+class AllSourceRoots(DeduplicatedCollection[SourceRoot]):
+    sort_input = True
+
+
+@rule(desc="Compute all source roots", level=LogLevel.DEBUG)
+async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
+    source_root_pattern_matcher = source_root_config.get_pattern_matcher()
+
+    # Create globs corresponding to all source root patterns.
+    pattern_matches: Set[str] = set()
+    for path in source_root_pattern_matcher.get_patterns():
+        if path == "/":
+            pattern_matches.add("**")
+        elif path.startswith("/"):
+            pattern_matches.add(f"{path[1:]}/")
+        else:
+            pattern_matches.add(f"**/{path}/")
+
+    # Create globs for any marker files.
+    marker_file_matches: Set[str] = set()
+    for marker_filename in source_root_config.options.marker_filenames:
+        marker_file_matches.add(f"**/{marker_filename}")
+
+    # Match the patterns against actual files, to find the roots that actually exist.
+    pattern_paths, marker_paths = await MultiGet(
+        Get(Paths, PathGlobs(globs=sorted(pattern_matches))),
+        Get(Paths, PathGlobs(globs=sorted(marker_file_matches))),
+    )
+
+    responses = await MultiGet(
+        itertools.chain(
+            (Get(OptionalSourceRoot, SourceRootRequest(PurePath(d))) for d in pattern_paths.dirs),
+            # We don't technically need to issue a SourceRootRequest for the marker files,
+            # since we know that their immediately enclosing dir is a source root by definition.
+            # However we may as well verify this formally, so that we're not replicating that
+            # logic here.
+            (Get(OptionalSourceRoot, SourceRootRequest(PurePath(f))) for f in marker_paths.files),
+        )
+    )
+    all_source_roots = {
+        response.source_root for response in responses if response.source_root is not None
+    }
+    return AllSourceRoots(all_source_roots)
+
+
+def rules():
+    return collect_rules()

@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -24,19 +26,21 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+#![type_length_limit = "1881109"]
 
-use clap;
-use env_logger;
-use fs;
-
-use rand;
-
-use serde_json;
+use std::convert::TryInto;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::process::exit;
+use std::sync::Arc;
+use std::time::Duration;
 
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
-use fs::GlobMatching;
+use fs::{
+  GlobExpansionConjunction, GlobMatching, PreparedPathGlobs, RelativePath, StrictGlobMatching,
+};
 use futures::compat::Future01CompatExt;
 use futures::future::TryFutureExt;
 use futures01::{future, Future};
@@ -45,13 +49,9 @@ use parking_lot::Mutex;
 use protobuf::Message;
 use rand::seq::SliceRandom;
 use serde_derive::Serialize;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
-use std::process::exit;
-use std::sync::Arc;
-use std::time::Duration;
-use store::{Snapshot, Store, StoreFileByDigest, UploadSummary};
-use tokio::runtime::Handle;
+use store::{
+  Snapshot, SnapshotOps, SnapshotOpsError, Store, StoreFileByDigest, SubsetParams, UploadSummary,
+};
 
 #[derive(Debug)]
 enum ExitCode {
@@ -158,6 +158,12 @@ to this directory.",
                   .takes_value(true)
                   .default_value("binary")
                   .possible_values(&["binary", "recursive-file-list", "recursive-file-list-with-digests", "text"]),
+              )
+              .arg(
+                Arg::with_name("child-dir")
+                    .long("child-dir")
+                    .takes_value(true)
+                    .help("Relative path of child Directory inside the Directory represented by the digest to navigate to before operating.")
               )
               .arg(Arg::with_name("fingerprint").required(true).takes_value(
                 true,
@@ -274,7 +280,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
-  let runtime = task_executor::Executor::new(Handle::current());
+  let runtime = task_executor::Executor::new();
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.values_of("server-address") {
       Some(cas_address) => {
@@ -446,17 +452,20 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         ));
         let store_copy = store.clone();
         let paths = posix_fs
-          .expand(fs::PathGlobs::create(
-            &args
-              .values_of("globs")
-              .unwrap()
-              .map(str::to_string)
-              .collect::<Vec<String>>(),
-            // By using `Ignore`, we say that we don't care if some globs fail to expand. Is
-            // that a valid assumption?
-            fs::StrictGlobMatching::Ignore,
-            fs::GlobExpansionConjunction::AllMatch,
-          )?)
+          .expand_globs(
+            fs::PathGlobs::new(
+              args
+                .values_of("globs")
+                .unwrap()
+                .map(str::to_string)
+                .collect::<Vec<String>>(),
+              // By using `Ignore`, we say that we don't care if some globs fail to expand. Is
+              // that a valid assumption?
+              fs::StrictGlobMatching::Ignore,
+              fs::GlobExpansionConjunction::AllMatch,
+            )
+            .parse()?,
+          )
           .await
           .map_err(|e| format!("Error expanding globs: {:?}", e))?;
 
@@ -481,7 +490,34 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .unwrap()
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
-        let digest = Digest(fingerprint, size_bytes);
+        let mut digest = Digest(fingerprint, size_bytes);
+
+        if let Some(prefix_to_strip) = args.value_of("child-dir") {
+          let mut result = store
+            .subset(
+              digest,
+              SubsetParams {
+                globs: PreparedPathGlobs::create(
+                  vec![format!("{}/**", prefix_to_strip)],
+                  StrictGlobMatching::Ignore,
+                  GlobExpansionConjunction::AnyMatch,
+                )?,
+              },
+            )
+            .await;
+          // It's a shame we can't just .and_then here, because we can't use async closures.
+          if let Ok(subset_digest) = result {
+            result = store
+              .strip_prefix(subset_digest, RelativePath::new(prefix_to_strip)?)
+              .await;
+          }
+          digest = result.map_err(|err| match err {
+            SnapshotOpsError::String(string)
+            | SnapshotOpsError::DigestMergeFailure(string)
+            | SnapshotOpsError::GlobMatchError(string) => string,
+          })?
+        }
+
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
           "binary" => {
             let maybe_directory = store.load_directory(digest).await?;
@@ -538,7 +574,10 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
       let digest = Digest(fingerprint, size_bytes);
-      let v = match store.load_file_bytes_with(digest, |bytes| bytes).await? {
+      let v = match store
+        .load_file_bytes_with(digest, |bytes| bytes.into())
+        .await?
+      {
         None => {
           let maybe_dir = store.load_directory(digest).await?;
           maybe_dir.map(|(dir, _metadata)| {
@@ -612,7 +651,7 @@ fn expand_files_helper(
         {
           let mut files_unlocked = files.lock();
           for file in dir.get_files() {
-            let file_digest: Result<Digest, String> = file.get_digest().into();
+            let file_digest: Result<Digest, String> = file.get_digest().try_into();
             files_unlocked.push((format!("{}{}", prefix, file.name), file_digest?));
           }
         }
@@ -620,7 +659,7 @@ fn expand_files_helper(
           .get_directories()
           .iter()
           .map(move |subdir| {
-            let digest: Result<Digest, String> = subdir.get_digest().into();
+            let digest: Result<Digest, String> = subdir.get_digest().try_into();
             digest.map(|digest| (subdir, digest))
           })
           .collect::<Result<Vec<_>, _>>()?;
@@ -652,7 +691,7 @@ fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> 
   // Unwrapping the output of creating the git ignorer with no patterns is infallible.
   fs::PosixFS::new(
     &root,
-    fs::GitignoreStyleExcludes::create(&[]).unwrap(),
+    fs::GitignoreStyleExcludes::create(vec![]).unwrap(),
     executor,
   )
   .unwrap()

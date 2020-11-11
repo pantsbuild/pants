@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -25,16 +27,16 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use hex;
-
-use digest::{Digest as DigestTrait, FixedOutput};
-use serde::ser::{Serialize, SerializeStruct, Serializer};
-use serde::{Deserialize, Deserializer};
-use sha2::Sha256;
-
+use byteorder::ByteOrder;
+use digest::consts::U32;
+use generic_array::GenericArray;
 use serde::de::{MapAccess, Visitor};
 use serde::export::fmt::Error;
 use serde::export::Formatter;
+use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::{Deserialize, Deserializer};
+use sha2::{Digest as Sha256Digest, Sha256};
+
 use std::fmt;
 use std::io::{self, Write};
 
@@ -63,6 +65,10 @@ impl Fingerprint {
     Fingerprint(fingerprint)
   }
 
+  pub fn from_bytes(bytes: GenericArray<u8, U32>) -> Fingerprint {
+    Fingerprint(bytes.into())
+  }
+
   pub fn from_hex_string(hex_string: &str) -> Result<Fingerprint, String> {
     <[u8; FINGERPRINT_SIZE] as hex::FromHex>::from_hex(hex_string)
       .map(Fingerprint)
@@ -79,6 +85,14 @@ impl Fingerprint {
       fmt::Write::write_fmt(&mut s, format_args!("{:02x}", byte)).unwrap();
     }
     s
+  }
+
+  ///
+  /// Using the fact that a Fingerprint is computed using a strong hash function, computes a strong
+  /// but short hash value from a prefix.
+  ///
+  pub fn prefix_hash(&self) -> u64 {
+    byteorder::BigEndian::read_u64(&self.0)
   }
 }
 
@@ -221,12 +235,9 @@ impl<'de> Deserialize<'de> for Digest {
 impl Digest {
   pub fn of_bytes(bytes: &[u8]) -> Self {
     let mut hasher = Sha256::default();
-    hasher.input(bytes);
+    hasher.update(bytes);
 
-    Digest(
-      Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
-      bytes.len(),
-    )
+    Digest(Fingerprint::from_bytes(hasher.finalize()), bytes.len())
   }
 }
 
@@ -254,7 +265,7 @@ impl<W: Write> WriterHasher<W> {
   pub fn finish(self) -> (Digest, W) {
     (
       Digest(
-        Fingerprint::from_bytes_unsafe(&self.hasher.fixed_result()),
+        Fingerprint::from_bytes(self.hasher.finalize()),
         self.byte_count,
       ),
       self.inner,
@@ -266,7 +277,7 @@ impl<W: Write> Write for WriterHasher<W> {
   fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
     let written = self.inner.write(buf)?;
     // Hash the bytes that were successfully written.
-    self.hasher.input(&buf[0..written]);
+    self.hasher.update(&buf[0..written]);
     self.byte_count += written;
     Ok(written)
   }

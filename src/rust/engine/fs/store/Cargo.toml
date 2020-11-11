@@ -5,26 +5,25 @@ authors = ["Daniel Wagner-Hall <dwagnerhall@twitter.com>"]
 edition = "2018"
 
 [dependencies]
+async-trait = "0.1"
 bazel_protos = { path = "../../process_execution/bazel_protos" }
 boxfuture = { path = "../../boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "../../concrete_time" }
-digest = "0.8"
-dirs = "1"
 fs = { path = ".." }
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
-# TODO: This is 0.5.1 + https://github.com/tikv/grpc-rs/pull/457.
-grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "d16fcfb4afbdd4c791e7c7e64e9748319ed8ad70", default_features = false, features = ["protobuf-codec", "secure"] }
+glob = "0.2.11"
+# TODO: This is 0.5.1 + https://github.com/tikv/grpc-rs/pull/457 + a workaround for https://github.com/rust-lang/cargo/issues/8258
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "ed3afa3c24ddf1fdd86826e836f57c00757dfc00", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../../hashing" }
-indexmap = "1.0.2"
+indexmap = "1.4"
 itertools = "0.7.2"
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
 log = "0.4"
-parking_lot = "0.6"
+parking_lot = "0.11"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 serverset = { path = "../../serverset" }
-sha2 = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }
@@ -37,5 +36,11 @@ workunit_store = {path = "../../workunit_store" }
 maplit = "*"
 mock = { path = "../../testutil/mock" }
 testutil = { path = "../../testutil" }
-tokio = { version = "0.2", features = ["rt-core", "macros"] }
+tokio = { version = "0.2.22", features = ["rt-core", "macros"] }
 walkdir = "2"
+criterion = "0.3"
+
+[[bench]]
+name = "store"
+# Using criterion: see https://bheisler.github.io/criterion.rs/book/getting_started.html
+harness = false

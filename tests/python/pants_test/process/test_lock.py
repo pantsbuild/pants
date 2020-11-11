@@ -31,7 +31,7 @@ class TestOwnerPrintingInterProcessFileLock(unittest.TestCase):
         self.lock_held = self.manager.Event()
         self.terminate = self.manager.Event()
         self.lock_process = Process(
-            target=hold_lock_until_terminate, args=(self.lock_path, self.lock_held, self.terminate),
+            target=hold_lock_until_terminate, args=(self.lock_path, self.lock_held, self.terminate)
         )
 
     def tearDown(self):

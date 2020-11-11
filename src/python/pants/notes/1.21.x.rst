@@ -3,6 +3,19 @@
 
 This document describes releases leading up to the ``1.21.x`` ``stable`` series.
 
+1.21.1rc0 (6/16/2020)
+---------------------
+
+N.B.: No further releases are expected in the ``1.21.x`` ``stable`` series. This ``.1rc0``
+release is for those upgrading through stable versions who wish to retain pytest console
+coverage support in Pants "v1".
+
+Bugfixes
+~~~~~~~~
+
+* Restore pytest coverage console report. (#10022)
+  `PR #10022 <https://github.com/pantsbuild/pants/pull/10022>`_
+
 1.21.0 (10/14/2019)
 -------------------
 

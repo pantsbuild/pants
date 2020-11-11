@@ -2,7 +2,7 @@
 line-length = 100
 exclude = '''
 /(
-  # These would already be ignored by pants, but having them here allows for manually running Black if one so whishes.
+  # These would already be ignored by pants, but having them here allows for manually running Black if one so wishes.
   | \.git
   | \.mypy_cache
   | dist
@@ -13,3 +13,10 @@ exclude = '''
   | compilation_failure
 )/
 '''
+
+
+[tool.isort]
+profile = "black"
+line_length = 100
+color_output = true
+known_first_party = ["internal_plugins", "pants", "pants_test"]

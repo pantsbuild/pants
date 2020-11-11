@@ -10,7 +10,7 @@ BOOTSTRAPPED_PEX_KEY=$2
 BOOTSTRAPPED_PEX_URL=s3://${AWS_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
 
 # shellcheck source=build-support/common.sh
- source "${REPO_ROOT}/build-support/common.sh"
+source "${REPO_ROOT}/build-support/common.sh"
 
 # Note that in the aws cli --no-sign-request allows access to public S3 buckets without
 # credentials, as long as we specify the region.
@@ -20,7 +20,7 @@ NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versio
   --bucket "${AWS_BUCKET}" --prefix "${BOOTSTRAPPED_PEX_KEY}" --max-items 2 \
   | jq '.Versions | length')
 [ "${NUM_VERSIONS}" == "1" ] || die "Multiple copies of pants.pex found at" \
-   "${BOOTSTRAPPED_PEX_URL}. This is not allowed as a security precuation. This likely happened" \
+   "${BOOTSTRAPPED_PEX_URL}. This is not allowed as a security precaution. This likely happened" \
    "from restarting the bootstrap shards in the same Travis build. Instead, initiate a new build" \
    "by either pulling from master or pushing an empty commit (\`git commit --allow-empty\`)."
 
@@ -36,7 +36,7 @@ chmod 755 ./pants.pex
 # The "|| true" is necessary because unzip returns a non-zero exit code if there were any
 # bytes before the zip magic number (in our case, the pex shebang), even though the unzip
 # operation otherwise succeeds.
-unzip -j pants.pex pants/engine/native_engine.so -d src/python/pants/engine/ || true
+unzip -j pants.pex pants/engine/internals/native_engine.so -d src/python/pants/engine/internals || true
 
 # TODO: As of 2019/10/24, we've seen sigbus errors while starting tests that feel potentially related
 # to either the PEX or native_engine.so just having finished extraction. If we continue to see those

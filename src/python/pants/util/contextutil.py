@@ -4,23 +4,21 @@
 import logging
 import os
 import shutil
-import signal
+import ssl
 import sys
 import tempfile
+import termios
 import threading
-import time
-import uuid
 import zipfile
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
+from pathlib import Path
 from queue import Queue
 from socketserver import TCPServer
-from types import FrameType
-from typing import IO, Any, Callable, Iterator, Mapping, Optional, Type, Union, cast
+from typing import IO, Any, Callable, Iterator, Mapping, Optional, Tuple, Type, Union
 
 from colors import green
 
 from pants.util.dirutil import safe_delete
-from pants.util.tarutil import TarFile
 
 
 class InvalidZipPath(ValueError):
@@ -85,8 +83,20 @@ def hermetic_environment_as(**kwargs: Optional[str]) -> Iterator[None]:
 
 
 @contextmanager
+def argv_as(args: Tuple[str, ...]) -> Iterator[None]:
+    """Temporarily set `sys.argv` to the supplied value."""
+    old_args = sys.argv
+    try:
+        sys.argv = list(args)
+        yield
+    finally:
+        sys.argv = old_args
+
+
+@contextmanager
 def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str) -> Iterator[None]:
     """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
+    src = None
     if src_fd == -1:
         src = open("/dev/null", mode)
         src_fd = src.fileno()
@@ -99,11 +109,21 @@ def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str
 
     # Open up a new file handle to temporarily replace the python-level io object, then yield.
     new_dst = os.fdopen(dst_fd, mode)
+    is_atty = new_dst.isatty()
     setattr(sys, dst_sys_attribute, new_dst)
     try:
         yield
     finally:
-        new_dst.close()
+        try:
+            if src:
+                src.close()
+            if is_atty:
+                termios.tcdrain(dst_fd)
+            else:
+                new_dst.flush()
+            new_dst.close()
+        except BaseException:
+            pass
 
         # Restore the python and os level file handles.
         os.dup2(old_dst_fd, dst_fd)
@@ -128,22 +148,6 @@ def stdio_as(stdout_fd: int, stderr_fd: int, stdin_fd: int) -> Iterator[None]:
         stdout_fd, 1, "stdout", "w"
     ), _stdio_stream_as(stderr_fd, 2, "stderr", "w"):
         yield
-
-
-@contextmanager
-def signal_handler_as(
-    sig: int, handler: Union[int, Callable[[int, FrameType], None]]
-) -> Iterator[None]:
-    """Temporarily replaces a signal handler for the given signal and restores the old handler.
-
-    :param sig: The target signal to replace the handler for (e.g. signal.SIGINT).
-    :param handler: The new temporary handler.
-    """
-    old_handler = signal.signal(sig, handler)
-    try:
-        yield
-    finally:
-        signal.signal(sig, old_handler)
 
 
 @contextmanager
@@ -227,26 +231,33 @@ def temporary_file(
 
 
 @contextmanager
-def safe_file(path: str, suffix: Optional[str] = None, cleanup: bool = True) -> Iterator[str]:
-    """A with-context that copies a file, and copies the copy back to the original file on success.
+def overwrite_file_content(
+    file_path: Union[str, Path],
+    temporary_content: Optional[Union[bytes, str, Callable[[bytes], bytes]]] = None,
+) -> Iterator[None]:
+    """A helper that resets a file after the method runs.
 
-    This is useful for doing work on a file but only changing its state on success.
+     It will read a file, save the content, maybe write temporary_content to it, yield, then
+     write the original content to the file.
 
-    :param suffix: Use this suffix to create the copy. Otherwise use a random string.
-    :param cleanup: Whether or not to clean up the copy.
+    :param file_path: Absolute path to the file to be reset after the method runs.
+    :param temporary_content: Content to write to the file, or a function from current content
+      to new temporary content.
     """
-    safe_path = f"{path}.{(suffix or uuid.uuid4())}"
-    if os.path.exists(path):
-        shutil.copy(path, safe_path)
+    file_path = Path(file_path)
+    original_content = file_path.read_bytes()
     try:
-        yield safe_path
-        if cleanup:
-            shutil.move(safe_path, path)
-        else:
-            shutil.copy(safe_path, path)
+        if temporary_content is not None:
+            if callable(temporary_content):
+                content = temporary_content(original_content)
+            elif isinstance(temporary_content, bytes):
+                content = temporary_content
+            else:
+                content = temporary_content.encode()
+            file_path.write_bytes(content)
+        yield
     finally:
-        if cleanup:
-            safe_delete(safe_path)
+        file_path.write_bytes(original_content)
 
 
 @contextmanager
@@ -290,65 +301,6 @@ def open_zip(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[zipfile
 
 
 @contextmanager
-def open_tar(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[TarFile]:
-    """A with-context for tar files.  Passes through positional and kwargs to tarfile.open.
-
-    If path_or_file is a file, caller must close it separately.
-    """
-    (path, fileobj) = (
-        (path_or_file, None) if isinstance(path_or_file, str) else (None, path_or_file)
-    )
-    kwargs["fileobj"] = fileobj
-    with closing(TarFile.open(path, *args, **kwargs)) as tar:
-        # We must cast the normal tarfile.TarFile to our custom pants.util.tarutil.TarFile.
-        typed_tar = cast(TarFile, tar)
-        yield typed_tar
-
-
-class Timer:
-    """Very basic with-context to time operations.
-
-  Example usage:
-    >>> from pants.util.contextutil import Timer
-    >>> with Timer() as timer:
-    ...   time.sleep(2)
-    ...
-    >>> timer.elapsed
-    2.0020849704742432
-    """
-
-    def __init__(self, clock=time) -> None:
-        self._clock = clock
-
-    def __enter__(self) -> "Timer":
-        self.start: float = self._clock.time()
-        self.finish: Optional[float] = None
-        return self
-
-    @property
-    def elapsed(self) -> float:
-        end_time: float = self.finish if self.finish is not None else self._clock.time()
-        return end_time - self.start
-
-    def __exit__(self, typ, val, traceback):
-        self.finish = self._clock.time()
-
-
-@contextmanager
-def exception_logging(logger: logging.Logger, msg: str) -> Iterator[None]:
-    """Provides exception logging via `logger.exception` for a given block of code.
-
-    :param logger: The `Logger` instance to use for logging.
-    :param msg: The message to emit before `logger.exception` emits the traceback.
-    """
-    try:
-        yield
-    except Exception:
-        logger.exception(msg)
-        raise
-
-
-@contextmanager
 def maybe_profiled(profile_path: Optional[str]) -> Iterator[None]:
     """A profiling context manager.
 
@@ -378,10 +330,13 @@ def maybe_profiled(profile_path: Optional[str]) -> Iterator[None]:
 
 
 @contextmanager
-def http_server(handler_class: Type) -> Iterator[int]:
+def http_server(handler_class: Type, ssl_context: Optional[ssl.SSLContext] = None) -> Iterator[int]:
     def serve(port_queue: "Queue[int]", shutdown_queue: "Queue[bool]") -> None:
         httpd = TCPServer(("", 0), handler_class)
         httpd.timeout = 0.1
+        if ssl_context:
+            httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
+
         port_queue.put(httpd.server_address[1])
         while shutdown_queue.empty():
             httpd.handle_request()

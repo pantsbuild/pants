@@ -5,14 +5,13 @@ use crate::{
 
 use bazel_protos;
 use bytes::Bytes;
-use digest::{Digest as DigestTrait, FixedOutput};
+use fs::RelativePath;
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
 use maplit::btreemap;
 use mock::StubCAS;
 use protobuf::Message;
 use serverset::BackoffConfig;
-use sha2::Sha256;
 use std;
 use std::collections::HashMap;
 use std::fs::File;
@@ -22,7 +21,6 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use tokio::runtime::Handle;
 
 impl LoadMetadata {
   fn is_remote(&self) -> bool {
@@ -71,7 +69,9 @@ pub fn extra_big_file_bytes() -> Bytes {
 }
 
 pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
-  let option = store.load_file_bytes_with(digest, |bytes| bytes).await?;
+  let option = store
+    .load_file_bytes_with(digest, |bytes| Bytes::from(bytes))
+    .await?;
   Ok(option.map(|(bytes, _metadata)| bytes))
 }
 
@@ -90,8 +90,7 @@ pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
 /// Create a new local store with whatever was already serialized in dir.
 ///
 fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
-  Store::local_only(task_executor::Executor::new(Handle::current()), dir)
-    .expect("Error creating local store")
+  Store::local_only(task_executor::Executor::new(), dir).expect("Error creating local store")
 }
 
 ///
@@ -99,7 +98,7 @@ fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
 ///
 fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
   Store::with_remote(
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     dir,
     vec![cas_address],
     None,
@@ -372,15 +371,8 @@ async fn non_canonical_remote_directory_is_error() {
       .write_to_bytes()
       .expect("Error serializing proto"),
   );
-  let non_canonical_directory_fingerprint = {
-    let mut hasher = Sha256::default();
-    hasher.input(&non_canonical_directory_bytes);
-    Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-  };
-  let directory_digest = Digest(
-    non_canonical_directory_fingerprint,
-    non_canonical_directory_bytes.len(),
-  );
+  let directory_digest = Digest::of_bytes(&non_canonical_directory_bytes);
+  let non_canonical_directory_fingerprint = directory_digest.0;
 
   let dir = TempDir::new().unwrap();
 
@@ -785,7 +777,7 @@ async fn upload_missing_files() {
     .expect_err("Want error");
   assert_eq!(
     error,
-    format!("Failed to upload digest {:?}: Not found", testdata.digest())
+    format!("Failed to expand digest {:?}: Not found", testdata.digest())
   );
 }
 
@@ -868,7 +860,7 @@ async fn instance_name_upload() {
     .expect("Error storing catnip locally");
 
   let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     dir.path(),
     vec![cas.address()],
     Some("dark-tower".to_owned()),
@@ -899,7 +891,7 @@ async fn instance_name_download() {
     .build();
 
   let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     dir.path(),
     vec![cas.address()],
     Some("dark-tower".to_owned()),
@@ -916,7 +908,7 @@ async fn instance_name_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| b,)
+      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::from(b))
       .await
       .unwrap()
       .unwrap()
@@ -949,7 +941,7 @@ async fn auth_upload() {
     .expect("Error storing catnip locally");
 
   let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     dir.path(),
     vec![cas.address()],
     None,
@@ -980,7 +972,7 @@ async fn auth_download() {
     .build();
 
   let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(Handle::current()),
+    task_executor::Executor::new(),
     dir.path(),
     vec![cas.address()],
     None,
@@ -997,7 +989,7 @@ async fn auth_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| b,)
+      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::from(b))
       .await
       .unwrap()
       .unwrap()
@@ -1570,4 +1562,90 @@ async fn explicitly_overwrites_already_existing_file() {
 
   let file_contents = std::fs::read(&file_path).unwrap();
   assert_eq!(file_contents, b"abc123".to_vec());
+}
+
+fn create_empty_directory_materialize_metadata() -> DirectoryMaterializeMetadata {
+  crate::DirectoryMaterializeMetadata {
+    metadata: LoadMetadata::Local,
+    child_directories: Default::default(),
+    child_files: Default::default(),
+  }
+}
+
+fn create_files_directory_materialize_metadata<S: AsRef<str>, F: IntoIterator<Item = S>>(
+  child_files: F,
+) -> DirectoryMaterializeMetadata {
+  crate::DirectoryMaterializeMetadata {
+    child_files: child_files
+      .into_iter()
+      .map(|c| (c.as_ref().to_string(), LoadMetadata::Local))
+      .collect(),
+    ..create_empty_directory_materialize_metadata()
+  }
+}
+
+fn create_directories_directory_materialize_metadata<
+  S: AsRef<str>,
+  F: IntoIterator<Item = (S, DirectoryMaterializeMetadata)>,
+>(
+  child_dirs: F,
+) -> DirectoryMaterializeMetadata {
+  crate::DirectoryMaterializeMetadata {
+    child_directories: child_dirs
+      .into_iter()
+      .map(|(c, d)| (c.as_ref().to_string(), d))
+      .collect(),
+    ..create_empty_directory_materialize_metadata()
+  }
+}
+
+#[test]
+fn directory_materialize_metadata_empty_contains_file_empty() {
+  let md = create_empty_directory_materialize_metadata();
+  assert!(!md.contains_file(&RelativePath::new("").unwrap()));
+}
+
+#[test]
+fn directory_materialize_metadata_empty_contains_file() {
+  let md = create_empty_directory_materialize_metadata();
+  assert!(!md.contains_file(&RelativePath::new("./script.sh").unwrap()));
+}
+
+#[test]
+fn directory_materialize_metadata_contains_file() {
+  let md = create_files_directory_materialize_metadata(vec!["script.sh"]);
+  assert!(md.contains_file(&RelativePath::new("./script.sh").unwrap()));
+  assert!(md.contains_file(&RelativePath::new("script.sh").unwrap()));
+}
+
+#[test]
+fn directory_materialize_metadata_un_normalized_contains_file() {
+  let md = create_files_directory_materialize_metadata(vec!["./script.sh"]);
+  assert!(md.contains_file(&RelativePath::new("./script.sh").unwrap()));
+  assert!(md.contains_file(&RelativePath::new("script.sh").unwrap()));
+}
+
+#[test]
+fn directory_materialize_metadata_contains_subdir_file() {
+  let subdir_md = create_files_directory_materialize_metadata(vec!["script.sh"]);
+  let md = create_directories_directory_materialize_metadata(vec![
+    ("subdir", subdir_md),
+    ("script", create_empty_directory_materialize_metadata()),
+  ]);
+
+  assert!(!md.contains_file(&RelativePath::new("./script.sh").unwrap()));
+  assert!(!md.contains_file(&RelativePath::new("script.sh").unwrap()));
+  assert!(md.contains_file(&RelativePath::new("./subdir/script.sh").unwrap()));
+  assert!(md.contains_file(&RelativePath::new("subdir/script.sh").unwrap()));
+}
+
+#[test]
+fn directory_materialize_metadata_empty_dir() {
+  let md = create_directories_directory_materialize_metadata(vec![(
+    "script",
+    create_empty_directory_materialize_metadata(),
+  )]);
+
+  assert!(!md.contains_file(&RelativePath::new("./script").unwrap()));
+  assert!(!md.contains_file(&RelativePath::new("script").unwrap()));
 }

@@ -56,8 +56,8 @@ impl ParsedJVMCommandLines {
     nailgun_args.extend(nailgun_args_after_classpath);
 
     Ok(ParsedJVMCommandLines {
-      nailgun_args: nailgun_args,
-      client_args: client_args,
+      nailgun_args,
+      client_args,
       client_main_class: main_class,
     })
   }

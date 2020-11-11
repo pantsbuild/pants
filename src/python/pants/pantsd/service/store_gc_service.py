@@ -4,7 +4,7 @@
 import logging
 import time
 
-from pants.engine.scheduler import Scheduler
+from pants.engine.internals.scheduler import Scheduler
 from pants.pantsd.service.pants_service import PantsService
 
 
@@ -13,24 +13,28 @@ class StoreGCService(PantsService):
 
     This service both ensures that in-use files continue to be present in the engine's Store, and
     performs occasional garbage collection to bound the size of the engine's Store.
+
+    NB: The lease extension interval should be significantly less than the rust-side
+    sharded_lmdb::DEFAULT_LEASE_TIME to ensure that valid leases are extended well before they
+    might expire.
     """
 
     def __init__(
         self,
         scheduler: Scheduler,
         period_secs=10,
-        lease_extension_interval_secs=(30 * 60),
-        gc_interval_secs=(4 * 60 * 60),
+        lease_extension_interval_secs=(15 * 60),
+        gc_interval_secs=(1 * 60 * 60),
+        target_size_bytes=(4 * 1024 * 1024 * 1024),
     ):
         super().__init__()
-        self._scheduler_session = scheduler.new_session(
-            zipkin_trace_v2=False, build_id="store_gc_service_session"
-        )
+        self._scheduler_session = scheduler.new_session(build_id="store_gc_service_session")
         self._logger = logging.getLogger(__name__)
 
         self._period_secs = period_secs
         self._lease_extension_interval_secs = lease_extension_interval_secs
         self._gc_interval_secs = gc_interval_secs
+        self._target_size_bytes = target_size_bytes
 
         self._set_next_gc()
         self._set_next_lease_extension()
@@ -44,17 +48,17 @@ class StoreGCService(PantsService):
     def _maybe_extend_lease(self):
         if time.time() < self._next_lease_extension:
             return
-        self._logger.debug("Extending leases")
+        self._logger.info("Extending leases")
         self._scheduler_session.lease_files_in_graph()
-        self._logger.debug("Done extending leases")
+        self._logger.info("Done extending leases")
         self._set_next_lease_extension()
 
     def _maybe_garbage_collect(self):
         if time.time() < self._next_gc:
             return
-        self._logger.debug("Garbage collecting store")
-        self._scheduler_session.garbage_collect_store()
-        self._logger.debug("Done garbage collecting store")
+        self._logger.info("Garbage collecting store")
+        self._scheduler_session.garbage_collect_store(self._target_size_bytes)
+        self._logger.info("Done garbage collecting store")
         self._set_next_gc()
 
     def run(self):

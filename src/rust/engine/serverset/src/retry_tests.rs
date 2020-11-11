@@ -1,9 +1,9 @@
-use crate::{BackoffConfig, Retry, Serverset};
-use maplit::hashset;
-use std::time::Duration;
-use testutil::owned_string_vec;
+use crate::{retry, BackoffConfig, Serverset};
 
-use futures::compat::Future01CompatExt;
+use std::time::Duration;
+
+use maplit::hashset;
+use testutil::owned_string_vec;
 
 #[tokio::test]
 async fn retries() {
@@ -23,9 +23,7 @@ async fn retries() {
   let mut saw = hashset![];
   for _ in 0..3 {
     saw.insert(
-      Retry(s.clone())
-        .all_errors_immediately(|v| v, 1)
-        .compat()
+      retry::all_errors_immediately(&s, 1, |v| async move { v })
         .await
         .unwrap(),
     );
@@ -44,9 +42,6 @@ async fn gives_up_on_enough_bad() {
   .unwrap();
   assert_eq!(
     Err(format!("Failed after 5 retries; last failure: bad")),
-    Retry(s)
-      .all_errors_immediately(|v: Result<u8, _>| v, 5)
-      .compat()
-      .await
+    retry::all_errors_immediately(&s, 5, |v: Result<u8, _>| async move { v }).await
   );
 }

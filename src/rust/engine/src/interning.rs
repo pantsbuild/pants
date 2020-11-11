@@ -4,8 +4,10 @@
 use std::collections::HashMap;
 use std::hash;
 
-use crate::core::{Key, Value, FNV};
-use crate::externs::{self, Ident};
+use cpython::{ObjectProtocol, PyClone, PyErr, PyType, Python, PythonObject, ToPyObject};
+
+use crate::core::{Key, TypeId, Value, FNV};
+use crate::externs;
 
 ///
 /// A struct that encapsulates interning of python `Value`s as comparable `Key`s.
@@ -33,8 +35,10 @@ use crate::externs::{self, Ident};
 ///
 #[derive(Default)]
 pub struct Interns {
-  forward: HashMap<InternKey, Key, FNV>,
-  reverse: HashMap<Key, Value, FNV>,
+  forward_keys: HashMap<InternKey, Key, FNV>,
+  reverse_keys: HashMap<Key, Value, FNV>,
+  forward_types: HashMap<InternType, TypeId, FNV>,
+  reverse_types: HashMap<TypeId, PyType, FNV>,
   id_generator: u64,
 }
 
@@ -43,37 +47,53 @@ impl Interns {
     Interns::default()
   }
 
-  pub fn insert(&mut self, v: Value) -> Key {
-    let ident = externs::identify(&v);
-    self.insert_with(v, ident)
-  }
+  pub fn key_insert(&mut self, py: Python, v: Value) -> Result<Key, PyErr> {
+    let intern_key = InternKey(v.hash(py)?, v.to_py_object(py).into());
 
-  pub fn insert_with(&mut self, v: Value, ident: Ident) -> Key {
-    let mut inserted = false;
-    let id_generator = self.id_generator;
-    let key = *self
-      .forward
-      .entry(InternKey(ident.hash, v.clone()))
-      .or_insert_with(|| {
-        inserted = true;
-        Key::new(id_generator, ident.type_id)
-      });
-    if inserted {
-      self.reverse.insert(key, v);
+    let key = if let Some(key) = self.forward_keys.get(&intern_key) {
+      *key
+    } else {
+      let id = self.id_generator;
       self.id_generator += 1;
-    }
-    key
+      let key = Key::new(id, self.type_insert(py, v.get_type(py)));
+      self.forward_keys.insert(intern_key, key);
+      self.reverse_keys.insert(key, v);
+      key
+    };
+    Ok(key)
   }
 
-  pub fn get(&self, k: &Key) -> &Value {
+  pub fn key_get(&self, k: &Key) -> &Value {
     self
-      .reverse
+      .reverse_keys
+      .get(&k)
+      .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
+  }
+
+  pub fn type_insert(&mut self, py: Python, v: PyType) -> TypeId {
+    let intern_type = InternType(v.as_object().hash(py).unwrap(), v.clone_ref(py));
+
+    if let Some(type_id) = self.forward_types.get(&intern_type) {
+      *type_id
+    } else {
+      let id = self.id_generator;
+      self.id_generator += 1;
+      let type_id = TypeId(id);
+      self.forward_types.insert(intern_type, type_id);
+      self.reverse_types.insert(type_id, v);
+      type_id
+    }
+  }
+
+  pub fn type_get(&self, k: &TypeId) -> &PyType {
+    self
+      .reverse_types
       .get(&k)
       .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
   }
 }
 
-struct InternKey(i64, Value);
+struct InternKey(isize, Value);
 
 impl Eq for InternKey {}
 
@@ -84,6 +104,22 @@ impl PartialEq for InternKey {
 }
 
 impl hash::Hash for InternKey {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    self.0.hash(state);
+  }
+}
+
+struct InternType(isize, PyType);
+
+impl Eq for InternType {}
+
+impl PartialEq for InternType {
+  fn eq(&self, other: &InternType) -> bool {
+    self.1 == other.1
+  }
+}
+
+impl hash::Hash for InternType {
   fn hash<H: hash::Hasher>(&self, state: &mut H) {
     self.0.hash(state);
   }

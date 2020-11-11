@@ -4,10 +4,12 @@
 from typing import Optional, Tuple, cast
 
 from pants.option.custom_types import shell_str
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 
 
 class PyTest(Subsystem):
+    """The pytest Python test framework (https://docs.pytest.org/)."""
+
     options_scope = "pytest"
 
     @classmethod
@@ -17,23 +19,26 @@ class PyTest(Subsystem):
             "--args",
             type=list,
             member_type=shell_str,
-            fingerprint=True,
+            passthrough=True,
             help='Arguments to pass directly to Pytest, e.g. `--pytest-args="-k test_foo --quiet"`',
         )
         register(
             "--version",
-            default="pytest>=5.3.5,<5.4",
-            fingerprint=True,
+            # This should be kept in sync with `requirements.txt`.
+            # TODO: To fix this, we should allow using a `target_option` referring to a
+            #  `python_requirement_library` to override the version.
+            default="pytest>=6.0.1,<6.1",
+            advanced=True,
             help="Requirement string for Pytest.",
         )
         register(
             "--pytest-plugins",
             type=list,
-            fingerprint=True,
+            advanced=True,
             default=[
-                "pytest-timeout>=1.3.4,<1.4",
-                "pytest-cov>=2.8.1,<2.9",
-                # NB: zipp has frequently destabilized builds due to floating transitive versions under pytest.
+                "pytest-cov>=2.10.1,<2.11",
+                # NB: zipp has frequently destabilized builds due to floating transitive versions
+                # under pytest.
                 "zipp==2.1.0",
             ],
             help="Requirement strings for any plugins or additional requirements you'd like to use.",
@@ -51,13 +56,42 @@ class PyTest(Subsystem):
             "--timeout-default",
             type=int,
             advanced=True,
-            help="The default timeout (in seconds) for a test target if the timeout field is not set on the target.",
+            help=(
+                "The default timeout (in seconds) for a test target if the `timeout` field is not "
+                "set on the target."
+            ),
         )
         register(
             "--timeout-maximum",
             type=int,
             advanced=True,
-            help="The maximum timeout (in seconds) that can be set on a test target.",
+            help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
+        )
+        register(
+            "--junit-xml-dir",
+            type=str,
+            metavar="<DIR>",
+            default=None,
+            advanced=True,
+            help="Specifying a directory causes Junit XML result files to be emitted under "
+            "that dir for each test run.",
+        )
+        register(
+            "--junit-family",
+            type=str,
+            default="xunit2",
+            advanced=True,
+            help="The format of the generated XML file. See https://docs.pytest.org/en/latest/reference.html#confval-junit_family.",
+        )
+        register(
+            "--execution-slot-var",
+            type=str,
+            default=None,
+            advanced=True,
+            help=(
+                "If a non-empty string, the process execution slot id (an integer) will be exposed "
+                "to tests under this environment variable name."
+            ),
         )
 
     def get_requirement_strings(self) -> Tuple[str, ...]:

@@ -1,5 +1,5 @@
 use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
-use crate::{PlatformConstraint, Process, ProcessMetadata};
+use crate::{NamedCaches, PlatformConstraint, Process, ProcessMetadata};
 use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
 use std::fs::read_link;
@@ -7,14 +7,19 @@ use std::os::unix::fs::symlink;
 use std::path::PathBuf;
 use store::Store;
 use tempfile::TempDir;
-use tokio::runtime::Handle;
 
 fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
   let store_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new(Handle::current());
+  let named_cache_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-  let local_runner =
-    crate::local::CommandRunner::new(store, executor.clone(), std::env::temp_dir(), true);
+  let local_runner = crate::local::CommandRunner::new(
+    store,
+    executor.clone(),
+    std::env::temp_dir(),
+    NamedCaches::new(named_cache_dir.path().to_owned()),
+    true,
+  );
   let metadata = ProcessMetadata {
     instance_name: None,
     cache_key_gen_version: None,
@@ -33,20 +38,11 @@ fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {
 }
 
 fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> Process {
-  Process {
-    argv: vec![],
-    env: Default::default(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: Default::default(),
-    output_directories: Default::default(),
-    timeout: Default::default(),
-    description: "".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: jdk_home,
-    target_platform: PlatformConstraint::Darwin,
-    is_nailgunnable: true,
-  }
+  let mut process = Process::new(vec![]);
+  process.jdk_home = jdk_home;
+  process.is_nailgunnable = true;
+  process.target_platform = PlatformConstraint::Darwin;
+  process
 }
 
 #[tokio::test]
@@ -54,7 +50,7 @@ async fn get_workdir_creates_directory_if_it_doesnt_exist() {
   let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None)
     .path()
     .to_owned();
-  let mock_nailgun_name = "mock_non_existing_workdir".to_string();
+  let mock_nailgun_name = "mock_nonexistent_workdir".to_string();
   let runner = mock_nailgun_runner(Some(mock_workdir_base.clone()));
 
   let target_workdir = mock_workdir_base.join(mock_nailgun_name.clone());

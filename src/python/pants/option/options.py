@@ -3,22 +3,18 @@
 
 import copy
 import logging
-import re
-import sys
-from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
+from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
-from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_list_option
-from pants.option.option_value_container import OptionValueContainer
+from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import frozen_after_init
+from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -75,6 +71,9 @@ class Options:
     class DuplicateScopeError(Exception):
         """More than one registration occurred for the same scope."""
 
+    class AmbiguousPassthroughError(Exception):
+        """More than one goal was passed along with passthrough args."""
+
     @classmethod
     def complete_scopes(cls, scope_infos: Iterable[ScopeInfo]) -> FrozenOrderedSet[ScopeInfo]:
         """Expand a set of scopes to include all enclosing scopes.
@@ -95,7 +94,7 @@ class Options:
                 )
             original_scopes[si.scope] = si
             if si.deprecated_scope:
-                ret.add(ScopeInfo(si.deprecated_scope, si.category, si.optionable_cls))
+                ret.add(ScopeInfo(si.deprecated_scope, si.optionable_cls))
                 original_scopes[si.deprecated_scope] = si
 
         # TODO: Once scope name validation is enforced (so there can be no dots in scope name
@@ -104,7 +103,7 @@ class Options:
         for si in copy.copy(ret):
             for scope in all_enclosing_scopes(si.scope, allow_global=False):
                 if scope not in original_scopes:
-                    ret.add(ScopeInfo(scope, ScopeInfo.INTERMEDIATE))
+                    ret.add(ScopeInfo(scope))
         return FrozenOrderedSet(ret)
 
     @classmethod
@@ -113,7 +112,7 @@ class Options:
         env: Mapping[str, str],
         config: Config,
         known_scope_infos: Iterable[ScopeInfo],
-        args: Optional[Sequence[str]] = None,
+        args: Sequence[str],
         bootstrap_option_values: Optional[OptionValueContainer] = None,
     ) -> "Options":
         """Create an Options instance.
@@ -128,11 +127,16 @@ class Options:
         # We need parsers for all the intermediate scopes, so inherited option values
         # can propagate through them.
         complete_known_scope_infos = cls.complete_scopes(known_scope_infos)
-        splitter = ArgSplitter(complete_known_scope_infos)
-        args = sys.argv if args is None else args
+        splitter = ArgSplitter(complete_known_scope_infos, get_buildroot())
         split_args = splitter.split_args(args)
 
-        option_tracker = OptionTracker()
+        if split_args.passthru and len(split_args.goals) > 1:
+            raise cls.AmbiguousPassthroughError(
+                f"Specifying multiple goals (in this case: {split_args.goals}) "
+                "along with passthrough args (args after `--`) is ambiguous.\n"
+                "Try either specifying only a single goal, or passing the passthrough args "
+                "directly to the relevant consumer via its associated flags."
+            )
 
         if bootstrap_option_values:
             spec_files = bootstrap_option_values.spec_files
@@ -145,21 +149,17 @@ class Options:
 
         help_request = splitter.help_request
 
-        parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos, option_tracker)
-        bootstrap_option_values = bootstrap_option_values
+        parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
         return cls(
             goals=split_args.goals,
             scope_to_flags=split_args.scope_to_flags,
             specs=split_args.specs,
             passthru=split_args.passthru,
-            passthru_owner=split_args.passthru_owner,
             help_request=help_request,
             parser_hierarchy=parser_hierarchy,
             bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
-            option_tracker=option_tracker,
-            unknown_scopes=split_args.unknown_scopes,
         )
 
     def __init__(
@@ -168,13 +168,10 @@ class Options:
         scope_to_flags: Dict[str, List[str]],
         specs: List[str],
         passthru: List[str],
-        passthru_owner: Optional[str],
         help_request: Optional[HelpRequest],
         parser_hierarchy: ParserHierarchy,
         bootstrap_option_values: Optional[OptionValueContainer],
         known_scope_to_info: Dict[str, ScopeInfo],
-        option_tracker: OptionTracker,
-        unknown_scopes: List[str],
     ) -> None:
         """The low-level constructor for an Options instance.
 
@@ -184,24 +181,17 @@ class Options:
         self._scope_to_flags = scope_to_flags
         self._specs = specs
         self._passthru = passthru
-        self._passthru_owner = passthru_owner
         self._help_request = help_request
         self._parser_hierarchy = parser_hierarchy
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
-        self._option_tracker = option_tracker
         self._frozen = False
-        self._unknown_scopes = unknown_scopes
 
     # TODO: Eliminate this in favor of a builder/factory.
     @property
     def frozen(self) -> bool:
         """Whether or not this Options object is frozen from writes."""
         return self._frozen
-
-    @property
-    def tracker(self) -> OptionTracker:
-        return self._option_tracker
 
     @property
     def help_request(self) -> Optional[HelpRequest]:
@@ -226,32 +216,6 @@ class Options:
         """
         return self._goals
 
-    @memoized_property
-    def goals_by_version(self) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...]]:
-        """Goals organized into three tuples by whether they are v1, ambiguous, or v2 goals
-        (respectively).
-
-        It's possible for a goal to be implemented with both v1 and v2, in which case a consumer
-        should use the `--v1` and `--v2` global flags to disambiguate.
-        """
-        v1, ambiguous, v2 = [], [], []
-        for goal in self._goals:
-            goal_dot = f"{goal}."
-            scope_categories = {
-                s.category
-                for s in self.known_scope_to_info.values()
-                if s.scope == goal or s.scope.startswith(goal_dot)
-            }
-            is_v1 = ScopeInfo.TASK in scope_categories
-            is_v2 = ScopeInfo.GOAL in scope_categories
-            if is_v1 and is_v2:
-                ambiguous.append(goal)
-            elif is_v1:
-                v1.append(goal)
-            else:
-                v2.append(goal)
-        return tuple(v1), tuple(ambiguous), tuple(v2)
-
     @property
     def known_scope_to_info(self) -> Dict[str, ScopeInfo]:
         return self._known_scope_to_info
@@ -272,8 +236,11 @@ class Options:
             for section in config.sections():
                 scope = GLOBAL_SCOPE if section == GLOBAL_SCOPE_CONFIG_SECTION else section
                 try:
+                    # TODO(#10834): this is broken for subscopes. Once we fix global options to no
+                    #  longer be included in self.for_scope(), we should set
+                    #  inherit_from_enclosing_scope=True.
                     valid_options_under_scope = set(
-                        self.for_scope(scope, include_passive_options=True)
+                        self.for_scope(scope, inherit_from_enclosing_scope=False)
                     )
                 # Only catch ConfigValidationError. Other exceptions will be raised directly.
                 except Config.ConfigValidationError:
@@ -311,13 +278,10 @@ class Options:
             scope_to_flags=no_flags,
             specs=self._specs,
             passthru=self._passthru,
-            passthru_owner=self._passthru_owner,
             help_request=self._help_request,
             parser_hierarchy=self._parser_hierarchy,
             bootstrap_option_values=self._bootstrap_option_values,
             known_scope_to_info=self._known_scope_to_info,
-            option_tracker=self._option_tracker,
-            unknown_scopes=self._unknown_scopes,
         )
 
     def is_known_scope(self, scope: str) -> bool:
@@ -326,30 +290,6 @@ class Options:
         :API: public
         """
         return scope in self._known_scope_to_info
-
-    def passthru_args_for_scope(self, scope: str) -> List[str]:
-        # Passthru args "belong" to the last scope mentioned on the command-line.
-
-        # Note: If that last scope is a goal, we allow all tasks in that goal to access the passthru
-        # args. This is to allow the more intuitive
-        # pants run <target> -- <passthru args>
-        # instead of requiring
-        # pants run.py <target> -- <passthru args>.
-        #
-        # However note that in the case where multiple tasks run in the same goal, e.g.,
-        # pants test <target> -- <passthru args>
-        # Then, e.g., both junit and pytest will get the passthru args even though the user probably
-        # only intended them to go to one of them. If the wrong one is not a no-op then the error will
-        # be unpredictable. However this is  not a common case, and can be circumvented with an
-        # explicit test.pytest or test.junit scope.
-        if (
-            scope
-            and self._passthru_owner
-            and scope.startswith(self._passthru_owner)
-            and (len(scope) == len(self._passthru_owner) or scope[len(self._passthru_owner)] == ".")
-        ):
-            return self._passthru
-        return []
 
     def _assert_not_frozen(self) -> None:
         if self._frozen:
@@ -366,10 +306,10 @@ class Options:
     def registration_function_for_optionable(self, optionable_class):
         """Returns a function for registering options on the given scope."""
         self._assert_not_frozen()
+
         # TODO(benjy): Make this an instance of a class that implements __call__, so we can
-        # docstring it, and so it's less weird than attatching properties to a function.
+        # docstring it, and so it's less weird than attaching properties to a function.
         def register(*args, **kwargs):
-            kwargs["registering_class"] = optionable_class
             self.register(optionable_class.options_scope, *args, **kwargs)
 
         # Clients can access the bootstrap option values as register.bootstrap.
@@ -439,70 +379,13 @@ class Options:
                     hint=f"Use scope {scope} instead (options: {', '.join(explicit_keys)})",
                 )
 
-    @frozen_after_init
-    @dataclass(unsafe_hash=True)
-    class _ScopedFlagNameForFuzzyMatching:
-        """Specify how a registered option would look like on the command line.
-
-        This information enables fuzzy matching to suggest correct option names when a user specifies an
-        unregistered option on the command line.
-
-        :param scope: the 'scope' component of a command-line flag.
-        :param arg: the unscoped flag name as it would appear on the command line.
-        :param normalized_arg: the fully-scoped option name, without any leading dashes.
-        :param scoped_arg: the fully-scoped option as it would appear on the command line.
-        """
-
-        scope: str
-        arg: str
-        normalized_arg: str
-        scoped_arg: str
-
-        def __init__(self, scope: str, arg: str) -> None:
-            self.scope = scope
-            self.arg = arg
-            self.normalized_arg = re.sub("^-+", "", arg)
-            if scope == GLOBAL_SCOPE:
-                self.scoped_arg = arg
-            else:
-                dashed_scope = scope.replace(".", "-")
-                self.scoped_arg = f"--{dashed_scope}-{self.normalized_arg}"
-
-        @property
-        def normalized_scoped_arg(self):
-            return re.sub(r"^-+", "", self.scoped_arg)
-
-    @memoized_property
-    def _all_scoped_flag_names_for_fuzzy_matching(self):
-        """A list of all registered flags in all their registered scopes.
-
-        This list is used for fuzzy matching against unrecognized option names across registered
-        scopes on the command line.
-        """
-        all_scoped_flag_names = []
-
-        def register_all_scoped_names(parser):
-            scope = parser.scope
-            known_args = parser.known_args
-            for arg in known_args:
-                scoped_flag = self._ScopedFlagNameForFuzzyMatching(scope=scope, arg=arg,)
-                all_scoped_flag_names.append(scoped_flag)
-
-        self.walk_parsers(register_all_scoped_names)
-        return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
-
-    def _make_parse_args_request(self, flags_in_scope, namespace, include_passive_options=False):
-        levenshtein_max_distance = (
-            self._bootstrap_option_values.option_name_check_distance
-            if self._bootstrap_option_values
-            else 0
-        )
+    def _make_parse_args_request(
+        self, flags_in_scope, namespace: OptionValueContainerBuilder
+    ) -> Parser.ParseArgsRequest:
         return Parser.ParseArgsRequest(
             flags_in_scope=flags_in_scope,
             namespace=namespace,
-            get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
-            levenshtein_max_distance=levenshtein_max_distance,
-            include_passive_options=include_passive_options,
+            passthrough_args=self._passthru,
         )
 
     # TODO: Eagerly precompute backing data for this?
@@ -511,7 +394,6 @@ class Options:
         self,
         scope: str,
         inherit_from_enclosing_scope: bool = True,
-        include_passive_options: bool = False,
     ) -> OptionValueContainer:
         """Return the option values for the given scope.
 
@@ -523,25 +405,28 @@ class Options:
 
         # First get enclosing scope's option values, if any.
         if scope == GLOBAL_SCOPE or not inherit_from_enclosing_scope:
-            values = OptionValueContainer()
+            values_builder = OptionValueContainerBuilder()
         else:
-            values = copy.copy(self.for_scope(enclosing_scope(scope)))
+            values_builder = self.for_scope(enclosing_scope(scope)).to_builder()
 
         # Now add our values.
         flags_in_scope = self._scope_to_flags.get(scope, [])
-        parse_args_request = self._make_parse_args_request(
-            flags_in_scope, values, include_passive_options
-        )
-        self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
+        parse_args_request = self._make_parse_args_request(flags_in_scope, values_builder)
+        values = self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 
         # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
         if inherit_from_enclosing_scope:
-            self._check_and_apply_deprecations(scope, values)
+            values_builder = values.to_builder()
+            self._check_and_apply_deprecations(scope, values_builder)
+            values = values_builder.build()
 
         return values
 
     def get_fingerprintable_for_scope(
-        self, bottom_scope, include_passthru=False, fingerprint_key=None, invert=False
+        self,
+        bottom_scope: str,
+        fingerprint_key: str = "fingerprint",
+        invert: bool = False,
     ):
         """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
@@ -551,23 +436,15 @@ class Options:
         This method also searches enclosing options scopes of `bottom_scope` to determine the set of
         fingerprintable pairs.
 
-        :param str bottom_scope: The scope to gather fingerprintable options for.
-        :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
-                                      fingerprintable options.
-        :param string fingerprint_key: The option kwarg to match against (defaults to 'fingerprint').
-        :param bool invert: Whether or not to invert the boolean check for the fingerprint_key value.
+        :param bottom_scope: The scope to gather fingerprintable options for.
+        :param fingerprint_key: The option kwarg to match against (defaults to 'fingerprint').
+        :param invert: Whether or not to invert the boolean check for the fingerprint_key value.
 
         :API: public
         """
-        fingerprint_key = fingerprint_key or "fingerprint"
+
         fingerprint_default = bool(invert)
         pairs = []
-
-        if include_passthru:
-            # Passthru args can only be sent to outermost scopes so we gather them once here up-front.
-            passthru_args = self.passthru_args_for_scope(bottom_scope)
-            # NB: We can't sort passthru args, the underlying consumer may be order-sensitive.
-            pairs.extend((str, pass_arg) for pass_arg in passthru_args)
 
         # Note that we iterate over options registered at `bottom_scope` and at all
         # enclosing scopes, since option-using code can read those values indirectly
@@ -578,7 +455,7 @@ class Options:
             for (_, kwargs) in sorted(parser.option_registrations_iter()):
                 if kwargs.get("recursive", False) and not kwargs.get("recursive_root", False):
                     continue  # We only need to fprint recursive options once.
-                if kwargs.get(fingerprint_key, fingerprint_default) is not True:
+                if not kwargs.get(fingerprint_key, fingerprint_default):
                     continue
                 # Note that we read the value from scope, even if the registration was on an enclosing
                 # scope, to get the right value for recursive options (and because this mirrors what

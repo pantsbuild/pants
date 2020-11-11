@@ -3,10 +3,10 @@
 
 import itertools
 import os
-import sys
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple, Type
+from typing import Dict, Iterable, List, Mapping, Sequence, Set, Tuple, Type
 
 from pants.base.build_environment import get_default_pants_config_file
 from pants.option.config import Config
@@ -21,25 +21,6 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
 
 
-# This is a temporary hack that allows us to note the fact that we're in v2-exclusive mode
-# in a static location, as soon as we know it. This way code that cannot access options
-# can still use this information to customize behavior. Again, this is a temporary hack
-# to provide a better v2 experience to users who are not (and possibly never have been)
-# running v1, and should go away ASAP.
-class IsV2Exclusive:
-    def __init__(self):
-        self._value = False
-
-    def set(self):
-        self._value = True
-
-    def __bool__(self):
-        return self._value
-
-
-is_v2_exclusive = IsV2Exclusive()
-
-
 @dataclass(frozen=True)
 class OptionsBootstrapper:
     """Holds the result of the first stage of options parsing, and assists with parsing full
@@ -49,6 +30,13 @@ class OptionsBootstrapper:
     bootstrap_args: Tuple[str, ...]
     args: Tuple[str, ...]
     config: Config
+
+    def __repr__(self) -> str:
+        env = {pair[0]: pair[1] for pair in self.env_tuples}
+        # Bootstrap args are included in `args`. We also drop the first argument, which is the path
+        # to `pants_loader.py`.
+        args = list(self.args[1:])
+        return f"OptionsBootstrapper(args={args}, env={env}, config={self.config})"
 
     @staticmethod
     def get_config_file_paths(env, args) -> List[str]:
@@ -95,97 +83,107 @@ class OptionsBootstrapper:
         env: Mapping[str, str], args: Sequence[str], config: Config
     ) -> Options:
         bootstrap_options = Options.create(
-            env=env, config=config, known_scope_infos=[GlobalOptions.get_scope_info()], args=args,
+            env=env,
+            config=config,
+            known_scope_infos=[GlobalOptions.get_scope_info()],
+            args=args,
         )
 
         def register_global(*args, **kwargs):
-            ## Only use of Options.register?
+            # Only use of Options.register?
             bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
 
         GlobalOptions.register_bootstrap_options(register_global)
-        opts = bootstrap_options.for_global_scope()
-        if opts.v2 and not opts.v1 and opts.backend_packages == []:
-            is_v2_exclusive.set()
         return bootstrap_options
 
     @classmethod
     def create(
-        cls, env: Optional[Mapping[str, str]] = None, args: Optional[Sequence[str]] = None,
+        cls, env: Mapping[str, str], args: Sequence[str], *, allow_pantsrc: bool
     ) -> "OptionsBootstrapper":
         """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
         :param env: An environment dictionary, or None to use `os.environ`.
         :param args: An args array, or None to use `sys.argv`.
+        :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
+          consume pantsrc files, they should pass False in order to avoid reading files from
+          absolute paths. Production usecases should pass True to allow options values to make the
+          decision of whether to respect pantsrc files.
         """
-        env = {
-            k: v for k, v in (os.environ if env is None else env).items() if k.startswith("PANTS_")
-        }
-        args = tuple(sys.argv if args is None else args)
+        with warnings.catch_warnings(record=True):
+            env = {k: v for k, v in env.items() if k.startswith("PANTS_")}
+            args = tuple(args)
 
-        flags = set()
-        short_flags = set()
+            flags = set()
+            short_flags = set()
 
-        # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
-        @dataclass(frozen=True)
-        class FileContent:
-            path: str
-            content: bytes
+            # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
+            @dataclass(frozen=True)
+            class FileContent:
+                path: str
+                content: bytes
 
-        def filecontent_for(path: str) -> FileContent:
-            return FileContent(ensure_text(path), read_file(path, binary_mode=True),)
+            def filecontent_for(path: str) -> FileContent:
+                return FileContent(
+                    ensure_text(path),
+                    read_file(path, binary_mode=True),
+                )
 
-        def capture_the_flags(*args: str, **kwargs) -> None:
-            for arg in args:
-                flags.add(arg)
-                if len(arg) == 2:
-                    short_flags.add(arg)
-                elif kwargs.get("type") == bool:
-                    flags.add(f"--no-{arg[2:]}")
+            def capture_the_flags(*args: str, **kwargs) -> None:
+                for arg in args:
+                    flags.add(arg)
+                    if len(arg) == 2:
+                        short_flags.add(arg)
+                    elif kwargs.get("type") == bool:
+                        flags.add(f"--no-{arg[2:]}")
 
-        GlobalOptions.register_bootstrap_options(capture_the_flags)
+            GlobalOptions.register_bootstrap_options(capture_the_flags)
 
-        def is_bootstrap_option(arg: str) -> bool:
-            components = arg.split("=", 1)
-            if components[0] in flags:
-                return True
-            for flag in short_flags:
-                if arg.startswith(flag):
+            def is_bootstrap_option(arg: str) -> bool:
+                components = arg.split("=", 1)
+                if components[0] in flags:
                     return True
-            return False
+                for flag in short_flags:
+                    if arg.startswith(flag):
+                        return True
+                return False
 
-        # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
-        # Stop before '--' since args after that are pass-through and may have duplicate names to our
-        # bootstrap options.
-        bargs = tuple(
-            filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
-        )
+            # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
+            # Stop before '--' since args after that are pass-through and may have duplicate names to our
+            # bootstrap options.
+            bargs = ("./pants",) + tuple(
+                filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
+            )
 
-        config_file_paths = cls.get_config_file_paths(env=env, args=args)
-        config_files_products = [filecontent_for(p) for p in config_file_paths]
-        pre_bootstrap_config = Config.load_file_contents(config_files_products)
+            config_file_paths = cls.get_config_file_paths(env=env, args=args)
+            config_files_products = [filecontent_for(p) for p in config_file_paths]
+            pre_bootstrap_config = Config.load_file_contents(config_files_products)
 
-        initial_bootstrap_options = cls.parse_bootstrap_options(env, bargs, pre_bootstrap_config)
-        bootstrap_option_values = initial_bootstrap_options.for_global_scope()
+            initial_bootstrap_options = cls.parse_bootstrap_options(
+                env, bargs, pre_bootstrap_config
+            )
+            bootstrap_option_values = initial_bootstrap_options.for_global_scope()
 
-        # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
-        # from (typically pants.toml), then config override, then rcfiles.
-        full_config_paths = pre_bootstrap_config.sources()
-        if bootstrap_option_values.pantsrc:
-            rcfiles = [
-                os.path.expanduser(str(rcfile)) for rcfile in bootstrap_option_values.pantsrc_files
-            ]
-            existing_rcfiles = list(filter(os.path.exists, rcfiles))
-            full_config_paths.extend(existing_rcfiles)
+            # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
+            # from (typically pants.toml), then config override, then rcfiles.
+            full_config_paths = pre_bootstrap_config.sources()
+            if allow_pantsrc and bootstrap_option_values.pantsrc:
+                rcfiles = [
+                    os.path.expanduser(str(rcfile))
+                    for rcfile in bootstrap_option_values.pantsrc_files
+                ]
+                existing_rcfiles = list(filter(os.path.exists, rcfiles))
+                full_config_paths.extend(existing_rcfiles)
 
-        full_config_files_products = [filecontent_for(p) for p in full_config_paths]
-        post_bootstrap_config = Config.load_file_contents(
-            full_config_files_products, seed_values=bootstrap_option_values.as_dict(),
-        )
+            full_config_files_products = [filecontent_for(p) for p in full_config_paths]
+            post_bootstrap_config = Config.load_file_contents(
+                full_config_files_products,
+                seed_values=bootstrap_option_values.as_dict(),
+            )
 
-        env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
-        return cls(
-            env_tuples=env_tuples, bootstrap_args=bargs, args=args, config=post_bootstrap_config
-        )
+            env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
+            return cls(
+                env_tuples=env_tuples, bootstrap_args=bargs, args=args, config=post_bootstrap_config
+            )
 
     @memoized_property
     def env(self) -> Dict[str, str]:
@@ -231,7 +229,7 @@ class OptionsBootstrapper:
         """Get the full Options instance bootstrapped by this object for the given known scopes.
 
         :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
-        :returns: A bootrapped Options instance that also carries options for all the supplied known
+        :returns: A bootstrapped Options instance that also carries options for all the supplied known
                   scopes.
         """
         return self._full_options(

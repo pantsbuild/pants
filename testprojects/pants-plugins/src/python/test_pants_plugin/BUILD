@@ -1,8 +1,10 @@
-python_library(
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+python_distribution(
   dependencies=[
+    # TODO: exclude all inferred Pants dependencies.
     'testprojects/pants-plugins/3rdparty/python/pants',
-    'testprojects/pants-plugins/src/python/test_pants_plugin/subsystems',
-    'testprojects/pants-plugins/src/python/test_pants_plugin/tasks',
   ],
   provides=setup_py(
     name='test_pants_plugin',
@@ -10,8 +12,7 @@ python_library(
     version='0.0.1',
     namespace_packages=[
       'test_pants_plugin',
-      'test_pants_plugin.subsystems',
-      'test_pants_plugin.tasks',
     ],
-  )
+  ),
+  tags=['lockfile_ignore'],
 )

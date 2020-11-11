@@ -6,12 +6,15 @@ Active Committers
 * Daniel McClanahan
 * Daniel Wagner-Hall
 * Dorothy Ordogh
+* Eric Arellano
+* Greg Shuflin
+* Henry Fuller
 * Ity Kaul
 * John Sirois
 * Kris Wilson
 * Larry Hosken
-* Mateo Rodriguez
 * Nora Howard
+* Pierre Chevalier
 * Stu Hood
 * Yi Cheng
 
@@ -24,6 +27,7 @@ Emeritus
 * Eric Ayers
 * Fedor Korotkov
 * Garrett Malmquist
+* Mateo Rodriguez
 * Matt Olsen
 * Patrick Lawson
 * Peiyu Wang

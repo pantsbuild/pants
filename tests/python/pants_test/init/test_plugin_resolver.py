@@ -3,87 +3,107 @@
 
 import os
 import shutil
-import unittest
-from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PurePath
 from textwrap import dedent
+from typing import Iterable
 
-from parameterized import parameterized
+import pytest
 from pex.interpreter import PythonInterpreter
 from pex.resolver import Unsatisfiable
 from pkg_resources import Requirement, WorkingSet
 
+from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, PexRequirements
+from pants.core.util_rules import archive, external_tool
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
+from pants.engine.process import Process, ProcessResult
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.python.setup_py_runner import SetupPyRunner
-from pants.testutil.interpreter_selection_utils import (
+from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.python_interpreter_selection import (
     PY_36,
     PY_37,
     python_interpreter_path,
     skip_unless_python36_and_python37_present,
 )
-from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.rule_runner import QueryRule
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_rmtree, touch
+from pants.util.dirutil import safe_mkdir, safe_rmtree, touch
 
-req = Requirement.parse
-
-
-class Installer(metaclass=ABCMeta):
-    def __init__(self, source_dir: Path, install_dir: Path) -> None:
-        self._source_dir = source_dir
-        self._install_dir = install_dir
-
-    def run(self) -> None:
-        init_subsystem(SetupPyRunner.Factory)
-        dist = self._create_dist(SetupPyRunner.Factory.create())
-        shutil.copy(str(dist), str(self._install_dir))
-
-    @abstractmethod
-    def _create_dist(self, runner: SetupPyRunner) -> Path:
-        ...
+DEFAULT_VERSION = "0.0.0"
 
 
-class SdistInstaller(Installer):
-    def _create_dist(self, runner: SetupPyRunner) -> Path:
-        return runner.sdist(source_dir=self._source_dir)
-
-
-class WheelInstaller(Installer):
-    def _create_dist(self, runner: SetupPyRunner):
-        return runner.bdist(source_dir=self._source_dir)
-
-
-INSTALLERS = [("sdist", SdistInstaller), ("whl", WheelInstaller)]
-
-
-class PluginResolverTest(unittest.TestCase):
-
-    DEFAULT_VERSION = "0.0.0"
-
+class PluginResolverTest(TestBase):
     @classmethod
-    def create_plugin(cls, distribution_repo_dir, plugin, version=None, packager_cls=None):
-        distribution_repo_dir = Path(distribution_repo_dir)
-
-        source_dir = distribution_repo_dir.joinpath(plugin)
-        source_dir.mkdir(parents=True)
-        source_dir.joinpath("setup.py").write_text(
-            dedent(
-                f"""
-                from setuptools import setup
-
-
-                setup(name="{plugin}", version="{version or cls.DEFAULT_VERSION}")
-                """
-            )
+    def rules(cls):
+        return (
+            *super().rules(),
+            *pex.rules(),
+            *external_tool.rules(),
+            *archive.rules(),
+            QueryRule(Pex, (PexRequest,)),
+            QueryRule(Process, (PexProcess,)),
+            QueryRule(ProcessResult, (Process,)),
         )
-        packager_cls = packager_cls or SdistInstaller
-        packager = packager_cls(source_dir=source_dir, install_dir=distribution_repo_dir)
-        packager.run()
+
+    def _create_pex(self) -> Pex:
+        return self.request(
+            Pex,
+            [
+                PexRequest(
+                    output_filename="setup-py-runner.pex",
+                    internal_only=True,
+                    requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"]),
+                ),
+                create_options_bootstrapper(args=["--backend-packages=pants.backend.python"]),
+            ],
+        )
+
+    def _run_setup_py(
+        self, plugin: str, version: str, setup_py_args: Iterable[str], install_dir: str
+    ) -> None:
+        pex_obj = self._create_pex()
+        source_digest = self.request(
+            Digest,
+            [
+                CreateDigest(
+                    [
+                        FileContent(
+                            "setup.py",
+                            dedent(
+                                f"""
+                    from setuptools import setup
+
+                    setup(name="{plugin}", version="{version or DEFAULT_VERSION}")
+                """
+                            ).encode(),
+                        )
+                    ]
+                )
+            ],
+        )
+        merged_digest = self.request(Digest, [MergeDigests([pex_obj.digest, source_digest])])
+
+        process = Process(
+            argv=("python", "setup-py-runner.pex", "setup.py") + tuple(setup_py_args),
+            # We reasonably expect there to be a python interpreter on the test-running
+            # process's path.
+            env={"PATH": os.getenv("PATH", "")},
+            input_digest=merged_digest,
+            description="Run setup.py",
+            output_directories=("dist/",),
+        )
+        result = self.request(ProcessResult, [process])
+        result_snapshot = self.request(Snapshot, [result.output_digest])
+        self.scheduler.write_digest(result.output_digest, path_prefix="output")
+        safe_mkdir(install_dir)
+        for path in result_snapshot.files:
+            shutil.copy(PurePath(self.build_root, "output", path), install_dir)
 
     @contextmanager
-    def plugin_resolution(self, *, interpreter=None, chroot=None, plugins=None, packager_cls=None):
+    def plugin_resolution(self, *, interpreter=None, chroot=None, plugins=None, sdist=True):
         @contextmanager
         def provide_chroot(existing):
             if existing:
@@ -109,7 +129,8 @@ class PluginResolverTest(unittest.TestCase):
                         plugin, version = plugin
                     plugin_list.append(f"{plugin}=={version}" if version else plugin)
                     if create_artifacts:
-                        self.create_plugin(repo_dir, plugin, version, packager_cls=packager_cls)
+                        setup_py_args = ["sdist" if sdist else "bdist_wheel", "--dist-dir", "dist/"]
+                        self._run_setup_py(plugin, version, setup_py_args, repo_dir)
                 env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
                 env["PANTS_PLUGIN_CACHE_DIR"] = os.path.join(root_dir, "plugin-cache")
 
@@ -118,44 +139,63 @@ class PluginResolverTest(unittest.TestCase):
                 touch(configpath)
             args = [f"--pants-config-files=['{configpath}']"]
 
-            options_bootstrapper = OptionsBootstrapper.create(env=env, args=args)
+            options_bootstrapper = OptionsBootstrapper.create(
+                env=env, args=args, allow_pantsrc=False
+            )
             plugin_resolver = PluginResolver(options_bootstrapper, interpreter=interpreter)
             cache_dir = plugin_resolver.plugin_cache_dir
 
             working_set = plugin_resolver.resolve(WorkingSet(entries=[]))
             for dist in working_set:
-                self.assertIn(Path(cache_dir), Path(dist.location).parents)
+                assert (
+                    Path(os.path.realpath(cache_dir))
+                    in Path(os.path.realpath(dist.location)).parents
+                )
 
             yield working_set, root_dir, repo_dir, cache_dir
 
-    def test_no_plugins(self):
+    def test_no_plugins(self) -> None:
         with self.plugin_resolution() as (working_set, _, _, _):
-            self.assertEqual([], list(working_set))
+            assert [] == list(working_set)
 
-    @parameterized.expand(INSTALLERS)
-    def test_plugins(self, unused_test_name, packager_cls):
-        with self.plugin_resolution(
-            plugins=[("jake", "1.2.3"), "jane"], packager_cls=packager_cls
-        ) as (working_set, _, _, cache_dir):
+    def test_plugins_sdist(self) -> None:
+        self._do_test_plugins(True)
+
+    def test_plugins_bdist(self) -> None:
+        self._do_test_plugins(False)
+
+    def _do_test_plugins(self, sdist: bool) -> None:
+        with self.plugin_resolution(plugins=[("jake", "1.2.3"), "jane"], sdist=sdist) as (
+            working_set,
+            _,
+            _,
+            cache_dir,
+        ):
 
             def assert_dist_version(name, expected_version):
-                dist = working_set.find(req(name))
-                self.assertEqual(expected_version, dist.version)
+                dist = working_set.find(Requirement.parse(name))
+                assert expected_version == dist.version
 
-            self.assertEqual(2, len(working_set.entries))
+            assert 2 == len(working_set.entries)
 
             assert_dist_version(name="jake", expected_version="1.2.3")
-            assert_dist_version(name="jane", expected_version=self.DEFAULT_VERSION)
+            assert_dist_version(name="jane", expected_version=DEFAULT_VERSION)
 
-    @parameterized.expand(INSTALLERS)
-    def test_exact_requirements(self, unused_test_name, packager_cls):
+    def test_exact_requirements_sdist(self) -> None:
+        self._do_test_exact_requirements(True)
+
+    def test_exact_requirements_bdist(self) -> None:
+        self._do_test_exact_requirements(False)
+
+    def _do_test_exact_requirements(self, sdist: bool) -> None:
         with self.plugin_resolution(
-            plugins=[("jake", "1.2.3"), ("jane", "3.4.5")], packager_cls=packager_cls
+            plugins=[("jake", "1.2.3"), ("jane", "3.4.5")], sdist=sdist
         ) as results:
             working_set, chroot, repo_dir, cache_dir = results
 
             # Kill the repo source dir and re-resolve.  If the PluginResolver truly detects exact
-            # requirements it should skip any resolves and load directly from the still in-tact cache.
+            # requirements it should skip any resolves and load directly from the still intact
+            # cache.
             safe_rmtree(repo_dir)
 
             with self.plugin_resolution(
@@ -164,48 +204,55 @@ class PluginResolverTest(unittest.TestCase):
 
                 working_set2, _, _, _ = results2
 
-                self.assertEqual(list(working_set), list(working_set2))
+                assert list(working_set) == list(working_set2)
 
-    @parameterized.expand(INSTALLERS)
     @skip_unless_python36_and_python37_present
-    def test_exact_requirements_interpreter_change(self, unused_test_name, packager_cls):
+    def test_exact_requirements_interpreter_change_sdist(self) -> None:
+        self._do_test_exact_requirements_interpreter_change(True)
+
+    @skip_unless_python36_and_python37_present
+    def test_exact_requirements_interpreter_change_bdist(self) -> None:
+        self._do_test_exact_requirements_interpreter_change(False)
+
+    def _do_test_exact_requirements_interpreter_change(self, sdist: bool) -> None:
         python36 = PythonInterpreter.from_binary(python_interpreter_path(PY_36))
         python37 = PythonInterpreter.from_binary(python_interpreter_path(PY_37))
 
         with self.plugin_resolution(
-            interpreter=python36,
-            plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
-            packager_cls=packager_cls,
+            interpreter=python36, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")], sdist=sdist
         ) as results:
 
             working_set, chroot, repo_dir, cache_dir = results
 
             safe_rmtree(repo_dir)
-            with self.assertRaises(Unsatisfiable):
+            with pytest.raises(Unsatisfiable):
                 with self.plugin_resolution(
                     interpreter=python37,
                     chroot=chroot,
                     plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
                 ):
-                    self.fail(
+                    pytest.fail(
                         "Plugin re-resolution is expected for an incompatible interpreter and it is "
                         "expected to fail since we removed the dist `repo_dir` above."
                     )
 
             # But for a compatible interpreter the exact resolve results should be re-used and load
             # directly from the still in-tact cache.
-            with self.plugin_resolution(
+            with self.plugin_resolution(  # type: ignore[unreachable]
                 interpreter=python36, chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
             ) as results2:
 
                 working_set2, _, _, _ = results2
-                self.assertEqual(list(working_set), list(working_set2))
+                assert list(working_set) == list(working_set2)
 
-    @parameterized.expand(INSTALLERS)
-    def test_inexact_requirements(self, unused_test_name, packager_cls):
-        with self.plugin_resolution(
-            plugins=[("jake", "1.2.3"), "jane"], packager_cls=packager_cls
-        ) as results:
+    def test_inexact_requirements_sdist(self) -> None:
+        self._do_test_inexact_requirements(True)
+
+    def test_inexact_requirements_bdist(self) -> None:
+        self._do_test_inexact_requirements(False)
+
+    def _do_test_inexact_requirements(self, sdist: bool) -> None:
+        with self.plugin_resolution(plugins=[("jake", "1.2.3"), "jane"], sdist=sdist) as results:
 
             working_set, chroot, repo_dir, cache_dir = results
 
@@ -215,6 +262,6 @@ class PluginResolverTest(unittest.TestCase):
             safe_rmtree(repo_dir)
             safe_rmtree(cache_dir)
 
-            with self.assertRaises(Unsatisfiable):
+            with pytest.raises(Unsatisfiable):
                 with self.plugin_resolution(chroot=chroot, plugins=[("jake", "1.2.3"), "jane"]):
-                    self.fail("Should not reach here, should raise first.")
+                    pytest.fail("Should not reach here, should raise first.")

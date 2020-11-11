@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import total_ordering
-from typing import Any, Dict, Iterator, List, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 
 @total_ordering
@@ -32,6 +32,9 @@ class Rank(Enum):
 
 
 Value = Union[str, int, float, None, Dict, Enum, List]
+
+
+ValueAndDetails = Tuple[Optional[Value], Optional[str]]
 
 
 @dataclass(frozen=True)
@@ -71,26 +74,26 @@ class RankedValue:
     @classmethod
     def prioritized_iter(
         cls,
-        flag_val: Value,
-        env_val: Value,
-        config_val: Value,
-        config_default_val: Value,
-        hardcoded_val: Value,
-        default: Value,
+        flag_val: ValueAndDetails,
+        env_val: ValueAndDetails,
+        config_val: ValueAndDetails,
+        config_default_val: ValueAndDetails,
+        hardcoded_val: ValueAndDetails,
+        default: ValueAndDetails,
     ) -> Iterator["RankedValue"]:
-        """Yield the non-None values from highest-ranked to lowest, wrapped in RankedValue
-        instances."""
-        if flag_val is not None:
-            yield RankedValue(Rank.FLAG, flag_val)
-        if env_val is not None:
-            yield RankedValue(Rank.ENVIRONMENT, env_val)
-        if config_val is not None:
-            yield RankedValue(Rank.CONFIG, config_val)
-        if config_default_val is not None:
-            yield RankedValue(Rank.CONFIG_DEFAULT, config_default_val)
-        if hardcoded_val is not None:
-            yield RankedValue(Rank.HARDCODED, hardcoded_val)
-        yield RankedValue(Rank.NONE, default)
+        """Yield the non-None values from highest-ranked to lowest, as RankedValue instances."""
+        if flag_val[0] is not None:
+            yield RankedValue(Rank.FLAG, *flag_val)
+        if env_val[0] is not None:
+            yield RankedValue(Rank.ENVIRONMENT, *env_val)
+        if config_val[0] is not None:
+            yield RankedValue(Rank.CONFIG, *config_val)
+        if config_default_val[0] is not None:
+            yield RankedValue(Rank.CONFIG_DEFAULT, *config_default_val)
+        if hardcoded_val[0] is not None:
+            yield RankedValue(Rank.HARDCODED, *hardcoded_val)
+        yield RankedValue(Rank.NONE, *default)
 
     rank: Rank
     value: Value
+    details: Optional[str] = None  # Optional details about the derivation of the value.

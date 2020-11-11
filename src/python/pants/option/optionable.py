@@ -7,7 +7,7 @@ import re
 from abc import ABC, ABCMeta, abstractmethod
 from typing import Optional, Type
 
-from pants.engine.selectors import Get
+from pants.engine.internals.selectors import Get, GetConstraints
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
 from pants.util.meta import classproperty
@@ -34,7 +34,7 @@ class OptionableFactory(ABC):
 
     @property
     @abstractmethod
-    def options_scope(self):
+    def options_scope(self) -> str:
         """The scope from which the ScopedOptions for the target Optionable will be parsed."""
 
     @classmethod
@@ -45,30 +45,27 @@ class OptionableFactory(ABC):
         """
         partial_construct_optionable = functools.partial(_construct_optionable, cls)
 
-        # NB: We must populate several dunder methods on the partial function because partial functions
-        # do not have these defined by default and the engine uses these values to visualize functions
-        # in error messages and the rule graph.
+        # NB: We must populate several dunder methods on the partial function because partial
+        # functions do not have these defined by default and the engine uses these values to
+        # visualize functions in error messages and the rule graph.
         snake_scope = cls.options_scope.replace("-", "_")
-        partial_construct_optionable.__name__ = f"construct_scope_{snake_scope}"
+        name = f"construct_scope_{snake_scope}"
+        partial_construct_optionable.__name__ = name
         partial_construct_optionable.__module__ = cls.__module__
         _, class_definition_lineno = inspect.getsourcelines(cls)
         partial_construct_optionable.__line_number__ = class_definition_lineno
 
         return dict(
             output_type=cls.optionable_cls,
-            input_selectors=tuple(),
+            input_selectors=(),
             func=partial_construct_optionable,
-            input_gets=(Get.create_statically_for_rule_graph(ScopedOptions, Scope),),
-            dependency_optionables=(cls.optionable_cls,),
+            input_gets=(GetConstraints(output_type=ScopedOptions, input_type=Scope),),
+            canonical_name=name,
         )
 
 
 class Optionable(OptionableFactory, metaclass=ABCMeta):
     """A mixin for classes that can register options on some scope."""
-
-    # Subclasses must override.
-    options_scope: Optional[str] = None
-    options_scope_category: Optional[str] = None
 
     # Subclasses may override these to specify a deprecated former name for this Optionable's scope.
     # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
@@ -99,9 +96,9 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     @classmethod
     def get_scope_info(cls):
         """Returns a ScopeInfo instance representing this Optionable's options scope."""
-        if cls.options_scope is None or cls.options_scope_category is None:
-            raise OptionsError(f"{cls.__name__} must set options_scope and options_scope_category.")
-        return ScopeInfo(cls.options_scope, cls.options_scope_category, cls)
+        if cls.options_scope is None:
+            raise OptionsError(f"{cls.__name__} must set options_scope.")
+        return ScopeInfo(cls.options_scope, cls)
 
     @classmethod
     def subscope(cls, scope):
@@ -145,16 +142,3 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
         Subclasses should not generally need to override this method.
         """
         cls.register_options(options.registration_function_for_optionable(cls))
-
-    def __init__(self) -> None:
-        # Check that the instance's class defines options_scope.
-        # Note: It is a bit odd to validate a class when instantiating an object of it. but checking
-        # the class itself (e.g., via metaclass magic) turns out to be complicated, because
-        # non-instantiable subclasses (such as TaskBase, Task, Subsystem and other domain-specific
-        # intermediate classes) don't define options_scope, so we can only apply this check to
-        # instantiable classes. And the easiest way to know if a class is instantiable is to hook into
-        # its __init__, as we do here. We usually only create a single instance of an Optionable
-        # subclass anyway.
-        cls = type(self)
-        if not isinstance(cls.options_scope, str):
-            raise NotImplementedError(f"{cls} must set an options_scope class-level property.")

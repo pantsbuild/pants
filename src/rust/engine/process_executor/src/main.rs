@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -24,24 +26,22 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+#![type_length_limit = "1257309"]
 
-use clap;
-use env_logger;
-
-use process_execution;
-
-use clap::{value_t, App, AppSettings, Arg};
-use futures::compat::Future01CompatExt;
-use hashing::{Digest, Fingerprint};
-use process_execution::{Context, Platform, PlatformConstraint, ProcessMetadata, RelativePath};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
+
+use clap::{value_t, App, AppSettings, Arg};
+use fs::RelativePath;
+use futures::compat::Future01CompatExt;
+use hashing::{Digest, Fingerprint};
+use process_execution::{Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata};
 use store::{BackoffConfig, Store};
-use tokio::runtime::Handle;
+use workunit_store::WorkunitStore;
 
 /// A binary which takes args of format:
 ///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80
@@ -53,6 +53,8 @@ use tokio::runtime::Handle;
 #[tokio::main]
 async fn main() {
   env_logger::init();
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
 
   let args = App::new("process_executor")
     .arg(
@@ -66,6 +68,12 @@ async fn main() {
         .long("local-store-path")
         .takes_value(true)
         .help("Path to lmdb directory used for local file storage"),
+    )
+    .arg(
+      Arg::with_name("named-cache-path")
+        .long("named-cache-path")
+        .takes_value(true)
+        .help("Path to a directory to be used for named caches")
     )
     .arg(
       Arg::with_name("input-digest")
@@ -191,7 +199,15 @@ async fn main() {
               .help("Whether or not to enable running the process through a Nailgun server.\
                         This will likely start a new Nailgun server as a side effect.")
       )
-    .setting(AppSettings::TrailingVarArg)
+      .arg(
+        Arg::with_name("overall-deadline-secs")
+            .long("overall-deadline-secs")
+            .takes_value(true)
+            .required(false)
+            .default_value("600")
+            .help("Overall timeout in seconds for each request from time of submission")
+      )
+      .setting(AppSettings::TrailingVarArg)
     .arg(
       Arg::with_name("argv")
         .multiple(true)
@@ -252,15 +268,25 @@ async fn main() {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
+  let named_cache_path = args
+    .value_of("named-cache-path")
+    .map(PathBuf::from)
+    .unwrap_or_else(NamedCaches::default_path);
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let output_files = if let Some(values) = args.values_of("output-file-path") {
-    values.map(PathBuf::from).collect()
+    values
+      .map(RelativePath::new)
+      .collect::<Result<BTreeSet<_>, _>>()
+      .unwrap()
   } else {
     BTreeSet::new()
   };
   let output_directories = if let Some(values) = args.values_of("output-directory-path") {
-    values.map(PathBuf::from).collect()
+    values
+      .map(RelativePath::new)
+      .collect::<Result<BTreeSet<_>, _>>()
+      .unwrap()
   } else {
     BTreeSet::new()
   };
@@ -268,8 +294,9 @@ async fn main() {
     .values_of("headers")
     .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
     .unwrap_or_default();
+  let overall_deadline_secs = value_t!(args.value_of("overall-deadline-secs"), u64).unwrap_or(3600);
 
-  let executor = task_executor::Executor::new(Handle::current());
+  let executor = task_executor::Executor::new();
 
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {
@@ -326,6 +353,10 @@ async fn main() {
     .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
   let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
 
+  let target_platform =
+    PlatformConstraint::try_from(&args.value_of("target-platform").unwrap().to_string())
+      .expect("invalid value for `target-platform");
+
   let request = process_execution::Process {
     argv,
     env,
@@ -333,16 +364,15 @@ async fn main() {
     input_files,
     output_files,
     output_directories,
-    timeout: Duration::new(15 * 60, 0),
+    timeout: Some(Duration::new(15 * 60, 0)),
     description: "process_executor".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
+    level: log::Level::Info,
+    append_only_caches: BTreeMap::new(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
-    target_platform: PlatformConstraint::try_from(
-      &args.value_of("target-platform").unwrap().to_string(),
-    )
-    .expect("invalid value for `target-platform"),
+    target_platform: target_platform,
     is_nailgunnable,
+    execution_slot_variable: None,
+    cache_failures: false,
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
@@ -360,38 +390,41 @@ async fn main() {
           None
         };
 
-      Box::new(
-        process_execution::remote::CommandRunner::new(
-          address,
-          ProcessMetadata {
-            instance_name: remote_instance_arg,
-            cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
-            platform_properties,
-          },
-          root_ca_certs,
-          oauth_bearer_token,
-          headers,
-          store.clone(),
-          Platform::Linux,
-          executor,
-          std::time::Duration::from_secs(300),
-          std::time::Duration::from_millis(500),
-          std::time::Duration::from_secs(5),
+      let command_runner_box: Box<dyn process_execution::CommandRunner> = {
+        Box::new(
+          process_execution::remote::CommandRunner::new(
+            address,
+            vec![address.to_owned()],
+            ProcessMetadata {
+              instance_name: remote_instance_arg,
+              cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
+              platform_properties,
+            },
+            root_ca_certs,
+            oauth_bearer_token,
+            headers,
+            store.clone(),
+            Platform::Linux,
+            Duration::from_secs(overall_deadline_secs),
+            Duration::from_millis(100),
+          )
+          .expect("Failed to make command runner"),
         )
-        .expect("Failed to make command runner"),
-      ) as Box<dyn process_execution::CommandRunner>
+      };
+
+      command_runner_box
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
       executor,
       work_dir_base,
+      NamedCaches::new(named_cache_path),
       true,
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
   let result = runner
     .run(request.into(), Context::default())
-    .compat()
     .await
     .expect("Error executing");
 
@@ -403,8 +436,22 @@ async fn main() {
       .unwrap();
   }
 
-  print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
-  eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
+  let stdout: Vec<u8> = store
+    .load_file_bytes_with(result.stdout_digest, |bytes| bytes.to_vec())
+    .await
+    .unwrap()
+    .unwrap()
+    .0;
+
+  let stderr: Vec<u8> = store
+    .load_file_bytes_with(result.stderr_digest, |bytes| bytes.to_vec())
+    .await
+    .unwrap()
+    .unwrap()
+    .0;
+
+  print!("{}", String::from_utf8(stdout).unwrap());
+  eprint!("{}", String::from_utf8(stderr).unwrap());
   exit(result.exit_code);
 }
 

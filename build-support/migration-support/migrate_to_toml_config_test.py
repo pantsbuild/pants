@@ -27,7 +27,7 @@ def test_fully_automatable_config() -> None:
             bool_opt2: True
             int_opt: 10
             float_opt: 5.0
-            
+
             [str_values]
             normal: .isort.cfg
             version: isort>=4.8
@@ -45,7 +45,7 @@ def test_fully_automatable_config() -> None:
             bool_opt2 = true
             int_opt = 10
             float_opt = 5.0
-            
+
             [str_values]
             normal = ".isort.cfg"
             version = "isort>=4.8"
@@ -110,7 +110,7 @@ def test_comments() -> None:
             int_opt: 10  ; semicolons matter too
             # commented_out: 10
             ; commented_out: 10
-            
+
             # Comments on new lines should be preserved
             ; Semicolon comments should also be preserved
             [isort]  # comments on section headers shouldn't matter because we don't convert sections
@@ -125,7 +125,7 @@ def test_comments() -> None:
             int_opt: 10  ; semicolons matter too
             # commented_out: 10
             ; commented_out: 10
-            
+
             # Comments on new lines should be preserved
             ; Semicolon comments should also be preserved
             [isort]  # comments on section headers shouldn't matter because we don't convert sections
@@ -215,14 +215,14 @@ def test_multiline_options_ignored() -> None:
         [GLOBAL]
         multiline_string: in a galaxy far,
            far, away...
-        
+
         l1: [
             'foo',
           ]
-        
+
         l2: ['foo',
              'bar']
-        
+
         d: {
             'a': 0,
           }

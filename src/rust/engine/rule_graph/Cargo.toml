@@ -4,3 +4,11 @@ edition = "2018"
 name = "rule_graph"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
+
+[dependencies]
+log = "0.4"
+petgraph = "0.4.5"
+indexmap = "1.4"
+
+[dev-dependencies]
+env_logger = "0.5.4"

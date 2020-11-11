@@ -26,7 +26,7 @@ function calculate_current_hash() {
   #
   # Assumes we're in the venv that will be used to build the native engine.
   #
-  # NB: Ensure that this stays in sync wtih `githooks/prepare-commit-msg`.
+  # NB: Ensure that this stays in sync with `githooks/prepare-commit-msg`.
   (
    cd "${REPO_ROOT}" || exit 1
    (echo "${MODE_FLAG}"
@@ -36,9 +36,7 @@ function calculate_current_hash() {
     git ls-files --cached --others --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/rust-toolchain" \
-     "${REPO_ROOT}/src/python/pants/engine/native.py" \
      "${REPO_ROOT}/build-support/bin/native" \
-     "${REPO_ROOT}/3rdparty/python/requirements.txt" \
    | grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" \
    | git hash-object --stdin-paths) | fingerprint_data
   )

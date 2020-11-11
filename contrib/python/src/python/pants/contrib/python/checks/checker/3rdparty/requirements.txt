@@ -1,6 +1,0 @@
-# NB: See https://github.com/pantsbuild/pants/issues/7158 before introducing additional
-# dependencies here.
-
-six>=1.9.0,<2
-pycodestyle==2.4.0
-pyflakes==2.1.1

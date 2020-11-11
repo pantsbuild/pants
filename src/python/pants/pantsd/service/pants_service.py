@@ -1,13 +1,17 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, KeysView, Tuple
 
+from pants.engine.internals.native import Native
 from pants.util.meta import frozen_after_init
+
+logger = logging.getLogger(__name__)
 
 
 class PantsService(ABC):
@@ -33,11 +37,8 @@ class PantsService(ABC):
         self.name = self.__class__.__name__
         self._state = _ServiceState()
 
-    def setup(self, services):
-        """Called before `run` to allow for service->service or other side-effecting setup.
-
-        :param PantsServices services: A registry of all services within this run.
-        """
+    def setup(self, services: Tuple["PantsService", ...]):
+        """Called before `run` to allow for service->service or other side-effecting setup."""
         self.services = services
 
     @abstractmethod
@@ -200,27 +201,63 @@ class _ServiceState(object):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PantsServices:
-    """A registry of PantsServices instances."""
+    """A collection of running PantsServices threads."""
 
-    services: Tuple[PantsService, ...]
-    port_map: Dict
-    lifecycle_lock: Any
+    JOIN_TIMEOUT_SECONDS = 1
 
-    def __init__(
-        self,
-        services: Optional[Tuple[PantsService, ...]] = None,
-        port_map: Optional[Dict] = None,
-        lifecycle_lock=None,
-    ) -> None:
+    _service_threads: Dict[PantsService, threading.Thread]
+
+    def __init__(self, services: Tuple[PantsService, ...] = ()) -> None:
+        self._service_threads = self._start(services)
+
+    @classmethod
+    def _make_thread(cls, service):
+        name = f"{service.__class__.__name__}Thread"
+
+        def target():
+            Native().override_thread_logging_destination_to_just_pantsd()
+            service.run()
+
+        t = threading.Thread(target=target, name=name)
+        t.daemon = True
+        return t
+
+    @classmethod
+    def _start(cls, services: Tuple[PantsService, ...]) -> Dict[PantsService, threading.Thread]:
+        """Launch a thread per service."""
+
+        for service in services:
+            logger.debug(f"setting up service {service}")
+            service.setup(services)
+
+        service_thread_map = {service: cls._make_thread(service) for service in services}
+
+        for service, service_thread in service_thread_map.items():
+            logger.debug(f"starting service {service}")
+            service_thread.start()
+
+        return service_thread_map
+
+    @property
+    def services(self) -> KeysView[PantsService]:
+        return self._service_threads.keys()
+
+    def are_all_alive(self) -> bool:
+        """Return true if all services threads are still alive, and false if any have died.
+
+        This method does not have sideeffects: if one service thread has died, the rest should be
+        killed and joined via `self.shutdown()`.
         """
-        :param port_map: A dict of (port_name -> port_info) for named ports hosted by the services.
-        :param lifecycle_lock: A lock to guard lifecycle changes for the services. This can be used by
-                               individual services to safeguard daemon-synchronous sections that should
-                               be protected from abrupt teardown. Notably, this lock is currently
-                               acquired for an entire pailgun request (by PailgunServer). NB: This is a
-                               `threading.RLock` instance, but the constructor for RLock is an alias for
-                               a native function, rather than an actual type.
-        """
-        self.services = services or tuple()
-        self.port_map = port_map or dict()
-        self.lifecycle_lock = lifecycle_lock or threading.RLock()
+        for service, service_thread in self._service_threads.items():
+            if not service_thread.is_alive():
+                logger.error(f"service failure for {service}.")
+                return False
+        return True
+
+    def shutdown(self) -> None:
+        """Shut down and join all service threads."""
+        for service, service_thread in self._service_threads.items():
+            service.terminate()
+        for service, service_thread in self._service_threads.items():
+            logger.debug(f"terminating pantsd service: {service}")
+            service_thread.join(self.JOIN_TIMEOUT_SECONDS)

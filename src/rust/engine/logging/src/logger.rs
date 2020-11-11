@@ -1,235 +1,188 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 use crate::PythonLogLevel;
 
+use colored::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::future::Future;
-use std::io::{stderr, Stderr, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
-use chrono;
 use lazy_static::lazy_static;
-use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
+use log::{debug, log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
-use simplelog::{ConfigBuilder, LevelPadding, WriteLogger};
 use tokio::task_local;
-use ui::EngineDisplay;
 use uuid::Uuid;
 
 const TIME_FORMAT_STR: &str = "%H:%M:%S";
 
+pub type StdioHandler = Box<dyn Fn(&str) -> Result<(), ()> + Send>;
+
 lazy_static! {
-  pub static ref LOGGER: Logger = Logger::new();
+  pub static ref PANTS_LOGGER: PantsLogger = PantsLogger::new();
 }
 
-pub struct Logger {
-  pantsd_log: Mutex<MaybeWriteLogger<File>>,
-  stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
+pub struct PantsLogger {
+  per_run_logs: Mutex<Option<File>>,
+  log_file: Mutex<Option<File>>,
+  global_level: Mutex<RefCell<LevelFilter>>,
+  use_color: AtomicBool,
   show_rust_3rdparty_logs: AtomicBool,
-  engine_display_handles: Mutex<HashMap<Uuid, Arc<Mutex<EngineDisplay>>>>,
+  stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
+  show_target: AtomicBool,
+  log_level_filters: Mutex<HashMap<String, log::LevelFilter>>,
 }
 
-impl Logger {
-  pub fn new() -> Logger {
-    Logger {
-      pantsd_log: Mutex::new(MaybeWriteLogger::empty()),
-      stderr_log: Mutex::new(MaybeWriteLogger::empty()),
+impl PantsLogger {
+  pub fn new() -> PantsLogger {
+    PantsLogger {
+      per_run_logs: Mutex::new(None),
+      log_file: Mutex::new(None),
+      global_level: Mutex::new(RefCell::new(LevelFilter::Off)),
       show_rust_3rdparty_logs: AtomicBool::new(true),
-      engine_display_handles: Mutex::new(HashMap::new()),
+      use_color: AtomicBool::new(false),
+      stderr_handlers: Mutex::new(HashMap::new()),
+      show_target: AtomicBool::new(false),
+      log_level_filters: Mutex::new(HashMap::new()),
     }
   }
 
-  pub fn init(max_level: u64, show_rust_3rdparty_logs: bool) {
+  pub fn init(
+    max_level: u64,
+    show_rust_3rdparty_logs: bool,
+    use_color: bool,
+    show_target: bool,
+    log_levels_by_target: HashMap<String, u64>,
+  ) {
+    let log_levels_by_target = log_levels_by_target
+      .iter()
+      .map(|(k, v)| {
+        let python_level: PythonLogLevel = (*v).try_into().unwrap_or_else(|e| {
+          panic!("Unrecognized log level from python: {}: {}", v, e);
+        });
+        let level: log::LevelFilter = python_level.into();
+        (k.clone(), level)
+      })
+      .collect::<HashMap<_, _>>();
+
     let max_python_level: Result<PythonLogLevel, _> = max_level.try_into();
     match max_python_level {
       Ok(python_level) => {
-        let level: log::LevelFilter = python_level.into();
-        set_max_level(level);
-        LOGGER
+        let level: LevelFilter = python_level.into();
+        // TODO this should be whatever the most verbose log level specified in log_domain_levels -
+        // but I'm not sure if it's actually much of a gain over just setting this to Trace.
+        set_max_level(LevelFilter::Trace);
+        PANTS_LOGGER.global_level.lock().replace(level);
+
+        PANTS_LOGGER.use_color.store(use_color, Ordering::SeqCst);
+        PANTS_LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
-        set_logger(&*LOGGER).expect("Error setting up global logger.");
+        *PANTS_LOGGER.log_level_filters.lock() = log_levels_by_target;
+        PANTS_LOGGER
+          .show_target
+          .store(show_target, Ordering::SeqCst);
+        if set_logger(&*PANTS_LOGGER).is_err() {
+          debug!("Logging already initialized.");
+        }
       }
-      Err(err) => panic!("Unrecognised log level from python: {}: {}", max_level, err),
+      Err(err) => panic!("Unrecognised log level from Python: {}: {}", max_level, err),
     };
   }
 
-  fn maybe_increase_global_verbosity(&self, new_level: log::LevelFilter) {
-    if log::max_level() < new_level {
-      set_max_level(new_level);
-    }
+  pub fn set_per_run_logs(&self, per_run_log_path: Option<PathBuf>) {
+    match per_run_log_path {
+      None => {
+        *self.per_run_logs.lock() = None;
+      }
+      Some(path) => {
+        let file = OpenOptions::new()
+          .create(true)
+          .append(true)
+          .open(path)
+          .map_err(|err| format!("Error opening per-run logfile: {}", err))
+          .unwrap();
+        *self.per_run_logs.lock() = Some(file);
+      }
+    };
   }
 
-  pub fn set_stderr_logger(&self, python_level: u64) -> Result<(), String> {
-    python_level
-      .try_into()
-      .map_err(|err| format!("{}", err))
-      .map(|level: PythonLogLevel| {
-        self.maybe_increase_global_verbosity(level.into());
-        *self.stderr_log.lock() = MaybeWriteLogger::new(
-          stderr(),
-          level.into(),
-          self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
-        )
-      })
-  }
-
-  ///
-  /// Set up a file logger which logs at python_level to log_file_path.
-  /// Returns the file descriptor of the log file.
-  ///
+  /// Set up a file logger to log_file_path. Returns the file descriptor of the log file.
   #[cfg(unix)]
   pub fn set_pantsd_logger(
     &self,
     log_file_path: PathBuf,
-    python_level: u64,
   ) -> Result<std::os::unix::io::RawFd, String> {
     use std::os::unix::io::AsRawFd;
-    python_level
-      .try_into()
-      .map_err(|err| format!("{}", err))
-      .and_then(|level: PythonLogLevel| {
-        {
-          // Maybe close open file by dropping the existing logger
-          *self.pantsd_log.lock() = MaybeWriteLogger::empty();
-        }
-        OpenOptions::new()
-          .create(true)
-          .append(true)
-          .open(log_file_path)
-          .map(|file| {
-            let fd = file.as_raw_fd();
-            self.maybe_increase_global_verbosity(level.into());
-            *self.pantsd_log.lock() = MaybeWriteLogger::new(
-              file,
-              level.into(),
-              self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
-            );
-            fd
-          })
-          .map_err(|err| format!("Error opening pantsd logfile: {}", err))
+
+    {
+      // Maybe close open file by dropping the existing file handle
+      *self.log_file.lock() = None;
+    }
+
+    OpenOptions::new()
+      .create(true)
+      .append(true)
+      .open(log_file_path)
+      .map(|file| {
+        let raw_fd = file.as_raw_fd();
+        *self.log_file.lock() = Some(file);
+        raw_fd
       })
+      .map_err(|err| format!("Error opening pantsd logfile: {}", err))
   }
 
-  pub fn log_from_python(
-    &self,
-    message: &str,
-    python_level: u64,
-    target: &str,
-  ) -> Result<(), String> {
-    python_level
-      .try_into()
-      .map_err(|err| format!("{}", err))
-      .map(|level: PythonLogLevel| {
-        log!(target: target, level.into(), "{}", message);
-      })
+  /// log_from_python is only used in the Python FFI, which in turn is only called within the
+  /// Python `NativeHandler` class. Every logging call from Python should get proxied through this
+  /// function, which translates the log message into the Rust log paradigm provided by
+  /// the `log` crate.
+  pub fn log_from_python(message: &str, python_level: u64, target: &str) -> Result<(), String> {
+    let level: PythonLogLevel = python_level.try_into().map_err(|err| format!("{}", err))?;
+    log!(target: target, level.into(), "{}", message);
+    Ok(())
   }
 
-  pub fn register_engine_display(&self, engine_display: Arc<Mutex<EngineDisplay>>) -> Uuid {
-    let mut handle = self.engine_display_handles.lock();
+  pub fn register_stderr_handler(&self, callback: StdioHandler) -> Uuid {
+    let mut handlers = self.stderr_handlers.lock();
     let unique_id = Uuid::new_v4();
-    handle.insert(unique_id, engine_display);
+    handlers.insert(unique_id, callback);
     unique_id
   }
 
-  pub fn deregister_engine_display(&self, unique_id: Uuid) {
-    let mut handle = self.engine_display_handles.lock();
-    handle.remove(&unique_id);
+  pub fn deregister_stderr_handler(&self, unique_id: Uuid) {
+    let mut handlers = self.stderr_handlers.lock();
+    handlers.remove(&unique_id);
   }
 }
 
-impl Log for Logger {
-  fn enabled(&self, _metadata: &Metadata) -> bool {
-    // Individual log levels are handled by each sub-logger,
-    // And a global filter is applied to set_max_level.
-    // No need to filter here.
-    true
-  }
-
-  fn log(&self, record: &Record) {
-    let destination = get_destination();
-    match destination {
-      Destination::Stderr => {
-        let mut handles_map = self.engine_display_handles.lock();
-        for handle in handles_map.values_mut() {
-          let cur_time = chrono::Utc::now().format(TIME_FORMAT_STR);
-          let level = record.level();
-          let log_string: String = format!("{} [{}] {}", cur_time, level, record.args());
-          let mut display_engine = handle.lock();
-          display_engine.log(log_string);
-        }
-        self.stderr_log.lock().log(record)
-      }
-      Destination::Pantsd => self.pantsd_log.lock().log(record),
-    }
-  }
-
-  fn flush(&self) {
-    self.stderr_log.lock().flush();
-    self.pantsd_log.lock().flush();
-  }
-}
-
-struct MaybeWriteLogger<W: Write + Send + 'static> {
-  level: LevelFilter,
-  show_rust_3rdparty_logs: bool,
-  inner: Option<Box<WriteLogger<W>>>,
-}
-
-impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
-  pub fn empty() -> MaybeWriteLogger<W> {
-    MaybeWriteLogger {
-      level: LevelFilter::Off,
-      show_rust_3rdparty_logs: true,
-      inner: None,
-    }
-  }
-
-  pub fn new(
-    writable: W,
-    level: LevelFilter,
-    show_rust_3rdparty_logs: bool,
-  ) -> MaybeWriteLogger<W> {
-    // We initialize the inner WriteLogger with no filters so that we don't
-    // have to create a new one every time we change the level of the outer
-    // MaybeWriteLogger.
-
-    let config = ConfigBuilder::new()
-      .set_time_format_str(TIME_FORMAT_STR)
-      .set_thread_level(LevelFilter::Off)
-      .set_level_padding(LevelPadding::Off)
-      .build();
-
-    MaybeWriteLogger {
-      level,
-      show_rust_3rdparty_logs,
-      inner: Some(WriteLogger::new(LevelFilter::max(), config, writable)),
-    }
-  }
-
-  pub fn level(&self) -> LevelFilter {
-    self.level
-  }
-}
-
-impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
+impl Log for PantsLogger {
   fn enabled(&self, metadata: &Metadata) -> bool {
-    metadata.level() <= self.level()
+    let global_level: LevelFilter = { *self.global_level.lock().borrow() };
+    let enabled_globally = metadata.level() <= global_level;
+    let log_level_filters = self.log_level_filters.lock();
+    let enabled_for_target = log_level_filters
+      .get(metadata.target())
+      .map(|lf| metadata.level() <= *lf)
+      .unwrap_or(false);
+
+    enabled_globally || enabled_for_target
   }
 
   fn log(&self, record: &Record) {
+    use chrono::Timelike;
+    use log::Level;
+
     if !self.enabled(record.metadata()) {
       return;
     }
-    let mut should_log = self.show_rust_3rdparty_logs;
-    if !self.show_rust_3rdparty_logs {
+
+    let mut should_log = self.show_rust_3rdparty_logs.load(Ordering::SeqCst);
+    if !should_log {
       if let Some(ref module_path) = record.module_path() {
         for pants_package in super::pants_packages::PANTS_PACKAGE_NAMES {
           if &module_path.split("::").next().unwrap() == pants_package {
@@ -244,16 +197,83 @@ impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
     if !should_log {
       return;
     }
-    if let Some(ref logger) = self.inner {
-      logger.log(record);
+
+    let destination = get_destination();
+    let cur_date = chrono::Local::now();
+    let time_str = format!(
+      "{}.{:02}",
+      cur_date.format(TIME_FORMAT_STR),
+      cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
+    );
+
+    let show_target = self.show_target.load(Ordering::SeqCst);
+    let level = record.level();
+    let destination_is_file = match destination {
+      Destination::Pantsd => true,
+      Destination::Stderr => false,
+    };
+    let use_color = self.use_color.load(Ordering::SeqCst) && (!destination_is_file);
+
+    let level_marker = match level {
+      _ if !use_color => format!("[{}]", level).normal().clear(),
+      Level::Info => format!("[{}]", level).normal(),
+      Level::Error => format!("[{}]", level).red(),
+      Level::Warn => format!("[{}]", level).red(),
+      Level::Debug => format!("[{}]", level).green(),
+      Level::Trace => format!("[{}]", level).magenta(),
+    };
+
+    let log_string = if show_target {
+      format!(
+        "{} {} ({}) {}",
+        time_str,
+        level_marker,
+        record.target(),
+        record.args(),
+      )
+    } else {
+      format!("{} {} {}", time_str, level_marker, record.args())
+    };
+
+    {
+      let mut maybe_per_run_file = self.per_run_logs.lock();
+      if let Some(ref mut file) = *maybe_per_run_file {
+        // deliberately ignore errors writing to per-run log file
+        let _ = writeln!(file, "{}", log_string);
+      }
+    }
+
+    match destination {
+      Destination::Stderr => {
+        // We first try to output to all registered handlers. If there are none, or any of them
+        // fail, then we fallback to sending directly to stderr.
+        let handlers_map = self.stderr_handlers.lock();
+        let mut any_handler_failed = false;
+        for callback in handlers_map.values() {
+          let handler_res = callback(&log_string);
+          if handler_res.is_err() {
+            any_handler_failed = true;
+          }
+        }
+        if handlers_map.len() == 0 || any_handler_failed {
+          eprintln!("{}", log_string);
+        }
+      }
+      Destination::Pantsd => {
+        let mut maybe_file = self.log_file.lock();
+        if let Some(ref mut file) = *maybe_file {
+          match writeln!(file, "{}", log_string) {
+            Ok(()) => (),
+            Err(e) => {
+              eprintln!("Error writing to log file: {}", e);
+            }
+          }
+        }
+      }
     }
   }
 
-  fn flush(&self) {
-    if let Some(ref logger) = self.inner {
-      logger.flush();
-    }
-  }
+  fn flush(&self) {}
 }
 
 ///
@@ -269,6 +289,17 @@ impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
 pub enum Destination {
   Pantsd,
   Stderr,
+}
+
+impl TryFrom<&str> for Destination {
+  type Error = String;
+  fn try_from(dest: &str) -> Result<Self, Self::Error> {
+    match dest {
+      "pantsd" => Ok(Destination::Pantsd),
+      "stderr" => Ok(Destination::Stderr),
+      other => Err(format!("Unknown log destination: {:?}", other)),
+    }
+  }
 }
 
 thread_local! {

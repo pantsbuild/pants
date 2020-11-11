@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -30,12 +32,18 @@ use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
+use fs::RelativePath;
+
 pub mod data;
 pub mod file;
 pub mod path;
 
 pub fn owned_string_vec(args: &[&str]) -> Vec<String> {
   args.iter().map(<&str>::to_string).collect()
+}
+
+pub fn relative_paths<'a>(paths: &'a [&str]) -> impl Iterator<Item = RelativePath> + 'a {
+  paths.iter().map(|p| RelativePath::new(p).unwrap())
 }
 
 pub fn as_byte_owned_vec(str: &str) -> Vec<u8> {
@@ -54,7 +62,7 @@ pub fn make_file(path: &Path, contents: &[u8], mode: u32) {
   file.set_permissions(permissions).unwrap();
 }
 
-pub fn append_to_exisiting_file(path: &Path, contents: &[u8]) {
+pub fn append_to_existing_file(path: &Path, contents: &[u8]) {
   let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
   file.write_all(contents).unwrap();
 }

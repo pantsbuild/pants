@@ -1,27 +1,19 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# see/edit requirements.txt in this directory to change deps.
-python_requirements()
-
-# Only used by tests, so we lift this library out of the requirements.txt
-# file used to bootstrap pants itself.
-python_requirement_library(
-  name='antlr-3.1.3',
-  requirements=[
-    # TODO: this library is not currently linked from pypi, so we override the repository
-    # to fetch it from antlr.org instead. If at any point it reappears on pypi, the
-    # repository arg can be removed.
-    python_requirement('antlr_python_runtime==3.1.3',
-                       repository='http://www.antlr3.org/download/Python/')
-  ]
+# See requirements.txt in this directory to change deps.
+python_requirements(
+  module_mapping={
+    "ansicolors": ["colors"],
+    "beautifulsoup4": ["bs4"],
+    "PyYAML": ["yaml"],
+    "setuptools": ["pkg_resources"],
+  }
 )
 
-# Only used by a maintenance tool, so we lift this library out of the requirements.txt
-# file used to bootstrap pants itself.
+# Useful when using IntelliJ/PyCharm remote debugging. Importing `pydevd_pycharm` at
+# the breakpoint will cause dep inference to add this dep on the remote debugger client.
 python_requirement_library(
-  name='s3logparse',
-  requirements=[
-    python_requirement('s3-log-parse==0.1.1')
-  ]
+  name = "pydevd-pycharm",
+  requirements=["pydevd-pycharm==203.5419.8"],
 )

@@ -10,6 +10,19 @@ The ``1.25.x`` series brings two major changes to Pants:
 
 Please see https://groups.google.com/forum/#!topic/pants-devel/3nmdSeyvwU0 for more information.
 
+1.25.1rc1 (6/16/2020)
+---------------------
+
+N.B.: No further releases are expected in the ``1.25.x`` ``stable`` series. This ``.1rc1``
+release is for those upgrading through stable versions who wish to retain pytest console
+coverage support in Pants "v1".
+
+Bugfixes
+~~~~~~~~
+
+* Restore pytest coverage console report. (#10018)
+  `PR #10018 <https://github.com/pantsbuild/pants/pull/10018>`_
+
 1.25.1rc0 (03/20/2020)
 ----------------------
 

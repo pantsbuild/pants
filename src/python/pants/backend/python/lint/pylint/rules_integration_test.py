@@ -3,195 +3,456 @@
 
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional
+from typing import Any, List, Optional, Sequence
 
-from pants.backend.python.lint.pylint.rules import PylintConfiguration, PylintConfigurations
+import pytest
+
+from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
+from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
-from pants.backend.python.rules.targets import PythonInterpreterCompatibility, PythonLibrary
-from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
-from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.build_graph.address import Address
-from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.core.goals.lint import LintResult, LintResults
+from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
-from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
-from pants.engine.target import Dependencies, Sources, TargetWithOrigin
-from pants.rules.core.lint import LintResult
-from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
+from pants.engine.target import Target
+from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-class PylintIntegrationTest(TestBase):
-    # See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
-    source_root = "src/python"
-    good_source = FileContent(
-        path=f"{source_root}/good.py", content=b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n",
-    )
-    bad_source = FileContent(
-        path=f"{source_root}/bad.py", content=b"'''docstring'''\nlowercase_constant = ''\n",
-    )
-
-    @classmethod
-    def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(targets={"python_library": PythonLibraryV1})
-
-    @classmethod
-    def target_types(cls):
-        return [PythonLibrary]
-
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
             *pylint_rules(),
-            RootRule(PylintConfigurations),
-            RootRule(HydratedTargets),
-        )
+            QueryRule(LintResults, (PylintRequest,)),
+        ],
+        target_types=[PythonLibrary, PythonRequirementLibrary, PylintSourcePlugin],
+    )
 
-    def make_target_with_origin(
-        self,
-        source_files: List[FileContent],
-        *,
-        name: str = "target",
-        interpreter_constraints: Optional[str] = None,
-        origin: Optional[OriginSpec] = None,
-        dependencies: Optional[List[Address]] = None,
-    ) -> TargetWithOrigin:
-        for source_file in source_files:
-            self.create_file(source_file.path, source_file.content.decode())
-        source_globs = [PurePath(source_file.path).name for source_file in source_files]
-        self.create_library(
-            path=self.source_root, target_type=PythonLibrary.alias, name=name, sources=source_globs
-        )
-        # We must re-write the files because `create_library` will have over-written the content.
-        for source_file in source_files:
-            self.create_file(source_file.path, source_file.content.decode())
-        target = PythonLibrary(
-            {
-                Sources.alias: source_globs,
-                Dependencies.alias: dependencies,
-                PythonInterpreterCompatibility.alias: interpreter_constraints,
-            },
-            address=Address(self.source_root, name),
-        )
-        if origin is None:
-            origin = SingleAddress(directory=self.source_root, name=name)
-        return TargetWithOrigin(target, origin)
 
-    def run_pylint(
-        self,
-        targets: List[TargetWithOrigin],
-        *,
-        config: Optional[str] = None,
-        passthrough_args: Optional[str] = None,
-        skip: bool = False,
-    ) -> LintResult:
-        args = ["--backend-packages2=pants.backend.python.lint.pylint"]
-        if config:
-            self.create_file(relpath="pylintrc", contents=config)
-            args.append("--pylint-config=pylintrc")
-        if passthrough_args:
-            args.append(f"--pylint-args='{passthrough_args}'")
-        if skip:
-            args.append(f"--pylint-skip")
-        return self.request_single_product(
-            LintResult,
-            Params(
-                PylintConfigurations(PylintConfiguration.create(tgt) for tgt in targets),
-                create_options_bootstrapper(args=args),
-            ),
-        )
+# See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
+PYLINT_FAILURE_RETURN_CODE = 16
 
-    def test_passing_source(self) -> None:
-        target = self.make_target_with_origin([self.good_source])
-        result = self.run_pylint([target])
-        assert result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+PACKAGE = "src/python/project"
+GOOD_SOURCE = FileContent(f"{PACKAGE}/good.py", b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n")
+BAD_SOURCE = FileContent(f"{PACKAGE}/bad.py", b"'''docstring'''\nlowercase_constant = ''\n")
+PY3_ONLY_SOURCES = FileContent(f"{PACKAGE}/py3.py", b"'''docstring'''\nCONSTANT: str = ''\n")
 
-    def test_failing_source(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
-        result = self.run_pylint([target])
-        assert result.exit_code == 16  # convention message issued
-        assert "bad.py:2:0: C0103" in result.stdout
+GLOBAL_ARGS = (
+    "--backend-packages=pants.backend.python.lint.pylint",
+    "--source-root-patterns=['src/python', 'tests/python']",
+)
 
-    def test_mixed_sources(self) -> None:
-        target = self.make_target_with_origin([self.good_source, self.bad_source])
-        result = self.run_pylint([target])
-        assert result.exit_code == 16  # convention message issued
-        assert "good.py" not in result.stdout
-        assert "bad.py:2:0: C0103" in result.stdout
 
-    def test_multiple_targets(self) -> None:
-        targets = [
-            self.make_target_with_origin([self.good_source], name="t1"),
-            self.make_target_with_origin([self.bad_source], name="t2"),
-        ]
-        result = self.run_pylint(targets)
-        assert result.exit_code == 16  # convention message issued
-        assert "good.py" not in result.stdout
-        assert "bad.py:2:0: C0103" in result.stdout
+def make_target(
+    rule_runner: RuleRunner,
+    source_files: List[FileContent],
+    *,
+    package: Optional[str] = None,
+    name: str = "target",
+    interpreter_constraints: Optional[str] = None,
+    dependencies: Optional[List[Address]] = None,
+) -> Target:
+    if not package:
+        package = PACKAGE
+    for source_file in source_files:
+        rule_runner.create_file(source_file.path, source_file.content.decode())
+    source_globs = [PurePath(source_file.path).name for source_file in source_files]
+    rule_runner.add_to_build_file(
+        package,
+        dedent(
+            f"""\
+            python_library(
+                name={repr(name)},
+                sources={source_globs},
+                dependencies={[str(dep) for dep in dependencies or ()]},
+                interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
+            )
+            """
+        ),
+    )
+    rule_runner.set_options(GLOBAL_ARGS)
+    return rule_runner.get_target(Address(package, target_name=name))
 
-    def test_precise_file_args(self) -> None:
-        target = self.make_target_with_origin(
-            [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
-        )
-        result = self.run_pylint([target])
-        assert result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
-    def test_respects_config_file(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
-        result = self.run_pylint([target], config="[pylint]\ndisable = C0103\n")
-        assert result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+def run_pylint(
+    rule_runner: RuleRunner,
+    targets: List[Target],
+    *,
+    config: Optional[str] = None,
+    passthrough_args: Optional[str] = None,
+    skip: bool = False,
+    additional_args: Optional[List[str]] = None,
+) -> Sequence[LintResult]:
+    args = list(GLOBAL_ARGS)
+    if config:
+        rule_runner.create_file(relpath="pylintrc", contents=config)
+        args.append("--pylint-config=pylintrc")
+    if passthrough_args:
+        args.append(f"--pylint-args='{passthrough_args}'")
+    if skip:
+        args.append("--pylint-skip")
+    if additional_args:
+        args.extend(additional_args)
+    rule_runner.set_options(args)
+    results = rule_runner.request(
+        LintResults,
+        [PylintRequest(PylintFieldSet.create(tgt) for tgt in targets)],
+    )
+    return results.results
 
-    def test_respects_passthrough_args(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
-        result = self.run_pylint([target], passthrough_args="--disable=C0103")
-        assert result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
-    def test_includes_direct_dependencies(self) -> None:
-        self.make_target_with_origin(source_files=[], name="transitive_dependency")
+def assert_success(rule_runner: RuleRunner, target: Target, **kwargs: Any) -> None:
+    result = run_pylint(rule_runner, [target], **kwargs)
+    assert len(result) == 1
+    assert "Your code has been rated at 10.00/10" in result[0].stdout
+    assert result[0].exit_code == 0
 
-        direct_dependency_content = dedent(
+
+def test_passing_source(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [GOOD_SOURCE])
+    assert_success(rule_runner, target)
+
+
+def test_failing_source(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [BAD_SOURCE])
+    result = run_pylint(rule_runner, [target])
+    assert len(result) == 1
+    assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert f"{PACKAGE}/bad.py:2:0: C0103" in result[0].stdout
+
+
+def test_mixed_sources(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [GOOD_SOURCE, BAD_SOURCE])
+    result = run_pylint(rule_runner, [target])
+    assert len(result) == 1
+    assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert f"{PACKAGE}/good.py" not in result[0].stdout
+    assert f"{PACKAGE}/bad.py:2:0: C0103" in result[0].stdout
+
+
+def test_multiple_targets(rule_runner: RuleRunner) -> None:
+    targets = [
+        make_target(rule_runner, [GOOD_SOURCE], name="t1"),
+        make_target(rule_runner, [BAD_SOURCE], name="t2"),
+    ]
+    result = run_pylint(rule_runner, targets)
+    assert len(result) == 1
+    assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert f"{PACKAGE}/good.py" not in result[0].stdout
+    assert f"{PACKAGE}/bad.py:2:0: C0103" in result[0].stdout
+
+
+@skip_unless_python27_and_python3_present
+def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
+    py2_args = [
+        "--pylint-version=pylint<2",
+        "--pylint-extra-requirements=['setuptools<45', 'isort>=4.3.21,<4.4']",
+    ]
+    py2_target = make_target(
+        rule_runner, [PY3_ONLY_SOURCES], name="py2", interpreter_constraints="CPython==2.7.*"
+    )
+    py2_result = run_pylint(rule_runner, [py2_target], additional_args=py2_args)
+    assert len(py2_result) == 1
+    assert py2_result[0].exit_code == 2
+    assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result[0].stdout
+
+    py3_target = make_target(
+        rule_runner,
+        [PY3_ONLY_SOURCES],
+        name="py3",
+        # NB: Avoid Python 3.8+ for this test due to issues with astroid/ast.
+        # See https://github.com/pantsbuild/pants/issues/10547.
+        interpreter_constraints="CPython>=3.6,<3.8",
+    )
+    py3_result = run_pylint(rule_runner, [py3_target])
+    assert len(py3_result) == 1
+    assert py3_result[0].exit_code == 0
+    assert "Your code has been rated at 10.00/10" in py3_result[0].stdout.strip()
+
+    combined_result = run_pylint(rule_runner, [py2_target, py3_target], additional_args=py2_args)
+    assert len(combined_result) == 2
+    batched_py3_result, batched_py2_result = sorted(
+        combined_result, key=lambda result: result.exit_code
+    )
+
+    assert batched_py2_result.exit_code == 2
+    assert batched_py2_result.partition_description == "['CPython==2.7.*']"
+    assert "invalid syntax (<string>, line 2) (syntax-error)" in batched_py2_result.stdout
+
+    assert batched_py3_result.exit_code == 0
+    assert batched_py3_result.partition_description == "['CPython<3.8,>=3.6']"
+    assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
+
+
+def test_respects_config_file(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [BAD_SOURCE])
+    assert_success(rule_runner, target, config="[pylint]\ndisable = C0103\n")
+
+
+def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [BAD_SOURCE])
+    assert_success(rule_runner, target, passthrough_args="--disable=C0103")
+
+
+def test_includes_direct_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
             """\
-            # No docstring because Pylint doesn't lint dependencies
+            python_requirement_library(
+                name='transitive_req',
+                requirements=['django'],
+            )
 
-            from transitive_dep import doesnt_matter_if_variable_exists
+            python_requirement_library(
+                name='direct_req',
+                requirements=['ansicolors'],
+            )
+            """
+        ),
+    )
+    rule_runner.add_to_build_file(PACKAGE, "python_library(name='transitive_dep', sources=[])\n")
+    rule_runner.create_file(
+        f"{PACKAGE}/direct_dep.py",
+        dedent(
+            """\
+            # No docstring - Pylint doesn't lint dependencies.
+
+            from project.transitive_dep import doesnt_matter_if_variable_exists
 
             THIS_VARIABLE_EXISTS = ''
             """
-        )
-        self.make_target_with_origin(
-            source_files=[
-                FileContent(
-                    f"{self.source_root}/direct_dependency.py", direct_dependency_content.encode()
-                )
-            ],
-            name="direct_dependency",
-            dependencies=[Address(self.source_root, "transitive_dependency")],
-        )
-
-        source_content = dedent(
+        ),
+    )
+    rule_runner.add_to_build_file(
+        PACKAGE,
+        dedent(
             """\
-            '''Code is not executed, but Pylint will check that variables exist and are used'''
-            from direct_dependency import THIS_VARIABLE_EXISTS
-
-            print(THIS_VARIABLE_EXISTS)
+            python_library(
+                name='direct_dep',
+                sources=['direct_dep.py'],
+                dependencies=[':transitive_dep', '//:transitive_req'],
+            )
             """
-        )
-        target = self.make_target_with_origin(
-            source_files=[FileContent(f"{self.source_root}/target.py", source_content.encode())],
-            dependencies=[Address(self.source_root, "direct_dependency")],
-        )
+        ),
+    )
 
-        result = self.run_pylint([target])
-        assert result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+    source_content = dedent(
+        """\
+        '''Pylint will check that variables exist and are used.'''
+        from colors import green
+        from project.direct_dep import THIS_VARIABLE_EXISTS
 
-    def test_skip(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
-        result = self.run_pylint([target], skip=True)
-        assert result == LintResult.noop()
+        print(green(THIS_VARIABLE_EXISTS))
+        """
+    )
+    target = make_target(
+        rule_runner,
+        source_files=[FileContent(f"{PACKAGE}/target.py", source_content.encode())],
+        dependencies=[
+            Address(PACKAGE, target_name="direct_dep"),
+            Address("", target_name="direct_req"),
+        ],
+    )
+    assert_success(rule_runner, target)
+
+
+def test_skip(rule_runner: RuleRunner) -> None:
+    target = make_target(rule_runner, [BAD_SOURCE])
+    result = run_pylint(rule_runner, [target], skip=True)
+    assert not result
+
+
+def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
+    test_fc = FileContent(
+        "tests/python/project/good_test.py",
+        dedent(
+            """\
+            '''Docstring.'''
+
+            from project.good import UPPERCASE_CONSTANT
+
+            CONSTANT2 = UPPERCASE_CONSTANT
+            """
+        ).encode(),
+    )
+    targets = [
+        make_target(rule_runner, [GOOD_SOURCE]),
+        make_target(
+            rule_runner,
+            [test_fc],
+            package="tests/python/project",
+            dependencies=[Address(PACKAGE, target_name="target")],
+        ),
+    ]
+    result = run_pylint(rule_runner, targets)
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
+
+
+def test_type_stubs(rule_runner: RuleRunner) -> None:
+    """Ensure that running over a type stub file doesn't cause issues."""
+    type_stub = FileContent(
+        f"{PACKAGE}/good.pyi",
+        dedent(
+            """\
+            '''Docstring.'''
+
+            def add(arg1: int, arg2: int) -> int:
+                '''Docstring.'''
+                return arg1 + arg2
+            """
+        ).encode(),
+    )
+    # First check when the stub has no sibling `.py` file.
+    target = make_target(rule_runner, [type_stub])
+    assert_success(rule_runner, target)
+    # Then check with a sibling `.py`.
+    target = make_target(rule_runner, [GOOD_SOURCE, type_stub], name="new_tgt")
+    assert_success(rule_runner, target)
+
+
+def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
+    source_content = dedent(
+        """\
+        '''Docstring.'''
+
+        import unittest
+
+        class PluginTest(unittest.TestCase):
+            '''Docstring.'''
+
+            def test_plugin(self):
+                '''Docstring.'''
+                self.assertEqual(True, True)
+        """
+    )
+    target = make_target(
+        rule_runner, [FileContent(f"{PACKAGE}/thirdparty_plugin.py", source_content.encode())]
+    )
+    result = run_pylint(
+        rule_runner,
+        [target],
+        additional_args=["--pylint-extra-requirements=pylint-unittest>=0.1.3,<0.2"],
+        passthrough_args="--load-plugins=pylint_unittest",
+    )
+    assert len(result) == 1
+    assert result[0].exit_code == 4
+    assert f"{PACKAGE}/thirdparty_plugin.py:10:8: W5301" in result[0].stdout
+
+
+def test_source_plugin(rule_runner: RuleRunner) -> None:
+    # NB: We make this source plugin fairly complex by having it use transitive dependencies.
+    # This is to ensure that we can correctly support plugins with dependencies.
+    # The plugin bans `print()`.
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            python_requirement_library(
+                name='pylint',
+                requirements=['pylint>=2.4.4,<2.5'],
+            )
+
+            python_requirement_library(
+                name='colors',
+                requirements=['ansicolors'],
+            )
+            """
+        ),
+    )
+    rule_runner.create_file(
+        "pants-plugins/plugins/subdir/dep.py",
+        dedent(
+            """\
+            from colors import red
+
+            def is_print(node):
+                _ = red("Test that transitive deps are loaded.")
+                return hasattr(node.func, "name") and node.func.name == "print"
+            """
+        ),
+    )
+    rule_runner.add_to_build_file(
+        "pants-plugins/plugins/subdir", "python_library(dependencies=['//:colors'])"
+    )
+    rule_runner.create_file(
+        "pants-plugins/plugins/print_plugin.py",
+        dedent(
+            """\
+            '''Docstring.'''
+
+            from pylint.checkers import BaseChecker
+            from pylint.interfaces import IAstroidChecker
+
+            from subdir.dep import is_print
+
+            class PrintChecker(BaseChecker):
+                '''Docstring.'''
+
+                __implements__ = IAstroidChecker
+                name = "print_plugin"
+                msgs = {
+                    "C9871": ("`print` statements are banned", "print-statement-used", ""),
+                }
+
+                def visit_call(self, node):
+                    '''Docstring.'''
+                    if is_print(node):
+                        self.add_message("print-statement-used", node=node)
+
+
+            def register(linter):
+                '''Docstring.'''
+                linter.register_checker(PrintChecker(linter))
+            """
+        ),
+    )
+    rule_runner.add_to_build_file(
+        "pants-plugins/plugins",
+        dedent(
+            """\
+            pylint_source_plugin(
+                name='print_plugin',
+                sources=['print_plugin.py'],
+                dependencies=['//:pylint', 'pants-plugins/plugins/subdir'],
+            )
+            """
+        ),
+    )
+    config_content = dedent(
+        """\
+        [MASTER]
+        load-plugins=print_plugin
+        """
+    )
+
+    def run_pylint_with_plugin(tgt: Target) -> LintResult:
+        result = run_pylint(
+            rule_runner,
+            [tgt],
+            additional_args=[
+                "--pylint-source-plugins=['pants-plugins/plugins:print_plugin']",
+                f"--source-root-patterns=['pants-plugins/plugins', '{PACKAGE}']",
+            ],
+            config=config_content,
+        )
+        assert len(result) == 1
+        return result[0]
+
+    target = make_target(
+        rule_runner, [FileContent(f"{PACKAGE}/source_plugin.py", b"'''Docstring.'''\nprint()\n")]
+    )
+    result = run_pylint_with_plugin(target)
+    assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert f"{PACKAGE}/source_plugin.py:2:0: C9871" in result.stdout
+
+    # Ensure that running Pylint on the plugin itself still works.
+    plugin_tgt = rule_runner.get_target(
+        Address("pants-plugins/plugins", target_name="print_plugin")
+    )
+    result = run_pylint_with_plugin(plugin_tgt)
+    assert result.exit_code == 0
+    assert "Your code has been rated at 10.00/10" in result.stdout

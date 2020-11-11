@@ -4,112 +4,38 @@
 import errno
 import logging
 import os
-import subprocess
-import sys
+import unittest
 import unittest.mock
 from contextlib import contextmanager
 
 import psutil
 import pytest
 
-from pants.pantsd.process_manager import (
-    ProcessGroup,
-    ProcessManager,
-    ProcessMetadataManager,
-    swallow_psutil_exceptions,
-)
-from pants.testutil.test_base import TestBase
+from pants.pantsd.process_manager import ProcessManager, ProcessMetadataManager
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_file_dump
+from pants.util.dirutil import safe_file_dump, safe_mkdtemp
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
 def fake_process(**kwargs):
     proc = unittest.mock.create_autospec(psutil.Process, spec_set=True)
-    [setattr(getattr(proc, k), "return_value", v) for k, v in kwargs.items()]
+    for k, v in kwargs.items():
+        setattr(getattr(proc, k), "return_value", v)
     return proc
 
 
-class TestProcessGroup(TestBase):
-    def setUp(self):
-        super().setUp()
-        self.pg = ProcessGroup("test", metadata_base_dir=self.subprocess_dir)
-
-    def test_swallow_psutil_exceptions(self):
-        with swallow_psutil_exceptions():
-            raise psutil.NoSuchProcess("test")
-
-    def test_iter_processes(self):
-        with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
-            mock_process_iter.return_value = [5, 4, 3, 2, 1]
-            items = [item for item in self.pg.iter_processes()]
-            self.assertEqual(items, [5, 4, 3, 2, 1])
-
-    def test_iter_processes_filter_raises_psutil_exception(self):
-        """If the filter triggers a psutil exception, skip the proc and continue."""
-        with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
-
-            def noop():
-                return True
-
-            def raises():
-                raise psutil.NoSuchProcess("a_test")
-
-            mock_process_iter.return_value = [noop, raises, noop]
-
-            items = [item for item in self.pg.iter_processes(proc_filter=lambda p: p())]
-            self.assertEqual([noop, noop], items)
-
-    def test_iter_processes_process_iter_raises_psutil_exception(self):
-        """If psutil.process_iter raises the exception, silently stop iteration."""
-
-        def id_or_raise(o):
-            if isinstance(o, Exception):
-                raise o
-            else:
-                return o
-
-        with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
-            mock_process_iter.return_value = (
-                id_or_raise(i)
-                for i in ["first", psutil.NoSuchProcess("The Exception"), "never seen"]
-            )
-
-            items = [item for item in self.pg.iter_processes()]
-            self.assertEqual(["first"], items)
-
-    def test_iter_processes_filtered(self):
-        with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
-            mock_process_iter.return_value = [5, 4, 3, 2, 1]
-            items = [item for item in self.pg.iter_processes(lambda x: x != 3)]
-            self.assertEqual(items, [5, 4, 2, 1])
-
-    def test_iter_instances(self):
-        with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
-            mock_process_iter.return_value = [
-                fake_process(name="a_test", pid=3, status=psutil.STATUS_IDLE),
-                fake_process(name="b_test", pid=4, status=psutil.STATUS_IDLE),
-            ]
-
-            items = [item for item in self.pg.iter_instances()]
-            self.assertEqual(len(items), 2)
-
-            for item in items:
-                self.assertIsInstance(item, ProcessManager)
-                self.assertTrue("_test" in item.name)
-
-
-class TestProcessMetadataManager(TestBase):
+class TestProcessMetadataManager(unittest.TestCase):
     NAME = "_test_"
     TEST_KEY = "TEST"
     TEST_VALUE = "300"
     TEST_VALUE_INT = 300
     BUILDROOT = "/mock_buildroot/"
+    SUBPROCESS_DIR = safe_mkdtemp()
 
     def setUp(self):
         super().setUp()
-        self.pmm = ProcessMetadataManager(metadata_base_dir=self.subprocess_dir)
+        self.pmm = ProcessMetadataManager(metadata_base_dir=self.SUBPROCESS_DIR)
 
     def test_maybe_cast(self):
         self.assertIsNone(self.pmm._maybe_cast(None, int))
@@ -120,17 +46,8 @@ class TestProcessMetadataManager(TestBase):
         self.pmm = ProcessMetadataManager(metadata_base_dir=self.BUILDROOT)
         self.assertEqual(
             self.pmm._get_metadata_dir_by_name(self.NAME, self.BUILDROOT),
-            os.path.join(self.BUILDROOT, self.NAME),
+            os.path.join(self.BUILDROOT, self.pmm.host_fingerprint, self.NAME),
         )
-
-    def test_maybe_init_metadata_dir_by_name(self):
-        with unittest.mock.patch(
-            "pants.pantsd.process_manager.safe_mkdir", **PATCH_OPTS
-        ) as mock_mkdir:
-            self.pmm._maybe_init_metadata_dir_by_name(self.NAME)
-            mock_mkdir.assert_called_once_with(
-                self.pmm._get_metadata_dir_by_name(self.NAME, self.subprocess_dir)
-            )
 
     def test_readwrite_metadata_by_name(self):
         with temporary_dir() as tmpdir, unittest.mock.patch(
@@ -160,12 +77,19 @@ class TestProcessMetadataManager(TestBase):
         with temporary_dir() as td:
             test_filename = os.path.join(td, "test.out")
             safe_file_dump(test_filename, "test")
-            self.pmm._wait_for_file(test_filename, timeout=0.1)
+            self.pmm._wait_for_file(
+                test_filename, "file to be created", "file was created", timeout=0.1
+            )
 
     def test_wait_for_file_timeout(self):
         with temporary_dir() as td:
             with self.assertRaises(ProcessMetadataManager.Timeout):
-                self.pmm._wait_for_file(os.path.join(td, "non_existent_file"), timeout=0.1)
+                self.pmm._wait_for_file(
+                    os.path.join(td, "non_existent_file"),
+                    "file to be created",
+                    "file was created",
+                    timeout=0.1,
+                )
 
     def test_await_metadata_by_name(self):
         with temporary_dir() as tmpdir, unittest.mock.patch(
@@ -174,7 +98,10 @@ class TestProcessMetadataManager(TestBase):
             self.pmm.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
 
             self.assertEqual(
-                self.pmm.await_metadata_by_name(self.NAME, self.TEST_KEY, 0.1), self.TEST_VALUE
+                self.pmm.await_metadata_by_name(
+                    self.NAME, self.TEST_KEY, "metadata to be created", "metadata was created", 0.1
+                ),
+                self.TEST_VALUE,
             )
 
     def test_purge_metadata(self):
@@ -190,80 +117,29 @@ class TestProcessMetadataManager(TestBase):
         self.assertGreater(mock_rm.call_count, 0)
 
 
-class TestProcessManager(TestBase):
+class TestProcessManager(unittest.TestCase):
     def setUp(self):
         super().setUp()
-        # N.B. We pass in `metadata_base_dir` here because ProcessManager (itself a non-task/non-
-        # subsystem) depends on an initialized `GlobalOptions` subsystem for the value of
-        # `--pants-subprocessdir` in the default case. This is normally provided by subsystem
-        # dependencies in a typical pants run (and integration tests), but not in unit tests.
-        # Thus, passing this parameter here short-circuits the subsystem-reliant path for the
-        # purposes of unit testing without requiring adhoc subsystem initialization.
-        self.pm = ProcessManager("test", metadata_base_dir=self.subprocess_dir)
-
-    def test_process_properties(self):
-        with unittest.mock.patch.object(
-            ProcessManager, "_as_process", **PATCH_OPTS
-        ) as mock_as_process:
-            mock_as_process.return_value = fake_process(
-                name="name", cmdline=["cmd", "line"], status="status"
-            )
-            self.assertEqual(self.pm.cmdline, ["cmd", "line"])
-            self.assertEqual(self.pm.cmd, "cmd")
-
-    def test_process_properties_cmd_indexing(self):
-        with unittest.mock.patch.object(
-            ProcessManager, "_as_process", **PATCH_OPTS
-        ) as mock_as_process:
-            mock_as_process.return_value = fake_process(cmdline="")
-            self.assertEqual(self.pm.cmd, None)
-
-    def test_process_properties_none(self):
-        with unittest.mock.patch.object(ProcessManager, "_as_process", **PATCH_OPTS) as mock_asproc:
-            mock_asproc.return_value = None
-            self.assertEqual(self.pm.cmdline, None)
-            self.assertEqual(self.pm.cmd, None)
-
-    def test_get_subprocess_output(self):
-        test_str = "333"
-        self.assertEqual(self.pm.get_subprocess_output(["echo", "-n", test_str]), test_str)
-
-    def test_get_subprocess_output_interleaved(self):
-        cmd_payload = "import sys; " + (
-            'sys.stderr.write("9"); sys.stderr.flush(); sys.stdout.write("3"); sys.stdout.flush();'
-            * 3
-        )
-        cmd = [sys.executable, "-c", cmd_payload]
-
-        self.assertEqual(self.pm.get_subprocess_output(cmd), "333")
-        self.assertEqual(self.pm.get_subprocess_output(cmd, ignore_stderr=False), "939393")
-        self.assertEqual(self.pm.get_subprocess_output(cmd, stderr=subprocess.STDOUT), "939393")
-
-    def test_get_subprocess_output_interleaved_bash(self):
-        cmd_payload = 'printf "9">&2; printf "3";' * 3
-        cmd = ["/bin/bash", "-c", cmd_payload]
-
-        self.assertEqual(self.pm.get_subprocess_output(cmd), "333")
-        self.assertEqual(self.pm.get_subprocess_output(cmd, ignore_stderr=False), "939393")
-        self.assertEqual(self.pm.get_subprocess_output(cmd, stderr=subprocess.STDOUT), "939393")
-
-    def test_get_subprocess_output_oserror_exception(self):
-        with self.assertRaises(ProcessManager.ExecutionError):
-            self.pm.get_subprocess_output(["i_do_not_exist"])
-
-    def test_get_subprocess_output_failure_exception(self):
-        with self.assertRaises(ProcessManager.ExecutionError):
-            self.pm.get_subprocess_output(["false"])
+        self.pm = ProcessManager("test", metadata_base_dir=safe_mkdtemp())
 
     def test_await_pid(self):
         with unittest.mock.patch.object(ProcessManager, "await_metadata_by_name") as mock_await:
             self.pm.await_pid(5)
-        mock_await.assert_called_once_with(self.pm.name, "pid", 5, unittest.mock.ANY)
+        mock_await.assert_called_once_with(
+            self.pm.name, "pid", "test to start", "test started", 5, caster=unittest.mock.ANY
+        )
 
     def test_await_socket(self):
         with unittest.mock.patch.object(ProcessManager, "await_metadata_by_name") as mock_await:
             self.pm.await_socket(5)
-        mock_await.assert_called_once_with(self.pm.name, "socket", 5, unittest.mock.ANY)
+        mock_await.assert_called_once_with(
+            self.pm.name,
+            "socket",
+            "test socket to be opened",
+            "test socket opened",
+            5,
+            caster=unittest.mock.ANY,
+        )
 
     def test_write_pid(self):
         with unittest.mock.patch.object(ProcessManager, "write_metadata_by_name") as mock_write:
@@ -275,28 +151,24 @@ class TestProcessManager(TestBase):
             self.pm.write_socket("/path/to/unix/socket")
         mock_write.assert_called_once_with(self.pm.name, "socket", "/path/to/unix/socket")
 
-    def test_write_named_socket(self):
-        with unittest.mock.patch.object(ProcessManager, "write_metadata_by_name") as mock_write:
-            self.pm.write_named_socket("pailgun", "31337")
-        mock_write.assert_called_once_with(self.pm.name, "socket_pailgun", "31337")
-
     def test_as_process(self):
         sentinel = 3333
         with unittest.mock.patch("psutil.Process", **PATCH_OPTS) as mock_proc:
             mock_proc.return_value = sentinel
-            self.pm._pid = sentinel
+            self.pm.write_pid(sentinel)
             self.assertEqual(self.pm._as_process(), sentinel)
 
     def test_as_process_no_pid(self):
         fake_pid = 3
         with unittest.mock.patch("psutil.Process", **PATCH_OPTS) as mock_proc:
             mock_proc.side_effect = psutil.NoSuchProcess(fake_pid)
-            self.pm._pid = fake_pid
+            self.pm.write_pid(fake_pid)
             with self.assertRaises(psutil.NoSuchProcess):
                 self.pm._as_process()
 
     def test_as_process_none(self):
-        self.assertEqual(self.pm._as_process(), None)
+        with self.assertRaises(self.pm.NotStarted):
+            self.pm._as_process()
 
     def test_is_alive_neg(self):
         with unittest.mock.patch.object(
@@ -341,7 +213,7 @@ class TestProcessManager(TestBase):
             mock_as_process.return_value = fake_process(
                 name="not_test", pid=3, status=psutil.STATUS_IDLE
             )
-            self.pm._process_name = "test"
+            self.pm.write_process_name("test")
             self.assertFalse(self.pm.is_alive())
             mock_as_process.assert_called_with(self.pm)
 
@@ -372,7 +244,7 @@ class TestProcessManager(TestBase):
 
     def test_kill(self):
         with unittest.mock.patch("os.kill", **PATCH_OPTS) as mock_kill:
-            self.pm._pid = 42
+            self.pm.write_pid(42)
             self.pm._kill(0)
             mock_kill.assert_called_once_with(42, 0)
 
@@ -454,21 +326,6 @@ class TestProcessManager(TestBase):
                 mock_post_child.assert_called_once_with(self.pm)
             if chk_post_parent:
                 mock_post_parent.assert_called_once_with(self.pm)
-
-    def test_daemonize_parent(self):
-        with self.mock_daemonize_context() as mock_fork:
-            mock_fork.side_effect = [1, 1]  # Simulate the parent.
-            self.pm.daemonize(write_pid=False)
-
-    def test_daemonize_child(self):
-        with self.mock_daemonize_context(chk_post_child=True) as mock_fork:
-            mock_fork.side_effect = [0, 0]  # Simulate the child.
-            self.pm.daemonize(write_pid=False)
-
-    def test_daemonize_child_parent(self):
-        with self.mock_daemonize_context(chk_post_parent=True) as mock_fork:
-            mock_fork.side_effect = [1, 1]  # Simulate the original parent process.
-            self.pm.daemonize(write_pid=False)
 
     def test_daemon_spawn_parent(self):
         with self.mock_daemonize_context(chk_post_parent=True) as mock_fork:

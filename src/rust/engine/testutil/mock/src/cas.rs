@@ -1,14 +1,13 @@
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::sync::Arc;
-
-use bazel_protos;
-use grpcio;
 
 use bytes::Bytes;
 use futures01::{Future, IntoFuture, Stream};
+use grpcio::RpcContext;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use testutil::data::{TestData, TestDirectory};
+use testutil::data::{TestData, TestDirectory, TestTree};
 
 ///
 /// Implements the ContentAddressableStorage gRPC API, answering read requests with either known
@@ -69,6 +68,11 @@ impl StubCASBuilder {
     self
       .content
       .insert(directory.fingerprint(), directory.bytes());
+    self
+  }
+
+  pub fn tree(mut self, tree: &TestTree) -> Self {
+    self.content.insert(tree.fingerprint(), tree.bytes());
     self
   }
 
@@ -137,10 +141,10 @@ impl StubCAS {
     let write_message_sizes = Arc::new(Mutex::new(Vec::new()));
     let blobs = Arc::new(Mutex::new(blobs));
     let responder = StubCASResponder {
-      chunk_size_bytes: chunk_size_bytes,
-      instance_name: instance_name,
+      chunk_size_bytes,
+      instance_name,
       blobs: blobs.clone(),
-      always_errors: always_errors,
+      always_errors,
       read_request_count: read_request_count.clone(),
       write_message_sizes: write_message_sizes.clone(),
       required_auth_header: required_auth_token.map(|t| format!("Bearer {}", t)),
@@ -150,8 +154,11 @@ impl StubCAS {
         responder.clone(),
       ))
       .register_service(
-        bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder),
+        bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder.clone()),
       )
+      .register_service(bazel_protos::remote_execution_grpc::create_capabilities(
+        responder,
+      ))
       .bind("localhost", port)
       .build()
       .unwrap();
@@ -223,6 +230,22 @@ macro_rules! check_auth {
         );
         return;
       }
+    }
+  };
+}
+
+macro_rules! check_instance_name {
+  ($self:ident, $req:ident, $sink:ident) => {
+    if $req.instance_name != $self.instance_name() {
+      $sink.fail(grpcio::RpcStatus::new(
+        grpcio::RpcStatusCode::NOT_FOUND,
+        Some(format!(
+          "Wrong instance_name; want {:?} got {:?}",
+          $self.instance_name(),
+          $req.instance_name
+        )),
+      ));
+      return;
     }
   };
 }
@@ -489,27 +512,31 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
       ));
       return;
     }
-    if req.instance_name != self.instance_name() {
-      sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::NOT_FOUND,
-        Some(format!(
-          "Wrong instance_name; want {:?} got {:?}",
-          self.instance_name(),
-          req.instance_name
-        )),
-      ));
-      return;
-    }
+
+    check_instance_name!(self, req, sink);
+
     let blobs = self.blobs.lock();
     let mut response = bazel_protos::remote_execution::FindMissingBlobsResponse::new();
     for digest in req.get_blob_digests() {
-      let hashing_digest_result: Result<Digest, String> = digest.into();
+      let hashing_digest_result: Result<Digest, String> = digest.try_into();
       let hashing_digest = hashing_digest_result.expect("Bad digest");
       if !blobs.contains_key(&hashing_digest.0) {
         response.mut_missing_blob_digests().push(digest.clone())
       }
     }
     sink.success(response);
+  }
+
+  fn batch_read_blobs(
+    &self,
+    _: RpcContext<'_>,
+    _: bazel_protos::remote_execution::BatchReadBlobsRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::BatchReadBlobsResponse>,
+  ) {
+    sink.fail(grpcio::RpcStatus::new(
+      grpcio::RpcStatusCode::UNIMPLEMENTED,
+      None,
+    ));
   }
 
   fn batch_update_blobs(
@@ -523,6 +550,7 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
       None,
     ));
   }
+
   fn get_tree(
     &self,
     _ctx: grpcio::RpcContext<'_>,
@@ -532,5 +560,34 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
     // Our client doesn't currently use get_tree, so we don't bother implementing it.
     // We will need to if the client starts wanting to use it.
     unimplemented!()
+  }
+}
+
+impl bazel_protos::remote_execution_grpc::Capabilities for StubCASResponder {
+  fn get_capabilities(
+    &self,
+    _ctx: grpcio::RpcContext<'_>,
+    req: bazel_protos::remote_execution::GetCapabilitiesRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::ServerCapabilities>,
+  ) {
+    check_instance_name!(self, req, sink);
+
+    let mut response = bazel_protos::remote_execution::ServerCapabilities::new();
+    let cache_capabilities = response.mut_cache_capabilities();
+    cache_capabilities.set_digest_function(vec![
+      bazel_protos::remote_execution::DigestFunction_Value::SHA256,
+    ]);
+    cache_capabilities.max_batch_total_size_bytes = 0;
+
+    response.mut_execution_capabilities().digest_function =
+      bazel_protos::remote_execution::DigestFunction_Value::SHA256;
+    response.mut_execution_capabilities().exec_enabled = true;
+
+    let mut max_semver = bazel_protos::semver::SemVer::new();
+    max_semver.major = 2;
+    max_semver.minor = 999;
+    response.set_high_api_version(max_semver);
+
+    sink.success(response);
   }
 }

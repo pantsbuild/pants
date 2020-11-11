@@ -22,7 +22,6 @@ members = [
   "async_semaphore",
   "boxfuture",
   "concrete_time",
-  "engine_cffi",
   "fs",
   "fs/brfs",
   "fs/fs_util",
@@ -30,18 +29,19 @@ members = [
   "graph",
   "hashing",
   "logging",
+  "nailgun",
   "process_execution",
   "process_executor",
   "rule_graph",
   "serverset",
   "sharded_lmdb",
-  "tar_api",
   "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
   "testutil/local_execution_server",
   "ui",
+  "watch",
   "workunit_store"
 ]
 
@@ -58,27 +58,39 @@ default-members = [
   "async_semaphore",
   "boxfuture",
   "concrete_time",
-  "engine_cffi",
   "fs",
   "fs/fs_util",
   "fs/store",
   "graph",
   "hashing",
   "logging",
+  "nailgun",
   "process_execution",
   "process_executor",
   "rule_graph",
   "serverset",
   "sharded_lmdb",
-  "tar_api",
   "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
   "testutil/local_execution_server",
   "ui",
+  "watch",
   "workunit_store"
 ]
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+# NB: To actually load this crate from python, the `extension-module` feature must be enabled. But
+# unfortunately, enabling `extension-module` causes tests linked against `cpython` to fail. We
+# define a feature to enable that, but we do not enable it by default: someone building this module
+# in order to extract `libengine.so` should pass `cargo build .. --features=extension-module`.
+#  see https://github.com/PyO3/pyo3/issues/340
+extension-module = ["cpython/extension-module"]
+default = []
 
 [dependencies]
 async_semaphore = { path = "async_semaphore" }
@@ -86,29 +98,25 @@ async-trait = "0.1"
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }
-crossbeam-channel = "0.3"
+cpython = "0.5"
+crossbeam-channel = "0.4"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
-futures-locks = "0.3.0"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
-indexmap = "1.0.2"
+indexmap = "1.4"
 itertools = "0.8.2"
 lazy_static = "1"
 log = "0.4"
 logging = { path = "logging" }
-num_cpus = "1"
+nailgun = { path = "nailgun" }
 num_enum = "0.4"
-# notify is currently an experimental API, we are pinning to https://docs.rs/notify/5.0.0-pre.1/notify/
-# because the latest prerelease at time of writing has removed the debounced watcher which we would like to use.
-# The author suggests they will add the debounced watcher back into the stable 5.0.0 release. When that happens
-# we can move to it.
-notify = { git = "https://github.com/notify-rs/notify", rev = "fba00891d9105e2f581c69fbe415a58cb7966fdd" }
-parking_lot = "0.6"
+parking_lot = "0.11"
 process_execution = { path = "process_execution" }
 rand = "0.6"
+regex = "1"
 reqwest = { version = "0.10", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
 sharded_lmdb = { path = "sharded_lmdb" }
@@ -117,10 +125,11 @@ store = { path = "fs/store" }
 task_executor = { path = "task_executor" }
 tempfile = "3"
 time = "0.1.40"
-tokio = { version = "0.2", features = ["rt-threaded"] }
+tokio = { version = "0.2.22", features = ["rt-threaded"] }
 ui = { path = "ui" }
 url = "2.1"
 uuid = { version = "0.7", features = ["v4"] }
+watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 
 [dev-dependencies]

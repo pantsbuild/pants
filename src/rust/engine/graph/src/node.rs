@@ -2,12 +2,12 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::fmt::{Debug, Display};
+use std::future::Future;
 use std::hash::Hash;
+use std::ops::DerefMut;
 
-use boxfuture::BoxFuture;
-use hashing::Digest;
+use async_trait::async_trait;
 
-use futures01::future::Future;
 use petgraph::stable_graph;
 
 use crate::entry::Entry;
@@ -21,31 +21,25 @@ pub type EntryId = stable_graph::NodeIndex<u32>;
 ///
 /// Note that it is assumed that Nodes are very cheap to clone.
 ///
+#[async_trait]
 pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   type Context: NodeContext<Node = Self>;
 
   type Item: Clone + Debug + Eq + Send + 'static;
   type Error: NodeError;
 
-  fn run(self, context: Self::Context) -> BoxFuture<Self::Item, Self::Error>;
+  async fn run(self, context: Self::Context) -> Result<Self::Item, Self::Error>;
 
   ///
-  /// If the given Node output represents an FS operation, returns its Digest.
-  ///
-  fn digest(result: Self::Item) -> Option<Digest>;
-
-  ///
-  /// If the node result is cacheable, return true.
+  /// If a node's output is cacheable based solely on properties of the node, and not the output,
+  /// return true.
   ///
   fn cacheable(&self) -> bool;
 
-  /// Nodes optionally have a user-facing name (distinct from their Debug and Display
-  /// implementations). This user-facing name is intended to provide high-level information
-  /// to end users of pants about what computation pants is currently doing. Not all
-  /// `Node`s need a user-facing name. For `Node`s derived from Python `@rule`s, the
-  /// user-facing name should be the same as the `name` annotation on the rule decorator.
-  fn user_facing_name(&self) -> Option<String> {
-    None
+  /// A Node may want to compute cacheability differently based on properties of the Node's item.
+  /// The output of this method will be and'd with `cacheable` to compute overall cacheability.
+  fn cacheable_item(&self, _item: &Self::Item) -> bool {
+    self.cacheable()
   }
 }
 
@@ -55,12 +49,6 @@ pub trait NodeError: Clone + Debug + Eq + Send {
   /// Graph (generally while running).
   ///
   fn invalidated() -> Self;
-  ///
-  /// Creates an instance that represents an uncacheable node failing from
-  /// retrying its dependencies too many times, but never able to resolve them,
-  /// usually because they were invalidated too many times while running.
-  ///
-  fn exhausted() -> Self;
 
   ///
   /// Creates an instance that represents that a Node dependency was cyclic along the given path.
@@ -84,26 +72,6 @@ pub trait NodeVisualizer<N: Node> {
 }
 
 ///
-/// A trait used to visualize Nodes for the purposes of CLI-output tracing.
-///
-pub trait NodeTracer<N: Node> {
-  ///
-  /// Returns true if the given Node Result represents the "bottom" of a trace.
-  ///
-  /// A trace represents a sub-dag of the entire Graph, and a "bottom" Node result represents
-  /// a boundary that the trace stops before (ie, a bottom Node will not be rendered in the trace,
-  /// but anything that depends on a bottom Node will be).
-  ///
-  fn is_bottom(result: Option<Result<N::Item, N::Error>>) -> bool;
-
-  ///
-  /// Renders the given result for a trace. The trace will already be indented by `indent`, but
-  /// an implementer creating a multi-line output would need to indent them as well.
-  ///
-  fn state_str(indent: &str, result: Option<Result<N::Item, N::Error>>) -> String;
-}
-
-///
 /// A context passed between Nodes that also stores an EntryId to uniquely identify them.
 ///
 pub trait NodeContext: Clone + Send + Sync + 'static {
@@ -113,11 +81,21 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   type Node: Node;
 
   ///
-  /// The Session ID type for this Context. Some Node behaviours (in particular: Node::cacheable)
-  /// have Session-specific semantics. More than one context object might be associated with a
-  /// single caller "session".
+  /// The Run ID type for this Context. Some Node behaviours have Run-specific semantics. In
+  /// particular: an uncacheable (Node::cacheable) Node will execute once per Run, regardless
+  /// of other invalidation.
   ///
-  type SessionId: Clone + Debug + Eq + Send;
+  type RunId: Clone + Debug + Eq + Send;
+
+  ///
+  /// Return a reference to a Stats instance that the Graph will use to record relevant statistics
+  /// about a run.
+  ///
+  /// TODO: This API is awkward because it assumes that you need a lock inside your NodeContext
+  /// implementation. We should likely make NodeContext a concrete struct with a type parameter
+  /// for other user specific context rather than having such a large trait.
+  ///
+  fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = Stats> + 'a>;
 
   ///
   /// Creates a clone of this NodeContext to be used for a different Node.
@@ -127,10 +105,10 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   fn clone_for(&self, entry_id: EntryId) -> <Self::Node as Node>::Context;
 
   ///
-  /// Returns the SessionId for this Context, which should uniquely identify a caller's run for the
-  /// purposes of "once per Session" behaviour.
+  /// Returns the RunId for this Context, which should uniquely identify a caller's run for the
+  /// purposes of "once per Run" behaviour.
   ///
-  fn session_id(&self) -> &Self::SessionId;
+  fn run_id(&self) -> &Self::RunId;
 
   ///
   /// Returns a reference to the Graph for this Context.
@@ -145,5 +123,12 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   ///
   fn spawn<F>(&self, future: F)
   where
-    F: Future<Item = (), Error = ()> + Send + 'static;
+    F: Future<Output = ()> + Send + 'static;
+}
+
+#[derive(Default)]
+pub struct Stats {
+  pub ran: usize,
+  pub cleaning_succeeded: usize,
+  pub cleaning_failed: usize,
 }

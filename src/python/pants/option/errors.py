@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Tuple
+
 from pants.option.scope import GLOBAL_SCOPE
 
 
@@ -20,7 +22,8 @@ class RegistrationError(OptionsError):
         scope_str = "global scope" if scope == GLOBAL_SCOPE else f"scope {scope}"
         if self.__doc__ is None:
             raise ValueError(
-                "Invalid RegistrationError definition. Please specify the error message in the docstring."
+                "Invalid RegistrationError definition. "
+                "Please specify the error message in the docstring."
             )
         docstring = self.__doc__.format(**msg_format_args)
         super().__init__(f"{docstring} [option {option} in {scope_str}].")
@@ -69,6 +72,10 @@ class OptionNameDoubleDash(RegistrationError):
     """Long option name must begin with a double-dash."""
 
 
+class PassthroughType(RegistrationError):
+    """Options marked passthrough must be typed as a string list."""
+
+
 class RecursiveSubsystemOption(RegistrationError):
     """Subsystem option cannot specify 'recursive'.
 
@@ -98,5 +105,15 @@ class FromfileError(ParseError):
 
 
 class MutuallyExclusiveOptionError(ParseError):
-    """Raised when more than one option belonging to the same mutually exclusive group is
-    specified."""
+    """Indicates that two options in the same mutually exclusive group were specified."""
+
+
+class UnknownFlagsError(ParseError):
+    """Indicates that unknown command-line flags were encountered in some scope."""
+
+    def __init__(self, flags: Tuple[str, ...], arg_scope: str):
+        self.flags = flags
+        self.arg_scope = arg_scope
+        scope = f"scope {self.arg_scope}" if self.arg_scope else "global scope"
+        msg = f"Unknown flags {', '.join(self.flags)} on {scope}"
+        super().__init__(msg)

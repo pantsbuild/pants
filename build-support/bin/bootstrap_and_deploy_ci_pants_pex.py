@@ -23,7 +23,7 @@ def main() -> None:
         )
     args = create_parser().parse_args()
     pex_url = f"s3://{args.aws_bucket}/{args.pex_key}"
-    native_engine_so_local_path = f"./src/python/pants/engine/native_engine.so"
+    native_engine_so_local_path = "./src/python/pants/engine/internals/native_engine.so"
 
     # NB: we must set `$PY` before calling `bootstrap()` to ensure that we use the exact same
     # Python interpreter when calculating the hash of `native_engine.so` as the one we use when
@@ -98,7 +98,7 @@ def create_parser() -> argparse.ArgumentParser:
 def calculate_native_engine_so_hash() -> str:
     return (
         subprocess.run(
-            ["build-support/bin/native/print_engine_hash.sh"], stdout=subprocess.PIPE, check=True,
+            ["build-support/bin/native/print_engine_hash.sh"], stdout=subprocess.PIPE, check=True
         )
         .stdout.decode()
         .strip()
@@ -123,8 +123,10 @@ def native_engine_so_in_s3_cache(*, aws_bucket: str, native_engine_so_aws_key: s
     ).stdout.decode()
     if not ls_output:
         return False
-    num_versions = len(json.loads(ls_output)["Versions"])
-    if num_versions > 1:
+    versions = json.loads(ls_output).get("Versions")
+    if versions is None:
+        return False
+    if len(versions) > 1:
         die(
             f"Multiple copies found of {native_engine_so_aws_key} in AWS S3. This is not allowed "
             "as a security precaution. Please raise this failure in the #infra channel "
@@ -167,7 +169,7 @@ def deploy_native_engine_so(
 
 
 def deploy_pants_pex(pex_url: str) -> None:
-    _deploy(f"./pants.pex", pex_url)
+    _deploy("./pants.pex", pex_url)
 
 
 if __name__ == "__main__":

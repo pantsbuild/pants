@@ -1,65 +1,70 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import sys
+import dataclasses
+import difflib
+import json
 import textwrap
-from typing import Dict, Optional, cast
+from typing import Dict, cast
 
-from colors import cyan, green
 from typing_extensions import Literal
 
-from pants.base.build_environment import pants_release, pants_version
-from pants.engine.goal import GoalSubsystem
-from pants.engine.rules import UnionMembership
-from pants.goal.goal import Goal
+from pants.base.build_environment import pants_version
 from pants.help.help_formatter import HelpFormatter
-from pants.help.scope_info_iterator import ScopeInfoIterator
+from pants.help.help_info_extracter import AllHelpInfo, HelpJSONEncoder
+from pants.help.maybe_color import MaybeColor
 from pants.option.arg_splitter import (
-    GoalsHelp,
+    AllHelp,
     HelpRequest,
     NoGoalHelp,
-    OptionsHelp,
+    ThingHelp,
     UnknownGoalHelp,
     VersionHelp,
 )
-from pants.option.options import Options
-from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE
 
 
-class HelpPrinter:
-    """Prints help to the console."""
+class HelpPrinter(MaybeColor):
+    """Prints general and goal-related help to the console."""
 
     def __init__(
         self,
         *,
-        options: Options,
-        help_request: Optional[HelpRequest] = None,
-        union_membership: UnionMembership,
+        bin_name: str,
+        help_request: HelpRequest,
+        all_help_info: AllHelpInfo,
+        color: bool,
     ) -> None:
-        self._options = options
-        self._help_request = help_request or self._options.help_request
-        self._union_membership = union_membership
-        self._use_color = sys.stdout.isatty()
-
-    @property
-    def bin_name(self) -> str:
-        return cast(str, self._options.for_global_scope().pants_bin_name)
+        super().__init__(color)
+        self._bin_name = bin_name
+        self._help_request = help_request
+        self._all_help_info = all_help_info
 
     def print_help(self) -> Literal[0, 1]:
         """Print help to the console."""
 
         def print_hint() -> None:
-            print(f"Use `{self.bin_name} goals` to list goals.")
-            print(f"Use `{self.bin_name} help` to get help.")
+            print(f"Use `{self.maybe_green(self._bin_name + ' help')}` to get help.")
+            print(f"Use `{self.maybe_green(self._bin_name + ' help goals')}` to list goals.")
 
         if isinstance(self._help_request, VersionHelp):
             print(pants_version())
-        elif isinstance(self._help_request, OptionsHelp):
-            self._print_options_help()
-        elif isinstance(self._help_request, GoalsHelp):
-            self._print_goals_help()
+        elif isinstance(self._help_request, AllHelp):
+            self._print_all_help()
+        elif isinstance(self._help_request, ThingHelp):
+            self._print_thing_help()
         elif isinstance(self._help_request, UnknownGoalHelp):
-            print("Unknown goals: {}".format(", ".join(self._help_request.unknown_goals)))
+            # Only print help and suggestions for the first unknown goal.
+            # It gets confusing to try and show suggestions for multiple cases.
+            unknown_goal = self._help_request.unknown_goals[0]
+            print(f"Unknown goal: {self.maybe_red(unknown_goal)}")
+            did_you_mean = list(
+                difflib.get_close_matches(
+                    unknown_goal, self._all_help_info.name_to_goal_info.keys()
+                )
+            )
+            if did_you_mean:
+                print(f"Did you mean: {', '.join(self.maybe_cyan(g) for g in did_you_mean)}?")
             print_hint()
             return 1
         elif isinstance(self._help_request, NoGoalHelp):
@@ -68,146 +73,198 @@ class HelpPrinter:
             return 1
         return 0
 
-    def _print_goals_help(self) -> None:
-        global_options = self._options.for_global_scope()
-        goal_descriptions: Dict[str, str] = {}
-        if global_options.v2:
-            goal_scope_infos = [
-                scope_info
-                for scope_info in self._options.known_scope_to_info.values()
-                if scope_info.category == ScopeInfo.GOAL
-            ]
-            for scope_info in goal_scope_infos:
-                optionable_cls = scope_info.optionable_cls
-                if optionable_cls is None or not issubclass(optionable_cls, GoalSubsystem):
-                    continue
-                is_implemented = self._union_membership.has_members_for_all(
-                    optionable_cls.required_union_implementations
-                )
-                if not is_implemented:
-                    continue
-                description = scope_info.description or "<no description>"
-                goal_descriptions[scope_info.scope] = description
-        if global_options.v1:
-            goal_descriptions.update(
-                {goal.name: goal.description_first_line for goal in Goal.all() if goal.description}
-            )
+    def _print_title(self, title_text: str) -> None:
+        title = self.maybe_green(f"{title_text}\n{'-' * len(title_text)}")
+        print(f"\n{title}\n")
 
-        title_text = "Goals"
-        title = f"{title_text}\n{'-' * len(title_text)}"
-        if self._use_color:
-            title = green(title)
+    def _print_all_help(self) -> None:
+        print(self._get_help_json())
 
-        max_width = max(len(name) for name in goal_descriptions.keys())
-        chars_before_description = max_width + 2
-
-        def format_goal(name: str, description: str) -> str:
-            name = name.ljust(chars_before_description)
-            if self._use_color:
-                name = cyan(name)
-            description_lines = textwrap.wrap(description, 80 - chars_before_description)
-            if len(description_lines) > 1:
-                description_lines = [
-                    description_lines[0],
-                    *(f"{' ' * chars_before_description}{line}" for line in description_lines[1:]),
-                ]
-            description = "\n".join(description_lines)
-            return f"{name}{description}\n"
-
-        lines = [
-            f"\n{title}\n",
-            f"Use `{self.bin_name} help $goal` to get help for a particular goal.",
-            "\n",
-            *(
-                format_goal(name, description)
-                for name, description in sorted(goal_descriptions.items())
-            ),
-        ]
-        print("\n".join(lines))
-
-    def _print_options_help(self) -> None:
+    def _print_thing_help(self) -> None:
         """Print a help screen.
 
         Assumes that self._help_request is an instance of OptionsHelp.
 
         Note: Ony useful if called after options have been registered.
         """
+        help_request = cast(ThingHelp, self._help_request)
+        things = set(help_request.things)
 
-        help_request = cast(OptionsHelp, self._help_request)
-        global_options = self._options.for_global_scope()
-
-        if help_request.all_scopes:
-            help_scopes = set(self._options.known_scope_to_info.keys())
+        if things:
+            for thing in sorted(things):
+                if thing == "goals":
+                    self._print_goals_help()
+                elif thing == "subsystems":
+                    self._print_subsystems_help()
+                elif thing == "targets":
+                    self._print_targets_help()
+                elif thing == "global":
+                    self._print_options_help(GLOBAL_SCOPE, help_request.advanced)
+                elif thing in self._all_help_info.scope_to_help_info:
+                    self._print_options_help(thing, help_request.advanced)
+                elif thing in self._all_help_info.name_to_target_type_info:
+                    self._print_target_help(thing)
+                else:
+                    print(self.maybe_red(f"Unknown entity: {thing}"))
         else:
-            # The scopes explicitly mentioned by the user on the cmd line.
-            help_scopes = set(self._options.scope_to_flags.keys()) - {GLOBAL_SCOPE}
+            self._print_global_help()
 
-        # If --v1 is enabled at all, don't use v2_help, even if --v2 is also enabled.
-        v2_help = global_options.v2 and not global_options.v1
+    def _print_goals_help(self) -> None:
+        goal_descriptions: Dict[str, str] = {}
 
-        scope_info_iterator = ScopeInfoIterator(
-            scope_to_info=self._options.known_scope_to_info, v2_help=v2_help
+        for goal_info in self._all_help_info.name_to_goal_info.values():
+            if goal_info.is_implemented:
+                goal_descriptions[goal_info.name] = goal_info.description
+
+        self._print_title("Goals")
+
+        max_width = max((len(name) for name in goal_descriptions.keys()), default=0)
+        chars_before_description = max_width + 2
+
+        def format_goal(name: str, descr: str) -> str:
+            name = self.maybe_cyan(name.ljust(chars_before_description))
+            description_lines = textwrap.wrap(descr, 80 - chars_before_description)
+            if len(description_lines) > 1:
+                description_lines = [
+                    description_lines[0],
+                    *(f"{' ' * chars_before_description}{line}" for line in description_lines[1:]),
+                ]
+            formatted_descr = "\n".join(description_lines)
+            return f"{name}{formatted_descr}\n"
+
+        for name, description in sorted(goal_descriptions.items()):
+            print(format_goal(name, description))
+        specific_help_cmd = f"{self._bin_name} help $goal"
+        print(f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal.\n")
+
+    def _print_subsystems_help(self) -> None:
+        self._print_title("Subsystems")
+
+        subsystem_description: Dict[str, str] = {}
+        for alias, help_info in self._all_help_info.scope_to_help_info.items():
+            if not help_info.is_goal and alias:
+                subsystem_description[alias] = help_info.description
+
+        longest_subsystem_alias = max(len(alias) for alias in subsystem_description.keys())
+        chars_before_description = longest_subsystem_alias + 2
+        for alias, description in sorted(subsystem_description.items()):
+            alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
+            print(f"{alias_str}{description}\n")
+
+        specific_help_cmd = f"{self._bin_name} help $subsystem"
+        print(
+            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a "
+            f"specific subsystem.\n"
         )
 
-        scope_infos = list(scope_info_iterator.iterate(help_scopes))
+    def _print_global_help(self):
+        def print_cmd(args: str, desc: str):
+            cmd = self.maybe_green(f"{self._bin_name} {args}".ljust(50))
+            print(f"  {cmd}  {desc}")
 
-        if scope_infos:
-            for scope_info in scope_infos:
-                help_str = self._format_help(scope_info, help_request.advanced)
-                if help_str:
-                    print(help_str)
-            return
-        else:
-            print(pants_release())
-            print("\nUsage:")
-            print(
-                f"  {self.bin_name} [option ...] [goal ...] [target/file ...]  Attempt the specified goals."
-            )
-            print(f"  {self.bin_name} help                                       Get help.")
-            print(
-                f"  {self.bin_name} help [goal]                                Get help for a goal."
-            )
-            print(
-                f"  {self.bin_name} help-advanced                              Get help for global advanced options."
-            )
-            print(
-                f"  {self.bin_name} help-advanced [goal]                       Get help for a goal's advanced options."
-            )
-            print(
-                f"  {self.bin_name} help-all                                   Get help for all goals."
-            )
-            print(
-                f"  {self.bin_name} goals                                      List all installed goals."
-            )
-            print("")
-            print("  [file] can be:")
-            print("     A path to a file.")
-            print("     A path glob, such as '**/*.ext', in quotes to prevent shell expansion.")
-            print("  [target] accepts two special forms:")
-            print("    dir:  to include all targets in the specified directory.")
-            print("    dir:: to include all targets found recursively under the directory.")
-            print("\nFriendly docs:\n  http://pantsbuild.org/")
+        print(f"\nPants {pants_version()}")
+        print("\nUsage:\n")
+        print_cmd(
+            "[option ...] [goal ...] [file/target ...]",
+            "Attempt the specified goals on the specified files/targets.",
+        )
+        print_cmd("help", "Display this usage message.")
+        print_cmd("help goals", "List all installed goals.")
+        print_cmd("help targets", "List all installed target types.")
+        print_cmd("help subsystems", "List all configurable subsystems.")
+        print_cmd("help global", "Help for global options.")
+        print_cmd("help-advanced global", "Help for global advanced options.")
+        print_cmd("help [target_type/goal/subsystem]", "Help for a target type, goal or subsystem.")
+        print_cmd(
+            "help-advanced [goal/subsystem]", "Help for a goal or subsystem's advanced options."
+        )
+        print_cmd("help-all", "Print a JSON object containing all help info.")
 
-            print(
-                self._format_help(ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL), help_request.advanced)
-            )
+        print("")
+        print("  [file] can be:")
+        print(f"     {self.maybe_cyan('path/to/file.ext')}")
+        glob_str = self.maybe_cyan("'**/*.ext'")
+        print(
+            f"     A path glob, such as {glob_str}, in quotes to prevent premature shell expansion."
+        )
+        print("\n  [target] can be:")
+        print(f"    {self.maybe_cyan('path/to/dir:target_name')}.")
+        print(
+            f"    {self.maybe_cyan('path/to/dir')} for a target whose name is the same as the directory name."
+        )
+        print(
+            f"    {self.maybe_cyan('path/to/dir:')}  to include all targets in the specified directory."
+        )
+        print(
+            f"    {self.maybe_cyan('path/to/dir::')} to include all targets found recursively under the directory.\n"
+        )
+        print(f"Documentation at {self.maybe_magenta('https://www.pantsbuild.org')}")
+        pypi_url = f"https://pypi.org/pypi/pantsbuild.pants/{pants_version()}"
+        print(f"Download at {self.maybe_magenta(pypi_url)}")
 
-    def _format_help(self, scope_info: ScopeInfo, show_advanced_and_deprecated: bool) -> str:
-        """Return a help message for the options registered on this object.
+    def _print_options_help(self, scope: str, show_advanced_and_deprecated: bool) -> None:
+        """Prints a human-readable help message for the options registered on this object.
 
         Assumes that self._help_request is an instance of OptionsHelp.
-
-        :param scope_info: Scope of the options.
         """
-        scope = scope_info.scope
-        description = scope_info.description
         help_formatter = HelpFormatter(
-            scope=scope,
             show_advanced=show_advanced_and_deprecated,
             show_deprecated=show_advanced_and_deprecated,
-            color=self._use_color,
+            color=self.color,
         )
-        formatted_lines = help_formatter.format_options(
-            scope, description, self._options.get_parser(scope).option_registrations_iter()
+        oshi = self._all_help_info.scope_to_help_info.get(scope)
+        if not oshi:
+            return
+        formatted_lines = help_formatter.format_options(oshi)
+        goal_info = self._all_help_info.name_to_goal_info.get(scope)
+        if goal_info:
+            related_scopes = sorted(set(goal_info.consumed_scopes) - {GLOBAL_SCOPE, goal_info.name})
+            if related_scopes:
+                related_subsystems_label = self.maybe_green("Related subsystems:")
+                formatted_lines.append(f"{related_subsystems_label} {', '.join(related_scopes)}")
+                formatted_lines.append("")
+        for line in formatted_lines:
+            print(line)
+
+    def _print_targets_help(self) -> None:
+        self._print_title("Target types")
+
+        longest_target_alias = max(
+            len(alias) for alias in self._all_help_info.name_to_target_type_info.keys()
         )
-        return "\n".join(formatted_lines)
+        chars_before_description = longest_target_alias + 2
+        for alias, target_type_info in sorted(
+            self._all_help_info.name_to_target_type_info.items(), key=lambda x: x[0]
+        ):
+            alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
+            summary = target_type_info.summary or "<no description>"
+            print(f"{alias_str}{summary}\n")
+        specific_help_cmd = f"{self._bin_name} help $target_type"
+        print(
+            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific "
+            f"target type.\n"
+        )
+
+    def _print_target_help(self, target_alias: str) -> None:
+        self._print_title(target_alias)
+        tinfo = self._all_help_info.name_to_target_type_info[target_alias]
+        if tinfo.description:
+            print(tinfo.description)
+        print("\nValid fields:")
+        for field in sorted(tinfo.fields, key=lambda x: x.alias):
+            print()
+            print(self.maybe_magenta(field.alias))
+            indent = "    "
+            required_or_default = "required" if field.required else f"default: {field.default}"
+            print(self.maybe_cyan(f"{indent}type: {field.type_hint}"))
+            print(self.maybe_cyan(f"{indent}{required_or_default}"))
+            if field.description:
+                for line in textwrap.wrap(field.description, 80):
+                    print(f"{indent}{line}")
+        print()
+
+    def _get_help_json(self) -> str:
+        """Return a JSON object containing all the help info we have, for every scope."""
+        return json.dumps(
+            dataclasses.asdict(self._all_help_info), sort_keys=True, indent=2, cls=HelpJSONEncoder
+        )

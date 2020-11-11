@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -88,6 +90,26 @@ impl TimeSpan {
   pub fn since(start: &std::time::SystemTime) -> TimeSpan {
     let start = Self::since_epoch(start);
     let duration = Self::since_epoch(&std::time::SystemTime::now()) - start;
+    TimeSpan {
+      start: start.into(),
+      duration: duration.into(),
+    }
+  }
+
+  /// Construct a TimeSpan that started at `start` and ends at `end`.
+  pub fn from_start_and_end_systemtime(
+    start: &std::time::SystemTime,
+    end: &std::time::SystemTime,
+  ) -> TimeSpan {
+    let start = Self::since_epoch(start);
+    let end = Self::since_epoch(end);
+    let duration = match end.checked_sub(start) {
+      Some(d) => d,
+      None => {
+        log::debug!("Invalid TimeSpan - start: {:?}, end: {:?}", start, end);
+        std::time::Duration::new(0, 0)
+      }
+    };
     TimeSpan {
       start: start.into(),
       duration: duration.into(),

@@ -4,7 +4,6 @@
 import logging
 import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import List, Optional
 
 from pathspec.pathspec import PathSpec
@@ -42,10 +41,6 @@ class ProjectTree(ABC):
         """Returns a list of paths in path that match glob."""
 
     @abstractmethod
-    def _scandir_raw(self, relpath):
-        """Return Stats relative to the root for items in the given directory."""
-
-    @abstractmethod
     def _isdir_raw(self, relpath):
         """Returns True if path is a directory."""
 
@@ -80,13 +75,6 @@ class ProjectTree(ABC):
         matched_files = self._glob1_raw(dir_relpath, glob)
         prefix = self._relpath_no_dot(dir_relpath)
         return self._filter_ignored(matched_files, selector=lambda p: os.path.join(prefix, p))
-
-    def scandir(self, relpath):
-        """Return paths relative to the root, which are in the given directory and not ignored."""
-        if self.isignored(relpath, directory=True):
-            self._raise_access_ignored(relpath)
-
-        return self._filter_ignored(self._scandir_raw(relpath), selector=lambda e: e.path)
 
     def isdir(self, relpath):
         """Returns True if path is a directory and is not ignored."""
@@ -197,35 +185,3 @@ class ProjectTree(ABC):
             return self._append_trailing_slash(relpath)
 
         return relpath
-
-
-@dataclass(init=False, frozen=True)
-class Stat(ABC):
-    """An existing filesystem path with a known type, relative to the ProjectTree's buildroot.
-
-    Note that in order to preserve these invariants, end-user functions are not able to instantiate
-    this base class (via the `init=False` argument to the dataclass decorator).
-    """
-
-    path: str
-
-
-@dataclass(frozen=True)
-class File(Stat):
-    """A file."""
-
-    path: str
-
-
-@dataclass(frozen=True)
-class Dir(Stat):
-    """A directory."""
-
-    path: str
-
-
-@dataclass(frozen=True)
-class Link(Stat):
-    """A symbolic link."""
-
-    path: str

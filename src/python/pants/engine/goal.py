@@ -4,17 +4,18 @@
 from abc import abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import ClassVar, Tuple, Type
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Tuple, Type, cast
 
-from pants.cache.cache_setup import CacheSetup
-from pants.option.optionable import Optionable
-from pants.option.options_bootstrapper import is_v2_exclusive
-from pants.option.scope import ScopeInfo
-from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from typing_extensions import final
+
+from pants.option.subsystem import Subsystem
 from pants.util.meta import classproperty
 
+if TYPE_CHECKING:
+    from pants.engine.console import Console
 
-class GoalSubsystem(SubsystemClientMixin, Optionable):
+
+class GoalSubsystem(Subsystem):
     """The Subsystem used by `Goal`s to register the external API, meaning the goal name, the help
     message, and any options.
 
@@ -25,14 +26,12 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
 
     ```
     @rule
-    def list(console: Console, options: ListOptions) -> List:
-      transitive = options.values.transitive
-      documented = options.values.documented
+    def list(console: Console, list_subsystem: ListSubsystem) -> List:
+      transitive = list_subsystem.options.transitive
+      documented = list_subsystem.options.documented
       ...
     ```
     """
-
-    options_scope_category = ScopeInfo.GOAL
 
     # If the goal requires downstream implementations to work properly, such as `test` and `run`,
     # it should declare the union types that must have members.
@@ -45,60 +44,8 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
         for its options."""
 
     @classproperty
-    def deprecated_cache_setup_removal_version(cls):
-        """Optionally defines a deprecation version for a CacheSetup dependency.
-
-        If this GoalSubsystem should have an associated deprecated instance of `CacheSetup` (which
-        was implicitly required by all v1 Tasks), subclasses may set this to a valid deprecation
-        version to create that association.
-        """
-        return None
-
-    @classmethod
-    def conflict_free_name(cls):
-        # v2 goal names ending in '2' are assumed to be so-named to avoid conflict with a v1 goal.
-        # If we're in v2-exclusivce mode, strip off the '2', so we can use the more natural name.
-        # Note that this implies a change of options scope when changing to v2-only mode: options
-        # on the foo2 scope will need to be moved to the foo scope. But we already expect options
-        # changes when switching to v2-exclusive mode (e.g., some v1 options aren't even registered
-        # in that mode), so this is in keeping with existing expectations. And this provides
-        # a much better experience to new users who never encountered v1 anyway.
-        if is_v2_exclusive and cls.name.endswith("2"):
-            return cls.name[:-1]
-        return cls.name
-
-    @classproperty
-    def options_scope(cls):
-        return cls.conflict_free_name()
-
-    @classmethod
-    def subsystem_dependencies(cls):
-        # NB: `GoalSubsystem` implements `SubsystemClientMixin` in order to allow v1 `Tasks` to
-        # depend on v2 Goals, and for `Goals` to declare a deprecated dependency on a `CacheSetup`
-        # instance for backwards compatibility purposes. But v2 Goals should _not_ have subsystem
-        # dependencies: instead, the @rules participating (transitively) in a Goal should directly
-        # declare their Subsystem deps.
-        if cls.deprecated_cache_setup_removal_version:
-            dep = CacheSetup.scoped(
-                cls,
-                removal_version=cls.deprecated_cache_setup_removal_version,
-                removal_hint="Goal `{}` uses an independent caching implementation, and ignores `{}`.".format(
-                    cls.options_scope, CacheSetup.subscope(cls.options_scope),
-                ),
-            )
-            return (dep,)
-        return tuple()
-
-    def __init__(self, scope, scoped_options):
-        # NB: This constructor is shaped to meet the contract of `Optionable(Factory).signature`.
-        super().__init__()
-        self._scope = scope
-        self._scoped_options = scoped_options
-
-    @property
-    def values(self):
-        """Returns the option values."""
-        return self._scoped_options
+    def options_scope(cls) -> str:  # type: ignore[override]
+        return cast(str, cls.name)
 
 
 @dataclass(frozen=True)
@@ -108,12 +55,12 @@ class Goal:
     This class should be subclassed and linked to a corresponding `GoalSubsystem`:
 
     ```
-    class ListOptions(GoalSubsystem):
+    class ListSubsystem(GoalSubsystem):
       '''List targets.'''
       name = "list"
 
     class List(Goal):
-      subsystem_cls = ListOptions
+      subsystem_cls = ListSubsystem
     ```
 
     Since `@goal_rules` always run in order to produce side effects (generally: console output),
@@ -124,9 +71,10 @@ class Goal:
     exit_code: int
     subsystem_cls: ClassVar[Type[GoalSubsystem]]
 
+    @final
     @classproperty
-    def name(cls):
-        return cls.subsystem_cls.conflict_free_name()
+    def name(cls) -> str:
+        return cast(str, cls.subsystem_cls.name)
 
 
 class Outputting:
@@ -143,23 +91,25 @@ class Outputting:
         register(
             "--output-file",
             metavar="<path>",
-            help="Output to this file.  If unspecified, outputs to stdout.",
+            help="Output the goal's stdout to this file. If unspecified, outputs to stdout.",
         )
 
+    @final
     @contextmanager
-    def output(self, console):
+    def output(self, console: "Console") -> Iterator[Callable[[str], None]]:
         """Given a Console, yields a function for writing data to stdout, or a file.
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
         """
         with self.output_sink(console) as output_sink:
-            yield lambda msg: output_sink.write(msg)
+            yield lambda msg: output_sink.write(msg)  # type: ignore[no-any-return]
 
+    @final
     @contextmanager
-    def output_sink(self, console):
+    def output_sink(self, console: "Console") -> Iterator:
         stdout_file = None
-        if self.values.output_file:
-            stdout_file = open(self.values.output_file, "w")
+        if self.options.output_file:  # type: ignore[attr-defined]
+            stdout_file = open(self.options.output_file, "w")  # type: ignore[attr-defined]
             output_sink = stdout_file
         else:
             output_sink = console.stdout
@@ -182,12 +132,13 @@ class LineOriented(Outputting):
             help="String to use to separate lines in line-oriented output.",
         )
 
+    @final
     @contextmanager
-    def line_oriented(self, console):
+    def line_oriented(self, console: "Console") -> Iterator[Callable[[str], None]]:
         """Given a Console, yields a function for printing lines to stdout or a file.
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
         """
-        sep = self.values.sep.encode().decode("unicode_escape")
+        sep = self.options.sep.encode().decode("unicode_escape")  # type: ignore[attr-defined]
         with self.output_sink(console) as output_sink:
             yield lambda msg: print(msg, file=output_sink, end=sep)

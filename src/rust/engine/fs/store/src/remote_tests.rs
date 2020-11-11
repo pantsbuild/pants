@@ -1,5 +1,5 @@
 use crate::remote::ByteStore;
-use crate::{EntryType, MEGABYTES};
+use crate::MEGABYTES;
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use hashing::Digest;
@@ -139,7 +139,7 @@ async fn write_file_one_chunk() {
 
   let store = new_byte_store(&cas);
   assert_eq!(
-    store.store_bytes(testdata.bytes()).await,
+    store.store_bytes(&testdata.bytes()).await,
     Ok(testdata.digest())
   );
 
@@ -170,7 +170,7 @@ async fn write_file_multiple_chunks() {
   let fingerprint = big_file_fingerprint();
 
   assert_eq!(
-    store.store_bytes(all_the_henries.clone()).await,
+    store.store_bytes(&all_the_henries).await,
     Ok(big_file_digest())
   );
 
@@ -198,7 +198,7 @@ async fn write_empty_file() {
 
   let store = new_byte_store(&cas);
   assert_eq!(
-    store.store_bytes(empty_file.bytes()).await,
+    store.store_bytes(&empty_file.bytes()).await,
     Ok(empty_file.digest())
   );
 
@@ -215,7 +215,7 @@ async fn write_file_errors() {
 
   let store = new_byte_store(&cas);
   let error = store
-    .store_bytes(TestData::roland().bytes())
+    .store_bytes(&TestData::roland().bytes())
     .await
     .expect_err("Want error");
   assert!(
@@ -244,7 +244,7 @@ async fn write_connection_error() {
   )
   .unwrap();
   let error = store
-    .store_bytes(TestData::roland().bytes())
+    .store_bytes(&TestData::roland().bytes())
     .await
     .expect_err("Want error");
   assert!(
@@ -361,20 +361,16 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
 }
 
 pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, EntryType::File, digest).await
+  load_bytes(&store, digest).await
 }
 
 pub async fn load_directory_proto_bytes(
   store: &ByteStore,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, EntryType::Directory, digest).await
+  load_bytes(&store, digest).await
 }
 
-async fn load_bytes(
-  store: &ByteStore,
-  entry_type: EntryType,
-  digest: Digest,
-) -> Result<Option<Bytes>, String> {
-  store.load_bytes_with(entry_type, digest, |b| b).await
+async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
+  store.load_bytes_with(digest, |b| Ok(b)).await
 }

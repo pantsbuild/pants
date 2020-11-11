@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -24,8 +26,6 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-
-use env_logger;
 
 use clap::{App, Arg};
 use mock::StubCAS;
@@ -47,6 +47,14 @@ fn main() -> Result<(), String> {
         .help("Port that the CAS should listen to.")
         .default_value("0"),
     )
+    .arg(
+      Arg::with_name("instance-name")
+        .long("instance-name")
+        .short("i")
+        .required(false)
+        .takes_value(true)
+        .default_value(""),
+    )
     .get_matches();
 
   let cas = StubCAS::builder()
@@ -57,6 +65,7 @@ fn main() -> Result<(), String> {
         .parse::<u16>()
         .expect("port must be a non-negative number"),
     )
+    .instance_name(matches.value_of("instance-name").unwrap().to_owned())
     .build();
   println!("Started CAS at address: {}", cas.address());
   println!("Press enter to exit.");
