@@ -581,7 +581,7 @@ impl Scheduler {
   }
 }
 
-fn maybe_break_execution_loop(python_signal_fn: &Value) -> Option<ExecutionTermination> {
+pub fn maybe_break_execution_loop(python_signal_fn: &Value) -> Option<ExecutionTermination> {
   match externs::call_function(&python_signal_fn, &[]) {
     Ok(value) => {
       if externs::is_truthy(&value) {

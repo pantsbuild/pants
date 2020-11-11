@@ -17,6 +17,7 @@ from pants.engine.internals.native_engine import (
     PyGeneratorResponseBreak,
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
+    PyNailgunClient,
     PyNailgunServer,
     PyRemotingOptions,
     PyScheduler,
@@ -196,6 +197,9 @@ class Native(metaclass=SingletonMetaclass):
         Returns the server and the actual port it bound to.
         """
         return cast(PyNailgunServer, self.lib.nailgun_server_create(self._executor, port, runner))
+
+    def new_nailgun_client(self, port: int) -> PyNailgunClient:
+        return cast(PyNailgunClient, self.lib.nailgun_client_create(self._executor, port))
 
     def new_tasks(self) -> PyTasks:
         return PyTasks()
