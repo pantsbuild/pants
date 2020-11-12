@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import warnings
 from typing import Optional
 
 import pytest
@@ -93,10 +94,10 @@ def test_address_input_parse_bad_path_component() -> None:
     assert_bad_path_component("///a")
 
 
-def test_address_input_parse_bad_target_component() -> None:
+def test_address_bad_target_component() -> None:
     def assert_bad_target_component(spec: str) -> None:
         with pytest.raises(InvalidTargetName):
-            repr(AddressInput.parse(spec))
+            repr(AddressInput.parse(spec).dir_to_address())
 
     # Missing target_component
     assert_bad_target_component("")
@@ -110,6 +111,12 @@ def test_address_input_parse_bad_target_component() -> None:
     assert_bad_target_component("//:!t")
     assert_bad_target_component("//:?t")
     assert_bad_target_component("//:=t")
+
+    # Deprecated banned chars. This should convert into an error in `2.2.0.dev1`.
+    with warnings.catch_warnings(record=True) as w:
+        AddressInput.parse(r"a:b\c").dir_to_address()
+        assert len(w) == 1
+        assert "deprecated" in str(w[0].message)
 
 
 def test_subproject_spec() -> None:
