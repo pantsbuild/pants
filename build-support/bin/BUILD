@@ -21,7 +21,7 @@ python_binary(
      ':common',
    ],
    tags = {'type_checked'},
- )
+)
 
 python_binary(
   name = 'check_banned_imports',
@@ -113,3 +113,5 @@ python_binary(
   ],
   tags = {"type_checked"},
 )
+
+python_tests()
