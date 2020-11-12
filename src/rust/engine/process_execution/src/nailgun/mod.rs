@@ -62,7 +62,7 @@ fn construct_nailgun_server_request(
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: Some(jdk),
-    target_platform: platform_constraint,
+    platform_constraint,
     is_nailgunnable: true,
     execution_slot_variable: None,
     cache_failures: false,
@@ -213,8 +213,12 @@ impl CapturedWorkdir for CommandRunner {
       .jdk_home
       .clone()
       .ok_or("JDK home must be specified for all nailgunnable requests.")?;
-    let nailgun_req =
-      construct_nailgun_server_request(&nailgun_name, nailgun_args, jdk_home, req.target_platform);
+    let nailgun_req = construct_nailgun_server_request(
+      &nailgun_name,
+      nailgun_args,
+      jdk_home,
+      req.platform_constraint,
+    );
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
     let nailgun_req_digest = crate::digest(

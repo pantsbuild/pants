@@ -220,7 +220,7 @@ impl ChildResults {
 #[async_trait]
 impl super::CommandRunner for CommandRunner {
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![PlatformConstraint::None, self.platform.into()].iter() {
+    for compatible_constraint in vec![PlatformConstraint::new(None), self.platform.into()].iter() {
       if let Some(compatible_req) = req.0.get(compatible_constraint) {
         return Some(compatible_req.clone());
       }

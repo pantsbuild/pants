@@ -117,13 +117,16 @@ class Process:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class MultiPlatformProcess:
-    platform_constraints: Tuple[str, ...]
+    platform_constraints: Tuple[Optional[str], ...]
     processes: Tuple[Process, ...]
 
     def __init__(self, request_dict: Dict[PlatformConstraint, Process]) -> None:
         if len(request_dict) == 0:
             raise ValueError("At least one platform constrained Process must be passed.")
-        validated_constraints = tuple(constraint.value for constraint in request_dict)
+        validated_constraints = tuple(
+            constraint.platform.value if constraint.platform else None
+            for constraint in request_dict
+        )
         if len([req.description for req in request_dict.values()]) != 1:
             raise ValueError(
                 f"The `description` of all processes in a {MultiPlatformProcess.__name__} must "
@@ -211,7 +214,7 @@ def get_multi_platform_request_description(req: MultiPlatformProcess) -> Product
 @rule
 def upcast_process(req: Process) -> MultiPlatformProcess:
     """This rule allows an Process to be run as a platform compatible MultiPlatformProcess."""
-    return MultiPlatformProcess({PlatformConstraint.none: req})
+    return MultiPlatformProcess({PlatformConstraint(None): req})
 
 
 @rule

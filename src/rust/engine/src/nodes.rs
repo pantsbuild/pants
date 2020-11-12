@@ -327,7 +327,7 @@ impl MultiPlatformExecuteProcess {
       level,
       append_only_caches,
       jdk_home,
-      target_platform: platform_constraint,
+      platform_constraint,
       is_nailgunnable,
       execution_slot_variable,
       cache_failures,
@@ -335,10 +335,10 @@ impl MultiPlatformExecuteProcess {
   }
 
   pub fn lift(types: &Types, value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
-    let raw_constraints = externs::getattr::<Vec<String>>(&value, "platform_constraints")?;
+    let raw_constraints = externs::getattr::<Vec<Option<String>>>(&value, "platform_constraints")?;
     let constraints = raw_constraints
       .into_iter()
-      .map(|constraint| PlatformConstraint::try_from(&constraint))
+      .map(PlatformConstraint::try_from)
       .collect::<Result<Vec<_>, _>>()?;
     let processes = externs::getattr::<Vec<Value>>(&value, "processes")?;
     if constraints.len() != processes.len() {

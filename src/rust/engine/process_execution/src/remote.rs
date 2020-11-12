@@ -790,7 +790,7 @@ impl crate::CommandRunner for CommandRunner {
 
   // TODO: This is a copy of the same method on crate::remote::CommandRunner.
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![PlatformConstraint::None, self.platform.into()].iter() {
+    for compatible_constraint in vec![PlatformConstraint::new(None), self.platform.into()].iter() {
       if let Some(compatible_req) = req.0.get(compatible_constraint) {
         return Some(compatible_req.clone());
       }
@@ -873,7 +873,7 @@ pub fn make_execute_request(
   {
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_string());
-    env.set_value(req.target_platform.into());
+    env.set_value(req.platform_constraint.into());
     command.mut_environment_variables().push(env);
   }
 

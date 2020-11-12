@@ -41,7 +41,7 @@ fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> Process {
   let mut process = Process::new(vec![]);
   process.jdk_home = jdk_home;
   process.is_nailgunnable = true;
-  process.target_platform = PlatformConstraint::Darwin;
+  process.platform_constraint = PlatformConstraint::Darwin;
   process
 }
 

@@ -258,7 +258,7 @@ impl CommandRunner for DelayedCommandRunner {
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     if self.is_compatible {
-      Some(req.0.get(&PlatformConstraint::None).unwrap().clone())
+      Some(req.0.get(&PlatformConstraint::new(None)).unwrap().clone())
     } else {
       None
     }
