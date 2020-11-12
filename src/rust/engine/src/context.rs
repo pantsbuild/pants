@@ -82,6 +82,9 @@ pub struct RemotingOptions {
   pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
   pub store_connection_limit: usize,
+  pub store_initial_timeout: Duration,
+  pub store_timeout_multiplier: f64,
+  pub store_maximum_timeout: Duration,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
@@ -111,6 +114,12 @@ impl Core {
     oauth_bearer_token: &Option<String>,
   ) -> Result<Store, String> {
     if enable_remote {
+      let backoff_config = store::BackoffConfig::new(
+        remoting_opts.store_initial_timeout,
+        remoting_opts.store_timeout_multiplier,
+        remoting_opts.store_maximum_timeout,
+      )?;
+
       Store::with_remote(
         executor.clone(),
         local_store_dir,
@@ -121,9 +130,7 @@ impl Core {
         remoting_opts.store_thread_count,
         remoting_opts.store_chunk_bytes,
         remoting_opts.store_chunk_upload_timeout,
-        // TODO: Take a parameter
-        store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
-          .unwrap(),
+        backoff_config,
         remoting_opts.store_rpc_retries,
         remoting_opts.store_connection_limit,
       )
