@@ -440,9 +440,6 @@ impl crate::CommandRunner for CommandRunner {
         }
         Err(err) => {
           log::warn!("Failed to read from remote cache: {}", err);
-          context
-            .workunit_store
-            .increment_counter(Metric::RemoteCacheReadErrors, 1);
         }
       };
     }

@@ -1283,7 +1283,12 @@ pub async fn check_action_cache(
           .increment_counter(Metric::RemoteCacheRequestsUncached, 1);
         Ok(None)
       }
-      _ => Err(rpcerror_to_string(err)),
+      _ => {
+        context
+          .workunit_store
+          .increment_counter(Metric::RemoteCacheReadErrors, 1);
+        Err(rpcerror_to_string(err))
+      }
     },
   }
 }
