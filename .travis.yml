@@ -566,9 +566,8 @@ jobs:
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
       -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest sh -c "./build-support/bin/release.sh -n && USE_PY37=true ./build-support/bin/release.sh
-      -n && USE_PY38=true ./build-support/bin/release.sh -n && ./build-support/bin/release.sh
-      -f"
+      travis_ci:latest sh -c "./build-support/bin/release.sh -n && USE_PY38=true ./build-support/bin/release.sh
+      -n && ./build-support/bin/release.sh -f"
     services:
     - docker
     stage: Test Pants
@@ -581,8 +580,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY36_VERSION} ${MACOS_PYENV_PY37_VERSION}
-      ${MACOS_PYENV_PY38_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${MACOS_PYENV_PY37_VERSION} ${MACOS_PYENV_PY38_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -613,7 +611,6 @@ jobs:
     osx_image: xcode8
     script:
     - ./build-support/bin/release.sh -n
-    - USE_PY37=true ./build-support/bin/release.sh -n
     - USE_PY38=true ./build-support/bin/release.sh -n
     - ./build-support/bin/release.sh -f
     stage: Test Pants
