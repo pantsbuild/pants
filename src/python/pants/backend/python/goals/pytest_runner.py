@@ -69,7 +69,7 @@ class PythonTestFieldSet(TestFieldSet):
     def is_conftest_or_type_stub(self) -> bool:
         """We skip both `conftest.py` and `.pyi` stubs, even though though they often belong to a
         `python_tests` target, because neither contain any tests to run on."""
-        if self.address.is_base_target:
+        if not self.address.is_file_target:
             return False
         file_name = PurePath(self.address.filename)
         return file_name.name == "conftest.py" or file_name.suffix == ".pyi"

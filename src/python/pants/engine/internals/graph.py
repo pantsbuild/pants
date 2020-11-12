@@ -90,18 +90,18 @@ async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
 
 @rule
 async def generate_subtargets(address: Address, global_options: GlobalOptions) -> Subtargets:
-    if not address.is_base_target:
+    if address.is_file_target:
         raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
-    wrapped_base_target = await Get(WrappedTarget, Address, address)
-    base_target = wrapped_base_target.target
+    wrapped_build_target = await Get(WrappedTarget, Address, address)
+    build_target = wrapped_build_target.target
 
-    if not base_target.has_field(Dependencies) or not base_target.has_field(Sources):
+    if not build_target.has_field(Dependencies) or not build_target.has_field(Sources):
         # If a target type does not support dependencies, we do not split it, as that would prevent
-        # the base target from depending on its splits.
-        return Subtargets(base_target, ())
+        # the BUILD target from depending on its splits.
+        return Subtargets(build_target, ())
 
     # Create subtargets for matched sources.
-    sources_field = base_target[Sources]
+    sources_field = build_target[Sources]
     sources_field_path_globs = sources_field.path_globs(
         global_options.options.files_not_found_behavior
     )
@@ -118,7 +118,7 @@ async def generate_subtargets(address: Address, global_options: GlobalOptions) -
         for subtarget_file in paths.files
     )
 
-    return Subtargets(base_target, tuple(wt.target for wt in wrapped_subtargets))
+    return Subtargets(build_target, tuple(wt.target for wt in wrapped_subtargets))
 
 
 @rule
@@ -127,10 +127,10 @@ async def resolve_target(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
 ) -> WrappedTarget:
-    if not address.is_base_target:
-        base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
+    if address.is_file_target:
+        build_target = await Get(WrappedTarget, Address, address.maybe_convert_to_build_target())
         subtarget = generate_subtarget(
-            base_target.target, full_file_name=address.filename, union_membership=union_membership
+            build_target.target, full_file_name=address.filename, union_membership=union_membership
         )
         return WrappedTarget(subtarget)
 
@@ -146,24 +146,24 @@ async def resolve_target(
 
 @rule
 async def resolve_targets(targets: UnexpandedTargets) -> Targets:
-    # Split out and expand any base targets.
+    # Split out and expand any BUILD targets.
     other_targets = []
-    base_targets = []
+    build_targets = []
     for target in targets:
-        if target.address.is_base_target:
-            base_targets.append(target)
+        if not target.address.is_file_target:
+            build_targets.append(target)
         else:
             other_targets.append(target)
 
-    base_targets_subtargets = await MultiGet(
-        Get(Subtargets, Address, bt.address) for bt in base_targets
+    build_targets_subtargets = await MultiGet(
+        Get(Subtargets, Address, bt.address) for bt in build_targets
     )
-    # Zip the subtargets back to the base targets and replace them.
-    # NB: If a target had no subtargets, we use the base.
+    # Zip the subtargets back to the BUILD targets and replace them.
+    # NB: If a target had no subtargets, we use the original.
     expanded_targets = OrderedSet(other_targets)
     expanded_targets.update(
         target
-        for subtargets in base_targets_subtargets
+        for subtargets in build_targets_subtargets
         for target in (subtargets.subtargets if subtargets.subtargets else (subtargets.base,))
     )
     return Targets(expanded_targets)
@@ -200,14 +200,14 @@ def _detect_cycles(
 
     def maybe_report_cycle(address: Address) -> None:
         # NB: File-level dependencies are cycle tolerant.
-        if not address.is_base_target or address not in path_stack:
+        if address.is_file_target or address not in path_stack:
             return
 
         # The path of the cycle is shorter than the entire path to the cycle: if the suffix of
         # the path representing the cycle contains a file dep, it is ignored.
         in_cycle = False
         for path_address in path_stack:
-            if in_cycle and not path_address.is_base_target:
+            if in_cycle and path_address.is_file_target:
                 # There is a file address inside the cycle: do not report it.
                 return
             elif in_cycle:
@@ -791,16 +791,16 @@ async def resolve_dependencies(
             for inference_request_type in relevant_inference_request_types
         )
 
-    # If this is a base target, or no dependency inference implementation can infer dependencies on
-    # a file address's sibling files, then we inject dependencies on all the base target's
+    # If this is a BUILD target, or no dependency inference implementation can infer dependencies on
+    # a file address's sibling files, then we inject dependencies on all the BUILD target's
     # generated subtargets.
     subtarget_addresses: Tuple[Address, ...] = ()
     no_sibling_file_deps_inferrable = not inferred or all(
         inferred_deps.sibling_dependencies_inferrable is False for inferred_deps in inferred
     )
-    if request.field.address.is_base_target or no_sibling_file_deps_inferrable:
+    if not request.field.address.is_file_target or no_sibling_file_deps_inferrable:
         subtargets = await Get(
-            Subtargets, Address, request.field.address.maybe_convert_to_base_target()
+            Subtargets, Address, request.field.address.maybe_convert_to_build_target()
         )
         subtarget_addresses = tuple(
             t.address for t in subtargets.subtargets if t.address != request.field.address
@@ -875,9 +875,9 @@ async def resolve_dependencies_lite(
         if isinstance(request.field, inject_request_type.inject_for)
     )
 
-    # Inject dependencies on all the base target's generated subtargets.
+    # Inject dependencies on all the BUILD target's generated file targets.
     subtargets = await Get(
-        Subtargets, Address, request.field.address.maybe_convert_to_base_target()
+        Subtargets, Address, request.field.address.maybe_convert_to_build_target()
     )
     subtarget_addresses = tuple(
         t.address for t in subtargets.subtargets if t.address != request.field.address

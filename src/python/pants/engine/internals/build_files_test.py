@@ -201,7 +201,7 @@ def test_build_file_address() -> None:
         assert bfa == expected_bfa
 
     assert_bfa_resolved(Address("helloworld"))
-    # File addresses should use their base target to find the BUILD file.
+    # File addresses should use their BUILD target to find the BUILD file.
     assert_bfa_resolved(Address("helloworld", relative_file_path="f.txt"))
 
 
@@ -257,7 +257,7 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
     }
 
     # The same filtering should work when given literal addresses, including file addresses.
-    # For file addresses, we look up the `tags` field of the original base target.
+    # For file addresses, we look up the `tags` field of the original BUILD target.
     literals_result = resolve_address_specs(
         address_specs_rule_runner,
         [

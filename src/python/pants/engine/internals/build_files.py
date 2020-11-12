@@ -115,7 +115,7 @@ async def parse_address_family(
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
-    owning_address = address.maybe_convert_to_base_target()
+    owning_address = address.maybe_convert_to_build_target()
     if address_family.get_target_adaptor(owning_address) is None:
         raise ResolveError.did_you_mean(
             bad_name=owning_address.target_name,
@@ -128,14 +128,14 @@ async def find_build_file(address: Address) -> BuildFileAddress:
         if build_file_address.address == owning_address
     )
     return (
-        bfa if address.is_base_target else BuildFileAddress(rel_path=bfa.rel_path, address=address)
+        BuildFileAddress(rel_path=bfa.rel_path, address=address) if address.is_file_target else bfa
     )
 
 
 @rule
 async def find_target_adaptor(address: Address) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
-    if not address.is_base_target:
+    if address.is_file_target:
         raise ValueError(
             f"Subtargets are not resident in BUILD files, and so do not have TargetAdaptors: {address}"
         )
@@ -170,13 +170,13 @@ async def addresses_from_address_specs(
         for spec in address_specs.literals
     )
     literal_target_adaptors = await MultiGet(
-        Get(TargetAdaptor, Address, addr.maybe_convert_to_base_target())
+        Get(TargetAdaptor, Address, addr.maybe_convert_to_build_target())
         for addr in literal_addresses
     )
     # We convert to targets for the side effect of validating that any file addresses actually
-    # belong to the specified base targets.
+    # belong to the specified BUILD targets.
     await Get(
-        UnexpandedTargets, Addresses(addr for addr in literal_addresses if not addr.is_base_target)
+        UnexpandedTargets, Addresses(addr for addr in literal_addresses if addr.is_file_target)
     )
     for literal_spec, addr, target_adaptor in zip(
         address_specs.literals, literal_addresses, literal_target_adaptors

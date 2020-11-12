@@ -627,9 +627,9 @@ def test_resolve_addresses_from_specs() -> None:
     rule_runner.add_to_build_file("address_spec", "target(sources=['f.txt'])")
     no_interaction_specs = ["fs_spec/f.txt", "address_spec:address_spec"]
 
-    # If a generated subtarget's original base target is included via an address spec,
-    # we will still include the generated subtarget for consistency. When we expand Targets
-    # into their base targets this redundancy is removed, but during Address expansion we
+    # If a file target's original BUILD target is included via an address spec,
+    # we will still include the file target for consistency. When we expand Targets
+    # into their BUILD targets this redundancy is removed, but during Address expansion we
     # get literal matches.
     rule_runner.create_files("multiple_files", ["f1.txt", "f2.txt"])
     rule_runner.add_to_build_file("multiple_files", "target(sources=['*.txt'])")
@@ -1310,7 +1310,7 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
     """We test that dependency inference works generally and that we merge it correctly with
     explicitly provided dependencies.
 
-    For consistency, dep inference does not merge generated subtargets with base targets: if both
+    For consistency, dep inference does not merge generated subtargets with BUILD targets: if both
     are inferred, expansion to Targets will remove the redundancy while converting to subtargets.
     """
     dependencies_rule_runner.create_files(
@@ -1419,8 +1419,8 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
 
 
 def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
-    """If the address is a base target, or none of the dependency inference rules can infer
-    dependencies on sibling files, then we should depend on all the base target's subtargets."""
+    """If the address is a BUILD target, or none of the dependency inference rules can infer
+    dependencies on sibling files, then we should depend on all the BUILD target's files."""
     dependencies_rule_runner.create_file("src/smalltalk/f1.st")
     dependencies_rule_runner.create_file("src/smalltalk/f2.st")
     dependencies_rule_runner.add_to_build_file("src/smalltalk", "smalltalk(sources=['*.st'])")

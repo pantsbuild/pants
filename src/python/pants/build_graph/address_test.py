@@ -280,9 +280,9 @@ def test_address_spec() -> None:
     )
 
 
-def test_address_maybe_convert_to_base_target() -> None:
+def test_address_maybe_convert_to_build_target() -> None:
     def assert_converts_to_base_target(generated_addr: Address, *, expected: Address) -> None:
-        assert generated_addr.maybe_convert_to_base_target() == expected
+        assert generated_addr.maybe_convert_to_build_target() == expected
 
     assert_converts_to_base_target(
         Address("a/b", relative_file_path="c.txt", target_name="c"),
@@ -300,7 +300,7 @@ def test_address_maybe_convert_to_base_target() -> None:
     )
 
     def assert_base_target_noops(addr: Address) -> None:
-        assert addr.maybe_convert_to_base_target() is addr
+        assert addr.maybe_convert_to_build_target() is addr
 
     assert_base_target_noops(Address("a/b", target_name="c"))
     assert_base_target_noops(Address("a/b"))

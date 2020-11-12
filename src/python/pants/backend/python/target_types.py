@@ -244,7 +244,7 @@ class PexPlatformsField(StringOrStringSequenceField):
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Optional[Tuple[str, ...]]:
-        if isinstance(raw_value, str) and address.is_base_target:
+        if isinstance(raw_value, str) and not address.is_file_target:
             warn_or_error(
                 deprecated_entity_description=f"Using a bare string for the `{cls.alias}` field",
                 removal_version="2.2.0.dev0",

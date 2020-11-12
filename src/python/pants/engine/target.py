@@ -64,7 +64,7 @@ class Field(ABC):
     # NB: We still expect `PrimitiveField` and `AsyncField` to define their own constructors. This
     # is only implemented so that we have a common deprecation mechanism.
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        if self.deprecated_removal_version and address.is_base_target and raw_value is not None:
+        if self.deprecated_removal_version and not address.is_file_target and raw_value is not None:
             if not self.deprecated_removal_hint:
                 raise ValueError(
                     f"You specified `deprecated_removal_version` for {self.__class__}, but not "
@@ -290,7 +290,7 @@ class Target(ABC):
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: Optional[UnionMembership] = None,
     ) -> None:
-        if self.deprecated_removal_version and address.is_base_target:
+        if self.deprecated_removal_version and not address.is_file_target:
             if not self.deprecated_removal_hint:
                 raise ValueError(
                     f"You specified `deprecated_removal_version` for {self.__class__}, but not "
@@ -544,9 +544,9 @@ class Target(ABC):
 
 @dataclass(frozen=True)
 class Subtargets:
-    # The base target from which the subtargets were extracted.
+    # The BUILD target from which the subtargets were extracted.
     base: Target
-    # The subtargets, one per file that was owned by the base target.
+    # The subtargets, one per file that was owned by the BUILD target.
     subtargets: Tuple[Target, ...]
 
 
@@ -672,21 +672,21 @@ class RegisteredTargetTypes:
 # -----------------------------------------------------------------------------------------------
 
 
-def generate_subtarget_address(base_target_address: Address, *, full_file_name: str) -> Address:
-    """Return the address for a new target based on the original target, but with a more precise
+def generate_subtarget_address(build_target_address: Address, *, full_file_name: str) -> Address:
+    """Return the address for a new target based on the BUILD target, but with a more precise
     `sources` field.
 
     The address's target name will be the relativized file, such as `:app.json`, or `:subdir/f.txt`.
 
     See generate_subtarget().
     """
-    if not base_target_address.is_base_target:
-        raise ValueError(f"Cannot generate file targets for a file Address: {base_target_address}")
-    original_spec_path = base_target_address.spec_path
+    if build_target_address.is_file_target:
+        raise ValueError(f"Cannot generate file targets for a file Address: {build_target_address}")
+    original_spec_path = build_target_address.spec_path
     relative_file_path = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
     return Address(
         spec_path=original_spec_path,
-        target_name=base_target_address.target_name,
+        target_name=build_target_address.target_name,
         relative_file_path=relative_file_path,
     )
 
@@ -695,7 +695,7 @@ _Tgt = TypeVar("_Tgt", bound=Target)
 
 
 def generate_subtarget(
-    base_target: _Tgt,
+    build_target: _Tgt,
     *,
     full_file_name: str,
     # NB: `union_membership` is only optional to facilitate tests. In production, we should
@@ -703,30 +703,30 @@ def generate_subtarget(
     # rarely directly instantiate Targets and should instead use the engine to request them.
     union_membership: Optional[UnionMembership] = None,
 ) -> _Tgt:
-    """Generate a new target with the exact same metadata as the original, except for the `sources`
-    field only referring to the single file `full_file_name` and with a new address.
+    """Generate a new target with the exact same metadata as the BUILD target, except for the
+    `sources` field only referring to the single file `full_file_name` and with a new address.
 
     This is used for greater precision when using dependency inference and file arguments. When we
     are able to deduce specifically which files are being used, we can use only the files we care
     about, rather than the entire `sources` field.
     """
-    if not base_target.has_field(Dependencies) or not base_target.has_field(Sources):
+    if not build_target.has_field(Dependencies) or not build_target.has_field(Sources):
         raise ValueError(
-            f"Target {base_target.address.spec} of type {type(base_target).__qualname__} does "
+            f"Target {build_target.address.spec} of type {type(build_target).__qualname__} does "
             "not have both a `dependencies` and `sources` field, and thus cannot generate a "
             f"subtarget for the file {full_file_name}."
         )
 
     relativized_file_name = (
-        PurePath(full_file_name).relative_to(base_target.address.spec_path).as_posix()
+        PurePath(full_file_name).relative_to(build_target.address.spec_path).as_posix()
     )
 
     generated_target_fields = {}
-    for field in base_target.field_values.values():
+    for field in build_target.field_values.values():
         if isinstance(field, Sources):
             if not bool(matches_filespec(field.filespec, paths=[full_file_name])):
                 raise ValueError(
-                    f"Target {base_target.address.spec}'s `sources` field does not match a file "
+                    f"Target {build_target.address.spec}'s `sources` field does not match a file "
                     f"{full_file_name}."
                 )
             value = (relativized_file_name,)
@@ -738,10 +738,10 @@ def generate_subtarget(
             )
         generated_target_fields[field.alias] = value
 
-    target_cls = type(base_target)
+    target_cls = type(build_target)
     return target_cls(
         generated_target_fields,
-        address=generate_subtarget_address(base_target.address, full_file_name=full_file_name),
+        address=generate_subtarget_address(build_target.address, full_file_name=full_file_name),
         union_membership=union_membership,
     )
 

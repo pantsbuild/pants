@@ -469,7 +469,7 @@ def test_generate_subtarget() -> None:
         == expected_subdir_address
     )
 
-    # The full_file_name must match the filespec of the base target's Sources field.
+    # The full_file_name must match the filespec of the BUILD target's Sources field.
     with pytest.raises(ValueError) as exc:
         generate_subtarget(single_source_tgt, full_file_name="src/fortran/fake_file.f95")
     assert "does not match a file src/fortran/fake_file.f95" in str(exc.value)
