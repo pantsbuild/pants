@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class TestResult:
+class TestResult(EngineAwareReturnType):
     exit_code: Optional[int]
     stdout: str
     stderr: str
@@ -47,6 +47,9 @@ class TestResult:
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
+
+    def metadata(self) -> Optional[Dict[str, Any]]:
+        return {"target": self.address }
 
     @classmethod
     def skip(cls, address: Address) -> "TestResult":
