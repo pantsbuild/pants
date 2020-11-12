@@ -39,7 +39,7 @@ use clap::{value_t, App, AppSettings, Arg};
 use fs::RelativePath;
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata};
+use process_execution::{Context, NamedCaches, Platform, ProcessMetadata};
 use store::{BackoffConfig, Store};
 use workunit_store::WorkunitStore;
 
@@ -353,9 +353,13 @@ async fn main() {
     .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
   let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
 
-  let platform_constraint =
-    PlatformConstraint::try_from(args.value_of("target-platform").map(|s| s.to_string()))
-      .expect("invalid value for `target-platform");
+  let platform_constraint = match args.value_of("target-platform") {
+    Some(s) => {
+      let plat = Platform::try_from(s.to_string()).expect("invalid value for `target-platform");
+      Some(plat)
+    }
+    None => None,
+  };
 
   let request = process_execution::Process {
     argv,

@@ -101,9 +101,9 @@ impl From<Platform> for String {
   }
 }
 
-impl TryFrom<&String> for Platform {
+impl TryFrom<String> for Platform {
   type Error = String;
-  fn try_from(variant_candidate: &String) -> Result<Self, Self::Error> {
+  fn try_from(variant_candidate: String) -> Result<Self, Self::Error> {
     match variant_candidate.as_ref() {
       "darwin" => Ok(Platform::Darwin),
       "linux" => Ok(Platform::Linux),
@@ -111,44 +111,6 @@ impl TryFrom<&String> for Platform {
         "Unknown platform {:?} encountered in parsing",
         other
       )),
-    }
-  }
-}
-
-#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub struct PlatformConstraint {
-  platform: Option<Platform>,
-}
-
-impl PlatformConstraint {
-  pub fn new(platform: Option<Platform>) -> PlatformConstraint {
-    PlatformConstraint { platform }
-  }
-}
-
-impl From<Platform> for PlatformConstraint {
-  fn from(platform: Platform) -> PlatformConstraint {
-    PlatformConstraint::new(Some(platform))
-  }
-}
-
-impl From<PlatformConstraint> for String {
-  fn from(constraint: PlatformConstraint) -> String {
-    match constraint.platform {
-      Some(plat) => plat.into(),
-      None => "none".to_string(),
-    }
-  }
-}
-
-impl TryFrom<Option<String>> for PlatformConstraint {
-  type Error = String;
-  fn try_from(maybe_constraint: Option<String>) -> Result<Self, Self::Error> {
-    match maybe_constraint {
-      Some(constraint) => {
-        Platform::try_from(&constraint).map(|plat| PlatformConstraint::new(Some(plat)))
-      }
-      None => Ok(PlatformConstraint::new(None)),
     }
   }
 }
@@ -223,7 +185,7 @@ pub struct Process {
   ///
   pub jdk_home: Option<PathBuf>,
 
-  pub platform_constraint: PlatformConstraint,
+  pub platform_constraint: Option<Platform>,
 
   pub is_nailgunnable: bool,
 
@@ -254,7 +216,7 @@ impl Process {
       level: log::Level::Info,
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
-      platform_constraint: PlatformConstraint::new(None),
+      platform_constraint: None,
       is_nailgunnable: false,
       execution_slot_variable: None,
       cache_failures: false,
@@ -301,7 +263,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
   type Error = String;
 
   fn try_from(req: MultiPlatformProcess) -> Result<Self, Self::Error> {
-    match req.0.get(&PlatformConstraint::new(None)) {
+    match req.0.get(&None) {
       Some(crossplatform_req) => Ok(crossplatform_req.clone()),
       None => Err(String::from(
         "Cannot coerce to a simple Process, no cross platform request exists.",
@@ -314,7 +276,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
 /// A container of platform constrained processes.
 ///
 #[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MultiPlatformProcess(pub BTreeMap<PlatformConstraint, Process>);
+pub struct MultiPlatformProcess(pub BTreeMap<Option<Platform>, Process>);
 
 impl MultiPlatformProcess {
   pub fn user_facing_name(&self) -> String {
@@ -342,11 +304,7 @@ impl MultiPlatformProcess {
 
 impl From<Process> for MultiPlatformProcess {
   fn from(proc: Process) -> Self {
-    MultiPlatformProcess(
-      vec![(PlatformConstraint::new(None), proc)]
-        .into_iter()
-        .collect(),
-    )
+    MultiPlatformProcess(vec![(None, proc)].into_iter().collect())
   }
 }
 

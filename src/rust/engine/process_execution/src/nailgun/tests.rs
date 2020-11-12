@@ -1,5 +1,5 @@
 use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
-use crate::{NamedCaches, PlatformConstraint, Process, ProcessMetadata};
+use crate::{NamedCaches, Platform, Process, ProcessMetadata};
 use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
 use std::fs::read_link;
@@ -41,7 +41,7 @@ fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> Process {
   let mut process = Process::new(vec![]);
   process.jdk_home = jdk_home;
   process.is_nailgunnable = true;
-  process.platform_constraint = PlatformConstraint::Darwin;
+  process.platform_constraint = Some(Platform::Darwin);
   process
 }
 
@@ -85,7 +85,7 @@ async fn creating_nailgun_server_request_updates_the_cli() {
     &NAILGUN_MAIN_CLASS.to_string(),
     Vec::new(),
     PathBuf::from(""),
-    PlatformConstraint::None,
+    None,
   );
   assert_eq!(req.argv[0], NAILGUN_MAIN_CLASS);
   assert_eq!(req.argv[1..], ARGS_TO_START_NAILGUN);

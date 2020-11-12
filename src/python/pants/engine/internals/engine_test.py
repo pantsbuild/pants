@@ -24,7 +24,6 @@ from pants.engine.internals.engine_testutil import (
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
-from pants.engine.platform import PlatformConstraint
 from pants.engine.platform import rules as platform_rules
 from pants.engine.process import MultiPlatformProcess, Process, ProcessResult
 from pants.engine.process import rules as process_rules
@@ -658,7 +657,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
                 ["/bin/sh", "-c", "true"],
                 description="always true",
             )
-            _ = await Get(ProcessResult, MultiPlatformProcess({PlatformConstraint(None): proc}))
+            _ = await Get(ProcessResult, MultiPlatformProcess({None: proc}))
             return TrueResult()
 
         rules = [a_rule, QueryRule(TrueResult, tuple()), *process_rules(), *platform_rules()]

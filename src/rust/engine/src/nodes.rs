@@ -29,9 +29,7 @@ use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
 };
-use process_execution::{
-  self, CacheDest, CacheName, MultiPlatformProcess, PlatformConstraint, Process,
-};
+use process_execution::{self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process};
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
@@ -247,7 +245,7 @@ impl MultiPlatformExecuteProcess {
   fn lift_process(
     types: &Types,
     value: &Value,
-    platform_constraint: PlatformConstraint,
+    platform_constraint: Option<Platform>,
   ) -> Result<Process, String> {
     let env = externs::getattr_from_frozendict(&value, "env");
 
@@ -338,7 +336,10 @@ impl MultiPlatformExecuteProcess {
     let raw_constraints = externs::getattr::<Vec<Option<String>>>(&value, "platform_constraints")?;
     let constraints = raw_constraints
       .into_iter()
-      .map(PlatformConstraint::try_from)
+      .map(|maybe_plat| match maybe_plat {
+        Some(plat) => Platform::try_from(plat).map(Some),
+        None => Ok(None),
+      })
       .collect::<Result<Vec<_>, _>>()?;
     let processes = externs::getattr::<Vec<Value>>(&value, "processes")?;
     if constraints.len() != processes.len() {
@@ -351,7 +352,7 @@ impl MultiPlatformExecuteProcess {
 
     let mut cache_failures = true;
 
-    let mut request_by_constraint: BTreeMap<PlatformConstraint, Process> = BTreeMap::new();
+    let mut request_by_constraint: BTreeMap<Option<Platform>, Process> = BTreeMap::new();
     for (constraint, execute_process) in constraints.iter().zip(processes.iter()) {
       let underlying_req =
         MultiPlatformExecuteProcess::lift_process(types, execute_process, *constraint)?;

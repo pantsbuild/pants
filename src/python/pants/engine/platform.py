@@ -1,9 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Optional
+from typing import Iterable
 
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.memo import memoized_classproperty
@@ -18,11 +17,6 @@ class Platform(Enum):
     @memoized_classproperty
     def current(cls) -> "Platform":
         return Platform(get_normalized_os_name())
-
-
-@dataclass(frozen=True)
-class PlatformConstraint:
-    platform: Optional[Platform]
 
 
 # TODO We will want to allow users to specify the execution platform for rules,
