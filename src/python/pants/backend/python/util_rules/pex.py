@@ -49,7 +49,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.platform import Platform, PlatformConstraint
+from pants.engine.platform import Platform
 from pants.engine.process import (
     MultiPlatformProcess,
     Process,
@@ -636,9 +636,7 @@ async def create_pex(
     # NB: Building a Pex is platform dependent, so in order to get a PEX that we can use locally
     # without cross-building, we specify that our PEX command should be run on the current local
     # platform.
-    result = await Get(
-        ProcessResult, MultiPlatformProcess({PlatformConstraint(platform.value): process})
-    )
+    result = await Get(ProcessResult, MultiPlatformProcess({platform: process}))
 
     if pex_runtime_env.verbosity > 0:
         log_output = result.stderr.decode()

@@ -19,22 +19,12 @@ class Platform(Enum):
         return Platform(get_normalized_os_name())
 
 
-class PlatformConstraint(Enum):
-    darwin = "darwin"
-    linux = "linux"
-    none = "none"
-
-    @memoized_classproperty
-    def local_platform(cls) -> "PlatformConstraint":
-        return PlatformConstraint(Platform.current.value)
-
-
 # TODO We will want to allow users to specify the execution platform for rules,
 # which means replacing this singleton rule with a RootRule populated by an option.
 @rule
-def materialize_platform() -> Platform:
+def current_platform() -> Platform:
     return Platform.current
 
 
-def create_platform_rules() -> Iterable[Rule]:
+def rules() -> Iterable[Rule]:
     return collect_rules()

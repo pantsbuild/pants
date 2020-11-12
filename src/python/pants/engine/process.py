@@ -15,7 +15,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.internals.uuid import UUIDRequest, UUIDScope
-from pants.engine.platform import Platform, PlatformConstraint
+from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -117,20 +117,22 @@ class Process:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class MultiPlatformProcess:
-    platform_constraints: Tuple[str, ...]
+    platform_constraints: Tuple[Optional[str], ...]
     processes: Tuple[Process, ...]
 
-    def __init__(self, request_dict: Dict[PlatformConstraint, Process]) -> None:
+    def __init__(self, request_dict: Dict[Optional[Platform], Process]) -> None:
         if len(request_dict) == 0:
-            raise ValueError("At least one platform constrained Process must be passed.")
-        validated_constraints = tuple(constraint.value for constraint in request_dict)
+            raise ValueError("At least one platform-constrained Process must be passed.")
+        serialized_constraints = tuple(
+            constraint.value if constraint else None for constraint in request_dict
+        )
         if len([req.description for req in request_dict.values()]) != 1:
             raise ValueError(
                 f"The `description` of all processes in a {MultiPlatformProcess.__name__} must "
                 f"be identical, but got: {list(request_dict.values())}."
             )
 
-        self.platform_constraints = validated_constraints
+        self.platform_constraints = serialized_constraints
         self.processes = tuple(request_dict.values())
 
     @property
@@ -211,7 +213,7 @@ def get_multi_platform_request_description(req: MultiPlatformProcess) -> Product
 @rule
 def upcast_process(req: Process) -> MultiPlatformProcess:
     """This rule allows an Process to be run as a platform compatible MultiPlatformProcess."""
-    return MultiPlatformProcess({PlatformConstraint.none: req})
+    return MultiPlatformProcess({None: req})
 
 
 @rule

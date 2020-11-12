@@ -84,52 +84,10 @@ impl Platform {
   pub fn current() -> Result<Platform, String> {
     let platform_info =
       uname::uname().map_err(|_| "Failed to get local platform info!".to_string())?;
-
     match platform_info {
       uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => Ok(Platform::Darwin),
       uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => Ok(Platform::Linux),
       uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
-    }
-  }
-}
-
-#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum PlatformConstraint {
-  Darwin,
-  Linux,
-  None,
-}
-
-impl PlatformConstraint {
-  pub fn current_platform_constraint() -> Result<PlatformConstraint, String> {
-    Platform::current().map(|p: Platform| p.into())
-  }
-}
-
-impl From<Platform> for PlatformConstraint {
-  fn from(platform: Platform) -> PlatformConstraint {
-    match platform {
-      Platform::Linux => PlatformConstraint::Linux,
-      Platform::Darwin => PlatformConstraint::Darwin,
-    }
-  }
-}
-
-impl TryFrom<&String> for PlatformConstraint {
-  type Error = String;
-  ///
-  /// This is a helper method to convert values from the python/engine/platform.py::PlatformConstraint enum,
-  /// which have been serialized, into the rust PlatformConstraint enum.
-  ///
-  fn try_from(variant_candidate: &String) -> Result<Self, Self::Error> {
-    match variant_candidate.as_ref() {
-      "darwin" => Ok(PlatformConstraint::Darwin),
-      "linux" => Ok(PlatformConstraint::Linux),
-      "none" => Ok(PlatformConstraint::None),
-      other => Err(format!(
-        "Unknown, platform {:?} encountered in parsing",
-        other
-      )),
     }
   }
 }
@@ -143,12 +101,16 @@ impl From<Platform> for String {
   }
 }
 
-impl From<PlatformConstraint> for String {
-  fn from(platform: PlatformConstraint) -> String {
-    match platform {
-      PlatformConstraint::Linux => "linux".to_string(),
-      PlatformConstraint::Darwin => "darwin".to_string(),
-      PlatformConstraint::None => "none".to_string(),
+impl TryFrom<String> for Platform {
+  type Error = String;
+  fn try_from(variant_candidate: String) -> Result<Self, Self::Error> {
+    match variant_candidate.as_ref() {
+      "darwin" => Ok(Platform::Darwin),
+      "linux" => Ok(Platform::Linux),
+      other => Err(format!(
+        "Unknown platform {:?} encountered in parsing",
+        other
+      )),
     }
   }
 }
@@ -222,7 +184,8 @@ pub struct Process {
   /// see https://github.com/pantsbuild/pants/issues/6416.
   ///
   pub jdk_home: Option<PathBuf>,
-  pub target_platform: PlatformConstraint,
+
+  pub platform_constraint: Option<Platform>,
 
   pub is_nailgunnable: bool,
 
@@ -253,7 +216,7 @@ impl Process {
       level: log::Level::Info,
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
-      target_platform: PlatformConstraint::None,
+      platform_constraint: None,
       is_nailgunnable: false,
       execution_slot_variable: None,
       cache_failures: false,
@@ -300,7 +263,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
   type Error = String;
 
   fn try_from(req: MultiPlatformProcess) -> Result<Self, Self::Error> {
-    match req.0.get(&PlatformConstraint::None) {
+    match req.0.get(&None) {
       Some(crossplatform_req) => Ok(crossplatform_req.clone()),
       None => Err(String::from(
         "Cannot coerce to a simple Process, no cross platform request exists.",
@@ -313,7 +276,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
 /// A container of platform constrained processes.
 ///
 #[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MultiPlatformProcess(pub BTreeMap<PlatformConstraint, Process>);
+pub struct MultiPlatformProcess(pub BTreeMap<Option<Platform>, Process>);
 
 impl MultiPlatformProcess {
   pub fn user_facing_name(&self) -> String {
@@ -340,8 +303,8 @@ impl MultiPlatformProcess {
 }
 
 impl From<Process> for MultiPlatformProcess {
-  fn from(req: Process) -> Self {
-    MultiPlatformProcess(vec![(PlatformConstraint::None, req)].into_iter().collect())
+  fn from(proc: Process) -> Self {
+    MultiPlatformProcess(vec![(None, proc)].into_iter().collect())
   }
 }
 

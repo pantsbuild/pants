@@ -39,7 +39,7 @@ use clap::{value_t, App, AppSettings, Arg};
 use fs::RelativePath;
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata};
+use process_execution::{Context, NamedCaches, Platform, ProcessMetadata};
 use store::{BackoffConfig, Store};
 use workunit_store::WorkunitStore;
 
@@ -184,11 +184,11 @@ async fn main() {
             .help("Symlink a JDK from .jdk in the working directory. For local execution, symlinks to the value of this flag. For remote execution, just requests that some JDK is symlinked if this flag has any value. https://github.com/pantsbuild/pants/issues/6416 will make this less weird in the future.")
       )
       .arg(
-        Arg::with_name("target-platform")
-            .long("target-platform")
+        Arg::with_name("platform-constraint")
+            .long("platform-constraint")
             .takes_value(true)
-            .required(true)
-            .help("The name of the platform that this request's output is compatible with. Options are 'linux', 'darwin', or 'none' (which indicates either)")
+            .required(false)
+            .help("Whether the process is only compatible with a certain platform. Options are 'linux' and 'darwin'. If left off, will default to no constraints.")
       )
       .arg(
           Arg::with_name("use-nailgun")
@@ -353,9 +353,13 @@ async fn main() {
     .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
   let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
 
-  let target_platform =
-    PlatformConstraint::try_from(&args.value_of("target-platform").unwrap().to_string())
-      .expect("invalid value for `target-platform");
+  let platform_constraint = match args.value_of("target-platform") {
+    Some(s) => {
+      let plat = Platform::try_from(s.to_string()).expect("invalid value for `target-platform");
+      Some(plat)
+    }
+    None => None,
+  };
 
   let request = process_execution::Process {
     argv,
@@ -369,7 +373,7 @@ async fn main() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
-    target_platform: target_platform,
+    platform_constraint,
     is_nailgunnable,
     execution_slot_variable: None,
     cache_failures: false,

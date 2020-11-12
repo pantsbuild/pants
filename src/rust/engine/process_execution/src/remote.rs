@@ -31,7 +31,7 @@ use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitSt
 
 use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
-  PlatformConstraint, Process, ProcessMetadata,
+  Process, ProcessMetadata,
 };
 use bazel_protos::remote_execution_grpc::ActionCacheClient;
 
@@ -790,7 +790,7 @@ impl crate::CommandRunner for CommandRunner {
 
   // TODO: This is a copy of the same method on crate::remote::CommandRunner.
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![PlatformConstraint::None, self.platform.into()].iter() {
+    for compatible_constraint in vec![None, self.platform.into()].iter() {
       if let Some(compatible_req) = req.0.get(compatible_constraint) {
         return Some(compatible_req.clone());
       }
@@ -873,7 +873,10 @@ pub fn make_execute_request(
   {
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_string());
-    env.set_value(req.target_platform.into());
+    env.set_value(match req.platform_constraint {
+      Some(plat) => plat.into(),
+      None => "none".to_string(),
+    });
     command.mut_environment_variables().push(env);
   }
 

@@ -11,7 +11,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine import desktop, fs, process
+from pants.engine import desktop, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
@@ -21,7 +21,6 @@ from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.platform import create_platform_rules
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
@@ -240,7 +239,7 @@ class EngineInitializer:
                 *uuid.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
-                *create_platform_rules(),
+                *platform.rules(),
                 *changed_rules(),
                 *specs_calculator.rules(),
                 *rules,

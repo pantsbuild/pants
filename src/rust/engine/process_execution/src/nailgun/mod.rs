@@ -13,8 +13,8 @@ use tokio::net::TcpStream;
 use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform,
-  PlatformConstraint, Process, ProcessMetadata,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
+  ProcessMetadata,
 };
 
 #[cfg(test)]
@@ -44,7 +44,7 @@ fn construct_nailgun_server_request(
   nailgun_name: &str,
   args_for_the_jvm: Vec<String>,
   jdk: PathBuf,
-  platform_constraint: PlatformConstraint,
+  platform_constraint: Option<Platform>,
 ) -> Process {
   let mut full_args = args_for_the_jvm;
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
@@ -62,7 +62,7 @@ fn construct_nailgun_server_request(
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: Some(jdk),
-    target_platform: platform_constraint,
+    platform_constraint,
     is_nailgunnable: true,
     execution_slot_variable: None,
     cache_failures: false,
@@ -213,8 +213,12 @@ impl CapturedWorkdir for CommandRunner {
       .jdk_home
       .clone()
       .ok_or("JDK home must be specified for all nailgunnable requests.")?;
-    let nailgun_req =
-      construct_nailgun_server_request(&nailgun_name, nailgun_args, jdk_home, req.target_platform);
+    let nailgun_req = construct_nailgun_server_request(
+      &nailgun_name,
+      nailgun_args,
+      jdk_home,
+      req.platform_constraint,
+    );
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
     let nailgun_req_digest = crate::digest(

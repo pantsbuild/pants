@@ -2,7 +2,7 @@ use crate::remote_tests::echo_foo_request;
 use crate::speculate::SpeculatingCommandRunner;
 use crate::{
   CommandRunner, Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
-  PlatformConstraint, Process,
+  Process,
 };
 
 use async_trait::async_trait;
@@ -258,7 +258,7 @@ impl CommandRunner for DelayedCommandRunner {
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     if self.is_compatible {
-      Some(req.0.get(&PlatformConstraint::None).unwrap().clone())
+      Some(req.0.get(&None).unwrap().clone())
     } else {
       None
     }

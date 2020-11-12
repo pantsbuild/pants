@@ -25,7 +25,7 @@ use workunit_store::{WorkunitState, WorkunitStore};
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  MultiPlatformProcess, Platform, PlatformConstraint, Process, ProcessMetadata,
+  MultiPlatformProcess, Platform, Process, ProcessMetadata,
 };
 
 const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
@@ -79,7 +79,7 @@ async fn make_execute_request() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    target_platform: PlatformConstraint::None,
+    platform_constraint: None,
     is_nailgunnable: false,
     execution_slot_variable: None,
     cache_failures: false,
@@ -160,7 +160,7 @@ async fn make_execute_request_with_instance_name() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    target_platform: PlatformConstraint::None,
+    platform_constraint: None,
     is_nailgunnable: false,
     execution_slot_variable: None,
     cache_failures: false,
@@ -254,7 +254,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    target_platform: PlatformConstraint::None,
+    platform_constraint: None,
     is_nailgunnable: false,
     execution_slot_variable: None,
     cache_failures: false,
@@ -497,7 +497,7 @@ async fn make_execute_request_with_timeout() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    target_platform: PlatformConstraint::None,
+    platform_constraint: None,
     is_nailgunnable: false,
     execution_slot_variable: None,
     cache_failures: false,
