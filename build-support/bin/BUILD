@@ -15,7 +15,7 @@ python_tests(
 pex_binary(
    name = 'bootstrap_and_deploy_ci_pants_pex',
    sources = ['bootstrap_and_deploy_ci_pants_pex.py'],
- )
+)
 
 pex_binary(
   name = 'check_banned_imports',
@@ -80,3 +80,5 @@ pex_binary(
   name = "packages",
   sources = ["packages.py"],
 )
+
+python_tests()
