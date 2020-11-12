@@ -75,7 +75,7 @@ class SignalHandler:
 
     def handle_sigint(self, signum: int, _frame):
         ExceptionSink._signal_sent = signum
-        self._send_signal_to_children(int(signal.SIGTERM), "SIGTERM")
+        self._send_signal_to_children(signum, "SIGINT")
         raise KeyboardInterrupt("User interrupted execution with control-c!")
 
     # TODO(#7406): figure out how to let sys.exit work in a signal handler instead of having to raise
@@ -102,12 +102,12 @@ class SignalHandler:
 
     def handle_sigquit(self, signum, _frame):
         ExceptionSink._signal_sent = signum
-        self._send_signal_to_children(int(signal.SIGQUIT), "SIGQUIT")
+        self._send_signal_to_children(signum, "SIGQUIT")
         raise self.SignalHandledNonLocalExit(signum, "SIGQUIT")
 
     def handle_sigterm(self, signum, _frame):
         ExceptionSink._signal_sent = signum
-        self._send_signal_to_children(int(signal.SIGTERM), "SIGTERM")
+        self._send_signal_to_children(signum, "SIGTERM")
         raise self.SignalHandledNonLocalExit(signum, "SIGTERM")
 
 
@@ -131,7 +131,7 @@ class ExceptionSink:
     _pid_specific_error_fileobj = None
     _shared_error_fileobj = None
 
-    # Set in methods on SignalHandler and exposed to the engine rust code.
+    # Stores a signal received by the signal-handling logic so that rust code can check for it.
     _signal_sent: Optional[int] = None
 
     def __new__(cls, *args, **kwargs):

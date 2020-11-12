@@ -86,9 +86,11 @@ async fn run_client(port: u16) -> Result<ExitCode, String> {
     working_dir: PathBuf::from("/dev/null"),
   };
   let (stdio_write, _stdio_read) = child_channel::<ChildOutput>();
-  let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
   let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-  client_handle_connection(Config::default(), stream, cmd, stdio_write, stdin_read)
-    .await
-    .map_err(|e| e.to_string())
+  client_handle_connection(Config::default(), stream, cmd, stdio_write, async {
+    let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
+    stdin_read
+  })
+  .await
+  .map_err(|e| e.to_string())
 }
