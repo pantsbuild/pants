@@ -123,7 +123,7 @@ class MultiPlatformProcess:
     def __init__(self, request_dict: Dict[PlatformConstraint, Process]) -> None:
         if len(request_dict) == 0:
             raise ValueError("At least one platform constrained Process must be passed.")
-        validated_constraints = tuple(
+        serialized_constraints = tuple(
             constraint.platform.value if constraint.platform else None
             for constraint in request_dict
         )
@@ -133,7 +133,7 @@ class MultiPlatformProcess:
                 f"be identical, but got: {list(request_dict.values())}."
             )
 
-        self.platform_constraints = validated_constraints
+        self.platform_constraints = serialized_constraints
         self.processes = tuple(request_dict.values())
 
     @property
