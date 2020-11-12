@@ -681,8 +681,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunits_with_counters = [item for item in finished if "counters" in item]
-        assert len(workunits_with_counters) == 1
         assert workunits_with_counters[0]["counters"]["local_execution_requests"] == 1
+        assert workunits_with_counters[1]["counters"]["local_cache_requests"] == 1
+        assert workunits_with_counters[1]["counters"]["local_cache_requests_uncached"] == 1
 
 
 @dataclass(frozen=True)
