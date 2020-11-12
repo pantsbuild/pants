@@ -6,9 +6,8 @@ import argparse
 import json
 import os
 import subprocess
-from collections import defaultdict
+from collections import Counter
 from pathlib import Path
-from typing import DefaultDict
 
 from common import banner, die
 
@@ -122,9 +121,7 @@ def _s3_listing_has_unique_version(listing_prefix: str, listing_result: str) -> 
     versions = result.get("Versions")
     if not versions:
         return False
-    tally: DefaultDict[str, int] = defaultdict(int)
-    for version in versions:
-        tally[version["Key"]] += 1
+    tally = Counter(version["Key"] for version in versions)
     if len(tally) > 1:
         keys = "\n".join(f"{index}.) {key}" for index, key in enumerate(tally.keys(), start=1))
         raise ListingError(
