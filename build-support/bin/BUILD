@@ -114,4 +114,8 @@ python_binary(
   tags = {"type_checked"},
 )
 
-python_tests()
+python_tests(
+  dependencies = [
+    ":bootstrap_and_deploy_ci_pants_pex",
+  ],
+)
