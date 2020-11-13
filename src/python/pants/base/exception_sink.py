@@ -113,7 +113,12 @@ class SignalHandler:
 
 
 class ExceptionSink:
-    """A mutable singleton object representing where exceptions should be logged to."""
+    """A mutable singleton object representing where exceptions should be logged to.
+
+    The ExceptionSink should be installed in any process that is running Pants @rules via the
+    engine. Notably, this does _not_ include the pantsd client, which does its own signal handling
+    directly in order to forward information to the pantsd server.
+    """
 
     # NB: see the bottom of this file where we call reset_log_location() and other mutators in order
     # to properly setup global state.
@@ -133,10 +138,27 @@ class ExceptionSink:
     _shared_error_fileobj = None
 
     def __new__(cls, *args, **kwargs):
-        raise TypeError("Instances of {} are not allowed to be constructed!".format(cls.__name__))
+        raise TypeError(
+            "Instances of {} are not allowed to be constructed! Call install() instead.".format(
+                cls.__name__
+            )
+        )
 
     class ExceptionSinkError(Exception):
         pass
+
+    @classmethod
+    def install(cls, log_location: str, pantsd_instance: bool) -> None:
+        """Setup global state for this process, such as signal handlers and sys.excepthook."""
+
+        # Set the log location for writing logs before bootstrap options are parsed.
+        cls.reset_log_location(log_location)
+
+        # NB: Mutate process-global state!
+        sys.excepthook = ExceptionSink.log_exception
+
+        # Setup a default signal handler.
+        cls.reset_signal_handler(SignalHandler(pantsd_instance=pantsd_instance))
 
     # All reset_* methods are ~idempotent!
     @classmethod
@@ -413,15 +435,3 @@ Exception message: {exception_message}{maybe_newline}
 
         # Print the output via standard logging.
         logger.error(terminal_log_entry)
-
-
-# Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
-# import time.
-# Set the log location for writing logs before bootstrap options are parsed.
-ExceptionSink.reset_log_location(os.getcwd())
-
-# NB: Mutate process-global state!
-sys.excepthook = ExceptionSink.log_exception
-
-# Setup a default signal handler.
-ExceptionSink.reset_signal_handler(SignalHandler(pantsd_instance=False))

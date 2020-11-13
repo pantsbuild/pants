@@ -8,9 +8,6 @@ import time
 from contextlib import contextmanager
 from typing import List, Mapping
 
-import psutil
-
-from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import ExitCode
 from pants.engine.internals.native import Native
 from pants.nailgun.nailgun_protocol import NailgunProtocol
@@ -53,26 +50,6 @@ class STTYSettings:
                 logger.debug("masking tcsetattr exception: {!r}".format(e))
 
 
-class PailgunClientSignalHandler(SignalHandler):
-    def __init__(self, pid: int):
-        self.pid = pid
-        super().__init__(pantsd_instance=False)
-
-    def _forward_signal(self, signum, signame):
-        logger.info(f"Sending {signame} to pantsd with pid {self.pid}")
-        pantsd_process = psutil.Process(pid=self.pid)
-        pantsd_process.send_signal(signum)
-
-    def handle_sigint(self, signum, _frame):
-        self._forward_signal(signum, "SIGINT")
-
-    def handle_sigquit(self, signum, _frame):
-        self._forward_signal(signum, "SIGQUIT")
-
-    def handle_sigterm(self, signum, _frame):
-        self._forward_signal(signum, "SIGTERM")
-
-
 class RemotePantsRunner:
     """A thin client variant of PantsRunner."""
 
@@ -112,8 +89,6 @@ class RemotePantsRunner:
     def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
         native = Native()
 
-        port = pantsd_handle.port
-        pid = pantsd_handle.pid
         global_options = self._bootstrap_options.for_global_scope()
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
@@ -130,18 +105,15 @@ class RemotePantsRunner:
         command = self._args[0]
         args = self._args[1:]
 
-        rust_nailgun_client = native.new_nailgun_client(port=port)
-        pantsd_signal_handler = PailgunClientSignalHandler(pid=pid)
-
         retries = 3
         attempt = 1
         while True:
+            port = pantsd_handle.port
             logger.debug(f"Connecting to pantsd on port {port} attempt {attempt}/{retries}")
 
-            with ExceptionSink.trapped_signals(pantsd_signal_handler), STTYSettings.preserved():
+            with STTYSettings.preserved():
                 try:
-                    output = rust_nailgun_client.execute(command, args, modified_env)
-                    return output
+                    return native.new_nailgun_client(port=port).execute(command, args, modified_env)
 
                 # NailgunConnectionException represents a failure connecting to pantsd, so we retry
                 # up to the retry limit.
@@ -152,4 +124,11 @@ class RemotePantsRunner:
                     # Wait one second before retrying
                     logger.warning(f"Pantsd was unresponsive on port {port}, retrying.")
                     time.sleep(1)
+
+                    # One possible cause of the daemon being non-responsive during an attempt might be if a
+                    # another lifecycle operation is happening concurrently (incl teardown). To account for
+                    # this, we won't begin attempting restarts until at least 1 second has passed (1 attempt).
+                    if attempt > 1:
+                        pantsd_handle = self._client.restart()
+
                     attempt += 1

@@ -18,6 +18,7 @@ from pants.engine.internals.native import Native
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import setup_logging, setup_logging_to_file, setup_warning_filtering
 from pants.init.options_initializer import OptionsInitializer
+from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -192,12 +193,9 @@ class PantsDaemon(PantsDaemonProcessManager):
         # Switch log output to the daemon's log stream from here forward.
         self._close_stdio()
         with self._pantsd_logging():
-
-            ExceptionSink.reset_signal_handler(SignalHandler(pantsd_instance=True))
-
-            # Reset the log location and the backtrace preference from the global bootstrap options.
+            # Install signal handling based on global bootstrap options.
             global_bootstrap_options = self._bootstrap_options.for_global_scope()
-            ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
+            ExceptionSink.install(log_location=init_workdir(global_bootstrap_options), pantsd_instance=True)
 
             self._native.set_panic_handler()
 
