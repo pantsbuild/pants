@@ -3,10 +3,12 @@
 
 import logging
 import os
+import sys
 import warnings
 from dataclasses import dataclass
 from typing import List, Mapping
 
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
 from pants.bin.remote_pants_runner import RemotePantsRunner
@@ -75,6 +77,19 @@ class PantsRunner:
         # We enable logging here, and everything before it will be routed through regular
         # Python logging.
         setup_logging(global_bootstrap_options, stderr_logging=True)
+
+        deprecated_conditional(
+            lambda: sys.version_info[:2] == (3, 6),
+            entity_description="running Pants with Python 3.6",
+            removal_version="2.2.0.dev0",
+            hint_message=(
+                "Pants 2.2+ will require running the tool with Python 3.7 or 3.8. Update your "
+                "`./pants` script by running `curl -L -o ./pants "
+                "https://raw.githubusercontent.com/pantsbuild/setup/2f079cbe4fc6a1d9d87decba51f19d7689aee69e/pants`"
+                "\n\n(Note: this does not impact what Python interpreter your own code uses, "
+                "outside of Pants plugin code.)"
+            ),
+        )
 
         if self._should_run_with_pantsd(global_bootstrap_options):
             try:
