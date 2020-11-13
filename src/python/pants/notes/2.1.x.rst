@@ -5,6 +5,30 @@ This document describes releases leading up to the ``2.1.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.1/docs/release-notes-2-1 for an overview of the changes in this release.
 
+2.1.0rc2 (11/13/2020)
+---------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Remoting: allow timeout parameters to be configured (Cherry-pick of #11125) (#11158)
+  `PR #11158 <https://github.com/pantsbuild/pants/pull/11158>`_
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Deprecate running Pants with Python 3.6 (#11173)
+  `PR #11173 <https://github.com/pantsbuild/pants/pull/11173>`_
+
+* Deprecate the `sources` field for `python_awslambda` (Cherry-pick of #11176) (#11178)
+  `PR #11178 <https://github.com/pantsbuild/pants/pull/11178>`_
+
+Bugfixes
+~~~~~~~~
+
+* make a few minor reliability fixes to remote caching code (Cherry-pick of #11130) (#11159)
+  `PR #11159 <https://github.com/pantsbuild/pants/pull/11159>`_
+
 2.1.0rc1 (11/11/2020)
 ---------------------
 
