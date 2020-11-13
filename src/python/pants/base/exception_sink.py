@@ -10,11 +10,12 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
-from typing import Callable, Dict, Iterator, Optional
+from typing import Callable, Dict, Iterator
 
 import psutil
 import setproctitle
 
+from pants.engine.internals.native_engine import session_cancel_all
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.osutil import Pid
 
@@ -74,7 +75,7 @@ class SignalHandler:
             child_process.send_signal(received_signal)
 
     def handle_sigint(self, signum: int, _frame):
-        ExceptionSink._signal_sent = signum
+        session_cancel_all()
         self._send_signal_to_children(signum, "SIGINT")
         raise KeyboardInterrupt("User interrupted execution with control-c!")
 
@@ -101,12 +102,12 @@ class SignalHandler:
                 )
 
     def handle_sigquit(self, signum, _frame):
-        ExceptionSink._signal_sent = signum
+        session_cancel_all()
         self._send_signal_to_children(signum, "SIGQUIT")
         raise self.SignalHandledNonLocalExit(signum, "SIGQUIT")
 
     def handle_sigterm(self, signum, _frame):
-        ExceptionSink._signal_sent = signum
+        session_cancel_all()
         self._send_signal_to_children(signum, "SIGTERM")
         raise self.SignalHandledNonLocalExit(signum, "SIGTERM")
 
@@ -131,18 +132,11 @@ class ExceptionSink:
     _pid_specific_error_fileobj = None
     _shared_error_fileobj = None
 
-    # Stores a signal received by the signal-handling logic so that rust code can check for it.
-    _signal_sent: Optional[int] = None
-
     def __new__(cls, *args, **kwargs):
         raise TypeError("Instances of {} are not allowed to be constructed!".format(cls.__name__))
 
     class ExceptionSinkError(Exception):
         pass
-
-    @classmethod
-    def signal_sent(cls) -> Optional[int]:
-        return cls._signal_sent
 
     # All reset_* methods are ~idempotent!
     @classmethod

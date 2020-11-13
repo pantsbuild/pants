@@ -59,7 +59,6 @@ class PailgunClientSignalHandler(SignalHandler):
         super().__init__(pantsd_instance=False)
 
     def _forward_signal(self, signum, signame):
-        ExceptionSink._signal_sent = signum
         logger.info(f"Sending {signame} to pantsd with pid {self.pid}")
         pantsd_process = psutil.Process(pid=self.pid)
         pantsd_process.send_signal(signum)
@@ -131,9 +130,6 @@ class RemotePantsRunner:
         command = self._args[0]
         args = self._args[1:]
 
-        def signal_fn() -> bool:
-            return ExceptionSink.signal_sent() is not None
-
         rust_nailgun_client = native.new_nailgun_client(port=port)
         pantsd_signal_handler = PailgunClientSignalHandler(pid=pid)
 
@@ -144,7 +140,7 @@ class RemotePantsRunner:
 
             with ExceptionSink.trapped_signals(pantsd_signal_handler), STTYSettings.preserved():
                 try:
-                    output = rust_nailgun_client.execute(signal_fn, command, args, modified_env)
+                    output = rust_nailgun_client.execute(command, args, modified_env)
                     return output
 
                 # NailgunConnectionException represents a failure connecting to pantsd, so we retry

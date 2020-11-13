@@ -49,7 +49,6 @@ use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::panic;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -58,7 +57,6 @@ use cpython::{
   PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
   ToPyObject,
 };
-use futures::channel::oneshot;
 use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
@@ -73,11 +71,10 @@ use std::collections::hash_map::HashMap;
 use task_executor::Executor;
 use workunit_store::{UserMetadataItem, Workunit, WorkunitState};
 
-use crate::scheduler::maybe_break_execution_loop;
 use crate::{
-  externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
-  Function, Intrinsics, Key, Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types,
-  Value,
+  externs, nodes, sessions_cancel, Core, ExecutionRequest, ExecutionStrategyOptions,
+  ExecutionTermination, Failure, Function, Intrinsics, Key, Params, RemotingOptions, Rule,
+  Scheduler, Session, Tasks, Types, Value,
 };
 
 py_exception!(native_engine, PollTimeout);
@@ -306,10 +303,16 @@ py_module_initializer!(native_engine, |py, m| {
   )?;
   m.add(
     py,
-    "poll_session_workunits",
+    "session_cancel",
+    py_fn!(py, session_cancel(a: PySession)),
+  )?;
+  m.add(py, "session_cancel_all", py_fn!(py, session_cancel_all()))?;
+  m.add(
+    py,
+    "session_poll_workunits",
     py_fn!(
       py,
-      poll_session_workunits(a: PyScheduler, b: PySession, c: u64)
+      session_poll_workunits(a: PyScheduler, b: PySession, c: u64)
     ),
   )?;
 
@@ -352,12 +355,7 @@ py_module_initializer!(native_engine, |py, m| {
     "scheduler_execute",
     py_fn!(
       py,
-      scheduler_execute(
-        a: PyScheduler,
-        b: PySession,
-        c: PyExecutionRequest,
-        d: PyObject
-      )
+      scheduler_execute(a: PyScheduler, b: PySession, c: PyExecutionRequest)
     ),
   )?;
   m.add(
@@ -617,7 +615,7 @@ py_class!(class PyNailgunClient |py| {
   data executor: PyExecutor;
   data port: u16;
 
-  def execute(&self, py_signal_fn: PyObject, command: String, args: Vec<String>, env: PyDict) -> CPyResult<PyInt> {
+  def execute(&self, command: String, args: Vec<String>, env: PyDict) -> CPyResult<PyInt> {
     use nailgun::NailgunClientError;
 
     let env_list: Vec<(String, String)> = env
@@ -632,64 +630,24 @@ py_class!(class PyNailgunClient |py| {
 
     let port = *self.port(py);
     let executor_ptr = self.executor(py);
-    let python_signal_fn: Value = py_signal_fn.into();
 
-    let (send_task_shutdown_request, recv_task_shutdown_request) = oneshot::channel();
-    let nailgun_fut = nailgun::client_execute(
-      port,
-      command,
-      args,
-      env_list,
-      recv_task_shutdown_request,
-    );
-
-    let exit_code: Result<i32, PyErr> = with_executor(py, executor_ptr, |executor| {
-        let (sender, receiver) = mpsc::channel();
-
-        let _spawned_fut = executor.spawn(async move {
-          let exit_code = nailgun_fut.await;
-          let _ = sender.send(exit_code);
-        });
-
-        let timeout = std::time::Duration::from_millis(50);
-        let output = loop {
-          let event = receiver.recv_timeout(timeout);
-          if let Some(_termination) = maybe_break_execution_loop(&python_signal_fn) {
-            let err_str = "Quitting because of explicit user interrupt";
-            break Err(PyErr::new::<NailgunClientException, _>(py, (err_str,)))
-          }
-
-          match event {
-            Ok(res) => break res.map_err(|e| match e {
-              NailgunClientError::PreConnect(err_str) => PyErr::new::<NailgunConnectionException, _>(py, (err_str,)),
-              NailgunClientError::PostConnect(s) => {
-                let err_str = format!("Nailgun client error: {:?}", s);
-                PyErr::new::<NailgunClientException, _>(py, (err_str,))
-              },
-              NailgunClientError::ExplicitQuit => {
-                PyErr::new::<NailgunClientException, _>(py, ("Explicit quit",))
-              }
-            }),
-            Err(RecvTimeoutError::Timeout) => {
-              continue;
-            }
-            Err(RecvTimeoutError::Disconnected) => {
-              let err_str = "Disconnected from Nailgun client task".to_string();
-              break Err(PyErr::new::<NailgunClientException, _>(py, (err_str,)))
-            }
-          }
-        };
-        debug!("Sending message to nailgun client task to exit.");
-        match send_task_shutdown_request.send(()) {
-          Ok(()) => (),
-          Err(e) => {
-            debug!("Error sending exit message to nailgun client task: {:?}", e);
-          }
-        };
-        output
-    });
-
-    exit_code.map(|code| code.to_py_object(py))
+    with_executor(py, executor_ptr, |executor| {
+      executor.block_on(nailgun::client_execute(
+        port,
+        command,
+        args,
+        env_list,
+      )).map(|code| code.to_py_object(py)).map_err(|e| match e{
+        NailgunClientError::PreConnect(err_str) => PyErr::new::<NailgunConnectionException, _>(py, (err_str,)),
+        NailgunClientError::PostConnect(s) => {
+          let err_str = format!("Nailgun client error: {:?}", s);
+          PyErr::new::<NailgunClientException, _>(py, (err_str,))
+        },
+        NailgunClientError::ExplicitQuit => {
+          PyErr::new::<NailgunClientException, _>(py, ("Explicit quit",))
+        }
+      })
+    })
   }
 });
 
@@ -1101,7 +1059,7 @@ async fn workunits_to_py_tuple_value<'a>(
   Ok(externs::store_tuple(workunit_values))
 }
 
-fn poll_session_workunits(
+fn session_poll_workunits(
   py: Python,
   scheduler_ptr: PyScheduler,
   session_ptr: PySession,
@@ -1160,15 +1118,13 @@ fn scheduler_execute(
   scheduler_ptr: PyScheduler,
   session_ptr: PySession,
   execution_request_ptr: PyExecutionRequest,
-  python_signal_fn: PyObject,
 ) -> CPyResult<PyTuple> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_execution_request(py, execution_request_ptr, |execution_request| {
       with_session(py, session_ptr, |session| {
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
-        let python_signal_fn: Value = python_signal_fn.into();
-        py.allow_threads(|| scheduler.execute(execution_request, session, python_signal_fn))
+        py.allow_threads(|| scheduler.execute(execution_request, session))
           .map(|root_results| {
             let py_results = root_results
               .into_iter()
@@ -1363,6 +1319,20 @@ fn graph_visualize(
 fn session_new_run_id(py: Python, session_ptr: PySession) -> PyUnitResult {
   with_session(py, session_ptr, |session| {
     session.new_run_id();
+    Ok(None)
+  })
+}
+
+fn session_cancel(py: Python, session_ptr: PySession) -> PyUnitResult {
+  with_session(py, session_ptr, |session| {
+    session.core().executor.block_on(session.cancel());
+    Ok(None)
+  })
+}
+
+fn session_cancel_all(py: Python) -> PyUnitResult {
+  py.allow_threads(|| {
+    sessions_cancel();
     Ok(None)
   })
 }

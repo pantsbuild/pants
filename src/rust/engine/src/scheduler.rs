@@ -5,24 +5,23 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
-
-use futures::future;
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
-use crate::externs;
 use crate::nodes::{Select, Visualizer};
 use crate::session::{ExecutionEvent, ObservedValueResult, Root, Session};
 
-use cpython::Python;
 use futures::compat::Future01CompatExt;
+use futures::future;
 use graph::{InvalidationResult, LastObserved};
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{debug, info, warn};
 use tempfile::TempDir;
 use tokio::process;
+use tokio::sync::mpsc;
+use tokio::time;
 use ui::ConsoleUI;
 use watch::Invalidatable;
 
@@ -289,7 +288,7 @@ impl Scheduler {
     &self,
     request: &ExecutionRequest,
     session: &Session,
-    sender: mpsc::Sender<ExecutionEvent>,
+    sender: mpsc::UnboundedSender<ExecutionEvent>,
   ) {
     let context = Context::new(self.core.clone(), session.clone());
     let roots = session.roots_zip_last_observed(&request.roots);
@@ -345,7 +344,6 @@ impl Scheduler {
     &self,
     request: &ExecutionRequest,
     session: &Session,
-    python_signal_fn: Value,
   ) -> Result<Vec<Result<Value, Failure>>, ExecutionTermination> {
     debug!(
       "Launching {} roots (poll={}).",
@@ -357,45 +355,47 @@ impl Scheduler {
     let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
 
     // Spawn and wait for all roots to complete.
-    let (sender, receiver) = mpsc::channel();
+    let (sender, mut receiver) = mpsc::unbounded_channel();
     session.maybe_display_initialize(&self.core.executor, &sender);
     self.execute_helper(request, session, sender);
-    let result = loop {
-      let execution_event = receiver.recv_timeout(Self::refresh_delay(interval, deadline));
 
-      if let Some(termination) = maybe_break_execution_loop(&python_signal_fn) {
-        return Err(termination);
-      }
-
-      match execution_event {
-        Ok(ExecutionEvent::Completed(res)) => {
-          // Completed successfully.
-          break Ok(Self::execute_record_results(&request.roots, &session, res));
-        }
-        Ok(ExecutionEvent::Stderr(stderr)) => {
-          session.write_stderr(&stderr);
-        }
-        Err(mpsc::RecvTimeoutError::Timeout) => {
-          if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
-            // The timeout on the request has been exceeded.
-            break Err(ExecutionTermination::PollTimeout);
-          } else {
-            // Just a receive timeout. render and continue.
-            session.maybe_display_render();
+    self.core.executor.block_on(async move {
+      let result = loop {
+        tokio::select! {
+          _ = session.cancelled() => {
+            // The Session was cancelled.
+            break Err(ExecutionTermination::KeyboardInterrupt)
+          }
+          _ = time::delay_for(Self::refresh_delay(interval, deadline)) => {
+            // It's time to render a new frame (or maybe to time out entirely if the deadline has
+            // elapsed).
+            if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
+              // The timeout on the request has been exceeded.
+              break Err(ExecutionTermination::PollTimeout);
+            } else {
+              // Just a receive timeout. render and continue.
+              session.maybe_display_render();
+            }
+          }
+          execution_event = receiver.recv() => match execution_event {
+            Some(ExecutionEvent::Completed(res)) => {
+              // Completed successfully.
+              break Ok(Self::execute_record_results(&request.roots, &session, res));
+            }
+            Some(ExecutionEvent::Stderr(stderr)) => {
+              session.write_stderr(&stderr);
+            }
+            None => {
+              break Err(ExecutionTermination::Fatal(
+                "Execution threads exited early.".to_owned(),
+              ));
+            }
           }
         }
-        Err(mpsc::RecvTimeoutError::Disconnected) => {
-          break Err(ExecutionTermination::Fatal(
-            "Execution threads exited early.".to_owned(),
-          ));
-        }
-      }
-    };
-    self
-      .core
-      .executor
-      .block_on(session.maybe_display_teardown());
-    result
+      };
+      session.maybe_display_teardown().await;
+      result
+    })
   }
 
   fn refresh_delay(refresh_interval: Duration, deadline: Option<Instant>) -> Duration {
@@ -403,36 +403,6 @@ impl Scheduler {
       .and_then(|deadline| deadline.checked_duration_since(Instant::now()))
       .map(|duration_till_deadline| std::cmp::min(refresh_interval, duration_till_deadline))
       .unwrap_or(refresh_interval)
-  }
-}
-
-pub fn maybe_break_execution_loop(python_signal_fn: &Value) -> Option<ExecutionTermination> {
-  match externs::call_function(&python_signal_fn, &[]) {
-    Ok(value) => {
-      if externs::is_truthy(&value) {
-        Some(ExecutionTermination::KeyboardInterrupt)
-      } else {
-        None
-      }
-    }
-    Err(mut e) => {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      if e
-        .instance(py)
-        .cast_as::<cpython::exc::KeyboardInterrupt>(py)
-        .is_ok()
-      {
-        Some(ExecutionTermination::KeyboardInterrupt)
-      } else {
-        let failure = Failure::from_py_err_with_gil(py, e);
-        std::mem::drop(gil);
-        Some(ExecutionTermination::Fatal(format!(
-          "Error when checking Python signal state: {}",
-          failure
-        )))
-      }
-    }
   }
 }
 

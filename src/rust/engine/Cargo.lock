@@ -54,6 +54,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "async_latch"
+version = "0.0.1"
+dependencies = [
+ "parking_lot",
+ "tokio",
+]
+
+[[package]]
 name = "async_semaphore"
 version = "0.0.1"
 dependencies = [
@@ -689,6 +697,7 @@ name = "engine"
 version = "0.0.1"
 dependencies = [
  "async-trait",
+ "async_latch",
  "async_semaphore",
  "boxfuture",
  "bytes 0.4.12",

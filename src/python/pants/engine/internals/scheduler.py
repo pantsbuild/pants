@@ -11,7 +11,6 @@ from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, U
 
 from typing_extensions import TypedDict
 
-from pants.base.exception_sink import ExceptionSink
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
@@ -305,26 +304,17 @@ class Scheduler:
         return self._native.lib.scheduler_metrics(self._scheduler, session)
 
     def poll_workunits(self, session, max_log_verbosity: LogLevel) -> PolledWorkunits:
-        result: Tuple[Tuple[Workunit], Tuple[Workunit]] = self._native.lib.poll_session_workunits(
+        result: Tuple[Tuple[Workunit], Tuple[Workunit]] = self._native.lib.session_poll_workunits(
             self._scheduler, session, max_log_verbosity.level
         )
         return {"started": result[0], "completed": result[1]}
 
     def _run_and_return_roots(self, session, execution_request):
-        def python_signal() -> bool:
-            """This function checks to see whether the main Python thread has responded to a signal.
-
-            It is invoked by the Rust scheduler, and if it returns true, the scheduler will
-            gracefully shut down.
-            """
-            return ExceptionSink.signal_sent() is not None
-
         try:
             raw_roots = self._native.lib.scheduler_execute(
                 self._scheduler,
                 session,
                 execution_request,
-                python_signal,
             )
         except self._native.lib.PollTimeout:
             raise ExecutionTimeoutError("Timed out")

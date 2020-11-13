@@ -35,9 +35,8 @@ use std::io;
 use std::net::Ipv4Addr;
 use tokio::io::AsyncWriteExt;
 
-use futures::channel::{mpsc, oneshot};
-use futures::{future, FutureExt, SinkExt, Stream, StreamExt};
-use log::debug;
+use futures::channel::mpsc;
+use futures::{SinkExt, Stream, StreamExt};
 
 pub enum NailgunClientError {
   PreConnect(String),
@@ -138,17 +137,6 @@ pub async fn client_execute(
   command: String,
   args: Vec<String>,
   env: Vec<(String, String)>,
-  exit_receiver: oneshot::Receiver<()>,
 ) -> Result<i32, NailgunClientError> {
-  use future::Either;
-
-  let execution_future = client_execute_helper(port, command, args, env).boxed();
-
-  match future::select(execution_future, exit_receiver).await {
-    Either::Left((execution_result, _exit_receiver_fut)) => {
-      debug!("Nailgun client future finished");
-      execution_result
-    }
-    Either::Right((_exited, _execution_result_future)) => Err(NailgunClientError::ExplicitQuit),
-  }
+  client_execute_helper(port, command, args, env).await
 }
