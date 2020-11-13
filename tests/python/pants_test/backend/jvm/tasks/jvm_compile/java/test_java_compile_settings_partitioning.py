@@ -225,8 +225,8 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
 
     def test_java_home_extraction_missing_distributions(self):
         # This will need to be bumped if java ever gets to major version one million.
-        far_future_version = "999999.1"
-        farer_future_version = "999999.2"
+        far_future_version = "999998"
+        farer_future_version = "999999"
 
         os_name = normalize_os_name(get_os_name())
 
