@@ -5,10 +5,12 @@ cd "$REPO_ROOT" || exit 1
 
 # This script is used to generate pants.pex, which is used to run Pants in CI.
 
-export PY="${PY:-python3.7}"
-
 # shellcheck source=build-support/common.sh
 source "${REPO_ROOT}/build-support/common.sh"
+
+PY="$(determine_python)"
+export PY
+
 # shellcheck source=build-support/pants_venv
 source "${REPO_ROOT}/build-support/pants_venv"
 # shellcheck source=build-support/bin/native/bootstrap_code.sh
