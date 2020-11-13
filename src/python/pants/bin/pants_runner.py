@@ -85,7 +85,7 @@ class PantsRunner:
             hint_message=(
                 "Pants 2.2+ will require running the tool with Python 3.7 or 3.8. Update your "
                 "`./pants` script by running `curl -L -o ./pants "
-                "https://raw.githubusercontent.com/pantsbuild/setup/c7a7f91e0a10bddcc6916cd9da37d56541341b9b/pants`"
+                "https://raw.githubusercontent.com/pantsbuild/setup/2f079cbe4fc6a1d9d87decba51f19d7689aee69e/pants`"
                 "\n\n(Note: this does not impact what Python interpreter your own code uses, "
                 "outside of Pants plugin code.)"
             ),
