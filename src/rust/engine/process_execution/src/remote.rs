@@ -564,7 +564,7 @@ impl CommandRunner {
           );
           context
             .workunit_store
-            .increment_counter(Metric::RemoteExecutionMethodExecute, 1);
+            .increment_counter(Metric::RemoteExecutionRPCExecute, 1);
           self
             .execution_client
             .execute_opt(&execute_request, call_opt)
@@ -579,7 +579,7 @@ impl CommandRunner {
           );
           context
             .workunit_store
-            .increment_counter(Metric::RemoteExecutionMethodWaitExecution, 1);
+            .increment_counter(Metric::RemoteExecutionRPCWaitExecution, 1);
           let mut wait_execution_request = WaitExecutionRequest::new();
           wait_execution_request.set_name(operation_name.to_owned());
           self
@@ -617,7 +617,7 @@ impl CommandRunner {
               if num_retries >= MAX_RETRIES {
                 context
                   .workunit_store
-                  .increment_counter(Metric::RemoteExecutionErrors, 1);
+                  .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
                 return Err(
                   "Too many failures from server. The last event was the server disconnecting with no error given.".to_owned(),
                 );
@@ -641,7 +641,7 @@ impl CommandRunner {
           _ => {
             context
               .workunit_store
-              .increment_counter(Metric::RemoteExecutionErrors, 1);
+              .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
             return Err(format!("gRPC error: {}", err));
           }
         },
@@ -653,7 +653,7 @@ impl CommandRunner {
           ExecutionError::Fatal(e) => {
             context
               .workunit_store
-              .increment_counter(Metric::RemoteExecutionErrors, 1);
+              .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
             return Err(e);
           }
           ExecutionError::Retryable(e) => {
@@ -664,7 +664,7 @@ impl CommandRunner {
             if num_retries >= MAX_RETRIES {
               context
                 .workunit_store
-                .increment_counter(Metric::RemoteExecutionErrors, 1);
+                .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
               return Err(format!(
                 "Too many failures from server. The last error was: {}",
                 e
