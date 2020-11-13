@@ -26,6 +26,7 @@ class JvmPlatformTest(TestBase):
         def rev(v):
             return Revision.lenient(v)
 
+        assert parse("1.6.2") == rev("1.6")
         assert parse("1.8") == rev("1.8")
         assert parse("1.8.2") == rev("1.8")
         assert parse("1.9") == rev("9")
@@ -37,6 +38,7 @@ class JvmPlatformTest(TestBase):
         assert parse("10") == rev("10")
         assert parse("11") == rev("11")
         assert parse("11.0") == rev("11")
+        assert parse("99.0") == rev("99")
         with self.assertRaisesWithMessage(ValueError, "Unsupported Java version 5"):
             parse("5")
 

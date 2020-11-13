@@ -313,7 +313,7 @@ class JvmPlatform(Subsystem):
         elif version.components[0] in cls.SUPPORTED_CONVERSION_VERSIONS:
             return Revision(1, version.components[0])
         elif version.components[0] > 8:
-            return Revision(*version.components)
+            return Revision(version.components[0])
         else:
             raise ValueError(f"Unsupported Java version {version}")
 
