@@ -65,25 +65,22 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
         "src/python/foo/bar",
         textwrap.dedent(
             """
-            python_library(
-              name='hello_world',
-              sources=['hello_world.py']
-            )
+            python_library(name='lib')
 
             python_awslambda(
-              name='hello_world_lambda',
-              dependencies=[':hello_world'],
-              handler='foo.bar.hello_world',
-              runtime='python3.7'
+                name='lambda',
+                dependencies=[':lib'],
+                handler='foo.bar.hello_world',
+                runtime='python3.7',
             )
             """
         ),
     )
 
     zip_file_relpath, content = create_python_awslambda(
-        rule_runner, Address("src/python/foo/bar", target_name="hello_world_lambda")
+        rule_runner, Address("src/python/foo/bar", target_name="lambda")
     )
-    assert "src.python.foo.bar/hello_world_lambda.zip" == zip_file_relpath
+    assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
     zipfile = ZipFile(BytesIO(content))
     names = set(zipfile.namelist())
     assert "lambdex_handler.py" in names
