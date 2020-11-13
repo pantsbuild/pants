@@ -540,7 +540,7 @@ impl CommandRunner {
       if num_retries > 0 {
         context
           .workunit_store
-          .increment_counter(Metric::RemoteExecutionRetries, 1);
+          .increment_counter(Metric::RemoteExecutionRPCRetries, 1);
 
         let multiplier = thread_rng().gen_range(0, 2_u32.pow(num_retries) + 1);
         let sleep_time = self.retry_interval_duration * multiplier;
