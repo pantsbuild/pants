@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)
 
-export PY=${PY:-python3}
+export PY=${PY:-python3.7}
 # Consumed by the cpython crate.
 export PYTHON_SYS_EXECUTABLE="${PY}"
 

@@ -10,7 +10,7 @@
  # shellcheck source=build-support/pants_venv
  source "${REPO_ROOT}/build-support/pants_venv"
 
- export PY="${PY:-python3}"
+ export PY="${PY:-python3.7}"
  activate_pants_venv 1>&2  # Redirect to ensure that we don't interfere with stdout.
 
  calculate_current_hash

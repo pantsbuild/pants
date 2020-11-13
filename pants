@@ -32,8 +32,8 @@
 # WRAPPER_SRCPATH=/src/wrapper/src/main/python \
 #    exec /src/pantsbuild-pants/pants "$@"
 #
-# The script defaults to running with Python 3. To use a specific Python version,
-# such as 3.7, prefix the script with `PY=python3.7`.
+# The script defaults to running with Python 3.7. To use another Python version,
+# such as 3.8, prefix the script with `PY=python3.8`.
 
 set -e
 
@@ -57,7 +57,7 @@ source "${HERE}/build-support/pants_venv"
 # shellcheck source=build-support/bin/native/bootstrap_code.sh
 source "${HERE}/build-support/bin/native/bootstrap_code.sh"
 
-export PY="${PY:-python3}"
+export PY="${PY:-python3.7}"
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 

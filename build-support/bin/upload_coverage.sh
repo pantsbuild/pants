@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-export PY=${PY:-python3}
+export PY=${PY:-python3.7}
 export PYTHON_SYS_EXECUTABLE="${PY}"
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../.. && pwd -P)
