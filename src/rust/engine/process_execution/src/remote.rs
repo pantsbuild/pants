@@ -531,10 +531,6 @@ impl CommandRunner {
     const MAX_RETRIES: u32 = 5;
     const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(10);
 
-    context
-      .workunit_store
-      .increment_counter(Metric::RemoteExecutionRequests, 1);
-
     let start_time = Instant::now();
     let mut current_operation_name: Option<String> = None;
     let mut num_retries = 0;
@@ -781,6 +777,9 @@ impl crate::CommandRunner for CommandRunner {
     .await?;
 
     // Submit the execution request to the RE server for execution.
+    context
+      .workunit_store
+      .increment_counter(Metric::RemoteExecutionRequests, 1);
     let result_fut = self.run_execute_request(execute_request, request, &context);
     let timeout_fut = tokio::time::timeout(deadline_duration, result_fut);
     let response = with_workunit(
@@ -800,13 +799,30 @@ impl crate::CommandRunner for CommandRunner {
       },
     )
     .await;
+
+    // Detect whether the operation ran or hit the deadline timeout.
     match response {
-      Ok(r) => r,
+      Ok(result) => {
+        if result.is_ok() {
+          context
+            .workunit_store
+            .increment_counter(Metric::RemoteExecutionSuccess, 1);
+        } else {
+          context
+            .workunit_store
+            .increment_counter(Metric::RemoteExecutionErrors, 1);
+        }
+        result
+      }
       Err(_) => {
+        // The Err in this match arm originates from the timeout future.
         debug!(
           "remote execution for build_id={} timed out after {:?}",
           &build_id, deadline_duration
         );
+        context
+          .workunit_store
+          .increment_counter(Metric::RemoteExecutionTimeouts, 1);
         Err(format!(
           "remote execution timed out after {:?}",
           deadline_duration
