@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import subprocess
+from collections import Counter
 from pathlib import Path
 
 from common import banner, die
@@ -105,6 +106,44 @@ def calculate_native_engine_so_hash() -> str:
     )
 
 
+class ListingError(Exception):
+    pass
+
+
+class NonUniqueVersionError(Exception):
+    pass
+
+
+def _s3_listing_has_unique_version(listing_prefix: str, listing_result: str) -> bool:
+    if not listing_result:
+        return False
+    result = json.loads(listing_result)
+    versions = result.get("Versions")
+    if not versions:
+        return False
+    tally = Counter(version["Key"] for version in versions)
+    if len(tally) > 1:
+        keys = "\n".join(f"{index}.) {key}" for index, key in enumerate(tally.keys(), start=1))
+        raise ListingError(
+            f"Multiple keys returned listing {listing_prefix} in AWS S3:\n{keys}\n"
+            "This is unexpected. Please raise this failure in the #infra channel in Slack so we "
+            "can investigate."
+        )
+    delete_markers = result.get("DeleteMarkers", [])
+    for delete_marker in delete_markers:
+        key = delete_marker["Key"]
+        if key in tally:
+            tally[key] -= 1
+    _, count = tally.popitem()
+    if count > 1:
+        raise NonUniqueVersionError(
+            f"Multiple copies found of {listing_prefix} in AWS S3. This is not allowed as a "
+            "security precaution. Please raise this failure in the #infra channel in Slack so that "
+            "we may investigate how this happened and delete the duplicate copy from S3."
+        )
+    return count == 1
+
+
 def native_engine_so_in_s3_cache(*, aws_bucket: str, native_engine_so_aws_key: str) -> bool:
     ls_output = subprocess.run(
         [
@@ -121,19 +160,10 @@ def native_engine_so_in_s3_cache(*, aws_bucket: str, native_engine_so_aws_key: s
         stdout=subprocess.PIPE,
         check=True,
     ).stdout.decode()
-    if not ls_output:
-        return False
-    versions = json.loads(ls_output).get("Versions")
-    if versions is None:
-        return False
-    if len(versions) > 1:
-        die(
-            f"Multiple copies found of {native_engine_so_aws_key} in AWS S3. This is not allowed "
-            "as a security precaution. Please raise this failure in the #infra channel "
-            "in Slack so that we may investigate how this happened and delete the duplicate "
-            "copy from S3."
-        )
-    return True
+    try:
+        return _s3_listing_has_unique_version(native_engine_so_aws_key, ls_output)
+    except NonUniqueVersionError as e:
+        die(str(e))
 
 
 def bootstrap_pants_pex(python_version: float) -> None:

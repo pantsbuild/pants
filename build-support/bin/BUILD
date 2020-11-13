@@ -21,7 +21,7 @@ python_binary(
      ':common',
    ],
    tags = {'type_checked'},
- )
+)
 
 python_binary(
   name = 'check_banned_imports',
@@ -112,4 +112,10 @@ python_binary(
     '3rdparty/python:requests',
   ],
   tags = {"type_checked"},
+)
+
+python_tests(
+  dependencies = [
+    ":bootstrap_and_deploy_ci_pants_pex",
+  ],
 )
