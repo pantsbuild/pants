@@ -4,9 +4,36 @@
 import re
 from typing import Match, Optional, Tuple, cast
 
-from pants.backend.python.target_types import COMMON_PYTHON_FIELDS, PythonSources
+from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
+from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
-from pants.engine.target import Dependencies, InvalidFieldException, StringField, Target
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Dependencies,
+    InvalidFieldException,
+    StringField,
+    Target,
+)
+
+
+class DeprecatedPythonAwsLambdaSources(PythonSources):
+    expected_num_files = range(0, 1)
+    deprecated_removal_version = "2.2.0.dev0"
+    deprecated_removal_hint = (
+        "Remove the `sources` field and create a new `python_library()` target (if you do not "
+        "yet have one), then add the `python_library()` to the `dependencies` field of this "
+        "`python_awslambda`. See https://www.pantsbuild.org/docs/awslambda-python for an example."
+    )
+
+
+class DeprecatedPythonInterpreterCompatibility(PythonInterpreterCompatibility):
+    deprecated_removal_version = "2.2.0.dev0"
+    deprecated_removal_hint = (
+        "Because the `sources` field will be removed, it no longer makes sense to have a "
+        "`compatibility` field for `python_awslambda` targets. Instead, set the "
+        "`compatibility` field on the `python_library` target containing this lambda's "
+        "handler code."
+    )
 
 
 class PythonAwsLambdaDependencies(Dependencies):
@@ -57,8 +84,10 @@ class PythonAWSLambda(Target):
 
     alias = "python_awslambda"
     core_fields = (
-        *COMMON_PYTHON_FIELDS,
-        PythonSources,
+        *COMMON_TARGET_FIELDS,
+        DeprecatedPythonAwsLambdaSources,
+        DeprecatedPythonInterpreterCompatibility,
+        OutputPathField,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandler,
         PythonAwsLambdaRuntime,
