@@ -594,7 +594,12 @@ def rust_tests_linux() -> Dict:
         **_RUST_TESTS_BASE,
         **linux_fuse_shard(),
         "name": "Rust tests - Linux",
-        "env": ["CACHE_NAME=rust_tests.linux"],
+        "env": [
+            "CACHE_NAME=rust_tests.linux",
+            # Despite being successfully linked at build time, the Linux Rust tests are unable to
+            # locate libpython3.7m.so.1.0 at runtime without this pointer.
+            'LD_LIBRARY_PATH="/opt/python/3.7.1/lib:${LD_LIBRARY_PATH}"'
+        ],
     }
 
 

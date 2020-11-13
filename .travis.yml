@@ -281,6 +281,7 @@ jobs:
     dist: xenial
     env:
     - CACHE_NAME=rust_tests.linux
+    - LD_LIBRARY_PATH="/opt/python/3.7.1/lib:${LD_LIBRARY_PATH}"
     if: commit_message !~ /\[ci skip-rust\]/
     name: Rust tests - Linux
     os: linux
