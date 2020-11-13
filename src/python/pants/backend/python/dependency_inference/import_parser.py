@@ -5,6 +5,7 @@ import ast as ast3
 import re
 import sys
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Optional, Set, Tuple
 
 from typed_ast import ast27
@@ -56,7 +57,8 @@ def parse_file(*, filename: str, content: str) -> Optional[Tuple]:
             return None
 
 
-def find_python_imports(*, filename: str, content: str, module_name: str) -> ParsedPythonImports:
+def find_python_imports(*, filename: str, content: str) -> ParsedPythonImports:
+    package = ".".join(PurePath(filename).parts[0:-1])
     parse_result = parse_file(filename=filename, content=content)
     # If there were syntax errors, gracefully early return. This is more user friendly than
     # propagating the exception. Dependency inference simply won't be used for that file, and
@@ -64,7 +66,7 @@ def find_python_imports(*, filename: str, content: str, module_name: str) -> Par
     if parse_result is None:
         return ParsedPythonImports(FrozenOrderedSet(), FrozenOrderedSet())
     tree, ast_visitor_cls = parse_result
-    ast_visitor = ast_visitor_cls(module_name)
+    ast_visitor = ast_visitor_cls(package)
     ast_visitor.visit(tree)
     return ParsedPythonImports(
         explicit_imports=FrozenOrderedSet(sorted(ast_visitor.explicit_imports)),
@@ -78,8 +80,8 @@ _INFERRED_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\d]*\.){2,}[a-zA-Z_]\w*$")
 
 
 class _BaseAstVisitor:
-    def __init__(self, module_name: str) -> None:
-        self._module_parts = module_name.split(".")
+    def __init__(self, package: str) -> None:
+        self._package_parts = package.split(".")
         self.explicit_imports: Set[str] = set()
         self.inferred_imports: Set[str] = set()
 
@@ -92,10 +94,15 @@ class _BaseAstVisitor:
             self.explicit_imports.add(alias.name)
 
     def visit_ImportFrom(self, node) -> None:
-        rel_module = node.module
-        abs_module = ".".join(
-            self._module_parts[0 : -node.level] + ([] if rel_module is None else [rel_module])
-        )
+        if node.level:
+            # Relative import.
+            rel_module = node.module
+            abs_module = ".".join(
+                self._package_parts[0 : len(self._package_parts) - node.level + 1]
+                + ([] if rel_module is None else [rel_module])
+            )
+        else:
+            abs_module = node.module
         for alias in node.names:
             self.explicit_imports.add(f"{abs_module}.{alias.name}")
 
