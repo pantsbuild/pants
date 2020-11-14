@@ -74,6 +74,13 @@ impl AsyncLatch {
     let mut receiver = self.receiver.clone();
     while receiver.recv().await.is_some() {}
   }
+
+  ///
+  /// Return true if the latch has been triggered.
+  ///
+  pub fn poll_triggered(&self) -> bool {
+    self.sender.lock().is_none()
+  }
 }
 
 #[cfg(test)]

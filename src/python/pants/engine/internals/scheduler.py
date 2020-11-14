@@ -29,7 +29,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.native_engine import PyTypes
+from pants.engine.internals.native_engine import PySessionCancellationLatch, PyTypes
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
@@ -342,6 +342,7 @@ class Scheduler:
         dynamic_ui: bool = False,
         should_report_workunits: bool = False,
         session_values: Optional[SessionValues] = None,
+        cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> "SchedulerSession":
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
@@ -352,6 +353,7 @@ class Scheduler:
                 build_id,
                 should_report_workunits,
                 session_values or SessionValues(),
+                cancellation_latch or PySessionCancellationLatch(),
             ),
         )
 

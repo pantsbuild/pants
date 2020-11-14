@@ -1704,6 +1704,7 @@ checksum = "2eb04b9f127583ed176e163fb9ec6f3e793b87e21deedd5734a69386a18a0151"
 name = "nailgun"
 version = "0.0.1"
 dependencies = [
+ "async_latch",
  "bytes 0.5.4",
  "futures 0.3.5",
  "log 0.4.8",

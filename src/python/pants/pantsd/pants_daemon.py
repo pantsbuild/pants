@@ -12,7 +12,7 @@ from typing import Any, Iterator
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink, SignalHandler
+from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
 from pants.init.engine_initializer import GraphScheduler
@@ -195,7 +195,9 @@ class PantsDaemon(PantsDaemonProcessManager):
         with self._pantsd_logging():
             # Install signal handling based on global bootstrap options.
             global_bootstrap_options = self._bootstrap_options.for_global_scope()
-            ExceptionSink.install(log_location=init_workdir(global_bootstrap_options), pantsd_instance=True)
+            ExceptionSink.install(
+                log_location=init_workdir(global_bootstrap_options), pantsd_instance=True
+            )
 
             self._native.set_panic_handler()
 

@@ -83,6 +83,8 @@ class PantsRunner:
         from pants.bin.local_pants_runner import LocalPantsRunner
 
         # We only install signal handling via ExceptionSink if the run will execute in this process.
-        ExceptionSink.install(log_location=init_workdir(global_bootstrap_options), pantsd_instance=False)
+        ExceptionSink.install(
+            log_location=init_workdir(global_bootstrap_options), pantsd_instance=False
+        )
         runner = LocalPantsRunner.create(env=self.env, options_bootstrapper=options_bootstrapper)
         return runner.run(start_time)

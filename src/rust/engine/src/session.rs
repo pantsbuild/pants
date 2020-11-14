@@ -141,6 +141,7 @@ impl Session {
     build_id: String,
     should_report_workunits: bool,
     session_values: Value,
+    cancelled: AsyncLatch,
   ) -> Session {
     let workunit_store = WorkunitStore::new(!should_render_ui);
     let display = Mutex::new(if should_render_ui {
@@ -158,7 +159,7 @@ impl Session {
     });
 
     let inner_session = Arc::new(InnerSession {
-      cancelled: AsyncLatch::new(),
+      cancelled,
       core: scheduler.core.clone(),
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashMap::new()),

@@ -51,6 +51,9 @@ class PyScheduler:
 class PySession:
     def __init__(self, **kwargs: Any) -> None: ...
 
+class PySessionCancellationLatch:
+    def __init__(self) -> None: ...
+
 class PyTasks:
     def __init__(self, **kwargs: Any) -> None: ...
 

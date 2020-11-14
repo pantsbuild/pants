@@ -52,6 +52,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_latch::AsyncLatch;
 use cpython::{
   exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyDict, PyErr, PyInt,
   PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
@@ -406,6 +407,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<PyResult>(py)?;
   m.add_class::<PyScheduler>(py)?;
   m.add_class::<PySession>(py)?;
+  m.add_class::<PySessionCancellationLatch>(py)?;
   m.add_class::<PyTasks>(py)?;
   m.add_class::<PyTypes>(py)?;
 
@@ -586,7 +588,8 @@ py_class!(class PySession |py| {
           should_render_ui: bool,
           build_id: String,
           should_report_workunits: bool,
-          session_values: PyObject
+          session_values: PyObject,
+          cancellation_latch: PySessionCancellationLatch,
     ) -> CPyResult<Self> {
       Self::create_instance(py, Session::new(
           scheduler.scheduler(py),
@@ -594,8 +597,20 @@ py_class!(class PySession |py| {
           build_id,
           should_report_workunits,
           session_values.into(),
+          cancellation_latch.cancelled(py).clone(),
         )
       )
+    }
+});
+
+py_class!(class PySessionCancellationLatch |py| {
+    data cancelled: AsyncLatch;
+    def __new__(_cls) -> CPyResult<Self> {
+      Self::create_instance(py, AsyncLatch::new())
+    }
+
+    def is_cancelled(&self) -> CPyResult<bool> {
+        Ok(self.cancelled(py).poll_triggered())
     }
 });
 
@@ -773,11 +788,20 @@ fn nailgun_server_create(
         let stdin_fd = externs::store_i64(exe.stdin_fd.into());
         let stdout_fd = externs::store_i64(exe.stdout_fd.into());
         let stderr_fd = externs::store_i64(exe.stderr_fd.into());
+        let cancellation_latch = {
+          let gil = Python::acquire_gil();
+          let py = gil.python();
+          PySessionCancellationLatch::create_instance(py, exe.cancelled)
+            .unwrap()
+            .into_object()
+            .into()
+        };
         let runner_args = vec![
           command,
           args,
           env,
           working_dir,
+          cancellation_latch,
           stdin_fd,
           stdout_fd,
           stderr_fd,
