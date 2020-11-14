@@ -13,7 +13,6 @@ def test_prepare_scheduler():
 
     core = PantsDaemonCore(create_services)
 
-    first_scheduler = core.prepare_scheduler(create_options_bootstrapper(args=["-ldebug"]))
-    second_scheduler = core.prepare_scheduler(create_options_bootstrapper(args=["-lwarn"]))
-
+    first_scheduler = core.prepare_scheduler(create_options_bootstrapper(["-ldebug"]))
+    second_scheduler = core.prepare_scheduler(create_options_bootstrapper(["-lwarn"]))
     assert first_scheduler is not second_scheduler

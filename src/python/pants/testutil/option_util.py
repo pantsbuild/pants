@@ -11,8 +11,8 @@ from pants.option.subsystem import Subsystem
 
 
 def create_options_bootstrapper(
-    *,
     args: Optional[Iterable[str]] = None,
+    *,
     env: Optional[Mapping[str, str]] = None,
 ) -> OptionsBootstrapper:
     return OptionsBootstrapper.create(
