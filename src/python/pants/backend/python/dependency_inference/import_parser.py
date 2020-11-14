@@ -99,7 +99,7 @@ class _BaseAstVisitor:
             rel_module = node.module
             abs_module = ".".join(
                 self._package_parts[0 : len(self._package_parts) - node.level + 1]
-                + ([] if rel_module is None else [rel_module])
+                + (tuple() if rel_module is None else (rel_module,))
             )
         else:
             abs_module = node.module
