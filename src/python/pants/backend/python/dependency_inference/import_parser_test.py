@@ -11,7 +11,7 @@ from pants.backend.python.dependency_inference.import_parser import find_python_
 
 def test_normal_imports() -> None:
     imports = find_python_imports(
-        filename="foo.py",
+        filename="project/foo.py",
         content=dedent(
             """\
             from __future__ import print_function
@@ -35,7 +35,6 @@ def test_normal_imports() -> None:
                 import subprocess23 as subprocess
             """
         ),
-        module_name="project.app",
     )
     assert set(imports.explicit_imports) == {
         "__future__.print_function",
@@ -53,20 +52,22 @@ def test_normal_imports() -> None:
     assert not imports.inferred_imports
 
 
-def test_relative_imports() -> None:
+@pytest.mark.parametrize("basename", ["foo.py", "__init__.py"])
+def test_relative_imports(basename: str) -> None:
     imports = find_python_imports(
-        filename="foo.py",
+        filename=f"project/util/{basename}",
         content=dedent(
             """\
             from . import sibling
+            from .sibling import Nibling
             from .subdir.child import Child
             from ..parent import Parent
             """
         ),
-        module_name="project.util.test_utils",
     )
     assert set(imports.explicit_imports) == {
         "project.util.sibling",
+        "project.util.sibling.Nibling",
         "project.util.subdir.child.Child",
         "project.parent.Parent",
     }
@@ -75,7 +76,7 @@ def test_relative_imports() -> None:
 
 def test_imports_from_strings() -> None:
     imports = find_python_imports(
-        filename="foo.py",
+        filename="project/foo.py",
         content=dedent(
             """\
             modules = [
@@ -105,7 +106,6 @@ def test_imports_from_strings() -> None:
                 importlib.import_module(module)
             """
         ),
-        module_name="project.app",
     )
     assert not imports.explicit_imports
     assert set(imports.inferred_imports) == {
@@ -121,14 +121,14 @@ def test_imports_from_strings() -> None:
 
 
 def test_gracefully_handle_syntax_errors() -> None:
-    imports = find_python_imports(filename="foo.py", content="x =", module_name="project.app")
+    imports = find_python_imports(filename="project/foo.py", content="x =")
     assert not imports.explicit_imports
     assert not imports.inferred_imports
 
 
 def test_works_with_python2() -> None:
     imports = find_python_imports(
-        filename="foo.py",
+        filename="project/foo.py",
         content=dedent(
             """\
             print "Python 2 lives on."
@@ -140,7 +140,6 @@ def test_works_with_python2() -> None:
             importlib.import_module(u"dep.from.str")
             """
         ),
-        module_name="project.app",
     )
     assert set(imports.explicit_imports) == {"demo", "project.demo.Demo"}
     assert set(imports.inferred_imports) == {"dep.from.bytes", "dep.from.str"}
@@ -152,7 +151,7 @@ def test_works_with_python2() -> None:
 )
 def test_works_with_python38() -> None:
     imports = find_python_imports(
-        filename="foo.py",
+        filename="project/foo.py",
         content=dedent(
             """\
             is_py38 = True
@@ -165,7 +164,6 @@ def test_works_with_python38() -> None:
             importlib.import_module("dep.from.str")
             """
         ),
-        module_name="project.app",
     )
     assert set(imports.explicit_imports) == {"demo", "project.demo.Demo"}
     assert set(imports.inferred_imports) == {"dep.from.str"}
