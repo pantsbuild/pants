@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-from pathlib import PurePath
 from typing import List, cast
 
 from pants.backend.python.dependency_inference import module_mapper
@@ -108,18 +107,13 @@ async def infer_python_dependencies(
         return InferredDependencies([], sibling_dependencies_inferrable=False)
 
     stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.sources_field]))
-    modules = tuple(
-        PythonModule.create_from_stripped_path(PurePath(fp))
-        for fp in stripped_sources.snapshot.files
-    )
     digest_contents = await Get(DigestContents, Digest, stripped_sources.snapshot.digest)
 
     owners_requests: List[Get[PythonModuleOwners, PythonModule]] = []
-    for file_content, module in zip(digest_contents, modules):
+    for file_content in digest_contents:
         file_imports_obj = find_python_imports(
             filename=file_content.path,
             content=file_content.content.decode(),
-            module_name=module.module,
         )
         detected_imports = (
             file_imports_obj.all_imports
