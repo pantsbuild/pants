@@ -35,12 +35,19 @@ pub enum Metric {
   LocalCacheReadErrors,
   LocalCacheWriteErrors,
   LocalExecutionRequests,
-  RemoteExecutionRequests,
   RemoteCacheRequests,
   RemoteCacheRequestsCached,
   RemoteCacheRequestsUncached,
   RemoteCacheReadErrors,
   RemoteCacheWriteErrors,
+  RemoteExecutionErrors,
+  RemoteExecutionRequests,
+  RemoteExecutionRPCErrors,
+  RemoteExecutionRPCExecute,
+  RemoteExecutionRPCRetries,
+  RemoteExecutionRPCWaitExecution,
+  RemoteExecutionSuccess,
+  RemoteExecutionTimeouts,
 }
 
 impl Metric {
@@ -54,12 +61,19 @@ impl Metric {
       LocalCacheReadErrors => "local_cache_read_errors",
       LocalCacheWriteErrors => "local_cache_write_errors",
       LocalExecutionRequests => "local_execution_requests",
-      RemoteExecutionRequests => "remote_execution_requests",
       RemoteCacheRequests => "remote_cache_requests",
       RemoteCacheRequestsCached => "remote_cache_requests_cached",
       RemoteCacheRequestsUncached => "remote_cache_requests_uncached",
       RemoteCacheReadErrors => "remote_cache_read_errors",
       RemoteCacheWriteErrors => "remote_cache_write_errors",
+      RemoteExecutionErrors => "remote_execution_errors",
+      RemoteExecutionRequests => "remote_execution_requests",
+      RemoteExecutionRPCRetries => "remote_execution_rpc_retries",
+      RemoteExecutionRPCErrors => "remote_execution_rpc_errors",
+      RemoteExecutionRPCExecute => "remote_execution_rpc_execute",
+      RemoteExecutionRPCWaitExecution => "remote_execution_rpc_wait_execution",
+      RemoteExecutionSuccess => "remote_execution_success",
+      RemoteExecutionTimeouts => "remote_execution_timeouts",
     }
   }
 }
