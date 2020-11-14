@@ -58,7 +58,7 @@ def parse_file(*, filename: str, content: str) -> Optional[Tuple]:
 
 
 def find_python_imports(*, filename: str, content: str) -> ParsedPythonImports:
-    package = ".".join(PurePath(filename).parts[0:-1])
+    package_parts = PurePath(filename).parts[0:-1]
     parse_result = parse_file(filename=filename, content=content)
     # If there were syntax errors, gracefully early return. This is more user friendly than
     # propagating the exception. Dependency inference simply won't be used for that file, and
@@ -66,7 +66,7 @@ def find_python_imports(*, filename: str, content: str) -> ParsedPythonImports:
     if parse_result is None:
         return ParsedPythonImports(FrozenOrderedSet(), FrozenOrderedSet())
     tree, ast_visitor_cls = parse_result
-    ast_visitor = ast_visitor_cls(package)
+    ast_visitor = ast_visitor_cls(package_parts)
     ast_visitor.visit(tree)
     return ParsedPythonImports(
         explicit_imports=FrozenOrderedSet(sorted(ast_visitor.explicit_imports)),
@@ -80,8 +80,8 @@ _INFERRED_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\d]*\.){2,}[a-zA-Z_]\w*$")
 
 
 class _BaseAstVisitor:
-    def __init__(self, package: str) -> None:
-        self._package_parts = package.split(".")
+    def __init__(self, package_parts: Tuple[str, ...]) -> None:
+        self._package_parts = package_parts
         self.explicit_imports: Set[str] = set()
         self.inferred_imports: Set[str] = set()
 
