@@ -77,3 +77,18 @@ impl Metric {
     }
   }
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ObservationMetric {
+  RemoteExecutionRPCFirstResponseTime,
+}
+
+impl ObservationMetric {
+  pub fn as_str(&self) -> &'static str {
+    use ObservationMetric::*;
+
+    match *self {
+      RemoteExecutionRPCFirstResponseTime => "remote_execution_rpc_first_response_time",
+    }
+  }
+}

@@ -31,6 +31,7 @@ use remexec::{
   ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
 };
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
+<<<<<<< HEAD
 use tonic::metadata::{
   AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataValue, KeyAndValueRef, MetadataMap,
 };
@@ -39,6 +40,11 @@ use tonic::{Code, Interceptor, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
 use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
+=======
+use workunit_store::{
+  with_workunit, Metric, ObservationMetric, SpanId, WorkunitMetadata, WorkunitStore,
+};
+>>>>>>> 3e166a239 (observation metric support)
 
 use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
@@ -276,23 +282,38 @@ impl CommandRunner {
   // Outputs progress reported by the server and returns the next actionable operation
   // or gRPC status back to the main loop (plus the operation name so the main loop can
   // reconnect).
-  async fn wait_on_operation_stream<S>(&self, mut stream: S, build_id: &str) -> StreamOutcome
+  async fn wait_on_operation_stream<S>(&self, mut stream: S, context: &Context) -> StreamOutcome
   where
     S: Stream<Item = Result<Operation, Status>> + Unpin,
   {
     let mut operation_name_opt: Option<String> = None;
+    let mut start_time_opt = Some(Instant::now());
 
     trace!(
       "wait_on_operation_stream (build_id={}): monitoring stream",
-      build_id
+      context.build_id
     );
 
     loop {
-      match stream.next().await {
+      let item = stream.next().await;
+
+      if let Some(start_time) = start_time_opt.take() {
+        let timing: Result<i64, _> = Instant::now()
+          .duration_since(start_time)
+          .as_millis()
+          .try_into();
+        if let Ok(obs) = timing {
+          context
+            .workunit_store
+            .record_observation(ObservationMetric::RemoteExecutionRPCFirstResponseTime, obs);
+        }
+      }
+
+      match item {
         Some(Ok(operation)) => {
           trace!(
             "wait_on_operation_stream (build_id={}): got operation: {:?}",
-            build_id,
+            context.build_id,
             &operation
           );
 
@@ -663,10 +684,15 @@ impl CommandRunner {
         Ok(operation_stream_response) => {
           // Monitor the operation stream until there is an actionable operation
           // or status to interpret.
+<<<<<<< HEAD
           let operation_stream = operation_stream_response.into_inner();
           let stream_outcome = self
             .wait_on_operation_stream(operation_stream, &context.build_id)
             .await;
+=======
+          let compat_stream = operation_stream.compat();
+          let stream_outcome = self.wait_on_operation_stream(compat_stream, &context).await;
+>>>>>>> 3e166a239 (observation metric support)
 
           match stream_outcome {
             StreamOutcome::Complete(status) => {
