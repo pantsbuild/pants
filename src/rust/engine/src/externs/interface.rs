@@ -1084,6 +1084,11 @@ async fn workunits_to_py_tuple_value<'a>(
   core: &Arc<Core>,
   session: &Session,
 ) -> CPyResult<Value> {
+  // Acquire the GIL here so that calls into the externs::store_* helpers via workunit_to_py_value
+  // do not block on obtaining the GIL for every value conversion. (This API supports recursive
+  // acquisition of the GIL.)
+  let _gil = Python::acquire_gil();
+
   let mut workunit_values = Vec::new();
   for workunit in workunits {
     let py_value = workunit_to_py_value(workunit, core, session).await?;
