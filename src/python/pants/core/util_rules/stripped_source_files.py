@@ -6,15 +6,26 @@ from dataclasses import dataclass
 
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.source_files import rules as source_files_rules
+from pants.engine.collection import Collection
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.engine.target import SourcesPaths
+from pants.source.source_root import (
+    SourceRoot,
+    SourceRootRequest,
+    SourceRootsRequest,
+    SourceRootsResult,
+)
 from pants.source.source_root import rules as source_root_rules
+from pants.util.dirutil import fast_relpath
 
 
 @dataclass(frozen=True)
 class StrippedSourceFiles:
-    """Wrapper for a snapshot of files whose source roots have been stripped."""
+    """Wrapper for a snapshot of files whose source roots have been stripped.
+
+    Use via `Get(StrippedSourceFiles, SourceFilesRequest([tgt.get(Sources)])`.
+    """
 
     snapshot: Snapshot
 
@@ -76,6 +87,25 @@ async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
         )
 
     return StrippedSourceFiles(resulting_snapshot)
+
+
+class StrippedSourceFileNames(Collection[str]):
+    """The file names from a target's `sources` field, with source roots stripped.
+
+    Use via `Get(StrippedSourceFileNames, SourcePathsRequest(tgt.get(Sources))`.
+    """
+
+
+@rule
+async def strip_sources_paths(sources_paths: SourcesPaths) -> StrippedSourceFileNames:
+    if not sources_paths.files:
+        return StrippedSourceFileNames()
+    source_root = await Get(
+        SourceRoot, SourceRootRequest, SourceRootRequest.for_file(sources_paths.files[0])
+    )
+    if source_root.path == ".":
+        return StrippedSourceFileNames(sources_paths.files)
+    return StrippedSourceFileNames(fast_relpath(f, source_root.path) for f in sources_paths.files)
 
 
 def rules():

@@ -53,6 +53,8 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     Sources,
+    SourcesPaths,
+    SourcesPathsRequest,
     SpecialCasedDependencies,
     Tags,
     Target,
@@ -747,7 +749,12 @@ def test_find_valid_field_sets() -> None:
 
 @pytest.fixture
 def sources_rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[QueryRule(HydratedSources, (HydrateSourcesRequest,))])
+    return RuleRunner(
+        rules=[
+            QueryRule(HydratedSources, [HydrateSourcesRequest]),
+            QueryRule(SourcesPaths, [SourcesPathsRequest]),
+        ]
+    )
 
 
 def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
@@ -761,7 +768,11 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
     )
     assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
-    # Also test that the Filespec is correct. This does not need hydration to be calculated.
+    # Test that `SourcesPaths` works too.
+    sources_paths = sources_rule_runner.request(SourcesPaths, [SourcesPathsRequest(sources)])
+    assert sources_paths.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
+
+    # Also test that the Filespec is correct. This does not need the engine to be calculated.
     assert (
         sources.filespec
         == {

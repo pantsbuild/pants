@@ -53,6 +53,8 @@ from pants.engine.target import (
     InjectedDependencies,
     RegisteredTargetTypes,
     Sources,
+    SourcesPaths,
+    SourcesPathsRequest,
     SpecialCasedDependencies,
     Subtargets,
     Target,
@@ -89,7 +91,7 @@ async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
 
 
 @rule
-async def generate_subtargets(address: Address, global_options: GlobalOptions) -> Subtargets:
+async def generate_subtargets(address: Address) -> Subtargets:
     if address.is_file_target:
         raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
     wrapped_build_target = await Get(WrappedTarget, Address, address)
@@ -100,15 +102,8 @@ async def generate_subtargets(address: Address, global_options: GlobalOptions) -
         # the BUILD target from depending on its splits.
         return Subtargets(build_target, ())
 
-    # Create subtargets for matched sources.
-    sources_field = build_target[Sources]
-    sources_field_path_globs = sources_field.path_globs(
-        global_options.options.files_not_found_behavior
-    )
-
     # Generate a subtarget per source.
-    paths = await Get(Paths, PathGlobs, sources_field_path_globs)
-    sources_field.validate_resolved_files(paths.files)
+    paths = await Get(SourcesPaths, SourcesPathsRequest(build_target[Sources]))
     wrapped_subtargets = await MultiGet(
         Get(
             WrappedTarget,
@@ -117,7 +112,6 @@ async def generate_subtargets(address: Address, global_options: GlobalOptions) -
         )
         for subtarget_file in paths.files
     )
-
     return Subtargets(build_target, tuple(wt.target for wt in wrapped_subtargets))
 
 
@@ -667,6 +661,17 @@ async def hydrate_sources(
     return HydratedSources(
         generated_sources.snapshot, sources_field.filespec, sources_type=sources_type
     )
+
+
+@rule(desc="Resolve `sources` field file names")
+async def resolve_source_paths(
+    request: SourcesPathsRequest, global_options: GlobalOptions
+) -> SourcesPaths:
+    sources_field = request.field
+    path_globs = sources_field.path_globs(global_options.options.files_not_found_behavior)
+    paths = await Get(Paths, PathGlobs, path_globs)
+    sources_field.validate_resolved_files(paths.files)
+    return SourcesPaths(files=paths.files, dirs=paths.dirs)
 
 
 # -----------------------------------------------------------------------------------------------

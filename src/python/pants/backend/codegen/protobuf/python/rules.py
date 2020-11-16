@@ -37,7 +37,7 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     Sources,
     TransitiveTargets,
-    TransitiveTargetsRequestLite,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -66,9 +66,8 @@ async def generate_python_from_protobuf(
     # Protoc needs all transitive dependencies on `protobuf_libraries` to work properly. It won't
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
-    # TODO(#10917): Use TransitiveTargets instead of TransitiveTargetsLite.
     transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequestLite([request.protocol_target.address])
+        TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])
     )
 
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
