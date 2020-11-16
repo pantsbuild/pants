@@ -5,6 +5,15 @@ This document describes releases leading up to the ``2.1.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.1/docs/release-notes-2-1 for an overview of the changes in this release.
 
+2.1.0rc3 (11/16/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix relative imports in dependency inference (Cherry-pick of #11181) (#11189)
+  `PR #11189 <https://github.com/pantsbuild/pants/pull/11189>`_
+
 2.1.0rc2 (11/13/2020)
 ---------------------
 
