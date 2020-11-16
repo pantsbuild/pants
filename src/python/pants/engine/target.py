@@ -32,7 +32,13 @@ from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Snapshot
+from pants.engine.fs import (
+    GlobExpansionConjunction,
+    GlobMatchErrorBehavior,
+    PathGlobs,
+    Paths,
+    Snapshot,
+)
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.filespec import Filespec, matches_filespec
@@ -638,6 +644,15 @@ class TransitiveTargetsRequestLite:
     roots: Tuple[Address, ...]
 
     def __init__(self, roots: Iterable[Address]) -> None:
+        warn_or_error(
+            removal_version="2.3.0.dev0",
+            deprecated_entity_description="`TransitiveTargetsRequestLite`",
+            hint=(
+                "Rather than `Get(TransitiveTargets, TransitiveTargetsRequestLite)`, use "
+                "`Get(TransitiveTargets, TransitiveTargetsRequest)`. There is no more need for "
+                "`TransitiveTargetsRequestLite` because the rule graph cycle has been resolved."
+            ),
+        )
         self.roots = tuple(roots)
 
 
@@ -1490,6 +1505,32 @@ class GeneratedSources:
     snapshot: Snapshot
 
 
+class SourcesPaths(Paths):
+    """The resolved file names of the `sources` field.
+
+    This does not consider codegen, and only captures the files from the `sources` field.
+    """
+
+
+@dataclass(frozen=True)
+class SourcesPathsRequest(EngineAwareParameter):
+    """A request to resolve the file names of the `sources` field.
+
+    Use via `Get(SourcesPaths, SourcesPathRequest(tgt.get(Sources))`.
+
+    This is faster than `Get(HydratedSources, HydrateSourcesRequest)` because it does not snapshot
+    the files and it only resolves the file names.
+
+    This does not consider codegen, and only captures the files from the `sources` field. Use
+    `HydrateSourcesRequest` to use codegen.
+    """
+
+    field: Sources
+
+    def debug_hint(self) -> str:
+        return self.field.address.spec
+
+
 # -----------------------------------------------------------------------------------------------
 # `Dependencies` field
 # -----------------------------------------------------------------------------------------------
@@ -1541,6 +1582,17 @@ class DependenciesRequestLite(EngineAwareParameter):
     """
 
     field: Dependencies
+
+    def __post_init__(self) -> None:
+        warn_or_error(
+            removal_version="2.3.0.dev0",
+            deprecated_entity_description="`DependenciesRequestLite`",
+            hint=(
+                "Rather than `Get(Targets, DependenciesRequestLite)`, use "
+                "`Get(Targets, DependenciesRequest)`. There is no more need for "
+                "`DependenciesRequestLite` because the rule graph cycle has been resolved."
+            ),
+        )
 
     def debug_hint(self) -> str:
         return self.field.address.spec
