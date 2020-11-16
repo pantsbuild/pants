@@ -6,6 +6,21 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release, and
 https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
 
+2.0.1rc1 (11/16/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Deprecate the `sources` field for `python_awslambda` (Cherry-pick of #11176) (#11177)
+  `PR #11177 <https://github.com/pantsbuild/pants/pull/11177>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix relative imports in dependency inference (Cherry-pick of #11181) (#11190)
+  `PR #11190 <https://github.com/pantsbuild/pants/pull/11190>`_
+
 2.0.1rc0 (11/11/2020)
 ---------------------
 
