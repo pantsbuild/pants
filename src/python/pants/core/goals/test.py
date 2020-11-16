@@ -140,6 +140,9 @@ class EnrichedTestResult(TestResult, EngineAwareReturnType):
             output = f"{output.rstrip()}\n\n"
         return f"{message}{output}"
 
+    def metadata(self) -> Dict[str, Any]:
+        return {"address": self.address.spec}
+
 
 @dataclass(frozen=True)
 class TestDebugRequest:
