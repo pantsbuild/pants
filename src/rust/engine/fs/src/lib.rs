@@ -782,14 +782,17 @@ pub fn increase_limits() -> Result<String, String> {
         for more information.",
         TARGET_NOFILE_LIMIT
       );
-      // If we might be able to increase the limit, try to.
+      // If we might be able to increase the soft limit, try to.
       if cur < max {
-        rlimit::Resource::NOFILE.set(max, max).map_err(|e| {
-          format!(
-            "Could not raise file handle limit above {}: `{}`. {}",
-            cur, e, err_suffix
-          )
-        })?;
+        let target_soft_limit = std::cmp::min(max, TARGET_NOFILE_LIMIT);
+        rlimit::Resource::NOFILE
+          .set(target_soft_limit, max)
+          .map_err(|e| {
+            format!(
+              "Could not raise soft file handle limit above {}: `{}`. {}",
+              cur, e, err_suffix
+            )
+          })?;
       } else {
         return Err(format!(
           "File handle limit is capped to: {}. {}",
