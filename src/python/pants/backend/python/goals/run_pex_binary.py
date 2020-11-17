@@ -24,6 +24,10 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
+class MissingEntryPoint(Exception):
+    """Indicates that the entry point was missing."""
+
+
 @rule(level=LogLevel.DEBUG)
 async def create_pex_binary_run_request(
     field_set: PexBinaryFieldSet,
@@ -37,7 +41,14 @@ async def create_pex_binary_run_request(
         ),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
+
+    if not entry_point.val:
+        raise MissingEntryPoint(
+            "To run a `pex_binary`, you must either set the `entry_point` field or the `sources` "
+            f"field, but {field_set.address} left both fields off. See "
+            "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target "
+            "for how to set the entry point."
+        )
 
     # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
     # so that we can get the interpreter constraints for use in runner_pex_request.

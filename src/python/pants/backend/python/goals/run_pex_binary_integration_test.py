@@ -64,3 +64,10 @@ def test_run_sample_script(tgt_content: str) -> None:
     assert "Hola, mundo.\n" in result.stderr
     assert result.stdout == "HELLO WORLD.\n"
     assert result.exit_code == 23
+
+
+def test_requires_entry_point() -> None:
+    with setup_tmpdir({"BUILD": "pex_binary()"}) as tmpdir:
+        result = run_pants(["--backend-packages=pants.backend.python", "run", tmpdir])
+    result.assert_failure()
+    assert "MissingEntryPoint" in result.stderr

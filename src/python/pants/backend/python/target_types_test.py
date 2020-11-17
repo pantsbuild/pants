@@ -77,7 +77,7 @@ def test_resolve_pex_binary_entry_point() -> None:
     )
 
     def assert_resolved(
-        *, entry_point: Optional[str], source: Optional[str], expected: str
+        *, entry_point: Optional[str], source: Optional[str], expected: Optional[str]
     ) -> None:
         addr = Address("src/python/project")
         rule_runner.create_file("src/python/project/app.py")
@@ -93,10 +93,11 @@ def test_resolve_pex_binary_entry_point() -> None:
     )
     assert_resolved(entry_point=":func", source="app.py", expected="project.app:func")
     assert_resolved(entry_point=None, source="app.py", expected="project.app")
+    # You can leave off an entry point, which is useful for things like a pex_binary acting like a
+    # venv. Some call sites may error if this is not set, though.
+    assert_resolved(entry_point=None, source=None, expected=None)
     with pytest.raises(ExecutionError):
         assert_resolved(entry_point=":func", source=None, expected="doesnt matter")
-    with pytest.raises(ExecutionError):
-        assert_resolved(entry_point=None, source=None, expected="doesnt matter")
 
 
 def test_requirements_field() -> None:

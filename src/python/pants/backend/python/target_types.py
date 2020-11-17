@@ -165,7 +165,7 @@ class PexEntryPointField(StringField):
 
 @dataclass(frozen=True)
 class ResolvedPexEntryPoint:
-    val: str
+    val: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -193,23 +193,16 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
         Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
     )
     if len(binary_source_paths.files) != 1:
-        instructions_url = "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
         if not entry_point_value:
-            raise InvalidFieldException(
-                f"Both the `entry_point` and `sources` fields are not set for the target "
-                f"{request.sources.address}, so Pants cannot determine an entry point. Please "
-                "either explicitly set the `entry_point` field and/or the `sources` field to "
-                f"exactly one file. See {instructions_url}."
-            )
-        else:
-            raise InvalidFieldException(
-                f"The `entry_point` field for the target {request.sources.address} is set to "
-                f"the short-hand value {repr(entry_point_value)}, but the `sources` field is not "
-                "set. Pants requires the `sources` field to expand the entry point to the "
-                f"normalized form `path.to.module:{entry_point_value}`. Please either set the "
-                "`sources` field to exactly one file or use a full value for `entry_point`. See "
-                f"{instructions_url}."
-            )
+            return ResolvedPexEntryPoint(None)
+        raise InvalidFieldException(
+            f"The `entry_point` field for the target {request.sources.address} is set to "
+            f"the short-hand value {repr(entry_point_value)}, but the `sources` field is not "
+            "set. Pants requires the `sources` field to expand the entry point to the "
+            f"normalized form `path.to.module:{entry_point_value}`. Please either set the "
+            "`sources` field to exactly one file or use a full value for `entry_point`. See "
+            "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target."
+        )
     entry_point_path = binary_source_paths.files[0]
     source_root = await Get(
         SourceRoot,
