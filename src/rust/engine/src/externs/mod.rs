@@ -298,63 +298,11 @@ pub fn call_method(value: &PyObject, method: &str, args: &[Value]) -> Result<PyO
   value.call_method(gil.python(), method, args_tuple, None)
 }
 
-///
-/// The result of an intrinsic or @rule is contained in this struct, depending on whether it returns
-/// a value, or raises an exception. This is *not* a Result, because most of the time we want to
-/// pass an exception from one coroutine or functional call right back into a "parent" coroutine,
-/// which allows for try/except handling within an `await Get(...)`.
-///
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub enum InvocationResult {
-  SuccessfulReturn(Value),
-  Exception(Failure),
-}
-
-impl From<Result<PyObject, PyErr>> for InvocationResult {
-  fn from(other: Result<PyObject, PyErr>) -> Self {
-    let value_result: Result<Value, Failure> = match other {
+pub fn into_value_result(py_result: Result<PyObject, PyErr>) -> Result<Value, Failure> {
+    match py_result {
       Ok(obj) => Ok(Value::from(obj)),
       Err(err) => Err(Failure::from_py_err(err)),
-    };
-    value_result.into()
-  }
-}
-
-impl From<Result<Value, Failure>> for InvocationResult {
-  fn from(other: Result<Value, Failure>) -> Self {
-    match other {
-      Ok(obj) => InvocationResult::SuccessfulReturn(obj),
-      Err(err) => InvocationResult::Exception(err),
     }
-  }
-}
-
-impl From<Result<Vec<Value>, Failure>> for InvocationResult {
-  fn from(other: Result<Vec<Value>, Failure>) -> Self {
-    match other {
-      Ok(new_values) => InvocationResult::SuccessfulReturn(store_tuple(new_values)),
-      Err(err) => InvocationResult::Exception(err),
-    }
-  }
-}
-
-impl InvocationResult {
-  pub fn into_result(self) -> Result<Value, Failure> {
-    match self {
-      InvocationResult::SuccessfulReturn(val) => Ok(val),
-      InvocationResult::Exception(failure) => Err(failure),
-    }
-  }
-
-  ///
-  /// Get a handle to the inner value (which may be an exception).
-  ///
-  pub fn as_error_value_ref(&self) -> Result<&Value, Failure> {
-    match self {
-      InvocationResult::SuccessfulReturn(val) => Ok(val),
-      InvocationResult::Exception(err) => err.as_py_err(),
-    }
-  }
 }
 
 pub fn call_function(func: &PyObject, args: &[Value]) -> Result<PyObject, PyErr> {
@@ -370,14 +318,14 @@ pub fn call_function(func: &PyObject, args: &[Value]) -> Result<PyObject, PyErr>
 ///
 pub fn generator_send(
   generator: &Value,
-  arg: InvocationResult,
+  arg: Result<Value, Failure>,
 ) -> Result<GeneratorResponse, Failure> {
   let response: PyObject = {
     let input: &Value = match &arg {
       // If we last received an raised exception from an inner coroutine, extract the exception
       // value, and send it to the current coroutine.
-      InvocationResult::Exception(err) => err.as_py_err()?,
-      InvocationResult::SuccessfulReturn(obj) => obj,
+      Err(err) => err.as_py_err()?,
+      Ok(obj) => obj,
     };
     with_externs(|py, e| {
       e.call_method(
@@ -426,7 +374,7 @@ pub fn generator_send(
   } else if let Ok(throw) = response.cast_as::<PyGeneratorResponseThrow>(py) {
     let new_err_val = Value::new(throw.err(py).clone_ref(py));
     match arg {
-      InvocationResult::Exception(err) => {
+        Err(err) => {
         // If this is the same error that we previously sent, then just return the previous error to
         // preserve the stacktraces.
         let err_is_same_as_last_time = err
@@ -443,10 +391,10 @@ pub fn generator_send(
           Ok(GeneratorResponse::Throw(joined_failure))
         }
       }
-      // We didn't have an error before, but we do now, so just return a new Failure instance.
-      InvocationResult::SuccessfulReturn(_) => Ok(GeneratorResponse::Throw(
-        Failure::from_py_err_value(new_err_val),
-      )),
+        // We didn't have an error before, but we do now, so just return a new Failure instance.
+        Ok(_) => Ok(GeneratorResponse::Throw(
+            Failure::from_py_err_value(new_err_val),
+        )),
     }
   } else {
     panic!("generator_send returned unrecognized type: {:?}", response);

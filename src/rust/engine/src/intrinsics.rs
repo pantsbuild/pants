@@ -416,8 +416,7 @@ fn session_values(context: Context, _args: Vec<Value>) -> BoxFuture<'static, Nod
   async move {
     context
       .get(SessionValues)
-      .await
-      .and_then(|result| result.into_result())
+      .await?
   }
   .boxed()
 }

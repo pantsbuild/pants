@@ -417,6 +417,15 @@ impl Failure {
       Failure::Throw { val, .. } => Ok(val),
     }
   }
+  ///
+  /// Get a handle to the exception Value, if applicable, or wrap this in an InternalFailure.
+  ///
+  pub fn into_py_err(self) -> Result<Value, Failure> {
+    match self {
+      Failure::Invalidated => Err(Failure::Invalidated),
+      Failure::Throw { val, .. } => Ok(val),
+    }
+  }
 
   pub fn from_py_err_value(val: Value) -> Failure {
     let gil = Python::acquire_gil();

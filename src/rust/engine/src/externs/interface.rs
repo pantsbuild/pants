@@ -592,9 +592,8 @@ py_class!(class PySession |py| {
           should_render_ui,
           build_id,
           should_report_workunits,
-          externs::InvocationResult::SuccessfulReturn(session_values.into()),
-        )
-      )
+          session_values.into(),
+        ))
     }
 });
 
