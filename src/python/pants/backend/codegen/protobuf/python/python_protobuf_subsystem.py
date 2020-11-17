@@ -60,7 +60,7 @@ class PythonProtobufSubsystem(Subsystem):
             advanced=True,
             help=(
                 "Infer when Python code depends on generated Protobuf files. This requires that "
-                "`[python-infer].inits` is also true (the default)."
+                "`[python-infer].imports` is also true (the default)."
             ),
         )
 
