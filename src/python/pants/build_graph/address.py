@@ -11,7 +11,7 @@ from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
 # @ is currently unused, but reserved for possible future needs.
-BANNED_CHARS_IN_TARGET_NAME = frozenset("@")
+BANNED_CHARS_IN_TARGET_NAME = frozenset(r"@!?/\:=")
 
 
 def parse_spec(
@@ -204,13 +204,25 @@ class Address:
             )
 
         banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(name)
-
-        if banned_chars:
-            raise InvalidTargetName(
-                "banned chars found in target name",
-                "{banned_chars} not allowed in target name: {name}".format(
-                    banned_chars=banned_chars, name=name
+        deprecated_banned_chars = banned_chars & set(r"/\:!=?")
+        if deprecated_banned_chars:
+            warn_or_error(
+                removal_version="2.2.0.dev1",
+                deprecated_entity_description=(
+                    r"Using any of the `\`, `/`, `:`, `!`, `=`, or `?` characters in a target name."
                 ),
+                hint=(
+                    f"The target name {name} (defined in directory {spec_path}) "
+                    f"contains deprecated characters (`{deprecated_banned_chars}`), which will "
+                    "cause some usecases to fail. Please replace these characters with another "
+                    "separator character like `_` or `-`."
+                ),
+            )
+        elif banned_chars:
+            raise InvalidTargetName(
+                f"The target name {name} (defined in directory {spec_path}) "
+                f"contains banned characters (`{banned_chars}`). Please replace these "
+                "characters with another separator character like `_` or `-`."
             )
 
     def __init__(self, spec_path: str, target_name: str) -> None:
