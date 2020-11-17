@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from pants.engine.collection import Collection
 from pants.engine.internals.engine_testutil import remove_locations_from_traceback
 from pants.engine.internals.engine_testutil import (
     assert_equal_with_printing,
@@ -406,6 +407,50 @@ def test_trace_includes_rule_exception_traceback() -> None:
     )
 
 
+def test_trace_includes_nested_exception_traceback() -> None:
+    rule_runner = RuleRunner(rules=[
+        raise_an_exception,
+        catch_and_reraise,
+        QueryRule(SomeOutput, (OuterInput,)),
+    ])
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(SomeOutput, [OuterInput("asdf")])
+    normalized_traceback = remove_locations_from_traceback(str(exc.value))
+    assert normalized_traceback == dedent(
+        f"""\
+         1 Exception encountered:
+
+         Engine traceback:
+           in select
+           in {__name__}.{catch_and_reraise.__name__}
+           in {__name__}.{raise_an_exception.__name__}
+         Traceback (most recent call last):
+           File LOCATION-INFO, in raise_an_exception
+             raise Exception(some_input.s)
+         Exception: asdf
+
+         While handling that, another exception was raised:
+
+         Traceback (most recent call last):
+           File LOCATION-INFO, in catch_and_reraise
+             return await Get(SomeOutput, SomeInput(outer_input.s))
+           File LOCATION-INFO, in __await__
+             result = yield self
+         Exception: asdf
+
+         During handling of the above exception, another exception occurred:
+
+         Traceback (most recent call last):
+           File LOCATION-INFO, in generator_send
+             res = func.throw(arg) if isinstance(arg, Exception) else func.send(arg)
+           File LOCATION-INFO, in catch_and_reraise
+             raise Exception("nested exception!")
+         Exception: nested exception!
+         """
+    )
+
+
+
 # -----------------------------------------------------------------------------------------------
 # Test unhashable types
 # -----------------------------------------------------------------------------------------------
@@ -447,120 +492,3 @@ def test_unhashable_types_failure() -> None:
     # Fail if the `input` in a `Get` is not hashable.
     with pytest.raises(ExecutionError, match="unhashable type: 'list'"):
         rule_runner.request(C, [])
-
-
-class SchedulerWithNestedRaiseTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            a_typecheck_fail_test,
-            c_unhashable,
-            nested_raise,
-            QueryRule(A, (TypeCheckFailWrapper,)),
-            QueryRule(A, (B,)),
-            QueryRule(C, (CollectionType,)),
-            raise_an_exception,
-            QueryRule(SomeOutput, (SomeInput,)),
-            catch_and_reraise,
-            QueryRule(SomeOutput, (OuterInput,)),
-        )
-
-    def test_get_type_match_failure(self):
-        """Test that Get(...)s are now type-checked during rule execution, to allow for union
-        types."""
-
-        with self.assertRaises(ExecutionError) as cm:
-            # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
-            self.request(A, [TypeCheckFailWrapper(A())])
-
-        expected_regex = "WithDeps.*did not declare a dependency on JustGet"
-        self.assertRegex(str(cm.exception), expected_regex)
-
-    def test_unhashable_root_params_failure(self):
-        """Test that unhashable root params result in a structured error."""
-        # This will fail at the rust boundary, before even entering the engine.
-        with self.assertRaisesRegex(TypeError, "unhashable type: 'list'"):
-            self.request(C, [CollectionType([1, 2, 3])])
-
-    def test_unhashable_get_params_failure(self):
-        """Test that unhashable Get(...) params result in a structured error."""
-        # This will fail inside of `c_unhashable_dataclass`.
-        with self.assertRaisesRegex(ExecutionError, "unhashable type: 'list'"):
-            self.request(C, [CollectionType(tuple())])
-
-    def test_trace_includes_rule_exception_traceback(self):
-        # Execute a request that will trigger the nested raise, and then directly inspect its trace.
-        request = self.scheduler.execution_request([A], [B()])
-        _, throws = self.scheduler.execute(request)
-
-        with self.assertRaises(ExecutionError) as cm:
-            self.scheduler._raise_on_error([t for _, t in throws])
-
-        trace = remove_locations_from_traceback(str(cm.exception))
-        assert_equal_with_printing(
-            self,
-            dedent(
-                f"""\
-                 1 Exception encountered:
-
-                 Engine traceback:
-                   in select
-                   in {self.__module__}.{nested_raise.__name__}
-                 Traceback (most recent call last):
-                   File LOCATION-INFO, in nested_raise
-                     fn_raises(b)
-                   File LOCATION-INFO, in fn_raises
-                     raise Exception(f"An exception for {{type(x).__name__}}")
-                 Exception: An exception for B
-                 """
-            ),
-            trace,
-        )
-
-    def test_trace_includes_nested_exception_traceback(self):
-        request = self.scheduler.execution_request([SomeOutput], [OuterInput("asdf")])
-        _, throws = self.scheduler.execute(request)
-
-        with self.assertRaises(ExecutionError) as cm:
-            self.scheduler._raise_on_error([t for _, t in throws])
-
-        trace = remove_locations_from_traceback(str(cm.exception))
-        assert_equal_with_printing(
-            self,
-            dedent(
-                f"""\
-                 1 Exception encountered:
-
-                 Engine traceback:
-                   in select
-                   in {self.__module__}.{catch_and_reraise.__name__}
-                   in {self.__module__}.{raise_an_exception.__name__}
-                 Traceback (most recent call last):
-                   File LOCATION-INFO, in raise_an_exception
-                     raise Exception(some_input.s)
-                 Exception: asdf
-
-                 While handling that, another exception was raised:
-
-                 Traceback (most recent call last):
-                   File LOCATION-INFO, in catch_and_reraise
-                     return await Get(SomeOutput, SomeInput(outer_input.s))
-                   File LOCATION-INFO, in __await__
-                     result = yield self
-                 Exception: asdf
-
-                 During handling of the above exception, another exception occurred:
-
-                 Traceback (most recent call last):
-                   File LOCATION-INFO, in generator_send
-                     res = self._send_to_coroutine(func, arg)
-                   File LOCATION-INFO, in _send_to_coroutine
-                     return func.throw(arg)  # type: ignore[arg-type]
-                   File LOCATION-INFO, in catch_and_reraise
-                     raise Exception("nested exception!")
-                 Exception: nested exception!
-                 """
-            ),
-            trace,
-        )
