@@ -410,6 +410,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::PyGeneratorResponseBreak>(py)?;
   m.add_class::<externs::PyGeneratorResponseGet>(py)?;
   m.add_class::<externs::PyGeneratorResponseGetMulti>(py)?;
+  m.add_class::<externs::PyGeneratorResponseThrow>(py)?;
 
   m.add_class::<externs::fs::PyDigest>(py)?;
 
@@ -591,7 +592,7 @@ py_class!(class PySession |py| {
           should_render_ui,
           build_id,
           should_report_workunits,
-          session_values.into(),
+          externs::InvocationResult::SuccessfulReturn(session_values.into()),
         )
       )
     }
@@ -740,7 +741,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> CPyResult<
         f @ Failure::Invalidated => {
           let msg = format!("{}", f);
           (
-            externs::create_exception(&msg),
+            externs::create_value_error(&msg),
             Failure::native_traceback(&msg),
             Vec::new(),
           )

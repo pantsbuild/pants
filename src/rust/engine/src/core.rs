@@ -10,7 +10,9 @@ use std::{fmt, hash};
 
 use crate::externs;
 
-use cpython::{FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, Python, ToPyObject};
+use cpython::{
+  FromPyObject, ObjectProtocol, PyClone, PyDict, PyErr, PyObject, PyResult, Python, ToPyObject,
+};
 use smallvec::SmallVec;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
@@ -344,6 +346,21 @@ pub enum Failure {
   },
 }
 
+///
+/// Because we may represent either an internal error or a normal raised python exception with a
+/// Failure instance, we want to make it explicit when we convert a Failure into a Value. In that
+/// case, we wrap a Failure which cannot be converted into a Value (such as a Failure::Invalidated)
+/// with an InternalFailure instance, which ensures that we propagate it to the top level without
+/// exposing it to python code.
+///
+pub struct InternalFailure(Failure);
+
+impl InternalFailure {
+  pub fn into_failure(self) -> Failure {
+    self.0
+  }
+}
+
 impl Failure {
   ///
   /// Consumes this Failure to produce a new Failure with an additional engine_traceback entry.
@@ -365,23 +382,88 @@ impl Failure {
       }
     }
   }
-}
 
-impl Failure {
+  ///
+  /// When an exception is raised from an inner `await Get(...)` and handled in a parent coroutine,
+  /// but then an exception is raised after handling it, the traceback of the second exception needs
+  /// to be joined with the first to present the complete traceback history of the raised exception
+  /// to the user.
+  ///
+  pub fn join_tracebacks(self, new_failure: Self) -> Failure {
+    match (self, new_failure) {
+      (
+        Failure::Throw {
+          val: _old_val,
+          python_traceback: old_python_traceback,
+          engine_traceback: old_engine_traceback,
+        },
+        Failure::Throw {
+          val: new_val,
+          python_traceback: new_python_traceback,
+          engine_traceback: new_engine_traceback,
+        },
+      ) => {
+        let joined_python_tracebacks = [
+          old_python_traceback,
+          "While handling that, another exception was raised:\n".to_string(),
+          new_python_traceback,
+        ]
+        .join("\n");
+        let joined_engine_tracebacks = old_engine_traceback
+          .into_iter()
+          .chain(new_engine_traceback.into_iter())
+          .collect::<Vec<_>>();
+        Failure::Throw {
+          val: new_val,
+          python_traceback: joined_python_tracebacks,
+          engine_traceback: joined_engine_tracebacks,
+        }
+      }
+      (_, new) => new,
+    }
+  }
+
+  ///
+  /// Get a handle to the exception Value, if applicable, or wrap this in an InternalFailure.
+  ///
+  pub fn as_py_err(&self) -> Result<&Value, InternalFailure> {
+    match self {
+      Failure::Invalidated => Err(InternalFailure(Failure::Invalidated)),
+      Failure::Throw { val, .. } => Ok(val),
+    }
+  }
+
+  pub fn from_py_err_value(val: Value) -> Failure {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let obj = val.consume_into_py_object(py);
+    let py_err = PyErr::from_instance(py, obj);
+    Self::from_py_err_with_gil(py, py_err)
+  }
   pub fn from_py_err(py_err: PyErr) -> Failure {
     let gil = Python::acquire_gil();
     let py = gil.python();
     Failure::from_py_err_with_gil(py, py_err)
   }
   pub fn from_py_err_with_gil(py: Python, mut py_err: PyErr) -> Failure {
-    let val = Value::from(py_err.instance(py));
-    let python_traceback = if let Some(tb) = py_err.ptraceback.as_ref() {
+    let err_object = py_err.instance(py);
+    // If executing generator_send() raises an exception, that method adds a ._formatted_stack
+    // attribute to the exception, which is used to persist the stacktrace across @rule methods.
+    let python_traceback = if err_object.hasattr(py, "_formatted_stack").unwrap_or(false) {
+      let locals = PyDict::new(py);
+      locals.set_item(py, "err_object", &err_object).unwrap();
+      py.eval("''.join(err_object._formatted_stack)", None, Some(&locals))
+        .unwrap()
+        .extract::<String>(py)
+        .unwrap()
+    } else if let Some(tb) = py_err.ptraceback.as_ref() {
+      // Otherwise, we rely on the traceback from the cpython crate.
       let locals = PyDict::new(py);
       locals
         .set_item(py, "traceback", py.import("traceback").unwrap())
         .unwrap();
       locals.set_item(py, "tb", tb).unwrap();
-      locals.set_item(py, "val", &val).unwrap();
+      locals.set_item(py, "val", &err_object).unwrap();
       py.eval(
         "''.join(traceback.format_exception(etype=None, value=val, tb=tb))",
         None,
@@ -391,10 +473,12 @@ impl Failure {
       .extract::<String>(py)
       .unwrap()
     } else {
-      Self::native_traceback(&externs::val_to_str(val.as_ref()))
+      // If the traceback is not available, we generate an opaque one that makes it clear the error
+      // is coming from the pants rust code.
+      Self::native_traceback(&externs::val_to_str(&err_object))
     };
     Failure::Throw {
-      val,
+      val: Value::from(err_object),
       python_traceback,
       engine_traceback: Vec::new(),
     }
@@ -419,7 +503,15 @@ impl fmt::Display for Failure {
 
 pub fn throw(msg: &str) -> Failure {
   Failure::Throw {
-    val: externs::create_exception(msg),
+    val: externs::create_value_error(msg),
+    python_traceback: Failure::native_traceback(msg),
+    engine_traceback: Vec::new(),
+  }
+}
+
+pub fn throw_type_error(msg: &str) -> Failure {
+  Failure::Throw {
+    val: externs::create_type_error(msg),
     python_traceback: Failure::native_traceback(msg),
     engine_traceback: Vec::new(),
   }

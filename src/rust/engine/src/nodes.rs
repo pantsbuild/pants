@@ -16,9 +16,11 @@ use futures::stream::StreamExt;
 use url::Url;
 
 use crate::context::{Context, Core};
-use crate::core::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
-use crate::externs;
+use crate::core::{
+  display_sorted_in_parens, throw, throw_type_error, Failure, Key, Params, TypeId, Value,
+};
 use crate::externs::engine_aware::{self, EngineAwareInformation};
+use crate::externs::{self, InvocationResult};
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
@@ -140,9 +142,10 @@ impl Select {
         ))
       })?;
     let context = context.clone();
-    Select::new_from_edges(self.params.clone(), product, &edges)
+    let result: InvocationResult = Select::new_from_edges(self.params.clone(), product, &edges)
       .run_wrapped_node(context)
-      .await
+      .await?;
+    result.into_result()
   }
 }
 
@@ -150,9 +153,9 @@ impl Select {
 // requested using context.get
 #[async_trait]
 impl WrappedNode for Select {
-  type Item = Value;
+  type Item = InvocationResult;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Value> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<InvocationResult> {
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
         match inner.rule() {
@@ -175,17 +178,21 @@ impl WrappedNode for Select {
                 .collect::<Vec<_>>(),
             )
             .await?;
-            context
+            let result: Result<Value, Failure> = context
               .core
               .intrinsics
               .run(intrinsic, context.clone(), values)
-              .await
+              .await;
+            match result {
+              Ok(value) => Ok(InvocationResult::SuccessfulReturn(value)),
+              Err(failure) => Ok(InvocationResult::Exception(failure)),
+            }
           }
         }
       }
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
-          Ok(externs::val_for(key))
+          Ok(InvocationResult::SuccessfulReturn(externs::val_for(key)))
         } else {
           Err(throw(&format!(
             "Expected a Param of type {} to be present.",
@@ -567,9 +574,9 @@ pub struct SessionValues;
 
 #[async_trait]
 impl WrappedNode for SessionValues {
-  type Item = Value;
+  type Item = InvocationResult;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Value> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<InvocationResult> {
     Ok(context.session.session_values())
   }
 }
@@ -880,7 +887,7 @@ impl Task {
     params: &Params,
     entry: &Arc<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
-  ) -> NodeResult<Vec<Value>> {
+  ) -> NodeResult<Vec<InvocationResult>> {
     let get_futures = gets
       .into_iter()
       .map(|get| {
@@ -936,32 +943,40 @@ impl Task {
   }
 
   ///
-  /// Given a python generator Value, loop to request the generator's dependencies until
-  /// it completes with a result Value.
+  /// Given a python coroutine, loop over its outputs while sending back the results of
+  ///`await Get(...)` calls until it completes with an InvocationResult, which may contain a
+  /// successful return value, or a raised exception.
   ///
   async fn generate(
     context: Context,
     params: Params,
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
-  ) -> NodeResult<Value> {
-    let mut input = Value::from(externs::none());
+  ) -> NodeResult<InvocationResult> {
+    let mut input = InvocationResult::SuccessfulReturn(Value::from(externs::none()));
     loop {
       let context = context.clone();
       let params = params.clone();
       let entry = entry.clone();
-      match externs::generator_send(&generator, &input)? {
+      match externs::generator_send(&generator, input)? {
         externs::GeneratorResponse::Get(get) => {
-          let values = Self::gen_get(&context, &params, &entry, vec![get]).await?;
-          input = values.into_iter().next().unwrap();
+          let results = Self::gen_get(&context, &params, &entry, vec![get]).await?;
+          input = results.into_iter().next().unwrap();
         }
         externs::GeneratorResponse::GetMulti(gets) => {
-          let values = Self::gen_get(&context, &params, &entry, gets).await?;
-          input = externs::store_tuple(values);
+          let results = Self::gen_get(&context, &params, &entry, gets).await?;
+          // If any of the sub-Gets fail, we return the result of the first failing Get in the given
+          // sequence as an InvocationResult, and discard the rest.
+          input = results
+            .into_iter()
+            .map(|result| result.into_result())
+            .collect::<Result<Vec<Value>, Failure>>()
+            .into();
         }
         externs::GeneratorResponse::Break(val) => {
-          break Ok(val);
+          break Ok(InvocationResult::SuccessfulReturn(val));
         }
+        externs::GeneratorResponse::Throw(err) => break Ok(InvocationResult::Exception(err)),
       }
     }
   }
@@ -978,11 +993,61 @@ impl fmt::Debug for Task {
 }
 
 pub struct PythonRuleOutput {
-  value: Value,
+  value: InvocationResult,
   new_level: Option<log::Level>,
   message: Option<String>,
   new_artifacts: Vec<(String, hashing::Digest)>,
   new_metadata: Vec<(String, Value)>,
+}
+
+impl Task {
+  ///
+  /// Execute the @rule function with its resolved params, converting any InvocationResult into a
+  /// Result<Value, Failure> to avoid lots of wrapping and unwrapping.
+  ///
+  async fn run_wrapped_node_helper(
+    dependency_results: Vec<InvocationResult>,
+    context: &Context,
+    params: Params,
+    product: TypeId,
+    func: crate::core::Function,
+    entry: Arc<rule_graph::Entry<Rule>>,
+  ) -> Result<Value, Failure> {
+    let mut result_val: Value = {
+      // All of the params should have been supplied by coroutines. Ensure that all of the
+      // coroutines succeeded, otherwise error.
+      let param_deps: Vec<Value> = dependency_results
+        .into_iter()
+        .map(|dep| dep.into_result())
+        .collect::<Result<Vec<Value>, Failure>>()?;
+      // The params were all successfully collected, now call the current @rule function with them.
+      let result: InvocationResult =
+        externs::call_function(&externs::val_for(&func.0), &param_deps).into();
+      // If the result of calling the current @rule was an exception, exit with that.
+      result.into_result()?
+    };
+    let mut result_type = externs::get_type_for(&result_val);
+    // Determine whether the @rule returned with a value, or whether it awaited on another
+    // generator with `await Get(...)`.
+    if result_type == context.core.types.coroutine {
+      // Repeatedly iterate the coroutine until it returns or raises an exception.
+      result_val = Self::generate(context.clone(), params, entry, result_val)
+        .await?
+        .into_result()?;
+      result_type = externs::get_type_for(&result_val);
+    }
+    if result_type == product {
+      // The @rule has now exited with a value -- return it.
+      Ok(result_val)
+    } else {
+      // NB: This error is now a catchable exception, raising an IncorrectProductError in python
+      // code.
+      Err(throw_type_error(&format!(
+        "{:?} returned a result value that did not satisfy its constraints (was type {:?}, should be type {:?}): {:?}",
+        func, result_type, product, result_val
+      )))
+    }
+  }
 }
 
 #[async_trait]
@@ -990,17 +1055,29 @@ impl WrappedNode for Task {
   type Item = PythonRuleOutput;
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<PythonRuleOutput> {
-    let params = self.params;
-    let deps = {
+    let Task {
+      params,
+      product,
+      task,
+      entry,
+    } = self;
+    let tasks::Task {
+      can_modify_workunit,
+      clause,
+      func,
+      ..
+    } = task;
+
+    // Inject all the params from unambiguous paths in the rule graph. Any raised exceptions are
+    // contained in an InvocationResult.
+    let deps: Vec<InvocationResult> = {
       let edges = &context
         .core
         .rule_graph
-        .edges_for_inner(&self.entry)
+        .edges_for_inner(&entry)
         .expect("edges for task exist.");
       future::try_join_all(
-        self
-          .task
-          .clause
+        clause
           .into_iter()
           .map(|type_id| {
             Select::new_from_edges(params.clone(), type_id, edges).run_wrapped_node(context.clone())
@@ -1010,46 +1087,38 @@ impl WrappedNode for Task {
       .await?
     };
 
-    let func = self.task.func;
-    let entry = self.entry;
-    let product = self.product;
-    let can_modify_workunit = self.task.can_modify_workunit;
-
-    let result_val =
-      externs::call_function(&externs::val_for(&func.0), &deps).map_err(Failure::from_py_err)?;
-    let mut result_val: Value = result_val.into();
-    let mut result_type = externs::get_type_for(&result_val);
-    if result_type == context.core.types.coroutine {
-      result_val = Self::generate(context.clone(), params, entry, result_val).await?;
-      result_type = externs::get_type_for(&result_val);
-    }
-
-    if result_type == product {
-      let (new_level, message, new_artifacts, new_metadata) = if can_modify_workunit {
+    // Execute the @rule function with its resolved params, and wrap any raised exceptions in an
+    // InvocationResult so they can be caught in a try/except block.
+    let function_call_result: InvocationResult =
+      Self::run_wrapped_node_helper(deps, &context, params, product, func, entry)
+        .await
+        .into();
+    let (new_level, message, new_artifacts, new_metadata) = {
+      // Get the returned object or raised exception as a Value, and extract any engine-aware
+      // parameters.
+      let result_val = function_call_result
+        .as_error_value_ref()
+        .map_err(|e| e.into_failure())?;
+      if can_modify_workunit {
         (
           engine_aware::EngineAwareLevel::retrieve(&context.core.types, &result_val),
           engine_aware::Message::retrieve(&context.core.types, &result_val),
           engine_aware::Artifacts::retrieve(&context.core.types, &result_val)
-            .unwrap_or_else(Vec::new),
-          engine_aware::Metadata::retrieve(&context.core.types, &result_val)
-            .unwrap_or_else(Vec::new),
+                .unwrap_or_else(Vec::new),
+            engine_aware::Metadata::retrieve(&context.core.types,
+                                             &result_val).unwrap_or_else(Vec::new),
         )
       } else {
         (None, None, Vec::new(), Vec::new())
-      };
-      Ok(PythonRuleOutput {
-        value: result_val,
-        new_level,
-        message,
+      }
+    };
+    Ok(PythonRuleOutput {
+      value: function_call_result,
+      new_level,
+      message,
         new_artifacts,
-        new_metadata,
-      })
-    } else {
-      Err(throw(&format!(
-        "{:?} returned a result value that did not satisfy its constraints: {:?}",
-        func, result_val
-      )))
-    }
+        new_metadata
+    })
   }
 }
 
@@ -1280,7 +1349,7 @@ impl Node for NodeKey {
       let mut user_metadata = Vec::new();
 
       let context2 = context.clone();
-      let mut result = match self {
+      let result = match self {
         NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::DownloadedFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::MultiPlatformExecuteProcess(n) => {
@@ -1298,10 +1367,18 @@ impl Node for NodeKey {
             .map_ok(NodeOutput::DirectoryListing)
             .await
         }
-        NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
+        NodeKey::Select(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(NodeOutput::InvocationResult)
+            .await
+        }
         NodeKey::Snapshot(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::Paths(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Paths).await,
-        NodeKey::SessionValues(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
+        NodeKey::SessionValues(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(NodeOutput::InvocationResult)
+            .await
+        }
         NodeKey::Task(n) => {
           n.run_wrapped_node(context)
             .map_ok(|python_rule_output| {
@@ -1311,22 +1388,47 @@ impl Node for NodeKey {
               message = python_rule_output.message;
               artifacts = python_rule_output.new_artifacts;
               user_metadata = python_rule_output.new_metadata;
-              NodeOutput::Value(python_rule_output.value)
+              NodeOutput::InvocationResult(python_rule_output.value)
             })
             .await
         }
       };
 
-      result = result.map_err(|failure| failure.with_pushed_frame(&failure_name));
+      // Flatten any exceptions into an InvocationResult, but keep everything else unchanged.
+      let (result, was_failure): (NodeOutput, bool) = match result {
+        Ok(result) => match result {
+          NodeOutput::InvocationResult(result) => match result {
+            InvocationResult::SuccessfulReturn(val) => (
+              NodeOutput::InvocationResult(InvocationResult::SuccessfulReturn(val)),
+              false,
+            ),
+            InvocationResult::Exception(failure) => (
+              // If an @rule raised or re-raised an exception.
+              NodeOutput::InvocationResult(InvocationResult::Exception(
+                // Ensure that the engine stacktrace covers the current frame.
+                failure.with_pushed_frame(&failure_name),
+              )),
+              true,
+            ),
+          },
+          x => (x, false),
+        },
+        Err(failure) => (
+          // If there was a failure with an intrinsic or any of the other NodeKeys above.
+          NodeOutput::InvocationResult(InvocationResult::Exception(
+            // Ensure that the engine stacktrace covers the current frame.
+            failure.with_pushed_frame(&failure_name),
+          )),
+          true,
+        ),
+      };
 
-      // If both the Node and the watch failed, prefer the Node's error message.
-      match (&result, maybe_watch) {
-        (Ok(_), Ok(_)) => {}
-        (Err(_), _) => {}
-        (Ok(_), Err(e)) => {
-          result = Err(e);
-        }
-      }
+      // If both the Node and the watch failed, prefer the Node's error message. If *only* the watch
+      // failed, then use that one.
+      let result: Result<NodeOutput, Failure> = match (was_failure, maybe_watch) {
+        (false, Err(e)) => Err(e),
+        _ => Ok(result),
+      };
 
       let session = context2.session;
       let final_metadata = WorkunitMetadata {
@@ -1437,7 +1539,7 @@ pub enum NodeOutput {
   LinkDest(LinkDest),
   ProcessResult(Box<ProcessResult>),
   Paths(Arc<Vec<PathStat>>),
-  Value(Value),
+  InvocationResult(InvocationResult),
 }
 
 impl NodeOutput {
@@ -1450,7 +1552,7 @@ impl NodeOutput {
       NodeOutput::DirectoryListing(_)
       | NodeOutput::LinkDest(_)
       | NodeOutput::Paths(_)
-      | NodeOutput::Value(_) => vec![],
+      | NodeOutput::InvocationResult(_) => vec![],
     }
   }
 }
@@ -1460,8 +1562,8 @@ impl TryFrom<NodeOutput> for PythonRuleOutput {
 
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeOutput::Value(v) => Ok(PythonRuleOutput {
-        value: v,
+      NodeOutput::InvocationResult(r) => Ok(PythonRuleOutput {
+        value: r,
         new_level: None,
         message: None,
         new_artifacts: Vec::new(),
@@ -1472,12 +1574,12 @@ impl TryFrom<NodeOutput> for PythonRuleOutput {
   }
 }
 
-impl TryFrom<NodeOutput> for Value {
+impl TryFrom<NodeOutput> for InvocationResult {
   type Error = ();
 
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeOutput::Value(v) => Ok(v),
+      NodeOutput::InvocationResult(v) => Ok(v),
       _ => Err(()),
     }
   }

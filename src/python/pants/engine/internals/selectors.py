@@ -208,7 +208,7 @@ class Get(GetConstraints, Generic[_Output, _Input]):
     ) -> "Generator[Get[_Output, _Input], None, _Output]":
         """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
-        The `yield`ed value `self` is interpreted by the engine within `extern_generator_send()` in
+        The `yield`ed value `self` is interpreted by the engine within `generator_send()` in
         `native.py`. This class will yield a single Get instance, which is converted into
         `PyGeneratorResponse::Get` from `externs.rs` via the python `cffi` library and the rust
         `cbindgen` crate.
@@ -219,8 +219,8 @@ class Get(GetConstraints, Generic[_Output, _Input]):
         - The engine will call `.send(None)` on the coroutine, which will either:
           - raise StopIteration with a value (if the coroutine `return`s), or
           - return a `Get` instance to the engine (if the rule instead called `await Get(...)`).
-        - The engine will fulfill the `Get` request to produce `x`, then call `.send(x)` and repeat the
-          above until StopIteration.
+        - The engine will fulfill the `Get` request to produce `x`, then call `.send(x)` and repeat
+          the above until StopIteration.
 
         See more information about implementing this method at
         https://www.python.org/dev/peps/pep-0492/#await-expression.
@@ -401,7 +401,7 @@ async def MultiGet(  # noqa: F811
     """Yield a tuple of Get instances all at once.
 
     The `yield`ed value `self.gets` is interpreted by the engine within
-    `extern_generator_send()` in `native.py`. This class will yield a tuple of Get instances,
+    `generator_send()` in `native.py`. This class will yield a tuple of Get instances,
     which is converted into `PyGeneratorResponse::GetMulti` from `externs.rs`.
 
     The engine will fulfill these Get instances in parallel, and return a tuple of _Output

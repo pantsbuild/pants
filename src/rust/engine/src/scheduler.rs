@@ -12,7 +12,7 @@ use futures::{future, FutureExt};
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
-use crate::externs;
+use crate::externs::{self, InvocationResult};
 use crate::nodes::{NodeKey, Select, Visualizer};
 
 use cpython::Python;
@@ -82,7 +82,7 @@ struct InnerSession {
   // The unique id for this Session: used for metrics gathering purposes.
   build_id: String,
   // Per-Session values that have been set for this session.
-  session_values: Mutex<Value>,
+  session_values: Mutex<InvocationResult>,
   // An id used to control the visibility of uncacheable rules. Generally this is identical for an
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
@@ -104,7 +104,7 @@ impl Session {
     should_render_ui: bool,
     build_id: String,
     should_report_workunits: bool,
-    session_values: Value,
+    session_values: InvocationResult,
   ) -> Session {
     let workunit_store = WorkunitStore::new(!should_render_ui);
     let display = Mutex::new(if should_render_ui {
@@ -163,7 +163,7 @@ impl Session {
     roots.keys().map(|r| r.clone().into()).collect()
   }
 
-  pub fn session_values(&self) -> Value {
+  pub fn session_values(&self) -> InvocationResult {
     self.0.session_values.lock().clone()
   }
 
@@ -447,12 +447,13 @@ impl Scheduler {
       (result, None)
     };
 
-    Ok((
-      result
-        .try_into()
-        .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {:?}", e)),
-      last_observed,
-    ))
+    let invocation_result = result
+      .try_into()
+      .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {:?}", e));
+    match invocation_result {
+      InvocationResult::Exception(err) => Err(err),
+      InvocationResult::SuccessfulReturn(val) => Ok((val, last_observed)),
+    }
   }
 
   ///

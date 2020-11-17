@@ -15,12 +15,11 @@ mod interface;
 mod interface_tests;
 
 use std::collections::BTreeMap;
-use std::convert::AsRef;
-use std::convert::TryInto;
+use std::convert::{AsRef, Into, TryInto};
 use std::fmt;
 use std::sync::atomic;
 
-use crate::core::{Failure, Key, TypeId, Value};
+use crate::core::{Failure, InternalFailure, Key, TypeId, Value};
 use crate::interning::Interns;
 
 use cpython::{
@@ -274,8 +273,12 @@ pub fn val_to_log_level(obj: &PyObject) -> Result<log::Level, String> {
   res.map(|py_level| py_level.into())
 }
 
-pub fn create_exception(msg: &str) -> Value {
-  Value::from(with_externs(|py, e| e.call_method(py, "create_exception", (msg,), None)).unwrap())
+pub fn create_value_error(msg: &str) -> Value {
+  Value::from(with_externs(|py, e| e.call_method(py, "create_value_error", (msg,), None)).unwrap())
+}
+
+pub fn create_type_error(msg: &str) -> Value {
+  Value::from(with_externs(|py, e| e.call_method(py, "create_type_error", (msg,), None)).unwrap())
 }
 
 pub fn check_for_python_none(value: PyObject) -> Option<PyObject> {
@@ -295,24 +298,99 @@ pub fn call_method(value: &PyObject, method: &str, args: &[Value]) -> Result<PyO
   value.call_method(gil.python(), method, args_tuple, None)
 }
 
-pub fn call_function<T: AsRef<PyObject>>(func: T, args: &[Value]) -> Result<PyObject, PyErr> {
-  let func: &PyObject = func.as_ref();
+///
+/// The result of an intrinsic or @rule is contained in this struct, depending on whether it returns
+/// a value, or raises an exception. This is *not* a Result, because most of the time we want to
+/// pass an exception from one coroutine or functional call right back into a "parent" coroutine,
+/// which allows for try/except handling within an `await Get(...)`.
+///
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum InvocationResult {
+  SuccessfulReturn(Value),
+  Exception(Failure),
+}
+
+impl From<Result<PyObject, PyErr>> for InvocationResult {
+  fn from(other: Result<PyObject, PyErr>) -> Self {
+    let value_result: Result<Value, Failure> = match other {
+      Ok(obj) => Ok(Value::from(obj)),
+      Err(err) => Err(Failure::from_py_err(err)),
+    };
+    value_result.into()
+  }
+}
+
+impl From<Result<Value, Failure>> for InvocationResult {
+  fn from(other: Result<Value, Failure>) -> Self {
+    match other {
+      Ok(obj) => InvocationResult::SuccessfulReturn(obj),
+      Err(err) => InvocationResult::Exception(err),
+    }
+  }
+}
+
+impl From<Result<Vec<Value>, Failure>> for InvocationResult {
+  fn from(other: Result<Vec<Value>, Failure>) -> Self {
+    match other {
+      Ok(new_values) => InvocationResult::SuccessfulReturn(store_tuple(new_values)),
+      Err(err) => InvocationResult::Exception(err),
+    }
+  }
+}
+
+impl InvocationResult {
+  pub fn into_result(self) -> Result<Value, Failure> {
+    match self {
+      InvocationResult::SuccessfulReturn(val) => Ok(val),
+      InvocationResult::Exception(failure) => Err(failure),
+    }
+  }
+
+  ///
+  /// Get a handle to the inner value (which may be an exception).
+  ///
+  pub fn as_error_value_ref(&self) -> Result<&Value, InternalFailure> {
+    match self {
+      InvocationResult::SuccessfulReturn(val) => Ok(val),
+      InvocationResult::Exception(err) => err.as_py_err(),
+    }
+  }
+}
+
+pub fn call_function(func: &PyObject, args: &[Value]) -> Result<PyObject, PyErr> {
   let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let gil = Python::acquire_gil();
   let args_tuple = PyTuple::new(gil.python(), &arg_handles);
   func.call(gil.python(), args_tuple, None)
 }
 
-pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
-  let response = with_externs(|py, e| {
-    e.call_method(
-      py,
-      "generator_send",
-      (generator as &PyObject, arg as &PyObject),
-      None,
-    )
-    .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))
-  })?;
+///
+/// Call the .send() or .throw() method of the coroutine, depending upon whether the result was a
+/// thrown exception.
+///
+pub fn generator_send(
+  generator: &Value,
+  arg: InvocationResult,
+) -> Result<GeneratorResponse, Failure> {
+  let response: PyObject = {
+    let input: &Value = match &arg {
+      // If we last received an raised exception from an inner coroutine, extract the exception
+      // value, and send it to the current coroutine.
+      InvocationResult::Exception(err) => err.as_py_err().map_err(|e| e.into_failure())?,
+      InvocationResult::SuccessfulReturn(obj) => obj,
+    };
+    with_externs(|py, e| {
+      e.call_method(
+        py,
+        "generator_send",
+        (generator as &PyObject, input as &PyObject),
+        None,
+      )
+      // An exception should never be raised within the generator_send() method, so we want to
+      // propagate it to the top level, and *not* treat it as a value.
+      .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))
+    })?
+  };
 
   let gil = Python::acquire_gil();
   let py = gil.python();
@@ -345,6 +423,31 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
         .collect::<Result<Vec<_>, _>>()?;
       Ok(GeneratorResponse::GetMulti(gets))
     })
+  } else if let Ok(throw) = response.cast_as::<PyGeneratorResponseThrow>(py) {
+    let new_err_val = Value::new(throw.err(py).clone_ref(py));
+    match arg {
+      InvocationResult::Exception(err) => {
+        // If this is the same error that we previously sent, then just return the previous error to
+        // preserve the stacktraces.
+        let err_is_same_as_last_time = err
+          .as_py_err()
+          .map(|previous_err_val| previous_err_val == &new_err_val)
+          .unwrap_or(false);
+        if err_is_same_as_last_time {
+          Ok(GeneratorResponse::Throw(err))
+        } else {
+          // Otherwise, the error was handled, but another error was raised in that handling, so we
+          // create a new Failure instance, and join the tracebacks.
+          let new_failure = Failure::from_py_err_value(new_err_val);
+          let joined_failure = err.join_tracebacks(new_failure);
+          Ok(GeneratorResponse::Throw(joined_failure))
+        }
+      }
+      // We didn't have an error before, but we do now, so just return a new Failure instance.
+      InvocationResult::SuccessfulReturn(_) => Ok(GeneratorResponse::Throw(
+        Failure::from_py_err_value(new_err_val),
+      )),
+    }
   } else {
     panic!("generator_send returned unrecognized type: {:?}", response);
   }
@@ -448,6 +551,13 @@ py_class!(pub class PyGeneratorResponseGetMulti |py| {
     }
 });
 
+py_class!(pub class PyGeneratorResponseThrow |py| {
+    data err: PyObject;
+    def __new__(_cls, err: PyObject) -> CPyResult<Self> {
+      Self::create_instance(py, err)
+    }
+});
+
 #[derive(Debug)]
 pub struct Get {
   pub output: TypeId,
@@ -480,6 +590,7 @@ impl fmt::Display for Get {
 
 pub enum GeneratorResponse {
   Break(Value),
+  Throw(Failure),
   Get(Get),
   GetMulti(Vec<Get>),
 }

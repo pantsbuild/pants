@@ -3,7 +3,9 @@
 
 import logging
 import os
-from typing import Dict, Iterable, List, Mapping, Optional, Tuple, Union, cast
+from traceback import TracebackException
+from types import ModuleType
+from typing import Any, Coroutine, Dict, Iterable, List, Mapping, Optional, Tuple, Type, Union, cast
 
 from typing_extensions import Protocol
 
@@ -17,6 +19,7 @@ from pants.engine.internals.native_engine import (
     PyGeneratorResponseBreak,
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
+    PyGeneratorResponseThrow,
     PyNailgunClient,
     PyNailgunServer,
     PyRemotingOptions,
@@ -35,35 +38,72 @@ from pants.util.meta import SingletonMetaclass
 logger = logging.getLogger(__name__)
 
 
+class IntrinsicError(ValueError):
+    """Exceptions raised for failures within intrinsic methods implemented in Rust."""
+
+
+class IncorrectProductError(TypeError):
+    """Exceptions raised when a rule's return value doesn't match its declared type."""
+
+
 class Externs:
     """Methods exposed from Python to Rust.
 
     TODO: These could be implemented in Rust in `externs.rs` via the cpython API.
     """
 
-    def __init__(self, lib):
+    def __init__(self, lib: ModuleType):
         self.lib = lib
 
+    # NB: This flag is exposed for testing error handling in CFFI methods. This should never be set
+    # in normal pants usage.
     _do_raise_keyboardinterrupt = bool(os.environ.get("_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS", False))
 
-    def is_union(self, input_type):
+    def is_union(self, input_type: Type) -> bool:
         """Return whether or not a type is a member of a union."""
         # NB: This check is exposed for testing error handling in CFFI methods. This code path should
         # never be active in normal pants usage.
         return union.is_instance(input_type)
 
-    def create_exception(self, msg):
-        """Given a utf8 message string, create an Exception object."""
-        return Exception(msg)
+    def create_value_error(self, msg: str) -> IntrinsicError:
+        """Given a utf8 message string, create an exception signalling a value error."""
+        return IntrinsicError(msg)
+
+    def create_type_error(self, msg: str) -> IncorrectProductError:
+        """Given a utf8 message string, create an exception signalling a type error."""
+        return IncorrectProductError(msg)
+
+    # A specification for how the native engine interacts with @rule coroutines:
+    # - coroutines may await on a `Get` or a tuple of `Get`.
+    # - we will send back a single `Any` or a tuple of `Any`, depending upon the variant of `Get`.
+    # - a coroutine will eventually return a single `Any`.
+    RuleSend = Union[Any, Tuple[Any, ...]]
+    RuleYield = Union[Get, Tuple[Get, ...]]
+    RuleCoroutine = Coroutine[RuleSend, RuleYield, Any]
+    NativeEngineGeneratorResponse = Union[
+        PyGeneratorResponseGet,
+        PyGeneratorResponseGetMulti,
+        PyGeneratorResponseBreak,
+        PyGeneratorResponseThrow,
+    ]
 
     def generator_send(
-        self, func, arg
-    ) -> Union[PyGeneratorResponseGet, PyGeneratorResponseGetMulti, PyGeneratorResponseBreak]:
-        """Given a generator, send it the given value and return a response."""
+        self,
+        func: RuleCoroutine,
+        arg: Union[RuleSend, Exception],
+    ) -> NativeEngineGeneratorResponse:
+        """Given a generator, send it the given value and return a response.
+
+        We can send a coroutine a single object, a tuple, or an exception.
+
+        We send coroutines inputs as the result of an `await Get(...)`. An exception occurs here
+        when any @rule or intrinsic called within an `await Get(...)` raises an exception instead of
+        returning a value.
+        """
         if self._do_raise_keyboardinterrupt:
             raise KeyboardInterrupt("ctrl-c interrupted execution of a ffi method!")
         try:
-            res = func.send(arg)
+            res = func.throw(arg) if isinstance(arg, Exception) else func.send(arg)
 
             if isinstance(res, Get):
                 # Get.
@@ -72,7 +112,7 @@ class Externs:
                     declared_subject=res.input_type,
                     subject=res.input,
                 )
-            elif type(res) in (tuple, list):
+            elif isinstance(res, tuple):
                 # GetMulti.
                 return PyGeneratorResponseGetMulti(
                     gets=tuple(
@@ -85,13 +125,19 @@ class Externs:
                     )
                 )
             else:
-                raise ValueError(f"internal engine error: unrecognized coroutine result {res}")
-        except StopIteration as e:
-            if not e.args:
-                raise
-            # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
-            # by calling `next()` on an empty iterator.
-            return PyGeneratorResponseBreak(val=e.value)
+                raise ValueError(f"Internal engine error: unrecognized coroutine result {res}")
+        except Exception as e:
+            if isinstance(e, StopIteration) and e.args:
+                # This was a `return` from a coroutine, as opposed to a `StopIteration` raised by
+                # calling `next()` on an empty iterator.
+                return PyGeneratorResponseBreak(val=e.value)
+            # Read the stack, and place it into an attribute on the exception object. This is
+            # consumed within the rust code to produce a combined stacktrace in cases where an
+            # exception was raised while trying to handle another exception.
+            wrapped = TracebackException.from_exception(e)
+            formatted_stack = list(wrapped.format())
+            e._formatted_stack = formatted_stack  # type: ignore[attr-defined]
+            return PyGeneratorResponseThrow(err=e)
 
 
 class RawFdRunner(Protocol):

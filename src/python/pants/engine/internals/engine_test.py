@@ -16,12 +16,14 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     FileContent,
+    MergeDigests,
     Snapshot,
 )
 from pants.engine.internals.engine_testutil import (
     assert_equal_with_printing,
     remove_locations_from_traceback,
 )
+from pants.engine.internals.native import IntrinsicError
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.platform import rules as platform_rules
@@ -169,6 +171,29 @@ def rule_C(e: Epsilon) -> Alpha:
     return Alpha()
 
 
+@dataclass(frozen=True)
+class FileInput:
+    filename: str
+
+
+@dataclass(frozen=True)
+class MergedOutput:
+    digest: Digest
+
+
+@rule
+async def catch_merge_digests_error(file_input: FileInput) -> MergedOutput:
+    # Create two separate digests writing different contents to the same file path.
+    input_1 = CreateDigest((FileContent(path=file_input.filename, content=b"yes"),))
+    input_2 = CreateDigest((FileContent(path=file_input.filename, content=b"no"),))
+    digests = await MultiGet(Get(Digest, CreateDigest, input_1), Get(Digest, CreateDigest, input_2))
+    try:
+        merged = await Get(Digest, MergeDigests(digests))
+    except IntrinsicError as e:
+        raise Exception(f"error merging digests for input {file_input}: {e}")
+    return MergedOutput(merged)
+
+
 class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     assert_equal_with_printing = assert_equal_with_printing
@@ -251,6 +276,15 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             "No installed QueryRules return the type MyFloat. Try registering QueryRule(MyFloat "
             "for MyInt)."
         ) in str(cm.exception)
+
+    def test_catch_intrinsic_error(self) -> None:
+        rules = [catch_merge_digests_error, QueryRule(MergedOutput, (FileInput,))]
+        scheduler = self.mk_scheduler(rules=rules, include_trace_on_error=False)
+        with self.assertRaises(Exception) as cm:
+            scheduler.product_request(MergedOutput, subjects=[FileInput("some-file.txt")])
+        assert "error merging digests for input FileInput(filename='some-file.txt')" in str(
+            cm.exception
+        )
 
 
 @dataclass
