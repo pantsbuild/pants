@@ -142,9 +142,10 @@ impl Select {
         ))
       })?;
     let context = context.clone();
-    let result: Result<Value, Failure> = Select::new_from_edges(self.params.clone(), product, &edges)
-      .run_wrapped_node(context)
-      .await?;
+    let result: Result<Value, Failure> =
+      Select::new_from_edges(self.params.clone(), product, &edges)
+        .run_wrapped_node(context)
+        .await?;
     result
   }
 }
@@ -967,9 +968,11 @@ impl Task {
           let results = Self::gen_get(&context, &params, &entry, gets).await?;
           // If any of the sub-Gets fail, we return the result of the first failing Get in the given
           // sequence as an Result<Value, Failure>, and discard the rest.
-          input = Ok(externs::store_tuple(results
-            .into_iter()
-            .collect::<Result<Vec<Value>, Failure>>()?));
+          input = Ok(externs::store_tuple(
+            results
+              .into_iter()
+              .collect::<Result<Vec<Value>, Failure>>()?,
+          ));
         }
         externs::GeneratorResponse::Break(val) => {
           break Ok(Ok(val));
@@ -1018,8 +1021,10 @@ impl Task {
         .into_iter()
         .collect::<Result<Vec<Value>, Failure>>()?;
       // The params were all successfully collected, now call the current @rule function with them.
-      let result: Result<Value, Failure> =
-        externs::into_value_result(externs::call_function(&externs::val_for(&func.0), &param_deps));
+      let result: Result<Value, Failure> = externs::into_value_result(externs::call_function(
+        &externs::val_for(&func.0),
+        &param_deps,
+      ));
       // If the result of calling the current @rule was an exception, exit with that.
       result?
     };
@@ -1087,7 +1092,7 @@ impl WrappedNode for Task {
     let function_call_result: Result<Value, Failure> =
       Self::run_wrapped_node_helper(deps, &context, params, product, func, entry)
         .await
-          .into();
+        .into();
     let function_call_result2 = function_call_result.clone();
     let (new_level, message, new_artifacts, new_metadata) = {
       // Get the returned object or raised exception as a Value, and extract any engine-aware
@@ -1098,9 +1103,9 @@ impl WrappedNode for Task {
           engine_aware::EngineAwareLevel::retrieve(&context.core.types, &result_val),
           engine_aware::Message::retrieve(&context.core.types, &result_val),
           engine_aware::Artifacts::retrieve(&context.core.types, &result_val)
-                .unwrap_or_else(Vec::new),
-            engine_aware::Metadata::retrieve(&context.core.types,
-                                             &result_val).unwrap_or_else(Vec::new),
+            .unwrap_or_else(Vec::new),
+          engine_aware::Metadata::retrieve(&context.core.types, &result_val)
+            .unwrap_or_else(Vec::new),
         )
       } else {
         (None, None, Vec::new(), Vec::new())
@@ -1110,8 +1115,8 @@ impl WrappedNode for Task {
       value: function_call_result2,
       new_level,
       message,
-        new_artifacts,
-        new_metadata
+      new_artifacts,
+      new_metadata,
     })
   }
 }
@@ -1343,7 +1348,7 @@ impl Node for NodeKey {
       let mut user_metadata = Vec::new();
 
       let context2 = context.clone();
-      let result = match self {
+      let mut result = match self {
         NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::DownloadedFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::MultiPlatformExecuteProcess(n) => {
@@ -1361,18 +1366,10 @@ impl Node for NodeKey {
             .map_ok(NodeOutput::DirectoryListing)
             .await
         }
-        NodeKey::Select(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::Result)
-            .await
-        }
+        NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Result).await,
         NodeKey::Snapshot(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::Paths(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Paths).await,
-        NodeKey::SessionValues(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::Result)
-            .await
-        }
+        NodeKey::SessionValues(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Result).await,
         NodeKey::Task(n) => {
           n.run_wrapped_node(context)
             .map_ok(|python_rule_output| {
@@ -1389,39 +1386,14 @@ impl Node for NodeKey {
       };
 
       // Flatten any exceptions into an InvocationResult, but keep everything else unchanged.
-      let (result, was_failure): (NodeOutput, bool) = match result {
-        Ok(result) => match result {
-          NodeOutput::Result(result) => match result {
-            Ok(val) => (
-              NodeOutput::Result(Ok(val)),
-              false,
-            ),
-            Err(failure) => (
-              // If an @rule raised or re-raised an exception.
-              NodeOutput::Result(
-                // Ensure that the engine stacktrace covers the current frame.
-                Err(failure.with_pushed_frame(&failure_name)),
-              ),
-              true,
-            ),
-          },
-          x => (x, false),
-        },
-        Err(failure) => (
-          // If there was a failure with an intrinsic or any of the other NodeKeys above.
-          NodeOutput::Result(
-            // Ensure that the engine stacktrace covers the current frame.
-            Err(failure.with_pushed_frame(&failure_name)),
-          ),
-          true,
-        ),
-      };
+      result = result.map_err(|failure| failure.with_pushed_frame(&failure_name));
+      let was_failure = !result.is_ok();
 
       // If both the Node and the watch failed, prefer the Node's error message. If *only* the watch
       // failed, then use that one.
       let result: Result<NodeOutput, Failure> = match (was_failure, maybe_watch) {
         (false, Err(e)) => Err(e),
-        _ => Ok(result),
+        _ => result,
       };
 
       let session = context2.session;

@@ -413,10 +413,5 @@ fn digest_subset_to_digest(
 }
 
 fn session_values(context: Context, _args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
-  async move {
-    context
-      .get(SessionValues)
-      .await?
-  }
-  .boxed()
+  async move { context.get(SessionValues).await? }.boxed()
 }

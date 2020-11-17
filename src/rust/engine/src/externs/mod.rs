@@ -299,10 +299,10 @@ pub fn call_method(value: &PyObject, method: &str, args: &[Value]) -> Result<PyO
 }
 
 pub fn into_value_result(py_result: Result<PyObject, PyErr>) -> Result<Value, Failure> {
-    match py_result {
-      Ok(obj) => Ok(Value::from(obj)),
-      Err(err) => Err(Failure::from_py_err(err)),
-    }
+  match py_result {
+    Ok(obj) => Ok(Value::from(obj)),
+    Err(err) => Err(Failure::from_py_err(err)),
+  }
 }
 
 pub fn call_function(func: &PyObject, args: &[Value]) -> Result<PyObject, PyErr> {
@@ -374,7 +374,7 @@ pub fn generator_send(
   } else if let Ok(throw) = response.cast_as::<PyGeneratorResponseThrow>(py) {
     let new_err_val = Value::new(throw.err(py).clone_ref(py));
     match arg {
-        Err(err) => {
+      Err(err) => {
         // If this is the same error that we previously sent, then just return the previous error to
         // preserve the stacktraces.
         let err_is_same_as_last_time = err
@@ -391,10 +391,10 @@ pub fn generator_send(
           Ok(GeneratorResponse::Throw(joined_failure))
         }
       }
-        // We didn't have an error before, but we do now, so just return a new Failure instance.
-        Ok(_) => Ok(GeneratorResponse::Throw(
-            Failure::from_py_err_value(new_err_val),
-        )),
+      // We didn't have an error before, but we do now, so just return a new Failure instance.
+      Ok(_) => Ok(GeneratorResponse::Throw(Failure::from_py_err_value(
+        new_err_val,
+      ))),
     }
   } else {
     panic!("generator_send returned unrecognized type: {:?}", response);
