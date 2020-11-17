@@ -19,7 +19,7 @@ use std::convert::{AsRef, Into, TryInto};
 use std::fmt;
 use std::sync::atomic;
 
-use crate::core::{Failure, InternalFailure, Key, TypeId, Value};
+use crate::core::{Failure, Key, TypeId, Value};
 use crate::interning::Interns;
 
 use cpython::{
@@ -349,7 +349,7 @@ impl InvocationResult {
   ///
   /// Get a handle to the inner value (which may be an exception).
   ///
-  pub fn as_error_value_ref(&self) -> Result<&Value, InternalFailure> {
+  pub fn as_error_value_ref(&self) -> Result<&Value, Failure> {
     match self {
       InvocationResult::SuccessfulReturn(val) => Ok(val),
       InvocationResult::Exception(err) => err.as_py_err(),
@@ -376,7 +376,7 @@ pub fn generator_send(
     let input: &Value = match &arg {
       // If we last received an raised exception from an inner coroutine, extract the exception
       // value, and send it to the current coroutine.
-      InvocationResult::Exception(err) => err.as_py_err().map_err(|e| e.into_failure())?,
+      InvocationResult::Exception(err) => err.as_py_err()?,
       InvocationResult::SuccessfulReturn(obj) => obj,
     };
     with_externs(|py, e| {

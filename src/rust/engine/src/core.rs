@@ -346,21 +346,6 @@ pub enum Failure {
   },
 }
 
-///
-/// Because we may represent either an internal error or a normal raised python exception with a
-/// Failure instance, we want to make it explicit when we convert a Failure into a Value. In that
-/// case, we wrap a Failure which cannot be converted into a Value (such as a Failure::Invalidated)
-/// with an InternalFailure instance, which ensures that we propagate it to the top level without
-/// exposing it to python code.
-///
-pub struct InternalFailure(Failure);
-
-impl InternalFailure {
-  pub fn into_failure(self) -> Failure {
-    self.0
-  }
-}
-
 impl Failure {
   ///
   /// Consumes this Failure to produce a new Failure with an additional engine_traceback entry.
@@ -426,9 +411,9 @@ impl Failure {
   ///
   /// Get a handle to the exception Value, if applicable, or wrap this in an InternalFailure.
   ///
-  pub fn as_py_err(&self) -> Result<&Value, InternalFailure> {
+  pub fn as_py_err(&self) -> Result<&Value, Failure> {
     match self {
-      Failure::Invalidated => Err(InternalFailure(Failure::Invalidated)),
+      Failure::Invalidated => Err(Failure::Invalidated),
       Failure::Throw { val, .. } => Ok(val),
     }
   }

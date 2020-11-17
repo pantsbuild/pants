@@ -1097,8 +1097,7 @@ impl WrappedNode for Task {
       // Get the returned object or raised exception as a Value, and extract any engine-aware
       // parameters.
       let result_val = function_call_result
-        .as_error_value_ref()
-        .map_err(|e| e.into_failure())?;
+        .as_error_value_ref()?;
       if can_modify_workunit {
         (
           engine_aware::EngineAwareLevel::retrieve(&context.core.types, &result_val),
