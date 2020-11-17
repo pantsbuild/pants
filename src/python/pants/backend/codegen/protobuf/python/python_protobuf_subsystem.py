@@ -53,6 +53,16 @@ class PythonProtobufSubsystem(Subsystem):
                 "`--mypy-plugin` for this option to be used."
             ),
         )
+        register(
+            "--dependency-inference",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "Infer when Python code depends on generated Protobuf files. This requires that "
+                "`[python-infer].inits` is also true (the default)."
+            ),
+        )
 
     @property
     def runtime_dependencies(self) -> UnparsedAddressInputs:
@@ -65,6 +75,10 @@ class PythonProtobufSubsystem(Subsystem):
     @property
     def mypy_plugin_version(self) -> str:
         return cast(str, self.options.mypy_plugin_version)
+
+    @property
+    def dependency_inference(self) -> bool:
+        return cast(bool, self.options.dependency_inference)
 
 
 class InjectPythonProtobufDependencies(InjectDependenciesRequest):
