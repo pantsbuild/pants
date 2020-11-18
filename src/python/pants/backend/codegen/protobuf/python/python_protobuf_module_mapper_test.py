@@ -5,16 +5,13 @@ import pytest
 
 from pants.backend.codegen.protobuf.python import additional_fields, python_protobuf_module_mapper
 from pants.backend.codegen.protobuf.python.python_protobuf_module_mapper import (
-    PythonProtobufMappingRequest,
+    PythonProtobufMappingMarker,
 )
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
-from pants.backend.python.dependency_inference.module_mapper import (
-    PythonFirstPartyModuleMappingPlugin,
-)
+from pants.backend.python.dependency_inference.module_mapper import FirstPartyPythonMappingImpl
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -24,7 +21,7 @@ def rule_runner() -> RuleRunner:
             *additional_fields.rules(),
             *stripped_source_files.rules(),
             *python_protobuf_module_mapper.rules(),
-            QueryRule(PythonFirstPartyModuleMappingPlugin, [PythonProtobufMappingRequest]),
+            QueryRule(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker]),
         ],
         target_types=[ProtobufLibrary],
     )
@@ -47,14 +44,12 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         "root1/tests", "protobuf_library(grpc=True, python_source_root='root3')"
     )
 
-    result = rule_runner.request(
-        PythonFirstPartyModuleMappingPlugin, [PythonProtobufMappingRequest()]
-    )
-    assert result.mapping == FrozenDict(
+    result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
+    assert result == FirstPartyPythonMappingImpl(
         {
-            "protos.f1_pb2": Address("root1/protos", relative_file_path="f1.proto"),
-            "protos.f2_pb2": Address("root1/protos", relative_file_path="f2.proto"),
-            "tests.f_pb2": Address("root1/tests", relative_file_path="f.proto"),
-            "tests.f_pb2_grpc": Address("root1/tests", relative_file_path="f.proto"),
+            "protos.f1_pb2": (Address("root1/protos", relative_file_path="f1.proto"),),
+            "protos.f2_pb2": (Address("root1/protos", relative_file_path="f2.proto"),),
+            "tests.f_pb2": (Address("root1/tests", relative_file_path="f.proto"),),
+            "tests.f_pb2_grpc": (Address("root1/tests", relative_file_path="f.proto"),),
         }
     )

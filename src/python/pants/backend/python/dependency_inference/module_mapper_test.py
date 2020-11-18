@@ -10,17 +10,16 @@ import pytest
 from pants.backend.codegen.protobuf.python import python_protobuf_module_mapper
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.dependency_inference.module_mapper import (
-    PythonFirstPartyModuleMapping,
+    FirstPartyPythonModuleMapping,
     PythonModule,
     PythonModuleOwners,
-    PythonThirdPartyModuleMapping,
+    ThirdPartyPythonModuleMapping,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.frozendict import FrozenDict
 
 
 @pytest.mark.parametrize(
@@ -42,8 +41,8 @@ def test_create_module_from_path(stripped_path: PurePath, expected: str) -> None
 def test_first_party_modules_mapping() -> None:
     util_addr = Address("src/python/util", relative_file_path="strutil.py")
     test_addr = Address("tests/python/project_test", relative_file_path="test.py")
-    mapping = PythonFirstPartyModuleMapping(
-        FrozenDict({"util.strutil": (util_addr,), "project_test.test": (test_addr,)})
+    mapping = FirstPartyPythonModuleMapping(
+        {"util.strutil": (util_addr,), "project_test.test": (test_addr,)}
     )
     assert mapping.addresses_for_module("util.strutil") == (util_addr,)
     assert mapping.addresses_for_module("util.strutil.ensure_text") == (util_addr,)
@@ -58,9 +57,7 @@ def test_first_party_modules_mapping() -> None:
 def test_third_party_modules_mapping() -> None:
     colors_addr = Address("", target_name="ansicolors")
     pants_addr = Address("", target_name="pantsbuild")
-    mapping = PythonThirdPartyModuleMapping(
-        FrozenDict({"colors": colors_addr, "pants": pants_addr})
-    )
+    mapping = ThirdPartyPythonModuleMapping({"colors": colors_addr, "pants": pants_addr})
     assert mapping.address_for_module("colors") == colors_addr
     assert mapping.address_for_module("colors.red") == colors_addr
     assert mapping.address_for_module("pants") == pants_addr
@@ -76,8 +73,8 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *module_mapper_rules(),
             *python_protobuf_module_mapper.rules(),
-            QueryRule(PythonFirstPartyModuleMapping, []),
-            QueryRule(PythonThirdPartyModuleMapping, []),
+            QueryRule(FirstPartyPythonModuleMapping, []),
+            QueryRule(ThirdPartyPythonModuleMapping, []),
             QueryRule(PythonModuleOwners, [PythonModule]),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary, ProtobufLibrary],
@@ -116,8 +113,8 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         ),
     )
 
-    result = rule_runner.request(PythonFirstPartyModuleMapping, [])
-    assert result.mapping == FrozenDict(
+    result = rule_runner.request(FirstPartyPythonModuleMapping, [])
+    assert result == FirstPartyPythonModuleMapping(
         {
             "project.util.dirutil": (
                 Address("src/python/project/util", relative_file_path="dirutil.py"),
@@ -169,8 +166,8 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    result = rule_runner.request(PythonThirdPartyModuleMapping, [])
-    assert result.mapping == FrozenDict(
+    result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
+    assert result == ThirdPartyPythonModuleMapping(
         {
             "colors": Address("3rdparty/python", target_name="ansicolors"),
             "local_dist": Address("3rdparty/python", target_name="direct_references"),
