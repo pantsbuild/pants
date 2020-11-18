@@ -85,21 +85,26 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         ["--source-root-patterns=['src/python', 'tests/python', 'build-support']"]
     )
+
     # Two modules belonging to the same target. We should generate subtargets for each file.
     rule_runner.create_files("src/python/project/util", ["dirutil.py", "tarutil.py"])
     rule_runner.add_to_build_file("src/python/project/util", "python_library()")
+
     # A module with two owners, meaning that neither should be resolved.
     rule_runner.create_file("src/python/two_owners.py")
     rule_runner.add_to_build_file("src/python", "python_library()")
     rule_runner.create_file("build-support/two_owners.py")
     rule_runner.add_to_build_file("build-support", "python_library()")
+
     # A package module. Because there's only one source file belonging to the target, we should
     # not generate subtargets.
     rule_runner.create_file("tests/python/project_test/demo_test/__init__.py")
     rule_runner.add_to_build_file("tests/python/project_test/demo_test", "python_library()")
+
     # A module with both an implementation and a type stub.
     rule_runner.create_files("src/python/stubs", ["stub.py", "stub.pyi"])
     rule_runner.add_to_build_file("src/python/stubs", "python_library()")
+
     # Check that plugin mappings work. Note that we duplicate one of the files with a normal
     # python_library(), which means neither the Protobuf nor Python targets should be used.
     rule_runner.create_files("src/python/protos", ["f1.proto", "f2.proto", "f2_pb2.py"])

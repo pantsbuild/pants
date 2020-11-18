@@ -120,15 +120,15 @@ async def map_first_party_python_targets_to_modules(
     _: FirstPartyPythonTargetsMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
     all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    candidate_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
+    python_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
     stripped_sources_per_target = await MultiGet(
         Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[PythonSources]))
-        for tgt in candidate_targets
+        for tgt in python_targets
     )
 
     modules_to_addresses: DefaultDict[str, List[Address]] = defaultdict(list)
     modules_with_multiple_implementations: Set[str] = set()
-    for tgt, stripped_sources in zip(candidate_targets, stripped_sources_per_target):
+    for tgt, stripped_sources in zip(python_targets, stripped_sources_per_target):
         for stripped_f in stripped_sources:
             module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
             if module in modules_to_addresses:
