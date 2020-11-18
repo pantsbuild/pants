@@ -17,6 +17,7 @@ from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesPathsRequest, Targets
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -33,50 +34,101 @@ class PythonModule:
         return cls(module_name_with_slashes.as_posix().replace("/", "."))
 
 
-@dataclass(frozen=True)
-class FirstPartyModuleToAddressMapping:
-    """A mapping of module names to owning addresses.
+# -----------------------------------------------------------------------------------------------
+# First-party module mapping
+# -----------------------------------------------------------------------------------------------
 
-    All mapped addresses will be file addresses, aka generated subtargets. That is, each target
-    will own no more than one single source file.
 
-    If there are >1 original owning targets that refer to the same module—such as `//:a` and `//:b` both owning module
-    `foo`—then we will not add any of the targets to the mapping because there is ambiguity. (We make an exception if
-    one target is an implementation (.py file) and the other is a type stub (.pyi file).
+class FirstPartyPythonMappingImpl(FrozenDict[str, Tuple[Address, ...]]):
+    """A mapping of module names to owning addresses that a specific implementation adds for Python
+    import dependency inference.
+
+    For almost every implementation, there should only be one address per module to avoid ambiguity.
+    However, the built-in implementation allows for 2 addresses when `.pyi` type stubs are used.
     """
 
-    # The mapping should either have 1 or 2 addresses per module, depending on if there is a type
-    # stub.
-    mapping: FrozenDict[str, Tuple[Address, ...]]
+
+@union
+class FirstPartyPythonMappingImplMarker:
+    """An entry point for a specific implementation of mapping module names to owning targets for
+    Python import dependency inference.
+
+    All implementations will be merged together. Any conflicting modules will be removed due to
+    ambiguity.
+
+    The addresses should all be file addresses, rather than BUILD addresses.
+    """
+
+
+class FirstPartyPythonModuleMapping(FrozenDict[str, Tuple[Address, ...]]):
+    """A merged mapping of module names to owning addresses.
+
+    This mapping may have been constructed from multiple distinct implementations, e.g.
+    implementations for each codegen backends.
+    """
 
     def addresses_for_module(self, module: str) -> Tuple[Address, ...]:
-        targets = self.mapping.get(module)
-        if targets:
-            return targets
+        addresses = self.get(module)
+        if addresses:
+            return addresses
         # If the module is not found, try the parent, if any. This is to accommodate `from`
         # imports, where we don't care about the specific symbol, but only the module. For example,
         # with `from my_project.app import App`, we only care about the `my_project.app` part.
         #
-        # We do not look past the direct parent, as this could cause multiple ambiguous owners to be resolved. This
-        # contrasts with the third-party module mapping, which will try every ancestor.
+        # We do not look past the direct parent, as this could cause multiple ambiguous owners to
+        # be resolved. This contrasts with the third-party module mapping, which will try every
+        # ancestor.
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return self.mapping.get(parent_module, ())
+        return self.get(parent_module, ())
 
 
-@rule(desc="Creating map of first party targets to Python modules", level=LogLevel.DEBUG)
-async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMapping:
+@rule(level=LogLevel.DEBUG)
+async def merge_first_party_module_mappings(
+    union_membership: UnionMembership,
+) -> FirstPartyPythonModuleMapping:
+    all_mappings = await MultiGet(
+        Get(
+            FirstPartyPythonMappingImpl,
+            FirstPartyPythonMappingImplMarker,
+            marker_cls(),
+        )
+        for marker_cls in union_membership.get(FirstPartyPythonMappingImplMarker)
+    )
+    modules_to_addresses: Dict[str, Tuple[Address, ...]] = {}
+    modules_with_multiple_implementations: Set[str] = set()
+    for mapping in all_mappings:
+        for module, addresses in mapping.items():
+            if module in modules_to_addresses:
+                modules_with_multiple_implementations.add(module)
+            else:
+                modules_to_addresses[module] = addresses
+    for module in modules_with_multiple_implementations:
+        modules_to_addresses.pop(module)
+    return FirstPartyPythonModuleMapping(sorted(modules_to_addresses.items()))
+
+
+# This is only used to register our implementation with the plugin hook via unions. Note that we
+# implement this like any other plugin implementation so that we can run them all in parallel.
+class FirstPartyPythonTargetsMappingMarker(FirstPartyPythonMappingImplMarker):
+    pass
+
+
+@rule(desc="Creating map of first party Python targets to Python modules", level=LogLevel.DEBUG)
+async def map_first_party_python_targets_to_modules(
+    _: FirstPartyPythonTargetsMappingMarker,
+) -> FirstPartyPythonMappingImpl:
     all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    candidate_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
+    python_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
     stripped_sources_per_target = await MultiGet(
         Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[PythonSources]))
-        for tgt in candidate_targets
+        for tgt in python_targets
     )
 
     modules_to_addresses: DefaultDict[str, List[Address]] = defaultdict(list)
     modules_with_multiple_implementations: Set[str] = set()
-    for tgt, stripped_sources in zip(candidate_targets, stripped_sources_per_target):
+    for tgt, stripped_sources in zip(python_targets, stripped_sources_per_target):
         for stripped_f in stripped_sources:
             module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
             if module in modules_to_addresses:
@@ -96,24 +148,22 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_implementations:
         modules_to_addresses.pop(module)
-    return FirstPartyModuleToAddressMapping(
-        FrozenDict(
-            {
-                module: tuple(sorted(addresses))
-                for module, addresses in sorted(modules_to_addresses.items())
-            }
-        )
+
+    return FirstPartyPythonMappingImpl(
+        {k: tuple(sorted(v)) for k, v in modules_to_addresses.items()}
     )
 
 
-@dataclass(frozen=True)
-class ThirdPartyModuleToAddressMapping:
-    mapping: FrozenDict[str, Address]
+# -----------------------------------------------------------------------------------------------
+# Third party module mapping
+# -----------------------------------------------------------------------------------------------
 
+
+class ThirdPartyPythonModuleMapping(FrozenDict[str, Address]):
     def address_for_module(self, module: str) -> Optional[Address]:
-        target = self.mapping.get(module)
-        if target is not None:
-            return target
+        address = self.get(module)
+        if address is not None:
+            return address
         # If the module is not found, recursively try the ancestor modules, if any. For example,
         # pants.task.task.Task -> pants.task.task -> pants.task -> pants
         if "." not in module:
@@ -123,7 +173,7 @@ class ThirdPartyModuleToAddressMapping:
 
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
-async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMapping:
+async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMapping:
     all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     modules_to_addresses: Dict[str, Address] = {}
     modules_with_multiple_owners: Set[str] = set()
@@ -144,7 +194,12 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMap
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_owners:
         modules_to_addresses.pop(module)
-    return ThirdPartyModuleToAddressMapping(FrozenDict(sorted(modules_to_addresses.items())))
+    return ThirdPartyPythonModuleMapping(sorted(modules_to_addresses.items()))
+
+
+# -----------------------------------------------------------------------------------------------
+# module -> owners
+# -----------------------------------------------------------------------------------------------
 
 
 class PythonModuleOwners(Collection[Address]):
@@ -158,15 +213,16 @@ class PythonModuleOwners(Collection[Address]):
 @rule
 async def map_module_to_address(
     module: PythonModule,
-    first_party_mapping: FirstPartyModuleToAddressMapping,
-    third_party_mapping: ThirdPartyModuleToAddressMapping,
+    first_party_mapping: FirstPartyPythonModuleMapping,
+    third_party_mapping: ThirdPartyPythonModuleMapping,
 ) -> PythonModuleOwners:
     third_party_address = third_party_mapping.address_for_module(module.module)
     first_party_addresses = first_party_mapping.addresses_for_module(module.module)
 
-    # It's possible for a user to write type stubs (`.pyi` files) for their third-party dependencies. We check if that
-    # happened, but we're strict in validating that there is only a single third party address and a single first-party
-    # address referring to a `.pyi` file; otherwise, we have ambiguous implementations, so no-op.
+    # It's possible for a user to write type stubs (`.pyi` files) for their third-party
+    # dependencies. We check if that happened, but we're strict in validating that there is only a
+    # single third party address and a single first-party address referring to a `.pyi` file;
+    # otherwise, we have ambiguous implementations, so no-op.
     third_party_resolved_only = third_party_address and not first_party_addresses
     third_party_resolved_with_type_stub = (
         third_party_address
@@ -189,4 +245,7 @@ async def map_module_to_address(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(FirstPartyPythonMappingImplMarker, FirstPartyPythonTargetsMappingMarker),
+    )

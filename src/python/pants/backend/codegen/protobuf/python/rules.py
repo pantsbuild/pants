@@ -7,7 +7,7 @@ from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.python.grpc_python_plugin import GrpcPythonPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
-from pants.backend.codegen.protobuf.target_types import ProtobufGrcpToggle, ProtobufSources
+from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import extract_pex, pex
 from pants.backend.python.util_rules.extract_pex import ExtractedPexDistributions
@@ -119,7 +119,7 @@ async def generate_python_from_protobuf(
             ExternalToolRequest,
             grpc_python_plugin.get_request(Platform.current),
         )
-        if request.protocol_target.get(ProtobufGrcpToggle).value
+        if request.protocol_target.get(ProtobufGrpcToggle).value
         else None
     )
 
