@@ -15,7 +15,7 @@ class ProtobufSources(Sources):
     expected_file_extensions = (".proto",)
 
 
-class ProtobufGrcpToggle(BoolField):
+class ProtobufGrpcToggle(BoolField):
     """Whether to generate gRPC code or not."""
 
     alias = "grpc"
@@ -29,4 +29,4 @@ class ProtobufLibrary(Target):
     """
 
     alias = "protobuf_library"
-    core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources, ProtobufGrcpToggle)
+    core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources, ProtobufGrpcToggle)
