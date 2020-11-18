@@ -232,10 +232,7 @@ impl CapturedWorkdir for CommandRunner {
     let build_id = context.build_id;
     let store = self.inner.store.clone();
 
-    // Streams to read child output from
-    let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
-
-    let nails_command = self
+    let mut child = self
       .async_semaphore
       .clone()
       .with_acquired(move |_id| {
@@ -273,21 +270,21 @@ impl CapturedWorkdir for CommandRunner {
         debug!("Connecting to server at {}...", addr);
         TcpStream::connect(addr)
           .and_then(move |stream| {
-            nails::client_handle_connection(
-              nails::Config::default(),
-              stream,
-              cmd,
-              stdio_write,
-              async {
-                let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
-                stdin_read
-              },
-            )
+            nails::client::handle_connection(nails::Config::default(), stream, cmd, async {
+              let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
+              stdin_read
+            })
           })
           .map_err(|e| format!("Error communicating with server: {}", e))
-          .map_ok(ChildOutput::Exit)
-      });
+      })
+      .await?;
 
-    Ok(futures::stream::select(stdio_read.map(Ok), nails_command.into_stream()).boxed())
+    let output_stream = child.output_stream.take().unwrap();
+    let exit_code = child
+      .wait()
+      .map_ok(ChildOutput::Exit)
+      .map_err(|e| format!("Error communicating with server: {}", e));
+
+    Ok(futures::stream::select(output_stream.map(Ok), exit_code.into_stream()).boxed())
   }
 }

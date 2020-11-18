@@ -98,10 +98,6 @@ async fn client_execute_helper(
     working_dir,
   };
 
-  let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
-
-  let output_handler = tokio::spawn(handle_client_output(stdio_read));
-
   let localhost = Ipv4Addr::new(127, 0, 0, 1);
   let addr = (localhost, port);
 
@@ -112,16 +108,15 @@ async fn client_execute_helper(
     ))
   })?;
 
-  let exit_code: ExitCode =
-    nails::client_handle_connection(config, socket, command, stdio_write, async {
-      let (stdin_write, stdin_read) = child_channel::<ChildInput>();
-      let _input_handler = tokio::spawn(handle_client_input(stdin_write));
-      stdin_read
-    })
-    .await
-    .map_err(|err| NailgunClientError::PostConnect(format!("Nailgun client error: {}", err)))?;
+  let mut child = nails::client::handle_connection(config, socket, command, async {
+    let (stdin_write, stdin_read) = child_channel::<ChildInput>();
+    let _input_handler = tokio::spawn(handle_client_input(stdin_write));
+    stdin_read
+  })
+  .await
+  .map_err(|err| NailgunClientError::PreConnect(format!("Failed to start remote task: {}", err)))?;
 
-  let () = output_handler
+  tokio::spawn(handle_client_output(child.output_stream.take().unwrap()))
     .await
     .map_err(|join_error| {
       NailgunClientError::PostConnect(format!("Error joining nailgun client task: {}", join_error))
@@ -129,6 +124,11 @@ async fn client_execute_helper(
     .map_err(|err| {
       NailgunClientError::PostConnect(format!("Nailgun client output error: {}", err))
     })?;
+
+  let exit_code: ExitCode = child
+    .wait()
+    .await
+    .map_err(|err| NailgunClientError::PostConnect(format!("Nailgun client error: {}", err)))?;
 
   Ok(exit_code.0)
 }
