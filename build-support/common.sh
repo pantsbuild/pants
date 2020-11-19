@@ -70,7 +70,7 @@ function git_merge_base() {
 }
 
 function determine_python() {
-  if [[ -n "${PY}" ]]; then
+  if [[ -n "${PY:-}" ]]; then
     echo "${PY}"
     return 0
   fi
