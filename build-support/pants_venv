@@ -25,14 +25,8 @@ function activate_venv() {
   source "$(venv_dir)/bin/activate"
 }
 
-function remove_venv() {
-  rm -rf "$(venv_dir)"
-  # Also remove legacy folders.
-  rm -rf "${venv_dir_prefix}.venv" "${venv_dir_prefix}.py{2,3}.venv"
-}
-
 function create_venv() {
-  remove_venv
+  rm -rf "$(venv_dir)"
   "${REPO_ROOT}/build-support/virtualenv" "$(venv_dir)"
 }
 
@@ -42,7 +36,7 @@ function ensure_gcc() {
 ERROR: unable to execute 'gcc'. Please verify that your compiler is installed, in your
        \$PATH and functional.
 
-Hint: on Mac OS X, you may need to accept the XCode EULA: 'sudo xcodebuild -license accept'.
+Hint: on macOS, you may need to accept the XCode EULA: 'sudo xcodebuild -license accept'.
 MESSAGE
 )"
   fi

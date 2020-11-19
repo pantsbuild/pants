@@ -65,7 +65,6 @@ def main() -> None:
 
 
 class PythonVersion(Enum):
-    py36 = "3.6"
     py37 = "3.7"
 
     def __str__(self) -> str:
@@ -78,8 +77,8 @@ def create_parser() -> argparse.ArgumentParser:
         "--python-version",
         type=PythonVersion,
         choices=list(PythonVersion),
-        default=PythonVersion.py36,
-        help="Run Pants with this version (defaults to 3.6).",
+        default=PythonVersion.py37,
+        help="Run Pants with this version.",
     )
     parser.add_argument(
         "--remote-execution-enabled",

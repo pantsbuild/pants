@@ -32,10 +32,10 @@
 # WRAPPER_SRCPATH=/src/wrapper/src/main/python \
 #    exec /src/pantsbuild-pants/pants "$@"
 #
-# The script defaults to running with Python 3. To use a specific Python version,
-# such as 3.7, prefix the script with `PY=python3.7`.
+# The script defaults to running with either Python 3.7 or Python 3.8. To use another Python version,
+# prefix the script with `PY=python3.8`.
 
-set -e
+set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
@@ -48,6 +48,14 @@ fi
 # Otherwise, run directly from sources, bootstrapping if needed.
 
 # Exposes:
+# + determine_python: Determine which interpreter version to use.
+# shellcheck source=build-support/common.sh
+source "${HERE}/build-support/common.sh"
+
+PY="$(determine_python)"
+export PY
+
+# Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
 # shellcheck source=build-support/pants_venv
 source "${HERE}/build-support/pants_venv"
@@ -56,8 +64,6 @@ source "${HERE}/build-support/pants_venv"
 # + bootstrap_native_code: Builds target-specific native engine binaries.
 # shellcheck source=build-support/bin/native/bootstrap_code.sh
 source "${HERE}/build-support/bin/native/bootstrap_code.sh"
-
-export PY="${PY:-python3}"
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 
@@ -87,8 +93,10 @@ function exec_pants_bare() {
   # Redirect activation and native bootstrap to ensure that they don't interfere with stdout.
   activate_pants_venv 1>&2
   bootstrap_native_code 1>&2
+  # Because the venv has been activated, we simply say `python` and it will use the venv's version. We cannot use
+  # `${PY}` because it could use the wrong interpreter if the value is an absolute path.
   PYTHONPATH="${PANTS_SRCPATH_STR}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
-    exec "${PY}" "${PANTS_EXE}" "$@"
+    exec python "${PANTS_EXE}" "$@"
 }
 
 if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then
