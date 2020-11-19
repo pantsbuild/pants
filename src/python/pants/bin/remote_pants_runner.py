@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import signal
 import sys
 import termios
 import time
@@ -15,6 +16,16 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def interrupts_ignored():
+    """Disables Python's default interrupt handling."""
+    old_handler = signal.signal(signal.SIGINT, lambda s, f: None)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGINT, old_handler)
 
 
 class STTYSettings:
@@ -111,7 +122,11 @@ class RemotePantsRunner:
             port = pantsd_handle.port
             logger.debug(f"Connecting to pantsd on port {port} attempt {attempt}/{retries}")
 
-            with STTYSettings.preserved():
+            # We preserve TTY settings since the server might write directly to the TTY, and we'd like
+            # to clean up any sideeffects before exiting.
+            #
+            # We ignore keyboard interrupts because the nailgun client will handle them.
+            with STTYSettings.preserved(), interrupts_ignored():
                 try:
                     return native.new_nailgun_client(port=port).execute(command, args, modified_env)
 

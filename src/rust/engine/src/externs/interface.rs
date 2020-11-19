@@ -658,8 +658,8 @@ py_class!(class PyNailgunClient |py| {
           let err_str = format!("Nailgun client error: {:?}", s);
           PyErr::new::<NailgunClientException, _>(py, (err_str,))
         },
-        NailgunClientError::ExplicitQuit => {
-          PyErr::new::<NailgunClientException, _>(py, ("Explicit quit",))
+        NailgunClientError::KeyboardInterrupt => {
+          PyErr::new::<exc::KeyboardInterrupt, _>(py, NoArgs)
         }
       })
     })
