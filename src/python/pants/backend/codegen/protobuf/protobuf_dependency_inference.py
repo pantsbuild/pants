@@ -19,6 +19,7 @@ from pants.engine.target import (
     SourcesPathsRequest,
     Targets,
 )
+from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -92,4 +93,4 @@ async def infer_protobuf_dependencies(
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), UnionRule(InferDependenciesRequest, InferProtobufDependencies))
