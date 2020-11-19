@@ -1436,6 +1436,7 @@ pub enum NodeOutput {
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(Box<ProcessResult>),
+  #[allow(clippy::rc_buffer)]
   Paths(Arc<Vec<PathStat>>),
   Value(Value),
 }
