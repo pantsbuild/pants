@@ -1436,6 +1436,8 @@ pub enum NodeOutput {
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(Box<ProcessResult>),
+  // Allow clippy::rc_buffer due to non-trivial issues that would arise in using the
+  // suggested Arc<[PathStat]> type. See https://github.com/rust-lang/rust-clippy/issues/6170
   #[allow(clippy::rc_buffer)]
   Paths(Arc<Vec<PathStat>>),
   Value(Value),
