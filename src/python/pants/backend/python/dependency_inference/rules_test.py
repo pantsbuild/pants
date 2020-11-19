@@ -63,6 +63,7 @@ def test_infer_python_imports() -> None:
         dedent(
             """\
             import django
+            import unrecognized.module
 
             from util.dep import Demo
             from util import dep
@@ -93,32 +94,27 @@ def test_infer_python_imports() -> None:
         rule_runner.set_options(args)
         target = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies,
-            [InferPythonDependencies(target[PythonSources])],
+            InferredDependencies, [InferPythonDependencies(target[PythonSources])]
         )
 
-    normal_address = Address("src/python")
-    assert run_dep_inference(normal_address) == InferredDependencies(
+    build_address = Address("src/python")
+    assert run_dep_inference(build_address) == InferredDependencies(
         [
             Address("3rdparty/python", target_name="Django"),
             Address("src/python", relative_file_path="app.py"),
-            Address("src/python/util", relative_file_path="dep.py", target_name="util"),
+            Address("src/python/util", relative_file_path="dep.py"),
         ],
         sibling_dependencies_inferrable=True,
     )
 
-    generated_subtarget_address = Address(
-        "src/python", relative_file_path="f2.py", target_name="python"
-    )
-    assert run_dep_inference(generated_subtarget_address) == InferredDependencies(
-        [Address("src/python", relative_file_path="app.py", target_name="python")],
+    file_address = Address("src/python", relative_file_path="f2.py")
+    assert run_dep_inference(file_address) == InferredDependencies(
+        [Address("src/python", relative_file_path="app.py")],
         sibling_dependencies_inferrable=True,
     )
-    assert run_dep_inference(
-        generated_subtarget_address, enable_string_imports=True
-    ) == InferredDependencies(
+    assert run_dep_inference(file_address, enable_string_imports=True) == InferredDependencies(
         [
-            Address("src/python", relative_file_path="app.py", target_name="python"),
+            Address("src/python", relative_file_path="app.py"),
             Address("src/python/str_import/subdir", relative_file_path="f.py"),
             Address("src/python/str_import/subdir", relative_file_path="f.pyi"),
         ],
