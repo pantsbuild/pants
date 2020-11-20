@@ -4,7 +4,7 @@
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Iterable, Optional, Tuple, cast
+from typing import Any, Dict, Iterable, Optional, Tuple, cast
 
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import (
@@ -38,7 +38,7 @@ class InvalidLinterReportsError(Exception):
 
 
 @dataclass(frozen=True)
-class LintResult:
+class LintResult(EngineAwareReturnType):
     exit_code: int
     stdout: str
     stderr: str
@@ -64,6 +64,9 @@ class LintResult:
             partition_description=partition_description,
             report=report,
         )
+
+    def metadata(self) -> Dict[str, Any]:
+        return {"partition": self.partition_description}
 
 
 @frozen_after_init
