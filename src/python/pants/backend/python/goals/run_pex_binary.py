@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import os
 
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -23,6 +24,8 @@ from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
+logger = logging.getLogger(__name__)
+
 
 class MissingEntryPoint(Exception):
     """Indicates that the entry point was missing."""
@@ -41,13 +44,12 @@ async def create_pex_binary_run_request(
         ),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
-
     if not entry_point.val:
-        raise MissingEntryPoint(
-            "To run a `pex_binary`, you must either set the `entry_point` field or the `sources` "
-            f"field, but {field_set.address} left both fields off. See "
-            "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target "
-            "for how to set the entry point."
+        logger.warning(
+            f"No entry point set for the `pex_binary` target {field_set.address}, so the `run` "
+            "goal will simply open a REPL (unless you specify passthrough args with `-- $args`). "
+            "\n\nDid you mean to instead set the `sources` field or `entry_point` field? See "
+            "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
         )
 
     # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
