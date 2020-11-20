@@ -2,11 +2,9 @@
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-cargo="${REPO_ROOT}/build-support/bin/native/cargo"
+"${REPO_ROOT}/cargo" install cargo-ensure-prefix --version "=0.1.3"
 
-"${cargo}" install cargo-ensure-prefix --version "=0.1.3"
-
-if ! out="$("${cargo}" ensure-prefix \
+if ! out="$("${REPO_ROOT}/cargo" ensure-prefix \
   --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" \
   --prefix-path="${REPO_ROOT}/build-support/rust-target-prefix.txt" \
   --all --exclude=bazel_protos)"; then
