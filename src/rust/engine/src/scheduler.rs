@@ -1,8 +1,9 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryInto;
+use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
@@ -16,10 +17,14 @@ use crate::externs;
 use crate::nodes::{NodeKey, Select, Visualizer};
 
 use cpython::Python;
+use futures::compat::Future01CompatExt;
 use graph::{InvalidationResult, LastObserved};
+use hashing::{Digest, EMPTY_DIGEST};
 use log::{debug, info, warn};
 use parking_lot::{Mutex, RwLock};
 use task_executor::Executor;
+use tempfile::TempDir;
+use tokio::process;
 use ui::ConsoleUI;
 use uuid::Uuid;
 use watch::Invalidatable;
@@ -210,10 +215,10 @@ impl Session {
     }
   }
 
-  pub async fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
+  pub async fn with_console_ui_disabled<T>(&self, f: impl Future<Output = T>) -> T {
     match *self.0.display.lock() {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.with_console_ui_disabled(f).await,
-      SessionDisplay::Logging { .. } => f(),
+      SessionDisplay::Logging { .. } => f.await,
     }
   }
 
@@ -426,6 +431,77 @@ impl Scheduler {
       .graph
       .visit_live(&context, |_, v| digests.extend(v.digests()));
     digests
+  }
+
+  pub async fn run_local_interactive_process(
+    &self,
+    session: &Session,
+    input_digest: Digest,
+    argv: Vec<String>,
+    env: BTreeMap<String, String>,
+    hermetic_env: bool,
+    run_in_workspace: bool,
+  ) -> Result<i32, String> {
+    let maybe_tempdir = if run_in_workspace {
+      None
+    } else {
+      Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
+    };
+
+    if input_digest != EMPTY_DIGEST {
+      if run_in_workspace {
+        warn!(
+          "Local interactive process should not attempt to materialize files when run in workspace"
+        );
+      } else {
+        let destination = match maybe_tempdir {
+          Some(ref dir) => dir.path().to_path_buf(),
+          None => unreachable!(),
+        };
+
+        self
+          .core
+          .store()
+          .materialize_directory(destination, input_digest)
+          .compat()
+          .await?;
+      }
+    }
+
+    let p = Path::new(&argv[0]);
+    let program_name = match maybe_tempdir {
+      Some(ref tempdir) if p.is_relative() => {
+        let mut buf = PathBuf::new();
+        buf.push(tempdir);
+        buf.push(p);
+        buf
+      }
+      _ => p.to_path_buf(),
+    };
+
+    let mut command = process::Command::new(program_name);
+    for arg in argv[1..].iter() {
+      command.arg(arg);
+    }
+
+    if let Some(ref tempdir) = maybe_tempdir {
+      command.current_dir(tempdir.path());
+    }
+
+    if hermetic_env {
+      command.env_clear();
+    }
+    command.envs(env);
+
+    session
+      .with_console_ui_disabled(async move {
+        let subprocess = command
+          .spawn()
+          .map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
+        let exit_status = subprocess.await.map_err(|e| e.to_string())?;
+        Ok(exit_status.code().unwrap_or(-1))
+      })
+      .await
   }
 
   async fn poll_or_create(

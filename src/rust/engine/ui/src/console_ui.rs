@@ -99,12 +99,12 @@ impl ConsoleUI {
     }
   }
 
-  pub async fn with_console_ui_disabled<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
+  pub async fn with_console_ui_disabled<T>(&mut self, f: impl Future<Output = T>) -> T {
     if self.instance.is_some() {
       self.teardown().await.unwrap();
-      f()
+      f.await
     } else {
-      f()
+      f.await
     }
   }
 
