@@ -16,24 +16,8 @@ from pants.engine.target import (
 )
 
 
-class DeprecatedPythonAwsLambdaSources(PythonSources):
+class PythonAwsLambdaSources(PythonSources):
     expected_num_files = range(0, 1)
-    deprecated_removal_version = "2.2.0.dev0"
-    deprecated_removal_hint = (
-        "Remove the `sources` field and create a new `python_library()` target (if you do not "
-        "yet have one), then add the `python_library()` to the `dependencies` field of this "
-        "`python_awslambda`. See https://www.pantsbuild.org/docs/awslambda-python for an example."
-    )
-
-
-class DeprecatedPythonInterpreterCompatibility(PythonInterpreterCompatibility):
-    deprecated_removal_version = "2.2.0.dev0"
-    deprecated_removal_hint = (
-        "Because the `sources` field will be removed, it no longer makes sense to have a "
-        "`compatibility` field for `python_awslambda` targets. Instead, set the "
-        "`compatibility` field on the `python_library` target containing this lambda's "
-        "handler code."
-    )
 
 
 class PythonAwsLambdaDependencies(Dependencies):
@@ -85,8 +69,8 @@ class PythonAWSLambda(Target):
     alias = "python_awslambda"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        DeprecatedPythonAwsLambdaSources,
-        DeprecatedPythonInterpreterCompatibility,
+        PythonAwsLambdaSources,
+        PythonInterpreterCompatibility,
         OutputPathField,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandler,
