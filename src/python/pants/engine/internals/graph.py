@@ -923,6 +923,10 @@ class NoApplicableTargetsException(Exception):
             )
         else:
             msg += "However, you did not specify any files/targets."
+        msg += (
+            f"\n\nRun `./pants filter --target-type={','.join(applicable_target_aliases)} ::` to "
+            "find all applicable targets in your project."
+        )
         super().__init__(msg)
 
     @classmethod
