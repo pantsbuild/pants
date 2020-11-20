@@ -6,7 +6,11 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)
 
-export PY=${PY:-python3}
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
+
+PY="$(determine_python)"
+export PY
 # Consumed by the cpython crate.
 export PYTHON_SYS_EXECUTABLE="${PY}"
 

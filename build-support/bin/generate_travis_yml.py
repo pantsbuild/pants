@@ -77,7 +77,6 @@ GLOBAL_ENV_VARS = [
     "BOOTSTRAPPED_PEX_KEY_PREFIX=daily/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex",
     "NATIVE_ENGINE_SO_KEY_PREFIX=monthly/native_engine_so",
     "MACOS_PYENV_PY27_VERSION=2.7.18",
-    "MACOS_PYENV_PY36_VERSION=3.6.10",
     "MACOS_PYENV_PY37_VERSION=3.7.7",
     "MACOS_PYENV_PY38_VERSION=3.8.3",
     # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
@@ -111,7 +110,6 @@ GLOBAL_ENV_VARS = [
 
 
 class PythonVersion(Enum):
-    py36 = "py36"
     py37 = "py37"
     py38 = "py38"
 
@@ -120,24 +118,16 @@ class PythonVersion(Enum):
 
     @property
     def number(self) -> int:
-        return {self.py36: 36, self.py37: 37, self.py38: 38}[self]  # type: ignore[index]
+        return {self.py37: 37, self.py38: 38}[self]  # type: ignore[index]
 
     @property
     def decimal(self) -> float:
-        return {self.py36: 3.6, self.py37: 3.7, self.py38: 3.8}[self]  # type: ignore[index]
+        return {self.py37: 3.7, self.py38: 3.8}[self]  # type: ignore[index]
 
     def default_stage(self, *, is_bootstrap: bool = False) -> Stage:
         if is_bootstrap:
-            return {
-                self.py36: Stage.bootstrap,
-                self.py37: Stage.bootstrap_cron,
-                self.py38: Stage.bootstrap_cron,
-            }[
-                self  # type: ignore[index]
-            ]
-        return {self.py36: Stage.test, self.py37: Stage.test_cron, self.py38: Stage.test_cron,}[
-            self  # type: ignore[index]
-        ]
+            return {self.py37: Stage.bootstrap, self.py38: Stage.bootstrap_cron}[self]  # type: ignore[index]
+        return {self.py37: Stage.test, self.py38: Stage.test_cron}[self]  # type: ignore[index]
 
 
 # ----------------------------------------------------------------------
@@ -291,7 +281,7 @@ def _linux_before_install(
 def linux_shard(
     *,
     load_test_config: bool = True,
-    python_version: PythonVersion = PythonVersion.py36,
+    python_version: PythonVersion = PythonVersion.py37,
     use_docker: bool = False,
     install_travis_wait: bool = False,
 ) -> Dict:
@@ -377,7 +367,6 @@ def _osx_env_with_pyenv() -> List[str]:
     return [
         *_osx_env(),
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"',
-        'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"',
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"',
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"',
     ]
@@ -386,7 +375,7 @@ def _osx_env_with_pyenv() -> List[str]:
 def osx_shard(
     *,
     load_test_config: bool = True,
-    python_version: PythonVersion = PythonVersion.py36,
+    python_version: PythonVersion = PythonVersion.py37,
     osx_image: Optional[str] = None,
 ) -> Dict:
     setup = {
@@ -607,10 +596,9 @@ def rust_tests_linux() -> Dict:
         "name": "Rust tests - Linux",
         "env": [
             "CACHE_NAME=rust_tests.linux",
-            # TODO: Despite being successfully linked at build time, the Linux rust tests
-            # shard is unable to locate `libpython3.6m.so.1.0` at runtime without this pointer:
-            # OSX appears to be fine.
-            'LD_LIBRARY_PATH="/opt/python/3.6.7/lib:${LD_LIBRARY_PATH}"',
+            # Despite being successfully linked at build time, the Linux Rust tests are unable to
+            # locate libpython3.7m.so.1.0 at runtime without this pointer.
+            'LD_LIBRARY_PATH="/opt/python/3.7.1/lib:${LD_LIBRARY_PATH}"',
         ],
     }
 
@@ -628,7 +616,7 @@ def rust_tests_osx() -> Dict:
         #      See https://gist.github.com/stuhood/856a9b09bbaa86141f36c9925c14fae7
         "osx_image": "xcode8",
         "before_install": [
-            './build-support/bin/install_python_for_ci.sh "${MACOS_PYENV_PY36_VERSION}"',
+            './build-support/bin/install_python_for_ci.sh "${MACOS_PYENV_PY37_VERSION}"',
             # We don't use the standard travis "addons" section here because it will either silently
             # fail (on older images) or cause a multi-minute `brew update` (on newer images), neither of
             # which we want. This doesn't happen if we just manually run `brew cask install`.
@@ -772,7 +760,7 @@ class NoAliasDumper(yaml.SafeDumper):
 
 
 def main() -> None:
-    supported_python_versions = [PythonVersion.py36, PythonVersion.py37]
+    supported_python_versions = [PythonVersion.py37]
     generated_yaml = yaml.dump(
         {
             # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1

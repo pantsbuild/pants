@@ -5,6 +5,7 @@ print_stacktrace = true
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.python",
+  "pants.backend.codegen.protobuf.python",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
@@ -54,6 +55,7 @@ root_patterns = [
 [python-setup]
 requirement_constraints = "3rdparty/python/constraints.txt"
 resolve_all_constraints = "nondeployables"
+interpreter_constraints = [">=3.7,<3.9"]
 
 [black]
 config = "pyproject.toml"
