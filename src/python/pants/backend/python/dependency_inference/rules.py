@@ -99,7 +99,7 @@ class InferPythonDependencies(InferDependenciesRequest):
     infer_from = PythonSources
 
 
-@rule(desc="Inferring Python dependencies.")
+@rule(desc="Inferring Python dependencies by analyzing imports")
 async def infer_python_dependencies(
     request: InferPythonDependencies, python_inference: PythonInference
 ) -> InferredDependencies:
@@ -127,10 +127,7 @@ async def infer_python_dependencies(
         )
 
     owners_per_import = await MultiGet(owners_requests)
-    # We remove the request's address so that we don't infer dependencies on self.
-    merged_result = sorted(
-        set(itertools.chain.from_iterable(owners_per_import)) - {request.sources_field.address}
-    )
+    merged_result = sorted(set(itertools.chain.from_iterable(owners_per_import)))
     return InferredDependencies(merged_result, sibling_dependencies_inferrable=True)
 
 

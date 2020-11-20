@@ -25,9 +25,26 @@ class Protoc(TemplatedExternalTool):
         "linux": "linux",
     }
 
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--dependency-inference",
+            default=True,
+            type=bool,
+            help=(
+                "Infer Protobuf dependencies on other Protobuf files by analyzing import "
+                "statements."
+            ),
+        )
+
     def generate_exe(self, plat: Platform) -> str:
         return "./bin/protoc"
 
     @property
     def runtime_targets(self) -> List[str]:
         return cast(List[str], self.options.runtime_targets)
+
+    @property
+    def dependency_inference(self) -> bool:
+        return cast(bool, self.options.dependency_inference)

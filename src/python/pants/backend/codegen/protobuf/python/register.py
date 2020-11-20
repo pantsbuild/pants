@@ -7,6 +7,7 @@ See https://www.pantsbuild.org/docs/protobuf.
 """
 
 from pants.backend.codegen import export_codegen_goal
+from pants.backend.codegen.protobuf import protobuf_dependency_inference
 from pants.backend.codegen.protobuf.python import (
     additional_fields,
     python_protobuf_module_mapper,
@@ -22,6 +23,7 @@ def rules():
         *python_protobuf_subsystem.rules(),
         *python_rules(),
         *python_protobuf_module_mapper.rules(),
+        *protobuf_dependency_inference.rules(),
         *export_codegen_goal.rules(),
     ]
 
