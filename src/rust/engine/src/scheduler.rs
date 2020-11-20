@@ -3,9 +3,9 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryInto;
+use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process;
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
@@ -24,6 +24,7 @@ use log::{debug, info, warn};
 use parking_lot::{Mutex, RwLock};
 use task_executor::Executor;
 use tempfile::TempDir;
+use tokio::process;
 use ui::ConsoleUI;
 use uuid::Uuid;
 use watch::Invalidatable;
@@ -214,10 +215,10 @@ impl Session {
     }
   }
 
-  pub async fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
+  pub async fn with_console_ui_disabled<T>(&self, f: impl Future<Output = T>) -> T {
     match *self.0.display.lock() {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.with_console_ui_disabled(f).await,
-      SessionDisplay::Logging { .. } => f(),
+      SessionDisplay::Logging { .. } => f.await,
     }
   }
 
@@ -493,11 +494,11 @@ impl Scheduler {
     command.envs(env);
 
     session
-      .with_console_ui_disabled(|| {
-        let mut subprocess = command
+      .with_console_ui_disabled(async move {
+        let subprocess = command
           .spawn()
           .map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
-        let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
+        let exit_status = subprocess.await.map_err(|e| e.to_string())?;
         Ok(exit_status.code().unwrap_or(-1))
       })
       .await
