@@ -56,7 +56,6 @@ async def map_protobuf_files() -> ProtobufMapping:
 
 # See https://developers.google.com/protocol-buffers/docs/reference/proto3-spec for the Proto
 # language spec.
-# PROTO_FILE_CHARS = r"a-zA-Z0-9/\\\-\_"
 QUOTE_CHAR = r"(?:'|\")"
 IMPORT_MODIFIERS = r"(?:\spublic|\sweak)?"
 FILE_NAME = r"(.+?\.proto)"
