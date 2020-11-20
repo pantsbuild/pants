@@ -2,18 +2,20 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-from typing import List, cast
+from typing import cast
 
-from pants.backend.python.dependency_inference import module_mapper
-from pants.backend.python.dependency_inference.import_parser import find_python_imports
+from pants.backend.python.dependency_inference import import_parser, module_mapper
+from pants.backend.python.dependency_inference.import_parser import (
+    ParsedPythonImports,
+    ParsePythonImportsRequest,
+)
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.backend.python.util_rules import ancestor_files
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
-from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.fs import Digest, DigestContents
+from pants.backend.python.util_rules.pex import PexInterpreterConstraints
+from pants.engine.addresses import Address
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -21,10 +23,12 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
+from pants.python.python_setup import PythonSetup
 
 
 class PythonInference(Subsystem):
@@ -101,32 +105,30 @@ class InferPythonDependencies(InferDependenciesRequest):
 
 @rule(desc="Inferring Python dependencies by analyzing imports")
 async def infer_python_dependencies(
-    request: InferPythonDependencies, python_inference: PythonInference
+    request: InferPythonDependencies, python_inference: PythonInference, python_setup: PythonSetup
 ) -> InferredDependencies:
     if not python_inference.imports:
         return InferredDependencies([], sibling_dependencies_inferrable=False)
 
-    stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.sources_field]))
-    digest_contents = await Get(DigestContents, Digest, stripped_sources.snapshot.digest)
+    wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
+    detected_imports = await Get(
+        ParsedPythonImports,
+        ParsePythonImportsRequest(
+            request.sources_field,
+            PexInterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
+        ),
+    )
+    relevant_imports = (
+        detected_imports.all_imports
+        if python_inference.string_imports
+        else detected_imports.explicit_imports
+    )
 
-    owners_requests: List[Get[PythonModuleOwners, PythonModule]] = []
-    for file_content in digest_contents:
-        file_imports_obj = find_python_imports(
-            filename=file_content.path,
-            content=file_content.content.decode(),
-        )
-        detected_imports = (
-            file_imports_obj.all_imports
-            if python_inference.string_imports
-            else file_imports_obj.explicit_imports
-        )
-        owners_requests.extend(
-            Get(PythonModuleOwners, PythonModule(imported_module))
-            for imported_module in detected_imports
-            if imported_module not in combined_stdlib
-        )
-
-    owners_per_import = await MultiGet(owners_requests)
+    owners_per_import = await MultiGet(
+        Get(PythonModuleOwners, PythonModule(imported_module))
+        for imported_module in relevant_imports
+        if imported_module not in combined_stdlib
+    )
     merged_result = sorted(set(itertools.chain.from_iterable(owners_per_import)))
     return InferredDependencies(merged_result, sibling_dependencies_inferrable=True)
 
@@ -195,6 +197,7 @@ def rules():
     return [
         *collect_rules(),
         *ancestor_files.rules(),
+        *import_parser.rules(),
         *module_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferPythonDependencies),
         UnionRule(InferDependenciesRequest, InferInitDependencies),
