@@ -246,14 +246,7 @@ def build_fs_util() -> None:
     # it in our releases because it can be a useful standalone tool.
     with travis_section("fs_util", "Building fs_util"):
         subprocess.run(
-            [
-                "build-support/bin/native/cargo",
-                "build",
-                "--release",
-                "--manifest-path=src/rust/engine/Cargo.toml",
-                "-p",
-                "fs_util",
-            ],
+            ["./cargo", "build", "--release", "-p", "fs_util"],
             check=True,
             env={**os.environ, "RUST_BACKTRACE": "1"},
         )

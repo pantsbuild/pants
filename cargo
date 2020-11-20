@@ -3,7 +3,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 
-cd "${NATIVE_ROOT}" || exit "${PIPESTATUS[0]}"
+cd "${REPO_ROOT}/src/rust/engine" || exit "${PIPESTATUS[0]}"
 exec "${REPO_ROOT}/build-support/bin/native/cargo.sh" "$@"
