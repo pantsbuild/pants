@@ -7,7 +7,6 @@ from typing import Any, Callable, Dict, List, Tuple, TypeVar
 T = TypeVar("T")
 
 def cyclic_paths(adjacencies: Dict[T, Tuple[T, ...]]) -> Tuple[Tuple[T]]: ...
-
 def session_cancel_all() -> None: ...
 
 class PyDigest:

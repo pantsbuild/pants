@@ -241,15 +241,29 @@ impl Scheduler {
     }
     command.envs(env);
 
-    session
+    command.kill_on_drop(true);
+
+    let exit_status = session
       .with_console_ui_disabled(async move {
-        let subprocess = command
+        let mut subprocess = command
           .spawn()
-          .map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
-        let exit_status = subprocess.await.map_err(|e| e.to_string())?;
-        Ok(exit_status.code().unwrap_or(-1))
+          .map_err(|e| format!("Error executing interactive process: {}", e))?;
+        tokio::select! {
+          _ = session.cancelled() => {
+            // The Session was cancelled: kill the process, and then wait for it to exit (to avoid
+            // zombies).
+            subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e))?;
+            subprocess.await.map_err(|e| e.to_string())
+          }
+          exit_status = &mut subprocess => {
+            // The process exited.
+            exit_status.map_err(|e| e.to_string())
+          }
+        }
       })
-      .await
+      .await?;
+
+    Ok(exit_status.code().unwrap_or(-1))
   }
 
   async fn poll_or_create(
