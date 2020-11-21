@@ -49,7 +49,13 @@ from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import recursive_dirname, safe_file_dump, safe_mkdir, safe_open
+from pants.util.dirutil import (
+    recursive_dirname,
+    safe_file_dump,
+    safe_mkdir,
+    safe_mkdtemp,
+    safe_open,
+)
 from pants.util.ordered_set import FrozenOrderedSet
 
 # -----------------------------------------------------------------------------------------------
@@ -85,6 +91,8 @@ class RuleRunner:
         target_types: Optional[Iterable[Type[Target]]] = None,
         objects: Optional[Dict[str, Any]] = None,
         context_aware_object_factories: Optional[Dict[str, Any]] = None,
+        isolated_local_store: bool = False,
+        ca_certs_path: Optional[str] = None,
     ) -> None:
         self.build_root = os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
         safe_mkdir(self.build_root, clean=True)
@@ -112,7 +120,11 @@ class RuleRunner:
 
         options_bootstrapper = create_options_bootstrapper()
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        local_store_dir = global_options.local_store_dir
+        local_store_dir = (
+            os.path.realpath(safe_mkdtemp())
+            if isolated_local_store
+            else global_options.local_store_dir
+        )
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
@@ -127,6 +139,7 @@ class RuleRunner:
             build_root=self.build_root,
             build_configuration=self.build_config,
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
+            ca_certs_path=ca_certs_path,
         ).new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(

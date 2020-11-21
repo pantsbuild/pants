@@ -51,6 +51,20 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
+ROLAND_DIGEST = Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80)
+
+
+def prime_store_with_roland_digest(rule_runner: RuleRunner) -> None:
+    """Prime lmdb_store with a directory of a file named 'roland' and contents 'European
+    Burmese'."""
+    with temporary_dir() as temp_dir:
+        Path(temp_dir, "roland").write_text("European Burmese")
+        snapshot = rule_runner.scheduler.capture_snapshots(
+            (PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),)
+        )[0]
+    assert snapshot.files == ("roland",)
+    assert snapshot.digest == ROLAND_DIGEST
+
 
 class FSTestBase(TestBase, SchedulerTestBase):
     @staticmethod
@@ -391,12 +405,6 @@ class FSTest(FSTestBase):
                 [MergeDigests((roland_snapshot.digest, susannah_snapshot.digest))],
             )
             assert both_snapshot.digest == both_merged
-
-    def test_write_digest(self) -> None:
-        self.prime_store_with_roland_digest()
-        digest = Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80)
-        self.scheduler.write_digest(digest, path_prefix="test/")
-        assert Path(self.build_root, "test/roland").read_text() == "European Burmese"
 
     def test_add_prefix(self) -> None:
         digest = self.request(
@@ -797,114 +805,9 @@ class FSTest(FSTestBase):
         self.assert_mutated_digest(mutation_function)
 
 
-class DownloadsTest(FSTestBase):
-    file_digest = FileDigest("8fcbc50cda241aee7238c71e87c27804e7abc60675974eaf6567aa16366bc105", 14)
-
-    expected_snapshot_digest = Digest(
-        "4c9cf91fcd7ba1abbf7f9a0a1c8175556a82bee6a398e34db3284525ac24a3ad", 84
-    )
-
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            QueryRule(Snapshot, (DownloadFile,)),
-        )
-
-    def test_download(self) -> None:
-        with self.isolated_local_store():
-            with http_server(StubHandler) as port:
-                snapshot = self.request(
-                    Snapshot,
-                    [DownloadFile(f"http://localhost:{port}/file.txt", self.file_digest)],
-                )
-                self.assert_snapshot_equals(
-                    snapshot,
-                    ["file.txt"],
-                    self.expected_snapshot_digest,
-                )
-
-    def test_download_missing_file(self) -> None:
-        with self.isolated_local_store():
-            with http_server(StubHandler) as port:
-                with self.assertRaises(ExecutionError) as cm:
-                    self.request(
-                        Snapshot,
-                        [DownloadFile(f"http://localhost:{port}/notfound", self.file_digest)],
-                    )
-                assert "404" in str(cm.exception)
-
-    def test_download_wrong_digest(self) -> None:
-        with self.isolated_local_store():
-            with http_server(StubHandler) as port:
-                with self.assertRaises(ExecutionError) as cm:
-                    self.request(
-                        Snapshot,
-                        [
-                            DownloadFile(
-                                f"http://localhost:{port}/file.txt",
-                                FileDigest(
-                                    self.file_digest.fingerprint,
-                                    self.file_digest.serialized_bytes_length + 1,
-                                ),
-                            )
-                        ],
-                    )
-                assert "wrong digest" in str(cm.exception).lower()
-
-    def test_caches_downloads(self) -> None:
-        with self.isolated_local_store():
-            with http_server(StubHandler) as port:
-                self.prime_store_with_roland_digest()
-
-                # This would error if we hit the HTTP server, because 404,
-                # but we're not going to hit the HTTP server because it's cached,
-                # so we shouldn't see an error...
-                url = DownloadFile(
-                    f"http://localhost:{port}/roland",
-                    FileDigest(
-                        "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16
-                    ),
-                )
-                snapshot = self.request(Snapshot, [url])
-                self.assert_snapshot_equals(
-                    snapshot,
-                    ["roland"],
-                    Digest("9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819", 82),
-                )
-
-    def test_download_https(self) -> None:
-        # Note that this also tests that the custom certs functionality works.
-        with temporary_dir() as temp_dir:
-
-            def write_resource(name: str) -> Path:
-                path = Path(temp_dir) / name
-                data = pkgutil.get_data("pants.engine.internals", f"tls_testing/rsa/{name}")
-                assert data is not None
-                path.write_bytes(data)
-                return path
-
-            server_cert = write_resource("server.crt")
-            server_key = write_resource("server.key")
-            cert_chain = write_resource("server.chain")
-
-            scheduler = self.mk_scheduler(
-                rules=[*fs_rules(), QueryRule(Snapshot, (DownloadFile,))],
-                ca_certs_path=str(cert_chain),
-            )
-            with self.isolated_local_store():
-                ssl_context = ssl.SSLContext()
-                ssl_context.load_cert_chain(certfile=str(server_cert), keyfile=str(server_key))
-
-                with http_server(StubHandler, ssl_context=ssl_context) as port:
-                    snapshot = self.execute(
-                        scheduler,
-                        Snapshot,
-                        DownloadFile(f"https://localhost:{port}/file.txt", self.file_digest),
-                    )[0]
-                    self.assert_snapshot_equals(
-                        snapshot, ["file.txt"], self.expected_snapshot_digest
-                    )
+@pytest.fixture
+def downloads_rule_runner() -> RuleRunner:
+    return RuleRunner(rules=[QueryRule(Snapshot, [DownloadFile])], isolated_local_store=True)
 
 
 class StubHandler(BaseHTTPRequestHandler):
@@ -923,6 +826,139 @@ class StubHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/utf-8")
         self.send_header("Content-Length", f"{len(self.response_text)}")
         self.end_headers()
+
+
+DOWNLOADS_FILE_DIGEST = FileDigest(
+    "8fcbc50cda241aee7238c71e87c27804e7abc60675974eaf6567aa16366bc105", 14
+)
+DOWNLOADS_EXPECTED_DIRECTORY_DIGEST = Digest(
+    "4c9cf91fcd7ba1abbf7f9a0a1c8175556a82bee6a398e34db3284525ac24a3ad", 84
+)
+
+
+def test_download(downloads_rule_runner: RuleRunner) -> None:
+    with http_server(StubHandler) as port:
+        snapshot = downloads_rule_runner.request(
+            Snapshot, [DownloadFile(f"http://localhost:{port}/file.txt", DOWNLOADS_FILE_DIGEST)]
+        )
+    assert snapshot.files == ("file.txt",)
+    assert snapshot.digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
+
+
+def test_download_missing_file(downloads_rule_runner: RuleRunner) -> None:
+    with pytest.raises(ExecutionError) as exc:
+        with http_server(StubHandler) as port:
+            downloads_rule_runner.request(
+                Snapshot, [DownloadFile(f"http://localhost:{port}/notfound", DOWNLOADS_FILE_DIGEST)]
+            )
+    assert "404" in str(exc.value)
+
+
+def test_download_wrong_digest(downloads_rule_runner: RuleRunner) -> None:
+    file_digest = FileDigest(
+        DOWNLOADS_FILE_DIGEST.fingerprint, DOWNLOADS_FILE_DIGEST.serialized_bytes_length + 1
+    )
+    with pytest.raises(ExecutionError) as exc:
+        with http_server(StubHandler) as port:
+            downloads_rule_runner.request(
+                Snapshot, [DownloadFile(f"http://localhost:{port}/file.txt", file_digest)]
+            )
+    assert "wrong digest" in str(exc.value).lower()
+
+
+def test_download_caches(downloads_rule_runner: RuleRunner) -> None:
+    # We would error if we hit the HTTP server with 404, but we're not going to hit the HTTP
+    # server because it's cached, so we shouldn't see an error.
+    prime_store_with_roland_digest(downloads_rule_runner)
+    with http_server(StubHandler) as port:
+        download_file = DownloadFile(
+            f"http://localhost:{port}/roland",
+            FileDigest("693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16),
+        )
+        snapshot = downloads_rule_runner.request(Snapshot, [download_file])
+    assert snapshot.files == ("roland",)
+    assert snapshot.digest == Digest(
+        "9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819", 82
+    )
+
+
+def test_download_https() -> None:
+    # This also tests that the custom certs functionality works.
+    with temporary_dir() as temp_dir:
+
+        def write_resource(name: str) -> Path:
+            path = Path(temp_dir) / name
+            data = pkgutil.get_data("pants.engine.internals", f"tls_testing/rsa/{name}")
+            assert data is not None
+            path.write_bytes(data)
+            return path
+
+        server_cert = write_resource("server.crt")
+        server_key = write_resource("server.key")
+        cert_chain = write_resource("server.chain")
+
+        rule_runner = RuleRunner(
+            rules=[QueryRule(Snapshot, [DownloadFile])],
+            isolated_local_store=True,
+            ca_certs_path=str(cert_chain),
+        )
+
+        ssl_context = ssl.SSLContext()
+        ssl_context.load_cert_chain(certfile=str(server_cert), keyfile=str(server_key))
+
+        with http_server(StubHandler, ssl_context=ssl_context) as port:
+            snapshot = rule_runner.request(
+                Snapshot,
+                [DownloadFile(f"https://localhost:{port}/file.txt", DOWNLOADS_FILE_DIGEST)],
+            )
+
+    assert snapshot.files == ("file.txt",)
+    assert snapshot.digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
+
+
+def test_write_digest_scheduler() -> None:
+    rule_runner = RuleRunner()
+    prime_store_with_roland_digest(rule_runner)
+
+    path = Path(rule_runner.build_root, "roland")
+    assert not path.is_file()
+
+    rule_runner.scheduler.write_digest(ROLAND_DIGEST)
+    assert path.is_file()
+    assert path.read_text() == "European Burmese"
+
+    rule_runner.scheduler.write_digest(ROLAND_DIGEST, path_prefix="test/")
+    path = Path(rule_runner.build_root, "test/roland")
+    assert path.is_file()
+    assert path.read_text() == "European Burmese"
+
+
+def test_write_digest_workspace() -> None:
+    rule_runner = RuleRunner()
+    workspace = Workspace(rule_runner.scheduler)
+    digest = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("a.txt", b"hello"), FileContent("subdir/b.txt", b"goodbye")])],
+    )
+
+    path1 = Path(rule_runner.build_root, "a.txt")
+    path2 = Path(rule_runner.build_root, "subdir/b.txt")
+    assert not path1.is_file()
+    assert not path2.is_file()
+
+    workspace.write_digest(digest)
+    assert path1.is_file()
+    assert path2.is_file()
+    assert path1.read_text() == "hello"
+    assert path2.read_text() == "goodbye"
+
+    workspace.write_digest(digest, path_prefix="prefix")
+    path1 = Path(rule_runner.build_root, "prefix/a.txt")
+    path2 = Path(rule_runner.build_root, "prefix/subdir/b.txt")
+    assert path1.is_file()
+    assert path2.is_file()
+    assert path1.read_text() == "hello"
+    assert path2.read_text() == "goodbye"
 
 
 def test_workspace_in_goal_rule() -> None:
@@ -955,26 +991,3 @@ def test_workspace_in_goal_rule() -> None:
     assert result.exit_code == 0
     assert result.stdout == "a.txt"
     assert Path(rule_runner.build_root, "a.txt").read_text() == "hello"
-
-
-def test_write_digest() -> None:
-    rule_runner = RuleRunner()
-
-    workspace = Workspace(rule_runner.scheduler)
-    digest = rule_runner.request(
-        Digest,
-        [CreateDigest([FileContent("a.txt", b"hello"), FileContent("subdir/b.txt", b"goodbye")])],
-    )
-
-    path1 = Path(rule_runner.build_root, "a.txt")
-    path2 = Path(rule_runner.build_root, "subdir/b.txt")
-    assert not path1.is_file()
-    assert not path2.is_file()
-
-    workspace.write_digest(digest)
-    assert path1.is_file()
-    assert path2.is_file()
-
-    workspace.write_digest(digest, path_prefix="prefix")
-    assert Path(rule_runner.build_root, "prefix", path1).is_file()
-    assert Path(rule_runner.build_root, "prefix", path2).is_file()
