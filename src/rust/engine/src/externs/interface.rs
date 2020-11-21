@@ -29,6 +29,7 @@
 // File-specific allowances to silence internal warnings of `py_class!`.
 #![allow(
   unused_braces,
+  clippy::manual_strip,
   clippy::used_underscore_binding,
   clippy::transmute_ptr_to_ptr,
   clippy::zero_ptr
