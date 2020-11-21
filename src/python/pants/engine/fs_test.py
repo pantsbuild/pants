@@ -328,116 +328,6 @@ class FSTest(FSTestBase):
     def test_files_digest_literal(self) -> None:
         self.assert_digest(["a/3.txt", "4.txt"], ["a/3.txt", "4.txt"])
 
-    def test_add_prefix(self) -> None:
-        digest = self.request(
-            Digest,
-            [
-                CreateDigest(
-                    (
-                        FileContent(path="main.py", content=b'print("from main")'),
-                        FileContent(path="subdir/sub.py", content=b'print("from sub")'),
-                    )
-                )
-            ],
-        )
-
-        # Two components.
-        output_digest = self.request(Digest, [AddPrefix(digest, "outer_dir/middle_dir")])
-        snapshot = self.request(Snapshot, [output_digest])
-        assert sorted(snapshot.files) == [
-            "outer_dir/middle_dir/main.py",
-            "outer_dir/middle_dir/subdir/sub.py",
-        ]
-        assert sorted(snapshot.dirs) == [
-            "outer_dir",
-            "outer_dir/middle_dir",
-            "outer_dir/middle_dir/subdir",
-        ]
-
-        # Empty.
-        output_digest = self.request(Digest, [AddPrefix(digest, "")])
-        assert digest == output_digest
-
-        # Illegal.
-        with self.assertRaisesRegex(Exception, r"The `prefix` must be relative."):
-            self.request(Digest, [AddPrefix(digest, "../something")])
-
-    def test_remove_prefix(self) -> None:
-        # Set up files:
-        relevant_files = (
-            "characters/dark_tower/roland",
-            "characters/dark_tower/susannah",
-        )
-        all_files = (
-            "books/dark_tower/gunslinger",
-            "characters/altered_carbon/kovacs",
-            *relevant_files,
-            "index",
-        )
-
-        with temporary_dir() as temp_dir:
-            safe_file_dump(os.path.join(temp_dir, "index"), "books\ncharacters\n")
-            safe_file_dump(
-                os.path.join(temp_dir, "characters", "altered_carbon", "kovacs"),
-                "Envoy",
-                makedirs=True,
-            )
-
-            tower_dir = os.path.join(temp_dir, "characters", "dark_tower")
-            safe_file_dump(os.path.join(tower_dir, "roland"), "European Burmese", makedirs=True)
-            safe_file_dump(os.path.join(tower_dir, "susannah"), "Not sure actually", makedirs=True)
-
-            safe_file_dump(
-                os.path.join(temp_dir, "books", "dark_tower", "gunslinger"),
-                "1982",
-                makedirs=True,
-            )
-
-            snapshot, snapshot_with_extra_files = self.scheduler.capture_snapshots(
-                (
-                    PathGlobsAndRoot(PathGlobs(["characters/dark_tower/*"]), temp_dir),
-                    PathGlobsAndRoot(PathGlobs(["**"]), temp_dir),
-                )
-            )
-            # Check that we got the full snapshots that we expect
-            assert snapshot.files == relevant_files
-            assert snapshot_with_extra_files.files == all_files
-
-            # Strip empty prefix:
-            zero_prefix_stripped_digest = self.request(
-                Digest,
-                [RemovePrefix(snapshot.digest, "")],
-            )
-            assert snapshot.digest == zero_prefix_stripped_digest
-
-            # Strip a non-empty prefix shared by all files:
-            stripped_digest = self.request(
-                Digest,
-                [RemovePrefix(snapshot.digest, "characters/dark_tower")],
-            )
-            assert stripped_digest == Digest(
-                fingerprint="71e788fc25783c424db555477071f5e476d942fc958a5d06ffc1ed223f779a8c",
-                serialized_bytes_length=162,
-            )
-
-            expected_snapshot = assert_single_element(
-                self.scheduler.capture_snapshots((PathGlobsAndRoot(PathGlobs(["*"]), tower_dir),))
-            )
-            assert expected_snapshot.files == ("roland", "susannah")
-            assert stripped_digest == expected_snapshot.digest
-
-            # Try to strip a prefix which isn't shared by all files:
-            with pytest.raises(Exception) as exc:
-                self.request(
-                    Digest,
-                    [RemovePrefix(snapshot_with_extra_files.digest, "characters/dark_tower")],
-                )
-            assert (
-                "Cannot strip prefix characters/dark_tower from root directory Digest(Fingerprint<"
-                "28c47f77867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root "
-                "directory contained non-matching directory named: books and file named: index"
-            ) in str(exc.value)
-
     def test_create_empty_directory(self) -> None:
         res = self.request(Snapshot, [CreateDigest([Directory("a/")])])
         assert res.dirs == ("a",)
@@ -808,6 +698,116 @@ def test_merge_digests() -> None:
         Digest, [MergeDigests((roland_snapshot.digest, susannah_snapshot.digest))]
     )
     assert both_snapshot.digest == both_merged
+
+
+# -----------------------------------------------------------------------------------------------
+# `AddPrefix` and `RemovePrefix`
+# -----------------------------------------------------------------------------------------------
+
+
+def test_add_prefix() -> None:
+    rule_runner = RuleRunner()
+    digest = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("main.ext", b""), FileContent("subdir/sub.ext", b"")])],
+    )
+
+    # Two components.
+    output_digest = rule_runner.request(Digest, [AddPrefix(digest, "outer_dir/middle_dir")])
+    snapshot = rule_runner.request(Snapshot, [output_digest])
+    assert sorted(snapshot.files) == [
+        "outer_dir/middle_dir/main.ext",
+        "outer_dir/middle_dir/subdir/sub.ext",
+    ]
+    assert sorted(snapshot.dirs) == [
+        "outer_dir",
+        "outer_dir/middle_dir",
+        "outer_dir/middle_dir/subdir",
+    ]
+
+    # Empty.
+    output_digest = rule_runner.request(Digest, [AddPrefix(digest, "")])
+    assert digest == output_digest
+
+    # Illegal.
+    with pytest.raises(Exception, match=r"The `prefix` must be relative."):
+        rule_runner.request(Digest, [AddPrefix(digest, "../something")])
+
+
+def test_remove_prefix() -> None:
+    rule_runner = RuleRunner()
+    relevant_files = (
+        "characters/dark_tower/roland",
+        "characters/dark_tower/susannah",
+    )
+    all_files = (
+        "books/dark_tower/gunslinger",
+        "characters/altered_carbon/kovacs",
+        *relevant_files,
+        "index",
+    )
+
+    with temporary_dir() as temp_dir:
+        safe_file_dump(os.path.join(temp_dir, "index"), "books\ncharacters\n")
+        safe_file_dump(
+            os.path.join(temp_dir, "characters", "altered_carbon", "kovacs"),
+            "Envoy",
+            makedirs=True,
+        )
+
+        tower_dir = os.path.join(temp_dir, "characters", "dark_tower")
+        safe_file_dump(os.path.join(tower_dir, "roland"), "European Burmese", makedirs=True)
+        safe_file_dump(os.path.join(tower_dir, "susannah"), "Not sure actually", makedirs=True)
+
+        safe_file_dump(
+            os.path.join(temp_dir, "books", "dark_tower", "gunslinger"),
+            "1982",
+            makedirs=True,
+        )
+
+        snapshot, snapshot_with_extra_files = rule_runner.scheduler.capture_snapshots(
+            [
+                PathGlobsAndRoot(PathGlobs(["characters/dark_tower/*"]), temp_dir),
+                PathGlobsAndRoot(PathGlobs(["**"]), temp_dir),
+            ]
+        )
+
+        # Check that we got the full snapshots that we expect
+        assert snapshot.files == relevant_files
+        assert snapshot_with_extra_files.files == all_files
+
+        # Strip empty prefix:
+        zero_prefix_stripped_digest = rule_runner.request(
+            Digest, [RemovePrefix(snapshot.digest, "")]
+        )
+        assert snapshot.digest == zero_prefix_stripped_digest
+
+        # Strip a non-empty prefix shared by all files:
+        stripped_digest = rule_runner.request(
+            Digest, [RemovePrefix(snapshot.digest, "characters/dark_tower")]
+        )
+        assert stripped_digest == Digest(
+            fingerprint="71e788fc25783c424db555477071f5e476d942fc958a5d06ffc1ed223f779a8c",
+            serialized_bytes_length=162,
+        )
+
+        expected_snapshot = assert_single_element(
+            rule_runner.scheduler.capture_snapshots([PathGlobsAndRoot(PathGlobs(["*"]), tower_dir)])
+        )
+        assert expected_snapshot.files == ("roland", "susannah")
+        assert stripped_digest == expected_snapshot.digest
+
+        # Try to strip a prefix which isn't shared by all files:
+        with pytest.raises(Exception) as exc:
+            rule_runner.request(
+                Digest,
+                [RemovePrefix(snapshot_with_extra_files.digest, "characters/dark_tower")],
+            )
+        assert (
+            "Cannot strip prefix characters/dark_tower from root directory Digest(Fingerprint<"
+            "28c47f77867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root "
+            "directory contained non-matching directory named: books and file named: index"
+        ) in str(exc.value)
 
 
 # -----------------------------------------------------------------------------------------------
