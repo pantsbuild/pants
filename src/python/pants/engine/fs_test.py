@@ -328,84 +328,6 @@ class FSTest(FSTestBase):
     def test_files_digest_literal(self) -> None:
         self.assert_digest(["a/3.txt", "4.txt"], ["a/3.txt", "4.txt"])
 
-    def test_snapshot_from_outside_buildroot(self) -> None:
-        with temporary_dir() as temp_dir:
-            Path(temp_dir, "roland").write_text("European Burmese")
-            snapshot = self.scheduler.capture_snapshots(
-                (PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),)
-            )[0]
-            self.assert_snapshot_equals(
-                snapshot,
-                ["roland"],
-                Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80),
-            )
-
-    def test_multiple_snapshots_from_outside_buildroot(self) -> None:
-        with temporary_dir() as temp_dir:
-            Path(temp_dir, "roland").write_text("European Burmese")
-            Path(temp_dir, "susannah").write_text("I don't know")
-            scheduler = self.mk_scheduler(rules=fs_rules())
-            snapshots = scheduler.capture_snapshots(
-                (
-                    PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
-                    PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
-                    PathGlobsAndRoot(PathGlobs(["doesnotexist"]), temp_dir),
-                )
-            )
-            assert 3 == len(snapshots)
-            self.assert_snapshot_equals(
-                snapshots[0],
-                ["roland"],
-                Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80),
-            )
-            self.assert_snapshot_equals(
-                snapshots[1],
-                ["susannah"],
-                Digest("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f", 82),
-            )
-            self.assert_snapshot_equals(snapshots[2], [], EMPTY_DIGEST)
-
-    def test_snapshot_from_outside_buildroot_failure(self) -> None:
-        with temporary_dir() as temp_dir:
-            with self.assertRaises(Exception) as cm:
-                self.scheduler.capture_snapshots(
-                    (PathGlobsAndRoot(PathGlobs(["*"]), os.path.join(temp_dir, "doesnotexist")),)
-                )
-            assert "doesnotexist" in str(cm.exception)
-
-    def test_asynchronously_merge_digests(self) -> None:
-        with temporary_dir() as temp_dir:
-            Path(temp_dir, "roland").write_text("European Burmese")
-            Path(temp_dir, "susannah").write_text("Not sure actually")
-            (
-                empty_snapshot,
-                roland_snapshot,
-                susannah_snapshot,
-                both_snapshot,
-            ) = self.scheduler.capture_snapshots(
-                (
-                    PathGlobsAndRoot(PathGlobs(["doesnotmatch"]), temp_dir),
-                    PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
-                    PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
-                    PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),
-                )
-            )
-
-            empty_merged = self.request(Digest, [MergeDigests((empty_snapshot.digest,))])
-            assert empty_snapshot.digest == empty_merged
-
-            roland_merged = self.request(
-                Digest,
-                [MergeDigests((roland_snapshot.digest, empty_snapshot.digest))],
-            )
-            assert roland_snapshot.digest == roland_merged
-
-            both_merged = self.request(
-                Digest,
-                [MergeDigests((roland_snapshot.digest, susannah_snapshot.digest))],
-            )
-            assert both_snapshot.digest == both_merged
-
     def test_add_prefix(self) -> None:
         digest = self.request(
             Digest,
@@ -805,6 +727,94 @@ class FSTest(FSTestBase):
         self.assert_mutated_digest(mutation_function)
 
 
+# -----------------------------------------------------------------------------------------------
+# `PathGlobsAndRoot`
+# -----------------------------------------------------------------------------------------------
+
+
+def test_snapshot_from_outside_buildroot() -> None:
+    with temporary_dir() as temp_dir:
+        Path(temp_dir, "roland").write_text("European Burmese")
+        snapshot = RuleRunner().scheduler.capture_snapshots(
+            [PathGlobsAndRoot(PathGlobs(["*"]), temp_dir)]
+        )[0]
+    assert snapshot.files == ("roland",)
+    assert snapshot.digest == ROLAND_DIGEST
+
+
+def test_multiple_snapshots_from_outside_buildroot() -> None:
+    with temporary_dir() as temp_dir:
+        Path(temp_dir, "roland").write_text("European Burmese")
+        Path(temp_dir, "susannah").write_text("I don't know")
+        snapshots = RuleRunner().scheduler.capture_snapshots(
+            [
+                PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
+                PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
+                PathGlobsAndRoot(PathGlobs(["doesnotexist"]), temp_dir),
+            ]
+        )
+    assert len(snapshots) == 3
+    assert snapshots[0].files == ("roland",)
+    assert snapshots[0].digest == ROLAND_DIGEST
+    assert snapshots[1].files == ("susannah",)
+    assert snapshots[1].digest == Digest(
+        "d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f", 82
+    )
+    assert snapshots[2] == EMPTY_SNAPSHOT
+
+
+def test_snapshot_from_outside_buildroot_failure() -> None:
+    with temporary_dir() as temp_dir:
+        with pytest.raises(Exception) as exc:
+            RuleRunner().scheduler.capture_snapshots(
+                [PathGlobsAndRoot(PathGlobs(["*"]), os.path.join(temp_dir, "doesnotexist"))]
+            )
+    assert "doesnotexist" in str(exc.value)
+
+
+# -----------------------------------------------------------------------------------------------
+# `MergeDigests`
+# -----------------------------------------------------------------------------------------------
+
+
+def test_merge_digests() -> None:
+    rule_runner = RuleRunner()
+    with temporary_dir() as temp_dir:
+        Path(temp_dir, "roland").write_text("European Burmese")
+        Path(temp_dir, "susannah").write_text("Not sure actually")
+        (
+            empty_snapshot,
+            roland_snapshot,
+            susannah_snapshot,
+            both_snapshot,
+        ) = rule_runner.scheduler.capture_snapshots(
+            (
+                PathGlobsAndRoot(PathGlobs(["doesnotmatch"]), temp_dir),
+                PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
+                PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
+                PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),
+            )
+        )
+
+    empty_merged = rule_runner.request(Digest, [MergeDigests((empty_snapshot.digest,))])
+    assert empty_snapshot.digest == empty_merged
+
+    roland_merged = rule_runner.request(
+        Digest, [MergeDigests((roland_snapshot.digest, empty_snapshot.digest))]
+    )
+    assert roland_snapshot.digest == roland_merged
+
+    both_merged = rule_runner.request(
+        Digest, [MergeDigests((roland_snapshot.digest, susannah_snapshot.digest))]
+    )
+    assert both_snapshot.digest == both_merged
+
+
+# -----------------------------------------------------------------------------------------------
+# `DownloadFile`
+# -----------------------------------------------------------------------------------------------
+
+
 @pytest.fixture
 def downloads_rule_runner() -> RuleRunner:
     return RuleRunner(rules=[QueryRule(Snapshot, [DownloadFile])], isolated_local_store=True)
@@ -914,6 +924,11 @@ def test_download_https() -> None:
 
     assert snapshot.files == ("file.txt",)
     assert snapshot.digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
+
+
+# -----------------------------------------------------------------------------------------------
+# `Workspace` and `.write_digest()`
+# -----------------------------------------------------------------------------------------------
 
 
 def test_write_digest_scheduler() -> None:

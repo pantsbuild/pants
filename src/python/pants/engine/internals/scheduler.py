@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, Union, cast
+from typing import Any, Dict, Iterable, List, NoReturn, Optional, Sequence, Tuple, Type, Union, cast
 
 from typing_extensions import TypedDict
 
@@ -588,15 +588,13 @@ class SchedulerSession:
         # order in output lists.
         return [ret.value for _, ret in returns]
 
-    def capture_snapshots(self, path_globs_and_roots):
+    def capture_snapshots(
+        self, path_globs_and_roots: Iterable[PathGlobsAndRoot]
+    ) -> Tuple[Snapshot, ...]:
         """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root
         directory.
 
         This is a blocking operation, and should be avoided where possible.
-
-        :param path_globs_and_roots tuple<PathGlobsAndRoot>: The PathGlobs to capture, and the root
-               directory relative to which each should be captured.
-        :returns: A tuple of Snapshots.
         """
         return self._scheduler._native.lib.capture_snapshots(
             self._scheduler._scheduler,
