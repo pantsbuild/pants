@@ -21,7 +21,7 @@ Bugfixes
 * Move graph cycle detection to rust to fix recursion limit. (cherrypick of #11202) (#11203)
   `PR #11203 <https://github.com/pantsbuild/pants/pull/11203>`_
 
-* Set the soft ulimit value more conservatively (cherrypick of #11194) (#11196)
+* Set the soft ulimit value more conservatively to fix macOS Big Sur issue (cherrypick of #11194) (#11196)
   `PR #11196 <https://github.com/pantsbuild/pants/pull/11196>`_
 
 2.0.1rc1 (11/16/2020)
