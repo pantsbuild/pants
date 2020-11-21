@@ -80,32 +80,6 @@ class InterpreterConstraintsField(StringSequenceField):
         return python_setup.compatibility_or_constraints(self.value)
 
 
-class PythonInterpreterCompatibility(StringOrStringSequenceField):
-    """Deprecated in favor of the `interpreter_constraints` field."""
-
-    alias = "compatibility"
-    deprecated_removal_version = "2.2.0.dev0"
-    deprecated_removal_hint = (
-        "Use the field `interpreter_constraints`. The field does not work with bare strings "
-        "and expects a list of strings, so replace `compatibility='>3.6'` with "
-        "interpreter_constraints=['>3.6']`."
-    )
-
-    def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
-        """Return either the given `compatibility` field or the global interpreter constraints.
-
-        If interpreter constraints are supplied by the CLI flag, return those only.
-        """
-        return python_setup.compatibility_or_constraints(self.value)
-
-
-COMMON_PYTHON_FIELDS = (
-    *COMMON_TARGET_FIELDS,
-    InterpreterConstraintsField,
-    PythonInterpreterCompatibility,
-)
-
-
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` target
 # -----------------------------------------------------------------------------------------------
@@ -341,7 +315,8 @@ class PexBinary(Target):
 
     alias = "pex_binary"
     core_fields = (
-        *COMMON_PYTHON_FIELDS,
+        *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
         OutputPathField,
         PexBinarySources,
         PexBinaryDependencies,
@@ -438,7 +413,8 @@ class PythonTests(Target):
 
     alias = "python_tests"
     core_fields = (
-        *COMMON_PYTHON_FIELDS,
+        *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
         PythonTestsSources,
         PythonTestsDependencies,
         PythonRuntimePackageDependencies,
@@ -464,7 +440,12 @@ class PythonLibrary(Target):
     """
 
     alias = "python_library"
-    core_fields = (*COMMON_PYTHON_FIELDS, Dependencies, PythonLibrarySources)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
+        Dependencies,
+        PythonLibrarySources,
+    )
 
 
 # -----------------------------------------------------------------------------------------------
