@@ -28,7 +28,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use nails::execution::{self, sink_for, stream_for, ChildInput, ChildOutput, ExitCode};
-use nails::{Child, Nail};
+use nails::Nail;
 use task_executor::Executor;
 use tokio::fs::File;
 use tokio::net::TcpListener;
@@ -157,7 +157,7 @@ impl Server {
         async move {
           let ongoing_connection_guard = ongoing_connections.read().await;
           connection_started.notify();
-          let result = nails::server_handle_connection(config, nail, tcp_stream).await;
+          let result = nails::server::handle_connection(config, nail, tcp_stream).await;
           std::mem::drop(ongoing_connection_guard);
           result
         }
@@ -230,7 +230,7 @@ impl Nail for RawFdNail {
     &self,
     cmd: execution::Command,
     input_stream: mpsc::Receiver<ChildInput>,
-  ) -> Result<Child, io::Error> {
+  ) -> Result<nails::server::Child, io::Error> {
     let env = cmd.env.iter().cloned().collect::<HashMap<_, _>>();
 
     // Handle stdin.
@@ -287,7 +287,7 @@ impl Nail for RawFdNail {
       })
       .boxed();
 
-    Ok(Child {
+    Ok(nails::server::Child {
       output_stream,
       accepts_stdin,
     })
