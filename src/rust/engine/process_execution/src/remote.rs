@@ -1173,7 +1173,6 @@ pub fn extract_output_files(
         // Retrieve the Tree proto and hash its root `Directory` proto to obtain the digest
         // of the output directory needed to construct the series of `Directory` protos needed
         // for the final merge of the output directories.
-        log::info!("processing dir={:?}", dir);
         let tree_digest: Digest = dir.get_tree_digest().try_into()?;
         let root_digest_opt = store.load_tree_from_remote(tree_digest).await?;
         let root_digest = root_digest_opt
