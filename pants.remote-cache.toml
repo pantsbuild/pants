@@ -1,0 +1,18 @@
+# Experimental remote cache configuration using Toolchain's remote cache service.
+
+[GLOBAL]
+remote_cache_read = true
+remote_cache_write = true
+
+remote_store_server = "build.toolchain.com:443"
+remote_store_initial_timeout=250
+remote_store_timeout_multiplier=1.5
+remote_store_maximum_timeout=5000
+
+remote_oauth_bearer_token_path = "./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted"
+remote_instance_name = "main"
+
+# Enable SSL by pointing Pants at the default TLS certificate truststore on Linux.
+# Note: This will probably be different for macOS.
+remote_ca_certs_path = "/etc/ssl/certs/ca-certificates.crt"
+

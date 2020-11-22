@@ -21,9 +21,9 @@ def main() -> None:
     args = create_parser().parse_args()
     setup_environment(python_version=args.python_version)
 
-    with maybe_get_remote_execution_oauth_token_path(
-        remote_execution_enabled=args.remote_execution_enabled
-    ) as remote_execution_oauth_token_path:
+    with maybe_get_remote_cache_oauth_token_path(
+        remote_cache_enabled=args.remote_cache_enabled
+    ) as remote_cache_oauth_token_path:
 
         if args.bootstrap:
             bootstrap(
@@ -38,7 +38,7 @@ def main() -> None:
         if args.smoke_tests:
             run_smoke_tests()
         if args.lint:
-            run_lint(oauth_token_path=remote_execution_oauth_token_path)
+            run_lint(oauth_token_path=remote_cache_oauth_token_path)
         if args.clippy:
             run_clippy()
         if args.cargo_audit:
@@ -47,7 +47,7 @@ def main() -> None:
             run_python_tests(
                 include_unit=args.unit_tests,
                 include_integration=args.integration_tests,
-                oauth_token_path=remote_execution_oauth_token_path,
+                oauth_token_path=remote_cache_oauth_token_path,
             )
         if args.rust_tests:
             run_rust_tests()
@@ -87,6 +87,14 @@ def create_parser() -> argparse.ArgumentParser:
         "If running locally, you must be logged in via the `gcloud` CLI to an account with remote "
         "build execution permissions. If running in CI, the script will ping the secure token "
         "generator at https://github.com/pantsbuild/rbe-token-server.",
+    )
+    parser.add_argument(
+        "--remote-cache-enabled",
+        action="store_true",
+        help="Pants will use the experimental remote cache service at build.toolchain.com:443 to cache "
+        "the results of processes using the cache features of Remote Execution API. Ths option "
+        "will only work when Pants is running with the Travis CI environment within the pantsbuild "
+        "organization given how the access token is encrypted.",
     )
     parser.add_argument(
         "--bootstrap", action="store_true", help="Bootstrap a pants.pex from local sources."
@@ -188,6 +196,16 @@ def maybe_get_remote_execution_oauth_token_path(
         yield tf.name
 
 
+@contextmanager
+def maybe_get_remote_cache_oauth_token_path(
+    *, remote_cache_enabled: bool
+) -> Iterator[Optional[str]]:
+    if not remote_cache_enabled:
+        yield None
+        return
+    yield "./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted"
+
+
 # -------------------------------------------------------------------------
 # Bootstrap pants.pex
 # -------------------------------------------------------------------------
@@ -242,6 +260,13 @@ def _use_remote_execution(oauth_token_path: str) -> List[str]:
     ]
 
 
+def _use_remote_cache(oauth_token_path: str) -> List[str]:
+    return [
+        "--pants-config-files=pants.remote-cache.toml",
+        f"--remote-oauth-bearer-token-path={oauth_token_path}",
+    ]
+
+
 def _run_command(
     command: List[str],
     *,
@@ -267,7 +292,7 @@ def _test_command(
     if extra_args:
         command.extend(extra_args)
     if oauth_token_path:
-        command.extend(_use_remote_execution(oauth_token_path))
+        command.extend(_use_remote_cache(oauth_token_path))
     return command
 
 
@@ -309,7 +334,7 @@ def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
     targets = ["build-support::", "src::", "tests::"]
     command = ["./pants.pex", "--tag=-nolint", "lint", "typecheck", *targets]
     if oauth_token_path:
-        command.extend(_use_remote_execution(oauth_token_path))
+        command.extend(_use_remote_cache(oauth_token_path))
     _run_command(
         command,
         slug="Lint",

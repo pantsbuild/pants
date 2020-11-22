@@ -288,6 +288,11 @@ def _linux_before_install(
                 "mv travis-wait-enhanced /home/travis/bin/",
             ]
         )
+    commands.append(
+        "openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv"
+        " -in  build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted "
+        " -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d"
+    )
     if include_test_config:
         return ["sudo sysctl fs.inotify.max_user_watches=524288", *commands]
     return commands
@@ -542,7 +547,7 @@ def python_tests(python_version: PythonVersion) -> Dict:
         "name": f"Python tests (Python {python_version.decimal})",
         "script": [
             "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-            "--unit-tests --integration-tests --python-version "
+            "--unit-tests --integration-tests --remote-cache-enabled --python-version "
             f"{python_version.decimal}"
         ],
         "after_success": ["./build-support/bin/upload_coverage.sh"],
