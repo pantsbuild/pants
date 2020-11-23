@@ -1729,3 +1729,4 @@ class ProvidesField(Field):
     world."""
 
     alias = "provides"
+    default: ClassVar[Optional[Any]] = None
