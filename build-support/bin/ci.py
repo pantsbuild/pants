@@ -320,7 +320,7 @@ def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
 
 def run_clippy() -> None:
     _run_command(
-        ["build-support/bin/check_clippy.sh"],
+        ["./cargo", "clippy", "--all"],
         slug="RustClippy",
         start_message="Running Clippy on Rust code.",
         die_message="Clippy failure.",
@@ -333,7 +333,7 @@ def run_cargo_audit() -> None:
         try:
             subprocess.run(
                 [
-                    "build-support/bin/native/cargo",
+                    "./cargo",
                     "ensure-installed",
                     "--package=cargo-audit",
                     "--version=0.11.2",
@@ -342,7 +342,7 @@ def run_cargo_audit() -> None:
             )
             subprocess.run(
                 [
-                    "build-support/bin/native/cargo",
+                    "./cargo",
                     "audit",
                     "-f",
                     "src/rust/engine/Cargo.lock",
@@ -361,13 +361,12 @@ def run_cargo_audit() -> None:
 def run_rust_tests() -> None:
     is_macos = platform.system() == "Darwin"
     command = [
-        "build-support/bin/native/cargo",
+        "./cargo",
         "test",
         "--all",
-        # We pass --tests to skip doc tests, because our generated protos contain invalid doc tests in
-        # their comments.
+        # We pass --tests to skip doc tests because our generated protos contain invalid doc tests
+        # in their comments.
         "--tests",
-        "--manifest-path=src/rust/engine/Cargo.toml",
         "--",
         "--nocapture",
     ]

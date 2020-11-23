@@ -25,8 +25,8 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
     # The TRAVIS env var is documented here:
     #   https://docs.travis-ci.com/user/environment-variables/#default-environment-variables
     if [[ "${TRAVIS}" != "true" ]]; then
-      echo "* Running cargo clippy"
-      ./build-support/bin/check_clippy.sh || exit 1
+      echo "* Running \`./cargo clippy --all\`"
+      ./cargo clippy --all || exit 1
     fi
     echo "* Checking formatting of Rust files"
     ./build-support/bin/check_rust_formatting.sh || exit 1

@@ -8,10 +8,7 @@ from textwrap import fill, indent
 from typing import cast
 
 from pants.backend.project_info.dependees import Dependees, DependeesRequest
-from pants.backend.python.target_types import (
-    InterpreterConstraintsField,
-    PythonInterpreterCompatibility,
-)
+from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.pex import PexInterpreterConstraints
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.engine.addresses import Addresses
@@ -90,7 +87,6 @@ async def py_constraints(
                 t
                 for t in (*all_expanded_targets, *all_explicit_targets)
                 if t.has_field(InterpreterConstraintsField)
-                or t.has_field(PythonInterpreterCompatibility)
             },
             key=lambda tgt: tgt.address,
         )
@@ -158,7 +154,6 @@ async def py_constraints(
             tgt_type.alias
             for tgt_type in registered_target_types.types
             if tgt_type.class_has_field(InterpreterConstraintsField, union_membership)
-            or tgt_type.class_has_field(PythonInterpreterCompatibility, union_membership)
         )
         logger.warning(
             "No Python files/targets matched for the `py-constraints` goal. All target types with "

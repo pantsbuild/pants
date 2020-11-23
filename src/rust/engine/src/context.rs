@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::core::Failure;
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
-use crate::scheduler::Session;
+use crate::session::Session;
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 

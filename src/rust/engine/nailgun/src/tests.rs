@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future;
-use nails::execution::{child_channel, ChildInput, ChildOutput, Command, ExitCode};
-use nails::{client_handle_connection, Config};
+use nails::execution::{child_channel, ChildInput, Command, ExitCode};
+use nails::Config;
 use task_executor::Executor;
 use tokio::net::TcpStream;
 use tokio::runtime::Handle;
@@ -85,12 +85,12 @@ async fn run_client(port: u16) -> Result<ExitCode, String> {
     env: vec![],
     working_dir: PathBuf::from("/dev/null"),
   };
-  let (stdio_write, _stdio_read) = child_channel::<ChildOutput>();
   let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-  client_handle_connection(Config::default(), stream, cmd, stdio_write, async {
+  let child = nails::client::handle_connection(Config::default(), stream, cmd, async {
     let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
     stdin_read
   })
   .await
-  .map_err(|e| e.to_string())
+  .map_err(|e| e.to_string())?;
+  child.wait().await.map_err(|e| e.to_string())
 }

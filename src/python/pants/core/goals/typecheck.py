@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple
 
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import (
@@ -23,7 +23,7 @@ from pants.util.strutil import strip_v2_chroot_path
 
 
 @dataclass(frozen=True)
-class TypecheckResult:
+class TypecheckResult(EngineAwareReturnType):
     exit_code: int
     stdout: str
     stderr: str
@@ -45,6 +45,9 @@ class TypecheckResult:
             stderr=prep_output(process_result.stderr),
             partition_description=partition_description,
         )
+
+    def metadata(self) -> Dict[str, Any]:
+        return {"partition": self.partition_description}
 
 
 @frozen_after_init

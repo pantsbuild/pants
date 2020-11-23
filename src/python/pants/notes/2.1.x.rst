@@ -5,6 +5,24 @@ This document describes releases leading up to the ``2.1.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.1/docs/release-notes-2-1 for an overview of the changes in this release.
 
+2.1.1rc0 (11/20/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Revert premature deprecation of `sources` field for `python_awslambda` (#11217)
+  `PR #11217 <https://github.com/pantsbuild/pants/pull/11217>`_
+
+Bugfixes
+~~~~~~~~
+
+* Move graph cycle detection to Rust to fix recursion limit. (cherrypick of #11202) (#11204)
+  `PR #11204 <https://github.com/pantsbuild/pants/pull/11204>`_
+
+* Set the soft ulimit value more conservatively to fix macOS Big Sur issue (cherrypick of #11194) (#11197)
+  `PR #11197 <https://github.com/pantsbuild/pants/pull/11197>`_
+
 2.1.0 (11/17/2020)
 ------------------
 

@@ -46,8 +46,7 @@ function _build_native_code() {
     # should be using.
     # NB: See Cargo.toml with regard to the `extension-module` feature.
     cd "${REPO_ROOT}"
-    "${REPO_ROOT}/build-support/bin/native/cargo" build --features=extension-module ${MODE_FLAG} \
-      --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine
+    "${REPO_ROOT}/cargo" build --features=extension-module ${MODE_FLAG} -p engine
   ) || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }

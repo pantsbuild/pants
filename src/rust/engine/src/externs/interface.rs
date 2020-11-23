@@ -29,6 +29,7 @@
 // File-specific allowances to silence internal warnings of `py_class!`.
 #![allow(
   unused_braces,
+  clippy::manual_strip,
   clippy::used_underscore_binding,
   clippy::transmute_ptr_to_ptr,
   clippy::zero_ptr
@@ -62,7 +63,7 @@ use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::Future;
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::Digest;
 use indexmap::IndexMap;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
@@ -70,7 +71,6 @@ use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
-use tempfile::TempDir;
 use workunit_store::{UserMetadataItem, Workunit, WorkunitState};
 
 use crate::scheduler::maybe_break_execution_loop;
@@ -1691,85 +1691,44 @@ fn run_local_interactive_process(
   session_ptr: PySession,
   request: PyObject,
 ) -> CPyResult<PyObject> {
-  use std::process;
-
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
-      block_in_place_and_wait(py, ||
-        session.with_console_ui_disabled(|| {
-          let types = &scheduler.core.types;
-          let interactive_process_result = types.interactive_process_result;
+      let types = &scheduler.core.types;
+      let interactive_process_result = types.interactive_process_result;
 
-          let value: Value = request.into();
+      let value: Value = request.into();
 
-          let argv: Vec<String> = externs::getattr(&value, "argv").unwrap();
-          if argv.is_empty() {
-            return Err("Empty argv list not permitted".to_string());
-          }
+      let argv: Vec<String> = externs::getattr(&value, "argv").unwrap();
+      if argv.is_empty() {
+        return Err("Empty argv list not permitted".to_string());
+      }
 
-          let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
-          let maybe_tempdir = if run_in_workspace {
-            None
-          } else {
-            Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
-          };
+      let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
+      let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
+      let input_digest: Digest = nodes::lift_directory_digest(types, &input_digest_value)?;
+      let hermetic_env: bool = externs::getattr(&value, "hermetic_env").unwrap();
+      let env = externs::getattr_from_frozendict(&value, "env");
 
-          let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
-          let digest: Digest = nodes::lift_directory_digest(types, &input_digest_value)?;
-          if digest != EMPTY_DIGEST {
-            if run_in_workspace {
-              warn!("Local interactive process should not attempt to materialize files when run in workspace");
-            } else {
-              let destination = match maybe_tempdir {
-                Some(ref dir) => dir.path().to_path_buf(),
-                None => unreachable!()
-              };
+      let code = block_in_place_and_wait(py, || {
+        scheduler
+          .run_local_interactive_process(
+            session,
+            input_digest,
+            argv,
+            env,
+            hermetic_env,
+            run_in_workspace,
+          )
+          .boxed_local()
+          .compat()
+      })?;
 
-              scheduler.core.store().materialize_directory(
-                destination,
-                digest,
-              ).wait()?;
-            }
-          }
-
-          let p = Path::new(&argv[0]);
-          let program_name = match maybe_tempdir {
-            Some(ref tempdir) if p.is_relative() =>  {
-              let mut buf = PathBuf::new();
-              buf.push(tempdir);
-              buf.push(p);
-              buf
-            },
-            _ => p.to_path_buf()
-          };
-
-          let mut command = process::Command::new(program_name);
-          for arg in argv[1..].iter() {
-            command.arg(arg);
-          }
-
-          if let Some(ref tempdir) = maybe_tempdir {
-            command.current_dir(tempdir.path());
-          }
-
-          let hermetic_env: bool = externs::getattr(&value, "hermetic_env").unwrap();
-          if hermetic_env {
-            command.env_clear();
-          }
-          let env = externs::getattr_from_frozendict(&value, "env");
-          command.envs(env);
-
-          let mut subprocess = command.spawn().map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
-          let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
-          let code = exit_status.code().unwrap_or(-1);
-
-          Ok(externs::unsafe_call(
-            interactive_process_result,
-            &[externs::store_i64(i64::from(code))],
-          ).into())
-        })
-        .boxed_local()
-        .compat()
+      Ok(
+        externs::unsafe_call(
+          interactive_process_result,
+          &[externs::store_i64(i64::from(code))],
+        )
+        .into(),
       )
     })
   })
