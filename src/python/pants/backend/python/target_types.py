@@ -132,6 +132,8 @@ class PexEntryPointField(StringField):
 
     If omitted, Pants will use the module name from the `sources` field, e.g. `project/app.py` will
     become the entry point `project.app` .
+
+    You can set `entry_point='<none>'` to leave off an entry point from the built PEX.
     """
 
     alias = "entry_point"
@@ -152,6 +154,8 @@ class ResolvePexEntryPointRequest:
     2. The `entry_point` using a shorthand `:my_func`, and the `sources` field being set. We
         combine these into `path.to.module:my_func`.
     3. The `entry_point` being left off, but `sources` defined. We will use `path.to.module`.
+
+    Users can set `entry_point='<none>'` to leave off the entry point.
     """
 
     entry_point_field: PexEntryPointField
