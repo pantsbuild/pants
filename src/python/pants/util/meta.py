@@ -177,19 +177,27 @@ def frozen_after_init(cls: C) -> C:
     prev_init = cls.__init__
     prev_setattr = cls.__setattr__
 
+    def freeze_instance(self) -> None:
+        self._is_frozen = True
+
+    def unfreeze_instance(self) -> None:
+        self._is_frozen = False
+
     @wraps(prev_init)
     def new_init(self, *args: Any, **kwargs: Any) -> None:
         prev_init(self, *args, **kwargs)
-        self._is_frozen = True
+        self._freeze_instance()
 
     @wraps(prev_setattr)
     def new_setattr(self, key: str, value: Any) -> None:
-        if getattr(self, "_is_frozen", False):
+        if getattr(self, "_is_frozen", False) and key != "_is_frozen":
             raise FrozenInstanceError(
                 f"Attempting to modify the attribute {key} after the object {self} was created."
             )
         prev_setattr(self, key, value)  # type: ignore[call-arg]
 
+    cls._freeze_instance = freeze_instance
+    cls._unfreeze_instance = unfreeze_instance
     cls.__init__ = new_init
     cls.__setattr__ = new_setattr
 

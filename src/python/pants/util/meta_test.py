@@ -313,6 +313,13 @@ def test_add_new_field_after_init() -> None:
     with pytest.raises(FrozenInstanceError):
         test.y = "abc"  # type: ignore[attr-defined]
 
+    test._unfreeze_instance()  # type: ignore[attr-defined]
+    test.y = "abc"  # type: ignore[attr-defined]
+
+    test._freeze_instance()  # type: ignore[attr-defined]
+    with pytest.raises(FrozenInstanceError):
+        test.z = "abc"  # type: ignore[attr-defined]
+
 
 def test_explicitly_call_setattr_after_init() -> None:
     @frozen_after_init
@@ -323,6 +330,13 @@ def test_explicitly_call_setattr_after_init() -> None:
     test = Test(x=0)
     with pytest.raises(FrozenInstanceError):
         setattr(test, "x", 1)
+
+    test._unfreeze_instance()  # type: ignore[attr-defined]
+    setattr(test, "x", 1)
+
+    test._freeze_instance()  # type: ignore[attr-defined]
+    with pytest.raises(FrozenInstanceError):
+        test.y = "abc"  # type: ignore[attr-defined]
 
 
 def test_works_with_dataclass() -> None:

@@ -19,11 +19,11 @@ from pants.engine.target import (
     Dependencies,
     DictStringToStringField,
     DictStringToStringSequenceField,
+    Field,
     FieldSet,
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
-    PrimitiveField,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
@@ -47,7 +47,7 @@ from pants.util.ordered_set import OrderedSet
 # -----------------------------------------------------------------------------------------------
 
 
-class FortranExtensions(PrimitiveField):
+class FortranExtensions(Field):
     alias = "fortran_extensions"
     value: Tuple[str, ...]
     default = ()
@@ -76,14 +76,14 @@ class UnrelatedField(BoolField):
 
 class FortranSources(AsyncField):
     alias = "sources"
-    sanitized_raw_value: Optional[Tuple[str, ...]]
+    value: Optional[Tuple[str, ...]]
     default = None
 
     @classmethod
-    def sanitize_raw_value(
+    def compute_value(
         cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
-        value_or_default = super().sanitize_raw_value(raw_value, address=address)
+        value_or_default = super().compute_value(raw_value, address=address)
         if value_or_default is None:
             return None
         return tuple(ensure_str_list(value_or_default))
@@ -102,7 +102,7 @@ class FortranSourcesResult:
 @rule
 async def hydrate_fortran_sources(request: FortranSourcesRequest) -> FortranSourcesResult:
     sources_field = request.field
-    result = await Get(Snapshot, PathGlobs(sources_field.sanitized_raw_value or ()))
+    result = await Get(Snapshot, PathGlobs(sources_field.value or ()))
     # Validate after hydration
     non_fortran_sources = [
         fp for fp in result.files if PurePath(fp).suffix not in (".f95", ".f03", ".f08")
@@ -171,7 +171,7 @@ def test_get_field() -> None:
     ).value == (not UnrelatedField.default)
 
 
-def test_primitive_field_hydration_is_eager() -> None:
+def test_field_hydration_is_eager() -> None:
     with pytest.raises(InvalidFieldException) as exc:
         FortranTarget(
             {FortranExtensions.alias: ["FortranExt1", "DoesNotStartWithFortran"]},
@@ -254,7 +254,7 @@ def test_async_field() -> None:
         == expected_files
     )
 
-    # Test that `raw_value` gets sanitized/validated eagerly.
+    # Test that `raw_value` gets hydrated/validated eagerly.
     with pytest.raises(ValueError) as exc:
         FortranTarget({FortranSources.alias: [0, 1, 2]}, address=Address("", target_name="lib"))
     assert "Not all elements of the iterable have type" in str(exc)
@@ -727,8 +727,8 @@ def test_async_string_sequence_field() -> None:
         alias = "example"
 
     addr = Address("", target_name="example")
-    assert Example(["hello", "world"], address=addr).sanitized_raw_value == ("hello", "world")
-    assert Example(None, address=addr).sanitized_raw_value is None
+    assert Example(["hello", "world"], address=addr).value == ("hello", "world")
+    assert Example(None, address=addr).value is None
     with pytest.raises(InvalidFieldTypeException):
         Example("strings are technically iterable...", address=addr)
     with pytest.raises(InvalidFieldTypeException):

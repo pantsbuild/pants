@@ -22,12 +22,12 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringSequenceField,
+    Field,
     InjectDependenciesRequest,
     InjectedDependencies,
     IntField,
     InvalidFieldException,
     InvalidFieldTypeException,
-    PrimitiveField,
     ProvidesField,
     ScalarField,
     Sources,
@@ -484,7 +484,7 @@ def format_invalid_requirement_string_error(
     )
 
 
-class PythonRequirementsField(PrimitiveField):
+class PythonRequirementsField(Field):
     """A sequence of pip-style requirement strings, e.g. ['foo==1.8', 'bar<=3 ;
     python_version<'3']."""
 

@@ -699,7 +699,7 @@ def parse_dependencies_field(
 
     addresses: List[AddressInput] = []
     ignored_addresses: List[AddressInput] = []
-    for v in field.sanitized_raw_value or ():
+    for v in field.value or ():
         is_ignore = v.startswith("!")
         if is_ignore:
             # Check if it's a transitive exclude, rather than a direct exclude.
