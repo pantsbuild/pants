@@ -77,7 +77,7 @@ def test_resolve_pex_binary_entry_point() -> None:
     )
 
     def assert_resolved(
-        *, entry_point: Optional[str], source: Optional[str], expected: str
+        *, entry_point: Optional[str], source: Optional[str], expected: Optional[str]
     ) -> None:
         addr = Address("src/python/project")
         rule_runner.create_file("src/python/project/app.py")
@@ -93,10 +93,15 @@ def test_resolve_pex_binary_entry_point() -> None:
     )
     assert_resolved(entry_point=":func", source="app.py", expected="project.app:func")
     assert_resolved(entry_point=None, source="app.py", expected="project.app")
+
+    # We special case the strings `<none>` and `<None>`.
+    assert_resolved(entry_point="<none>", source=None, expected=None)
+    assert_resolved(entry_point="<none>", source="app.py", expected=None)
+    assert_resolved(entry_point="<None>", source=None, expected=None)
+    assert_resolved(entry_point="<None>", source="app.py", expected=None)
+
     with pytest.raises(ExecutionError):
         assert_resolved(entry_point=":func", source=None, expected="doesnt matter")
-    with pytest.raises(ExecutionError):
-        assert_resolved(entry_point=None, source=None, expected="doesnt matter")
 
 
 def test_requirements_field() -> None:
