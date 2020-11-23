@@ -162,21 +162,31 @@ class ResolvePexEntryPointRequest:
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
     entry_point_value = request.entry_point_field.value
     if entry_point_value and not entry_point_value.startswith(":"):
+        if entry_point_value in ("<none>", "<None>"):
+            return ResolvedPexEntryPoint(None)
         return ResolvedPexEntryPoint(entry_point_value)
     binary_source_paths = await Get(
         Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
     )
     if len(binary_source_paths.files) != 1:
+        instructions_url = "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
         if not entry_point_value:
-            return ResolvedPexEntryPoint(None)
-        raise InvalidFieldException(
-            f"The `entry_point` field for the target {request.sources.address} is set to "
-            f"the short-hand value {repr(entry_point_value)}, but the `sources` field is not "
-            "set. Pants requires the `sources` field to expand the entry point to the "
-            f"normalized form `path.to.module:{entry_point_value}`. Please either set the "
-            "`sources` field to exactly one file or use a full value for `entry_point`. See "
-            "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target."
-        )
+            raise InvalidFieldException(
+                "Both the `entry_point` and `sources` fields are not set for the target "
+                f"{request.sources.address}, so Pants cannot determine an entry point. Please "
+                "either explicitly set the `entry_point` field and/or the `sources` field to "
+                "exactly one file. You can set `entry_point='<none>' to leave off the entry point."
+                f"See {instructions_url}."
+            )
+        else:
+            raise InvalidFieldException(
+                f"The `entry_point` field for the target {request.sources.address} is set to "
+                f"the short-hand value {repr(entry_point_value)}, but the `sources` field is not "
+                "set. Pants requires the `sources` field to expand the entry point to the "
+                f"normalized form `path.to.module:{entry_point_value}`. Please either set the "
+                "`sources` field to exactly one file or use a full value for `entry_point`. See "
+                f"{instructions_url}."
+            )
     entry_point_path = binary_source_paths.files[0]
     source_root = await Get(
         SourceRoot,
