@@ -66,8 +66,19 @@ def test_run_sample_script(tgt_content: str) -> None:
     assert result.exit_code == 23
 
 
-def test_requires_entry_point() -> None:
+def test_warns_if_entry_point_not_set(caplog) -> None:
     with setup_tmpdir({"BUILD": "pex_binary()"}) as tmpdir:
-        result = run_pants(["--backend-packages=pants.backend.python", "run", tmpdir])
+        result = run_pants(
+            [
+                "--backend-packages=pants.backend.python",
+                "run",
+                tmpdir,
+                # We use a passthrough arg to make sure we don't open a venv, which would never
+                # terminate and cause a timeout.
+                "--",
+                "invalid_passthrough_arg",
+            ]
+        )
     result.assert_failure()
-    assert "MissingEntryPoint" in result.stderr
+    assert len(caplog.records) == 1
+    assert f"No entry point set for the `pex_binary` target {tmpdir}" in caplog.text
