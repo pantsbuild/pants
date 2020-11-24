@@ -5,6 +5,15 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.2rc2 (11/24/2020)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Add a specific error for target names containing slashes (cherry pick of #11115) (#11121)
+  `PR #11121 <https://github.com/pantsbuild/pants/pull/11121>`_
+
 1.30.2rc1 (9/30/2020)
 ---------------------
 
