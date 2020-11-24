@@ -9,14 +9,14 @@ import pytest
 
 from pants.engine.addresses import Address
 from pants.engine.target import (
-    AsyncField,
-    AsyncStringSequenceField,
+    AsyncFieldMixin,
     BoolField,
     Dependencies,
     DictStringToStringField,
     DictStringToStringSequenceField,
     Field,
     FieldSet,
+    IntField,
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -76,6 +76,63 @@ class UnrelatedField(BoolField):
 class FortranTarget(Target):
     alias = "fortran"
     core_fields = (FortranExtensions, FortranVersion)
+
+
+def test_field_and_target_eq() -> None:
+    addr = Address("", target_name="tgt")
+    field = FortranVersion("dev0", address=addr)
+    assert field.value == "dev0"
+
+    other = FortranVersion("dev0", address=addr)
+    assert field == other
+    assert hash(field) == hash(other)
+
+    other = FortranVersion("dev1", address=addr)
+    assert field != other
+    assert hash(field) != hash(other)
+
+    # NB: because normal `Field`s throw away the address, these are equivalent.
+    other = FortranVersion("dev0", address=Address("", target_name="other"))
+    assert field == other
+    assert hash(field) == hash(other)
+
+    # Ensure the field is frozen.
+    with pytest.raises(FrozenInstanceError):
+        field.y = "foo"  # type: ignore[attr-defined]
+
+    tgt = FortranTarget({"version": "dev0"}, address=addr)
+    assert tgt.address == addr
+
+    other_tgt = FortranTarget({"version": "dev0"}, address=addr)
+    assert tgt == other_tgt
+    assert hash(tgt) == hash(other_tgt)
+
+    other_tgt = FortranTarget({"version": "dev1"}, address=addr)
+    assert tgt != other_tgt
+    assert hash(tgt) != hash(other_tgt)
+
+    other_tgt = FortranTarget({"version": "dev0"}, address=Address("", target_name="other"))
+    assert tgt != other_tgt
+    assert hash(tgt) != hash(other_tgt)
+
+    # Ensure the target is frozen.
+    with pytest.raises(FrozenInstanceError):
+        tgt.y = "foo"  # type: ignore[attr-defined]
+
+    # Ensure that subclasses are not equal.
+    class SubclassField(FortranVersion):
+        pass
+
+    subclass_field = SubclassField("dev0", address=addr)
+    assert field != subclass_field
+    assert hash(field) != hash(subclass_field)
+
+    class SubclassTarget(FortranTarget):
+        pass
+
+    subclass_tgt = SubclassTarget({"version": "dev0"}, address=addr)
+    assert tgt != subclass_tgt
+    assert hash(tgt) != hash(subclass_tgt)
 
 
 def test_invalid_fields_rejected() -> None:
@@ -323,8 +380,8 @@ def test_required_field() -> None:
     assert "field" in str(exc.value)
 
 
-def test_async_field() -> None:
-    class ExampleField(AsyncField):
+def test_async_field_mixin() -> None:
+    class ExampleField(IntField, AsyncFieldMixin):
         alias = "field"
         default = 10
 
@@ -332,6 +389,7 @@ def test_async_field() -> None:
     field = ExampleField(None, address=addr)
     assert field.value == 10
     assert field.address == addr
+    ExampleField.mro()  # Regression test that the mro is resolvable.
 
     # Ensure equality and __hash__ work correctly.
     other = ExampleField(None, address=addr)
@@ -342,6 +400,7 @@ def test_async_field() -> None:
     assert field != other
     assert hash(field) != hash(other)
 
+    # Whereas normally the address is not considered, it is considered for async fields.
     other = ExampleField(None, address=Address("", target_name="other"))
     assert field != other
     assert hash(field) != hash(other)
@@ -349,6 +408,14 @@ def test_async_field() -> None:
     # Ensure it's still frozen.
     with pytest.raises(FrozenInstanceError):
         field.y = "foo"  # type: ignore[attr-defined]
+
+    # Ensure that subclasses are not equal.
+    class Subclass(ExampleField):
+        pass
+
+    subclass = Subclass(None, address=addr)
+    assert field != subclass
+    assert hash(field) != hash(subclass)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -646,16 +713,3 @@ def test_dict_string_to_string_sequence_field() -> None:
         default = FrozenDict({"default": ("val",)})
 
     assert ExampleDefault(None, address=addr).value == FrozenDict({"default": ("val",)})
-
-
-def test_async_string_sequence_field() -> None:
-    class Example(AsyncStringSequenceField):
-        alias = "example"
-
-    addr = Address("", target_name="example")
-    assert Example(["hello", "world"], address=addr).value == ("hello", "world")
-    assert Example(None, address=addr).value is None
-    with pytest.raises(InvalidFieldTypeException):
-        Example("strings are technically iterable...", address=addr)
-    with pytest.raises(InvalidFieldTypeException):
-        Example(["hello", 0, "world"], address=addr)
