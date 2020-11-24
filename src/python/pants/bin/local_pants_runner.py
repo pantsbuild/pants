@@ -15,6 +15,7 @@ from pants.base.workunit import WorkUnit
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
 from pants.engine.target import RegisteredTargetTypes
@@ -64,6 +65,7 @@ class LocalPantsRunner:
         build_config: BuildConfiguration,
         options: Options,
         scheduler: Optional[GraphScheduler] = None,
+        cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> GraphSession:
         native = Native()
         native.set_panic_handler()
@@ -89,6 +91,7 @@ class LocalPantsRunner:
                     PantsEnvironment: PantsEnvironment(os.environ),
                 }
             ),
+            cancellation_latch=cancellation_latch,
         )
 
     @staticmethod
@@ -106,6 +109,7 @@ class LocalPantsRunner:
         env: Mapping[str, str],
         options_bootstrapper: OptionsBootstrapper,
         scheduler: Optional[GraphScheduler] = None,
+        cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> "LocalPantsRunner":
         """Creates a new LocalPantsRunner instance by parsing options.
 
@@ -131,7 +135,7 @@ class LocalPantsRunner:
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
         graph_session = cls._init_graph_session(
-            options_bootstrapper, build_config, options, scheduler
+            options_bootstrapper, build_config, options, scheduler, cancellation_latch
         )
 
         # Option values are usually computed lazily on demand,

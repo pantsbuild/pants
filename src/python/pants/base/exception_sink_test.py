@@ -21,11 +21,6 @@ def _gen_sink_subclass():
     return AnonymousSink
 
 
-def test_default_log_location():
-    sink = _gen_sink_subclass()
-    assert os.getcwd() == sink._log_dir
-
-
 def test_reset_log_location():
     sink = _gen_sink_subclass()
     with temporary_dir() as tmpdir:
