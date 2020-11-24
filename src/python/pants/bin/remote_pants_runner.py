@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 @contextmanager
 def interrupts_ignored():
     """Disables Python's default interrupt handling."""
-    old_handler = signal.signal(signal.SIGINT, lambda s, f: None)
+    old_handler = signal.signal(signal.SIGINT, handler=lambda s, f: None)
     try:
         yield
     finally:
@@ -123,7 +123,7 @@ class RemotePantsRunner:
             logger.debug(f"Connecting to pantsd on port {port} attempt {attempt}/{retries}")
 
             # We preserve TTY settings since the server might write directly to the TTY, and we'd like
-            # to clean up any sideeffects before exiting.
+            # to clean up any side effects before exiting.
             #
             # We ignore keyboard interrupts because the nailgun client will handle them.
             with STTYSettings.preserved(), interrupts_ignored():
@@ -142,7 +142,7 @@ class RemotePantsRunner:
 
                     # One possible cause of the daemon being non-responsive during an attempt might be if a
                     # another lifecycle operation is happening concurrently (incl teardown). To account for
-                    # this, we won't begin attempting restarts until at least 1 second has passed (1 attempt).
+                    # this, we won't begin attempting restarts until at least 1 attempt has passed.
                     if attempt > 1:
                         pantsd_handle = self._client.restart()
 
