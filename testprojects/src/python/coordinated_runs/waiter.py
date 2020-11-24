@@ -7,7 +7,10 @@ import sys
 import time
 
 waiting_for_file = sys.argv[1]
+pid_file = sys.argv[2]
 attempts = 60
+with open(pid_file, "w") as pf:
+    pf.write(str(os.getpid()))
 while not os.path.isfile(waiting_for_file):
     if attempts <= 0:
         raise Exception("File was never written.")

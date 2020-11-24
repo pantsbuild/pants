@@ -11,10 +11,7 @@ from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, cas
 import pytest
 from pkg_resources import Requirement
 
-from pants.backend.python.target_types import (
-    InterpreterConstraintsField,
-    PythonInterpreterCompatibility,
-)
+from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -218,7 +215,6 @@ def test_interpreter_constraints_do_not_require_python38(constraints):
 @dataclass(frozen=True)
 class MockFieldSet(FieldSet):
     interpreter_constraints: InterpreterConstraintsField
-    compatibility: PythonInterpreterCompatibility
 
     @classmethod
     def create_for_test(cls, address: Address, compat: Optional[str]) -> "MockFieldSet":
@@ -227,7 +223,6 @@ class MockFieldSet(FieldSet):
             interpreter_constraints=InterpreterConstraintsField(
                 [compat] if compat else None, address=address
             ),
-            compatibility=PythonInterpreterCompatibility(None, address=address),
         )
 
 

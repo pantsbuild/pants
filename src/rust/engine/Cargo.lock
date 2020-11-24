@@ -54,6 +54,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "async_latch"
+version = "0.0.1"
+dependencies = [
+ "parking_lot",
+ "tokio",
+]
+
+[[package]]
 name = "async_semaphore"
 version = "0.0.1"
 dependencies = [
@@ -689,6 +697,7 @@ name = "engine"
 version = "0.0.1"
 dependencies = [
  "async-trait",
+ "async_latch",
  "async_semaphore",
  "boxfuture",
  "bytes 0.4.12",
@@ -1695,6 +1704,7 @@ checksum = "2eb04b9f127583ed176e163fb9ec6f3e793b87e21deedd5734a69386a18a0151"
 name = "nailgun"
 version = "0.0.1"
 dependencies = [
+ "async_latch",
  "bytes 0.5.4",
  "futures 0.3.5",
  "log 0.4.8",
@@ -1706,9 +1716,9 @@ dependencies = [
 
 [[package]]
 name = "nails"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a495346f7367d386ab5fd0a487554cd338062adf11fd91c25396eef9e5557411"
+checksum = "324d0793d44314222dc61947ffecc0325fb1c824dd6ef6b231b98e0b1f06b11b"
 dependencies = [
  "byteorder",
  "bytes 0.5.4",

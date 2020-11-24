@@ -22,12 +22,12 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringSequenceField,
+    Field,
     InjectDependenciesRequest,
     InjectedDependencies,
     IntField,
     InvalidFieldException,
     InvalidFieldTypeException,
-    PrimitiveField,
     ProvidesField,
     ScalarField,
     Sources,
@@ -78,32 +78,6 @@ class InterpreterConstraintsField(StringSequenceField):
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
         return python_setup.compatibility_or_constraints(self.value)
-
-
-class PythonInterpreterCompatibility(StringOrStringSequenceField):
-    """Deprecated in favor of the `interpreter_constraints` field."""
-
-    alias = "compatibility"
-    deprecated_removal_version = "2.2.0.dev0"
-    deprecated_removal_hint = (
-        "Use the field `interpreter_constraints`. The field does not work with bare strings "
-        "and expects a list of strings, so replace `compatibility='>3.6'` with "
-        "interpreter_constraints=['>3.6']`."
-    )
-
-    def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
-        """Return either the given `compatibility` field or the global interpreter constraints.
-
-        If interpreter constraints are supplied by the CLI flag, return those only.
-        """
-        return python_setup.compatibility_or_constraints(self.value)
-
-
-COMMON_PYTHON_FIELDS = (
-    *COMMON_TARGET_FIELDS,
-    InterpreterConstraintsField,
-    PythonInterpreterCompatibility,
-)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -158,6 +132,8 @@ class PexEntryPointField(StringField):
 
     If omitted, Pants will use the module name from the `sources` field, e.g. `project/app.py` will
     become the entry point `project.app` .
+
+    You can set `entry_point='<none>'` to leave off an entry point from the built PEX.
     """
 
     alias = "entry_point"
@@ -165,7 +141,7 @@ class PexEntryPointField(StringField):
 
 @dataclass(frozen=True)
 class ResolvedPexEntryPoint:
-    val: str
+    val: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -178,6 +154,8 @@ class ResolvePexEntryPointRequest:
     2. The `entry_point` using a shorthand `:my_func`, and the `sources` field being set. We
         combine these into `path.to.module:my_func`.
     3. The `entry_point` being left off, but `sources` defined. We will use `path.to.module`.
+
+    Users can set `entry_point='<none>'` to leave off the entry point.
     """
 
     entry_point_field: PexEntryPointField
@@ -188,6 +166,8 @@ class ResolvePexEntryPointRequest:
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
     entry_point_value = request.entry_point_field.value
     if entry_point_value and not entry_point_value.startswith(":"):
+        if entry_point_value in ("<none>", "<None>"):
+            return ResolvedPexEntryPoint(None)
         return ResolvedPexEntryPoint(entry_point_value)
     binary_source_paths = await Get(
         Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
@@ -196,10 +176,11 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
         instructions_url = "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
         if not entry_point_value:
             raise InvalidFieldException(
-                f"Both the `entry_point` and `sources` fields are not set for the target "
+                "Both the `entry_point` and `sources` fields are not set for the target "
                 f"{request.sources.address}, so Pants cannot determine an entry point. Please "
                 "either explicitly set the `entry_point` field and/or the `sources` field to "
-                f"exactly one file. See {instructions_url}."
+                "exactly one file. You can set `entry_point='<none>' to leave off the entry point."
+                f"See {instructions_url}."
             )
         else:
             raise InvalidFieldException(
@@ -341,7 +322,8 @@ class PexBinary(Target):
 
     alias = "pex_binary"
     core_fields = (
-        *COMMON_PYTHON_FIELDS,
+        *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
         OutputPathField,
         PexBinarySources,
         PexBinaryDependencies,
@@ -438,7 +420,8 @@ class PythonTests(Target):
 
     alias = "python_tests"
     core_fields = (
-        *COMMON_PYTHON_FIELDS,
+        *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
         PythonTestsSources,
         PythonTestsDependencies,
         PythonRuntimePackageDependencies,
@@ -464,7 +447,12 @@ class PythonLibrary(Target):
     """
 
     alias = "python_library"
-    core_fields = (*COMMON_PYTHON_FIELDS, Dependencies, PythonLibrarySources)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
+        Dependencies,
+        PythonLibrarySources,
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -503,7 +491,7 @@ def format_invalid_requirement_string_error(
     )
 
 
-class PythonRequirementsField(PrimitiveField):
+class PythonRequirementsField(Field):
     """A sequence of pip-style requirement strings, e.g. ['foo==1.8', 'bar<=3 ;
     python_version<'3']."""
 

@@ -11,14 +11,13 @@ from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, Type, ca
 from pants.base import deprecated
 from pants.engine.goal import GoalSubsystem
 from pants.engine.target import (
-    AsyncField,
+    AsyncFieldMixin,
     BoolField,
     DictStringToStringField,
     DictStringToStringSequenceField,
     Field,
     FloatField,
     IntField,
-    PrimitiveField,
     RegisteredTargetTypes,
     ScalarField,
     SequenceField,
@@ -159,19 +158,18 @@ class TargetFieldHelpInfo:
         # we can still generate meaningful documentation for all these custom fields without
         # requiring the Field author to rewrite the docstring.
         #
-        # However, if the original `Field` author did not define docstring, then this means we
-        # would typically fall back to the docstring for `AsyncField`, `PrimitiveField`, or a
-        # helper class like `StringField`. This is a quirk of this heuristic and it's not
-        # intentional since these core `Field` types have documentation oriented to the custom
-        # `Field` author and not the end user filling in fields in a BUILD file target.
+        # However, if the original plugin author did not define docstring, then this means we
+        # would typically fall back to the docstring for `Field` or a template like `StringField`.
+        # This is a an awkward edge of our heuristic and it's not intentional since these core
+        # `Field` types have documentation oriented to the plugin author and not the end user
+        # filling in fields in a BUILD file.
         description = get_docstring(
             field,
             flatten=True,
             fallback_to_ancestors=True,
             ignored_ancestors={
                 *Field.mro(),
-                AsyncField,
-                PrimitiveField,
+                AsyncFieldMixin,
                 BoolField,
                 DictStringToStringField,
                 DictStringToStringSequenceField,
@@ -185,12 +183,7 @@ class TargetFieldHelpInfo:
                 StringSequenceField,
             },
         )
-        if issubclass(field, PrimitiveField):
-            raw_value_type = get_type_hints(field.compute_value)["raw_value"]
-        elif issubclass(field, AsyncField):
-            raw_value_type = get_type_hints(field.sanitize_raw_value)["raw_value"]
-        else:
-            raw_value_type = get_type_hints(field.__init__)["raw_value"]
+        raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
 
         # Check if the field only allows for certain choices.

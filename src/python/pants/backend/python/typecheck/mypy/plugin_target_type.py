@@ -1,8 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.target_types import COMMON_PYTHON_FIELDS, PythonSources
-from pants.engine.target import Dependencies, Target
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
+from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Target
 
 
 class MyPyPluginSources(PythonSources):
@@ -41,4 +41,15 @@ class MyPySourcePlugin(Target):
     """
 
     alias = "mypy_source_plugin"
-    core_fields = (*COMMON_PYTHON_FIELDS, Dependencies, MyPyPluginSources)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
+        Dependencies,
+        MyPyPluginSources,
+    )
+
+    deprecated_removal_version = "2.3.0.dev0"
+    deprecated_removal_hint = (
+        "Use a `python_library` target rather than `mypy_source_plugin`, which behaves "
+        "identically. If you change the target's name, update `[mypy].source_plugins`."
+    )

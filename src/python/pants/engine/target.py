@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import collections.abc
 import dataclasses
 import itertools
@@ -58,52 +60,22 @@ from pants.util.strutil import pluralize
 ImmutableValue = Any
 
 
-class Field(ABC):
-    # Subclasses must define these.
-    alias: ClassVar[str]
-    default: ClassVar[ImmutableValue]
-    # Subclasses may define these.
-    required: ClassVar[bool] = False
-    deprecated_removal_version: ClassVar[Optional[str]] = None
-    deprecated_removal_hint: ClassVar[Optional[str]] = None
-
-    # NB: We still expect `PrimitiveField` and `AsyncField` to define their own constructors. This
-    # is only implemented so that we have a common deprecation mechanism.
-    def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        if self.deprecated_removal_version and not address.is_file_target and raw_value is not None:
-            if not self.deprecated_removal_hint:
-                raise ValueError(
-                    f"You specified `deprecated_removal_version` for {self.__class__}, but not "
-                    "the class property `deprecated_removal_hint`."
-                )
-            warn_or_error(
-                removal_version=self.deprecated_removal_version,
-                deprecated_entity_description=f"the {repr(self.alias)} field",
-                hint=(
-                    f"Using the `{self.alias}` field in the target {address}. "
-                    f"{self.deprecated_removal_hint}"
-                ),
-            )
-
-
 @frozen_after_init
-@dataclass(unsafe_hash=True)
-class PrimitiveField(Field, metaclass=ABCMeta):
-    """A Field that does not need the engine in order to be hydrated.
+class Field:
+    """A Field.
 
-    The majority of fields should use subclasses of `PrimitiveField`, e.g. use `BoolField`,
-    `StringField`, or `StringSequenceField`. These subclasses will provide sane type hints and
-    hydration/validation automatically.
+    The majority of fields should use field templates like `BoolField`, `StringField`, and
+    `StringSequenceField`. These subclasses will provide sensible type hints and validation
+    automatically.
 
-    If you are directly subclassing `PrimitiveField`, you should likely override `compute_value()`
+    If you are directly subclassing `Field`, you should likely override `compute_value()`
     to perform any custom hydration and/or validation, such as converting unhashable types to
     hashable types or checking for banned values. The returned value must be hashable
-    (and should be immutable) so that this Field may be used by the V2 engine. This means, for
+    (and should be immutable) so that this Field may be used by the engine. This means, for
     example, using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
 
-    All hydration and/or validation happens eagerly in the constructor. If the
-    hydration is particularly expensive, use `AsyncField` instead to get the benefits of the
-    engine's caching.
+    If you plan to use the engine to fully hydrate the value, you can also inherit
+    `AsyncFieldMixin`, which will store an `address: Address` property on the `Field` instance.
 
     Subclasses should also override the type hints for `value` and `raw_value` to be more precise
     than `Any`. The type hint for `raw_value` is used to generate documentation, e.g. for
@@ -111,8 +83,8 @@ class PrimitiveField(Field, metaclass=ABCMeta):
 
     Example:
 
-        # NB: Really, this should subclass IntField. We only use PrimitiveField as an example.
-        class Timeout(PrimitiveField):
+        # NB: Really, this should subclass IntField. We only use Field as an example.
+        class Timeout(Field):
             alias = "timeout"
             value: Optional[int]
             default = None
@@ -128,24 +100,26 @@ class PrimitiveField(Field, metaclass=ABCMeta):
                 return value_or_default
     """
 
-    value: ImmutableValue
+    # Subclasses must define this.
+    alias: ClassVar[str]
+    # Subclasses must define at least one of these two.
+    default: ClassVar[ImmutableValue]
+    required: ClassVar[bool] = False
+    # Subclasses may define these.
+    deprecated_removal_version: ClassVar[Optional[str]] = None
+    deprecated_removal_hint: ClassVar[Optional[str]] = None
 
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        # NB: We neither store the `address` or `raw_value` as attributes on this dataclass:
-        # * Don't store `raw_value` because it very often is mutable and/or unhashable, which means
-        #   this Field could not be passed around in the engine.
-        # * Don't store `address` to avoid the cost in memory of storing `Address` on every single
-        #   field encountered by Pants in a run.
-        super().__init__(raw_value, address=address)
-        self.value = self.compute_value(raw_value, address=address)
+        self._check_deprecated(raw_value, address)
+        self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address=address)
 
     @classmethod
     def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
         """Convert the `raw_value` into `self.value`.
 
         You should perform any optional validation and/or hydration here. For example, you may want
-        to check that an integer is > 0 or convert an Iterable[str] to List[str].
+        to check that an integer is > 0 or convert an `Iterable[str]` to `List[str]`.
 
         The resulting value must be hashable (and should be immutable).
         """
@@ -154,6 +128,24 @@ class PrimitiveField(Field, metaclass=ABCMeta):
                 raise RequiredFieldMissingException(address, cls.alias)
             return cls.default
         return raw_value
+
+    @classmethod
+    def _check_deprecated(cls, raw_value: Optional[Any], address: Address) -> None:
+        if not cls.deprecated_removal_version or address.is_file_target or raw_value is None:
+            return
+        if not cls.deprecated_removal_hint:
+            raise ValueError(
+                f"You specified `deprecated_removal_version` for {cls}, but not "
+                "the class property `deprecated_removal_hint`."
+            )
+        warn_or_error(
+            removal_version=cls.deprecated_removal_version,
+            deprecated_entity_description=f"the {repr(cls.alias)} field",
+            hint=(
+                f"Using the `{cls.alias}` field in the target {address}. "
+                f"{cls.deprecated_removal_hint}"
+            ),
+        )
 
     def __repr__(self) -> str:
         return (
@@ -164,34 +156,35 @@ class PrimitiveField(Field, metaclass=ABCMeta):
     def __str__(self) -> str:
         return f"{self.alias}={self.value}"
 
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.value))
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class AsyncField(Field, metaclass=ABCMeta):
-    """A field that needs the engine in order to be hydrated.
+    def __eq__(self, other: Union[Any, Field]) -> bool:
+        if not isinstance(other, Field):
+            return NotImplemented
+        return (self.__class__, self.value) == (other.__class__, other.value)
 
-    You should implement `sanitize_raw_value()` to convert the `raw_value` into a type that is
-    immutable and hashable so that this Field may be used by the V2 engine. This means, for example,
-    using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
 
-    You should also create corresponding HydratedField and HydrateFieldRequest classes and define a
-    rule to go from this HydrateFieldRequest to HydratedField. The HydrateFieldRequest type should
-    have an attribute storing the underlying AsyncField; it also must be registered as a RootRule.
+# NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter which
+# order you use for inheriting the field template vs. the mixin.
+class AsyncFieldMixin(Field):
+    """A mixin to store the field's original `Address` for use during hydration by the engine.
+
+    Typically, you should also create a dataclass representing the hydrated value and another for
+    the request, then a rule to go from the request to the hydrated value. The request class should
+    store the async field as a property.
+
+    (Why use the request class as the rule input, rather than the field itself? It's a wrapper so
+    that subclasses of the async field work properly, given that the engine uses exact type IDs.
+    This is like WrappedTarget.)
 
     For example:
 
-        class Sources(AsyncField):
-            alias: ClassVar = "sources"
-            sanitized_raw_value: Optional[Tuple[str, ...]]
+        class Sources(StringSequenceField, AsyncFieldMixin):
+            alias = "sources"
 
-            def sanitize_raw_value(
-                raw_value: Optional[List[str]], *, address: Address
-            ) -> Optional[Tuple[str, ...]]:
-                ...
-
-            # Example extension point provided by this field. Subclasses can override this to do
-            # whatever validation they'd like. Each AsyncField must define its own entry points
-            # like this to allow subclasses to change behavior.
+            # Often, async fields will want to define entry points like this to allow subclasses to
+            # change behavior.
             def validate_resolved_files(self, files: Sequence[str]) -> None:
                 pass
 
@@ -208,54 +201,44 @@ class AsyncField(Field, metaclass=ABCMeta):
 
         @rule
         def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
-            result = await Get(Snapshot, PathGlobs(request.field.sanitized_raw_value))
+            result = await Get(Snapshot, PathGlobs(request.field.value))
             request.field.validate_resolved_files(result.files)
             ...
             return HydratedSources(result)
 
-
-        def rules():
-            return [hydrate_sources, RootRule(HydrateSourcesRequest)]
-
     Then, call sites can `await Get` if they need to hydrate the field, even if they subclassed
-    the original `AsyncField` to have custom behavior:
+    the original async field to have custom behavior:
 
         sources1 = await Get(HydratedSources, HydrateSourcesRequest(my_tgt.get(Sources)))
         sources2 = await Get(HydratedSources, HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
-    address: Address
-    sanitized_raw_value: ImmutableValue
-
-    @final
+    @final  # type: ignore[misc]
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
         super().__init__(raw_value, address=address)
+        # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
+        # subclasses from adding arbitrary fields.
+        self._unfreeze_instance()  # type: ignore[attr-defined]
         self.address = address
-        self.sanitized_raw_value = self.sanitize_raw_value(raw_value, address=address)
-
-    @classmethod
-    def sanitize_raw_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
-        """Sanitize the `raw_value` into a type that is safe for the V2 engine to use.
-
-        The resulting type should be immutable and hashable.
-
-        You may also do light-weight validation in this method, such as ensuring that all
-        elements of a list are strings.
-        """
-        if raw_value is None:
-            if cls.required:
-                raise RequiredFieldMissingException(address, cls.alias)
-            return cls.default
-        return raw_value
+        self._freeze_instance()  # type: ignore[attr-defined]
 
     def __repr__(self) -> str:
         return (
-            f"{self.__class__}(alias={repr(self.alias)}, "
-            f"sanitized_raw_value={repr(self.sanitized_raw_value)}, default={repr(self.default)})"
+            f"{self.__class__}(alias={repr(self.alias)}, address={self.address}, "
+            "value={repr(self.value)}, default={repr(self.default)})"
         )
 
-    def __str__(self) -> str:
-        return f"{self.alias}={self.sanitized_raw_value}"
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.value, self.address))
+
+    def __eq__(self, other: Union[Any, AsyncFieldMixin]) -> bool:
+        if not isinstance(other, AsyncFieldMixin):
+            return NotImplemented
+        return (self.__class__, self.value, self.address) == (
+            other.__class__,
+            other.value,
+            other.address,
+        )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -268,8 +251,7 @@ _F = TypeVar("_F", bound=Field)
 
 
 @frozen_after_init
-@dataclass(unsafe_hash=True)
-class Target(ABC):
+class Target:
     """A Target represents a combination of fields that are valid _together_."""
 
     # Subclasses must define these
@@ -365,6 +347,18 @@ class Target(ABC):
         address = f"address=\"{self.address}\"{', ' if fields else ''}"
         return f"{self.alias}({address}{fields})"
 
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.address, self.field_values))
+
+    def __eq__(self, other: Union[Target, Any]) -> bool:
+        if not isinstance(other, Target):
+            return NotImplemented
+        return (self.__class__, self.address, self.field_values) == (
+            other.__class__,
+            other.address,
+            other.field_values,
+        )
+
     @final
     @classmethod
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
@@ -430,9 +424,9 @@ class Target(ABC):
         """Get the requested `Field` instance belonging to this target.
 
         This will return an instance of the requested field type, e.g. an instance of
-        `Compatibility`, `Sources`, `EntryPoint`, etc. Usually, you will want to grab the
-        `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For `AsyncField`s, you would
-        call `await Get(SourcesResult, SourcesRequest, tgt.get(Sources).request)`).
+        `InterpreterConstraints`, `Sources`, `EntryPoint`, etc. Usually, you will want to grab the
+        `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
+        `Sources`, you may need to hydrate the value.).
 
         This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
         custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
@@ -738,6 +732,7 @@ def generate_subtarget(
 
     generated_target_fields = {}
     for field in build_target.field_values.values():
+        value: Optional[ImmutableValue]
         if isinstance(field, Sources):
             if not bool(matches_filespec(field.filespec, paths=[full_file_name])):
                 raise ValueError(
@@ -746,11 +741,7 @@ def generate_subtarget(
                 )
             value = (relativized_file_name,)
         else:
-            value = (
-                field.value
-                if isinstance(field, PrimitiveField)
-                else field.sanitized_raw_value  # type: ignore[attr-defined]
-            )
+            value = field.value
         generated_target_fields[field.alias] = value
 
     target_cls = type(build_target)
@@ -1001,7 +992,7 @@ class UnrecognizedTargetTypeException(Exception):
 T = TypeVar("T")
 
 
-class ScalarField(Generic[T], PrimitiveField, metaclass=ABCMeta):
+class ScalarField(Generic[T], Field):
     """A field with a scalar value (vs. a compound value like a sequence or dict).
 
     Subclasses must define the class properties `expected_type` and `expected_type_description`.
@@ -1038,7 +1029,7 @@ class ScalarField(Generic[T], PrimitiveField, metaclass=ABCMeta):
         return value_or_default
 
 
-class BoolField(PrimitiveField, metaclass=ABCMeta):
+class BoolField(Field):
     """A field whose value is a boolean.
 
     If subclasses do not set the class property `required = True` or `default`, the value will
@@ -1065,7 +1056,7 @@ class BoolField(PrimitiveField, metaclass=ABCMeta):
         return value_or_default
 
 
-class IntField(ScalarField[int], metaclass=ABCMeta):
+class IntField(ScalarField[int]):
     expected_type = int
     expected_type_description = "an integer"
 
@@ -1074,7 +1065,7 @@ class IntField(ScalarField[int], metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class FloatField(ScalarField[float], metaclass=ABCMeta):
+class FloatField(ScalarField[float]):
     expected_type = float
     expected_type_description = "a float"
 
@@ -1083,7 +1074,7 @@ class FloatField(ScalarField[float], metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class StringField(ScalarField[str], metaclass=ABCMeta):
+class StringField(ScalarField[str]):
     """A field whose value is a string.
 
     If you expect the string to only be one of several values, set the class property
@@ -1110,7 +1101,7 @@ class StringField(ScalarField[str], metaclass=ABCMeta):
         return value_or_default
 
 
-class SequenceField(Generic[T], PrimitiveField, metaclass=ABCMeta):
+class SequenceField(Generic[T], Field):
     """A field whose value is a homogeneous sequence.
 
     Subclasses must define the class properties `expected_element_type` and
@@ -1153,7 +1144,7 @@ class SequenceField(Generic[T], PrimitiveField, metaclass=ABCMeta):
         return tuple(value_or_default)
 
 
-class StringSequenceField(SequenceField[str], metaclass=ABCMeta):
+class StringSequenceField(SequenceField[str]):
     expected_element_type = str
     expected_type_description = "an iterable of strings (e.g. a list of strings)"
 
@@ -1164,7 +1155,7 @@ class StringSequenceField(SequenceField[str], metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class StringOrStringSequenceField(SequenceField[str], metaclass=ABCMeta):
+class StringOrStringSequenceField(SequenceField[str]):
     """The raw_value may either be a string or be an iterable of strings.
 
     This is syntactic sugar that we use for certain fields to make BUILD files simpler when the user
@@ -1187,7 +1178,7 @@ class StringOrStringSequenceField(SequenceField[str], metaclass=ABCMeta):
         return super().compute_value(raw_value, address=address)
 
 
-class DictStringToStringField(PrimitiveField, metaclass=ABCMeta):
+class DictStringToStringField(Field):
     value: Optional[FrozenDict[str, str]]
     default: ClassVar[Optional[FrozenDict[str, str]]] = None
 
@@ -1208,7 +1199,7 @@ class DictStringToStringField(PrimitiveField, metaclass=ABCMeta):
         return FrozenDict(value_or_default)
 
 
-class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
+class DictStringToStringSequenceField(Field):
     value: Optional[FrozenDict[str, Tuple[str, ...]]]
     default: ClassVar[Optional[FrozenDict[str, Tuple[str, ...]]]] = None
 
@@ -1238,35 +1229,12 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
         return FrozenDict(result)
 
 
-class AsyncStringSequenceField(AsyncField):
-    sanitized_raw_value: Optional[Tuple[str, ...]]
-    default: ClassVar[Optional[Tuple[str, ...]]] = None
-
-    @classmethod
-    def sanitize_raw_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[str, ...]]:
-        value_or_default = super().sanitize_raw_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        try:
-            ensure_str_list(value_or_default)
-        except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                value_or_default,
-                expected_type="an iterable of strings (e.g. a list of strings)",
-            )
-        return tuple(sorted(value_or_default))
-
-
 # -----------------------------------------------------------------------------------------------
 # Sources and codegen
 # -----------------------------------------------------------------------------------------------
 
 
-class Sources(AsyncStringSequenceField):
+class Sources(StringSequenceField, AsyncFieldMixin):
     """A list of files and globs that belong to this target.
 
     Paths are relative to the BUILD file's directory. You can ignore files/globs by prefixing them
@@ -1333,7 +1301,7 @@ class Sources(AsyncStringSequenceField):
 
     @final
     def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
-        globs = self.sanitized_raw_value or ()
+        globs = self.value or ()
         error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
         conjunction = (
             GlobExpansionConjunction.all_match
@@ -1362,7 +1330,7 @@ class Sources(AsyncStringSequenceField):
         """
         includes = []
         excludes = []
-        for glob in self.sanitized_raw_value or ():
+        for glob in self.value or ():
             if glob.startswith("!"):
                 excludes.append(os.path.join(self.address.spec_path, glob[1:]))
             else:
@@ -1538,7 +1506,7 @@ class SourcesPathsRequest(EngineAwareParameter):
 # NB: To hydrate the dependencies, use one of:
 #   await Get(Addresses, DependenciesRequest(tgt[Dependencies])
 #   await Get(Targets, DependenciesRequest(tgt[Dependencies])
-class Dependencies(AsyncStringSequenceField):
+class Dependencies(StringSequenceField, AsyncFieldMixin):
     """Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib'].
 
     Alternatively, you may include file names. Pants will find which target owns that file, and
@@ -1556,10 +1524,10 @@ class Dependencies(AsyncStringSequenceField):
 
     @memoized_property
     def unevaluated_transitive_excludes(self) -> UnparsedAddressInputs:
-        if not self.supports_transitive_excludes or not self.sanitized_raw_value:
+        if not self.supports_transitive_excludes or not self.value:
             return UnparsedAddressInputs((), owning_address=self.address)
         return UnparsedAddressInputs(
-            (v[2:] for v in self.sanitized_raw_value if v.startswith("!!")),
+            (v[2:] for v in self.value if v.startswith("!!")),
             owning_address=self.address,
         )
 
@@ -1710,7 +1678,7 @@ class InferredDependencies:
         return iter(self.dependencies)
 
 
-class SpecialCasedDependencies(AsyncStringSequenceField):
+class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     """Subclass this for fields that act similarly to the `dependencies` field, but are handled
     differently than normal dependencies.
 
@@ -1728,7 +1696,7 @@ class SpecialCasedDependencies(AsyncStringSequenceField):
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.sanitized_raw_value or (), owning_address=self.address)
+        return UnparsedAddressInputs(self.value or (), owning_address=self.address)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1760,7 +1728,7 @@ COMMON_TARGET_FIELDS = (Tags, DescriptionField)
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
 #  Artifact, there is no common Artifact interface.
-class ProvidesField(PrimitiveField):
+class ProvidesField(Field):
     """An `artifact`, such as `setup_py`, that describes how to represent this target to the outside
     world."""
 

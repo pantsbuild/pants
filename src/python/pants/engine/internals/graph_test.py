@@ -776,8 +776,8 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
     assert (
         sources.filespec
         == {
-            "includes": ["src/fortran/*.f03", "src/fortran/f1.f95"],
-            "excludes": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"],
+            "includes": ["src/fortran/f1.f95", "src/fortran/*.f03"],
+            "excludes": ["src/fortran/ignored.f03", "src/fortran/**/ignore*"],
         }
         == hydrated_sources.filespec
     )
@@ -828,7 +828,7 @@ def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
     # than the normal `all` conjunction.
     sources_rule_runner.create_files("src/fortran", files=["default.f95", "f1.f08", "ignored.f08"])
     sources = DefaultSources(None, address=addr)
-    assert set(sources.sanitized_raw_value or ()) == set(DefaultSources.default)
+    assert set(sources.value or ()) == set(DefaultSources.default)
 
     hydrated_sources = sources_rule_runner.request(
         HydratedSources, [HydrateSourcesRequest(sources)]

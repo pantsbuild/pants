@@ -27,13 +27,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use nails::execution::{self, sink_for, stream_for, ChildInput, ChildOutput, ExitCode};
-use nails::{Child, Nail};
-use task_executor::Executor;
-use tokio::fs::File;
-use tokio::net::TcpListener;
-use tokio::sync::{Notify, RwLock};
-
 use std::collections::HashMap;
 use std::io;
 use std::net::Ipv4Addr;
@@ -41,10 +34,17 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use async_latch::AsyncLatch;
 use bytes::Bytes;
 use futures::channel::{mpsc, oneshot};
 use futures::{future, sink, stream, FutureExt, SinkExt, StreamExt, TryStreamExt};
 use log::{debug, error, info};
+use nails::execution::{self, sink_for, stream_for, ChildInput, ChildOutput, ExitCode};
+use nails::Nail;
+use task_executor::Executor;
+use tokio::fs::File;
+use tokio::net::TcpListener;
+use tokio::sync::{Notify, RwLock};
 
 pub struct Server {
   exit_sender: oneshot::Sender<()>,
@@ -157,7 +157,7 @@ impl Server {
         async move {
           let ongoing_connection_guard = ongoing_connections.read().await;
           connection_started.notify();
-          let result = nails::server_handle_connection(config, nail, tcp_stream).await;
+          let result = nails::server::handle_connection(config, nail, tcp_stream).await;
           std::mem::drop(ongoing_connection_guard);
           result
         }
@@ -197,6 +197,7 @@ impl Server {
 
 pub struct RawFdExecution {
   pub cmd: execution::Command,
+  pub cancelled: AsyncLatch,
   pub stdin_fd: RawFd,
   pub stdout_fd: RawFd,
   pub stderr_fd: RawFd,
@@ -230,27 +231,40 @@ impl Nail for RawFdNail {
     &self,
     cmd: execution::Command,
     input_stream: mpsc::Receiver<ChildInput>,
-  ) -> Result<Child, io::Error> {
+  ) -> Result<nails::server::Child, io::Error> {
     let env = cmd.env.iter().cloned().collect::<HashMap<_, _>>();
 
-    // Handle stdin.
+    // Handle stdin. If the input stream closes, the run is cancelled.
+    let cancelled = AsyncLatch::new();
     let (stdin_handle, stdin_sink) = Self::input(Self::ttypath_from_env(&env, 0))?;
-    let accepts_stdin = if let Some(mut stdin_sink) = stdin_sink {
-      let mut input_stream = input_stream.filter_map(|child_input| {
-        Box::pin(async move {
-          match child_input {
-            ChildInput::Stdin(bytes) => Some(Ok(bytes)),
-            ChildInput::StdinEOF => None,
+    let accepts_stdin = {
+      let (accepts_stdin, input_stream_fut) = if let Some(mut stdin_sink) = stdin_sink {
+        // Forward all stdin to the child process.
+        (
+          true,
+          async move {
+            let mut input_stream = input_stream.filter_map(|child_input| {
+              Box::pin(async move {
+                match child_input {
+                  ChildInput::Stdin(bytes) => Some(Ok(bytes)),
+                  ChildInput::StdinEOF => None,
+                }
+              })
+            });
+            let _ = stdin_sink.send_all(&mut input_stream).await;
           }
-        })
-      });
-      let _join = self.executor.spawn(async move {
-        stdin_sink.send_all(&mut input_stream).map(|_| ()).await;
-      });
-      true
-    } else {
-      // Stdin will be handled directly by the TTY.
-      false
+          .boxed(),
+        )
+      } else {
+        // Stdin will be handled directly by the TTY. Only propagate cancellation.
+        (false, input_stream.fold((), |(), _| async {}).boxed())
+      };
+      // Spawn a task that will propagate the input stream, and then trigger cancellation.
+      let cancelled = cancelled.clone();
+      let _join = self.executor.spawn(input_stream_fut.map(move |_| {
+        cancelled.trigger();
+      }));
+      accepts_stdin
     };
 
     // And stdout/stderr.
@@ -264,6 +278,7 @@ impl Nail for RawFdNail {
       // NB: This closure captures the stdio handles, and will drop/close them when it completes.
       (nail.runner)(RawFdExecution {
         cmd,
+        cancelled,
         stdin_fd: stdin_handle.as_raw_fd(),
         stdout_fd: stdout_handle.as_raw_fd(),
         stderr_fd: stderr_handle.as_raw_fd(),
@@ -287,7 +302,7 @@ impl Nail for RawFdNail {
       })
       .boxed();
 
-    Ok(Child {
+    Ok(nails::server::Child {
       output_stream,
       accepts_stdin,
     })

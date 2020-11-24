@@ -6,13 +6,14 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+async_latch = { path = "../async_latch" }
 bytes = "0.5"
 futures = "0.3.5"
 log = "0.4"
-nails = "0.7.0"
+nails = "0.8"
 os_pipe = "0.9"
 task_executor = { path = "../task_executor" }
-tokio = { version = "0.2.23", features = ["tcp", "fs", "sync", "io-std"] }
+tokio = { version = "0.2.23", features = ["tcp", "fs", "sync", "io-std", "signal"] }
 
 [dev-dependencies]
 tokio = { version = "0.2.23", features = ["dns", "rt-threaded", "macros", "tcp", "io-std"] }
