@@ -21,7 +21,7 @@ from pants.engine.target import (
 
 
 class PythonAwsLambdaSources(PythonSources):
-    expected_num_files = range(0, 1)
+    expected_num_files = range(0, 2)
 
 
 class PythonAwsLambdaDependencies(Dependencies):
