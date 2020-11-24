@@ -3,15 +3,11 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import PurePath
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple
 
 import pytest
-from typing_extensions import final
 
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, PathGlobs, Snapshot
-from pants.engine.rules import Get, rule
 from pants.engine.target import (
     AsyncField,
     AsyncStringSequenceField,
@@ -37,9 +33,8 @@ from pants.engine.target import (
     generate_subtarget_address,
 )
 from pants.engine.unions import UnionMembership
-from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
-from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
+from pants.util.meta import FrozenInstanceError
 from pants.util.ordered_set import OrderedSet
 
 # -----------------------------------------------------------------------------------------------
@@ -69,55 +64,18 @@ class FortranExtensions(Field):
         return tuple(value_or_default)
 
 
+class FortranVersion(StringField):
+    alias = "version"
+
+
 class UnrelatedField(BoolField):
     alias = "unrelated"
     default = False
 
 
-class FortranSources(AsyncField):
-    alias = "sources"
-    value: Optional[Tuple[str, ...]]
-    default = None
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Optional[Tuple[str, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        return tuple(ensure_str_list(value_or_default))
-
-
-@dataclass(frozen=True)
-class FortranSourcesRequest:
-    field: FortranSources
-
-
-@dataclass(frozen=True)
-class FortranSourcesResult:
-    snapshot: Snapshot
-
-
-@rule
-async def hydrate_fortran_sources(request: FortranSourcesRequest) -> FortranSourcesResult:
-    sources_field = request.field
-    result = await Get(Snapshot, PathGlobs(sources_field.value or ()))
-    # Validate after hydration
-    non_fortran_sources = [
-        fp for fp in result.files if PurePath(fp).suffix not in (".f95", ".f03", ".f08")
-    ]
-    if non_fortran_sources:
-        raise ValueError(
-            f"Received non-Fortran sources in {sources_field.alias} for target "
-            f"{sources_field.address}: {non_fortran_sources}."
-        )
-    return FortranSourcesResult(result)
-
-
 class FortranTarget(Target):
     alias = "fortran"
-    core_fields = (FortranExtensions, FortranSources)
+    core_fields = (FortranExtensions, FortranVersion)
 
 
 def test_invalid_fields_rejected() -> None:
@@ -139,11 +97,6 @@ def test_get_field() -> None:
 
     # Default field value. This happens when the field is registered on the target type, but the
     # user does not explicitly set the field in the BUILD file.
-    #
-    # NB: `default_raw_value` is not used in this case - that parameter is solely used when
-    # the field is not registered on the target type. To override the default field value, either
-    # subclass the Field and create a new target, or, in your call site, interpret the result and
-    # and apply your default.
     default_field_tgt = FortranTarget({}, address=Address("", target_name="default"))
     assert default_field_tgt[FortranExtensions].value == ()
     assert default_field_tgt.get(FortranExtensions).value == ()
@@ -185,10 +138,10 @@ def test_has_fields() -> None:
     empty_union_membership = UnionMembership({})
     tgt = FortranTarget({}, address=Address("", target_name="lib"))
 
-    assert tgt.field_types == (FortranExtensions, FortranSources)
+    assert tgt.field_types == (FortranExtensions, FortranVersion)
     assert FortranTarget.class_field_types(union_membership=empty_union_membership) == (
         FortranExtensions,
-        FortranSources,
+        FortranVersion,
     )
 
     assert tgt.has_fields([]) is True
@@ -225,47 +178,6 @@ def test_has_fields() -> None:
     )
 
 
-def test_async_field() -> None:
-    def hydrate_field(
-        *, raw_source_files: List[str], hydrated_source_files: Tuple[str, ...]
-    ) -> FortranSourcesResult:
-        sources_field = FortranTarget(
-            {FortranSources.alias: raw_source_files}, address=Address("", target_name="lib")
-        )[FortranSources]
-        result: FortranSourcesResult = run_rule_with_mocks(
-            hydrate_fortran_sources,
-            rule_args=[FortranSourcesRequest(sources_field)],
-            mock_gets=[
-                MockGet(
-                    output_type=Snapshot,
-                    input_type=PathGlobs,
-                    mock=lambda _: Snapshot(EMPTY_DIGEST, files=hydrated_source_files, dirs=()),
-                )
-            ],
-        )
-        return result
-
-    # Normal field
-    expected_files = ("important.f95", "big_banks.f08", "big_loans.f08")
-    assert (
-        hydrate_field(
-            raw_source_files=["important.f95", "big_*.f08"], hydrated_source_files=expected_files
-        ).snapshot.files
-        == expected_files
-    )
-
-    # Test that `raw_value` gets hydrated/validated eagerly.
-    with pytest.raises(ValueError) as exc:
-        FortranTarget({FortranSources.alias: [0, 1, 2]}, address=Address("", target_name="lib"))
-    assert "Not all elements of the iterable have type" in str(exc)
-
-    # Test post-hydration validation.
-    with pytest.raises(ValueError) as exc:
-        hydrate_field(raw_source_files=["*.js"], hydrated_source_files=("not_fortran.js",))
-    assert "Received non-Fortran sources" in str(exc)
-    assert "//:lib" in str(exc)
-
-
 def test_add_custom_fields() -> None:
     class CustomField(BoolField):
         alias = "custom_field"
@@ -279,14 +191,14 @@ def test_add_custom_fields() -> None:
         tgt_values, address=Address("", target_name="lib"), union_membership=union_membership
     )
 
-    assert tgt.field_types == (FortranExtensions, FortranSources, CustomField)
-    assert tgt.core_fields == (FortranExtensions, FortranSources)
+    assert tgt.field_types == (FortranExtensions, FortranVersion, CustomField)
+    assert tgt.core_fields == (FortranExtensions, FortranVersion)
     assert tgt.plugin_fields == (CustomField,)
     assert tgt.has_field(CustomField) is True
 
     assert FortranTarget.class_field_types(union_membership=union_membership) == (
         FortranExtensions,
-        FortranSources,
+        FortranVersion,
         CustomField,
     )
     assert FortranTarget.class_has_field(CustomField, union_membership=union_membership) is True
@@ -392,37 +304,51 @@ def test_override_preexisting_field_via_new_target() -> None:
 
 
 def test_required_field() -> None:
-    class RequiredPrimitiveField(StringField):
-        alias = "primitive"
+    class RequiredField(StringField):
+        alias = "field"
         required = True
-
-    class RequiredAsyncField(AsyncField):
-        alias = "async"
-        required = True
-
-        @final
-        @property
-        def request(self):
-            raise NotImplementedError
 
     class RequiredTarget(Target):
         alias = "required_target"
-        core_fields = (RequiredPrimitiveField, RequiredAsyncField)
+        core_fields = (RequiredField,)
 
     address = Address("", target_name="lib")
 
-    # No errors when all defined
-    RequiredTarget({"primitive": "present", "async": 0}, address=address)
+    # No errors when defined
+    RequiredTarget({"field": "present"}, address=address)
 
     with pytest.raises(RequiredFieldMissingException) as exc:
-        RequiredTarget({"primitive": "present"}, address=address)
+        RequiredTarget({}, address=address)
     assert str(address) in str(exc.value)
-    assert "async" in str(exc.value)
+    assert "field" in str(exc.value)
 
-    with pytest.raises(RequiredFieldMissingException) as exc:
-        RequiredTarget({"async": 0}, address=address)
-    assert str(address) in str(exc.value)
-    assert "primitive" in str(exc.value)
+
+def test_async_field() -> None:
+    class ExampleField(AsyncField):
+        alias = "field"
+        default = 10
+
+    addr = Address("", target_name="tgt")
+    field = ExampleField(None, address=addr)
+    assert field.value == 10
+    assert field.address == addr
+
+    # Ensure equality and __hash__ work correctly.
+    other = ExampleField(None, address=addr)
+    assert field == other
+    assert hash(field) == hash(other)
+
+    other = ExampleField(25, address=addr)
+    assert field != other
+    assert hash(field) != hash(other)
+
+    other = ExampleField(None, address=Address("", target_name="other"))
+    assert field != other
+    assert hash(field) != hash(other)
+
+    # Ensure it's still frozen.
+    with pytest.raises(FrozenInstanceError):
+        field.y = "foo"  # type: ignore[attr-defined]
 
 
 # -----------------------------------------------------------------------------------------------
@@ -507,9 +433,9 @@ def test_field_set() -> None:
 
     @dataclass(frozen=True)
     class FortranFieldSet(FieldSet):
-        required_fields = (FortranSources,)
+        required_fields = (FortranVersion,)
 
-        sources: FortranSources
+        version: FortranVersion
         unrelated_field: UnrelatedField
 
     @dataclass(frozen=True)

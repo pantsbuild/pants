@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError as FrozenInstanceError
 from functools import wraps
 from typing import Any, Callable, Optional, Type, TypeVar, Union
 
