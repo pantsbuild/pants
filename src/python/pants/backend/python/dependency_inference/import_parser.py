@@ -84,7 +84,7 @@ else:
 
 
 def parse_file(filename):
-    with open(filename, "r") as f:
+    with open(filename, "rb") as f:
         content = f.read()
     try:
         return ast.parse(content, filename=filename)

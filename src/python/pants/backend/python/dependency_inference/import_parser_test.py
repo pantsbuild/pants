@@ -181,6 +181,12 @@ def test_gracefully_handle_syntax_errors(rule_runner: RuleRunner) -> None:
     assert_imports_parsed(rule_runner, content="x =", expected_explicit=[], expected_string=[])
 
 
+def test_handle_unicode(rule_runner: RuleRunner) -> None:
+    assert_imports_parsed(
+        rule_runner, content="x = 'äbç'", expected_explicit=[], expected_string=[]
+    )
+
+
 def test_gracefully_handle_no_sources(rule_runner: RuleRunner) -> None:
     assert_imports_parsed(rule_runner, content=None, expected_explicit=[], expected_string=[])
 
@@ -214,10 +220,10 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         is_py38 = True
         if walrus := is_py38:
             print(walrus)
-    
+
         import demo
         from project.demo import Demo
-    
+
         importlib.import_module("dep.from.str")
         """
     )
@@ -242,7 +248,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
 
         import demo
         from project.demo import Demo
-    
+
         importlib.import_module("dep.from.str")
         """
     )
