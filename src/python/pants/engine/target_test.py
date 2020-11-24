@@ -119,6 +119,21 @@ def test_field_and_target_eq() -> None:
     with pytest.raises(FrozenInstanceError):
         tgt.y = "foo"  # type: ignore[attr-defined]
 
+    # Ensure that subclasses are not equal.
+    class SubclassField(FortranVersion):
+        pass
+
+    subclass_field = SubclassField("dev0", address=addr)
+    assert field != subclass_field
+    assert hash(field) != hash(subclass_field)
+
+    class SubclassTarget(FortranTarget):
+        pass
+
+    subclass_tgt = SubclassTarget({"version": "dev0"}, address=addr)
+    assert tgt != subclass_tgt
+    assert hash(tgt) != hash(subclass_tgt)
+
 
 def test_invalid_fields_rejected() -> None:
     with pytest.raises(InvalidFieldException) as exc:
@@ -393,6 +408,14 @@ def test_async_field_mixin() -> None:
     # Ensure it's still frozen.
     with pytest.raises(FrozenInstanceError):
         field.y = "foo"  # type: ignore[attr-defined]
+
+    # Ensure that subclasses are not equal.
+    class Subclass(ExampleField):
+        pass
+
+    subclass = Subclass(None, address=addr)
+    assert field != subclass
+    assert hash(field) != hash(subclass)
 
 
 # -----------------------------------------------------------------------------------------------

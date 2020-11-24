@@ -157,12 +157,12 @@ class Field:
         return f"{self.alias}={self.value}"
 
     def __hash__(self) -> int:
-        return hash((self.alias, self.value))
+        return hash((self.__class__, self.value))
 
     def __eq__(self, other: Union[Any, Field]) -> bool:
         if not isinstance(other, Field):
             return NotImplemented
-        return (self.alias, self.value) == (other.alias, other.value)
+        return (self.__class__, self.value) == (other.__class__, other.value)
 
 
 # NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter which
@@ -229,12 +229,16 @@ class AsyncFieldMixin(Field):
         )
 
     def __hash__(self) -> int:
-        return hash((self.alias, self.value, self.address))
+        return hash((self.__class__, self.value, self.address))
 
     def __eq__(self, other: Union[Any, AsyncFieldMixin]) -> bool:
         if not isinstance(other, AsyncFieldMixin):
             return NotImplemented
-        return (self.alias, self.value, self.address) == (other.alias, other.value, other.address)
+        return (self.__class__, self.value, self.address) == (
+            other.__class__,
+            other.value,
+            other.address,
+        )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -344,13 +348,13 @@ class Target:
         return f"{self.alias}({address}{fields})"
 
     def __hash__(self) -> int:
-        return hash((self.alias, self.address, self.field_values))
+        return hash((self.__class__, self.address, self.field_values))
 
     def __eq__(self, other: Union[Target, Any]) -> bool:
         if not isinstance(other, Target):
             return NotImplemented
-        return (self.alias, self.address, self.field_values) == (
-            other.alias,
+        return (self.__class__, self.address, self.field_values) == (
+            other.__class__,
             other.address,
             other.field_values,
         )

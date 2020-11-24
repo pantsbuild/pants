@@ -776,8 +776,8 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
     assert (
         sources.filespec
         == {
-            "includes": ["src/fortran/*.f03", "src/fortran/f1.f95"],
-            "excludes": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"],
+            "includes": ["src/fortran/f1.f95", "src/fortran/*.f03"],
+            "excludes": ["src/fortran/ignored.f03", "src/fortran/**/ignore*"],
         }
         == hydrated_sources.filespec
     )
