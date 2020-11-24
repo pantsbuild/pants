@@ -58,3 +58,9 @@ class PylintSourcePlugin(Target):
         PylintPluginDependencies,
         PylintPluginSources,
     )
+
+    deprecated_removal_version = "2.3.0.dev0"
+    deprecated_removal_hint = (
+        "Use a `python_library` target rather than `pylint_source_plugin`, which behaves "
+        "identically. If you change the target's name, update `[pylint].source_plugins`."
+    )
