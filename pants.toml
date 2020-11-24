@@ -76,7 +76,7 @@ config = ["pyproject.toml"]
 
 [mypy]
 config = "build-support/mypy/mypy.ini"
-source_plugins = ["pants-plugins/mypy_plugins:total_ordering"]
+source_plugins = ["pants-plugins/mypy_plugins"]
 
 [pants-releases]
 release_notes = """
