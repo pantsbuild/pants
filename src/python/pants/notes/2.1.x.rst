@@ -5,6 +5,18 @@ This document describes releases leading up to the ``2.1.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.1/docs/release-notes-2-1 for an overview of the changes in this release.
 
+2.1.1rc1 (11/24/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix off-by-one error for `python_awslambda` `sources` field validation (#11234)
+  `PR #11234 <https://github.com/pantsbuild/pants/pull/11234>`_
+
+* Remove extraneous INFO level log line (Cherry-pick of #11228) (#11229)
+  `PR #11229 <https://github.com/pantsbuild/pants/pull/11229>`_
+
 2.1.1rc0 (11/20/2020)
 ---------------------
 
