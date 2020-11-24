@@ -1,22 +1,34 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import datetime
 import glob
 import os
-import re
 import signal
 import threading
 import time
 import unittest
 from textwrap import dedent
+from typing import Tuple
 
+import psutil
 import pytest
 
-from pants.testutil.pants_integration_test import read_pantsd_log, temporary_workdir
+from pants.testutil.pants_integration_test import (
+    PantsJoinHandle,
+    read_pantsd_log,
+    temporary_workdir,
+)
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
-from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, safe_rmtree, touch
-from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
+from pants.util.dirutil import (
+    maybe_read_file,
+    rm_rf,
+    safe_file_dump,
+    safe_mkdir,
+    safe_open,
+    safe_rmtree,
+    touch,
+)
+from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase, attempts
 
 
 def launch_file_toucher(f):
@@ -423,7 +435,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             )
 
             checker.assert_started()
-            checker.assert_pantsd_runner_started(waiter_handle.process.pid)
 
             creator_handle = self.run_pants_with_workdir_without_waiting(
                 ["run", "testprojects/src/python/coordinated_runs:creator", "--", file_to_make],
@@ -434,158 +445,85 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             creator_handle.join().assert_success()
             waiter_handle.join().assert_success()
 
-    def _assert_pantsd_keyboardinterrupt_signal(self, signum, regexps=[], quit_timeout=None):
+    def _launch_waiter(self, workdir: str, config) -> Tuple[PantsJoinHandle, int, str]:
+        """Launch a process via pantsd that will wait forever for the a file to be created.
+
+        Returns the pid of the pantsd client, the pid of the waiting child process, and the file to
+        create to cause the waiting child to exit.
+        """
+        file_to_make = os.path.join(workdir, "some_magic_file")
+        waiter_pid_file = os.path.join(workdir, "pid_file")
+
+        argv = [
+            "run",
+            "testprojects/src/python/coordinated_runs:waiter",
+            "--",
+            file_to_make,
+            waiter_pid_file,
+        ]
+        client_handle = self.run_pants_with_workdir_without_waiting(
+            argv, workdir=workdir, config=config
+        )
+        for _ in attempts("The waiter process should have written its pid."):
+            waiter_pid_str = maybe_read_file(waiter_pid_file)
+            if waiter_pid_str:
+                waiter_pid = int(waiter_pid_str)
+                break
+        return client_handle, waiter_pid, file_to_make
+
+    def _assert_pantsd_keyboardinterrupt_signal(self, signum, regexps=[]):
         """Send a signal to the thin pailgun client and observe the error messaging.
 
         :param int signum: The signal to send.
         :param regexps: Assert that all of these regexps match somewhere in stderr.
         :type regexps: list of str
-        :param float quit_timeout: The duration of time to wait for the pailgun client to flush all of
-                                   its output and die after being killed.
         """
-        # TODO: This tests that pantsd processes actually die after the thin client receives the
-        # specified signal.
         with self.pantsd_test_context() as (workdir, config, checker):
-            # Launch a run that will wait for a file to be created (but do not create that file).
-            file_to_make = os.path.join(workdir, "some_magic_file")
+            client_handle, waiter_process_pid, _ = self._launch_waiter(workdir, config)
+            client_pid = client_handle.process.pid
+            waiter_process = psutil.Process(waiter_process_pid)
 
-            if quit_timeout is not None:
-                timeout_args = [f"--pantsd-pailgun-quit-timeout={quit_timeout}"]
-            else:
-                timeout_args = []
-            argv = timeout_args + [
-                "run",
-                "testprojects/src/python/coordinated_runs:waiter",
-                "--",
-                file_to_make,
-            ]
-            waiter_handle = self.run_pants_with_workdir_without_waiting(
-                argv, workdir=workdir, config=config
-            )
-            client_pid = waiter_handle.process.pid
-
+            assert waiter_process.is_running()
             checker.assert_started()
-            checker.assert_pantsd_runner_started(client_pid)
 
-            # This should kill the pantsd processes through the RemotePantsRunner signal handler.
+            # This should kill the client, which will cancel the run on the server, which will
+            # kill the waiting process.
             os.kill(client_pid, signum)
-            waiter_run = waiter_handle.join()
-            waiter_run.assert_failure()
+            client_run = client_handle.join()
+            client_run.assert_failure()
 
             for regexp in regexps:
-                self.assertRegex(waiter_run.stderr, regexp)
+                self.assertRegex(client_run.stderr, regexp)
 
+            # pantsd should still be running, but the waiter process should have been killed.
             time.sleep(5)
-            checker.assert_stopped()
+            assert not waiter_process.is_running()
+            checker.assert_running()
 
-    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7554")
-    def test_pantsd_sigterm(self):
-        self._assert_pantsd_keyboardinterrupt_signal(
-            signal.SIGTERM,
-            regexps=[
-                "\\[INFO\\] Sending SIGTERM to pantsd with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.",
-                re.escape(
-                    "\nSignal {signum} (SIGTERM) was raised. Exiting with failure.\n".format(
-                        signum=signal.SIGTERM
-                    )
-                ),
-                """
-Interrupted by user:
-Interrupted by user over pailgun client!
-$""",
-            ],
-        )
-
-    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7572")
-    def test_pantsd_sigquit(self):
-        self._assert_pantsd_keyboardinterrupt_signal(
-            signal.SIGQUIT,
-            regexps=[
-                "\\[INFO\\] Sending SIGQUIT to pantsd with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.",
-                re.escape(
-                    "\nSignal {signum} (SIGQUIT) was raised. Exiting with failure.\n".format(
-                        signum=signal.SIGQUIT
-                    )
-                ),
-                """
-Interrupted by user:
-Interrupted by user over pailgun client!
-$""",
-            ],
-        )
-
-    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7547")
     def test_pantsd_sigint(self):
         self._assert_pantsd_keyboardinterrupt_signal(
             signal.SIGINT,
-            regexps=[
-                """\
-\\[INFO\\] Sending SIGINT to pantsd with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.
-Interrupted by user.
-Interrupted by user:
-Interrupted by user over pailgun client!
-$"""
-            ],
+            regexps=["Interrupted by user."],
         )
 
-    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7457")
-    def test_signal_pailgun_stream_timeout(self):
-        # NB: The actual timestamp has the date and time at sub-second granularity. The date is just
-        # used here since that is known in advance in order to assert that the timestamp is well-formed.
-        today = datetime.date.today().isoformat()
-        self._assert_pantsd_keyboardinterrupt_signal(
-            signal.SIGINT,
-            regexps=[
-                """\
-\\[INFO\\] Sending SIGINT to pantsd with pid [0-9]+, waiting up to 0\\.01 seconds before sending SIGKILL\\.\\.\\.
-Interrupted by user\\.
-[^ ]* \\[WARN\\] timed out when attempting to gracefully shut down the remote client executing \
-"'pantsd.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating \
-over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, \
-overtime seconds: [^\n]+
-Interrupted by user:
-Interrupted by user over pailgun client!
-""".format(
-                    today=re.escape(today)
-                )
-            ],
-            # NB: Make the timeout very small to ensure the warning message will reliably occur in CI!
-            quit_timeout=1e-6,
-        )
-
-    @unittest.skip(
-        reason="This started consistently hanging on Jan. 13, 2020 for some unknown reason."
-    )
     def test_sigint_kills_request_waiting_for_lock(self):
         """Test that, when a pailgun request is blocked waiting for another one to end, sending
-        SIGINT to the blocked run will kill it.
-
-        Regression test for issue: #7920
-        """
+        SIGINT to the blocked run will kill it."""
         config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": -1, "level": "debug"}}
         with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
-            # Run a repl, so that any other run waiting to acquire the daemon lock waits forever.
-            first_run_handle = self.run_pants_with_workdir_without_waiting(
-                command=["repl", "testprojects/src/python/hello::"],
-                workdir=workdir,
-                config=config,
-            )
+            # Run a process that will wait forever.
+            first_run_handle, _, file_to_create = self._launch_waiter(workdir, config)
+
             checker.assert_started()
             checker.assert_running()
 
+            # And another that will block on the first.
             blocking_run_handle = self.run_pants_with_workdir_without_waiting(
                 command=["goals"], workdir=workdir, config=config
             )
 
             # Block until the second request is waiting for the lock.
-            blocked = True
-            while blocked:
-                log = "\n".join(read_pantsd_log(workdir))
-                if "didn't acquire the lock on the first try, polling." in log:
-                    blocked = False
-                # NB: This sleep is totally deterministic, it's just so that we don't spend too many cycles
-                # busy waiting.
-                time.sleep(0.1)
+            time.sleep(10)
 
             # Sends SIGINT to the run that is waiting.
             blocking_run_client_pid = blocking_run_handle.process.pid
@@ -595,8 +533,10 @@ Interrupted by user over pailgun client!
             # Check that pantsd is still serving the other request.
             checker.assert_running()
 
-            # Send exit() to the repl, and exit it.
-            result = first_run_handle.join(stdin_data="exit()")
+            # Exit the second run by writing the file it is waiting for, and confirm that it
+            # exited, and that pantsd is still running.
+            safe_file_dump(file_to_create, "content!")
+            result = first_run_handle.join()
             result.assert_success()
             checker.assert_running()
 

@@ -19,6 +19,7 @@ codegen-units = 1
 # (e.g. fs_util) won't be included when we build/test things.
 members = [
   ".",
+  "async_latch",
   "async_semaphore",
   "boxfuture",
   "concrete_time",
@@ -55,6 +56,7 @@ members = [
 # On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
 default-members = [
   ".",
+  "async_latch",
   "async_semaphore",
   "boxfuture",
   "concrete_time",
@@ -93,6 +95,7 @@ extension-module = ["cpython/extension-module"]
 default = []
 
 [dependencies]
+async_latch = { path = "async_latch" }
 async_semaphore = { path = "async_semaphore" }
 async-trait = "0.1"
 boxfuture = { path = "boxfuture" }
@@ -125,7 +128,7 @@ store = { path = "fs/store" }
 task_executor = { path = "task_executor" }
 tempfile = "3"
 time = "0.1.40"
-tokio = { version = "0.2.23", features = ["rt-threaded"] }
+tokio = { version = "0.2.23", features = ["macros", "rt-threaded"] }
 ui = { path = "ui" }
 url = "2.1"
 uuid = { version = "0.7", features = ["v4"] }

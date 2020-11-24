@@ -17,6 +17,7 @@ from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing, uuid
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
@@ -50,9 +51,14 @@ class GraphScheduler:
         use_colors=True,
         should_report_workunits=False,
         session_values: Optional[SessionValues] = None,
+        cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> "GraphSession":
         session = self.scheduler.new_session(
-            build_id, dynamic_ui, should_report_workunits, session_values=session_values
+            build_id,
+            dynamic_ui,
+            should_report_workunits,
+            session_values=session_values,
+            cancellation_latch=cancellation_latch,
         )
         console = Console(use_colors=use_colors, session=session if dynamic_ui else None)
         return GraphSession(session, console, self.goal_map)
