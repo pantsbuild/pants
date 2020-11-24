@@ -11,8 +11,7 @@ from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, Type, ca
 from pants.base import deprecated
 from pants.engine.goal import GoalSubsystem
 from pants.engine.target import (
-    AsyncField,
-    AsyncStringSequenceField,
+    AsyncFieldMixin,
     BoolField,
     DictStringToStringField,
     DictStringToStringSequenceField,
@@ -170,8 +169,7 @@ class TargetFieldHelpInfo:
             fallback_to_ancestors=True,
             ignored_ancestors={
                 *Field.mro(),
-                AsyncField,
-                AsyncStringSequenceField,
+                AsyncFieldMixin,
                 BoolField,
                 DictStringToStringField,
                 DictStringToStringSequenceField,
