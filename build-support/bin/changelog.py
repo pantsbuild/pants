@@ -56,7 +56,7 @@ def prepare_sha(sha: str) -> str:
     pr_num = pr_num_match.groups()[0]
     pr_url = f"https://github.com/pantsbuild/pants/pull/{pr_num}"
     subject_with_url = subject.replace(f"(#{pr_num})", f"([#{pr_num}]({pr_url}))")
-    return f"* {subject_with_url.capitalize()}"
+    return f"* {subject_with_url}"
 
 
 def instructions(new_version: str) -> str:
@@ -72,24 +72,24 @@ def instructions(new_version: str) -> str:
 
         ---------------------------------------------------------------------
 
-        # {new_version} ({date})
+        ## {new_version} ({date})
 
-        ## New Features
-
-
-        ## User API Changes
+        ### New Features
 
 
-        ## Plugin API Changes
+        ### User API Changes
 
 
-        ## Bug fixes
+        ### Plugin API Changes
 
 
-        ## Documentation
+        ### Bug fixes
 
 
-        ## Internal only (Copy into the PR description, rather than the release notes)
+        ### Documentation
+
+
+        ### Internal only (Copy into the PR description, rather than the release notes)
 
 
         --------------------------------------------------------------------

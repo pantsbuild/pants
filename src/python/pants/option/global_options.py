@@ -356,7 +356,7 @@ class GlobalOptions(Subsystem):
                 "`src.python.project/app.pex`, rather than `app.pex`. Use the field `output_path` "
                 "to override these default values."
             ),
-            removal_version="2.2.0.dev0",
+            removal_version="2.2.0.dev1",
             removal_hint=(
                 "The pre-2.0 naming scheme for artifacts built with `./pants package` is being "
                 "removed because it often resulted in ambiguity and overwriting other artifacts. "
@@ -777,7 +777,7 @@ class GlobalOptions(Subsystem):
         register(
             "--remote-execution-process-cache-namespace",
             advanced=True,
-            removal_version="2.2.0.dev0",
+            removal_version="2.2.0.dev1",
             removal_hint="Use the `--process-execution-cache-namespace` option instead.",
             help="The cache namespace for remote process execution. "
             "Bump this to invalidate every artifact's remote execution. "
