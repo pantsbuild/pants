@@ -18,6 +18,11 @@ pex_binary(
 )
 
 pex_binary(
+  name="changelog",
+  sources=["changelog.py"],
+)
+
+pex_binary(
   name = 'check_banned_imports',
   sources = ['check_banned_imports.py'],
 )
@@ -80,5 +85,3 @@ pex_binary(
   name = "packages",
   sources = ["packages.py"],
 )
-
-python_tests()
