@@ -3,7 +3,7 @@
 
 from textwrap import dedent
 
-from pants.backend.python.dependency_inference import module_mapper
+from pants.backend.python.dependency_inference import import_parser, module_mapper
 from pants.backend.python.dependency_inference.rules import (
     InferConftestDependencies,
     InferInitDependencies,
@@ -19,7 +19,7 @@ from pants.backend.python.target_types import (
     PythonSources,
     PythonTests,
 )
-from pants.backend.python.util_rules import ancestor_files
+from pants.backend.python.util_rules import ancestor_files, pex
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import SubsystemRule
@@ -31,7 +31,9 @@ def test_infer_python_imports() -> None:
     rule_runner = RuleRunner(
         rules=[
             *stripped_source_files.rules(),
+            *import_parser.rules(),
             *module_mapper.rules(),
+            *pex.rules(),
             infer_python_dependencies,
             SubsystemRule(PythonInference),
             QueryRule(InferredDependencies, (InferPythonDependencies,)),
