@@ -165,7 +165,9 @@ class Field:
         return (self.alias, self.value) == (other.alias, other.value)
 
 
-class AsyncFieldMixin:
+# NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter which
+# order you use for inheriting the field template vs. the mixin.
+class AsyncFieldMixin(Field):
     """A mixin to store the field's original `Address` for use during hydration by the engine.
 
     Typically, you should also create a dataclass representing the hydrated value and another for
@@ -178,7 +180,7 @@ class AsyncFieldMixin:
 
     For example:
 
-        class Sources(AsyncFieldMixin, StringSequenceField):
+        class Sources(StringSequenceField, AsyncFieldMixin):
             alias = "sources"
 
             # Often, async fields will want to define entry points like this to allow subclasses to
@@ -211,8 +213,9 @@ class AsyncFieldMixin:
         sources2 = await Get(HydratedSources, HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
+    @final  # type: ignore[misc]
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        super().__init__(raw_value, address=address)  # type: ignore[call-arg]
+        super().__init__(raw_value, address=address)
         # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
         # subclasses from adding arbitrary fields.
         self._unfreeze_instance()  # type: ignore[attr-defined]
@@ -221,21 +224,17 @@ class AsyncFieldMixin:
 
     def __repr__(self) -> str:
         return (
-            f"{self.__class__}(alias={repr(self.alias)}, address={self.address}, "  # type: ignore[attr-defined]
+            f"{self.__class__}(alias={repr(self.alias)}, address={self.address}, "
             "value={repr(self.value)}, default={repr(self.default)})"
         )
 
     def __hash__(self) -> int:
-        return hash((self.alias, self.value, self.address))  # type: ignore[attr-defined]
+        return hash((self.alias, self.value, self.address))
 
     def __eq__(self, other: Union[Any, AsyncFieldMixin]) -> bool:
         if not isinstance(other, AsyncFieldMixin):
             return NotImplemented
-        return (self.alias, self.value, self.address) == (  # type: ignore[attr-defined]
-            other.alias,  # type: ignore[attr-defined]
-            other.value,  # type: ignore[attr-defined]
-            other.address,
-        )
+        return (self.alias, self.value, self.address) == (other.alias, other.value, other.address)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -421,9 +420,9 @@ class Target:
         """Get the requested `Field` instance belonging to this target.
 
         This will return an instance of the requested field type, e.g. an instance of
-        `Compatibility`, `Sources`, `EntryPoint`, etc. Usually, you will want to grab the
-        `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For `AsyncField`s, you would
-        call `await Get(SourcesResult, SourcesRequest, tgt.get(Sources).request)`).
+        `InterpreterConstraints`, `Sources`, `EntryPoint`, etc. Usually, you will want to grab the
+        `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
+        `Sources`, you may need to hydrate the value.).
 
         This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
         custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
@@ -1231,7 +1230,7 @@ class DictStringToStringSequenceField(Field):
 # -----------------------------------------------------------------------------------------------
 
 
-class Sources(AsyncFieldMixin, StringSequenceField):
+class Sources(StringSequenceField, AsyncFieldMixin):
     """A list of files and globs that belong to this target.
 
     Paths are relative to the BUILD file's directory. You can ignore files/globs by prefixing them
@@ -1503,7 +1502,7 @@ class SourcesPathsRequest(EngineAwareParameter):
 # NB: To hydrate the dependencies, use one of:
 #   await Get(Addresses, DependenciesRequest(tgt[Dependencies])
 #   await Get(Targets, DependenciesRequest(tgt[Dependencies])
-class Dependencies(AsyncFieldMixin, StringSequenceField):
+class Dependencies(StringSequenceField, AsyncFieldMixin):
     """Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib'].
 
     Alternatively, you may include file names. Pants will find which target owns that file, and
@@ -1675,7 +1674,7 @@ class InferredDependencies:
         return iter(self.dependencies)
 
 
-class SpecialCasedDependencies(AsyncFieldMixin, StringSequenceField):
+class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     """Subclass this for fields that act similarly to the `dependencies` field, but are handled
     differently than normal dependencies.
 

@@ -366,7 +366,7 @@ def test_required_field() -> None:
 
 
 def test_async_field_mixin() -> None:
-    class ExampleField(AsyncFieldMixin, IntField):
+    class ExampleField(IntField, AsyncFieldMixin):
         alias = "field"
         default = 10
 
@@ -374,6 +374,7 @@ def test_async_field_mixin() -> None:
     field = ExampleField(None, address=addr)
     assert field.value == 10
     assert field.address == addr
+    ExampleField.mro()  # Regression test that the mro is resolvable.
 
     # Ensure equality and __hash__ work correctly.
     other = ExampleField(None, address=addr)
