@@ -22,6 +22,7 @@ from pants.engine.internals.native_engine import (
     PyRemotingOptions,
     PyScheduler,
     PySession,
+    PySessionCancellationLatch,
     PyTasks,
     PyTypes,
 )
@@ -101,6 +102,7 @@ class RawFdRunner(Protocol):
         args: Tuple[str, ...],
         env: Dict[str, str],
         working_directory: bytes,
+        cancellation_latch: PySessionCancellationLatch,
         stdin_fd: int,
         stdout_fd: int,
         stderr_fd: int,
@@ -214,6 +216,7 @@ class Native(metaclass=SingletonMetaclass):
         build_id,
         should_report_workunits: bool,
         session_values: SessionValues,
+        cancellation_latch: PySessionCancellationLatch,
     ) -> PySession:
         return PySession(
             scheduler=scheduler,
@@ -221,6 +224,7 @@ class Native(metaclass=SingletonMetaclass):
             build_id=build_id,
             should_report_workunits=should_report_workunits,
             session_values=session_values,
+            cancellation_latch=cancellation_latch,
         )
 
     def new_scheduler(

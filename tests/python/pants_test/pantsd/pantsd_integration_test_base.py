@@ -26,7 +26,7 @@ def attempts(
     msg: str,
     *,
     delay: float = 0.5,
-    timeout: float = 30,
+    timeout: float = 60,
     backoff: float = 1.2,
 ) -> Iterator[None]:
     """A generator that yields a number of times before failing.
@@ -62,16 +62,6 @@ class PantsDaemonMonitor(ProcessManager):
         self._started = True
         self._check_pantsd_is_alive()
         return self.pid
-
-    def assert_pantsd_runner_started(self, client_pid, timeout=12):
-        return self.await_metadata_by_name(
-            name="nailgun-client",
-            metadata_key=str(client_pid),
-            ongoing_msg="client to start",
-            completed_msg="client started",
-            timeout=timeout,
-            caster=int,
-        )
 
     def _check_pantsd_is_alive(self):
         self._log()

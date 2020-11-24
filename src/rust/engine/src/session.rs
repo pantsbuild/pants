@@ -3,19 +3,22 @@
 
 use std::collections::HashMap;
 use std::future::Future;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
-use futures::FutureExt;
-
+use crate::context::Core;
 use crate::core::{Failure, Value};
 use crate::nodes::{NodeKey, Select};
 use crate::scheduler::Scheduler;
 
+use async_latch::AsyncLatch;
+use futures::FutureExt;
 use graph::LastObserved;
+use lazy_static::lazy_static;
 use log::warn;
 use parking_lot::{Mutex, RwLock};
 use task_executor::Executor;
+use tokio::sync::mpsc;
 use ui::ConsoleUI;
 use uuid::Uuid;
 use workunit_store::{UserMetadataPyValue, WorkunitStore};
@@ -48,6 +51,38 @@ enum SessionDisplay {
   },
 }
 
+lazy_static! {
+  // A collection of all live Sessions. Completed Sessions (i.e., those for which the Weak
+  // reference is dead) are removed from this collection on a best effort basis.
+  static ref SESSIONS: Mutex<Vec<Weak<InnerSession>>> = Mutex::default();
+}
+
+fn sessions_add(session: &Arc<InnerSession>) {
+  let mut sessions = SESSIONS.lock();
+  sessions.retain(|weak_session| weak_session.upgrade().is_some());
+  sessions.push(Arc::downgrade(session));
+}
+
+///
+/// Cancel all live Sessions.
+///
+/// In the case of pantsd, Sessions are generally canceled one at a time if their associated clients
+/// disconnect. But if a pants process receives a Unix signal, it might use this method to attempt to
+/// cancel ongoing work before exiting.
+///
+pub fn sessions_cancel() {
+  let sessions = {
+    let sessions = SESSIONS.lock();
+    sessions
+      .iter()
+      .filter_map(|weak_session| weak_session.upgrade())
+      .collect::<Vec<_>>()
+  };
+  for session in sessions {
+    session.core.executor.block_on(session.cancel());
+  }
+}
+
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
 /// underlying Scheduler, and is a useful scope for metrics.
@@ -56,6 +91,11 @@ enum SessionDisplay {
 /// they use internal mutability in order to avoid exposing locks to callers.
 ///
 struct InnerSession {
+  // Whether or not this Session has been cancelled. If a Session has been cancelled, all work that
+  // it started should attempt to exit in an orderly fashion.
+  cancelled: AsyncLatch,
+  // The Core that this Session is running on.
+  core: Arc<Core>,
   // The total size of the graph at Session-creation time.
   preceding_graph_size: usize,
   // The set of roots that have been requested within this session, with associated LastObserved
@@ -81,6 +121,16 @@ struct InnerSession {
   workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
 }
 
+impl InnerSession {
+  ///
+  /// Cancels this Session.
+  ///
+  pub async fn cancel(&self) {
+    // TODO: If this sticks, this function doesn't need to be async.
+    self.cancelled.trigger();
+  }
+}
+
 #[derive(Clone)]
 pub struct Session(Arc<InnerSession>);
 
@@ -91,6 +141,7 @@ impl Session {
     build_id: String,
     should_report_workunits: bool,
     session_values: Value,
+    cancelled: AsyncLatch,
   ) -> Session {
     let workunit_store = WorkunitStore::new(!should_render_ui);
     let display = Mutex::new(if should_render_ui {
@@ -107,7 +158,9 @@ impl Session {
       }
     });
 
-    let inner_session = InnerSession {
+    let inner_session = Arc::new(InnerSession {
+      cancelled,
+      core: scheduler.core.clone(),
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashMap::new()),
       display,
@@ -117,8 +170,27 @@ impl Session {
       run_id: Mutex::new(Uuid::new_v4()),
       should_report_workunits,
       workunit_metadata_map: RwLock::new(HashMap::new()),
-    };
-    Session(Arc::new(inner_session))
+    });
+    sessions_add(&inner_session);
+    Session(inner_session)
+  }
+
+  pub fn core(&self) -> &Arc<Core> {
+    &self.0.core
+  }
+
+  ///
+  /// Cancels this Session.
+  ///
+  pub async fn cancel(&self) {
+    self.0.cancel().await;
+  }
+
+  ///
+  /// Returns only if this Session has been cancelled.
+  ///
+  pub async fn cancelled(&self) {
+    self.0.cancelled.triggered().await;
   }
 
   pub fn with_metadata_map<F, T>(&self, f: F) -> T
@@ -206,7 +278,7 @@ impl Session {
   pub fn maybe_display_initialize(
     &self,
     executor: &Executor,
-    sender: &mpsc::Sender<ExecutionEvent>,
+    sender: &mpsc::UnboundedSender<ExecutionEvent>,
   ) {
     let result = match *self.0.display.lock() {
       SessionDisplay::ConsoleUI(ref mut ui) => {
