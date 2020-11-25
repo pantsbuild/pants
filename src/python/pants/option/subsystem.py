@@ -5,24 +5,10 @@ import importlib
 import inspect
 import logging
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Iterable, List, Optional, TypeVar
 
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable, OptionableFactory
-from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.ordered_set import OrderedSet
 
@@ -96,21 +82,6 @@ class Subsystem(Optionable):
     scope: str
     options: OptionValueContainer
 
-    # TODO: The full Options object for this pants run for use by `global_instance` and
-    # `scoped_instance`.
-    _options: ClassVar[Optional[Options]] = None
-
-    # TODO: A cache of (cls, scope) -> the instance of cls tied to that scope.
-    # NB: it would be ideal to use `_S` rather than `Subsystem`, but we can't do this because
-    # MyPy complains that `_S` would not be properly constrained. Specifically, it suggests that we'd
-    # have to use typing.Generic or typing.Protocol to properly constrain the type var, which we
-    # don't want to do.
-    _scoped_instances: ClassVar[Dict[Tuple[Type["Subsystem"], str], "Subsystem"]] = {}
-
-    class UninitializedSubsystemError(SubsystemError):
-        def __init__(self, class_name, scope):
-            super().__init__(f'Subsystem "{class_name}" not initialized for scope "{scope}"')
-
     @classmethod
     def is_subsystem_type(cls, obj):
         return inspect.isclass(obj) and issubclass(obj, cls)
@@ -133,63 +104,6 @@ class Subsystem(Optionable):
             return super().get_scope_info()
         else:
             return ScopeInfo(cls.subscope(subscope), cls)
-
-    @classmethod
-    def set_options(cls, options: Options) -> None:
-        cls._options = options
-
-    @classmethod
-    def is_initialized(cls) -> bool:
-        return cls._options is not None
-
-    @classmethod
-    def global_instance(cls: Type[_S]) -> _S:
-        """Returns the global instance of this subsystem.
-
-        :API: public
-
-        :returns: The global subsystem instance.
-
-        Note that `global_instance` is a v1-idiom only. v2 rules should always request a subsystem as a rule input, rather than
-        trying to call <subsystem>.global_instance() in the body of an `@rule`.
-        """
-        return cls._instance_for_scope(cls.options_scope)  # type: ignore[arg-type]  # MyPy is treating cls.options_scope as a Callable, rather than `str`
-
-    @classmethod
-    def scoped_instance(cls: Type[_S], optionable: Union[Optionable, Type[Optionable]]) -> _S:
-        """Returns an instance of this subsystem for exclusive use by the given `optionable`.
-
-        :API: public
-
-        :param optionable: An optionable type or instance to scope this subsystem under.
-        :returns: The scoped subsystem instance.
-        """
-        if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):
-            raise TypeError(
-                "Can only scope an instance against an Optionable, given {} of type {}.".format(
-                    optionable, type(optionable)
-                )
-            )
-        return cls._instance_for_scope(cls.subscope(optionable.options_scope))
-
-    @classmethod
-    def _instance_for_scope(cls: Type[_S], scope: str) -> _S:
-        if cls._options is None:
-            raise cls.UninitializedSubsystemError(cls.__name__, scope)
-        key = (cls, scope)
-        if key not in cls._scoped_instances:
-            cls._scoped_instances[key] = cls(scope, cls._options.for_scope(scope))
-        return cast(_S, cls._scoped_instances[key])
-
-    @classmethod
-    def reset(cls, reset_options: bool = True) -> None:
-        """Forget all option values and cached subsystem instances.
-
-        Used primarily for test isolation and to reset subsystem state for pantsd.
-        """
-        if reset_options:
-            cls._options = None
-        cls._scoped_instances = {}
 
     def __init__(self, scope: str, options: OptionValueContainer) -> None:
         super().__init__()

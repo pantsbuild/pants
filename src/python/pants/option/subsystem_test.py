@@ -45,37 +45,6 @@ def si(scope, subsystem_cls):
     return ScopeInfo(scope, subsystem_cls)
 
 
-@pytest.fixture(autouse=True)
-def init_subsystems():
-    DummySubsystem._options = DummyOptions()
-    WorkunitSubscriptableSubsystem._options = DummyOptions()
-
-
-def test_global_instance() -> None:
-    # Verify that we get the same instance back every time.
-    global_instance = DummySubsystem.global_instance()
-    assert global_instance is DummySubsystem.global_instance()
-
-
-def test_scoped_instance() -> None:
-    # Verify that we get the same instance back every time.
-    task = DummyOptionable()
-    task_instance = DummySubsystem.scoped_instance(task)
-    assert task_instance is DummySubsystem.scoped_instance(task)
-
-
-def test_invalid_subsystem_class():
-    class NoScopeSubsystem(Subsystem):
-        pass
-
-    NoScopeSubsystem._options = DummyOptions()
-    with pytest.raises(TypeError) as exc:
-        NoScopeSubsystem.global_instance()
-    assert str(exc.value) == (
-        "Can't instantiate abstract class NoScopeSubsystem with abstract methods options_scope"
-    )
-
-
 def test_scoping_simple() -> None:
     assert {si("dummy", DummySubsystem)} == DummySubsystem.known_scope_infos()
     assert {
@@ -220,29 +189,6 @@ def test_scoping_complex() -> None:
         si("c.b.d", SubsystemC),
         si("e", SubsystemE),
     }
-
-
-def test_uninitialized_global() -> None:
-    Subsystem.reset()
-    with pytest.raises(
-        Subsystem.UninitializedSubsystemError,
-        match=r"UninitializedSubsystem.*uninitialized-scope",
-    ):
-        UninitializedSubsystem.global_instance()
-
-
-def test_uninitialized_scoped_instance() -> None:
-    Subsystem.reset()
-
-    class UninitializedOptional(Optionable):
-        options_scope = "optional"
-
-    optional = UninitializedOptional()
-    with pytest.raises(
-        Subsystem.UninitializedSubsystemError,
-        match=r"UninitializedSubsystem.*uninitialized-scope",
-    ):
-        UninitializedSubsystem.scoped_instance(optional)
 
 
 def test_subsystem_dependencies_iter() -> None:

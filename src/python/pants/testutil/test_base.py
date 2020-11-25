@@ -45,7 +45,6 @@ from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.global_options import ExecutionOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.subsystem import Subsystem
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import GoalRuleResult as GoalRuleResult
@@ -347,13 +346,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         if self._scheduler is None:
             self._init_engine()
         return cast(SchedulerSession, self._scheduler)
-
-    def tearDown(self):
-        """
-        :API: public
-        """
-        super().tearDown()
-        Subsystem.reset()
 
     def make_snapshot(self, files: Dict[str, Union[str, bytes]]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content."""

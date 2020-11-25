@@ -45,6 +45,7 @@ class LocalPantsRunner:
     build_root: The build root for this run.
     options: The parsed options for this run.
     build_config: The parsed build configuration for this run.
+    run_tracker: A tracker for metrics for the run.
     specs: The specs for this run, i.e. either the address or filesystem specs.
     graph_session: A LegacyGraphSession instance for graph reuse.
     profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
@@ -53,6 +54,7 @@ class LocalPantsRunner:
     build_root: str
     options: Options
     build_config: BuildConfiguration
+    run_tracker: RunTracker
     specs: Specs
     graph_session: GraphSession
     union_membership: UnionMembership
@@ -63,6 +65,7 @@ class LocalPantsRunner:
         cls,
         options_bootstrapper: OptionsBootstrapper,
         build_config: BuildConfiguration,
+        run_tracker: RunTracker,
         options: Options,
         scheduler: Optional[GraphScheduler] = None,
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
@@ -81,7 +84,7 @@ class LocalPantsRunner:
 
         stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
         return graph_scheduler_helper.new_session(
-            RunTracker.global_instance().run_id,
+            run_tracker.run_id,
             dynamic_ui=global_scope.dynamic_ui,
             use_colors=global_scope.get("colors", True),
             should_report_workunits=stream_workunits,
@@ -108,6 +111,7 @@ class LocalPantsRunner:
         cls,
         env: Mapping[str, str],
         options_bootstrapper: OptionsBootstrapper,
+        run_tracker: Optional[RunTracker] = None,
         scheduler: Optional[GraphScheduler] = None,
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> "LocalPantsRunner":
@@ -124,6 +128,7 @@ class LocalPantsRunner:
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
 
         build_config = BuildConfigInitializer.get(options_bootstrapper)
+        run_tracker = run_tracker or RunTracker()
         try:
             options = OptionsInitializer.create(options_bootstrapper, build_config)
         except UnknownFlagsError as err:
@@ -135,7 +140,7 @@ class LocalPantsRunner:
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
         graph_session = cls._init_graph_session(
-            options_bootstrapper, build_config, options, scheduler, cancellation_latch
+            options_bootstrapper, build_config, run_tracker, options, scheduler, cancellation_latch
         )
 
         # Option values are usually computed lazily on demand,
@@ -164,19 +169,20 @@ class LocalPantsRunner:
             build_root=build_root,
             options=options,
             build_config=build_config,
+            run_tracker=run_tracker,
             specs=specs,
             graph_session=graph_session,
             union_membership=union_membership,
             profile_path=profile_path,
         )
 
-    def _start_run(self, run_tracker: RunTracker, start_time: float) -> None:
-        run_tracker.start(self.options, run_start_time=start_time)
+    def _start_run(self, start_time: float) -> None:
+        self.run_tracker.start(self.options, run_start_time=start_time)
 
         spec_parser = SpecsParser(get_buildroot())
         specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
         # Note: This will not include values from `--changed-*` flags.
-        run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
+        self.run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
 
     def _run_v2(self, goals: Tuple[str, ...]) -> ExitCode:
         if not goals:
@@ -208,14 +214,14 @@ class LocalPantsRunner:
             poll_delay=(0.1 if poll else None),
         )
 
-    def _finish_run(self, run_tracker: RunTracker, code: ExitCode) -> None:
+    def _finish_run(self, code: ExitCode) -> None:
         """Cleans up the run tracker."""
 
         metrics = self.graph_session.scheduler_session.metrics()
-        run_tracker.set_pantsd_scheduler_metrics(metrics)
+        self.run_tracker.set_pantsd_scheduler_metrics(metrics)
         outcome = WorkUnit.SUCCESS if code == PANTS_SUCCEEDED_EXIT_CODE else WorkUnit.FAILURE
-        run_tracker.set_root_outcome(outcome)
-        run_tracker.end()
+        self.run_tracker.set_root_outcome(outcome)
+        self.run_tracker.end()
 
     def _print_help(self, request: HelpRequest) -> ExitCode:
         global_options = self.options.for_global_scope()
@@ -235,8 +241,7 @@ class LocalPantsRunner:
         return help_printer.print_help()
 
     def run(self, start_time: float) -> ExitCode:
-        run_tracker = RunTracker.global_instance()
-        self._start_run(run_tracker, start_time)
+        self._start_run(start_time)
 
         with maybe_profiled(self.profile_path):
             global_options = self.options.for_global_scope()
@@ -260,5 +265,5 @@ class LocalPantsRunner:
                 except Exception as e:
                     ExceptionSink.log_exception(e)
 
-                self._finish_run(run_tracker, engine_result)
+                self._finish_run(engine_result)
             return engine_result

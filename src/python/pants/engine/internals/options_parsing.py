@@ -33,9 +33,7 @@ class _Options:
 
     @memoized_property
     def options(self) -> Options:
-        return OptionsInitializer.create(
-            self.options_bootstrapper, self.build_config, init_subsystems=False
-        )
+        return OptionsInitializer.create(self.options_bootstrapper, self.build_config)
 
 
 @rule

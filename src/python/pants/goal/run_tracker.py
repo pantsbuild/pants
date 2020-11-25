@@ -41,16 +41,10 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
         return super().default(o)
 
 
-class RunTracker(Subsystem):
-    """Tracks and times the execution of a pants run."""
+class DeprecatedRunTracker(Subsystem):
+    """Metrics recorded about each Pants run."""
 
     options_scope = "run-tracker"
-
-    # The name of the tracking root for the main thread (and the foreground worker threads).
-    DEFAULT_ROOT_NAME = "main"
-
-    # The name of the tracking root for the background worker threads.
-    BACKGROUND_ROOT_NAME = "background"
 
     @classmethod
     def register_options(cls, register):
@@ -58,6 +52,10 @@ class RunTracker(Subsystem):
             "--stats-local-json-file",
             advanced=True,
             default=None,
+            removal_version="2.3.0.dev0",
+            removal_hint=(
+                "This option is now a noop: instead, use global option " "`--stats-json-file`."
+            ),
             help="Write stats to this local json file on run completion.",
         )
         register(
@@ -65,17 +63,31 @@ class RunTracker(Subsystem):
             advanced=True,
             type=list,
             default=[],
+            removal_version="2.3.0.dev0",
+            removal_hint=(
+                "This option is now a noop: instead, use global option "
+                "`--stats-record-option-scopes`."
+            ),
             help="Option scopes to record in stats on run completion. "
             "Options may be selected by joining the scope and the option with a ^ character, "
             "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "
             "Add a '*' to the list to capture all known scopes.",
         )
 
-    def __init__(self, *args, **kwargs):
+
+class RunTracker:
+    """Tracks and times the execution of a single Pants run."""
+
+    # The name of the tracking root for the main thread (and the foreground worker threads).
+    DEFAULT_ROOT_NAME = "main"
+
+    # The name of the tracking root for the background worker threads.
+    BACKGROUND_ROOT_NAME = "background"
+
+    def __init__(self):
         """
         :API: public
         """
-        super().__init__(*args, **kwargs)
         self._run_timestamp = time.time()
         self._cmd_line = " ".join(["pants"] + sys.argv[1:])
         self._v2_goal_rule_names: Tuple[str, ...] = tuple()
@@ -145,7 +157,7 @@ class RunTracker(Subsystem):
 
         # Initialize the run.
 
-        info_dir = os.path.join(self.options.pants_workdir, self.options_scope)
+        info_dir = os.path.join(all_options.for_global_scope().pants_workdir, "run-tracker")
         self.run_info_dir = os.path.join(info_dir, self.run_id)
         self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
         self.run_info.add_basic_info(self.run_id, self._run_timestamp)
@@ -227,12 +239,12 @@ class RunTracker(Subsystem):
         }
         return stats
 
-    def store_stats(self):
+    def store_stats(self) -> None:
         """Store stats about this run in local and optionally remote stats dbs."""
         stats = self._stats()
 
         # Write stats to user-defined json file.
-        stats_json_file_name = self.options.stats_local_json_file
+        stats_json_file_name = self._all_options.for_global_scope().stats_json_file
         if stats_json_file_name:
             self.write_stats_to_json(stats_json_file_name, stats)
 
@@ -314,7 +326,7 @@ class RunTracker(Subsystem):
 
     def get_options_to_record(self) -> dict:
         recorded_options = {}
-        scopes = self.options.stats_option_scopes_to_record
+        scopes = self._all_options.for_global_scope().stats_record_option_scopes
         if "*" in scopes:
             scopes = self._all_options.known_scope_to_info.keys()
         for scope in scopes:

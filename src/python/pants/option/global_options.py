@@ -572,6 +572,25 @@ class GlobalOptions(Subsystem):
             "Pants's own code, plugins, and `--pants-config-files` are inherently invalidated.",
         )
 
+        register(
+            "--stats-json-file",
+            advanced=True,
+            default=None,
+            help="Write stats to this local json file on run completion.",
+        )
+        register(
+            "--stats-record-option-scopes",
+            advanced=True,
+            type=list,
+            default=[],
+            help=(
+                "Option scopes to record in stats on run completion. "
+                "Options may be selected by joining the scope and the option with a ^ character, "
+                "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "
+                "Add a '*' to the list to capture all known scopes."
+            ),
+        )
+
         cache_instructions = (
             "The path may be absolute or relative. If the directory is within the build root, be "
             "sure to include it in `--pants-ignore`."

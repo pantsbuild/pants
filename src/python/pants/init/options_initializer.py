@@ -17,7 +17,6 @@ from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.ordered_set import OrderedSet
 
@@ -141,7 +140,6 @@ class OptionsInitializer:
         cls,
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
-        init_subsystems: bool = True,
     ) -> Options:
         global_bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
 
@@ -161,8 +159,5 @@ class OptionsInitializer:
         options = options_bootstrapper.get_full_options(known_scope_infos)
 
         GlobalOptions.validate_instance(options.for_global_scope())
-
-        if init_subsystems:
-            Subsystem.set_options(options)
 
         return options
