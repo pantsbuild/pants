@@ -22,7 +22,6 @@ from pants.engine.target import (
     ScalarField,
     SequenceField,
     StringField,
-    StringOrStringSequenceField,
     StringSequenceField,
     Target,
 )
@@ -179,7 +178,6 @@ class TargetFieldHelpInfo:
                 ScalarField,
                 SequenceField,
                 StringField,
-                StringOrStringSequenceField,
                 StringSequenceField,
             },
         )
