@@ -16,7 +16,7 @@ from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.goal.run_tracker import RunTracker
+from pants.goal.run_tracker import DeprecatedRunTracker
 from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
 from pants.option.scope import normalize_scope
@@ -33,7 +33,7 @@ _RESERVED_NAMES = {"global", "targets", "goals"}
 
 # Subsystems used outside of any rule.
 _GLOBAL_SUBSYSTEMS: FrozenOrderedSet[Type[Optionable]] = FrozenOrderedSet(
-    {GlobalOptions, RunTracker, Changed}
+    {GlobalOptions, DeprecatedRunTracker, Changed}
 )
 
 

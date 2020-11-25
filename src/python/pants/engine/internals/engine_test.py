@@ -286,7 +286,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
             scheduler,
-            run_tracker=RunTracker("run-tracker", None),
+            run_tracker=RunTracker(None),  # type: ignore[arg-type]
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
             max_workunit_verbosity=max_workunit_verbosity,
@@ -648,7 +648,7 @@ def test_more_complicated_engine_aware(rule_runner: RuleRunner) -> None:
     tracker = WorkunitTracker()
     handler = StreamingWorkunitHandler(
         rule_runner.scheduler,
-        run_tracker=RunTracker("run-tracker", None),
+        run_tracker=RunTracker(None),  # type: ignore[arg-type]
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.TRACE,
@@ -705,7 +705,7 @@ def test_process_digests_on_streaming_workunits(rule_runner: RuleRunner) -> None
     tracker = WorkunitTracker()
     handler = StreamingWorkunitHandler(
         scheduler,
-        run_tracker=RunTracker("run-tracker", None),
+        run_tracker=RunTracker(None),  # type: ignore[arg-type]
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
@@ -735,7 +735,7 @@ def test_process_digests_on_streaming_workunits(rule_runner: RuleRunner) -> None
     tracker = WorkunitTracker()
     handler = StreamingWorkunitHandler(
         scheduler,
-        run_tracker=RunTracker("run-tracker", None),
+        run_tracker=RunTracker(None),  # type: ignore[arg-type]
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
@@ -792,7 +792,7 @@ def test_context_object_on_streaming_workunits(rule_runner: RuleRunner) -> None:
 
     handler = StreamingWorkunitHandler(
         scheduler,
-        run_tracker=RunTracker("run-tracker", None),
+        run_tracker=RunTracker(None),  # type: ignore[arg-type]
         callbacks=[callback],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
