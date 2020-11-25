@@ -58,15 +58,9 @@ class OutputPathField(StringField):
 
     alias = "output_path"
 
-    def value_or_default(
-        self, address: Address, *, file_ending: str, use_legacy_format: bool
-    ) -> str:
+    def value_or_default(self, address: Address, *, file_ending: str) -> str:
         assert not file_ending.startswith("."), "`file_ending` should not start with `.`"
-        if self.value is not None:
-            return self.value
-        if use_legacy_format:
-            return f"{address.target_name}.{file_ending}"
-        return os.path.join(
+        return self.value or os.path.join(
             address.spec_path.replace(os.sep, "."), f"{address.target_name}.{file_ending}"
         )
 
