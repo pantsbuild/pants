@@ -90,7 +90,7 @@ async def inject_pex_binary_entry_point_dependency(
     request: InjectPexBinaryEntryPointDependency, pex_binary_defaults: PexBinaryDefaults
 ) -> InjectedDependencies:
     if not pex_binary_defaults.infer_dependencies:
-        return InjectedDependencies([])
+        return InjectedDependencies()
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
     entry_point = await Get(
         ResolvedPexEntryPoint,
@@ -99,7 +99,7 @@ async def inject_pex_binary_entry_point_dependency(
         ),
     )
     if entry_point.val is None:
-        return InjectedDependencies([])
+        return InjectedDependencies()
     module, _, _func = entry_point.val.partition(":")
     owners = await Get(PythonModuleOwners, PythonModule(module))
     # TODO: remove the check for == self once the `sources` field is removed.
