@@ -298,5 +298,4 @@ def get_pyenv_root():
     try:
         return subprocess.check_output(["pyenv", "root"]).decode().strip()
     except (OSError, subprocess.CalledProcessError):
-        logger.info("No pyenv binary found. Will not use pyenv interpreters.")
-    return None
+        return None
