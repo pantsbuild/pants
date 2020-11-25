@@ -345,26 +345,6 @@ class GlobalOptions(Subsystem):
             help="Write end products, such as the results of `./pants package`, to this dir.",
         )
         register(
-            "--pants-distdir-legacy-paths",
-            type=bool,
-            advanced=True,
-            default=False,
-            help=(
-                "If true, will write paths for artifacts built with `./pants package` using only "
-                "the target name, which may be ambiguous and result in overwriting unrelated "
-                "artifacts. Otherwise, will use the target's address, e.g. "
-                "`src.python.project/app.pex`, rather than `app.pex`. Use the field `output_path` "
-                "to override these default values."
-            ),
-            removal_version="2.2.0.dev1",
-            removal_hint=(
-                "The pre-2.0 naming scheme for artifacts built with `./pants package` is being "
-                "removed because it often resulted in ambiguity and overwriting other artifacts. "
-                "Use the field `output_path` on each `pex_binary`, `python_awslambda`, and "
-                "`archive` target where you would like to avoid the default."
-            ),
-        )
-        register(
             "--pants-subprocessdir",
             advanced=True,
             default=os.path.join(buildroot, ".pids"),

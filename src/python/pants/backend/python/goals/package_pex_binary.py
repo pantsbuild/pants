@@ -34,7 +34,6 @@ from pants.core.goals.package import (
 from pants.core.goals.run import RunFieldSet
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 
@@ -73,18 +72,12 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 @rule(level=LogLevel.DEBUG)
 async def package_pex_binary(
-    field_set: PexBinaryFieldSet,
-    pex_binary_defaults: PexBinaryDefaults,
-    global_options: GlobalOptions,
+    field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults
 ) -> BuiltPackage:
     resolved_entry_point = await Get(
         ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point, field_set.sources)
     )
-    output_filename = field_set.output_path.value_or_default(
-        field_set.address,
-        file_ending="pex",
-        use_legacy_format=global_options.options.pants_distdir_legacy_paths,
-    )
+    output_filename = field_set.output_path.value_or_default(field_set.address, file_ending="pex")
     two_step_pex = await Get(
         TwoStepPex,
         TwoStepPexFromTargetsRequest(
