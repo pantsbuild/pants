@@ -778,12 +778,12 @@ def test_no_applicable_targets_exception() -> None:
             """\
             The `foo` goal only works with these target types:
 
-            * tgt1
-            * tgt2
+              * tgt1
+              * tgt2
 
             However, you only specified files/targets with these target types:
 
-            * tgt3
+              * tgt3
 
             Run `./pants filter --target-type=tgt1,tgt2 ::` to find all applicable targets in your project."""
         )
