@@ -159,7 +159,7 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
             InjectedDependencies,
             [InjectPexBinaryEntryPointDependency(tgt[PexBinaryDependencies])],
         )
-        assert injected == InjectedDependencies([expected])
+        assert injected == InjectedDependencies([expected] if expected else [])
 
     assert_injected(
         Address("project", target_name="first_party"),

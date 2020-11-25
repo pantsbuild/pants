@@ -86,7 +86,7 @@ def test_inject_handler_dependency() -> None:
             InjectedDependencies,
             [InjectPythonLambdaHandlerDependency(tgt[PythonAwsLambdaDependencies])],
         )
-        assert injected == InjectedDependencies([expected])
+        assert injected == InjectedDependencies([expected] if expected else [])
 
     assert_injected(
         Address("project", target_name="first_party"),

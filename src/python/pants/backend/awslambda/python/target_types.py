@@ -95,8 +95,6 @@ async def inject_lambda_handler_dependency(
         ResolvedPythonAwsHandler,
         ResolvePythonAwsHandlerRequest(original_tgt.target[PythonAwsLambdaHandlerField]),
     )
-    if handler.val is None:
-        return InjectedDependencies()
     module, _, _func = handler.val.partition(":")
     owners = await Get(PythonModuleOwners, PythonModule(module))
     # TODO: remove the check for == self once the `sources` field is removed.

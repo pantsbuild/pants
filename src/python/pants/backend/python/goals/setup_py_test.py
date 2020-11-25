@@ -6,6 +6,7 @@ from typing import Iterable, Type
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals.setup_py import (
     AmbiguousOwnerError,
     DependencyOwner,
@@ -41,7 +42,6 @@ from pants.backend.python.target_types import (
     PythonLibrary,
     PythonRequirementLibrary,
 )
-from pants.backend.python.target_types import rules as target_types_rules
 from pants.backend.python.util_rules import python_sources
 from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
@@ -95,7 +95,7 @@ def chroot_rule_runner() -> RuleRunner:
             get_owned_dependencies,
             get_exporting_owner,
             *python_sources.rules(),
-            *target_types_rules(),
+            *target_types_rules.rules(),
             setup_kwargs_plugin,
             SubsystemRule(SetupPyGeneration),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
@@ -226,14 +226,14 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
 
 
 def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
-    chroot_rule_runner.create_file("src/python/invalid_binary/app.py")
+    chroot_rule_runner.create_files("src/python/invalid_binary", ["app1.py", "app2.py"])
     chroot_rule_runner.add_to_build_file(
         "src/python/invalid_binary",
         textwrap.dedent(
             """
             python_library(name='not_a_binary', sources=[])
-            pex_binary(name='no_explicit_entrypoint', sources=["app.py"])
-            pex_binary(name='malformed_entrypoint', entry_point='invalid_binary.app')
+            pex_binary(name='no_explicit_entrypoint', sources=["app1.py"])
+            pex_binary(name='malformed_entrypoint', entry_point='invalid_binary.app2')
             python_distribution(
                 name='invalid_bin1',
                 provides=setup_py(

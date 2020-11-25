@@ -10,6 +10,7 @@ defined in `target_types.py`.
 import os.path
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
+from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.target_types import (
     PexBinaryDefaults,
     PexBinaryDependencies,
@@ -141,6 +142,7 @@ async def inject_python_distribution_dependencies(
 def rules():
     return (
         *collect_rules(),
+        *import_rules(),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
     )
