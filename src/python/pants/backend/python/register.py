@@ -6,6 +6,7 @@
 See https://www.pantsbuild.org/docs/python-backend.
 """
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import (
     coverage_py,
@@ -28,7 +29,6 @@ from pants.backend.python.target_types import (
     PythonRequirementsFile,
     PythonTests,
 )
-from pants.backend.python.target_types import rules as target_type_rules
 from pants.backend.python.util_rules import (
     ancestor_files,
     extract_pex,
@@ -68,7 +68,7 @@ def rules():
         *python_native_code.rules(),
         *repl.rules(),
         *run_pex_binary.rules(),
-        *target_type_rules(),
+        *target_types_rules.rules(),
         *setup_py.rules(),
     )
 

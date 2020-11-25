@@ -7,24 +7,34 @@ from typing import Optional
 import pytest
 from pkg_resources import Requirement
 
+from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
-    InjectPythonDistributionDependencies,
     PexBinary,
+    PexBinaryDefaults,
+    PexBinaryDependencies,
     PexBinarySources,
     PexEntryPointField,
     PythonDistribution,
     PythonDistributionDependencies,
+    PythonLibrary,
+    PythonRequirementLibrary,
     PythonRequirementsField,
     PythonTestsTimeout,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
+)
+from pants.backend.python.target_types_rules import (
+    InjectPexBinaryEntryPointDependency,
+    InjectPythonDistributionDependencies,
+    inject_pex_binary_entry_point_dependency,
+    inject_python_distribution_dependencies,
     resolve_pex_entry_point,
 )
-from pants.backend.python.target_types import rules as target_type_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.rules import SubsystemRule
 from pants.engine.target import (
     InjectedDependencies,
     InvalidFieldException,
@@ -104,6 +114,79 @@ def test_resolve_pex_binary_entry_point() -> None:
         assert_resolved(entry_point=":func", source=None, expected="doesnt matter")
 
 
+def test_inject_pex_binary_entry_point_dependency() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            inject_pex_binary_entry_point_dependency,
+            resolve_pex_entry_point,
+            *import_rules(),
+            SubsystemRule(PexBinaryDefaults),
+            QueryRule(InjectedDependencies, [InjectPexBinaryEntryPointDependency]),
+        ],
+        target_types=[PexBinary, PythonRequirementLibrary, PythonLibrary],
+    )
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            python_requirement_library(
+                name='ansicolors',
+                requirements=['ansicolors'],
+                module_mapping={'ansicolors': ['colors']},
+            )
+            """
+        ),
+    )
+    rule_runner.create_files("project", ["app.py", "self.py"])
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            python_library(sources=['app.py'])
+            pex_binary(name='first_party', entry_point='project.app')
+            pex_binary(name='first_party_func', entry_point='project.app:func')
+            pex_binary(name='third_party', entry_point='colors')
+            pex_binary(name='third_party_func', entry_point='colors:func')
+            pex_binary(name='unrecognized', entry_point='who_knows.module')
+            pex_binary(name='self', sources=['self.py'])
+            """
+        ),
+    )
+
+    def assert_injected(address: Address, *, expected: Optional[Address]) -> None:
+        tgt = rule_runner.get_target(address)
+        injected = rule_runner.request(
+            InjectedDependencies,
+            [InjectPexBinaryEntryPointDependency(tgt[PexBinaryDependencies])],
+        )
+        assert injected == InjectedDependencies([expected])
+
+    assert_injected(
+        Address("project", target_name="first_party"),
+        expected=Address("project", relative_file_path="app.py"),
+    )
+    assert_injected(
+        Address("project", target_name="first_party_func"),
+        expected=Address("project", relative_file_path="app.py"),
+    )
+    assert_injected(
+        Address("project", target_name="third_party"),
+        expected=Address("", target_name="ansicolors"),
+    )
+    assert_injected(
+        Address("project", target_name="third_party_func"),
+        expected=Address("", target_name="ansicolors"),
+    )
+    assert_injected(Address("project", target_name="unrecognized"), expected=None)
+    assert_injected(
+        Address("project", target_name="self", relative_file_path="self.py"), expected=None
+    )
+
+    # Test that we can turn off the injection.
+    rule_runner.set_options(["--no-pex-binary-defaults-infer-dependencies"])
+    assert_injected(Address("project", target_name="first_party"), expected=None)
+
+
 def test_requirements_field() -> None:
     raw_value = (
         "argparse==1.2.1",
@@ -142,11 +225,8 @@ def test_requirements_field() -> None:
 def test_python_distribution_dependency_injection() -> None:
     rule_runner = RuleRunner(
         rules=[
-            *target_type_rules(),
-            QueryRule(
-                InjectedDependencies,
-                (InjectPythonDistributionDependencies,),
-            ),
+            inject_python_distribution_dependencies,
+            QueryRule(InjectedDependencies, [InjectPythonDistributionDependencies]),
         ],
         target_types=[PythonDistribution, PexBinary],
         objects={"setup_py": PythonArtifact},

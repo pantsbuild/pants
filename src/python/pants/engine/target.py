@@ -1296,8 +1296,8 @@ class Sources(StringSequenceField, AsyncFieldMixin):
     @final
     def _prefix_glob_with_address(self, glob: str) -> str:
         if glob.startswith("!"):
-            return f"!{PurePath(self.address.spec_path, glob[1:])}"
-        return str(PurePath(self.address.spec_path, glob))
+            return f"!{os.path.join(self.address.spec_path, glob[1:])}"
+        return os.path.join(self.address.spec_path, glob)
 
     @final
     def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:

@@ -12,12 +12,13 @@ from pants.backend.python.dependency_inference.import_parser import (
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
-from pants.backend.python.util_rules import ancestor_files
+from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.util_rules.pex import PexInterpreterConstraints
+from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, SubsystemRule, rule
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
@@ -99,13 +100,15 @@ class PythonInference(Subsystem):
         return cast(bool, self.options.conftests)
 
 
-class InferPythonDependencies(InferDependenciesRequest):
+class InferPythonImportDependencies(InferDependenciesRequest):
     infer_from = PythonSources
 
 
 @rule(desc="Inferring Python dependencies by analyzing imports")
-async def infer_python_dependencies(
-    request: InferPythonDependencies, python_inference: PythonInference, python_setup: PythonSetup
+async def infer_python_dependencies_via_imports(
+    request: InferPythonImportDependencies,
+    python_inference: PythonInference,
+    python_setup: PythonSetup,
 ) -> InferredDependencies:
     if not python_inference.imports:
         return InferredDependencies([], sibling_dependencies_inferrable=False)
@@ -193,13 +196,26 @@ async def infer_python_conftest_dependencies(
     )
 
 
-def rules():
+# This is a separate function to facilitate tests registering import inference.
+def import_rules():
     return [
-        *collect_rules(),
-        *ancestor_files.rules(),
+        infer_python_dependencies_via_imports,
+        *pex.rules(),
         *import_parser.rules(),
         *module_mapper.rules(),
-        UnionRule(InferDependenciesRequest, InferPythonDependencies),
+        *stripped_source_files.rules(),
+        SubsystemRule(PythonInference),
+        SubsystemRule(PythonSetup),
+        UnionRule(InferDependenciesRequest, InferPythonImportDependencies),
+    ]
+
+
+def rules():
+    return [
+        *import_rules(),
+        infer_python_init_dependencies,
+        infer_python_conftest_dependencies,
+        *ancestor_files.rules(),
         UnionRule(InferDependenciesRequest, InferInitDependencies),
         UnionRule(InferDependenciesRequest, InferConftestDependencies),
     ]

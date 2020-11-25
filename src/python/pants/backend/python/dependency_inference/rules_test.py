@@ -3,14 +3,13 @@
 
 from textwrap import dedent
 
-from pants.backend.python.dependency_inference import import_parser, module_mapper
 from pants.backend.python.dependency_inference.rules import (
     InferConftestDependencies,
     InferInitDependencies,
-    InferPythonDependencies,
+    InferPythonImportDependencies,
     PythonInference,
+    import_rules,
     infer_python_conftest_dependencies,
-    infer_python_dependencies,
     infer_python_init_dependencies,
 )
 from pants.backend.python.target_types import (
@@ -19,8 +18,7 @@ from pants.backend.python.target_types import (
     PythonSources,
     PythonTests,
 )
-from pants.backend.python.util_rules import ancestor_files, pex
-from pants.core.util_rules import stripped_source_files
+from pants.backend.python.util_rules import ancestor_files
 from pants.engine.addresses import Address
 from pants.engine.rules import SubsystemRule
 from pants.engine.target import InferredDependencies
@@ -29,15 +27,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 def test_infer_python_imports() -> None:
     rule_runner = RuleRunner(
-        rules=[
-            *stripped_source_files.rules(),
-            *import_parser.rules(),
-            *module_mapper.rules(),
-            *pex.rules(),
-            infer_python_dependencies,
-            SubsystemRule(PythonInference),
-            QueryRule(InferredDependencies, (InferPythonDependencies,)),
-        ],
+        rules=[*import_rules(), QueryRule(InferredDependencies, [InferPythonImportDependencies])],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )
     rule_runner.add_to_build_file(
@@ -96,7 +86,7 @@ def test_infer_python_imports() -> None:
         rule_runner.set_options(args)
         target = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferPythonDependencies(target[PythonSources])]
+            InferredDependencies, [InferPythonImportDependencies(target[PythonSources])]
         )
 
     build_address = Address("src/python")
