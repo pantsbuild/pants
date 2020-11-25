@@ -6,6 +6,15 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release, and
 https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
 
+2.0.1rc3 (11/24/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix off-by-one error for `python_awslambda` `sources` field validation (#11234)
+  `PR #11234 <https://github.com/pantsbuild/pants/pull/11234>`_
+
 2.0.1rc2 (11/20/2020)
 ---------------------
 
