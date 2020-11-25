@@ -503,7 +503,9 @@ impl Store {
     let store = self.clone();
     let remote = remote.clone();
     async move {
-      let ingested_digests = store.expand_local_digests(digests.iter(), false).await?;
+      let ingested_digests = store
+        .expand_digests(digests.iter(), LocalMissingBehavior::Fetch)
+        .await?;
       let digests_to_upload =
         if Store::upload_is_faster_than_checking_whether_to_upload(&ingested_digests) {
           ingested_digests.keys().cloned().collect()
@@ -678,7 +680,9 @@ impl Store {
     &self,
     digests: Ds,
   ) -> Result<(), String> {
-    let reachable_digests_and_types = self.expand_local_digests(digests, true).await?;
+    let reachable_digests_and_types = self
+      .expand_digests(digests, LocalMissingBehavior::Ignore)
+      .await?;
     self
       .local
       .lease_all(reachable_digests_and_types.into_iter())
@@ -727,15 +731,18 @@ impl Store {
   }
 
   ///
-  /// Return all Digests reachable locally from the given root Digests (which may represent either
+  /// Return all Digests reachable from the given root Digests (which may represent either
   /// Files or Directories).
   ///
-  /// If `allow_missing`, root digests which do not exist locally will be ignored.
+  /// `missing_behavior` defines what to do if the digests are not available locally.
   ///
-  pub async fn expand_local_digests<'a, Ds: Iterator<Item = &'a Digest>>(
+  /// If `missing_behavior` is `Fetch`, and one of the explicitly passed Digests was of a Directory
+  /// which was not known locally, this function may return an error.
+  ///
+  pub async fn expand_digests<'a, Ds: Iterator<Item = &'a Digest>>(
     &self,
     digests: Ds,
-    allow_missing: bool,
+    missing_behavior: LocalMissingBehavior,
   ) -> Result<HashMap<Digest, EntryType>, String> {
     // Expand each digest into either a single file digest, or a collection of recursive digests
     // below a directory.
@@ -747,17 +754,21 @@ impl Store {
             match store.local.entry_type(digest.0).await {
               Ok(Some(EntryType::File)) => Ok(Either::Left(*digest)),
               Ok(Some(EntryType::Directory)) => {
-                // Locally expand the directory.
-                let reachable = store.into_local_only().expand_directory(*digest).await?;
+                let store_for_expanding = match missing_behavior {
+                  LocalMissingBehavior::Fetch => store,
+                  LocalMissingBehavior::Error | LocalMissingBehavior::Ignore => {
+                    store.into_local_only()
+                  }
+                };
+                let reachable = store_for_expanding.expand_directory(*digest).await?;
                 Ok(Either::Right(reachable))
               }
-              Ok(None) => {
-                if allow_missing {
-                  Ok(Either::Right(HashMap::new()))
-                } else {
+              Ok(None) => match missing_behavior {
+                LocalMissingBehavior::Ignore => Ok(Either::Right(HashMap::new())),
+                LocalMissingBehavior::Fetch | LocalMissingBehavior::Error => {
                   Err(format!("Failed to expand digest {:?}: Not found", digest))
                 }
-              }
+              },
               Err(err) => Err(format!("Failed to expand digest {:?}: {:?}", digest, err)),
             }
           }
@@ -1106,6 +1117,17 @@ impl Store {
   pub fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
     self.local.all_digests(entry_type)
   }
+}
+
+/// Behavior in case a needed digest is missing in the local store.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LocalMissingBehavior {
+  /// Hard error that the digest is missing.
+  Error,
+  /// Attempt to fetch the digest from a remote, if one is present, and error if it couldn't be found.
+  Fetch,
+  /// Ignore the digest being missing, and try to proceed regardless.
+  Ignore,
 }
 
 #[async_trait]
