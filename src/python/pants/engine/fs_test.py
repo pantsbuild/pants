@@ -51,6 +51,15 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[QueryRule(Snapshot, [CreateDigest]), QueryRule(Snapshot, [DigestSubset])],
+        isolated_local_store=True,
+    )
+
+
 ROLAND_DIGEST = Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80)
 
 
@@ -328,39 +337,6 @@ class FSTest(FSTestBase):
     def test_files_digest_literal(self) -> None:
         self.assert_digest(["a/3.txt", "4.txt"], ["a/3.txt", "4.txt"])
 
-    def test_create_empty_directory(self) -> None:
-        res = self.request(Snapshot, [CreateDigest([Directory("a/")])])
-        assert res.dirs == ("a",)
-        assert not res.files
-        assert res.digest != EMPTY_DIGEST
-
-        res = self.request(
-            Snapshot, [CreateDigest([Directory("x/y/z"), Directory("m"), Directory("m/n")])]
-        )
-        assert res.dirs == ("m", "m/n", "x", "x/y", "x/y/z")
-        assert not res.files
-        assert res.digest != EMPTY_DIGEST
-
-    def test_lift_digest_to_snapshot(self) -> None:
-        digest = self.prime_store_with_roland_digest()
-        snapshot = self.request(Snapshot, [digest])
-        assert snapshot.files == ("roland",)
-        assert snapshot.digest == digest
-
-    def test_error_lifting_file_digest_to_snapshot(self) -> None:
-        self.prime_store_with_roland_digest()
-
-        # A file digest is not a directory digest! Hash the file that was primed as part of that
-        # directory, and show that we can't turn it into a Snapshot.
-        text = b"European Burmese"
-        hasher = hashlib.sha256()
-        hasher.update(text)
-        digest = Digest(fingerprint=hasher.hexdigest(), serialized_bytes_length=len(text))
-
-        with pytest.raises(ExecutionError) as exc:
-            self.request(Snapshot, [digest])
-        assert "unknown directory" in str(exc.value)
-
     def test_glob_match_error(self) -> None:
         test_name = f"{__name__}.{self.test_glob_match_error.__name__}()"
         with self.assertRaises(ValueError) as cm:
@@ -413,94 +389,6 @@ class FSTest(FSTestBase):
                 [],
             )
             assert len(captured.warnings()) == 0
-
-    def generate_original_digest(self) -> Digest:
-        content = b"dummy content"
-        return self.request(
-            Digest,
-            [
-                CreateDigest(
-                    (
-                        FileContent(path="a.txt", content=content),
-                        FileContent(path="b.txt", content=content),
-                        FileContent(path="c.txt", content=content),
-                        FileContent(path="subdir/a.txt", content=content),
-                        FileContent(path="subdir/b.txt", content=content),
-                        FileContent(path="subdir2/a.txt", content=content),
-                        FileContent(path="subdir2/nested_subdir/x.txt", content=content),
-                    )
-                )
-            ],
-        )
-
-    def test_empty_digest_subset(self) -> None:
-        subset_snapshot = self.request(
-            Snapshot, [DigestSubset(self.generate_original_digest(), PathGlobs(()))]
-        )
-        assert subset_snapshot.digest == EMPTY_DIGEST
-        assert subset_snapshot.files == ()
-        assert subset_snapshot.dirs == ()
-
-    def test_digest_subset_globs(self) -> None:
-        subset_snapshot = self.request(
-            Snapshot,
-            [
-                DigestSubset(
-                    self.generate_original_digest(),
-                    PathGlobs(("a.txt", "c.txt", "subdir2/**")),
-                )
-            ],
-        )
-        assert set(subset_snapshot.files) == {
-            "a.txt",
-            "c.txt",
-            "subdir2/a.txt",
-            "subdir2/nested_subdir/x.txt",
-        }
-        assert set(subset_snapshot.dirs) == {"subdir2", "subdir2/nested_subdir"}
-
-        content = b"dummy content"
-        subset_input = CreateDigest(
-            (
-                FileContent(path="a.txt", content=content),
-                FileContent(path="c.txt", content=content),
-                FileContent(path="subdir2/a.txt", content=content),
-                FileContent(path="subdir2/nested_subdir/x.txt", content=content),
-            )
-        )
-        subset_digest = self.request(Digest, [subset_input])
-        assert subset_snapshot.digest == subset_digest
-
-    def test_digest_subset_globs_2(self) -> None:
-        subset_snapshot = self.request(
-            Snapshot,
-            [
-                DigestSubset(
-                    self.generate_original_digest(), PathGlobs(("a.txt", "c.txt", "subdir2/*"))
-                )
-            ],
-        )
-        assert set(subset_snapshot.files) == {"a.txt", "c.txt", "subdir2/a.txt"}
-        assert set(subset_snapshot.dirs) == {"subdir2", "subdir2/nested_subdir"}
-
-    def test_nonexistent_filename_globs(self) -> None:
-        # We expect to ignore, rather than error, on files that don't exist in the original snapshot.
-        subset_snapshot = self.request(
-            Snapshot,
-            [
-                DigestSubset(
-                    self.generate_original_digest(),
-                    PathGlobs(("some_file_not_in_snapshot.txt", "a.txt")),
-                )
-            ],
-        )
-        assert set(subset_snapshot.files) == {"a.txt"}
-
-        content = b"dummy content"
-        subset_input = CreateDigest((FileContent(path="a.txt", content=content),))
-
-        subset_digest = self.request(Digest, [subset_input])
-        assert subset_snapshot.digest == subset_digest
 
     def test_file_content_invalidated(self) -> None:
         """Test that we can update files and have the native engine invalidate previous operations
@@ -622,21 +510,21 @@ class FSTest(FSTestBase):
 # -----------------------------------------------------------------------------------------------
 
 
-def test_snapshot_from_outside_buildroot() -> None:
+def test_snapshot_from_outside_buildroot(rule_runner: RuleRunner) -> None:
     with temporary_dir() as temp_dir:
         Path(temp_dir, "roland").write_text("European Burmese")
-        snapshot = RuleRunner().scheduler.capture_snapshots(
+        snapshot = rule_runner.scheduler.capture_snapshots(
             [PathGlobsAndRoot(PathGlobs(["*"]), temp_dir)]
         )[0]
     assert snapshot.files == ("roland",)
     assert snapshot.digest == ROLAND_DIGEST
 
 
-def test_multiple_snapshots_from_outside_buildroot() -> None:
+def test_multiple_snapshots_from_outside_buildroot(rule_runner: RuleRunner) -> None:
     with temporary_dir() as temp_dir:
         Path(temp_dir, "roland").write_text("European Burmese")
         Path(temp_dir, "susannah").write_text("I don't know")
-        snapshots = RuleRunner().scheduler.capture_snapshots(
+        snapshots = rule_runner.scheduler.capture_snapshots(
             [
                 PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
                 PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
@@ -653,13 +541,32 @@ def test_multiple_snapshots_from_outside_buildroot() -> None:
     assert snapshots[2] == EMPTY_SNAPSHOT
 
 
-def test_snapshot_from_outside_buildroot_failure() -> None:
+def test_snapshot_from_outside_buildroot_failure(rule_runner: RuleRunner) -> None:
     with temporary_dir() as temp_dir:
         with pytest.raises(Exception) as exc:
-            RuleRunner().scheduler.capture_snapshots(
+            rule_runner.scheduler.capture_snapshots(
                 [PathGlobsAndRoot(PathGlobs(["*"]), os.path.join(temp_dir, "doesnotexist"))]
             )
     assert "doesnotexist" in str(exc.value)
+
+
+# -----------------------------------------------------------------------------------------------
+# `CreateDigest`
+# -----------------------------------------------------------------------------------------------
+
+
+def test_create_empty_directory(rule_runner: RuleRunner) -> None:
+    res = rule_runner.request(Snapshot, [CreateDigest([Directory("a/")])])
+    assert res.dirs == ("a",)
+    assert not res.files
+    assert res.digest != EMPTY_DIGEST
+
+    res = rule_runner.request(
+        Snapshot, [CreateDigest([Directory("x/y/z"), Directory("m"), Directory("m/n")])]
+    )
+    assert res.dirs == ("m", "m/n", "x", "x/y", "x/y/z")
+    assert not res.files
+    assert res.digest != EMPTY_DIGEST
 
 
 # -----------------------------------------------------------------------------------------------
@@ -667,8 +574,7 @@ def test_snapshot_from_outside_buildroot_failure() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-def test_merge_digests() -> None:
-    rule_runner = RuleRunner()
+def test_merge_digests(rule_runner: RuleRunner) -> None:
     with temporary_dir() as temp_dir:
         Path(temp_dir, "roland").write_text("European Burmese")
         Path(temp_dir, "susannah").write_text("Not sure actually")
@@ -701,12 +607,144 @@ def test_merge_digests() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
+# `DigestSubset`
+# -----------------------------------------------------------------------------------------------
+
+
+def generate_original_digest(rule_runner: RuleRunner) -> Digest:
+    files = [
+        FileContent(path, b"dummy content")
+        for path in [
+            "a.txt",
+            "b.txt",
+            "c.txt",
+            "subdir/a.txt",
+            "subdir/b.txt",
+            "subdir2/a.txt",
+            "subdir2/nested_subdir/x.txt",
+        ]
+    ]
+    return rule_runner.request(
+        Digest,
+        [CreateDigest(files)],
+    )
+
+
+def test_digest_subset_empty(rule_runner: RuleRunner) -> None:
+    subset_snapshot = rule_runner.request(
+        Snapshot, [DigestSubset(generate_original_digest(rule_runner), PathGlobs(()))]
+    )
+    assert subset_snapshot.digest == EMPTY_DIGEST
+    assert subset_snapshot.files == ()
+    assert subset_snapshot.dirs == ()
+
+
+def test_digest_subset_globs(rule_runner: RuleRunner) -> None:
+    subset_snapshot = rule_runner.request(
+        Snapshot,
+        [
+            DigestSubset(
+                generate_original_digest(rule_runner),
+                PathGlobs(("a.txt", "c.txt", "subdir2/**")),
+            )
+        ],
+    )
+    assert set(subset_snapshot.files) == {
+        "a.txt",
+        "c.txt",
+        "subdir2/a.txt",
+        "subdir2/nested_subdir/x.txt",
+    }
+    assert set(subset_snapshot.dirs) == {"subdir2", "subdir2/nested_subdir"}
+
+    expected_files = [
+        FileContent(path, b"dummy content")
+        for path in [
+            "a.txt",
+            "c.txt",
+            "subdir2/a.txt",
+            "subdir2/nested_subdir/x.txt",
+        ]
+    ]
+    subset_digest = rule_runner.request(Digest, [CreateDigest(expected_files)])
+    assert subset_snapshot.digest == subset_digest
+
+
+def test_digest_subset_globs_2(rule_runner: RuleRunner) -> None:
+    subset_snapshot = rule_runner.request(
+        Snapshot,
+        [
+            DigestSubset(
+                generate_original_digest(rule_runner), PathGlobs(("a.txt", "c.txt", "subdir2/*"))
+            )
+        ],
+    )
+    assert set(subset_snapshot.files) == {"a.txt", "c.txt", "subdir2/a.txt"}
+    assert set(subset_snapshot.dirs) == {"subdir2", "subdir2/nested_subdir"}
+
+
+def test_digest_subset_nonexistent_filename_globs(rule_runner: RuleRunner) -> None:
+    # We behave according to the `GlobMatchErrorBehavior`.
+    original_digest = generate_original_digest(rule_runner)
+    globs = ["some_file_not_in_snapshot.txt", "a.txt"]
+    subset_snapshot = rule_runner.request(
+        Snapshot, [DigestSubset(original_digest, PathGlobs(globs))]
+    )
+    assert set(subset_snapshot.files) == {"a.txt"}
+    expected_digest = rule_runner.request(
+        Digest, [CreateDigest([FileContent("a.txt", b"dummy content")])]
+    )
+    assert subset_snapshot.digest == expected_digest
+
+    # TODO: Fix this to actually error.
+    # with pytest.raises(ExecutionError):
+    #     rule_runner.request(
+    #         Snapshot,
+    #         [
+    #             DigestSubset(
+    #                 original_digest,
+    #                 PathGlobs(
+    #                     globs,
+    #                     glob_match_error_behavior=GlobMatchErrorBehavior.error,
+    #                     conjunction=GlobExpansionConjunction.all_match,
+    #                     description_of_origin="test",
+    #                 ),
+    #             )
+    #         ],
+    #     )
+
+
+# -----------------------------------------------------------------------------------------------
+# `Digest` -> `Snapshot`
+# -----------------------------------------------------------------------------------------------
+
+
+def test_lift_digest_to_snapshot(rule_runner: RuleRunner) -> None:
+    prime_store_with_roland_digest(rule_runner)
+    snapshot = rule_runner.request(Snapshot, [ROLAND_DIGEST])
+    assert snapshot.files == ("roland",)
+    assert snapshot.digest == ROLAND_DIGEST
+
+
+def test_error_lifting_file_digest_to_snapshot(rule_runner: RuleRunner) -> None:
+    prime_store_with_roland_digest(rule_runner)
+    # A file digest is not a directory digest. Here, we hash the file that was primed as part of
+    # that directory, and show that we can't turn it into a Snapshot.
+    text = b"European Burmese"
+    hasher = hashlib.sha256()
+    hasher.update(text)
+    digest = Digest(fingerprint=hasher.hexdigest(), serialized_bytes_length=len(text))
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(Snapshot, [digest])
+    assert "unknown directory" in str(exc.value)
+
+
+# -----------------------------------------------------------------------------------------------
 # `AddPrefix` and `RemovePrefix`
 # -----------------------------------------------------------------------------------------------
 
 
-def test_add_prefix() -> None:
-    rule_runner = RuleRunner()
+def test_add_prefix(rule_runner: RuleRunner) -> None:
     digest = rule_runner.request(
         Digest,
         [CreateDigest([FileContent("main.ext", b""), FileContent("subdir/sub.ext", b"")])],
@@ -734,8 +772,7 @@ def test_add_prefix() -> None:
         rule_runner.request(Digest, [AddPrefix(digest, "../something")])
 
 
-def test_remove_prefix() -> None:
-    rule_runner = RuleRunner()
+def test_remove_prefix(rule_runner: RuleRunner) -> None:
     relevant_files = (
         "characters/dark_tower/roland",
         "characters/dark_tower/susannah",
@@ -931,8 +968,7 @@ def test_download_https() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-def test_write_digest_scheduler() -> None:
-    rule_runner = RuleRunner()
+def test_write_digest_scheduler(rule_runner: RuleRunner) -> None:
     prime_store_with_roland_digest(rule_runner)
 
     path = Path(rule_runner.build_root, "roland")
@@ -948,8 +984,7 @@ def test_write_digest_scheduler() -> None:
     assert path.read_text() == "European Burmese"
 
 
-def test_write_digest_workspace() -> None:
-    rule_runner = RuleRunner()
+def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
     workspace = Workspace(rule_runner.scheduler)
     digest = rule_runner.request(
         Digest,
