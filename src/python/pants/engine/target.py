@@ -871,12 +871,18 @@ class TargetRootsToFieldSets(Generic[_AFS]):
         return tuple(self.mapping.keys())
 
 
+class NoApplicableTargetsBehavior(Enum):
+    ignore = "ignore"
+    warn = "warn"
+    error = "error"
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSetsRequest(Generic[_AFS]):
     field_set_superclass: Type[_AFS]
     goal_description: str
-    error_if_no_applicable_targets: bool
+    no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
     # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
     #  `util_rules/filter_empty_sources.py`.
@@ -886,12 +892,12 @@ class TargetRootsToFieldSetsRequest(Generic[_AFS]):
         field_set_superclass: Type[_AFS],
         *,
         goal_description: str,
-        error_if_no_applicable_targets: bool,
+        no_applicable_targets_behavior: NoApplicableTargetsBehavior,
         expect_single_field_set: bool = False,
     ) -> None:
         self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
-        self.error_if_no_applicable_targets = error_if_no_applicable_targets
+        self.no_applicable_targets_behavior = no_applicable_targets_behavior
         self.expect_single_field_set = expect_single_field_set
 
 

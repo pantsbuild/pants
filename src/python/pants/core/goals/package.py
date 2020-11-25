@@ -14,6 +14,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     FieldSet,
+    NoApplicableTargetsBehavior,
     StringField,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -90,7 +91,7 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
         TargetRootsToFieldSetsRequest(
             PackageFieldSet,
             goal_description="the `package` goal",
-            error_if_no_applicable_targets=False,
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
         ),
     )
     if not target_roots_to_field_sets.field_sets:

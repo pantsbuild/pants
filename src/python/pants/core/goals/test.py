@@ -25,6 +25,7 @@ from pants.engine.process import FallibleProcessResult, InteractiveProcess, Inte
 from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
+    NoApplicableTargetsBehavior,
     Sources,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -353,7 +354,9 @@ async def run_tests(
         targets_to_valid_field_sets = await Get(
             TargetRootsToFieldSets,
             TargetRootsToFieldSetsRequest(
-                TestFieldSet, goal_description="`test --debug`", error_if_no_applicable_targets=True
+                TestFieldSet,
+                goal_description="`test --debug`",
+                no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
             ),
         )
         debug_requests = await MultiGet(
@@ -374,7 +377,7 @@ async def run_tests(
         TargetRootsToFieldSetsRequest(
             TestFieldSet,
             goal_description=f"the `{test_subsystem.name}` goal",
-            error_if_no_applicable_targets=False,
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
         ),
     )
     field_sets_with_sources = await Get(

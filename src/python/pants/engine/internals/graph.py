@@ -52,6 +52,7 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    NoApplicableTargetsBehavior,
     RegisteredTargetTypes,
     Sources,
     SourcesPaths,
@@ -902,7 +903,7 @@ async def resolve_unparsed_address_inputs(
 class NoApplicableTargetsException(Exception):
     def __init__(
         self,
-        targets: Targets,
+        targets: Iterable[Target],
         *,
         applicable_target_types: Iterable[Type[Target]],
         goal_description: str,
@@ -913,12 +914,12 @@ class NoApplicableTargetsException(Exception):
         inapplicable_target_aliases = sorted({tgt.alias for tgt in targets})
         bulleted_list_sep = "\n  * "
         msg = (
-            f"{goal_description.capitalize()} only works with these target types:"
+            f"{goal_description.capitalize()} only works with these target types:\n"
             f"{bulleted_list_sep}{bulleted_list_sep.join(applicable_target_aliases)}\n\n"
         )
         if inapplicable_target_aliases:
             msg += (
-                "However, you only specified files/targets with these target types:"
+                "However, you only specified files/targets with these target types:\n"
                 f"{bulleted_list_sep}{bulleted_list_sep.join(inapplicable_target_aliases)}"
             )
         else:
@@ -932,7 +933,7 @@ class NoApplicableTargetsException(Exception):
     @classmethod
     def create_from_field_sets(
         cls,
-        targets: Targets,
+        targets: Iterable[Target],
         *,
         field_set_types: Iterable[Type[_AbstractFieldSet]],
         goal_description: str,
@@ -996,19 +997,26 @@ async def find_valid_field_sets_for_target_roots(
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
     )
-    targets_to_valid_field_sets = {}
+    targets_to_applicable_field_sets = {}
     for tgt, field_sets in zip(targets, field_sets_per_target.collection):
         if field_sets:
-            targets_to_valid_field_sets[tgt] = field_sets
-    if request.error_if_no_applicable_targets and not targets_to_valid_field_sets:
-        raise NoApplicableTargetsException.create_from_field_sets(
+            targets_to_applicable_field_sets[tgt] = field_sets
+
+    # Possibly warn or error if no targets were applicable.
+    if not targets_to_applicable_field_sets:
+        no_applicable_exception = NoApplicableTargetsException.create_from_field_sets(
             targets,
             field_set_types=union_membership.union_rules[request.field_set_superclass],
             goal_description=request.goal_description,
             union_membership=union_membership,
             registered_target_types=registered_target_types,
         )
-    result = TargetRootsToFieldSets(targets_to_valid_field_sets)
+        if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
+            raise no_applicable_exception
+        if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn:
+            logger.warning(f"No applicable targets matched. {no_applicable_exception}")
+
+    result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
     if not request.expect_single_field_set:
         return result
     if len(result.targets) > 1:

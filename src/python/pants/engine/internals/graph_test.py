@@ -52,6 +52,7 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    NoApplicableTargetsBehavior,
     Sources,
     SourcesPaths,
     SourcesPathsRequest,
@@ -654,7 +655,7 @@ def test_resolve_addresses_from_specs() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-def test_find_valid_field_sets() -> None:
+def test_find_valid_field_sets(caplog) -> None:
     class FortranSources(Sources):
         pass
 
@@ -698,13 +699,13 @@ def test_find_valid_field_sets() -> None:
         superclass: Type,
         targets: Iterable[Target],
         *,
-        error_if_no_applicable_targets: bool = False,
+        no_applicable_behavior: NoApplicableTargetsBehavior = NoApplicableTargetsBehavior.ignore,
         expect_single_config: bool = False,
     ) -> TargetRootsToFieldSets:
         request = TargetRootsToFieldSetsRequest(
             superclass,
             goal_description="fake",
-            error_if_no_applicable_targets=error_if_no_applicable_targets,
+            no_applicable_targets_behavior=no_applicable_behavior,
             expect_single_field_set=expect_single_config,
         )
         return rule_runner.request(
@@ -737,9 +738,63 @@ def test_find_valid_field_sets() -> None:
 
     with pytest.raises(ExecutionError) as exc:
         find_valid_field_sets(
-            FieldSetSuperclass, [invalid_tgt], error_if_no_applicable_targets=True
+            FieldSetSuperclass,
+            [invalid_tgt],
+            no_applicable_behavior=NoApplicableTargetsBehavior.error,
         )
     assert NoApplicableTargetsException.__name__ in str(exc.value)
+
+    caplog.clear()
+    find_valid_field_sets(
+        FieldSetSuperclass,
+        [invalid_tgt],
+        no_applicable_behavior=NoApplicableTargetsBehavior.warn,
+    )
+    assert len(caplog.records) == 1
+    assert "No applicable targets matched." in caplog.text
+
+
+def test_no_applicable_targets_exception() -> None:
+    # Check that we correctly render the error message.
+    class Tgt1(Target):
+        alias = "tgt1"
+        core_fields = ()
+
+    class Tgt2(Target):
+        alias = "tgt2"
+        core_fields = ()
+
+    class Tgt3(Target):
+        alias = "tgt3"
+        core_fields = ()
+
+    exc = NoApplicableTargetsException(
+        [Tgt3({}, address=Address("blah"))],
+        applicable_target_types=[Tgt1, Tgt2],
+        goal_description="the `foo` goal",
+    )
+    assert (
+        dedent(
+            """\
+            The `foo` goal only works with these target types:
+
+            * tgt1
+            * tgt2
+
+            However, you only specified files/targets with these target types:
+
+            * tgt3
+
+            Run `./pants filter --target-type=tgt1,tgt2 ::` to find all applicable targets in your project."""
+        )
+        in str(exc)
+    )
+
+    # Adapt if no targets/files specified.
+    exc = NoApplicableTargetsException(
+        [], applicable_target_types=[Tgt1, Tgt2], goal_description="the `foo` goal"
+    )
+    assert "However, you did not specify any files/targets." in str(exc)
 
 
 # -----------------------------------------------------------------------------------------------
