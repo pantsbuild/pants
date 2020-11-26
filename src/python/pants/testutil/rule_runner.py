@@ -129,7 +129,7 @@ class RuleRunner:
         named_caches_dir = global_options.named_caches_dir
 
         graph_session = EngineInitializer.setup_graph_extended(
-            pants_ignore_patterns=[],
+            pants_ignore_patterns=[".pants.d"],
             use_gitignore=False,
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,

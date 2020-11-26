@@ -2,24 +2,20 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import hashlib
-import logging
 import os
 import pkgutil
 import shutil
 import ssl
 import tarfile
 import time
-import unittest
-from contextlib import contextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, Iterable, Optional, Set
 
 import pytest
 
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -41,13 +37,10 @@ from pants.engine.fs import (
     Snapshot,
     Workspace,
 )
-from pants.engine.fs import rules as fs_rules
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.rules import Get, goal_rule, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
@@ -108,6 +101,22 @@ def setup_fs_test_tar(rule_runner: RuleRunner) -> None:
         tf.extractall(rule_runner.build_root)
 
 
+FS_TAR_ALL_FILES = (
+    "4.txt",
+    "a/3.txt",
+    "a/4.txt.ln",
+    "a/b/1.txt",
+    "a/b/2",
+    "c.ln/1.txt",
+    "c.ln/2",
+    "d.ln/3.txt",
+    "d.ln/4.txt.ln",
+    "d.ln/b/1.txt",
+    "d.ln/b/2",
+)
+FS_TAR_ALL_DIRS = ("a", "a/b", "c.ln", "d.ln", "d.ln/b")
+
+
 def try_with_backoff(assertion_fn: Callable[[], bool]) -> bool:
     for i in range(4):
         time.sleep(0.1 * i)
@@ -116,303 +125,271 @@ def try_with_backoff(assertion_fn: Callable[[], bool]) -> bool:
     return False
 
 
-class FSTestBase(TestBase, SchedulerTestBase):
-    @staticmethod
-    def assert_snapshot_equals(snapshot: Snapshot, files: List[str], digest: Digest) -> None:
-        assert list(snapshot.files) == files
-        assert snapshot.digest == digest
+# -----------------------------------------------------------------------------------------------
+# `PathGlobs`, including `GlobMatchErrorBehavior` and symlink handling
+# -----------------------------------------------------------------------------------------------
 
 
-class FSTest(FSTestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            QueryRule(Snapshot, (CreateDigest,)),
-            QueryRule(Snapshot, (DigestSubset,)),
+def assert_path_globs(
+    rule_runner: RuleRunner,
+    globs: Iterable[str],
+    *,
+    expected_files: Iterable[str],
+    expected_dirs: Iterable[str],
+) -> None:
+    snapshot = rule_runner.request(Snapshot, [PathGlobs(globs)])
+    assert snapshot.files == tuple(sorted(expected_files))
+    assert snapshot.dirs == tuple(sorted(expected_dirs))
+    if expected_files or expected_dirs:
+        assert snapshot.digest != EMPTY_DIGEST
+    else:
+        assert snapshot.digest == EMPTY_DIGEST
+
+
+def test_path_globs_literal_files(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    assert_path_globs(rule_runner, ["4.txt"], expected_files=["4.txt"], expected_dirs=[])
+    assert_path_globs(
+        rule_runner,
+        ["a/b/1.txt", "a/b/2"],
+        expected_files=["a/b/1.txt", "a/b/2"],
+        expected_dirs=["a", "a/b"],
+    )
+    assert_path_globs(rule_runner, ["c.ln/2"], expected_files=["c.ln/2"], expected_dirs=["c.ln"])
+    assert_path_globs(
+        rule_runner,
+        ["d.ln/b/1.txt"],
+        expected_files=["d.ln/b/1.txt"],
+        expected_dirs=["d.ln", "d.ln/b"],
+    )
+    assert_path_globs(rule_runner, ["a/3.txt"], expected_files=["a/3.txt"], expected_dirs=["a"])
+    assert_path_globs(rule_runner, ["z.fake"], expected_files=[], expected_dirs=[])
+
+
+def test_path_globs_literal_directories(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    assert_path_globs(rule_runner, ["c.ln"], expected_files=[], expected_dirs=["c.ln"])
+    assert_path_globs(rule_runner, ["a"], expected_files=[], expected_dirs=["a"])
+    assert_path_globs(rule_runner, ["a/b"], expected_files=[], expected_dirs=["a", "a/b"])
+    assert_path_globs(rule_runner, ["z"], expected_files=[], expected_dirs=[])
+
+
+def test_path_globs_glob_pattern(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    assert_path_globs(rule_runner, ["*.txt"], expected_files=["4.txt"], expected_dirs=[])
+    assert_path_globs(
+        rule_runner, ["a/b/*.txt"], expected_files=["a/b/1.txt"], expected_dirs=["a", "a/b"]
+    )
+    assert_path_globs(
+        rule_runner, ["c.ln/*.txt"], expected_files=["c.ln/1.txt"], expected_dirs=["c.ln"]
+    )
+    assert_path_globs(
+        rule_runner, ["a/b/*"], expected_files=["a/b/1.txt", "a/b/2"], expected_dirs=["a", "a/b"]
+    )
+    assert_path_globs(rule_runner, ["*/0.txt"], expected_files=[], expected_dirs=[])
+    assert_path_globs(
+        rule_runner, ["*"], expected_files=["4.txt"], expected_dirs=["a", "c.ln", "d.ln"]
+    )
+    assert_path_globs(
+        rule_runner,
+        ["*/*"],
+        expected_files=[
+            "a/3.txt",
+            "a/4.txt.ln",
+            "c.ln/1.txt",
+            "c.ln/2",
+            "d.ln/3.txt",
+            "d.ln/4.txt.ln",
+        ],
+        expected_dirs=FS_TAR_ALL_DIRS,
+    )
+    assert_path_globs(
+        rule_runner,
+        ["*/*/*"],
+        expected_files=["a/b/1.txt", "a/b/2", "d.ln/b/1.txt", "d.ln/b/2"],
+        expected_dirs=["a", "a/b", "d.ln", "d.ln/b"],
+    )
+
+
+def test_path_globs_rglob_pattern(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    assert_path_globs(
+        rule_runner,
+        ["**/*.txt.ln"],
+        expected_files=["a/4.txt.ln", "d.ln/4.txt.ln"],
+        expected_dirs=["a", "d.ln"],
+    )
+    assert_path_globs(
+        rule_runner,
+        ["**/*.txt"],
+        expected_files=[
+            "4.txt",
+            "a/3.txt",
+            "a/b/1.txt",
+            "c.ln/1.txt",
+            "d.ln/3.txt",
+            "d.ln/b/1.txt",
+        ],
+        expected_dirs=FS_TAR_ALL_DIRS,
+    )
+    assert_path_globs(
+        rule_runner,
+        ["**/3.t*t"],
+        expected_files=["a/3.txt", "d.ln/3.txt"],
+        expected_dirs=["a", "d.ln"],
+    )
+    assert_path_globs(rule_runner, ["**/*.fake"], expected_files=[], expected_dirs=[])
+    assert_path_globs(
+        rule_runner, ["**"], expected_files=FS_TAR_ALL_FILES, expected_dirs=FS_TAR_ALL_DIRS
+    )
+    assert_path_globs(
+        rule_runner, ["**/*"], expected_files=FS_TAR_ALL_FILES, expected_dirs=FS_TAR_ALL_DIRS
+    )
+    assert_path_globs(
+        rule_runner,
+        ["a/**"],
+        expected_files=["a/3.txt", "a/4.txt.ln", "a/b/1.txt", "a/b/2"],
+        expected_dirs=["a", "a/b"],
+    )
+    assert_path_globs(
+        rule_runner,
+        ["d.ln/**"],
+        expected_files=["d.ln/3.txt", "d.ln/4.txt.ln", "d.ln/b/1.txt", "d.ln/b/2"],
+        expected_dirs=["d.ln", "d.ln/b"],
+    )
+    assert_path_globs(rule_runner, ["a/**/3.txt"], expected_files=["a/3.txt"], expected_dirs=["a"])
+    assert_path_globs(
+        rule_runner, ["a/**/b/1.txt"], expected_files=["a/b/1.txt"], expected_dirs=["a", "a/b"]
+    )
+    assert_path_globs(rule_runner, ["a/**/2"], expected_files=["a/b/2"], expected_dirs=["a", "a/b"])
+
+
+def test_path_globs_ignore_pattern(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    assert_path_globs(
+        rule_runner,
+        ["**", "!*.ln"],
+        # TODO: should `a/4.txt.ln` be included?
+        expected_files=["4.txt", "a/3.txt", "a/b/1.txt", "a/b/2"],
+        expected_dirs=["a", "a/b"],
+    )
+
+
+def test_path_globs_remove_duplicates(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    assert_path_globs(
+        rule_runner, ["*", "**"], expected_files=FS_TAR_ALL_FILES, expected_dirs=FS_TAR_ALL_DIRS
+    )
+    assert_path_globs(
+        rule_runner,
+        ["**/*.txt", "a/b/1.txt", "4.txt"],
+        expected_files=[
+            "4.txt",
+            "a/3.txt",
+            "c.ln/1.txt",
+            "d.ln/3.txt",
+            "a/b/1.txt",
+            "d.ln/b/1.txt",
+        ],
+        expected_dirs=FS_TAR_ALL_DIRS,
+    )
+
+
+def test_path_globs_parent_link(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    assert_path_globs(
+        rule_runner,
+        ["c.ln/../3.txt"],
+        expected_files=["c.ln/../3.txt"],
+        expected_dirs=["c.ln", "c.ln/.."],
+    )
+
+
+def test_path_globs_symlink_escaping_errors(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    link = os.path.join(rule_runner.build_root, "subdir/escaping")
+    dest = os.path.join(rule_runner.build_root, "../../..")
+    relative_symlink(dest, link)
+
+    exc_reg = rf".*While expanding link.*subdir/escaping.*may not traverse outside of the buildroot"
+    with pytest.raises(Exception, match=exc_reg):
+        assert_path_globs(rule_runner, ["subdir/escaping"], expected_files=[], expected_dirs=[])
+
+
+def test_path_globs_symlink_dead(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    link = os.path.join(rule_runner.build_root, "subdir/dead")
+    dest = os.path.join(rule_runner.build_root, "this_file_does_not_exist")
+    relative_symlink(dest, link)
+
+    # Because the symlink does not escape, it should be ignored, rather than cause an error.
+    assert_path_globs(rule_runner, ["subdir/dead"], expected_files=[], expected_dirs=[])
+
+
+def test_path_globs_symlink_dead_nested(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    link = os.path.join(rule_runner.build_root, "subdir/dead")
+    dest = os.path.join(
+        rule_runner.build_root, "this_folder_does_not_exist/this_file_does_not_exist"
+    )
+    relative_symlink(dest, link)
+
+    # Because the symlink does not escape, it should be ignored, rather than cause an error.
+    assert_path_globs(rule_runner, ["subdir/dead"], expected_files=[], expected_dirs=[])
+
+
+def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+
+    def get_contents(globs: Iterable[str]) -> Set[FileContent]:
+        return set(rule_runner.request(DigestContents, [PathGlobs(globs)]))
+
+    assert get_contents(["4.txt", "a/4.txt.ln"]) == {
+        FileContent("4.txt", b"four\n"),
+        FileContent("a/4.txt.ln", b"four\n"),
+    }
+    assert get_contents(["c.ln/../3.txt"]) == {FileContent("c.ln/../3.txt", b"three\n")}
+
+    # Directories raise an exception.
+    with pytest.raises(Exception):
+        get_contents(["a/b"])
+    with pytest.raises(Exception):
+        get_contents(["c.ln"])
+
+
+def test_glob_match_error_behavior(rule_runner: RuleRunner, caplog) -> None:
+    setup_fs_test_tar(rule_runner)
+    test_name = f"{__name__}.{test_glob_match_error_behavior.__name__}()"
+
+    def evaluate_path_globs(globs: Iterable[str], error_behavior: GlobMatchErrorBehavior) -> None:
+        pg = PathGlobs(
+            globs,
+            glob_match_error_behavior=error_behavior,
+            description_of_origin=(
+                test_name if error_behavior != GlobMatchErrorBehavior.ignore else None
+            ),
         )
+        rule_runner.request(Snapshot, [pg])
 
-    _original_src = os.path.join(os.path.dirname(__file__), "internals/fs_test_data/fs_test.tar")
+    with pytest.raises(Exception) as exc:
+        evaluate_path_globs(["not-a-file.txt"], GlobMatchErrorBehavior.error)
+    assert f'Unmatched glob from {test_name}: "not-a-file.txt"' in str(exc.value)
 
-    @contextmanager
-    def mk_project_tree(self, ignore_patterns=None):
-        """Construct a ProjectTree for the given src path."""
-        project_tree = self.mk_fs_tree(ignore_patterns=ignore_patterns)
-        with tarfile.open(self._original_src) as tar:
-            tar.extractall(project_tree.build_root)
-        yield project_tree
+    with pytest.raises(Exception) as exc:
+        evaluate_path_globs(["not-a-file.txt", "!ignore.txt"], GlobMatchErrorBehavior.error)
+    assert f'Unmatched glob from {test_name}: "not-a-file.txt", exclude: "ignore.txt"' in str(
+        exc.value
+    )
 
-    @staticmethod
-    def path_globs(globs) -> PathGlobs:
-        if isinstance(globs, PathGlobs):
-            return globs
-        return PathGlobs(globs)
+    # TODO: get Rust logging working with RuleRunner.
+    # caplog.clear()
+    # evaluate_path_globs(["not-a-file.txt"], GlobMatchErrorBehavior.warn)
+    # assert len(caplog.records) == 1
+    # assert f'Unmatched glob from {test_name}: "not-a-file.txt"' in caplog.text
 
-    def read_digest_contents(self, scheduler, filespecs_or_globs):
-        """Helper method for reading the content of some files from an existing scheduler
-        session."""
-        snapshot = self.execute_expecting_one_result(
-            scheduler, Snapshot, self.path_globs(filespecs_or_globs)
-        ).value
-        result = self.execute_expecting_one_result(scheduler, DigestContents, snapshot.digest).value
-        return {f.path: f.content for f in result}
-
-    def assert_walk_dirs(self, filespecs_or_globs, paths, **kwargs):
-        self.assert_walk_snapshot("dirs", filespecs_or_globs, paths, **kwargs)
-
-    def assert_walk_files(self, filespecs_or_globs, paths, **kwargs):
-        self.assert_walk_snapshot("files", filespecs_or_globs, paths, **kwargs)
-
-    def assert_walk_snapshot(
-        self, field, filespecs_or_globs, paths, ignore_patterns=None, prepare=None
-    ):
-        with self.mk_project_tree(ignore_patterns=ignore_patterns) as project_tree:
-            scheduler = self.mk_scheduler(
-                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))], project_tree=project_tree
-            )
-            if prepare:
-                prepare(project_tree)
-            result = self.execute(scheduler, Snapshot, self.path_globs(filespecs_or_globs))[0]
-            assert sorted(getattr(result, field)) == sorted(paths)
-
-    def assert_content(self, filespecs_or_globs, expected_content):
-        with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(
-                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))], project_tree=project_tree
-            )
-            actual_content = self.read_digest_contents(scheduler, filespecs_or_globs)
-            assert expected_content == actual_content
-
-    def assert_digest(self, filespecs_or_globs, expected_files):
-        with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(
-                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))], project_tree=project_tree
-            )
-            result = self.execute(scheduler, Snapshot, self.path_globs(filespecs_or_globs))[0]
-            # Confirm all expected files were digested.
-            assert set(expected_files) == set(result.files)
-            assert result.digest.fingerprint is not None
-
-    def test_walk_literal(self) -> None:
-        self.assert_walk_files(["4.txt"], ["4.txt"])
-        self.assert_walk_files(["a/b/1.txt", "a/b/2"], ["a/b/1.txt", "a/b/2"])
-        self.assert_walk_files(["c.ln/2"], ["c.ln/2"])
-        self.assert_walk_files(["d.ln/b/1.txt"], ["d.ln/b/1.txt"])
-        self.assert_walk_files(["a/3.txt"], ["a/3.txt"])
-        self.assert_walk_files(["z.txt"], [])
-
-    def test_walk_literal_directory(self) -> None:
-        self.assert_walk_dirs(["c.ln"], ["c.ln"])
-        self.assert_walk_dirs(["a"], ["a"])
-        self.assert_walk_dirs(["a/b"], ["a", "a/b"])
-        self.assert_walk_dirs(["z"], [])
-        self.assert_walk_dirs(["4.txt", "a/3.txt"], ["a"])
-
-    def test_walk_siblings(self) -> None:
-        self.assert_walk_files(["*.txt"], ["4.txt"])
-        self.assert_walk_files(["a/b/*.txt"], ["a/b/1.txt"])
-        self.assert_walk_files(["c.ln/*.txt"], ["c.ln/1.txt"])
-        self.assert_walk_files(["a/b/*"], ["a/b/1.txt", "a/b/2"])
-        self.assert_walk_files(["*/0.txt"], [])
-
-    def test_walk_recursive(self) -> None:
-        self.assert_walk_files(["**/*.txt.ln"], ["a/4.txt.ln", "d.ln/4.txt.ln"])
-        self.assert_walk_files(
-            ["**/*.txt"],
-            ["4.txt", "a/3.txt", "a/b/1.txt", "c.ln/1.txt", "d.ln/3.txt", "d.ln/b/1.txt"],
-        )
-        self.assert_walk_files(
-            ["**/*.txt"],
-            ["a/3.txt", "a/b/1.txt", "c.ln/1.txt", "d.ln/3.txt", "d.ln/b/1.txt", "4.txt"],
-        )
-        self.assert_walk_files(["**/3.t*t"], ["a/3.txt", "d.ln/3.txt"])
-        self.assert_walk_files(["**/*.zzz"], [])
-
-    def test_walk_single_star(self) -> None:
-        self.assert_walk_files(["*"], ["4.txt"])
-
-    def test_walk_parent_link(self) -> None:
-        self.assert_walk_files(["c.ln/../3.txt"], ["c.ln/../3.txt"])
-
-    def test_walk_symlink_escaping(self) -> None:
-        link = "subdir/escaping"
-        dest = "../../.."
-
-        def prepare(project_tree):
-            link_path = os.path.join(project_tree.build_root, link)
-            dest_path = os.path.join(project_tree.build_root, dest)
-            relative_symlink(dest_path, link_path)
-
-        exc_reg = (
-            f".*While expanding link.*{link}.*may not traverse outside of the buildroot.*{dest}.*"
-        )
-        with self.assertRaisesRegex(Exception, exc_reg):
-            self.assert_walk_files([link], [], prepare=prepare)
-
-    def test_walk_symlink_dead(self) -> None:
-        link = "subdir/dead"
-        dest = "this_file_does_not_exist"
-
-        def prepare(project_tree):
-            link_path = os.path.join(project_tree.build_root, link)
-            dest_path = os.path.join(project_tree.build_root, dest)
-            relative_symlink(dest_path, link_path)
-
-        # Because the symlink does not escape, it should be ignored.
-        self.assert_walk_files([link], [], prepare=prepare)
-
-    def test_walk_symlink_dead_nested(self) -> None:
-        link = "subdir/dead"
-        dest = "this_folder_does_not_exist/this_file_does_not_exist"
-
-        def prepare(project_tree):
-            link_path = os.path.join(project_tree.build_root, link)
-            dest_path = os.path.join(project_tree.build_root, dest)
-            relative_symlink(dest_path, link_path)
-
-        # Because the symlink does not escape, it should be ignored.
-        self.assert_walk_files([link], [], prepare=prepare)
-
-    def test_walk_recursive_all(self) -> None:
-        self.assert_walk_files(
-            ["**"],
-            [
-                "4.txt",
-                "a/3.txt",
-                "a/4.txt.ln",
-                "a/b/1.txt",
-                "a/b/2",
-                "c.ln/1.txt",
-                "c.ln/2",
-                "d.ln/3.txt",
-                "d.ln/4.txt.ln",
-                "d.ln/b/1.txt",
-                "d.ln/b/2",
-            ],
-        )
-
-    def test_walk_ignore(self) -> None:
-        # Ignore '*.ln' suffixed items at the root.
-        self.assert_walk_files(
-            ["**"],
-            ["4.txt", "a/3.txt", "a/4.txt.ln", "a/b/1.txt", "a/b/2"],
-            ignore_patterns=["/*.ln"],
-        )
-        # Whitelist one entry.
-        self.assert_walk_files(
-            ["**"],
-            ["4.txt", "a/3.txt", "a/4.txt.ln", "a/b/1.txt", "a/b/2", "c.ln/1.txt", "c.ln/2"],
-            ignore_patterns=["/*.ln", "!c.ln"],
-        )
-
-    def test_walk_recursive_trailing_doublestar(self) -> None:
-        self.assert_walk_files(["a/**"], ["a/3.txt", "a/4.txt.ln", "a/b/1.txt", "a/b/2"])
-        self.assert_walk_files(
-            ["d.ln/**"], ["d.ln/3.txt", "d.ln/4.txt.ln", "d.ln/b/1.txt", "d.ln/b/2"]
-        )
-        self.assert_walk_dirs(["a/**"], ["a", "a/b"])
-
-    def test_walk_recursive_slash_doublestar_slash(self) -> None:
-        self.assert_walk_files(["a/**/3.txt"], ["a/3.txt"])
-        self.assert_walk_files(["a/**/b/1.txt"], ["a/b/1.txt"])
-        self.assert_walk_files(["a/**/2"], ["a/b/2"])
-
-    def test_walk_recursive_directory(self) -> None:
-        self.assert_walk_dirs(["*"], ["a", "c.ln", "d.ln"])
-        self.assert_walk_dirs(["*/*"], ["a", "a/b", "c.ln", "d.ln", "d.ln/b"])
-        self.assert_walk_dirs(["**/*"], ["a", "c.ln", "d.ln", "a/b", "d.ln/b"])
-        self.assert_walk_dirs(["*/*/*"], ["a", "a/b", "d.ln", "d.ln/b"])
-
-    def test_remove_duplicates(self) -> None:
-        self.assert_walk_files(
-            ["*", "**"],
-            [
-                "4.txt",
-                "a/3.txt",
-                "a/4.txt.ln",
-                "a/b/1.txt",
-                "a/b/2",
-                "c.ln/1.txt",
-                "c.ln/2",
-                "d.ln/3.txt",
-                "d.ln/4.txt.ln",
-                "d.ln/b/1.txt",
-                "d.ln/b/2",
-            ],
-        )
-        self.assert_walk_files(
-            ["**/*.txt", "a/b/1.txt", "4.txt"],
-            ["4.txt", "a/3.txt", "c.ln/1.txt", "d.ln/3.txt", "a/b/1.txt", "d.ln/b/1.txt"],
-        )
-        self.assert_walk_dirs(["*", "**"], ["a", "c.ln", "d.ln", "a/b", "d.ln/b"])
-
-    def test_digest_contents_literal(self) -> None:
-        self.assert_content(["4.txt", "a/4.txt.ln"], {"4.txt": b"four\n", "a/4.txt.ln": b"four\n"})
-
-    def test_digest_contents_directory(self) -> None:
-        with self.assertRaises(Exception):
-            self.assert_content(["a/b/"], {"a/b/": "nope\n"})
-        with self.assertRaises(Exception):
-            self.assert_content(["a/b"], {"a/b": "nope\n"})
-
-    def test_digest_contents_symlink(self) -> None:
-        self.assert_content(["c.ln/../3.txt"], {"c.ln/../3.txt": b"three\n"})
-
-    def test_files_digest_literal(self) -> None:
-        self.assert_digest(["a/3.txt", "4.txt"], ["a/3.txt", "4.txt"])
-
-    def test_glob_match_error(self) -> None:
-        test_name = f"{__name__}.{self.test_glob_match_error.__name__}()"
-        with self.assertRaises(ValueError) as cm:
-            self.assert_walk_files(
-                PathGlobs(
-                    globs=["not-a-file.txt"],
-                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                    description_of_origin=test_name,
-                ),
-                [],
-            )
-        assert f'Unmatched glob from {test_name}: "not-a-file.txt"' in str(cm.exception)
-
-    def test_glob_match_error_with_exclude(self) -> None:
-        test_name = f"{__name__}.{self.test_glob_match_error_with_exclude.__name__}()"
-        with self.assertRaises(ValueError) as cm:
-            self.assert_walk_files(
-                PathGlobs(
-                    globs=["*.txt", "!4.txt"],
-                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                    description_of_origin=test_name,
-                ),
-                [],
-            )
-        assert f'Unmatched glob from {test_name}: "*.txt", exclude: "4.txt"' in str(cm.exception)
-
-    @unittest.skip("Skipped to expedite landing #5769: see #5863")
-    def test_glob_match_warn_logging(self) -> None:
-        test_name = f"{__name__}.{self.test_glob_match_warn_logging.__name__}()"
-        with self.captured_logging(logging.WARNING) as captured:
-            self.assert_walk_files(
-                PathGlobs(
-                    globs=["not-a-file.txt"],
-                    glob_match_error_behavior=GlobMatchErrorBehavior.warn,
-                    description_of_origin=test_name,
-                ),
-                [],
-            )
-            all_warnings = captured.warnings()
-            assert len(all_warnings) == 1
-            assert f'Unmatched glob from {test_name}: "not-a-file.txt"' == str(all_warnings[0])
-
-    def test_glob_match_ignore_logging(self) -> None:
-        with self.captured_logging(logging.WARNING) as captured:
-            self.assert_walk_files(
-                PathGlobs(
-                    globs=["not-a-file.txt"],
-                    glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-                ),
-                [],
-            )
-            assert len(captured.warnings()) == 0
+    caplog.clear()
+    evaluate_path_globs(["not-a-file.txt"], GlobMatchErrorBehavior.ignore)
+    assert len(caplog.records) == 0
 
 
 # -----------------------------------------------------------------------------------------------
