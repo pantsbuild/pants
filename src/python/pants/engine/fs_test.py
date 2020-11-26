@@ -311,7 +311,7 @@ def test_path_globs_symlink_escaping_errors(rule_runner: RuleRunner) -> None:
     dest = os.path.join(rule_runner.build_root, "../../..")
     relative_symlink(dest, link)
 
-    exc_reg = rf".*While expanding link.*subdir/escaping.*may not traverse outside of the buildroot"
+    exc_reg = r".*While expanding link.*subdir/escaping.*may not traverse outside of the buildroot"
     with pytest.raises(Exception, match=exc_reg):
         assert_path_globs(rule_runner, ["subdir/escaping"], expected_files=[], expected_dirs=[])
 

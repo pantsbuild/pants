@@ -596,10 +596,13 @@ class SchedulerSession:
 
         This is a blocking operation, and should be avoided where possible.
         """
-        return self._scheduler._native.lib.capture_snapshots(
-            self._scheduler._scheduler,
-            self._session,
-            _PathGlobsAndRootCollection(path_globs_and_roots),
+        return cast(
+            Tuple[Snapshot, ...],
+            self._scheduler._native.lib.capture_snapshots(
+                self._scheduler._scheduler,
+                self._session,
+                _PathGlobsAndRootCollection(path_globs_and_roots),
+            ),
         )
 
     def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes]:
