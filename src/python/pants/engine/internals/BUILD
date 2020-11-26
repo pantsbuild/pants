@@ -27,9 +27,7 @@ python_library(
     'native.py',
     'native_engine.pyi',
   ],
-  dependencies=[
-    ':native_engine',
-  ],
+  dependencies=[':native_engine'],
 )
 
 resources(
@@ -41,6 +39,6 @@ resources(
 )
 
 resources(
-  name='tls_testing',
-  sources=['tls_testing/rsa/*']
+  name='fs_test_data',
+  sources=['fs_test_data/fs_test.tar', 'fs_test_data/tls/rsa/*']
 )

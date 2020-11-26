@@ -5,9 +5,6 @@ python_library()
 
 python_tests(
   name='tests',
-  dependencies=[
-    'src/python/pants/engine/internals:tls_testing',
-    'src/python/pants/engine/internals/examples:fs_test',
-  ],
+  dependencies=['src/python/pants/engine/internals:fs_test_data'],
   timeout=90,
 )

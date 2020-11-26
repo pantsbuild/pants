@@ -13,8 +13,9 @@ import unittest
 from contextlib import contextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
+from io import BytesIO
 from pathlib import Path
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import pytest
 
@@ -55,7 +56,12 @@ from pants.util.dirutil import relative_symlink, safe_file_dump
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(Snapshot, [CreateDigest]), QueryRule(Snapshot, [DigestSubset])],
+        rules=[
+            QueryRule(DigestContents, [PathGlobs]),
+            QueryRule(Snapshot, [CreateDigest]),
+            QueryRule(Snapshot, [DigestSubset]),
+            QueryRule(Snapshot, [PathGlobs]),
+        ],
         isolated_local_store=True,
     )
 
@@ -75,26 +81,46 @@ def prime_store_with_roland_digest(rule_runner: RuleRunner) -> None:
     assert snapshot.digest == ROLAND_DIGEST
 
 
+def setup_fs_test_tar(rule_runner: RuleRunner) -> None:
+    """Extract fs_test.tar into the rule_runner's build root.
+
+    Note that we use a tar, rather than rule_runner.create_file(), because it has symlinks set up a
+    certain way.
+
+    Contents:
+
+        4.txt
+        a
+        ├── 3.txt
+        ├── 4.txt.ln -> ../4.txt
+        └── b
+            ├── 1.txt
+            └── 2
+        c.ln -> a/b
+        d.ln -> a
+    """
+    data = pkgutil.get_data("pants.engine.internals", "fs_test_data/fs_test.tar")
+    assert data is not None
+    io = BytesIO()
+    io.write(data)
+    io.seek(0)
+    with tarfile.open(fileobj=io) as tf:
+        tf.extractall(rule_runner.build_root)
+
+
+def try_with_backoff(assertion_fn: Callable[[], bool]) -> bool:
+    for i in range(4):
+        time.sleep(0.1 * i)
+        if assertion_fn():
+            return True
+    return False
+
+
 class FSTestBase(TestBase, SchedulerTestBase):
     @staticmethod
     def assert_snapshot_equals(snapshot: Snapshot, files: List[str], digest: Digest) -> None:
         assert list(snapshot.files) == files
         assert snapshot.digest == digest
-
-    def prime_store_with_roland_digest(self) -> Digest:
-        """This method primes the store with a directory of a file named 'roland' and contents
-        'European Burmese'."""
-        with temporary_dir() as temp_dir:
-            with open(os.path.join(temp_dir, "roland"), "w") as f:
-                f.write("European Burmese")
-            globs = PathGlobs(["*"])
-            snapshot = self.scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
-
-            expected_digest = Digest(
-                "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80
-            )
-            self.assert_snapshot_equals(snapshot, ["roland"], expected_digest)
-        return expected_digest
 
 
 class FSTest(FSTestBase):
@@ -106,9 +132,7 @@ class FSTest(FSTestBase):
             QueryRule(Snapshot, (DigestSubset,)),
         )
 
-    _original_src = os.path.join(
-        os.path.dirname(__file__), "internals/examples/fs_test/fs_test.tar"
-    )
+    _original_src = os.path.join(os.path.dirname(__file__), "internals/fs_test_data/fs_test.tar")
 
     @contextmanager
     def mk_project_tree(self, ignore_patterns=None):
@@ -389,120 +413,6 @@ class FSTest(FSTestBase):
                 [],
             )
             assert len(captured.warnings()) == 0
-
-    def test_file_content_invalidated(self) -> None:
-        """Test that we can update files and have the native engine invalidate previous operations
-        on those files."""
-
-        with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(
-                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))],
-                project_tree=project_tree,
-            )
-            fname = "4.txt"
-            new_data = "rouf"
-            # read the original file so we have a cached value.
-            self.read_digest_contents(scheduler, [fname])
-            path_to_fname = os.path.join(project_tree.build_root, fname)
-            with open(path_to_fname, "w") as f:
-                f.write(new_data)
-
-            def assertion_fn() -> bool:
-                new_content = self.read_digest_contents(scheduler, [fname])
-                if new_content[fname].decode() == new_data:
-                    # successfully read new data
-                    return True
-                return False
-
-            if not self.try_with_backoff(assertion_fn):
-                raise AssertionError(
-                    f"New content {new_data} was not found in the FilesContent of the "
-                    "modified file {path_to_fname}, instead we found {new_content[fname]}"
-                )
-
-    def test_file_content_invalidated_after_parent_deletion(self) -> None:
-        """Test that FileContent is invalidated after deleting parent directory."""
-
-        with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(
-                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))],
-                project_tree=project_tree,
-            )
-            fname = "a/b/1.txt"
-            # read the original file so we have nodes to invalidate.
-            original_content = self.read_digest_contents(scheduler, [fname])
-            self.assertIn(fname, original_content)
-            path_to_parent_dir = os.path.join(project_tree.build_root, "a/b/")
-            shutil.rmtree(path_to_parent_dir)
-
-            def assertion_fn():
-                new_content = self.read_digest_contents(scheduler, [fname])
-                if new_content.get(fname) is None:
-                    return True
-                return False
-
-            if not self.try_with_backoff(assertion_fn):
-                raise AssertionError(
-                    "Deleting parent dir and could still read file from original snapshot."
-                )
-
-    def assert_mutated_digest(
-        self, mutation_function: Callable[[FileSystemProjectTree, str], Exception]
-    ) -> None:
-        with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(
-                rules=[*fs_rules(), QueryRule(Snapshot, (PathGlobs,))],
-                project_tree=project_tree,
-            )
-            dir_path = "a/"
-            dir_glob = f"{dir_path}/*"
-            initial_snapshot = self.execute_expecting_one_result(
-                scheduler, Snapshot, PathGlobs([dir_glob])
-            ).value
-            assert initial_snapshot != EMPTY_SNAPSHOT
-            assertion_error = mutation_function(project_tree, dir_path)
-
-            def assertion_fn() -> bool:
-                new_snapshot = self.execute_expecting_one_result(
-                    scheduler, Snapshot, PathGlobs([dir_glob])
-                ).value
-                assert new_snapshot != EMPTY_SNAPSHOT
-                if initial_snapshot.digest != new_snapshot.digest:
-                    # successfully invalidated snapshot and got a new digest
-                    return True
-                return False
-
-            if not self.try_with_backoff(assertion_fn):
-                raise assertion_error
-
-    @staticmethod
-    def try_with_backoff(assertion_fn: Callable[[], bool]) -> bool:
-        for i in range(4):
-            time.sleep(0.1 * i)
-            if assertion_fn():
-                return True
-        return False
-
-    def test_digest_invalidated_by_child_removal(self) -> None:
-        def mutation_function(project_tree, dir_path):
-            removed_path = os.path.join(project_tree.build_root, dir_path, "3.txt")
-            os.remove(removed_path)
-            return AssertionError(
-                f"Did not find a new directory snapshot after adding file {removed_path}."
-            )
-
-        self.assert_mutated_digest(mutation_function)
-
-    def test_digest_invalidated_by_child_change(self) -> None:
-        def mutation_function(project_tree, dir_path):
-            new_file_path = os.path.join(project_tree.build_root, dir_path, "new_file.txt")
-            with open(new_file_path, "w") as f:
-                f.write("new file")
-            return AssertionError(
-                f"Did not find a new directory snapshot after adding file {new_file_path}."
-            )
-
-        self.assert_mutated_digest(mutation_function)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -883,7 +793,7 @@ DOWNLOADS_EXPECTED_DIRECTORY_DIGEST = Digest(
 )
 
 
-def test_download(downloads_rule_runner: RuleRunner) -> None:
+def test_download_valid(downloads_rule_runner: RuleRunner) -> None:
     with http_server(StubHandler) as port:
         snapshot = downloads_rule_runner.request(
             Snapshot, [DownloadFile(f"http://localhost:{port}/file.txt", DOWNLOADS_FILE_DIGEST)]
@@ -935,7 +845,7 @@ def test_download_https() -> None:
 
         def write_resource(name: str) -> Path:
             path = Path(temp_dir) / name
-            data = pkgutil.get_data("pants.engine.internals", f"tls_testing/rsa/{name}")
+            data = pkgutil.get_data("pants.engine.internals", f"fs_test_data/tls/rsa/{name}")
             assert data is not None
             path.write_bytes(data)
             return path
@@ -1041,3 +951,81 @@ def test_workspace_in_goal_rule() -> None:
     assert result.exit_code == 0
     assert result.stdout == "a.txt"
     assert Path(rule_runner.build_root, "a.txt").read_text() == "hello"
+
+
+# -----------------------------------------------------------------------------------------------
+# Invalidation of the FS
+# -----------------------------------------------------------------------------------------------
+
+
+def test_invalidated_after_rewrite(rule_runner: RuleRunner) -> None:
+    """Test that updating files causes invalidation of previous operations on those files."""
+    setup_fs_test_tar(rule_runner)
+
+    def read_file() -> str:
+        digest_contents = rule_runner.request(DigestContents, [PathGlobs(["4.txt"])])
+        assert len(digest_contents) == 1
+        return digest_contents[0].content.decode()
+
+    # First read the file, which should cache it.
+    assert read_file() == "four\n"
+
+    new_value = "cuatro\n"
+    Path(rule_runner.build_root, "4.txt").write_text(new_value)
+    assert try_with_backoff(lambda: read_file() == new_value)
+
+
+def test_invalidated_after_parent_deletion(rule_runner: RuleRunner) -> None:
+    """Test that FileContent is invalidated after deleting parent directory."""
+    setup_fs_test_tar(rule_runner)
+
+    def read_file() -> Optional[str]:
+        digest_contents = rule_runner.request(DigestContents, [PathGlobs(["a/b/1.txt"])])
+        if not digest_contents:
+            return None
+        assert len(digest_contents) == 1
+        return digest_contents[0].content.decode()
+
+    # Read the original file so that we have nodes to invalidate.
+    assert read_file() == "one\n"
+
+    shutil.rmtree(Path(rule_runner.build_root, "a/b"))
+    assert try_with_backoff(lambda: read_file() is None)
+
+
+def test_invalidated_after_child_deletion(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    original_snapshot = rule_runner.request(Snapshot, [PathGlobs(["a/*"])])
+    assert original_snapshot.files == ("a/3.txt", "a/4.txt.ln")
+    assert original_snapshot.dirs == ("a", "a/b")
+
+    Path(rule_runner.build_root, "a/3.txt").unlink()
+
+    def is_changed_snapshot() -> bool:
+        new_snapshot = rule_runner.request(Snapshot, [PathGlobs(["a/*"])])
+        return (
+            new_snapshot.digest != original_snapshot.digest
+            and new_snapshot.files == ("a/4.txt.ln",)
+            and new_snapshot.dirs == ("a", "a/b")
+        )
+
+    assert try_with_backoff(is_changed_snapshot)
+
+
+def test_invalidated_after_new_child(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+    original_snapshot = rule_runner.request(Snapshot, [PathGlobs(["a/*"])])
+    assert original_snapshot.files == ("a/3.txt", "a/4.txt.ln")
+    assert original_snapshot.dirs == ("a", "a/b")
+
+    Path(rule_runner.build_root, "a/new_file.txt").write_text("new file")
+
+    def is_changed_snapshot() -> bool:
+        new_snapshot = rule_runner.request(Snapshot, [PathGlobs(["a/*"])])
+        return (
+            new_snapshot.digest != original_snapshot.digest
+            and new_snapshot.files == ("a/3.txt", "a/4.txt.ln", "a/new_file.txt")
+            and new_snapshot.dirs == ("a", "a/b")
+        )
+
+    assert try_with_backoff(is_changed_snapshot)
