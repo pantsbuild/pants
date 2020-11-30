@@ -165,9 +165,7 @@ def test_archive() -> None:
         ],
         target_types=[ArchiveTarget, Files, RelocatedFiles, PexBinary],
     )
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", "--no-pants-distdir-legacy-paths"]
-    )
+    rule_runner.set_options(["--backend-packages=pants.backend.python"])
 
     rule_runner.create_file("resources/d1.json", "{'k': 1}")
     rule_runner.create_file("resources/d2.json", "{'k': 2}")

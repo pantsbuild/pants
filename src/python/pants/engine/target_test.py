@@ -25,7 +25,6 @@ from pants.engine.target import (
     SequenceField,
     Sources,
     StringField,
-    StringOrStringSequenceField,
     StringSequenceField,
     Tags,
     Target,
@@ -637,17 +636,6 @@ def test_string_sequence_field() -> None:
     assert Example(None, address=addr).value is None
     with pytest.raises(InvalidFieldTypeException):
         Example("strings are technically iterable...", address=addr)
-    with pytest.raises(InvalidFieldTypeException):
-        Example(["hello", 0, "world"], address=addr)
-
-
-def test_string_or_string_sequence_field() -> None:
-    class Example(StringOrStringSequenceField):
-        alias = "example"
-
-    addr = Address("", target_name="example")
-    assert Example(["hello", "world"], address=addr).value == ("hello", "world")
-    assert Example("hello world", address=addr).value == ("hello world",)
     with pytest.raises(InvalidFieldTypeException):
         Example(["hello", 0, "world"], address=addr)
 

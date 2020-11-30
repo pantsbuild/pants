@@ -10,7 +10,6 @@ from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
 from pants.engine.target import (
@@ -28,7 +27,6 @@ from pants.engine.target import (
     Sources,
     SpecialCasedDependencies,
     StringField,
-    StringOrStringSequenceField,
     StringSequenceField,
     Target,
 )
@@ -154,7 +152,7 @@ class ResolvePexEntryPointRequest:
     sources: PexBinarySources
 
 
-class PexPlatformsField(StringOrStringSequenceField):
+class PexPlatformsField(StringSequenceField):
     """The platforms the built PEX should be compatible with.
 
     This defaults to the current platform, but can be overridden to different platforms. You can
@@ -169,21 +167,6 @@ class PexPlatformsField(StringOrStringSequenceField):
     """
 
     alias = "platforms"
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[str, ...]]:
-        if isinstance(raw_value, str) and not address.is_file_target:
-            warn_or_error(
-                deprecated_entity_description=f"Using a bare string for the `{cls.alias}` field",
-                removal_version="2.2.0.dev1",
-                hint=(
-                    f"Using a bare string for the `{cls.alias}` field for {address}. Please "
-                    f"instead use a list of strings, i.e. use `[{raw_value}]`."
-                ),
-            )
-        return super().compute_value(raw_value, address=address)
 
 
 class PexInheritPathField(StringField):
