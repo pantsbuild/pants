@@ -269,7 +269,6 @@ def test_path_globs_ignore_pattern(rule_runner: RuleRunner) -> None:
     assert_path_globs(
         rule_runner,
         ["**", "!*.ln"],
-        # TODO: should `a/4.txt.ln` be included?
         expected_files=["4.txt", "a/3.txt", "a/b/1.txt", "a/b/2"],
         expected_dirs=["a", "a/b"],
     )
