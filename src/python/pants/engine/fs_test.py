@@ -350,11 +350,9 @@ def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
     }
     assert get_contents(["c.ln/../3.txt"]) == {FileContent("c.ln/../3.txt", b"three\n")}
 
-    # Directories raise an exception.
-    with pytest.raises(Exception):
-        get_contents(["a/b"])
-    with pytest.raises(Exception):
-        get_contents(["c.ln"])
+    # Directories are empty.
+    assert not get_contents(["a/b"])
+    assert not get_contents(["c.ln"])
 
 
 def test_glob_match_error_behavior(rule_runner: RuleRunner, caplog) -> None:
