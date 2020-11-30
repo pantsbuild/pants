@@ -32,7 +32,6 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 
@@ -47,13 +46,12 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
 async def package_python_awslambda(
-    field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex, global_options: GlobalOptions
+    field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex
 ) -> BuiltPackage:
     output_filename = field_set.output_path.value_or_default(
         field_set.address,
         # Lambdas typically use the .zip suffix, so we use that instead of .pex.
         file_ending="zip",
-        use_legacy_format=global_options.options.pants_distdir_legacy_paths,
     )
 
     # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.

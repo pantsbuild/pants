@@ -30,7 +30,6 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 # -----------------------------------------------------------------------------------------------
@@ -289,9 +288,7 @@ class ArchiveFieldSet(PackageFieldSet):
 
 
 @rule(level=LogLevel.DEBUG)
-async def package_archive_target(
-    field_set: ArchiveFieldSet, global_options: GlobalOptions
-) -> BuiltPackage:
+async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
     package_targets, files_targets = await MultiGet(
         Get(Targets, UnparsedAddressInputs, field_set.packages.to_unparsed_address_inputs()),
         Get(Targets, UnparsedAddressInputs, field_set.files.to_unparsed_address_inputs()),
@@ -326,9 +323,7 @@ async def package_archive_target(
     )
 
     output_filename = field_set.output_path.value_or_default(
-        field_set.address,
-        file_ending=field_set.format_field.value,
-        use_legacy_format=global_options.options.pants_distdir_legacy_paths,
+        field_set.address, file_ending=field_set.format_field.value
     )
     archive = await Get(
         Digest,
