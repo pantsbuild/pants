@@ -58,7 +58,8 @@ jobs:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/rust/cargo
+      - ${HOME}/.rustup
+      - ${HOME}/.cargo
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
@@ -78,9 +79,10 @@ jobs:
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
       -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest sh -c "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py
-      --python-version 3.7 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix
-      ${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
+      travis_ci:latest sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
+      | sh && ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version
+      3.7 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
+      --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     services:
     - docker
     stage: Bootstrap Pants
@@ -102,7 +104,8 @@ jobs:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/rust/cargo
+      - ${HOME}/.rustup
+      - ${HOME}/.cargo
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
@@ -120,6 +123,7 @@ jobs:
     os: osx
     osx_image: xcode8
     script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
     - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.7
       --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
       --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -141,6 +145,7 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - rm -rf "${HOME}/.cargo/registry/src"
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
@@ -192,7 +197,8 @@ jobs:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/rust/cargo
+      - ${HOME}/.rustup
+      - ${HOME}/.cargo
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
@@ -225,6 +231,7 @@ jobs:
     - ./build-support/bin/upload_coverage.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - rm -rf "${HOME}/.cargo/registry/src"
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
@@ -274,7 +281,8 @@ jobs:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/rust/cargo
+      - ${HOME}/.rustup
+      - ${HOME}/.cargo
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
@@ -302,7 +310,8 @@ jobs:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/rust/cargo
+      - ${HOME}/.rustup
+      - ${HOME}/.cargo
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
@@ -338,6 +347,7 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - rm -rf "${HOME}/.cargo/registry/src"
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
@@ -392,7 +402,8 @@ jobs:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/rust/cargo
+      - ${HOME}/.rustup
+      - ${HOME}/.cargo
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
@@ -508,6 +519,7 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - rm -rf "${HOME}/.cargo/registry/src"
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
@@ -564,6 +576,7 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - rm -rf "${HOME}/.cargo/registry/src"
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
     - ./build-support/bin/prune_travis_cache.sh
     before_install:

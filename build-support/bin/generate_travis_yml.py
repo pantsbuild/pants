@@ -215,7 +215,8 @@ CACHE_NATIVE_ENGINE = {
         "timeout": _cache_timeout,
         "directories": [
             *_cache_common_directories,
-            "${HOME}/.cache/pants/rust/cargo",
+            "${HOME}/.rustup",
+            "${HOME}/.cargo",
             "build-support/virtualenvs",
             "src/rust/engine/target",
         ],
@@ -225,6 +226,8 @@ CACHE_NATIVE_ENGINE = {
 CACHE_PANTS_RUN = {
     "before_cache": [
         _cache_set_required_permissions,
+        # Travis recommends purging this folder for Rust projects.
+        'rm -rf "${HOME}/.cargo/registry/src"',
         # Render a summary to assist with further tuning the cache.
         "du -m -d2 ${HOME}/.cache/pants | sort -r -n",
         "./build-support/bin/prune_travis_cache.sh",
@@ -405,13 +408,14 @@ SKIP_WHEELS_CONDITION = (
 # ----------------------------------------------------------------------
 
 
-def _bootstrap_command(*, python_version: PythonVersion) -> str:
-    return (
+def _bootstrap_commands(*, python_version: PythonVersion) -> List[str]:
+    bootstrap_script = (
         "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version "
         f"{python_version.decimal} --aws-bucket ${{AWS_BUCKET}} --native-engine-so-key-prefix "
         "${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key "
         "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     )
+    return ["curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh", bootstrap_script]
 
 
 def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List[str]:
@@ -429,7 +433,9 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
         "stage": python_version.default_stage(is_bootstrap=True).value,
         "script": [
             docker_build_travis_ci_image(),
-            docker_run_travis_ci_image(_bootstrap_command(python_version=python_version)),
+            docker_run_travis_ci_image(
+                " && ".join(_bootstrap_commands(python_version=python_version))
+            ),
         ],
     }
     safe_extend(
@@ -448,7 +454,7 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
         "name": f"Build macOS native engine and pants.pex (Python {python_version.decimal})",
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage(is_bootstrap=True).value,
-        "script": [_bootstrap_command(python_version=python_version)],
+        "script": _bootstrap_commands(python_version=python_version),
     }
     safe_extend(shard, "env", _bootstrap_env(python_version=python_version, platform=Platform.osx))
     return shard

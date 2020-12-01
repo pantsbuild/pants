@@ -10,8 +10,8 @@ source "${REPO_ROOT}/build-support/common.sh"
 PY="$(determine_python)"
 export PY
 
-# shellcheck source=build-support/bin/native/calculate_engine_hash.sh
-source "${REPO_ROOT}/build-support/bin/native/calculate_engine_hash.sh"
+# shellcheck source=build-support/bin/rust/calculate_engine_hash.sh
+source "${REPO_ROOT}/build-support/bin/rust/calculate_engine_hash.sh"
 
 # shellcheck source=build-support/pants_venv
 source "${REPO_ROOT}/build-support/pants_venv"

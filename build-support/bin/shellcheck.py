@@ -32,7 +32,6 @@ def run_shellcheck() -> None:
         "./build-support/githooks/pre-commit",
         "./build-support/githooks/prepare-commit-msg",
     }
-    targets -= set(glob("./build-support/bin/native/src/**/*.sh", recursive=True))
     targets -= set(glob("./build-support/virtualenv.dist/**/*.sh", recursive=True))
     targets -= set(glob("./build-support/virtualenvs/**/*.sh", recursive=True))
     targets -= set(glob("./build-support/twine-deps.venv/**/*.sh", recursive=True))

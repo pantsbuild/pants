@@ -18,11 +18,11 @@ CHANGED_FILES="$(git diff --name-only "${MERGE_BASE}")"
 
 NUM_NON_MD_FILES=$(echo "${CHANGED_FILES})" | grep -c -v ".\md$")
 
-# Ensure that this stays in sync with `build-support/bin/native/calculate_engine_hash.sh`.
+# Ensure that this stays in sync with `build-support/bin/rust/calculate_engine_hash.sh`.
 NUM_RUST_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^src/rust/engine" \
   -e "^rust-toolchain" \
-  -e "^build-support/bin/native" \
+  -e "^build-support/bin/rust" \
   -e "^build-support/bin/generate_travis_yml.py")
 
 NUM_RELEASE_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \

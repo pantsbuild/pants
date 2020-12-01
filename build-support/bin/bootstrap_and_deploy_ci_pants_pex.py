@@ -99,7 +99,7 @@ def create_parser() -> argparse.ArgumentParser:
 def calculate_native_engine_so_hash() -> str:
     return (
         subprocess.run(
-            ["build-support/bin/native/print_engine_hash.sh"], stdout=subprocess.PIPE, check=True
+            ["build-support/bin/rust/print_engine_hash.sh"], stdout=subprocess.PIPE, check=True
         )
         .stdout.decode()
         .strip()
