@@ -43,13 +43,20 @@ from pants.engine.rules import Rule
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import ExecutionOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import recursive_dirname, safe_file_dump, safe_mkdir, safe_open
+from pants.util.dirutil import (
+    recursive_dirname,
+    safe_file_dump,
+    safe_mkdir,
+    safe_mkdtemp,
+    safe_open,
+)
 from pants.util.ordered_set import FrozenOrderedSet
 
 # -----------------------------------------------------------------------------------------------
@@ -85,6 +92,8 @@ class RuleRunner:
         target_types: Optional[Iterable[Type[Target]]] = None,
         objects: Optional[Dict[str, Any]] = None,
         context_aware_object_factories: Optional[Dict[str, Any]] = None,
+        isolated_local_store: bool = False,
+        ca_certs_path: Optional[str] = None,
     ) -> None:
         self.build_root = os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
         safe_mkdir(self.build_root, clean=True)
@@ -112,12 +121,18 @@ class RuleRunner:
 
         options_bootstrapper = create_options_bootstrapper()
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        local_store_dir = global_options.local_store_dir
+        local_store_dir = (
+            os.path.realpath(safe_mkdtemp())
+            if isolated_local_store
+            else global_options.local_store_dir
+        )
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
         graph_session = EngineInitializer.setup_graph_extended(
-            pants_ignore_patterns=[],
+            pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
+                self.build_root, global_options
+            ),
             use_gitignore=False,
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
@@ -127,6 +142,7 @@ class RuleRunner:
             build_root=self.build_root,
             build_configuration=self.build_config,
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
+            ca_certs_path=ca_certs_path,
         ).new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(
@@ -284,12 +300,9 @@ class RuleRunner:
             for file_name, content in files.items():
                 mode = "wb" if isinstance(content, bytes) else "w"
                 safe_file_dump(os.path.join(temp_dir, file_name), content, mode=mode)
-            return cast(
-                Snapshot,
-                self.scheduler.capture_snapshots((PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),))[
-                    0
-                ],
-            )
+            return self.scheduler.capture_snapshots(
+                (PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),)
+            )[0]
 
     def make_snapshot_of_empty_files(self, files: Iterable[str]) -> Snapshot:
         """Makes a snapshot with empty content for each file.
