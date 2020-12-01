@@ -426,7 +426,8 @@ def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List
     return [
         f"CACHE_NAME=bootstrap.{platform}.py{python_version.number}",
         f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.{platform}",
-        'PATH="${HOME}/.rustup:$PATH"',
+        # This exposes the `rustup` binary.
+        'PATH="${HOME}/.cargo/bin:$PATH"',
     ]
 
 
