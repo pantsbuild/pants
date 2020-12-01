@@ -67,6 +67,7 @@ jobs:
     env:
     - CACHE_NAME=bootstrap.linux.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
+    - PATH="${HOME}/.rustup:$PATH"
     language: python
     name: Build Linux native engine and pants.pex (Python 3.7)
     os: linux
@@ -118,11 +119,13 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
+    - PATH="${HOME}/.rustup:$PATH"
     language: generic
     name: Build macOS native engine and pants.pex (Python 3.7)
     os: osx
     osx_image: xcode8
     script:
+    - brew install xz
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
     - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.7
