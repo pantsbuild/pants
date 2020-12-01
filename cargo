@@ -8,7 +8,7 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 source "${REPO_ROOT}/build-support/common.sh"
 
 if ! command -v rustup &> /dev/null; then
-  die "Please install Rustup 1.23.0+ and ensure \`rustup\` is on your PATH. See https://rustup.rs."
+  die "Please install Rustup and ensure \`rustup\` is on your PATH (usually by adding ~/.cargo/bin). See https://rustup.rs."
 fi
 
 # This will download some tools needed to build Rust, like Cmake, and will add them to the PATH.
