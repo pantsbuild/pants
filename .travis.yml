@@ -67,7 +67,6 @@ jobs:
     env:
     - CACHE_NAME=bootstrap.linux.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PATH="${HOME}/.cargo/bin:$PATH"
     language: python
     name: Build Linux native engine and pants.pex (Python 3.7)
     os: linux
@@ -81,9 +80,10 @@ jobs:
       -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
-      | sh -s -- -y --default-toolchain none && ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py
-      --python-version 3.7 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix
-      ${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
+      | sh -s -- -y --default-toolchain none && export PATH="${HOME}/.cargo/bin:${PATH}"
+      && ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version
+      3.7 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
+      --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     services:
     - docker
     stage: Bootstrap Pants
@@ -119,7 +119,6 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
-    - PATH="${HOME}/.cargo/bin:$PATH"
     language: generic
     name: Build macOS native engine and pants.pex (Python 3.7)
     os: osx
@@ -127,6 +126,7 @@ jobs:
     script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
+    - export PATH="${HOME}/.cargo/bin:${PATH}"
     - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.7
       --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
       --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}

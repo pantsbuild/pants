@@ -25,8 +25,11 @@ RUN chown -R ${TRAVIS_USER} ${TRAVIS_WORK_DIR_PATH}
 
 USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 
-# Our newly created user is unlikely to have a sane environment: set a locale at least.
+# Our newly created user is unlikely to have a sensible environment: set a locale at least.
 ENV LC_ALL="en_US.UTF-8"
+
+# Pants's auto-detection fails for the Docker image used in CI.
+ENV PANTS_DYNAMIC_UI=false
 
 WORKDIR ${TRAVIS_WORK_DIR_PATH}
 

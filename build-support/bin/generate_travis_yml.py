@@ -65,6 +65,8 @@ class Stage(Enum):
 # Env vars
 # ----------------------------------------------------------------------
 
+# NB: These are not applied to the Linux Docker image - all of those env vars must be explicitly
+# exported in the image.
 GLOBAL_ENV_VARS = [
     'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"',
     "PANTS_DYNAMIC_UI=false",
@@ -413,21 +415,22 @@ def _bootstrap_commands(*, python_version: PythonVersion) -> List[str]:
         "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y "
         "--default-toolchain none"
     )
+    # We run this as a command, rather than using Travis's `env`, to ensure that the env var is set
+    # in the Linux Docker image.
+    export_cargo = 'export PATH="${HOME}/.cargo/bin:${PATH}"'
     bootstrap_script = (
         "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version "
         f"{python_version.decimal} --aws-bucket ${{AWS_BUCKET}} --native-engine-so-key-prefix "
         "${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key "
         "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     )
-    return [rustup, bootstrap_script]
+    return [rustup, export_cargo, bootstrap_script]
 
 
 def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List[str]:
     return [
         f"CACHE_NAME=bootstrap.{platform}.py{python_version.number}",
         f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.{platform}",
-        # This exposes the `rustup` binary.
-        'PATH="${HOME}/.cargo/bin:$PATH"',
     ]
 
 
