@@ -460,13 +460,7 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
         "name": f"Build macOS native engine and pants.pex (Python {python_version.decimal})",
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage(is_bootstrap=True).value,
-        # We need to install `xz` to get modern `rustup` to work.
-        #
-        # We don't use the standard Travis "addons" section here for Homebrew because it will
-        # either silently fail (on older images) or cause a multi-minute `brew update` (on newer
-        # images), neither of which we want. This doesn't happen if we just manually run
-        # `brew install`.
-        "script": ["brew install xz", *_bootstrap_commands(python_version=python_version)],
+        "script": _bootstrap_commands(python_version=python_version),
     }
     safe_extend(shard, "env", _bootstrap_env(python_version=python_version, platform=Platform.osx))
     return shard
@@ -635,15 +629,17 @@ def rust_tests_osx() -> Dict:
         "osx_image": "xcode8",
         "before_install": [
             './build-support/bin/install_python_for_ci.sh "${MACOS_PYENV_PY37_VERSION}"',
-            # See bootstrap_osx() for why we don't use the standard Travis `addons` feature for B
-            # rew.
+            # We don't use the standard Travis "addons" section here because it will either silently
+            # fail (on older images) or cause a multi-minute `brew update` (on newer images),
+            # neither of which we want. This doesn't happen if we just manually run `brew cask
+            # install`.
             #
             # Also, you will notice in the Travis log that it says that macOS needs to be rebooted
             # before this install will work. This is a lie.
             "brew cask install osxfuse",
             # We don't need to install openssl because it already happens to be installed on this
-            # image. This is good, because `brew install openssl` would trigger the same issues as
-            # noted on why we don't use the `addons` section.
+            # image. This is good, because both `brew install openssl` and the Travis Brew addon
+            # would trigger the same issues as noted above.
         ],
         "env": [*_osx_env_with_pyenv(), "CACHE_NAME=rust_tests.osx"],
     }

@@ -125,7 +125,6 @@ jobs:
     os: osx
     osx_image: xcode8
     script:
-    - brew install xz
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
     - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.7
