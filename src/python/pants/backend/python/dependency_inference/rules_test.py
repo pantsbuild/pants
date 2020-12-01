@@ -7,7 +7,7 @@ from pants.backend.python.dependency_inference.rules import (
     InferConftestDependencies,
     InferInitDependencies,
     InferPythonImportDependencies,
-    PythonInference,
+    PythonInferSubsystem,
     import_rules,
     infer_python_conftest_dependencies,
     infer_python_init_dependencies,
@@ -119,7 +119,7 @@ def test_infer_python_inits() -> None:
         rules=[
             *ancestor_files.rules(),
             infer_python_init_dependencies,
-            SubsystemRule(PythonInference),
+            SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
         ],
         target_types=[PythonLibrary],
@@ -162,7 +162,7 @@ def test_infer_python_conftests() -> None:
         rules=[
             *ancestor_files.rules(),
             infer_python_conftest_dependencies,
-            SubsystemRule(PythonInference),
+            SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
         target_types=[PythonTests],

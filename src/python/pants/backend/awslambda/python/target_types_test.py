@@ -102,5 +102,5 @@ def test_inject_handler_dependency() -> None:
     )
 
     # Test that we can turn off the injection.
-    rule_runner.set_options(["--no-python-awslambda-defaults-infer-dependencies"])
+    rule_runner.set_options(["--no-python-infer-entry-points"])
     assert_injected(Address("project", target_name="first_party"), expected=None)

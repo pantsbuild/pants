@@ -32,7 +32,7 @@ from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 
 
-class PythonInference(Subsystem):
+class PythonInferSubsystem(Subsystem):
     """Options controlling which dependencies will be inferred for Python targets."""
 
     options_scope = "python-infer"
@@ -82,6 +82,15 @@ class PythonInference(Subsystem):
                 "directory and ancestor directories."
             ),
         )
+        register(
+            "--entry-points",
+            default=True,
+            type=bool,
+            help=(
+                "Infer dependencies on binary targets' entry points, e.g. `pex_binary`'s "
+                "`entry_point` field and `python_awslambda`'s `handler` field."
+            ),
+        )
 
     @property
     def imports(self) -> bool:
@@ -99,6 +108,10 @@ class PythonInference(Subsystem):
     def conftests(self) -> bool:
         return cast(bool, self.options.conftests)
 
+    @property
+    def entry_points(self) -> bool:
+        return cast(bool, self.options.entry_points)
+
 
 class InferPythonImportDependencies(InferDependenciesRequest):
     infer_from = PythonSources
@@ -107,10 +120,10 @@ class InferPythonImportDependencies(InferDependenciesRequest):
 @rule(desc="Inferring Python dependencies by analyzing imports")
 async def infer_python_dependencies_via_imports(
     request: InferPythonImportDependencies,
-    python_inference: PythonInference,
+    python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
 ) -> InferredDependencies:
-    if not python_inference.imports:
+    if not python_infer_subsystem.imports:
         return InferredDependencies([], sibling_dependencies_inferrable=False)
 
     wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
@@ -123,7 +136,7 @@ async def infer_python_dependencies_via_imports(
     )
     relevant_imports = (
         detected_imports.all_imports
-        if python_inference.string_imports
+        if python_infer_subsystem.string_imports
         else detected_imports.explicit_imports
     )
 
@@ -142,9 +155,9 @@ class InferInitDependencies(InferDependenciesRequest):
 
 @rule(desc="Inferring dependencies on `__init__.py` files")
 async def infer_python_init_dependencies(
-    request: InferInitDependencies, python_inference: PythonInference
+    request: InferInitDependencies, python_infer_subsystem: PythonInferSubsystem
 ) -> InferredDependencies:
-    if not python_inference.inits:
+    if not python_infer_subsystem.inits:
         return InferredDependencies([], sibling_dependencies_inferrable=False)
 
     # Locate __init__.py files not already in the Snapshot.
@@ -173,9 +186,9 @@ class InferConftestDependencies(InferDependenciesRequest):
 @rule(desc="Inferring dependencies on `conftest.py` files")
 async def infer_python_conftest_dependencies(
     request: InferConftestDependencies,
-    python_inference: PythonInference,
+    python_infer_subsystem: PythonInferSubsystem,
 ) -> InferredDependencies:
-    if not python_inference.conftests:
+    if not python_infer_subsystem.conftests:
         return InferredDependencies([], sibling_dependencies_inferrable=False)
 
     # Locate conftest.py files not already in the Snapshot.
@@ -204,7 +217,7 @@ def import_rules():
         *import_parser.rules(),
         *module_mapper.rules(),
         *stripped_source_files.rules(),
-        SubsystemRule(PythonInference),
+        SubsystemRule(PythonInferSubsystem),
         SubsystemRule(PythonSetup),
         UnionRule(InferDependenciesRequest, InferPythonImportDependencies),
     ]

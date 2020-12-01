@@ -81,13 +81,6 @@ class PexBinaryDefaults(Subsystem):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--infer-dependencies",
-            advanced=True,
-            type=bool,
-            default=True,
-            help="Infer a dependency on the module specified by the `entry_point` field.",
-        )
-        register(
             "--emit-warnings",
             advanced=True,
             type=bool,
@@ -98,10 +91,6 @@ class PexBinaryDefaults(Subsystem):
                 "`pex_binary` targets"
             ),
         )
-
-    @property
-    def infer_dependencies(self) -> bool:
-        return cast(bool, self.options.infer_dependencies)
 
     @property
     def emit_warnings(self) -> bool:

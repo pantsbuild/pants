@@ -10,9 +10,8 @@ defined in `target_types.py`.
 import os.path
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
-from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
 from pants.backend.python.target_types import (
-    PexBinaryDefaults,
     PexBinaryDependencies,
     PexBinarySources,
     PexEntryPointField,
@@ -88,9 +87,9 @@ class InjectPexBinaryEntryPointDependency(InjectDependenciesRequest):
 
 @rule(desc="Inferring dependency from the pex_binary `entry_point` field")
 async def inject_pex_binary_entry_point_dependency(
-    request: InjectPexBinaryEntryPointDependency, pex_binary_defaults: PexBinaryDefaults
+    request: InjectPexBinaryEntryPointDependency, python_infer_subsystem: PythonInferSubsystem
 ) -> InjectedDependencies:
-    if not pex_binary_defaults.infer_dependencies:
+    if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
     entry_point = await Get(

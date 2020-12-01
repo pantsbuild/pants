@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Match, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
-from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
@@ -23,28 +23,6 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
-from pants.option.subsystem import Subsystem
-
-
-class PythonAwsLambdaDefaults(Subsystem):
-    """Default settings for the `python_awslambda` target."""
-
-    options_scope = "python-awslambda-defaults"
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--infer-dependencies",
-            advanced=True,
-            type=bool,
-            default=True,
-            help="Infer a dependency on the module specified by the `handler` field.",
-        )
-
-    @property
-    def infer_dependencies(self) -> bool:
-        return cast(bool, self.options.infer_dependencies)
 
 
 class PythonAwsLambdaSources(PythonSources):
@@ -86,9 +64,9 @@ class InjectPythonLambdaHandlerDependency(InjectDependenciesRequest):
 
 @rule(desc="Inferring dependency from the python_awslambda `handler` field")
 async def inject_lambda_handler_dependency(
-    request: InjectPythonLambdaHandlerDependency, awslambda_defaults: PythonAwsLambdaDefaults
+    request: InjectPythonLambdaHandlerDependency, python_infer_subsystem: PythonInferSubsystem
 ) -> InjectedDependencies:
-    if not awslambda_defaults.infer_dependencies:
+    if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
     handler = await Get(

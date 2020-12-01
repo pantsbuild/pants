@@ -12,7 +12,6 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     PexBinary,
-    PexBinaryDefaults,
     PexBinaryDependencies,
     PexBinarySources,
     PexEntryPointField,
@@ -34,7 +33,6 @@ from pants.backend.python.target_types_rules import (
 )
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import SubsystemRule
 from pants.engine.target import (
     InjectedDependencies,
     InvalidFieldException,
@@ -120,7 +118,6 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
             inject_pex_binary_entry_point_dependency,
             resolve_pex_entry_point,
             *import_rules(),
-            SubsystemRule(PexBinaryDefaults),
             QueryRule(InjectedDependencies, [InjectPexBinaryEntryPointDependency]),
         ],
         target_types=[PexBinary, PythonRequirementLibrary, PythonLibrary],
@@ -183,7 +180,7 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
     )
 
     # Test that we can turn off the injection.
-    rule_runner.set_options(["--no-pex-binary-defaults-infer-dependencies"])
+    rule_runner.set_options(["--no-python-infer-entry-points"])
     assert_injected(Address("project", target_name="first_party"), expected=None)
 
 
