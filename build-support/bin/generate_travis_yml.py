@@ -416,7 +416,7 @@ def _bootstrap_commands(*, python_version: PythonVersion) -> List[str]:
         "--default-toolchain none"
     )
     # This will mutate the PATH to add `rustup` and `cargo`.
-    activate_rustup = 'source "${HOME}/.cargo/env"'
+    activate_rustup = 'source ${HOME}/.cargo/env'
     bootstrap_script = (
         "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version "
         f"{python_version.decimal} --aws-bucket ${{AWS_BUCKET}} --native-engine-so-key-prefix "
