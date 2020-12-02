@@ -415,16 +415,15 @@ def _bootstrap_commands(*, python_version: PythonVersion) -> List[str]:
         "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y "
         "--default-toolchain none"
     )
-    # We run this as a command, rather than using Travis's `env`, to ensure that the env var is set
-    # in the Linux Docker image.
-    export_cargo = 'export PATH="${HOME}/.cargo/bin:${PATH}"'
+    # This will mutate the PATH to add `rustup` and `cargo`.
+    activate_rustup = 'source "${HOME}/.cargo/env"'
     bootstrap_script = (
         "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version "
         f"{python_version.decimal} --aws-bucket ${{AWS_BUCKET}} --native-engine-so-key-prefix "
         "${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key "
         "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     )
-    return [rustup, export_cargo, bootstrap_script]
+    return [rustup, activate_rustup, bootstrap_script]
 
 
 def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List[str]:
