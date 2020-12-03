@@ -43,6 +43,10 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     ep_val = request.entry_point_field.value
     ep_alias = request.entry_point_field.alias
     address = request.entry_point_field.address
+
+    # TODO: factor up some of this code between python_awslambda and pex_binary once `sources` is
+    #  removed.
+
     # This code is tricky, as we support several different schemes:
     #  1) `<none>` or `<None>` => set to `None`.
     #  2) `path.to.module` => preserve exactly.
@@ -96,8 +100,7 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     if not path.endswith(".py"):
         return ResolvedPexEntryPoint(ep_val)
 
-    # We don't actually need to use the engine here, but we do this to validate that the file
-    # exists and that it resolves to only one file.
+    # Use the engine to validate that the file exists and that it resolves to only one file.
     full_glob = os.path.join(address.spec_path, path)
     entry_point_paths = await Get(
         Paths,

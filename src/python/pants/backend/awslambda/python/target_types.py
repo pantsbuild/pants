@@ -78,8 +78,7 @@ async def resolve_python_aws_handler(
     if not path.endswith(".py"):
         return ResolvedPythonAwsHandler(handler_val)
 
-    # We don't actually need to use the engine here, but we do this to validate that the file
-    # exists and that it resolves to only one file.
+    # Use the engine to validate that the file exists and that it resolves to only one file.
     full_glob = os.path.join(address.spec_path, path)
     handler_paths = await Get(
         Paths,
