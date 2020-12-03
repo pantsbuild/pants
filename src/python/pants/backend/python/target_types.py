@@ -118,10 +118,13 @@ class PexBinaryDependencies(Dependencies):
 class PexEntryPointField(StringField, AsyncFieldMixin):
     """The entry point for the binary, i.e. what gets run when executing `./my_binary.pex`.
 
-    If omitted, Pants will use the module name from the `sources` field, e.g. `project/app.py` will
-    become the entry point `project.app` .
+    You can specify a full module like 'path.to.module' and 'path.to.module:func', or use a
+    shorthand to specify a file name, using the same syntax as the `sources` field:
 
-    You can set `entry_point='<none>'` to leave off an entry point from the built PEX.
+        1) 'app.py', Pants will convert into the module `path.to.app`;
+        2) 'app.py:func', Pants will convert into `path.to.app:func`.
+
+    To leave off an entry point, set to '<none>'.
     """
 
     alias = "entry_point"

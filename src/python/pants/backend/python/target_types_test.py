@@ -85,10 +85,11 @@ def test_resolve_pex_binary_entry_point() -> None:
     )
 
     def assert_resolved(
-        *, entry_point: Optional[str], source: Optional[str], expected: Optional[str]
+        *, entry_point: Optional[str], source: Optional[str] = None, expected: Optional[str]
     ) -> None:
         addr = Address("src/python/project")
         rule_runner.create_file("src/python/project/app.py")
+        rule_runner.create_file("src/python/project/f2.py")
         ep_field = PexEntryPointField(entry_point, address=addr)
         sources = PexBinarySources([source] if source else None, address=addr)
         result = rule_runner.request(
@@ -96,20 +97,39 @@ def test_resolve_pex_binary_entry_point() -> None:
         )
         assert result.val == expected
 
+    # Full module provided.
+    assert_resolved(entry_point="custom.entry_point", expected="custom.entry_point")
+    assert_resolved(entry_point="custom.entry_point:func", expected="custom.entry_point:func")
+    assert_resolved(
+        entry_point="custom.entry_point", source="app.py", expected="custom.entry_point"
+    )
     assert_resolved(
         entry_point="custom.entry_point:func", source="app.py", expected="custom.entry_point:func"
     )
+
+    # File names are expanded into the full module path.
+    assert_resolved(entry_point="app.py", expected="project.app")
+    assert_resolved(entry_point="app.py:func", expected="project.app:func")
+    assert_resolved(entry_point="app.py", source="app.py", expected="project.app")
+    assert_resolved(entry_point="app.py:func", source="app.py", expected="project.app:func")
+
+    # We special case the strings `<none>` and `<None>`.
+    assert_resolved(entry_point="<none>", expected=None)
+    assert_resolved(entry_point="<None>", expected=None)
+    assert_resolved(entry_point="<none>", source="app.py", expected=None)
+    assert_resolved(entry_point="<None>", source="app.py", expected=None)
+
+    # No entry point, but `sources` given (soon to be deprecated).
     assert_resolved(entry_point=":func", source="app.py", expected="project.app:func")
     assert_resolved(entry_point=None, source="app.py", expected="project.app")
 
-    # We special case the strings `<none>` and `<None>`.
-    assert_resolved(entry_point="<none>", source=None, expected=None)
-    assert_resolved(entry_point="<none>", source="app.py", expected=None)
-    assert_resolved(entry_point="<None>", source=None, expected=None)
-    assert_resolved(entry_point="<None>", source="app.py", expected=None)
-
     with pytest.raises(ExecutionError):
-        assert_resolved(entry_point=":func", source=None, expected="doesnt matter")
+        assert_resolved(entry_point=":func", expected="doesnt matter")
+    with pytest.raises(ExecutionError):
+        assert_resolved(entry_point="doesnt_exist.py", expected="doesnt matter")
+    # Resolving >1 file is an error.
+    with pytest.raises(ExecutionError):
+        assert_resolved(entry_point="*.py", expected="doesnt matter")
 
 
 def test_inject_pex_binary_entry_point_dependency() -> None:
@@ -142,6 +162,8 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
             python_library(sources=['app.py'])
             pex_binary(name='first_party', entry_point='project.app')
             pex_binary(name='first_party_func', entry_point='project.app:func')
+            pex_binary(name='first_party_shorthand', entry_point='app.py:func')
+            pex_binary(name='first_party_shorthand_func', entry_point='app.py:func')
             pex_binary(name='third_party', entry_point='colors')
             pex_binary(name='third_party_func', entry_point='colors:func')
             pex_binary(name='unrecognized', entry_point='who_knows.module')
@@ -164,6 +186,14 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
     )
     assert_injected(
         Address("project", target_name="first_party_func"),
+        expected=Address("project", relative_file_path="app.py"),
+    )
+    assert_injected(
+        Address("project", target_name="first_party_shorthand"),
+        expected=Address("project", relative_file_path="app.py"),
+    )
+    assert_injected(
+        Address("project", target_name="first_party_shorthand_func"),
         expected=Address("project", relative_file_path="app.py"),
     )
     assert_injected(
