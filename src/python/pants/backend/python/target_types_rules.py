@@ -89,44 +89,41 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     if ep_val in ("<none>", "<None>"):
         return ResolvedPexEntryPoint(None)
 
-    # Split out the possible `:func` suffix so that we can determine if an explicit entry point was
-    # provided vs. a file name.
     path, _, func = ep_val.partition(":")
 
     # If it's already a module (cases #2 and #3), simply use that. Otherwise, convert the file name
     # into a module path (cases #4 and #5).
     if not path.endswith(".py"):
-        normalized_path = path
-    else:
-        # We don't actually need to use the engine here, but we do this to validate that the file
-        # exists and that it resolves to only one file.
-        full_glob = os.path.join(address.spec_path, path)
-        entry_point_paths = await Get(
-            Paths,
-            PathGlobs(
-                [full_glob],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"{address}'s `{request.entry_point_field.alias}` field",
-            ),
-        )
-        # We will have already raised if the glob did not match, i.e. if there were no files. But
-        # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
-        if len(entry_point_paths.files) != 1:
-            raise InvalidFieldException(
-                f"Multiple files matched for the `{ep_alias}` {repr(ep_val)} for the target "
-                f"{address}, but only one file expected. Are you using a glob, rather than a file "
-                f"name?\n\nAll matching files: {list(entry_point_paths.files)}."
-            )
-        entry_point_path = entry_point_paths.files[0]
-        source_root = await Get(
-            SourceRoot,
-            SourceRootRequest,
-            SourceRootRequest.for_file(entry_point_path),
-        )
-        stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
-        module_base, _ = os.path.splitext(stripped_source_path)
-        normalized_path = module_base.replace(os.path.sep, ".")
+        return ResolvedPexEntryPoint(ep_val)
 
+    # We don't actually need to use the engine here, but we do this to validate that the file
+    # exists and that it resolves to only one file.
+    full_glob = os.path.join(address.spec_path, path)
+    entry_point_paths = await Get(
+        Paths,
+        PathGlobs(
+            [full_glob],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"{address}'s `{request.entry_point_field.alias}` field",
+        ),
+    )
+    # We will have already raised if the glob did not match, i.e. if there were no files. But
+    # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
+    if len(entry_point_paths.files) != 1:
+        raise InvalidFieldException(
+            f"Multiple files matched for the `{ep_alias}` {repr(ep_val)} for the target "
+            f"{address}, but only one file expected. Are you using a glob, rather than a file "
+            f"name?\n\nAll matching files: {list(entry_point_paths.files)}."
+        )
+    entry_point_path = entry_point_paths.files[0]
+    source_root = await Get(
+        SourceRoot,
+        SourceRootRequest,
+        SourceRootRequest.for_file(entry_point_path),
+    )
+    stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
+    module_base, _ = os.path.splitext(stripped_source_path)
+    normalized_path = module_base.replace(os.path.sep, ".")
     return ResolvedPexEntryPoint(f"{normalized_path}:{func}" if func else normalized_path)
 
 
