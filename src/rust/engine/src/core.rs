@@ -11,7 +11,9 @@ use std::{fmt, hash};
 
 use crate::externs;
 
-use cpython::{FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, Python, ToPyObject};
+use cpython::{
+  FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, PyType, Python, ToPyObject,
+};
 use indexmap::{IndexMap, IndexSet};
 use smallvec::SmallVec;
 
@@ -114,15 +116,29 @@ impl fmt::Display for Params {
 
 pub type Id = u64;
 
-// The type of a python object (which itself has a type, but which is not represented
-// by a Key, because that would result in a infinitely recursive structure.)
-#[repr(C)]
+// A pointer to an underlying PyTypeObject instance.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TypeId(pub Id);
+pub struct TypeId(*mut std::ffi::c_void);
+
+unsafe impl Send for TypeId {}
+unsafe impl Sync for TypeId {}
 
 impl TypeId {
+  pub fn as_py_type(&self, py: Python) -> PyType {
+    // NB: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
+    // type is not unloaded. That is true today, but would not be if we implemented support for hot
+    // reloading of plugins.
+    unsafe { PyType::from_type_ptr(py, self.0 as _) }
+  }
+
   fn pretty_print(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", externs::type_to_str(self))
+  }
+}
+
+impl From<&PyType> for TypeId {
+  fn from(py_type: &PyType) -> Self {
+    TypeId(py_type.as_type_ptr() as *mut std::ffi::c_void)
   }
 }
 

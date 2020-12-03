@@ -39,24 +39,19 @@ pub fn none() -> PyObject {
 }
 
 pub fn get_type_for(val: &Value) -> TypeId {
-  with_interns_mut(|interns| {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let py_type = val.get_type(py);
-    interns.type_insert(py, py_type)
-  })
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  (&val.get_type(py)).into()
 }
 
 pub fn is_union(ty: TypeId) -> bool {
-  with_interns(|interns| {
-    with_externs(|py, e| {
-      let py_type = interns.type_get(&ty);
-      e.call_method(py, "is_union", (py_type,), None)
-        .unwrap()
-        .cast_as::<PyBool>(py)
-        .unwrap()
-        .is_true()
-    })
+  with_externs(|py, e| {
+    let py_type = (&ty).as_py_type(py);
+    e.call_method(py, "is_union", (py_type,), None)
+      .unwrap()
+      .cast_as::<PyBool>(py)
+      .unwrap()
+      .is_true()
   })
 }
 
@@ -78,18 +73,12 @@ pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
 }
 
 pub fn type_for_type_id(ty: TypeId) -> PyType {
-  with_interns(|interns| {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    interns.type_get(&ty).clone_ref(py)
-  })
+  let gil = Python::acquire_gil();
+  (&ty).as_py_type(gil.python())
 }
 
 pub fn type_for(py_type: PyType) -> TypeId {
-  with_interns_mut(|interns| {
-    let gil = Python::acquire_gil();
-    interns.type_insert(gil.python(), py_type)
-  })
+  (&py_type).into()
 }
 
 pub fn key_for(val: Value) -> Result<Key, PyErr> {
@@ -452,11 +441,11 @@ pub struct Get {
 impl Get {
   fn new(py: Python, interns: &mut Interns, get: &PyGeneratorResponseGet) -> Result<Get, Failure> {
     Ok(Get {
-      output: interns.type_insert(py, get.product(py).clone_ref(py)),
+      output: get.product(py).into(),
       input: interns
         .key_insert(py, get.subject(py).clone_ref(py).into())
         .map_err(|e| Failure::from_py_err_with_gil(py, e))?,
-      input_type: interns.type_insert(py, get.declared_subject(py).clone_ref(py)),
+      input_type: get.declared_subject(py).into(),
     })
   }
 }

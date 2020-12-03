@@ -4,9 +4,9 @@
 use std::collections::HashMap;
 use std::hash;
 
-use cpython::{ObjectProtocol, PyClone, PyErr, PyType, Python, PythonObject, ToPyObject};
+use cpython::{ObjectProtocol, PyErr, PyType, Python, ToPyObject};
 
-use crate::core::{Key, TypeId, Value, FNV};
+use crate::core::{Key, Value, FNV};
 use crate::externs;
 
 ///
@@ -37,8 +37,6 @@ use crate::externs;
 pub struct Interns {
   forward_keys: HashMap<InternKey, Key, FNV>,
   reverse_keys: HashMap<Key, Value, FNV>,
-  forward_types: HashMap<InternType, TypeId, FNV>,
-  reverse_types: HashMap<TypeId, PyType, FNV>,
   id_generator: u64,
 }
 
@@ -55,7 +53,7 @@ impl Interns {
     } else {
       let id = self.id_generator;
       self.id_generator += 1;
-      let key = Key::new(id, self.type_insert(py, v.get_type(py)));
+      let key = Key::new(id, (&v.get_type(py)).into());
       self.forward_keys.insert(intern_key, key);
       self.reverse_keys.insert(key, v);
       key
@@ -66,28 +64,6 @@ impl Interns {
   pub fn key_get(&self, k: &Key) -> &Value {
     self
       .reverse_keys
-      .get(&k)
-      .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
-  }
-
-  pub fn type_insert(&mut self, py: Python, v: PyType) -> TypeId {
-    let intern_type = InternType(v.as_object().hash(py).unwrap(), v.clone_ref(py));
-
-    if let Some(type_id) = self.forward_types.get(&intern_type) {
-      *type_id
-    } else {
-      let id = self.id_generator;
-      self.id_generator += 1;
-      let type_id = TypeId(id);
-      self.forward_types.insert(intern_type, type_id);
-      self.reverse_types.insert(type_id, v);
-      type_id
-    }
-  }
-
-  pub fn type_get(&self, k: &TypeId) -> &PyType {
-    self
-      .reverse_types
       .get(&k)
       .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
   }
