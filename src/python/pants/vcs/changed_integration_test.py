@@ -173,31 +173,41 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
     hermetic = False
 
     TEST_MAPPING = {
-        # A `pex_binary` with `sources=['file.name']`.
+        # A `pex_binary` with `entry_point='file.name'` (secondary ownership), and a
+        # `python_library` with primary ownership of the file.
         "src/python/python_targets/test_binary.py": dict(
-            none=["src/python/python_targets/test_binary.py:test"],
+            none=[
+                "src/python/python_targets/test_binary.py:binary_file",
+                "src/python/python_targets:test_binary",
+            ],
             direct=[
-                "src/python/python_targets/test_binary.py:test",
-                "src/python/python_targets:test",
+                "src/python/python_targets/test_binary.py:binary_file",
+                "src/python/python_targets:test_binary",
+                "src/python/python_targets:binary_file",
             ],
             transitive=[
-                "src/python/python_targets/test_binary.py:test",
-                "src/python/python_targets:test",
+                "src/python/python_targets/test_binary.py:binary_file",
+                "src/python/python_targets:test_binary",
+                "src/python/python_targets:binary_file",
             ],
         ),
         # A `python_library` with `sources=['file.name']`.
         "src/python/python_targets/test_library.py": dict(
             none=["src/python/python_targets/test_library.py:test_library"],
             direct=[
-                "src/python/python_targets/test_binary.py:test",
+                "src/python/python_targets/test_binary.py:binary_file",
                 "src/python/python_targets/test_library.py:test_library",
-                "src/python/python_targets:test",
+                "src/python/python_targets:binary_file",
                 "src/python/python_targets:test_library",
+                # NB: 'src/python/python_targets:test_binary' does not show up here because it is
+                # not a direct dependee of `test_library.py:test_library`; instead, it depends on
+                # `test_binary.py:binary_file`, which is itself a direct dependee.
             ],
             transitive=[
-                "src/python/python_targets/test_binary.py:test",
+                "src/python/python_targets/test_binary.py:binary_file",
                 "src/python/python_targets/test_library.py:test_library",
-                "src/python/python_targets:test",
+                "src/python/python_targets:binary_file",
+                "src/python/python_targets:test_binary",
                 "src/python/python_targets:test_library",
                 "src/python/python_targets:test_library_direct_dependee",
                 "src/python/python_targets:test_library_transitive_dependee",

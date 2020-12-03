@@ -53,6 +53,7 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     RegisteredTargetTypes,
+    SecondaryOwnerMixin,
     Sources,
     SourcesPaths,
     SourcesPathsRequest,
@@ -386,6 +387,18 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             matching_files = set(
                 matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
             )
+            # Also consider secondary ownership, meaning it's not a `Sources` field with primary
+            # ownership, but the target still should match the file. We can't use `tgt.get()`
+            # because this is a mixin, and there technically may be >1 field.
+            secondary_owner_fields = tuple(
+                field  # type: ignore[misc]
+                for field in candidate_tgt.field_values.values()
+                if isinstance(field, SecondaryOwnerMixin)
+            )
+            for secondary_owner_field in secondary_owner_fields:
+                matching_files.update(
+                    matches_filespec(secondary_owner_field.filespec, paths=sources_set)
+                )
             if not matching_files and bfa.rel_path not in sources_set:
                 continue
 

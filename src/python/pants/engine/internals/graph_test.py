@@ -2,10 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Set, Tuple, Type
+from typing import Iterable, List, Set, Tuple, Type, cast
 
 import pytest
 
@@ -40,6 +41,7 @@ from pants.engine.internals.graph import (
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
+    AsyncFieldMixin,
     Dependencies,
     DependenciesRequest,
     DependenciesRequestLite,
@@ -52,10 +54,12 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    SecondaryOwnerMixin,
     Sources,
     SourcesPaths,
     SourcesPathsRequest,
     SpecialCasedDependencies,
+    StringField,
     Tags,
     Target,
     TargetRootsToFieldSets,
@@ -66,6 +70,7 @@ from pants.engine.target import (
     TransitiveTargetsRequestLite,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.source.filespec import Filespec
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -462,9 +467,26 @@ def test_resolve_specs_snapshot() -> None:
     assert result.snapshot.files == ("demo/BUILD", "demo/f1.txt", "demo/f2.txt")
 
 
+class MockSecondaryOwnerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
+    alias = "secondary_owner_field"
+    required = True
+
+    @property
+    def filespec(self) -> Filespec:
+        return {"includes": [os.path.join(self.address.spec_path, cast(str, self.value))]}
+
+
+class MockSecondaryOwnerTarget(Target):
+    alias = "secondary_owner"
+    core_fields = (MockSecondaryOwnerField,)
+
+
 @pytest.fixture
 def owners_rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[QueryRule(Owners, (OwnersRequest,))], target_types=[MockTarget])
+    return RuleRunner(
+        rules=[QueryRule(Owners, (OwnersRequest,))],
+        target_types=[MockTarget, MockSecondaryOwnerTarget],
+    )
 
 
 def assert_owners(
@@ -478,34 +500,41 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
     """Test when a source file belongs to a target, even though the file does not actually exist.
 
     This happens, for example, when the file is deleted and we're computing `--changed-since`. In
-    this case, we should not attempt to generate a subtarget and should use the original target.
+    this case, we should use the BUILD target as we can't use a more precise file target.
     """
     owners_rule_runner.create_file("demo/f.txt")
-    owners_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
-    assert_owners(
-        owners_rule_runner, ["demo/deleted.txt"], expected={Address("demo", target_name="demo")}
+    owners_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])\n")
+    owners_rule_runner.add_to_build_file(
+        "demo", "secondary_owner(name='secondary', secondary_owner_field='deleted.txt')"
     )
 
-    # For files that do exist, we should still use a generated subtarget, though.
+    assert_owners(
+        owners_rule_runner,
+        ["demo/deleted.txt"],
+        expected={Address("demo", target_name="demo"), Address("demo", target_name="secondary")},
+    )
+
+    # For files that do exist, we should still use a file target, though.
     assert_owners(
         owners_rule_runner,
         ["demo/f.txt"],
         expected={Address("demo", relative_file_path="f.txt", target_name="demo")},
     )
 
-    # If a sibling file uses the original target, then both should be used.
+    # If a sibling file uses the BUILD target, then both should be used.
     assert_owners(
         owners_rule_runner,
         ["demo/f.txt", "demo/deleted.txt"],
         expected={
             Address("demo", relative_file_path="f.txt", target_name="demo"),
             Address("demo"),
+            Address("demo", target_name="secondary"),
         },
     )
 
 
 def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
-    """Even if there are multiple owners of the same file, we still use generated subtargets."""
+    """Even if there are multiple owners of the same file, we still use file targets."""
     owners_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
     owners_rule_runner.add_to_build_file(
         "demo",
@@ -513,13 +542,19 @@ def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
             """\
             target(name='all', sources=['*.txt'])
             target(name='f2', sources=['f2.txt'])
+            secondary_owner(name='secondary', secondary_owner_field='f1.txt')
             """
         ),
     )
     assert_owners(
         owners_rule_runner,
         ["demo/f1.txt"],
-        expected={Address("demo", relative_file_path="f1.txt", target_name="all")},
+        expected={
+            Address("demo", relative_file_path="f1.txt", target_name="all"),
+            # This target matches through "secondary ownership", rather than through a `sources`
+            # field, so it uses a BUILD target instead of file target.
+            Address("demo", target_name="secondary"),
+        },
     )
     assert_owners(
         owners_rule_runner,
@@ -541,6 +576,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
             target(name='f1', sources=['f1.txt'])
             target(name='f2_first', sources=['f2.txt'])
             target(name='f2_second', sources=['f2.txt'])
+            secondary_owner(name='secondary', secondary_owner_field='f1.txt')
             """
         ),
     )
@@ -551,6 +587,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
             Address("demo", relative_file_path="f1.txt", target_name="f1"),
             Address("demo", relative_file_path="f2.txt", target_name="f2_first"),
             Address("demo", relative_file_path="f2.txt", target_name="f2_second"),
+            Address("demo", target_name="secondary"),
         },
     )
 
