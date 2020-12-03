@@ -10,13 +10,29 @@ from pants.backend.awslambda.python.target_types import (
     InjectPythonLambdaHandlerDependency,
     PythonAWSLambda,
     PythonAwsLambdaDependencies,
+    PythonAwsLambdaHandlerField,
     PythonAwsLambdaRuntime,
+    ResolvedPythonAwsHandler,
+    ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.awslambda.python.target_types import rules as target_type_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.address import Address
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import InjectedDependencies, InvalidFieldException
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *target_type_rules(),
+            QueryRule(ResolvedPythonAwsHandler, [ResolvePythonAwsHandlerRequest]),
+            QueryRule(InjectedDependencies, [InjectPythonLambdaHandlerDependency]),
+        ],
+        target_types=[PythonAWSLambda, PythonRequirementLibrary, PythonLibrary],
+    )
 
 
 @pytest.mark.parametrize(
@@ -32,26 +48,44 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 )
 def test_to_interpreter_version(runtime, expected_major, expected_minor):
     assert (expected_major, expected_minor) == PythonAwsLambdaRuntime(
-        raw_value=runtime, address=Address("foo/bar", target_name="baz")
+        runtime, address=Address("", target_name="t")
     ).to_interpreter_version()
 
 
 @pytest.mark.parametrize(["invalid_runtime"], (["python88.99"], ["fooobar"]))
 def test_runtime_validation(invalid_runtime):
     with pytest.raises(InvalidFieldException):
-        PythonAwsLambdaRuntime(
-            raw_value=invalid_runtime, address=Address("foo/bar", target_name="baz")
+        PythonAwsLambdaRuntime(invalid_runtime, address=Address("", target_name="t"))
+
+
+@pytest.mark.parametrize(["invalid_handler"], (["path.to.lambda"], ["lambda.py"]))
+def test_handler_validation(invalid_handler):
+    with pytest.raises(InvalidFieldException):
+        PythonAwsLambdaHandlerField(invalid_handler, address=Address("", target_name="t"))
+
+
+def test_resolve_handler(rule_runner: RuleRunner) -> None:
+    def assert_resolved(handler: str, *, expected: str) -> None:
+        addr = Address("src/python/project")
+        rule_runner.create_file("src/python/project/lambda.py")
+        rule_runner.create_file("src/python/project/f2.py")
+        field = PythonAwsLambdaHandlerField(handler, address=addr)
+        result = rule_runner.request(
+            ResolvedPythonAwsHandler, [ResolvePythonAwsHandlerRequest(field)]
         )
+        assert result.val == expected
+
+    assert_resolved("path.to.lambda:func", expected="path.to.lambda:func")
+    assert_resolved("lambda.py:func", expected="project.lambda:func")
+
+    with pytest.raises(ExecutionError):
+        assert_resolved("doesnt_exist.py:func", expected="doesnt matter")
+    # Resolving >1 file is an error.
+    with pytest.raises(ExecutionError):
+        assert_resolved("*.py:func", expected="doesnt matter")
 
 
-def test_inject_handler_dependency() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            *target_type_rules(),
-            QueryRule(InjectedDependencies, [InjectPythonLambdaHandlerDependency]),
-        ],
-        target_types=[PythonAWSLambda, PythonRequirementLibrary, PythonLibrary],
-    )
+def test_inject_handler_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file(
         "",
         dedent(
@@ -71,6 +105,7 @@ def test_inject_handler_dependency() -> None:
             """\
             python_library(sources=['app.py'])
             python_awslambda(name='first_party', handler='project.app:func', runtime='python3.7')
+            python_awslambda(name='first_party_shorthand', handler='app.py:func', runtime='python3.7')
             python_awslambda(name='third_party', handler='colors:func', runtime='python3.7')
             python_awslambda(name='unrecognized', handler='who_knows.module:func', runtime='python3.7')
             python_awslambda(
@@ -90,6 +125,10 @@ def test_inject_handler_dependency() -> None:
 
     assert_injected(
         Address("project", target_name="first_party"),
+        expected=Address("project", relative_file_path="app.py"),
+    )
+    assert_injected(
+        Address("project", target_name="first_party_shorthand"),
         expected=Address("project", relative_file_path="app.py"),
     )
     assert_injected(

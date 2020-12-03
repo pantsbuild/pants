@@ -21,7 +21,7 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
 )
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.engine.fs import PathGlobs, Paths
+from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     InjectDependenciesRequest,
@@ -38,36 +38,87 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 # -----------------------------------------------------------------------------------------------
 
 
-@rule
+@rule(desc="Determining the entry point for a `pex_binary` target")
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
-    entry_point_value = request.entry_point_field.value
-    if entry_point_value and not entry_point_value.startswith(":"):
-        if entry_point_value in ("<none>", "<None>"):
-            return ResolvedPexEntryPoint(None)
-        return ResolvedPexEntryPoint(entry_point_value)
-    binary_source_paths = await Get(
-        Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
-    )
-    if len(binary_source_paths.files) != 1:
-        instructions_url = "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
-        if not entry_point_value:
+    ep_val = request.entry_point_field.value
+    ep_alias = request.entry_point_field.alias
+    address = request.entry_point_field.address
+
+    # TODO: factor up some of this code between python_awslambda and pex_binary once `sources` is
+    #  removed.
+
+    # This code is tricky, as we support several different schemes:
+    #  1) `<none>` or `<None>` => set to `None`.
+    #  2) `path.to.module` => preserve exactly.
+    #  3) `path.to.module:func` => preserve exactly.
+    #  4) `app.py` => convert into `path.to.app`.
+    #  5) `app.py:func` => convert into `path.to.app:func`.
+    #  6) `:func` => if there's a sources field, convert to `path.to.sources:func` (soon to be deprecated).
+    #  7) no entry point field, but `sources` field => convert to `path.to.sources` (soon to be deprecated).
+
+    # Handle deprecated cases #6 and #7, which are the only cases where the `sources` field matters
+    # for calculating the entry point.
+    if not ep_val or ep_val.startswith(":"):
+        binary_source_paths = await Get(
+            Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
+        )
+        if len(binary_source_paths.files) != 1:
+            instructions_url = "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
+            if not ep_val:
+                raise InvalidFieldException(
+                    f"The `{ep_alias}` field is not set for the target {address}. Run "
+                    f"`./pants help pex_binary` for more information on how to set the field or "
+                    f"see {instructions_url}."
+                )
             raise InvalidFieldException(
-                "Both the `entry_point` and `sources` fields are not set for the target "
-                f"{request.sources.address}, so Pants cannot determine an entry point. Please "
-                "either explicitly set the `entry_point` field and/or the `sources` field to "
-                "exactly one file. You can set `entry_point='<none>' to leave off the entry point."
-                f"See {instructions_url}."
-            )
-        else:
-            raise InvalidFieldException(
-                f"The `entry_point` field for the target {request.sources.address} is set to "
-                f"the short-hand value {repr(entry_point_value)}, but the `sources` field is not "
-                "set. Pants requires the `sources` field to expand the entry point to the "
-                f"normalized form `path.to.module:{entry_point_value}`. Please either set the "
-                "`sources` field to exactly one file or use a full value for `entry_point`. See "
+                f"The `{ep_alias}` field for the target {address} is set to the short-hand value "
+                f"{repr(ep_val)}, but the `sources` field is not set. Pants requires the "
+                "`sources` field to expand the entry point to the normalized form "
+                f"`path.to.module:{ep_val}`. Please either set the `sources` field to exactly one "
+                f"file or set `{ep_alias}='my_file.py:{ep_val}'`. See "
                 f"{instructions_url}."
             )
-    entry_point_path = binary_source_paths.files[0]
+        entry_point_path = binary_source_paths.files[0]
+        source_root = await Get(
+            SourceRoot,
+            SourceRootRequest,
+            SourceRootRequest.for_file(entry_point_path),
+        )
+        stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
+        module_base, _ = os.path.splitext(stripped_source_path)
+        normalized_path = module_base.replace(os.path.sep, ".")
+        return ResolvedPexEntryPoint(f"{normalized_path}{ep_val}" if ep_val else normalized_path)
+
+    # Case #1.
+    if ep_val in ("<none>", "<None>"):
+        return ResolvedPexEntryPoint(None)
+
+    path, _, func = ep_val.partition(":")
+
+    # If it's already a module (cases #2 and #3), simply use that. Otherwise, convert the file name
+    # into a module path (cases #4 and #5).
+    if not path.endswith(".py"):
+        return ResolvedPexEntryPoint(ep_val)
+
+    # Use the engine to validate that the file exists and that it resolves to only one file.
+    full_glob = os.path.join(address.spec_path, path)
+    entry_point_paths = await Get(
+        Paths,
+        PathGlobs(
+            [full_glob],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"{address}'s `{request.entry_point_field.alias}` field",
+        ),
+    )
+    # We will have already raised if the glob did not match, i.e. if there were no files. But
+    # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
+    if len(entry_point_paths.files) != 1:
+        raise InvalidFieldException(
+            f"Multiple files matched for the `{ep_alias}` {repr(ep_val)} for the target "
+            f"{address}, but only one file expected. Are you using a glob, rather than a file "
+            f"name?\n\nAll matching files: {list(entry_point_paths.files)}."
+        )
+    entry_point_path = entry_point_paths.files[0]
     source_root = await Get(
         SourceRoot,
         SourceRootRequest,
@@ -76,9 +127,7 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
     module_base, _ = os.path.splitext(stripped_source_path)
     normalized_path = module_base.replace(os.path.sep, ".")
-    return ResolvedPexEntryPoint(
-        f"{normalized_path}{entry_point_value}" if entry_point_value else normalized_path
-    )
+    return ResolvedPexEntryPoint(f"{normalized_path}:{func}" if func else normalized_path)
 
 
 class InjectPexBinaryEntryPointDependency(InjectDependenciesRequest):
