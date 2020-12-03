@@ -14,7 +14,16 @@ backend_packages.add = [
   "pants.backend.python.typecheck.mypy",
   "pants.backend.python.mixed_interpreter_constraints",
   "internal_plugins.releases",
+  "toolchain.pants.auth",
+  "toolchain.pants.buildsense",
+  "toolchain.pants.common",
 ]
+
+plugins = [
+  "toolchain.pants.buildsense.plugin==0.1.0",
+]
+
+streaming_workunits_report_interval = 1
 
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
 
@@ -134,3 +143,9 @@ interpreter_constraints = [">=3.7,<3.9"]
 
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
+
+[run-tracker]
+stats_option_scopes_to_record = ["*"]
+
+[toolchain-setup]
+repo = "pants"
