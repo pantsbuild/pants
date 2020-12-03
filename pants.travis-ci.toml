@@ -8,6 +8,8 @@ dynamic_ui = false
 # now in order to smooth off rough edges locally.
 pantsd = false
 
+streaming_workunits_handlers = ["toolchain.pants.buildsense.reporter.Reporter"]
+
 [test]
 use_coverage = true
 
