@@ -116,7 +116,11 @@ impl fmt::Display for Params {
 
 pub type Id = u64;
 
-// A pointer to an underlying PyTypeObject instance.
+///
+/// A pointer to an underlying PyTypeObject instance.
+///
+/// NB: This is a void pointer because the `cpython::ffi::PyTypeObject` is not public.
+///
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(*mut std::ffi::c_void);
 
