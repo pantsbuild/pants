@@ -71,7 +71,7 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
             python_awslambda(
                 name='lambda',
                 dependencies=[':lib'],
-                handler='foo.bar.hello_world',
+                handler='foo.bar.hello_world:handler',
                 runtime='python3.7',
             )
             """
