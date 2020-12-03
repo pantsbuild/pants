@@ -905,6 +905,8 @@ class NoApplicableTargetsException(Exception):
     def __init__(
         self,
         targets: Iterable[Target],
+        specs: Specs,
+        union_membership: UnionMembership,
         *,
         applicable_target_types: Iterable[Type[Target]],
         goal_description: str,
@@ -914,32 +916,71 @@ class NoApplicableTargetsException(Exception):
         )
         inapplicable_target_aliases = sorted({tgt.alias for tgt in targets})
         bulleted_list_sep = "\n  * "
+
         msg = (
-            f"{goal_description.capitalize()} only works with these target types:\n"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(applicable_target_aliases)}\n\n"
+            "No applicable files or targets matched."
+            if inapplicable_target_aliases
+            else "No files or targets specified."
         )
+        msg += (
+            f" {goal_description.capitalize()} works "
+            f"with these target types:\n{bulleted_list_sep}"
+            f"{bulleted_list_sep.join(applicable_target_aliases)}\n\n"
+        )
+
+        # Explain what was specified, if relevant.
         if inapplicable_target_aliases:
+            if bool(specs.filesystem_specs) and bool(specs.address_specs):
+                specs_description = " files and targets with "
+            elif bool(specs.filesystem_specs):
+                specs_description = " files with "
+            elif bool(specs.address_specs):
+                specs_description = " targets with "
+            else:
+                specs_description = " "
             msg += (
-                "However, you only specified files/targets with these target types:\n"
-                f"{bulleted_list_sep}{bulleted_list_sep.join(inapplicable_target_aliases)}"
+                f"However, you only specified{specs_description}these target types:\n"
+                f"{bulleted_list_sep}{bulleted_list_sep.join(inapplicable_target_aliases)}\n\n"
+            )
+
+        # Add a remedy.
+        #
+        # We sometimes suggest using `./pants filedeps` to find applicable files. However, this
+        # command only works if at least one of the targets has a Sources field.
+        #
+        # NB: Even with the "secondary owners" mechanism - used by target types like `pex_binary`
+        # and `python_awslambda` to still work with file args - those targets will not show the
+        # associated files when using filedeps.
+        filedeps_goal_works = any(
+            tgt.class_has_field(Sources, union_membership) for tgt in applicable_target_types
+        )
+        pants_filter_command = (
+            f"./pants filter --target-type={','.join(applicable_target_aliases)} ::"
+        )
+        remedy = (
+            f"Please specify relevant files and/or targets. Run `{pants_filter_command}` to "
+            "find all applicable targets in your project"
+        )
+        if filedeps_goal_works:
+            remedy += (
+                f", or run `{pants_filter_command} | xargs ./pants filedeps` to find all "
+                "applicable files."
             )
         else:
-            msg += "However, you did not specify any files/targets."
-        msg += (
-            f"\n\nRun `./pants filter --target-type={','.join(applicable_target_aliases)} ::` to "
-            "find all applicable targets in your project."
-        )
+            remedy += "."
+        msg += remedy
         super().__init__(msg)
 
     @classmethod
     def create_from_field_sets(
         cls,
         targets: Iterable[Target],
+        specs: Specs,
+        union_membership: UnionMembership,
+        registered_target_types: RegisteredTargetTypes,
         *,
         field_set_types: Iterable[Type[_AbstractFieldSet]],
         goal_description: str,
-        union_membership: UnionMembership,
-        registered_target_types: RegisteredTargetTypes,
     ) -> "NoApplicableTargetsException":
         applicable_target_types = {
             target_type
@@ -950,6 +991,8 @@ class NoApplicableTargetsException(Exception):
         }
         return cls(
             targets,
+            specs,
+            union_membership,
             applicable_target_types=applicable_target_types,
             goal_description=goal_description,
         )
@@ -991,10 +1034,13 @@ class AmbiguousImplementationsException(Exception):
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
-    targets: Targets,
+    specs: Specs,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> TargetRootsToFieldSets:
+    # NB: This must be in an `await Get`, rather than the rule signature, to avoid a rule graph
+    # issue.
+    targets = await Get(Targets, Specs, specs)
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
     )
@@ -1007,15 +1053,16 @@ async def find_valid_field_sets_for_target_roots(
     if not targets_to_applicable_field_sets:
         no_applicable_exception = NoApplicableTargetsException.create_from_field_sets(
             targets,
+            specs,
+            union_membership,
+            registered_target_types,
             field_set_types=union_membership.union_rules[request.field_set_superclass],
             goal_description=request.goal_description,
-            union_membership=union_membership,
-            registered_target_types=registered_target_types,
         )
         if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
             raise no_applicable_exception
         if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn:
-            logger.warning(f"No applicable targets matched. {no_applicable_exception}")
+            logger.warning(str(no_applicable_exception))
 
     result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
     if not request.expect_single_field_set:
