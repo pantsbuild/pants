@@ -370,6 +370,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     matching_addresses: OrderedSet[Address] = OrderedSet()
     unmatched_sources = set(owners_request.sources)
     for live in (True, False):
+        candidate_tgts: Sequence[Target]
         if live:
             candidate_tgts = live_candidate_tgts
             sources_set = live_files
