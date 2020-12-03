@@ -23,7 +23,7 @@ pystache==0.5.4
 pytest>=6.0.1,<6.1
 PyYAML>=5.3.1,<5.4
 requests[security]>=2.20.1
-setproctitle==1.1.10
+setproctitle==1.2
 setuptools>=50.3.0,<50.4
 toml==0.10.2
 typing-extensions==3.7.4.2

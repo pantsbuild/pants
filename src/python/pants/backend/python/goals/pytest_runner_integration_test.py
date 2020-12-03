@@ -9,6 +9,7 @@ from typing import List, Mapping, Optional
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_coverage_config
@@ -18,7 +19,6 @@ from pants.backend.python.target_types import (
     PythonLibrary,
     PythonRequirementLibrary,
     PythonTests,
-    resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
@@ -41,7 +41,7 @@ def rule_runner() -> RuleRunner:
             *distdir.rules(),
             *package_pex_binary.rules(),
             get_filtered_environment,
-            resolve_pex_entry_point,
+            *target_types_rules.rules(),
             QueryRule(TestResult, (PythonTestFieldSet,)),
             QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
         ],

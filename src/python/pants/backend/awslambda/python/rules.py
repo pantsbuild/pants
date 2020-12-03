@@ -5,8 +5,10 @@ from dataclasses import dataclass
 
 from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.awslambda.python.target_types import (
-    PythonAwsLambdaHandler,
+    PythonAwsLambdaHandlerField,
     PythonAwsLambdaRuntime,
+    ResolvedPythonAwsHandler,
+    ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
@@ -32,28 +34,26 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
 class PythonAwsLambdaFieldSet(PackageFieldSet):
-    required_fields = (PythonAwsLambdaHandler, PythonAwsLambdaRuntime)
+    required_fields = (PythonAwsLambdaHandlerField, PythonAwsLambdaRuntime)
 
-    handler: PythonAwsLambdaHandler
+    handler: PythonAwsLambdaHandlerField
     runtime: PythonAwsLambdaRuntime
     output_path: OutputPathField
 
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
 async def package_python_awslambda(
-    field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex, global_options: GlobalOptions
+    field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex
 ) -> BuiltPackage:
     output_filename = field_set.output_path.value_or_default(
         field_set.address,
         # Lambdas typically use the .zip suffix, so we use that instead of .pex.
         file_ending="zip",
-        use_legacy_format=global_options.options.pants_distdir_legacy_paths,
     )
 
     # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.
@@ -91,9 +91,10 @@ async def package_python_awslambda(
         entry_point=lambdex.entry_point,
     )
 
-    lambdex_pex, pex_result = await MultiGet(
+    lambdex_pex, pex_result, handler = await MultiGet(
         Get(Pex, PexRequest, lambdex_request),
         Get(TwoStepPex, TwoStepPexFromTargetsRequest, pex_request),
+        Get(ResolvedPythonAwsHandler, ResolvePythonAwsHandlerRequest(field_set.handler)),
     )
     input_digest = await Get(Digest, MergeDigests((pex_result.pex.digest, lambdex_pex.digest)))
 
@@ -102,7 +103,7 @@ async def package_python_awslambda(
         ProcessResult,
         PexProcess(
             lambdex_pex,
-            argv=("build", "-e", field_set.handler.value, output_filename),
+            argv=("build", "-e", handler.val, output_filename),
             input_digest=input_digest,
             output_files=(output_filename,),
             description=f"Setting up handler in {output_filename}",

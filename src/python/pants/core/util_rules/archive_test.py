@@ -107,7 +107,6 @@ def test_create_tar_archive(rule_runner: RuleRunner, format: ArchiveFormat) -> N
     io.seek(0)
     compression = "" if format == ArchiveFormat.TAR else f"{format.value[4:]}"  # Strip `tar.`.
     with tarfile.open(fileobj=io, mode=f"r:{compression}") as tf:
-        print(tf.getmembers())
         assert set(tf.getnames()) == set(FILES.keys())
 
     # We also use Pants to extract the created archive, which checks for idempotency.

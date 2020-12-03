@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections.abc
-import logging
-import os.path
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Iterable, Optional, Tuple, Union, cast
@@ -12,19 +10,15 @@ from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     BoolField,
     Dependencies,
     DictStringToStringSequenceField,
     Field,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     IntField,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -33,18 +27,11 @@ from pants.engine.target import (
     Sources,
     SpecialCasedDependencies,
     StringField,
-    StringOrStringSequenceField,
     StringSequenceField,
     Target,
-    WrappedTarget,
 )
-from pants.engine.unions import UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
-from pants.source.source_root import SourceRoot, SourceRootRequest
-
-logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
@@ -123,22 +110,27 @@ class PexBinarySources(PythonSources):
     expected_num_files = range(0, 2)
 
 
+# See `target_types_rules.py` for a dependency injection rule.
 class PexBinaryDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PexEntryPointField(StringField):
-    """The entry point for the binary.
+class PexEntryPointField(StringField, AsyncFieldMixin):
+    """The entry point for the binary, i.e. what gets run when executing `./my_binary.pex`.
 
-    If omitted, Pants will use the module name from the `sources` field, e.g. `project/app.py` will
-    become the entry point `project.app` .
+    You can specify a full module like 'path.to.module' and 'path.to.module:func', or use a
+    shorthand to specify a file name, using the same syntax as the `sources` field:
 
-    You can set `entry_point='<none>'` to leave off an entry point from the built PEX.
+        1) 'app.py', Pants will convert into the module `path.to.app`;
+        2) 'app.py:func', Pants will convert into `path.to.app:func`.
+
+    To leave off an entry point, set to '<none>'.
     """
 
     alias = "entry_point"
 
 
+# See `target_types_rules.py` for the `ResolvePexEntryPointRequest -> ResolvedPexEntryPoint` rule.
 @dataclass(frozen=True)
 class ResolvedPexEntryPoint:
     val: Optional[str]
@@ -146,66 +138,13 @@ class ResolvedPexEntryPoint:
 
 @dataclass(frozen=True)
 class ResolvePexEntryPointRequest:
-    """Determine the entry_point by looking at both `PexEntryPointField` and and the sources field.
-
-    In order of precedence, this can be calculated by:
-
-    1. The `entry_point` field having a well-formed value.
-    2. The `entry_point` using a shorthand `:my_func`, and the `sources` field being set. We
-        combine these into `path.to.module:my_func`.
-    3. The `entry_point` being left off, but `sources` defined. We will use `path.to.module`.
-
-    Users can set `entry_point='<none>'` to leave off the entry point.
-    """
+    """Determine the `entry_point` for a `pex_binary` after applying all syntactic sugar."""
 
     entry_point_field: PexEntryPointField
     sources: PexBinarySources
 
 
-@rule
-async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
-    entry_point_value = request.entry_point_field.value
-    if entry_point_value and not entry_point_value.startswith(":"):
-        if entry_point_value in ("<none>", "<None>"):
-            return ResolvedPexEntryPoint(None)
-        return ResolvedPexEntryPoint(entry_point_value)
-    binary_source_paths = await Get(
-        Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
-    )
-    if len(binary_source_paths.files) != 1:
-        instructions_url = "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
-        if not entry_point_value:
-            raise InvalidFieldException(
-                "Both the `entry_point` and `sources` fields are not set for the target "
-                f"{request.sources.address}, so Pants cannot determine an entry point. Please "
-                "either explicitly set the `entry_point` field and/or the `sources` field to "
-                "exactly one file. You can set `entry_point='<none>' to leave off the entry point."
-                f"See {instructions_url}."
-            )
-        else:
-            raise InvalidFieldException(
-                f"The `entry_point` field for the target {request.sources.address} is set to "
-                f"the short-hand value {repr(entry_point_value)}, but the `sources` field is not "
-                "set. Pants requires the `sources` field to expand the entry point to the "
-                f"normalized form `path.to.module:{entry_point_value}`. Please either set the "
-                "`sources` field to exactly one file or use a full value for `entry_point`. See "
-                f"{instructions_url}."
-            )
-    entry_point_path = binary_source_paths.files[0]
-    source_root = await Get(
-        SourceRoot,
-        SourceRootRequest,
-        SourceRootRequest.for_file(entry_point_path),
-    )
-    stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
-    module_base, _ = os.path.splitext(stripped_source_path)
-    normalized_path = module_base.replace(os.path.sep, ".")
-    return ResolvedPexEntryPoint(
-        f"{normalized_path}{entry_point_value}" if entry_point_value else normalized_path
-    )
-
-
-class PexPlatformsField(StringOrStringSequenceField):
+class PexPlatformsField(StringSequenceField):
     """The platforms the built PEX should be compatible with.
 
     This defaults to the current platform, but can be overridden to different platforms. You can
@@ -220,21 +159,6 @@ class PexPlatformsField(StringOrStringSequenceField):
     """
 
     alias = "platforms"
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[str, ...]]:
-        if isinstance(raw_value, str) and not address.is_file_target:
-            warn_or_error(
-                deprecated_entity_description=f"Using a bare string for the `{cls.alias}` field",
-                removal_version="2.2.0.dev1",
-                hint=(
-                    f"Using a bare string for the `{cls.alias}` field for {address}. Please "
-                    f"instead use a list of strings, i.e. use `[{raw_value}]`."
-                ),
-            )
-        return super().compute_value(raw_value, address=address)
 
 
 class PexInheritPathField(StringField):
@@ -585,6 +509,7 @@ class PythonRequirementsFile(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+# See `target_types_rules.py` for a dependency injection rule.
 class PythonDistributionDependencies(Dependencies):
     supports_transitive_excludes = True
 
@@ -633,36 +558,4 @@ class PythonDistribution(Target):
         PythonDistributionDependencies,
         PythonProvidesField,
         SetupPyCommandsField,
-    )
-
-
-class InjectPythonDistributionDependencies(InjectDependenciesRequest):
-    inject_for = PythonDistributionDependencies
-
-
-@rule
-async def inject_python_distribution_dependencies(
-    request: InjectPythonDistributionDependencies,
-) -> InjectedDependencies:
-    """Inject any `.with_binaries()` values, as it would be redundant to have to include in the
-    `dependencies` field."""
-    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    with_binaries = original_tgt.target[PythonProvidesField].value.binaries
-    if not with_binaries:
-        return InjectedDependencies()
-    # Note that we don't validate that these are all `pex_binary` targets; we don't care about
-    # that here. `setup_py.py` will do that validation.
-    addresses = await Get(
-        Addresses,
-        UnparsedAddressInputs(
-            with_binaries.values(), owning_address=request.dependencies_field.address
-        ),
-    )
-    return InjectedDependencies(addresses)
-
-
-def rules():
-    return (
-        *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
     )

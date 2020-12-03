@@ -1,27 +1,13 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 import os
 import unittest
 from abc import ABC, ABCMeta, abstractmethod
-from contextlib import contextmanager
 from io import StringIO
 from pathlib import PurePath
 from tempfile import mkdtemp
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Iterable, List, Mapping, Optional, Sequence, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.deprecated import warn_or_error
@@ -32,7 +18,7 @@ from pants.core.util_rules import pants_environment
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.console import Console
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
+from pants.engine.fs import Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
@@ -50,15 +36,7 @@ from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import GoalRuleResult as GoalRuleResult
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import (
-    recursive_dirname,
-    safe_file_dump,
-    safe_mkdir,
-    safe_mkdtemp,
-    safe_open,
-    safe_rmtree,
-)
+from pants.util.dirutil import recursive_dirname, safe_mkdir, safe_open, safe_rmtree
 from pants.util.memo import memoized_method
 
 
@@ -285,24 +263,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         if self._scheduler is not None:
             self._scheduler.invalidate_all_files()
 
-    @contextmanager
-    def isolated_local_store(self):
-        """Temporarily use an anonymous, empty Store for the Scheduler.
-
-        In most cases we re-use a Store across all tests, since `file` and `directory` entries are
-        content addressed, and `process` entries are intended to have strong cache keys. But when
-        dealing with non-referentially transparent `process` executions, it can sometimes be
-        necessary to avoid this cache.
-        """
-        self._scheduler = None
-        local_store_dir = os.path.realpath(safe_mkdtemp())
-        self._init_engine(local_store_dir=local_store_dir)
-        try:
-            yield
-        finally:
-            self._scheduler = None
-            safe_rmtree(local_store_dir)
-
     @memoized_method
     def _build_root(self) -> str:
         return os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
@@ -354,65 +314,3 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         super().tearDown()
         Subsystem.reset()
-
-    def make_snapshot(self, files: Dict[str, Union[str, bytes]]) -> Snapshot:
-        """Makes a snapshot from a map of file name to file content."""
-        with temporary_dir() as temp_dir:
-            for file_name, content in files.items():
-                mode = "wb" if isinstance(content, bytes) else "w"
-                safe_file_dump(os.path.join(temp_dir, file_name), content, mode=mode)
-            return cast(
-                Snapshot,
-                self.scheduler.capture_snapshots((PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),))[
-                    0
-                ],
-            )
-
-    def make_snapshot_of_empty_files(self, files: Iterable[str]) -> Snapshot:
-        """Makes a snapshot with empty content for each file.
-
-        This is a convenience around `TestBase.make_snapshot`, which allows specifying the content
-        for each file.
-        """
-        return self.make_snapshot({fp: "" for fp in files})
-
-    class _LoggingRecorder:
-        """Simple logging handler to record warnings."""
-
-        def __init__(self):
-            self._records = []
-            self.level = logging.DEBUG
-
-        def handle(self, record):
-            self._records.append(record)
-
-        def _messages_for_level(self, levelname):
-            return [
-                f"{record.name}: {record.getMessage()}"
-                for record in self._records
-                if record.levelname == levelname
-            ]
-
-        def infos(self):
-            return self._messages_for_level("INFO")
-
-        def warnings(self):
-            return self._messages_for_level("WARNING")
-
-        def errors(self):
-            return self._messages_for_level("ERROR")
-
-    @contextmanager
-    def captured_logging(self, level=None):
-        root_logger = logging.getLogger()
-
-        old_level = root_logger.level
-        root_logger.setLevel(level or logging.NOTSET)
-
-        handler = self._LoggingRecorder()
-        root_logger.addHandler(handler)
-        try:
-            yield handler
-        finally:
-            root_logger.setLevel(old_level)
-            root_logger.removeHandler(handler)

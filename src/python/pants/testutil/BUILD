@@ -6,6 +6,7 @@ python_distribution(
   dependencies=[
     ':testutil',
     ':int-test-for-export',
+    ':rule_runner',
   ],
   setup_py_commands=["bdist_wheel", "--python-tag", "py37.py38", "sdist"],
   provides=setup_py(

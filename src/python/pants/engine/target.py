@@ -1161,29 +1161,6 @@ class StringSequenceField(SequenceField[str]):
         return super().compute_value(raw_value, address=address)
 
 
-class StringOrStringSequenceField(SequenceField[str]):
-    """The raw_value may either be a string or be an iterable of strings.
-
-    This is syntactic sugar that we use for certain fields to make BUILD files simpler when the user
-    has no need for more than one element.
-
-    Generally, this should not be used by any new Fields. This mechanism is a misfeature.
-    """
-
-    expected_element_type = str
-    expected_type_description = (
-        "either a single string or an iterable of strings (e.g. a list of strings)"
-    )
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Union[str, Iterable[str]]], *, address: Address
-    ) -> Optional[Tuple[str, ...]]:
-        if isinstance(raw_value, str):
-            return (raw_value,)
-        return super().compute_value(raw_value, address=address)
-
-
 class DictStringToStringField(Field):
     value: Optional[FrozenDict[str, str]]
     default: ClassVar[Optional[FrozenDict[str, str]]] = None
@@ -1302,8 +1279,8 @@ class Sources(StringSequenceField, AsyncFieldMixin):
     @final
     def _prefix_glob_with_address(self, glob: str) -> str:
         if glob.startswith("!"):
-            return f"!{PurePath(self.address.spec_path, glob[1:])}"
-        return str(PurePath(self.address.spec_path, glob))
+            return f"!{os.path.join(self.address.spec_path, glob[1:])}"
+        return os.path.join(self.address.spec_path, glob)
 
     @final
     def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:

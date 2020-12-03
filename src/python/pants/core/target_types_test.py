@@ -6,8 +6,9 @@ import zipfile
 from io import BytesIO
 from textwrap import dedent
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
-from pants.backend.python.target_types import PexBinary, resolve_pex_entry_point
+from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
@@ -159,14 +160,12 @@ def test_archive() -> None:
             *target_type_rules(),
             *pex_from_targets.rules(),
             *package_pex_binary.rules(),
-            resolve_pex_entry_point,
+            *target_types_rules.rules(),
             QueryRule(BuiltPackage, [ArchiveFieldSet]),
         ],
         target_types=[ArchiveTarget, Files, RelocatedFiles, PexBinary],
     )
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", "--no-pants-distdir-legacy-paths"]
-    )
+    rule_runner.set_options(["--backend-packages=pants.backend.python"])
 
     rule_runner.create_file("resources/d1.json", "{'k': 1}")
     rule_runner.create_file("resources/d2.json", "{'k': 2}")
