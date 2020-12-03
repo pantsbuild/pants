@@ -28,7 +28,6 @@ use cpython::{
   PyObject, PyResult as CPyResult, PyTuple, PyType, Python, PythonObject, ToPyObject,
 };
 use lazy_static::lazy_static;
-use parking_lot::RwLock;
 
 use logging::PythonLogLevel;
 
@@ -39,24 +38,19 @@ pub fn none() -> PyObject {
 }
 
 pub fn get_type_for(val: &Value) -> TypeId {
-  with_interns_mut(|interns| {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let py_type = val.get_type(py);
-    interns.type_insert(py, py_type)
-  })
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  (&val.get_type(py)).into()
 }
 
 pub fn is_union(ty: TypeId) -> bool {
-  with_interns(|interns| {
-    with_externs(|py, e| {
-      let py_type = interns.type_get(&ty);
-      e.call_method(py, "is_union", (py_type,), None)
-        .unwrap()
-        .cast_as::<PyBool>(py)
-        .unwrap()
-        .is_true()
-    })
+  with_externs(|py, e| {
+    let py_type = (&ty).as_py_type(py);
+    e.call_method(py, "is_union", (py_type,), None)
+      .unwrap()
+      .cast_as::<PyBool>(py)
+      .unwrap()
+      .is_true()
   })
 }
 
@@ -78,29 +72,21 @@ pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
 }
 
 pub fn type_for_type_id(ty: TypeId) -> PyType {
-  with_interns(|interns| {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    interns.type_get(&ty).clone_ref(py)
-  })
+  let gil = Python::acquire_gil();
+  (&ty).as_py_type(gil.python())
 }
 
 pub fn type_for(py_type: PyType) -> TypeId {
-  with_interns_mut(|interns| {
-    let gil = Python::acquire_gil();
-    interns.type_insert(gil.python(), py_type)
-  })
+  (&py_type).into()
 }
 
 pub fn key_for(val: Value) -> Result<Key, PyErr> {
-  with_interns_mut(|interns| {
-    let gil = Python::acquire_gil();
-    interns.key_insert(gil.python(), val)
-  })
+  let gil = Python::acquire_gil();
+  INTERNS.key_insert(gil.python(), val)
 }
 
 pub fn val_for(key: &Key) -> Value {
-  with_interns(|interns| interns.key_get(key).clone())
+  INTERNS.key_get(key)
 }
 
 pub fn store_tuple(values: Vec<Value>) -> Value {
@@ -315,30 +301,19 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
       b.val(py).clone_ref(py),
     )))
   } else if let Ok(get) = response.cast_as::<PyGeneratorResponseGet>(py) {
-    with_interns_mut(|interns| {
-      let gil = Python::acquire_gil();
-      Ok(GeneratorResponse::Get(Get::new(
-        gil.python(),
-        interns,
-        get,
-      )?))
-    })
+    Ok(GeneratorResponse::Get(Get::new(py, get)?))
   } else if let Ok(get_multi) = response.cast_as::<PyGeneratorResponseGetMulti>(py) {
-    with_interns_mut(|interns| {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      let gets = get_multi
-        .gets(py)
-        .iter(py)
-        .map(|g| {
-          let get = g
-            .cast_as::<PyGeneratorResponseGet>(py)
-            .map_err(|e| Failure::from_py_err_with_gil(py, e.into()))?;
-          Ok(Get::new(py, interns, get)?)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-      Ok(GeneratorResponse::GetMulti(gets))
-    })
+    let gets = get_multi
+      .gets(py)
+      .iter(py)
+      .map(|g| {
+        let get = g
+          .cast_as::<PyGeneratorResponseGet>(py)
+          .map_err(|e| Failure::from_py_err_with_gil(py, e.into()))?;
+        Ok(Get::new(py, get)?)
+      })
+      .collect::<Result<Vec<_>, _>>()?;
+    Ok(GeneratorResponse::GetMulti(gets))
   } else {
     panic!("generator_send returned unrecognized type: {:?}", response);
   }
@@ -370,12 +345,7 @@ lazy_static! {
   // See set_externs.
   static ref EXTERNS: atomic::AtomicPtr<PyObject> = atomic::AtomicPtr::new(Box::into_raw(Box::new(none())));
 
-  // Strangely enough, GILProtected does not actually provide mutual exclusion, so we use a RwLock
-  // here. To avoid deadlocks, the `with_interns` and `with_interns_mut` accessors acquire the GIL
-  // and then explicitly release it before acquiring this lock. That way we can guarantee that this
-  // lock is always acquired before the GIL.
-  //   see https://github.com/dgrunwald/rust-cpython/issues/218
-  static ref INTERNS: RwLock<Interns> = RwLock::new(Interns::new());
+  static ref INTERNS: Interns = Interns::new();
 }
 
 ///
@@ -395,28 +365,6 @@ where
   let result = f(gil.python(), &externs);
   std::mem::forget(externs);
   result
-}
-
-fn with_interns<F, T>(f: F) -> T
-where
-  F: Send + FnOnce(&Interns) -> T,
-{
-  let gil = Python::acquire_gil();
-  gil.python().allow_threads(|| {
-    let interns = INTERNS.read();
-    f(&interns)
-  })
-}
-
-fn with_interns_mut<F, T>(f: F) -> T
-where
-  F: Send + FnOnce(&mut Interns) -> T,
-{
-  let gil = Python::acquire_gil();
-  gil.python().allow_threads(|| {
-    let mut interns = INTERNS.write();
-    f(&mut interns)
-  })
 }
 
 py_class!(pub class PyGeneratorResponseBreak |py| {
@@ -450,13 +398,13 @@ pub struct Get {
 }
 
 impl Get {
-  fn new(py: Python, interns: &mut Interns, get: &PyGeneratorResponseGet) -> Result<Get, Failure> {
+  fn new(py: Python, get: &PyGeneratorResponseGet) -> Result<Get, Failure> {
     Ok(Get {
-      output: interns.type_insert(py, get.product(py).clone_ref(py)),
-      input: interns
+      output: get.product(py).into(),
+      input: INTERNS
         .key_insert(py, get.subject(py).clone_ref(py).into())
         .map_err(|e| Failure::from_py_err_with_gil(py, e))?,
-      input_type: interns.type_insert(py, get.declared_subject(py).clone_ref(py)),
+      input_type: get.declared_subject(py).into(),
     })
   }
 }
