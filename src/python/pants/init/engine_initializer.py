@@ -1,6 +1,8 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,7 +54,7 @@ class GraphScheduler:
         should_report_workunits=False,
         session_values: Optional[SessionValues] = None,
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
-    ) -> "GraphSession":
+    ) -> GraphSession:
         session = self.scheduler.new_session(
             build_id,
             dynamic_ui,

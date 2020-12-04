@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import errno
 import os
 import unittest
@@ -153,11 +155,11 @@ class DirutilTest(unittest.TestCase):
         contents: str
 
         @classmethod
-        def empty(cls, path: str) -> "DirutilTest.File":
+        def empty(cls, path: str) -> DirutilTest.File:
             return cls(path, contents="")
 
         @classmethod
-        def read(cls, root: str, relpath: str) -> "DirutilTest.File":
+        def read(cls, root: str, relpath: str) -> DirutilTest.File:
             with open(os.path.join(root, relpath), "r") as fp:
                 return cls(relpath, fp.read())
 

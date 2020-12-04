@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict, Iterable, Mapping, Type, TypeVar
@@ -61,7 +63,7 @@ class UnionMembership:
     union_rules: FrozenDict[Type, FrozenOrderedSet[Type]]
 
     @classmethod
-    def from_rules(cls, rules: Iterable[UnionRule]) -> "UnionMembership":
+    def from_rules(cls, rules: Iterable[UnionRule]) -> UnionMembership:
         mapping: DefaultDict[Type, OrderedSet[Type]] = defaultdict(OrderedSet)
         for rule in rules:
             mapping[rule.union_base].add(rule.union_member)

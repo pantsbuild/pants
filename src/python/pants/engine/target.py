@@ -659,7 +659,7 @@ class RegisteredTargetTypes:
         self.aliases_to_types = FrozenDict(aliases_to_types)
 
     @classmethod
-    def create(cls, target_types: Iterable[Type[Target]]) -> "RegisteredTargetTypes":
+    def create(cls, target_types: Iterable[Type[Target]]) -> RegisteredTargetTypes:
         return cls(
             {
                 target_type.alias: target_type
@@ -796,6 +796,7 @@ def _get_field_set_fields_from_target(
         for dataclass_field in dataclasses.fields(field_set)
         if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[unreachable]
     }
+
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)

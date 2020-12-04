@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from io import StringIO
@@ -74,7 +76,7 @@ class GoalRuleResult:
     stderr: str
 
     @staticmethod
-    def noop() -> "GoalRuleResult":
+    def noop() -> GoalRuleResult:
         return GoalRuleResult(0, stdout="", stderr="")
 
 

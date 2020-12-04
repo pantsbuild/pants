@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -61,7 +63,7 @@ class AddressInput:
         spec: str,
         relative_to: Optional[str] = None,
         subproject_roots: Optional[Sequence[str]] = None,
-    ) -> "AddressInput":
+    ) -> AddressInput:
         """Parse a string into an AddressInput.
 
         :param spec: Target address spec.
@@ -136,7 +138,7 @@ class AddressInput:
 
         return cls(path_component, target_component)
 
-    def file_to_address(self) -> "Address":
+    def file_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a file on disk."""
         if self.target_component is None:
             # Use the default target in the same directory as the file.
@@ -186,7 +188,7 @@ class AddressInput:
         target_name = os.path.basename(self.target_component)
         return Address(spec_path, relative_file_path=relative_file_path, target_name=target_name)
 
-    def dir_to_address(self) -> "Address":
+    def dir_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a directory on disk."""
         return Address(spec_path=self.path_component, target_name=self.target_component)
 
@@ -330,7 +332,7 @@ class Address(EngineAwareParameter):
             target_portion = f"{parent_prefix}{target_name}"
         return f"{self.spec_path.replace(os.path.sep, '.')}{file_portion}{target_portion}"
 
-    def maybe_convert_to_build_target(self) -> "Address":
+    def maybe_convert_to_build_target(self) -> Address:
         """If this address is for a file target, convert it back into its BUILD target.
 
         Otherwise, return itself unmodified.

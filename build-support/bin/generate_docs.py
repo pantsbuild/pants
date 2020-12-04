@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import argparse
 import html
 import json
@@ -43,7 +45,7 @@ class ReferenceGenerator:
     """
 
     @classmethod
-    def create(cls) -> "ReferenceGenerator":
+    def create(cls) -> ReferenceGenerator:
         # Note that we want to be able to run this script using `./pants run`, so having it
         # invoke `./pants help-all` itself would be unnecessarily complicated.
         # So we require the input to be provided externally.

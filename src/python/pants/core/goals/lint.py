@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import logging
 from dataclasses import dataclass
@@ -53,7 +55,7 @@ class LintResult(EngineAwareReturnType):
         partition_description: Optional[str] = None,
         strip_chroot_path: bool = False,
         report: Optional[LintReport] = None,
-    ) -> "LintResult":
+    ) -> LintResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 

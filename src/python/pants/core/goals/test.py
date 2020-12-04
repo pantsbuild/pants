@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import logging
 from abc import ABC, ABCMeta
@@ -49,7 +51,7 @@ class TestResult:
     __test__ = False
 
     @classmethod
-    def skip(cls, address: Address) -> "TestResult":
+    def skip(cls, address: Address) -> TestResult:
         return cls(exit_code=None, stdout="", stderr="", address=address)
 
     @classmethod
@@ -60,7 +62,7 @@ class TestResult:
         *,
         coverage_data: Optional["CoverageData"] = None,
         xml_results: Optional[Snapshot] = None,
-    ) -> "TestResult":
+    ) -> TestResult:
         return cls(
             exit_code=process_result.exit_code,
             stdout=process_result.stdout.decode(),
