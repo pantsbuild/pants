@@ -40,8 +40,7 @@ class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMi
     You can specify a full module like 'path.to.module:handler_func' or use a shorthand to specify a
     file name, using the same syntax as the `sources` field, e.g. 'lambda.py:handler_func'.
 
-    You must use the file name shorthand for file arguments and `--changed-since` to work with this
-    target.
+    You must use the file name shorthand for file arguments to work with this target.
     """
 
     alias = "handler"
