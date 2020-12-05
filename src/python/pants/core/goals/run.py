@@ -12,7 +12,12 @@ from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import FieldSet, TargetRootsToFieldSets, TargetRootsToFieldSetsRequest
+from pants.engine.target import (
+    FieldSet,
+    NoApplicableTargetsBehavior,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
+)
 from pants.engine.unions import union
 from pants.option.custom_types import shell_str
 from pants.option.global_options import GlobalOptions
@@ -93,7 +98,7 @@ async def run(
         TargetRootsToFieldSetsRequest(
             RunFieldSet,
             goal_description="the `run` goal",
-            error_if_no_applicable_targets=True,
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
             expect_single_field_set=True,
         ),
     )
