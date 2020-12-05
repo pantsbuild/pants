@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import logging
 import os
@@ -152,7 +154,7 @@ class SourceRootsRequest:
                 raise ValueError(f"SourceRootRequest path must be relative: {path}")
 
     @classmethod
-    def for_files(cls, file_paths: Iterable[str]) -> "SourceRootsRequest":
+    def for_files(cls, file_paths: Iterable[str]) -> SourceRootsRequest:
         """Create a request for the source root for the given file."""
         return cls({PurePath(file_path) for file_path in file_paths}, ())
 
@@ -174,19 +176,19 @@ class SourceRootRequest(EngineAwareParameter):
             raise ValueError(f"SourceRootRequest path must be relative: {self.path}")
 
     @classmethod
-    def for_file(cls, file_path: str) -> "SourceRootRequest":
+    def for_file(cls, file_path: str) -> SourceRootRequest:
         """Create a request for the source root for the given file."""
         # The file itself cannot be a source root, so we may as well start the search
         # from its enclosing directory, and save on some superfluous checking.
         return cls(PurePath(file_path).parent)
 
     @classmethod
-    def for_address(cls, address: Address) -> "SourceRootRequest":
+    def for_address(cls, address: Address) -> SourceRootRequest:
         # Note that we don't use for_file() here because the spec_path is a directory.
         return cls(PurePath(address.spec_path))
 
     @classmethod
-    def for_target(cls, target: Target) -> "SourceRootRequest":
+    def for_target(cls, target: Target) -> SourceRootRequest:
         return cls.for_address(target.address)
 
     def debug_hint(self) -> str:

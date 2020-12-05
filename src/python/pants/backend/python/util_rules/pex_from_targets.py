@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import itertools
 import logging
@@ -140,7 +142,7 @@ class PexFromTargetsRequest:
         hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints] = None,
         zip_safe: bool = False,
         direct_deps_only: bool = False,
-    ) -> "PexFromTargetsRequest":
+    ) -> PexFromTargetsRequest:
         """Create an instance that can be used to get a requirements pex.
 
         Useful to ensure that these requests are uniform (e.g., the using the same output filename),

@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
@@ -97,7 +99,7 @@ class BuildFileAliases:
         """
         return self._context_aware_object_factories
 
-    def merge(self, other: "BuildFileAliases") -> "BuildFileAliases":
+    def merge(self, other: BuildFileAliases) -> BuildFileAliases:
         """Merges a set of build file aliases and returns a new set of aliases containing both.
 
         Any duplicate aliases from `other` will trump.

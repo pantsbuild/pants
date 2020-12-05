@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import functools
 import itertools
 import logging
@@ -981,7 +983,7 @@ class NoApplicableTargetsException(Exception):
         *,
         field_set_types: Iterable[Type[_AbstractFieldSet]],
         goal_description: str,
-    ) -> "NoApplicableTargetsException":
+    ) -> NoApplicableTargetsException:
         applicable_target_types = {
             target_type
             for field_set_type in field_set_types
