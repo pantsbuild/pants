@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
 import textwrap
 from dataclasses import dataclass
@@ -81,7 +83,7 @@ class ValidationConfig:
     required_matches: FrozenDict[str, Tuple[str]]  # path pattern name -> content pattern names.
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "ValidationConfig":
+    def from_dict(cls, d: Dict[str, Any]) -> ValidationConfig:
         return cls(
             path_patterns=tuple(PathPattern(**kwargs) for kwargs in d["path_patterns"]),
             content_patterns=tuple(ContentPattern(**kwargs) for kwargs in d["content_patterns"]),

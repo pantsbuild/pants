@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import configparser
 from dataclasses import dataclass
 from enum import Enum
@@ -77,8 +79,8 @@ class CoverageReportType(Enum):
 
     _report_name: str
 
-    def __new__(cls, value: str, report_name: Optional[str] = None) -> "CoverageReportType":
-        member: "CoverageReportType" = object.__new__(cls)
+    def __new__(cls, value: str, report_name: Optional[str] = None) -> CoverageReportType:
+        member: CoverageReportType = object.__new__(cls)
         member._value_ = value
         member._report_name = report_name if report_name is not None else value
         return member

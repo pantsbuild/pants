@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from typing import Iterable
 
 
@@ -36,7 +38,7 @@ class ResolveError(MappingError):
     @classmethod
     def did_you_mean(
         cls, *, bad_name: str, known_names: Iterable[str], namespace: str
-    ) -> "ResolveError":
+    ) -> ResolveError:
         possibilities = "\n  ".join(f":{target_name}" for target_name in sorted(known_names))
         return cls(
             f"'{bad_name}' was not found in namespace '{namespace}'. Did you mean one "

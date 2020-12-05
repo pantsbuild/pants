@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import os
 from dataclasses import dataclass, replace
@@ -110,7 +112,7 @@ class LocalPantsRunner:
         options_bootstrapper: OptionsBootstrapper,
         scheduler: Optional[GraphScheduler] = None,
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
-    ) -> "LocalPantsRunner":
+    ) -> LocalPantsRunner:
         """Creates a new LocalPantsRunner instance by parsing options.
 
         By the time this method runs, logging will already have been initialized in either

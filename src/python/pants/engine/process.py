@@ -1,6 +1,8 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import hashlib
 import logging
@@ -300,7 +302,7 @@ class InteractiveProcess:
     @classmethod
     def from_process(
         cls, process: Process, *, hermetic_env: bool = True, forward_signals_to_process: bool = True
-    ) -> "InteractiveProcess":
+    ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
@@ -382,7 +384,7 @@ class BinaryPath:
     @classmethod
     def fingerprinted(
         cls, path: str, representative_content: Union[bytes, bytearray, memoryview]
-    ) -> "BinaryPath":
+    ) -> BinaryPath:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 

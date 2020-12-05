@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import inspect
 import json
@@ -151,7 +153,7 @@ class TargetFieldHelpInfo:
     default: Optional[str]
 
     @classmethod
-    def create(cls, field: Type[Field]) -> "TargetFieldHelpInfo":
+    def create(cls, field: Type[Field]) -> TargetFieldHelpInfo:
         # NB: It is very common (and encouraged) to subclass Fields to give custom behavior, e.g.
         # `PythonSources` subclassing `Sources`. Here, we set `fallback_to_ancestors=True` so that
         # we can still generate meaningful documentation for all these custom fields without
@@ -223,7 +225,7 @@ class TargetTypeHelpInfo:
     @classmethod
     def create(
         cls, target_type: Type[Target], *, union_membership: UnionMembership
-    ) -> "TargetTypeHelpInfo":
+    ) -> TargetTypeHelpInfo:
         return cls(
             alias=target_type.alias,
             summary=get_docstring_summary(target_type),

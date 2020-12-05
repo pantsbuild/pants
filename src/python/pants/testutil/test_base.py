@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 import unittest
 from abc import ABC, ABCMeta, abstractmethod
@@ -83,7 +85,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     _O = TypeVar("_O")
 
-    def request(self, output_type: Type["TestBase._O"], inputs: Iterable[Any]) -> "TestBase._O":
+    def request(self, output_type: Type[TestBase._O], inputs: Iterable[Any]) -> TestBase._O:
         # TODO: Update all callsites to pass this explicitly via session values.
         session = self.scheduler
         for value in inputs:

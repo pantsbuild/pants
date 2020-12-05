@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import configparser
 import getpass
 import io
@@ -130,7 +132,7 @@ class Config(ABC):
     @classmethod
     def _parse_toml(
         cls, config_content: str, normalized_seed_values: Dict[str, str]
-    ) -> "_ConfigValues":
+    ) -> _ConfigValues:
         """Attempt to parse as TOML, raising an exception on failure."""
         toml_values = cast(Dict[str, Any], toml.loads(config_content))
         toml_values["DEFAULT"] = {

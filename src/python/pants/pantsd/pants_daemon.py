@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import os
 import sys
@@ -45,7 +47,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
     @classmethod
-    def create(cls, options_bootstrapper: OptionsBootstrapper) -> "PantsDaemon":
+    def create(cls, options_bootstrapper: OptionsBootstrapper) -> PantsDaemon:
 
         with warnings.catch_warnings(record=True):
             bootstrap_options = options_bootstrapper.bootstrap_options

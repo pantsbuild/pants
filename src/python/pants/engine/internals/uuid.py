@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass
 from enum import Enum
@@ -30,7 +32,7 @@ class UUIDRequest:
         return cast(str, scope.value)
 
     @classmethod
-    def scoped(cls, scope: UUIDScope) -> "UUIDRequest":
+    def scoped(cls, scope: UUIDScope) -> UUIDRequest:
         return cls(cls._to_scope_name(scope))
 
 
