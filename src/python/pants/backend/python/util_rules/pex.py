@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import functools
 import itertools
@@ -74,7 +76,7 @@ class PexRequirements(DeduplicatedCollection[str]):
         fields: Iterable[PythonRequirementsField],
         *,
         additional_requirements: Iterable[str] = (),
-    ) -> "PexRequirements":
+    ) -> PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
         return PexRequirements({*field_requirements, *additional_requirements})
 
@@ -183,7 +185,7 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
     @classmethod
     def create_from_targets(
         cls, targets: Iterable[Target], python_setup: PythonSetup
-    ) -> "PexInterpreterConstraints":
+    ) -> PexInterpreterConstraints:
         return cls.create_from_compatibility_fields(
             (
                 tgt[InterpreterConstraintsField]
@@ -196,7 +198,7 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
     @classmethod
     def create_from_compatibility_fields(
         cls, fields: Iterable[InterpreterConstraintsField], python_setup: PythonSetup
-    ) -> "PexInterpreterConstraints":
+    ) -> PexInterpreterConstraints:
         constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
         # This will OR within each field and AND across fields.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
@@ -303,7 +305,7 @@ class PexPlatforms(DeduplicatedCollection[str]):
     sort_input = True
 
     @classmethod
-    def create_from_platforms_field(cls, field: PythonPlatformsField) -> "PexPlatforms":
+    def create_from_platforms_field(cls, field: PythonPlatformsField) -> PexPlatforms:
         return cls(field.value or ())
 
     def generate_pex_arg_list(self) -> List[str]:

@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
@@ -47,7 +49,7 @@ class FmtResult:
         original_digest: Digest,
         formatter_name: str,
         strip_chroot_path: bool = False,
-    ) -> "FmtResult":
+    ) -> FmtResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 

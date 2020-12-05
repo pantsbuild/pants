@@ -659,7 +659,7 @@ class RegisteredTargetTypes:
         self.aliases_to_types = FrozenDict(aliases_to_types)
 
     @classmethod
-    def create(cls, target_types: Iterable[Type[Target]]) -> "RegisteredTargetTypes":
+    def create(cls, target_types: Iterable[Type[Target]]) -> RegisteredTargetTypes:
         return cls(
             {
                 target_type.alias: target_type
@@ -796,6 +796,7 @@ def _get_field_set_fields_from_target(
         for dataclass_field in dataclasses.fields(field_set)
         if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[unreachable]
     }
+
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
@@ -871,12 +872,18 @@ class TargetRootsToFieldSets(Generic[_AFS]):
         return tuple(self.mapping.keys())
 
 
+class NoApplicableTargetsBehavior(Enum):
+    ignore = "ignore"
+    warn = "warn"
+    error = "error"
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSetsRequest(Generic[_AFS]):
     field_set_superclass: Type[_AFS]
     goal_description: str
-    error_if_no_applicable_targets: bool
+    no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
     # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
     #  `util_rules/filter_empty_sources.py`.
@@ -886,12 +893,12 @@ class TargetRootsToFieldSetsRequest(Generic[_AFS]):
         field_set_superclass: Type[_AFS],
         *,
         goal_description: str,
-        error_if_no_applicable_targets: bool,
+        no_applicable_targets_behavior: NoApplicableTargetsBehavior,
         expect_single_field_set: bool = False,
     ) -> None:
         self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
-        self.error_if_no_applicable_targets = error_if_no_applicable_targets
+        self.no_applicable_targets_behavior = no_applicable_targets_behavior
         self.expect_single_field_set = expect_single_field_set
 
 

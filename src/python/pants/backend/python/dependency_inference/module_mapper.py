@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -27,7 +29,7 @@ class PythonModule:
     module: str
 
     @classmethod
-    def create_from_stripped_path(cls, path: PurePath) -> "PythonModule":
+    def create_from_stripped_path(cls, path: PurePath) -> PythonModule:
         module_name_with_slashes = (
             path.parent if path.name == "__init__.py" else path.with_suffix("")
         )

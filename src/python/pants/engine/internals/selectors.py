@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import ast
 import itertools
 from dataclasses import dataclass
@@ -205,7 +207,7 @@ class Get(GetConstraints, Generic[_Output, _Input]):
 
     def __await__(
         self,
-    ) -> "Generator[Get[_Output, _Input], None, _Output]":
+    ) -> Generator[Get[_Output, _Input], None, _Output]:
         """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
         The `yield`ed value `self` is interpreted by the engine within `extern_generator_send()` in

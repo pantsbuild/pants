@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import copy
 import logging
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
@@ -114,7 +116,7 @@ class Options:
         known_scope_infos: Iterable[ScopeInfo],
         args: Sequence[str],
         bootstrap_option_values: Optional[OptionValueContainer] = None,
-    ) -> "Options":
+    ) -> Options:
         """Create an Options instance.
 
         :param env: a dict of environment variables.
@@ -264,7 +266,7 @@ class Options:
                 "remove.\n(Specify --no-verify-config to disable this check.)"
             )
 
-    def drop_flag_values(self) -> "Options":
+    def drop_flag_values(self) -> Options:
         """Returns a copy of these options that ignores values specified via flags.
 
         Any pre-cached option values are cleared and only option values that come from option

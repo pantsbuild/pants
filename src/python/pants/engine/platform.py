@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from enum import Enum
 from typing import Iterable
 
@@ -15,7 +17,7 @@ class Platform(Enum):
 
     # TODO: try to turn all of these accesses into v2 dependency injections!
     @memoized_classproperty
-    def current(cls) -> "Platform":
+    def current(cls) -> Platform:
         return Platform(get_normalized_os_name())
 
 

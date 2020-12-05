@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import os
 import time
@@ -343,7 +345,7 @@ class Scheduler:
         should_report_workunits: bool = False,
         session_values: Optional[SessionValues] = None,
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
-    ) -> "SchedulerSession":
+    ) -> SchedulerSession:
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
             self,
@@ -636,7 +638,7 @@ class SchedulerSession:
 
     def run_local_interactive_process(
         self, request: "InteractiveProcess"
-    ) -> "InteractiveProcessResult":
+    ) -> InteractiveProcessResult:
         sched_pointer = self._scheduler._scheduler
         session_pointer = self._session
         result: "InteractiveProcessResult" = (

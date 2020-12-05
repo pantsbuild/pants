@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from functools import total_ordering
@@ -19,7 +21,7 @@ class Rank(Enum):
 
     _rank: int
 
-    def __new__(cls, rank: int, display: str) -> "Rank":
+    def __new__(cls, rank: int, display: str) -> Rank:
         member: "Rank" = object.__new__(cls)
         member._value_ = display
         member._rank = rank
