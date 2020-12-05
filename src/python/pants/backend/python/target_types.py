@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections.abc
+import os.path
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Iterable, Optional, Tuple, Union, cast
@@ -24,6 +25,7 @@ from pants.engine.target import (
     InvalidFieldTypeException,
     ProvidesField,
     ScalarField,
+    SecondaryOwnerMixin,
     Sources,
     SpecialCasedDependencies,
     StringField,
@@ -32,6 +34,7 @@ from pants.engine.target import (
 )
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
+from pants.source.filespec import Filespec
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
@@ -115,7 +118,7 @@ class PexBinaryDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PexEntryPointField(StringField, AsyncFieldMixin):
+class PexEntryPointField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     """The entry point for the binary, i.e. what gets run when executing `./my_binary.pex`.
 
     You can specify a full module like 'path.to.module' and 'path.to.module:func', or use a
@@ -124,10 +127,22 @@ class PexEntryPointField(StringField, AsyncFieldMixin):
         1) 'app.py', Pants will convert into the module `path.to.app`;
         2) 'app.py:func', Pants will convert into `path.to.app:func`.
 
+    You must use the file name shorthand for file arguments to work with this target.
+
     To leave off an entry point, set to '<none>'.
     """
 
     alias = "entry_point"
+
+    @property
+    def filespec(self) -> Filespec:
+        if not self.value:
+            return {"includes": []}
+        path, _, func = self.value.partition(":")
+        if not path.endswith(".py"):
+            return {"includes": []}
+        full_glob = os.path.join(self.address.spec_path, path)
+        return {"includes": [full_glob]}
 
 
 # See `target_types_rules.py` for the `ResolvePexEntryPointRequest -> ResolvedPexEntryPoint` rule.

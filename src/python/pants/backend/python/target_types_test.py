@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import dedent
-from typing import Optional
+from typing import List, Optional
 
 import pytest
 from pkg_resources import Requirement
@@ -74,6 +74,24 @@ def test_timeout_calculation() -> None:
     assert_timeout_calculated(field_value=None, expected=None)
     assert_timeout_calculated(field_value=None, global_default=20, global_max=10, expected=10)
     assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
+
+
+@pytest.mark.parametrize(
+    ["entry_point", "expected"],
+    (
+        ("<none>", []),
+        ("path.to.module", []),
+        ("path.to.module:func", []),
+        ("lambda.py", ["project/dir/lambda.py"]),
+        ("lambda.py:func", ["project/dir/lambda.py"]),
+        # Soon to be deprecated.
+        (None, []),
+        (":func", []),
+    ),
+)
+def test_entry_point_filespec(entry_point: Optional[str], expected: List[str]) -> None:
+    field = PexEntryPointField(entry_point, address=Address("project/dir"))
+    assert field.filespec == {"includes": expected}
 
 
 def test_resolve_pex_binary_entry_point() -> None:

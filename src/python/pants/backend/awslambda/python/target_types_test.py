@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import dedent
-from typing import Optional
+from typing import List, Optional
 
 import pytest
 
@@ -46,22 +46,31 @@ def rule_runner() -> RuleRunner:
         ["python3.8", 3, 8],
     ),
 )
-def test_to_interpreter_version(runtime, expected_major, expected_minor):
+def test_to_interpreter_version(runtime: str, expected_major: int, expected_minor: int) -> None:
     assert (expected_major, expected_minor) == PythonAwsLambdaRuntime(
         runtime, address=Address("", target_name="t")
     ).to_interpreter_version()
 
 
-@pytest.mark.parametrize(["invalid_runtime"], (["python88.99"], ["fooobar"]))
-def test_runtime_validation(invalid_runtime):
+@pytest.mark.parametrize("invalid_runtime", ("python88.99", "fooobar"))
+def test_runtime_validation(invalid_runtime: str) -> None:
     with pytest.raises(InvalidFieldException):
         PythonAwsLambdaRuntime(invalid_runtime, address=Address("", target_name="t"))
 
 
-@pytest.mark.parametrize(["invalid_handler"], (["path.to.lambda"], ["lambda.py"]))
-def test_handler_validation(invalid_handler):
+@pytest.mark.parametrize("invalid_handler", ("path.to.lambda", "lambda.py"))
+def test_handler_validation(invalid_handler: str) -> None:
     with pytest.raises(InvalidFieldException):
         PythonAwsLambdaHandlerField(invalid_handler, address=Address("", target_name="t"))
+
+
+@pytest.mark.parametrize(
+    ["handler", "expected"],
+    (("path.to.module:func", []), ("lambda.py:func", ["project/dir/lambda.py"])),
+)
+def test_handler_filespec(handler: str, expected: List[str]) -> None:
+    field = PythonAwsLambdaHandlerField(handler, address=Address("project/dir"))
+    assert field.filespec == {"includes": expected}
 
 
 def test_resolve_handler(rule_runner: RuleRunner) -> None:

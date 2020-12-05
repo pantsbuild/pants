@@ -20,11 +20,13 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldException,
+    SecondaryOwnerMixin,
     StringField,
     Target,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 
 
@@ -32,11 +34,13 @@ class PythonAwsLambdaSources(PythonSources):
     expected_num_files = range(0, 2)
 
 
-class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin):
+class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     """Entry point to the AWS Lambda handler.
 
     You can specify a full module like 'path.to.module:handler_func' or use a shorthand to specify a
     file name, using the same syntax as the `sources` field, e.g. 'lambda.py:handler_func'.
+
+    You must use the file name shorthand for file arguments to work with this target.
     """
 
     alias = "handler"
@@ -52,6 +56,14 @@ class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin):
                 f"format `:my_handler_func`, but was {value}."
             )
         return value
+
+    @property
+    def filespec(self) -> Filespec:
+        path, _, func = self.value.partition(":")
+        if not path.endswith(".py"):
+            return {"includes": []}
+        full_glob = os.path.join(self.address.spec_path, path)
+        return {"includes": [full_glob]}
 
 
 @dataclass(frozen=True)
