@@ -36,7 +36,6 @@ from pants.engine.fs import (
     Snapshot,
     SpecsSnapshot,
 )
-from pants.engine.internals.native_engine import cyclic_paths
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -191,18 +190,21 @@ class CycleException(Exception):
         self.path = path
 
 
-def _detect_cycles(dependency_mapping: Dict[Address, Tuple[Address, ...]]) -> None:
-    for path in cyclic_paths(dependency_mapping):
-        address = path[-1]
+def _detect_cycles(
+    roots: Tuple[Address, ...], dependency_mapping: Dict[Address, Tuple[Address, ...]]
+) -> None:
+    path_stack: OrderedSet[Address] = OrderedSet()
+    visited: Set[Address] = set()
 
+    def maybe_report_cycle(address: Address) -> None:
         # NB: File-level dependencies are cycle tolerant.
-        if address.is_file_target:
+        if address.is_file_target or address not in path_stack:
             return
 
         # The path of the cycle is shorter than the entire path to the cycle: if the suffix of
         # the path representing the cycle contains a file dep, it is ignored.
         in_cycle = False
-        for path_address in path:
+        for path_address in path_stack:
             if in_cycle and path_address.is_file_target:
                 # There is a file address inside the cycle: do not report it.
                 return
@@ -214,7 +216,27 @@ def _detect_cycles(dependency_mapping: Dict[Address, Tuple[Address, ...]]) -> No
                 # the address in question.
                 in_cycle = path_address == address
         # If we did not break out early, it's because there were no file addresses in the cycle.
-        raise CycleException(address, path)
+        raise CycleException(address, (*path_stack, address))
+
+    def visit(address: Address):
+        if address in visited:
+            maybe_report_cycle(address)
+            return
+        path_stack.add(address)
+        visited.add(address)
+
+        for dep_address in dependency_mapping[address]:
+            visit(dep_address)
+
+        path_stack.remove(address)
+
+    for root in roots:
+        visit(root)
+        if path_stack:
+            raise AssertionError(
+                f"The stack of visited nodes should have been empty at the end of recursion, "
+                f"but it still contained: {path_stack}"
+            )
 
 
 @rule(desc="Resolve transitive targets")
@@ -253,7 +275,10 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
         )
         visited.update(queued)
 
-    _detect_cycles(dependency_mapping)
+    # NB: We use `roots_as_targets` to get the root addresses, rather than `request.roots`. This
+    # is because expanding from the `Addresses` -> `Targets` may have resulted in generated
+    # subtargets being used, so we need to use `roots_as_targets` to have this expansion.
+    _detect_cycles(tuple(t.address for t in roots_as_targets), dependency_mapping)
 
     # Apply any transitive excludes (`!!` ignores).
     transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
@@ -310,7 +335,7 @@ async def transitive_targets_lite(request: TransitiveTargetsRequestLite) -> Tran
     # NB: We use `roots_as_targets` to get the root addresses, rather than `request.roots`. This
     # is because expanding from the `Addresses` -> `Targets` may have resulted in generated
     # subtargets being used, so we need to use `roots_as_targets` to have this expansion.
-    _detect_cycles(dependency_mapping)
+    _detect_cycles(tuple(t.address for t in roots_as_targets), dependency_mapping)
 
     # Apply any transitive excludes (`!!` ignores).
     wrapped_transitive_excludes = await MultiGet(

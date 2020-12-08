@@ -1,12 +1,9 @@
-from typing import Any, Callable, Dict, List, Tuple, TypeVar
+from typing import Any, Callable, Dict, List
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
 # flake8: noqa: E302
 
-T = TypeVar("T")
-
-def cyclic_paths(adjacencies: Dict[T, Tuple[T, ...]]) -> Tuple[Tuple[T]]: ...
 def session_cancel_all() -> None: ...
 
 class PyDigest:
