@@ -4,6 +4,7 @@
 import importlib
 import locale
 import os
+import sys
 import warnings
 from textwrap import dedent
 
@@ -13,6 +14,8 @@ class PantsLoader:
 
     ENTRYPOINT_ENV_VAR = "PANTS_ENTRYPOINT"
     DEFAULT_ENTRYPOINT = "pants.bin.pants_exe:main"
+
+    RECURSION_LIMIT_ENV_VAR = "PANTS_RECURSION_LIMIT"
 
     ENCODING_IGNORE_ENV_VAR = "PANTS_IGNORE_UNRECOGNIZED_ENCODING"
 
@@ -67,6 +70,10 @@ class PantsLoader:
                 )
             )
 
+    @classmethod
+    def set_recursion_limit(cls):
+        sys.setrecursionlimit(int(os.environ.get(cls.RECURSION_LIMIT_ENV_VAR, "10000")))
+
     @staticmethod
     def determine_entrypoint(env_var, default):
         return os.environ.pop(env_var, default)
@@ -86,6 +93,7 @@ class PantsLoader:
     def run(cls):
         cls.setup_warnings()
         cls.ensure_locale()
+        cls.set_recursion_limit()
         entrypoint = cls.determine_entrypoint(cls.ENTRYPOINT_ENV_VAR, cls.DEFAULT_ENTRYPOINT)
         cls.load_and_execute(entrypoint)
 
