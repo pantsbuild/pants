@@ -129,5 +129,8 @@ pytest_plugins.add = [
 ]
 timeout_default = 60
 
+[coverage-py]
+interpreter_constraints = [">=3.7,<3.9"]
+
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
