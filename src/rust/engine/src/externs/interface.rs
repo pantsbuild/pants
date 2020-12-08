@@ -63,7 +63,6 @@ use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::Future;
 use hashing::Digest;
-use indexmap::IndexMap;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
@@ -74,8 +73,8 @@ use workunit_store::{UserMetadataItem, Workunit, WorkunitState};
 
 use crate::{
   externs, nodes, sessions_cancel, Core, ExecutionRequest, ExecutionStrategyOptions,
-  ExecutionTermination, Failure, Function, Intrinsics, Key, Params, RemotingOptions, Rule,
-  Scheduler, Session, Tasks, Types, Value,
+  ExecutionTermination, Failure, Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler,
+  Session, Tasks, Types, Value,
 };
 
 py_exception!(native_engine, PollTimeout);
@@ -100,8 +99,6 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(py, "default_cache_path", py_fn!(py, default_cache_path()))?;
 
   m.add(py, "default_config_path", py_fn!(py, default_config_path()))?;
-
-  m.add(py, "cyclic_paths", py_fn!(py, cyclic_paths(a: PyDict)))?;
 
   m.add(
     py,
@@ -1789,39 +1786,6 @@ fn default_config_path(py: Python) -> CPyResult<String> {
         ),),
       )
     })
-}
-
-fn cyclic_paths(py: Python, adjacencies: PyDict) -> CPyResult<Vec<PyTuple>> {
-  let adjacencies = adjacencies
-    .items(py)
-    .into_iter()
-    .map(|(k, v)| {
-      let node = externs::key_for(k.into())?;
-      let adjacent = v
-        .extract::<Vec<PyObject>>(py)?
-        .into_iter()
-        .map(|v| externs::key_for(v.into()))
-        .collect::<Result<Vec<Key>, _>>()?;
-      let res: Result<_, PyErr> = Ok((node, adjacent));
-      res
-    })
-    .collect::<Result<IndexMap<Key, Vec<Key>>, _>>()?;
-  let paths = py.allow_threads(move || crate::core::cyclic_paths(adjacencies));
-
-  Ok(
-    paths
-      .into_iter()
-      .map(|path| {
-        let gil = Python::acquire_gil();
-        let path_vec = path
-          .iter()
-          .map(externs::val_for)
-          .map(|node| node.consume_into_py_object(gil.python()))
-          .collect::<Vec<_>>();
-        PyTuple::new(gil.python(), &path_vec)
-      })
-      .collect(),
-  )
 }
 
 fn init_logging(
