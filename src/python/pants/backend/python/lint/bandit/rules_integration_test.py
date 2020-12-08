@@ -61,7 +61,7 @@ def run_bandit(
 ) -> Sequence[LintResult]:
     args = [
         "--backend-packages=pants.backend.python.lint.bandit",
-        "--bandit-version='bandit==1.6.2'",
+        "--bandit-version=bandit==1.6.2",
     ]
     if config:
         rule_runner.create_file(relpath=".bandit", contents=config)
