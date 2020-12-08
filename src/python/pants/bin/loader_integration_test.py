@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.bin.pants_loader import PantsLoader
-from pants.testutil.pants_integration_test import run_pants
+from pants.testutil.pants_integration_test import PantsResult, run_pants
 
 
 def test_invalid_locale() -> None:
@@ -49,3 +49,17 @@ def test_alternate_entrypoint_scrubbing() -> None:
     )
     pants_run.assert_success()
     assert "PANTS_ENTRYPOINT=None" in pants_run.stdout
+
+
+def test_recursion_limit() -> None:
+    def run(limit: str) -> PantsResult:
+        return run_pants(command=["help"], extra_env={"PANTS_RECURSION_LIMIT": limit})
+
+    # Large value succeeds.
+    run("100000").assert_success()
+    # Very small value fails in an arbitrary spot.
+    small_run = run("1")
+    small_run.assert_failure()
+    assert "RecursionError" in small_run.stderr
+    # Non integer value fails.
+    run("this isn't an int").assert_failure()
