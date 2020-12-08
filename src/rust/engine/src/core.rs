@@ -3,7 +3,6 @@
 
 use fnv::FnvHasher;
 
-use std::collections::HashSet;
 use std::convert::AsRef;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -12,7 +11,6 @@ use std::{fmt, hash};
 use crate::externs;
 
 use cpython::{FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, Python, ToPyObject};
-use indexmap::{IndexMap, IndexSet};
 use smallvec::SmallVec;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
@@ -425,56 +423,4 @@ pub fn throw(msg: &str) -> Failure {
     python_traceback: Failure::native_traceback(msg),
     engine_traceback: Vec::new(),
   }
-}
-
-///
-/// Given a graph represented as an adjacency list, return a collection of cyclic paths.
-///
-pub fn cyclic_paths<N: hash::Hash + Eq + Copy>(adjacencies: IndexMap<N, Vec<N>>) -> Vec<Vec<N>> {
-  let mut cyclic_paths = Vec::new();
-  let mut path_stack = IndexSet::new();
-  let mut visited = HashSet::new();
-
-  for node in adjacencies.keys() {
-    cyclic_paths_visit(
-      *node,
-      &adjacencies,
-      &mut cyclic_paths,
-      &mut path_stack,
-      &mut visited,
-    );
-  }
-
-  cyclic_paths
-}
-
-fn cyclic_paths_visit<N: hash::Hash + Eq + Copy>(
-  node: N,
-  adjacencies: &IndexMap<N, Vec<N>>,
-  cyclic_paths: &mut Vec<Vec<N>>,
-  path_stack: &mut IndexSet<N>,
-  visited: &mut HashSet<N>,
-) {
-  if visited.contains(&node) {
-    if path_stack.contains(&node) {
-      cyclic_paths.push(
-        path_stack
-          .iter()
-          .cloned()
-          .chain(std::iter::once(node))
-          .collect::<Vec<_>>(),
-      );
-    }
-    return;
-  }
-  path_stack.insert(node);
-  visited.insert(node);
-
-  if let Some(adjacent) = adjacencies.get(&node) {
-    for dep_node in adjacent {
-      cyclic_paths_visit(*dep_node, adjacencies, cyclic_paths, path_stack, visited);
-    }
-  }
-
-  path_stack.remove(&node);
 }
