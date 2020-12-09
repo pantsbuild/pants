@@ -20,7 +20,7 @@ from typing import Any, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple
 import toml
 from typing_extensions import Literal
 
-from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
+from pants.base.build_environment import get_buildroot
 from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
 from pants.util.ordered_set import OrderedSet
@@ -154,8 +154,6 @@ class Config(ABC):
             "buildroot": buildroot,
             "homedir": os.path.expanduser("~"),
             "user": getpass.getuser(),
-            "pants_bootstrapdir": get_pants_cachedir(),
-            "pants_configdir": get_pants_configdir(),
         }
 
         def update_seed_values(key: str, *, default_dir: str) -> None:

@@ -15,7 +15,7 @@ from pants.util.logging import LogLevel
 class StreamingWorkunitContext:
     _scheduler: SchedulerSession
 
-    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes]:
+    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes, ...]:
         """Given a list of Digest objects, each representing the contents of a single file, return a
         list of the bytes corresponding to each of those Digests in sequence."""
         return self._scheduler.single_file_digests_to_bytes(digests)

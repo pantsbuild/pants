@@ -5,13 +5,11 @@ import glob
 import os
 import subprocess
 import sys
-import unittest
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Iterator, List, Mapping, Optional, Union
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import warn_or_error
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -34,33 +32,6 @@ class PantsResult:
     stderr: str
     workdir: str
     pid: Pid
-
-    @property
-    def returncode(self) -> int:
-        warn_or_error(
-            removal_version="2.2.0.dev1",
-            deprecated_entity_description="the property PantsResult.returncode",
-            hint="Use `PantsResult.exit_code` instead.",
-        )
-        return self.exit_code
-
-    @property
-    def stdout_data(self) -> str:
-        warn_or_error(
-            removal_version="2.2.0.dev1",
-            deprecated_entity_description="the property PantsResult.stdout_data",
-            hint="Use `PantsResult.stdout` instead.",
-        )
-        return self.stdout
-
-    @property
-    def stderr_data(self) -> str:
-        warn_or_error(
-            removal_version="2.2.0.dev1",
-            deprecated_entity_description="the property PantsResult.stderr_data",
-            hint="Use `PantsResult.stderr` instead.",
-        )
-        return self.stderr
 
     def _format_unexpected_error_code_msg(self, msg: Optional[str]) -> str:
         details = [msg] if msg else []
@@ -364,123 +335,3 @@ def _read_log(filename: str) -> Iterator[str]:
     with open(filename, "r") as f:
         for line in f:
             yield line.rstrip()
-
-
-class PantsIntegrationTest(unittest.TestCase):
-    """A base class for integration tests that run Pants."""
-
-    # Classes can optionally override these.
-    hermetic = True  # If False, pants.toml will be used.
-    use_pantsd = True
-
-    def run_pants_with_workdir_without_waiting(
-        self,
-        command: Command,
-        *,
-        workdir: str,
-        config: Optional[Mapping] = None,
-        extra_env: Optional[Mapping[str, str]] = None,
-        **kwargs: Any,
-    ) -> PantsJoinHandle:
-        warn_or_error(
-            removal_version="2.2.0.dev1",
-            deprecated_entity_description="PantsIntegrationTest.run_pants_with_workdir_without_waiting()",
-            hint=(
-                "Use the top-level function `run_pants_with_workdir_without_waiting()`. "
-                "`PantsIntegrationTest` is deprecated."
-            ),
-        )
-        return run_pants_with_workdir_without_waiting(
-            command,
-            workdir=workdir,
-            hermetic=self.hermetic,
-            use_pantsd=self.use_pantsd,
-            config=config,
-            extra_env=extra_env,
-            **kwargs,
-        )
-
-    def run_pants_with_workdir(
-        self,
-        command: Command,
-        *,
-        workdir: str,
-        config: Optional[Mapping] = None,
-        stdin_data: Optional[Union[bytes, str]] = None,
-        tee_output: bool = False,
-        **kwargs: Any,
-    ) -> PantsResult:
-        warn_or_error(
-            removal_version="2.2.0.dev1",
-            deprecated_entity_description="PantsIntegrationTest.run_pants_with_workdir()",
-            hint=(
-                "Use the top-level function `run_pants_with_workdir()`. "
-                "`PantsIntegrationTest` is deprecated."
-            ),
-        )
-        return run_pants_with_workdir(
-            command,
-            workdir=workdir,
-            hermetic=self.hermetic,
-            use_pantsd=self.use_pantsd,
-            config=config,
-            stdin_data=stdin_data,
-            tee_output=tee_output,
-            **kwargs,
-        )
-
-    def run_pants(
-        self,
-        command: Command,
-        *,
-        config: Optional[Mapping] = None,
-        extra_env: Optional[Mapping[str, str]] = None,
-        stdin_data: Optional[Union[bytes, str]] = None,
-        **kwargs: Any,
-    ) -> PantsResult:
-        warn_or_error(
-            removal_version="2.2.0.dev1",
-            deprecated_entity_description="PantsIntegrationTest.run_pants()",
-            hint=(
-                "Use the top-level function `run_pants()`. `PantsIntegrationTest` is deprecated."
-            ),
-        )
-        return run_pants(
-            command,
-            hermetic=self.hermetic,
-            use_pantsd=self.use_pantsd,
-            config=config,
-            extra_env=extra_env,
-            stdin_data=stdin_data,
-            **kwargs,
-        )
-
-    @staticmethod
-    def assert_success(pants_run: PantsResult, msg: Optional[str] = None) -> None:
-        warn_or_error(
-            removal_version="2.2.0.dev1",
-            deprecated_entity_description="PantsIntegrationTest.assert_success()",
-            hint="Use `PantsResult.assert_success()`. `PantsIntegrationTest` is deprecated.",
-        )
-        pants_run.assert_success(msg)
-
-    @staticmethod
-    def assert_failure(pants_run: PantsResult, msg: Optional[str] = None) -> None:
-        warn_or_error(
-            removal_version="2.2.0.dev1",
-            deprecated_entity_description="PantsIntegrationTest.assert_failure()",
-            hint="Use `PantsResult.assert_failure()`. `PantsIntegrationTest` is deprecated.",
-        )
-        pants_run.assert_failure(msg)
-
-    @staticmethod
-    def temporary_workdir(cleanup: bool = True):
-        warn_or_error(
-            removal_version="2.2.0.dev1",
-            deprecated_entity_description="PantsIntegrationTest.temporary_workdir()",
-            hint=(
-                "Use the top-level function `temporary_workdir`. `PantsIntegrationTest` is "
-                "deprecated."
-            ),
-        )
-        return temporary_workdir(cleanup=cleanup)

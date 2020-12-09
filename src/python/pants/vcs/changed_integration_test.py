@@ -4,6 +4,7 @@
 import os
 import shutil
 import subprocess
+import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 from typing import Iterator, List, Optional
@@ -11,7 +12,12 @@ from typing import Iterator, List, Optional
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_integration_test import PantsIntegrationTest, ensure_daemon
+from pants.testutil.pants_integration_test import (
+    PantsResult,
+    ensure_daemon,
+    run_pants,
+    run_pants_with_workdir,
+)
 from pants.testutil.test_base import AbstractTestGenerator
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
@@ -168,9 +174,16 @@ def create_isolated_git_repo():
                 yield worktree
 
 
-class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
-    # Git isn't detected if hermetic=True for some reason.
-    hermetic = False
+class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
+    @staticmethod
+    def run_pants(*args, **kwargs) -> PantsResult:
+        # Git isn't detected if hermetic=True for some reason.
+        return run_pants(*args, **{**kwargs, **{"hermetic": False}})
+
+    @staticmethod
+    def run_pants_with_workdir(*args, **kwargs) -> PantsResult:
+        # Git isn't detected if hermetic=True for some reason.
+        return run_pants_with_workdir(*args, **{**kwargs, **{"hermetic": False}})
 
     TEST_MAPPING = {
         # A `pex_binary` with `entry_point='file.name'` (secondary ownership), and a
