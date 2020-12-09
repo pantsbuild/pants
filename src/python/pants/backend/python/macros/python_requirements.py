@@ -1,6 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import os
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
@@ -81,10 +81,12 @@ class PythonRequirements:
                 )
             requirements.append(req)
 
-        self._parse_context.create_object(
-            "_python_requirements_file", name=requirements_relpath, sources=[requirements_relpath]
+        req_file_tgt = self._parse_context.create_object(
+            "_python_requirements_file",
+            name=requirements_relpath.replace(os.path.sep, "_"),
+            sources=[requirements_relpath],
         )
-        requirements_dep = f":{requirements_relpath}"
+        requirements_dep = f":{req_file_tgt.name}"
 
         for parsed_req in requirements:
             req_module_mapping = (

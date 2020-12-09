@@ -236,8 +236,8 @@ class Address(EngineAwareParameter):
             if banned_chars:
                 raise InvalidTargetName(
                     f"The target name {target_name} (defined in directory {self.spec_path}) "
-                    f"contains banned characters (`{banned_chars}`). Please replace these "
-                    "characters with another separator character like `_` or `-`."
+                    f"contains banned characters (`{'`,`'.join(banned_chars)}`). Please replace "
+                    "these characters with another separator character like `_` or `-`."
                 )
             self._target_name = target_name
         else:
