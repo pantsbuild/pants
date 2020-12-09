@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashMap};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::fmt::Display;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -29,7 +29,9 @@ use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
 };
-use process_execution::{self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process};
+use process_execution::{
+  self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process, ProcessCacheScope,
+};
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
@@ -237,7 +239,7 @@ pub fn lift_file_digest(types: &Types, digest: &Value) -> Result<hashing::Digest
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct MultiPlatformExecuteProcess {
-  cache_failures: bool,
+  cache_scope: ProcessCacheScope,
   process: MultiPlatformProcess,
 }
 
@@ -311,7 +313,9 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let cache_failures: bool = externs::getattr(&value, "cache_failures").unwrap();
+    let cache_scope =
+      externs::getattr_as_string(&externs::getattr(&value, "cache_scope").unwrap(), "name")
+        .try_into()?;
 
     Ok(process_execution::Process {
       argv: externs::getattr(&value, "argv").unwrap(),
@@ -328,7 +332,7 @@ impl MultiPlatformExecuteProcess {
       platform_constraint,
       is_nailgunnable,
       execution_slot_variable,
-      cache_failures,
+      cache_scope,
     })
   }
 
@@ -350,19 +354,20 @@ impl MultiPlatformExecuteProcess {
       ));
     }
 
-    let mut cache_failures = true;
-
     let mut request_by_constraint: BTreeMap<Option<Platform>, Process> = BTreeMap::new();
     for (constraint, execute_process) in constraints.iter().zip(processes.iter()) {
       let underlying_req =
         MultiPlatformExecuteProcess::lift_process(types, execute_process, *constraint)?;
-      if !underlying_req.cache_failures {
-        cache_failures = false;
-      }
       request_by_constraint.insert(*constraint, underlying_req.clone());
     }
+
+    let cache_scope = request_by_constraint
+      .values()
+      .next()
+      .map(|p| p.cache_scope)
+      .unwrap();
     Ok(MultiPlatformExecuteProcess {
-      cache_failures,
+      cache_scope,
       process: MultiPlatformProcess(request_by_constraint),
     })
   }
@@ -1372,14 +1377,11 @@ impl Node for NodeKey {
   fn cacheable_item(&self, output: &NodeOutput) -> bool {
     match self {
       NodeKey::MultiPlatformExecuteProcess(ref mp) => match output {
-        NodeOutput::ProcessResult(ref process_result) => {
-          let process_succeeded = process_result.0.exit_code == 0;
-          if mp.cache_failures {
-            true
-          } else {
-            process_succeeded
-          }
-        }
+        NodeOutput::ProcessResult(ref process_result) => match mp.cache_scope {
+          ProcessCacheScope::Always | ProcessCacheScope::PerRestart => true,
+          ProcessCacheScope::Successful => process_result.0.exit_code == 0,
+          ProcessCacheScope::Never => false,
+        },
         _ => true,
       },
       _ => true,

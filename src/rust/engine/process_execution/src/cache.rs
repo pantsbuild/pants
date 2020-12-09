@@ -1,6 +1,6 @@
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessMetadata,
+  ProcessCacheScope, ProcessMetadata,
 };
 use std::sync::Arc;
 
@@ -93,7 +93,10 @@ impl crate::CommandRunner for CommandRunner {
       }
     }
 
-    let cache_failures = req.0.values().any(|process| process.cache_failures);
+    let cache_failures = req
+      .0
+      .values()
+      .any(|process| process.cache_scope == ProcessCacheScope::Always);
 
     let result = command_runner.underlying.run(req, context.clone()).await?;
     if result.exit_code == 0 || cache_failures {

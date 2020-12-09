@@ -13,6 +13,7 @@ from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
     Process,
+    ProcessCacheScope,
     ProcessResult,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -20,8 +21,7 @@ from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir, touch
 
 
-@pytest.fixture
-def rule_runner() -> RuleRunner:
+def new_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(BinaryPaths, [BinaryPathRequest]),
@@ -29,6 +29,11 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleProcessResult, [Process]),
         ],
     )
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return new_rule_runner()
 
 
 def test_argv_executable(rule_runner: RuleRunner) -> None:
@@ -105,6 +110,62 @@ def test_failing_process(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError) as exc:
         rule_runner.request(ProcessResult, [process])
     assert "Process 'failure' failed with exit code 1." in str(exc.value)
+
+
+def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
+    # Should not re-run on success, even in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.SUCCESSFUL,
+        description="success",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("next attempt")
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    assert result_one is result_two
+
+    # Should re-run on failure, but only in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM && exit 1"),
+        cache_scope=ProcessCacheScope.SUCCESSFUL,
+        description="failure",
+    )
+    result_three = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("next attempt")
+    result_four = rule_runner.request(FallibleProcessResult, [process])
+    assert result_three != result_four
+
+
+def test_cache_scope_per_restart() -> None:
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.PER_RESTART,
+        description="random",
+    )
+    runner_one = new_rule_runner()
+    result_one = runner_one.request(FallibleProcessResult, [process])
+    runner_one.new_session("next attempt")
+    result_two = runner_one.request(FallibleProcessResult, [process])
+    # Should not re-run within the same Scheduler, even with a new Session.
+    assert result_one is result_two
+
+    # Should re-run in a new Scheduler.
+    runner_two = new_rule_runner()
+    result_three = runner_two.request(FallibleProcessResult, [process])
+    assert result_one.stdout != result_three.stdout
+
+
+def test_cache_scope_never(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.NEVER,
+        description="random",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("next attempt")
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    # Should re-run in a new Session.
+    assert result_one.stdout != result_two.stdout
 
 
 # TODO: Move to fs_test.py.

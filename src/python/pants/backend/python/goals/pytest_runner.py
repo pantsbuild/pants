@@ -41,7 +41,12 @@ from pants.core.goals.test import (
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
+from pants.engine.process import (
+    FallibleProcessResult,
+    InteractiveProcess,
+    Process,
+    ProcessCacheScope,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -218,6 +223,8 @@ async def setup_pytest_for_target(
 
     extra_env.update(test_extra_env.env)
 
+    # Cache test runs only if they are successful, or not at all if `--test-force`.
+    cache_scope = ProcessCacheScope.NEVER if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     process = await Get(
         Process,
         PexProcess(
@@ -230,7 +237,7 @@ async def setup_pytest_for_target(
             execution_slot_variable=pytest.options.execution_slot_var,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
-            uncacheable=test_subsystem.force and not request.is_debug,
+            cache_scope=cache_scope,
         ),
     )
     return TestSetup(process, results_file_name=results_file_name)

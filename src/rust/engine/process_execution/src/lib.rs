@@ -115,6 +115,31 @@ impl TryFrom<String> for Platform {
   }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum ProcessCacheScope {
+  // Cached in all locations, regardless of success or failure.
+  Always,
+  // Cached in all locations, but only if the process exits successfully.
+  Successful,
+  // Cached only in memory (i.e. memoized in pantsd), but never persistently.
+  PerRestart,
+  // Never cached anywhere: will run once per Session (i.e. once per run of Pants).
+  Never,
+}
+
+impl TryFrom<String> for ProcessCacheScope {
+  type Error = String;
+  fn try_from(variant_candidate: String) -> Result<Self, Self::Error> {
+    match variant_candidate.to_lowercase().as_ref() {
+      "always" => Ok(ProcessCacheScope::Always),
+      "successful" => Ok(ProcessCacheScope::Successful),
+      "per_restart" => Ok(ProcessCacheScope::PerRestart),
+      "never" => Ok(ProcessCacheScope::Never),
+      other => Err(format!("Unknown Process cache scope: {:?}", other)),
+    }
+  }
+}
+
 ///
 /// A process to be executed.
 ///
@@ -189,7 +214,7 @@ pub struct Process {
 
   pub is_nailgunnable: bool,
 
-  pub cache_failures: bool,
+  pub cache_scope: ProcessCacheScope,
 }
 
 impl Process {
@@ -219,7 +244,7 @@ impl Process {
       platform_constraint: None,
       is_nailgunnable: false,
       execution_slot_variable: None,
-      cache_failures: false,
+      cache_scope: ProcessCacheScope::Always,
     }
   }
 
