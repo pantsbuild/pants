@@ -132,6 +132,7 @@ async fn invalidate_with_changed_dependencies() {
   );
 }
 
+#[ignore] // flaky: https://github.com/pantsbuild/pants/issues/10839
 #[tokio::test]
 async fn invalidate_randomly() {
   let graph = Arc::new(Graph::new());
@@ -330,7 +331,7 @@ async fn uncacheable_node_only_runs_once() {
   let graph2 = graph.clone();
   let (send, recv) = mpsc::channel::<()>();
   let _join = thread::spawn(move || {
-    recv.recv_timeout(Duration::from_millis(100)).unwrap();
+    recv.recv_timeout(Duration::from_secs(10)).unwrap();
     thread::sleep(Duration::from_millis(50));
     graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
   });
