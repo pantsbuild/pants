@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, cast
 
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import _uncacheable_rule, collect_rules
 from pants.util.meta import frozen_after_init
 
 
@@ -36,7 +36,7 @@ class UUIDRequest:
         return cls(cls._to_scope_name(scope))
 
 
-@rule
+@_uncacheable_rule
 async def generate_uuid(_: UUIDRequest) -> uuid.UUID:
     """A rule to generate a UUID.
 
