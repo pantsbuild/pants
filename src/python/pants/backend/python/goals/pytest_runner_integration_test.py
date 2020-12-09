@@ -145,6 +145,7 @@ def run_pytest(
     execution_slot_var: Optional[str] = None,
     extra_env_vars: Optional[str] = None,
     env: Optional[Mapping[str, str]] = None,
+    force: bool = False,
 ) -> TestResult:
     args = [
         "--backend-packages=pants.backend.python",
@@ -163,6 +164,8 @@ def run_pytest(
         args.append("--test-use-coverage")
     if execution_slot_var:
         args.append(f"--pytest-execution-slot-var={execution_slot_var}")
+    if force:
+        args.append("--test-force")
     rule_runner.set_options(args, env=env)
 
     inputs = [PythonTestFieldSet.create(test_target)]
@@ -179,6 +182,16 @@ def test_single_passing_test(rule_runner: RuleRunner) -> None:
     result = run_pytest(rule_runner, tgt)
     assert result.exit_code == 0
     assert f"{PACKAGE}/test_good.py ." in result.stdout
+
+
+def test_force(rule_runner: RuleRunner) -> None:
+    tgt = create_test_target(rule_runner, [GOOD_SOURCE])
+    result_one = run_pytest(rule_runner, tgt, force=True)
+    assert result_one.exit_code == 0
+    result_two = run_pytest(rule_runner, tgt, force=True)
+    assert result_two.exit_code == 0
+    # Should not receive a memoized result.
+    assert result_one is not result_two
 
 
 def test_single_failing_test(rule_runner: RuleRunner) -> None:
