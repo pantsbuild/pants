@@ -8,7 +8,7 @@ import threading
 import time
 import unittest
 from textwrap import dedent
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 import psutil
 import pytest
@@ -16,6 +16,9 @@ import pytest
 from pants.testutil.pants_integration_test import (
     PantsJoinHandle,
     read_pantsd_log,
+    run_pants,
+    run_pants_with_workdir,
+    run_pants_with_workdir_without_waiting,
     temporary_workdir,
 )
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
@@ -67,7 +70,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     def test_pantsd_broken_pipe(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
-            run = self.run_pants_with_workdir(
+            run = run_pants_with_workdir(
                 "help | head -1", workdir=workdir, config=pantsd_config, shell=True
             )
             self.assertNotIn("broken pipe", run.stderr.lower())
@@ -76,7 +79,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             # Run target that throws an exception in pants.
-            self.run_pants_with_workdir(
+            run_pants_with_workdir(
                 ["lint", "testprojects/src/python/unicode/compilation_failure"],
                 workdir=workdir,
                 config=pantsd_config,
@@ -84,9 +87,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             checker.assert_started()
 
             # Assert pantsd is in a good functional state.
-            self.run_pants_with_workdir(
-                ["help"], workdir=workdir, config=pantsd_config
-            ).assert_success()
+            run_pants_with_workdir(["help"], workdir=workdir, config=pantsd_config).assert_success()
             checker.assert_running()
 
     def test_pantsd_lifecycle_invalidation(self):
@@ -140,11 +141,11 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_lifecycle_shutdown_for_broken_scheduler(self):
         with self.pantsd_test_context() as (workdir, config, checker):
             # Run with valid options.
-            self.run_pants_with_workdir(["help"], workdir=workdir, config=config).assert_success()
+            run_pants_with_workdir(["help"], workdir=workdir, config=config).assert_success()
             checker.assert_started()
 
             # And again with invalid scheduler-fingerprinted options that trigger a re-init.
-            self.run_pants_with_workdir(
+            run_pants_with_workdir(
                 ["--backend-packages=nonsensical", "help"], workdir=workdir, config=config
             ).assert_failure()
             checker.assert_stopped()
@@ -155,7 +156,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
         cmds = [["help", "goals"], ["help", "targets"], ["roots"]]
 
-        non_daemon_runs = [self.run_pants(cmd) for cmd in cmds]
+        non_daemon_runs = [run_pants(cmd) for cmd in cmds]
 
         with self.pantsd_successful_run_context() as ctx:
             daemon_runs = [ctx.runner(cmd) for cmd in cmds]
@@ -191,8 +192,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             join()
 
     def test_pantsd_client_env_var_is_inherited_by_pantsd_runner_children(self):
-        EXPECTED_KEY = "TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST"
-        EXPECTED_VALUE = "333"
+        expected_key = "TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST"
+        expected_value = "333"
         with self.pantsd_successful_run_context() as ctx:
             # First, launch the daemon without any local env vars set.
             ctx.runner(["help"])
@@ -202,26 +203,26 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             # We additionally set the `HERMETIC_ENV` env var to allow the integration test harness
             # to pass this variable through.
             env = {
-                EXPECTED_KEY: EXPECTED_VALUE,
-                "HERMETIC_ENV": EXPECTED_KEY,
+                expected_key: expected_value,
+                "HERMETIC_ENV": expected_key,
             }
             with environment_as(**env):
                 result = ctx.runner(
-                    ["run", "testprojects/src/python/print_env", "--", EXPECTED_KEY]
+                    ["run", "testprojects/src/python/print_env", "--", expected_key]
                 )
                 ctx.checker.assert_running()
 
-            self.assertEqual(EXPECTED_VALUE, "".join(result.stdout).strip())
+            self.assertEqual(expected_value, "".join(result.stdout).strip())
 
     def test_pantsd_launch_env_var_is_not_inherited_by_pantsd_runner_children(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             with environment_as(NO_LEAKS="33"):
-                self.run_pants_with_workdir(
+                run_pants_with_workdir(
                     ["help"], workdir=workdir, config=pantsd_config
                 ).assert_success()
                 checker.assert_started()
 
-            self.run_pants_with_workdir(
+            run_pants_with_workdir(
                 ["run", "testprojects/src/python/print_env", "--", "NO_LEAKS"],
                 workdir=workdir,
                 config=pantsd_config,
@@ -428,7 +429,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_multiple_parallel_runs(self):
         with self.pantsd_test_context() as (workdir, config, checker):
             file_to_make = os.path.join(workdir, "some_magic_file")
-            waiter_handle = self.run_pants_with_workdir_without_waiting(
+            waiter_handle = run_pants_with_workdir_without_waiting(
                 ["run", "testprojects/src/python/coordinated_runs:waiter", "--", file_to_make],
                 workdir=workdir,
                 config=config,
@@ -436,7 +437,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             checker.assert_started()
 
-            creator_handle = self.run_pants_with_workdir_without_waiting(
+            creator_handle = run_pants_with_workdir_without_waiting(
                 ["run", "testprojects/src/python/coordinated_runs:creator", "--", file_to_make],
                 workdir=workdir,
                 config=config,
@@ -445,7 +446,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             creator_handle.join().assert_success()
             waiter_handle.join().assert_success()
 
-    def _launch_waiter(self, workdir: str, config) -> Tuple[PantsJoinHandle, int, str]:
+    @staticmethod
+    def _launch_waiter(workdir: str, config) -> Tuple[PantsJoinHandle, int, str]:
         """Launch a process via pantsd that will wait forever for the a file to be created.
 
         Returns the pid of the pantsd client, the pid of the waiting child process, and the file to
@@ -461,9 +463,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             file_to_make,
             waiter_pid_file,
         ]
-        client_handle = self.run_pants_with_workdir_without_waiting(
-            argv, workdir=workdir, config=config
-        )
+        client_handle = run_pants_with_workdir_without_waiting(argv, workdir=workdir, config=config)
+        waiter_pid = -1
         for _ in attempts("The waiter process should have written its pid."):
             waiter_pid_str = maybe_read_file(waiter_pid_file)
             if waiter_pid_str:
@@ -471,12 +472,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 break
         return client_handle, waiter_pid, file_to_make
 
-    def _assert_pantsd_keyboardinterrupt_signal(self, signum, regexps=[]):
+    def _assert_pantsd_keyboardinterrupt_signal(
+        self, signum: int, regexps: Optional[List[str]] = None
+    ):
         """Send a signal to the thin pailgun client and observe the error messaging.
 
-        :param int signum: The signal to send.
+        :param signum: The signal to send.
         :param regexps: Assert that all of these regexps match somewhere in stderr.
-        :type regexps: list of str
         """
         with self.pantsd_test_context() as (workdir, config, checker):
             client_handle, waiter_process_pid, _ = self._launch_waiter(workdir, config)
@@ -492,7 +494,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             client_run = client_handle.join()
             client_run.assert_failure()
 
-            for regexp in regexps:
+            for regexp in regexps or []:
                 self.assertRegex(client_run.stderr, regexp)
 
             # pantsd should still be running, but the waiter process should have been killed.
@@ -518,7 +520,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             checker.assert_running()
 
             # And another that will block on the first.
-            blocking_run_handle = self.run_pants_with_workdir_without_waiting(
+            blocking_run_handle = run_pants_with_workdir_without_waiting(
                 command=["goals"], workdir=workdir, config=config
             )
 
@@ -592,9 +594,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         concurrent runs under pantsd."""
         config = {"GLOBAL": {"concurrent": True, "pantsd": True}}
         with temporary_workdir() as workdir:
-            pants_run = self.run_pants_with_workdir(
-                ["help", "goals"], workdir=workdir, config=config
-            )
+            pants_run = run_pants_with_workdir(["help", "goals"], workdir=workdir, config=config)
             pants_run.assert_success()
             pantsd_log_location = os.path.join(workdir, "pantsd", "pantsd.log")
             self.assertFalse(os.path.exists(pantsd_log_location))
