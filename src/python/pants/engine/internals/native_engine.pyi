@@ -1,12 +1,8 @@
-from typing import Any, Dict, Tuple, TypeVar
+from typing import Any
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
 # flake8: noqa: E302
-
-T = TypeVar("T")
-
-def cyclic_paths(adjacencies: Dict[T, Tuple[T, ...]]) -> Tuple[Tuple[T]]: ...
 
 class PyDigest:
     def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
