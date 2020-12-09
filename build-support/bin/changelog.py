@@ -22,7 +22,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--new",
         required=True,
         type=str,
-        help="The version for the new release, e.g. `2.0.0.dev0` or `2.0.0rc1`.",
+        help="The version for the new release, e.g. `2.0.0.dev1` or `2.0.0rc2`.",
     )
     return parser
 
@@ -65,10 +65,13 @@ def instructions(new_version: str) -> str:
     major, minor = version_components[0], version_components[1]
     return dedent(
         f"""\
-        Copy the below headers into `src/python/notes/{major}.{minor}.x.md`. Then, put each commit
-        into the relevant category. You can tweak descriptions to be more descriptive or to fix
-        typos, and you can reorder based on relative importance to end users. Delete any unused
-        headers.
+        Copy the below headers into `src/python/pants/notes/{major}.{minor}.x.md`. Then, put each
+        external-facing commit into the relevant category. Commits that are internal-only (i.e.,
+        that are only of interest to Pants developers and have no user-facing implications) should
+        be pasted into the PR description, not the release notes.
+
+        You can tweak descriptions to be more descriptive or to fix typos, and you can reorder
+        based on relative importance to end users. Delete any unused headers.
 
         ---------------------------------------------------------------------
 
@@ -86,11 +89,13 @@ def instructions(new_version: str) -> str:
         ### Bug fixes
 
 
+        ### Performance
+
+
         ### Documentation
 
 
-        ### Internal only (Copy into the PR description, rather than the release notes)
-
+        ### Internal (put these in the PR description, not the release notes)
 
         --------------------------------------------------------------------
 
