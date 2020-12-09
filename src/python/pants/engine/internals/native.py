@@ -147,9 +147,6 @@ class Native(metaclass=SingletonMetaclass):
     def default_cache_path(self) -> str:
         return cast(str, self.lib.default_cache_path())
 
-    def default_config_path(self) -> str:
-        return cast(str, self.lib.default_config_path())
-
     def setup_pantsd_logger(self, log_file_path):
         return self.lib.setup_pantsd_logger(log_file_path)
 
