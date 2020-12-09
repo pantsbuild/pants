@@ -12,4 +12,4 @@ pantsd = false
 use_coverage = true
 
 [coverage-py]
-report = ["raw"]
+report = ["raw", "xml"]
