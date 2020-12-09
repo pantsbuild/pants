@@ -6,6 +6,26 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release, and
 https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
 
+2.0.1rc4 (12/09/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Revert "Move graph cycle detection to rust. (#11202)" (cherrypick of #11272) (#11277)
+  `PR #11202 <https://github.com/pantsbuild/pants/pull/11202>`_
+  `PR #11277 <https://github.com/pantsbuild/pants/pull/11277>`_
+
+* Increase Pants' python recursion limit by default, and allow it to be overridden. (cherrypick of #11271) (#11276)
+  `PR #11276 <https://github.com/pantsbuild/pants/pull/11276>`_
+
+Internal
+~~~~~~~~
+
+* [tests] Use a bandit version that works with older python versions. (cherrypick of #11268) (#11279)
+  `PR #11279 <https://github.com/pantsbuild/pants/pull/11279>`_
+
+
 2.0.1rc3 (11/24/2020)
 ---------------------
 
