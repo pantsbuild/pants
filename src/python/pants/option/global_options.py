@@ -13,10 +13,8 @@ from pants.base.build_environment import (
     get_buildroot,
     get_default_pants_config_file,
     get_pants_cachedir,
-    get_pants_configdir,
     pants_version,
 )
-from pants.base.deprecated import resolve_conflicting_options
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE
@@ -110,14 +108,7 @@ class ExecutionOptions:
             process_execution_speculation_delay=bootstrap_options.process_execution_speculation_delay,
             process_execution_speculation_strategy=bootstrap_options.process_execution_speculation_strategy,
             process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
-            process_execution_cache_namespace=resolve_conflicting_options(
-                old_option="remote_execution_process_cache_namespace",
-                new_option="process_execution_cache_namespace",
-                old_scope=GLOBAL_SCOPE,
-                new_scope=GLOBAL_SCOPE,
-                old_container=bootstrap_options,
-                new_container=bootstrap_options,
-            ),
+            process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             remote_instance_name=bootstrap_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
@@ -302,15 +293,19 @@ class GlobalOptions(Subsystem):
             "--pants-bootstrapdir",
             advanced=True,
             metavar="<dir>",
-            default=get_pants_cachedir(),
-            help="Unused. Will be deprecated in 2.2.0.",
+            default=None,
+            removal_version="2.3.0.dev1",
+            removal_hint="Unused.",
+            help="Unused.",
         )
         register(
             "--pants-configdir",
             advanced=True,
             metavar="<dir>",
-            default=get_pants_configdir(),
-            help="Unused. Will be deprecated in 2.2.0.",
+            default=None,
+            removal_version="2.3.0.dev1",
+            removal_hint="Unused.",
+            help="Unused.",
         )
         register(
             "--pants-workdir",
@@ -753,16 +748,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_maximum_timeout,
             help="Maximum timeout (in millseconds) to allow between retry attempts in accessing a remote store.",
-        )
-        register(
-            "--remote-execution-process-cache-namespace",
-            advanced=True,
-            removal_version="2.2.0.dev1",
-            removal_hint="Use the `--process-execution-cache-namespace` option instead.",
-            help="The cache namespace for remote process execution. "
-            "Bump this to invalidate every artifact's remote execution. "
-            "This is the remote execution equivalent of the legacy cache-key-gen-version "
-            "flag.",
         )
         register(
             "--remote-instance-name",

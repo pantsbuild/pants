@@ -4,6 +4,7 @@
 import functools
 import os
 import time
+import unittest
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterator, Optional, Tuple
@@ -11,7 +12,15 @@ from typing import Any, Callable, Dict, Iterator, Optional, Tuple
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
-from pants.testutil.pants_integration_test import PantsIntegrationTest, kill_daemon, read_pantsd_log
+from pants.testutil.pants_integration_test import (
+    PantsJoinHandle,
+    PantsResult,
+    kill_daemon,
+    read_pantsd_log,
+    run_pants,
+    run_pants_with_workdir,
+    run_pants_with_workdir_without_waiting,
+)
 from pants.util.collections import recursively_update
 from pants.util.contextutil import temporary_dir
 
@@ -103,8 +112,21 @@ class PantsdRunContext:
     pantsd_config: Dict[str, Any]
 
 
-class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
-    use_pantsd = False  # We set our own ad-hoc pantsd configuration in most of these tests.
+class PantsDaemonIntegrationTestBase(unittest.TestCase):
+    @staticmethod
+    def run_pants(*args, **kwargs) -> PantsResult:
+        # We set our own ad-hoc pantsd configuration in most of these tests.
+        return run_pants(*args, **{**kwargs, **{"use_pantsd": False}})
+
+    @staticmethod
+    def run_pants_with_workdir(*args, **kwargs) -> PantsResult:
+        # We set our own ad-hoc pantsd configuration in most of these tests.
+        return run_pants_with_workdir(*args, **{**kwargs, **{"use_pantsd": False}})
+
+    @staticmethod
+    def run_pants_with_workdir_without_waiting(*args, **kwargs) -> PantsJoinHandle:
+        # We set our own ad-hoc pantsd configuration in most of these tests.
+        return run_pants_with_workdir_without_waiting(*args, **{**kwargs, **{"use_pantsd": False}})
 
     @contextmanager
     def pantsd_test_context(
@@ -119,6 +141,11 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
                     "pantsd": True,
                     "level": log_level,
                     "pants_subprocessdir": pid_dir,
+                    "backend_packages": [
+                        # Provide goals used by various tests.
+                        "pants.backend.python",
+                        "pants.backend.python.lint.flake8",
+                    ],
                 }
             }
 
@@ -129,7 +156,7 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
             checker = PantsDaemonMonitor(pid_dir)
             kill_daemon(pid_dir)
             try:
-                yield (workdir, pantsd_config, checker)
+                yield workdir, pantsd_config, checker
                 kill_daemon(pid_dir)
                 checker.assert_stopped()
             finally:
@@ -179,13 +206,13 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
         workdir: str,
         config,
         cmd,
-        extra_config={},
-        extra_env={},
+        extra_config=None,
+        extra_env=None,
         success=True,
         expected_runs: int = 1,
     ):
         combined_config = config.copy()
-        recursively_update(combined_config, extra_config)
+        recursively_update(combined_config, extra_config or {})
         print(
             bold(
                 cyan(
@@ -198,7 +225,7 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
         run_count = self._run_count(workdir)
         start_time = time.time()
         run = self.run_pants_with_workdir(
-            cmd, workdir=workdir, config=combined_config, extra_env=extra_env
+            cmd, workdir=workdir, config=combined_config, extra_env=extra_env or {}
         )
         elapsed = time.time() - start_time
         print(bold(cyan(f"\ncompleted in {elapsed} seconds")))

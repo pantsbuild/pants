@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Optional, Sequence
 
-from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
@@ -234,25 +233,11 @@ class Address(EngineAwareParameter):
         self._target_name: Optional[str]
         if target_name and target_name != os.path.basename(self.spec_path):
             banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(target_name)
-            deprecated_banned_chars = banned_chars & set(r"/\:")
-            if deprecated_banned_chars:
-                warn_or_error(
-                    removal_version="2.2.0.dev1",
-                    deprecated_entity_description=(
-                        r"Using any of the `\`, `/`, or `:` characters in a target name."
-                    ),
-                    hint=(
-                        f"The target name {target_name} (defined in directory {self.spec_path}) "
-                        f"contains deprecated characters (`{deprecated_banned_chars}`), which will "
-                        "cause some usecases to fail. Please replace these characters with another "
-                        "separator character like `_` or `-`."
-                    ),
-                )
-            elif banned_chars:
+            if banned_chars:
                 raise InvalidTargetName(
                     f"The target name {target_name} (defined in directory {self.spec_path}) "
-                    f"contains banned characters (`{banned_chars}`). Please replace these "
-                    "characters with another separator character like `_` or `-`."
+                    f"contains banned characters (`{'`,`'.join(banned_chars)}`). Please replace "
+                    "these characters with another separator character like `_` or `-`."
                 )
             self._target_name = target_name
         else:

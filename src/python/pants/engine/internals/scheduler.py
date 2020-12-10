@@ -607,10 +607,10 @@ class SchedulerSession:
             ),
         )
 
-    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes]:
+    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes, ...]:
         sched_pointer = self._scheduler._scheduler
         return cast(
-            Tuple[bytes],
+            Tuple[bytes, ...],
             tuple(
                 self._scheduler._native.lib.single_file_digests_to_bytes(
                     sched_pointer, list(digests)

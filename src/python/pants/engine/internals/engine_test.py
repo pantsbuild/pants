@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import List, Optional
 
+import pytest
+
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import (
     EMPTY_FILE_DIGEST,
@@ -32,8 +34,7 @@ from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
 )
-from pants.testutil.rule_runner import QueryRule
-from pants.testutil.test_base import TestBase
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.logging import LogLevel
 
 
@@ -703,175 +704,171 @@ def a_rule(input: ComplicatedInput) -> Output:
     return Output(snapshot_1=input.snapshot_1, snapshot_2=input.snapshot_2)
 
 
-class MoreComplicatedEngineAware(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
             a_rule,
             QueryRule(Output, (ComplicatedInput,)),
-        )
+            QueryRule(ProcessResult, (Process,)),
+        ],
+        isolated_local_store=True,
+    )
 
-    def test_more_complicated_engine_aware(self) -> None:
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            self.scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler.session():
-            input_1 = CreateDigest(
-                (
-                    FileContent(path="a.txt", content=b"alpha"),
-                    FileContent(path="b.txt", content=b"beta"),
-                )
+
+def test_more_complicated_engine_aware(rule_runner: RuleRunner) -> None:
+    tracker = WorkunitTracker()
+    handler = StreamingWorkunitHandler(
+        rule_runner.scheduler,
+        callbacks=[tracker.add],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.TRACE,
+    )
+    with handler.session():
+        input_1 = CreateDigest(
+            (
+                FileContent(path="a.txt", content=b"alpha"),
+                FileContent(path="b.txt", content=b"beta"),
             )
-            digest_1 = self.request(Digest, [input_1])
-            snapshot_1 = self.request(Snapshot, [digest_1])
-
-            input_2 = CreateDigest((FileContent(path="g.txt", content=b"gamma"),))
-            digest_2 = self.request(Digest, [input_2])
-            snapshot_2 = self.request(Snapshot, [digest_2])
-
-            input = ComplicatedInput(snapshot_1=snapshot_1, snapshot_2=snapshot_2)
-
-            self.request(Output, [input])
-
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
         )
+        digest_1 = rule_runner.request(Digest, [input_1])
+        snapshot_1 = rule_runner.request(Snapshot, [digest_1])
 
-        streaming_workunit_context = handler._context
+        input_2 = CreateDigest((FileContent(path="g.txt", content=b"gamma"),))
+        digest_2 = rule_runner.request(Digest, [input_2])
+        snapshot_2 = rule_runner.request(Snapshot, [digest_2])
 
-        artifacts = workunit["artifacts"]
-        output_snapshot_1 = artifacts["snapshot_1"]
-        output_snapshot_2 = artifacts["snapshot_2"]
+        input = ComplicatedInput(snapshot_1=snapshot_1, snapshot_2=snapshot_2)
 
-        output_contents_list = streaming_workunit_context.snapshots_to_file_contents(
-            [output_snapshot_1, output_snapshot_2]
-        )
-        assert len(output_contents_list) == 2
+        rule_runner.request(Output, [input])
 
-        assert isinstance(output_contents_list[0], DigestContents)
-        assert isinstance(output_contents_list[1], DigestContents)
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    workunit = next(
+        item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+    )
 
-        digest_contents_1 = output_contents_list[0]
-        digest_contents_2 = output_contents_list[1]
+    streaming_workunit_context = handler._context
 
-        assert len(tuple(x for x in digest_contents_1 if x.content == b"alpha")) == 1
-        assert len(tuple(x for x in digest_contents_1 if x.content == b"beta")) == 1
+    artifacts = workunit["artifacts"]
+    output_snapshot_1 = artifacts["snapshot_1"]
+    output_snapshot_2 = artifacts["snapshot_2"]
 
-        assert len(tuple(x for x in digest_contents_2 if x.content == b"gamma")) == 1
+    output_contents_list = streaming_workunit_context.snapshots_to_file_contents(
+        [output_snapshot_1, output_snapshot_2]
+    )
+    assert len(output_contents_list) == 2
+
+    assert isinstance(output_contents_list[0], DigestContents)
+    assert isinstance(output_contents_list[1], DigestContents)
+
+    digest_contents_1 = output_contents_list[0]
+    digest_contents_2 = output_contents_list[1]
+
+    assert len(tuple(x for x in digest_contents_1 if x.content == b"alpha")) == 1
+    assert len(tuple(x for x in digest_contents_1 if x.content == b"beta")) == 1
+
+    assert len(tuple(x for x in digest_contents_2 if x.content == b"gamma")) == 1
 
 
-class StreamingWorkunitProcessTests(TestBase):
+def test_process_digests_on_streaming_workunits(rule_runner: RuleRunner) -> None:
+    scheduler = rule_runner.scheduler
 
-    additional_options = ["--no-process-execution-use-local-cache"]
+    tracker = WorkunitTracker()
+    handler = StreamingWorkunitHandler(
+        scheduler,
+        callbacks=[tracker.add],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.INFO,
+    )
 
-    @classmethod
-    def rules(cls):
-        return [*super().rules(), QueryRule(ProcessResult, (Process,))]
+    stdout_process = Process(
+        argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
+    )
 
-    def test_process_digests_on_workunits(self):
-        scheduler = self.scheduler
+    with handler.session():
+        result = rule_runner.request(ProcessResult, [stdout_process])
 
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
-        )
+    assert tracker.finished
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
-        stdout_process = Process(
-            argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
-        )
+    process_workunit = next(
+        item for item in finished if item["name"] == "multi_platform_process-running"
+    )
+    assert process_workunit is not None
+    stdout_digest = process_workunit["artifacts"]["stdout_digest"]
+    stderr_digest = process_workunit["artifacts"]["stderr_digest"]
 
-        with handler.session():
-            result = self.request(ProcessResult, [stdout_process])
+    assert result.stdout == b"stdout output\n"
+    assert stderr_digest == EMPTY_FILE_DIGEST
+    assert stdout_digest.serialized_bytes_length == len(result.stdout)
 
-        assert tracker.finished
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    tracker = WorkunitTracker()
+    handler = StreamingWorkunitHandler(
+        scheduler,
+        callbacks=[tracker.add],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.INFO,
+    )
 
-        process_workunit = next(
-            item for item in finished if item["name"] == "multi_platform_process-running"
-        )
-        assert process_workunit is not None
-        stdout_digest = process_workunit["artifacts"]["stdout_digest"]
-        stderr_digest = process_workunit["artifacts"]["stderr_digest"]
+    stderr_process = Process(
+        argv=("/bin/bash", "-c", "1>&2 /bin/echo 'stderr output'"), description="Stderr process"
+    )
 
-        assert result.stdout == b"stdout output\n"
-        assert stderr_digest == EMPTY_FILE_DIGEST
-        assert stdout_digest.serialized_bytes_length == len(result.stdout)
+    with handler.session():
+        result = rule_runner.request(ProcessResult, [stderr_process])
 
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            self._scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
-        )
+    assert tracker.finished
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    process_workunit = next(
+        item for item in finished if item["name"] == "multi_platform_process-running"
+    )
 
-        stderr_process = Process(
-            argv=("/bin/bash", "-c", "1>&2 /bin/echo 'stderr output'"), description="Stderr process"
-        )
+    assert process_workunit is not None
+    stdout_digest = process_workunit["artifacts"]["stdout_digest"]
+    stderr_digest = process_workunit["artifacts"]["stderr_digest"]
 
-        with handler.session():
-            result = self.request(ProcessResult, [stderr_process])
+    assert result.stderr == b"stderr output\n"
+    assert stdout_digest == EMPTY_FILE_DIGEST
+    assert stderr_digest.serialized_bytes_length == len(result.stderr)
 
-        assert tracker.finished
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        process_workunit = next(
-            item for item in finished if item["name"] == "multi_platform_process-running"
-        )
+    assert process_workunit["metadata"]["exit_code"] == 0
 
-        assert process_workunit is not None
-        stdout_digest = process_workunit["artifacts"]["stdout_digest"]
-        stderr_digest = process_workunit["artifacts"]["stderr_digest"]
+    try:
+        scheduler.ensure_remote_has_recursive([stdout_digest, stderr_digest])
+    except Exception as e:
+        # This is the exception message we should expect from invoking ensure_remote_has_recursive()
+        # in rust.
+        assert str(e) == "Cannot ensure remote has blobs without a remote"
 
-        assert result.stderr == b"stderr output\n"
-        assert stdout_digest == EMPTY_FILE_DIGEST
-        assert stderr_digest.serialized_bytes_length == len(result.stderr)
+    byte_outputs = scheduler.single_file_digests_to_bytes([stdout_digest, stderr_digest])
+    assert byte_outputs[0] == result.stdout
+    assert byte_outputs[1] == result.stderr
 
-        assert process_workunit["metadata"]["exit_code"] == 0
 
-        try:
-            self._scheduler.ensure_remote_has_recursive([stdout_digest, stderr_digest])
-        except Exception as e:
-            # This is the exception message we should expect from invoking ensure_remote_has_recursive()
-            # in rust.
-            assert str(e) == "Cannot ensure remote has blobs without a remote"
+def test_context_object_on_streaming_workunits(rule_runner: RuleRunner) -> None:
+    scheduler = rule_runner.scheduler
 
-        byte_outputs = self._scheduler.single_file_digests_to_bytes([stdout_digest, stderr_digest])
-        assert byte_outputs[0] == result.stdout
-        assert byte_outputs[1] == result.stderr
+    def callback(**kwargs) -> None:
+        context = kwargs["context"]
+        assert isinstance(context, StreamingWorkunitContext)
 
-    def test_context_object(self):
-        scheduler = self.scheduler
+        completed_workunits = kwargs["completed_workunits"]
+        for workunit in completed_workunits:
+            if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
+                digest = workunit["artifacts"]["stdout_digest"]
+                output = context.single_file_digests_to_bytes([digest])
+                assert output == (b"stdout output\n",)
 
-        def callback(**kwargs) -> None:
-            context = kwargs["context"]
-            assert isinstance(context, StreamingWorkunitContext)
+    handler = StreamingWorkunitHandler(
+        scheduler,
+        callbacks=[callback],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.INFO,
+    )
 
-            completed_workunits = kwargs["completed_workunits"]
-            for workunit in completed_workunits:
-                if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
-                    digest = workunit["artifacts"]["stdout_digest"]
-                    output = context.single_file_digests_to_bytes([digest])
-                    assert output == (b"stdout output\n",)
+    stdout_process = Process(
+        argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
+    )
 
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[callback],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
-        )
-
-        stdout_process = Process(
-            argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
-        )
-
-        with handler.session():
-            self.request(ProcessResult, [stdout_process])
+    with handler.session():
+        rule_runner.request(ProcessResult, [stdout_process])
