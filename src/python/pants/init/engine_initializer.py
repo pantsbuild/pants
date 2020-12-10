@@ -17,7 +17,7 @@ from pants.engine import desktop, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals import build_files, graph, options_parsing, uuid
+from pants.engine.internals import build_files, graph, options_parsing
 from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
@@ -244,7 +244,6 @@ class EngineInitializer:
                 *fs.rules(),
                 *desktop.rules(),
                 *graph.rules(),
-                *uuid.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
                 *platform.rules(),
