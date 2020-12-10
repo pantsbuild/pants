@@ -186,12 +186,19 @@ def test_single_passing_test(rule_runner: RuleRunner) -> None:
 
 def test_force(rule_runner: RuleRunner) -> None:
     tgt = create_test_target(rule_runner, [GOOD_SOURCE])
+
+    # Should not receive a memoized result if force=True.
     result_one = run_pytest(rule_runner, tgt, force=True)
-    assert result_one.exit_code == 0
     result_two = run_pytest(rule_runner, tgt, force=True)
+    assert result_one.exit_code == 0
     assert result_two.exit_code == 0
-    # Should not receive a memoized result.
     assert result_one is not result_two
+
+    # But should if force=False.
+    result_one = run_pytest(rule_runner, tgt, force=False)
+    result_two = run_pytest(rule_runner, tgt, force=False)
+    assert result_one.exit_code == 0
+    assert result_one is result_two
 
 
 def test_single_failing_test(rule_runner: RuleRunner) -> None:

@@ -244,7 +244,7 @@ impl Process {
       platform_constraint: None,
       is_nailgunnable: false,
       execution_slot_variable: None,
-      cache_scope: ProcessCacheScope::Always,
+      cache_scope: ProcessCacheScope::Successful,
     }
   }
 

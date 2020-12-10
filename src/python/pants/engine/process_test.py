@@ -112,6 +112,19 @@ def test_failing_process(rule_runner: RuleRunner) -> None:
     assert "Process 'failure' failed with exit code 1." in str(exc.value)
 
 
+def test_cache_scope_always(rule_runner: RuleRunner) -> None:
+    # Should not re-run on failure, even in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM && exit 1"),
+        cache_scope=ProcessCacheScope.ALWAYS,
+        description="failure",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("session two")
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    assert result_one is result_two
+
+
 def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
     # Should not re-run on success, even in a new Session.
     process = Process(
@@ -120,7 +133,7 @@ def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
         description="success",
     )
     result_one = rule_runner.request(FallibleProcessResult, [process])
-    rule_runner.new_session("next attempt")
+    rule_runner.new_session("session one")
     result_two = rule_runner.request(FallibleProcessResult, [process])
     assert result_one is result_two
 
@@ -131,9 +144,11 @@ def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
         description="failure",
     )
     result_three = rule_runner.request(FallibleProcessResult, [process])
-    rule_runner.new_session("next attempt")
     result_four = rule_runner.request(FallibleProcessResult, [process])
-    assert result_three != result_four
+    rule_runner.new_session("session two")
+    result_five = rule_runner.request(FallibleProcessResult, [process])
+    assert result_three is result_four
+    assert result_four != result_five
 
 
 def test_cache_scope_per_restart() -> None:
@@ -144,7 +159,7 @@ def test_cache_scope_per_restart() -> None:
     )
     runner_one = new_rule_runner()
     result_one = runner_one.request(FallibleProcessResult, [process])
-    runner_one.new_session("next attempt")
+    runner_one.new_session("session one")
     result_two = runner_one.request(FallibleProcessResult, [process])
     # Should not re-run within the same Scheduler, even with a new Session.
     assert result_one is result_two

@@ -67,9 +67,14 @@ impl crate::CommandRunner for CommandRunner {
     let digest = crate::digest(req.clone(), &self.metadata);
     let key = digest.0;
 
+    let cache_failures = req
+      .0
+      .values()
+      .any(|process| process.cache_scope == ProcessCacheScope::Always);
+
     let command_runner = self.clone();
     match self.lookup(key).await {
-      Ok(Some(result)) => {
+      Ok(Some(result)) if result.exit_code == 0 || cache_failures => {
         context
           .workunit_store
           .increment_counter(Metric::LocalCacheRequestsCached, 1);
@@ -85,18 +90,14 @@ impl crate::CommandRunner for CommandRunner {
           .increment_counter(Metric::LocalCacheReadErrors, 1);
         // Falling through to re-execute.
       }
-      Ok(None) => {
+      Ok(_) => {
+        // Either we missed, or we hit for a failing result.
         context
           .workunit_store
           .increment_counter(Metric::LocalCacheRequestsUncached, 1);
         // Falling through to execute.
       }
     }
-
-    let cache_failures = req
-      .0
-      .values()
-      .any(|process| process.cache_scope == ProcessCacheScope::Always);
 
     let result = command_runner.underlying.run(req, context.clone()).await?;
     if result.exit_code == 0 || cache_failures {

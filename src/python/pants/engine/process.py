@@ -135,7 +135,7 @@ class Process:
             cache_scope = (
                 ProcessCacheScope.ALWAYS if cache_failures else ProcessCacheScope.SUCCESSFUL
             )
-        self.cache_scope = cache_scope or ProcessCacheScope.ALWAYS
+        self.cache_scope = cache_scope or ProcessCacheScope.SUCCESSFUL
 
 
 @frozen_after_init
