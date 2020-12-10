@@ -39,7 +39,9 @@ use clap::{value_t, App, AppSettings, Arg};
 use fs::RelativePath;
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata};
+use process_execution::{
+  Context, NamedCaches, Platform, PlatformConstraint, ProcessCacheScope, ProcessMetadata,
+};
 use store::{BackoffConfig, Store};
 use tokio::runtime::Handle;
 use workunit_store::WorkunitStore;
@@ -373,7 +375,7 @@ async fn main() {
     target_platform: target_platform,
     is_nailgunnable,
     execution_slot_variable: None,
-    cache_failures: false,
+    cache_scope: ProcessCacheScope::Always,
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {

@@ -14,7 +14,7 @@ use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform,
-  PlatformConstraint, Process, ProcessMetadata,
+  PlatformConstraint, Process, ProcessCacheScope, ProcessMetadata,
 };
 
 #[cfg(test)]
@@ -65,7 +65,7 @@ fn construct_nailgun_server_request(
     target_platform: platform_constraint,
     is_nailgunnable: true,
     execution_slot_variable: None,
-    cache_failures: false,
+    cache_scope: ProcessCacheScope::Never,
   }
 }
 

@@ -150,6 +150,10 @@ class RuleRunner:
     def target_types(self) -> FrozenOrderedSet[Type[Target]]:
         return self.build_config.target_types
 
+    def new_session(self, build_id: str) -> None:
+        """Mutates this RuleRunner to begin a new Session with the same Scheduler."""
+        self.scheduler = self.scheduler.scheduler.new_session(build_id)
+
     def request(self, output_type: Type[_O], inputs: Iterable[Any]) -> _O:
         result = assert_single_element(
             self.scheduler.product_request(output_type, [Params(*inputs)])
