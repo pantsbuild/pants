@@ -50,13 +50,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.process import (
-    MultiPlatformProcess,
-    Process,
-    ProcessResult,
-    ProcessScope,
-    UncacheableProcess,
-)
+from pants.engine.process import MultiPlatformProcess, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import InvalidFieldException, Target
 from pants.python.python_repos import PythonRepos
@@ -466,8 +460,8 @@ async def find_interpreter(
     interpreter_constraints: PexInterpreterConstraints, pex_runtime_env: PexRuntimeEnvironment
 ) -> PythonExecutable:
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         PexCliProcess(
             description=f"Find interpreter for constraints: {formatted_constraints}",
             # Here, we run the Pex CLI with no requirements, which just selects an interpreter.
@@ -501,10 +495,11 @@ async def find_interpreter(
                 ),
             ),
             level=LogLevel.DEBUG,
+            # NB: We want interpreter discovery to re-run fairly frequently (PER_RESTART), but
+            # not on every run of Pants (NEVER, which is effectively per-Session). See #10769 for
+            # a solution that is less of a tradeoff.
+            cache_scope=ProcessCacheScope.PER_RESTART,
         ),
-    )
-    result = await Get(
-        ProcessResult, UncacheableProcess(process=process, scope=ProcessScope.PER_SESSION)
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
 
@@ -707,7 +702,7 @@ class PexProcess:
     output_directories: Optional[Tuple[str, ...]]
     timeout_seconds: Optional[int]
     execution_slot_variable: Optional[str]
-    uncacheable: bool
+    cache_scope: Optional[ProcessCacheScope]
 
     def __init__(
         self,
@@ -722,7 +717,7 @@ class PexProcess:
         output_directories: Optional[Iterable[str]] = None,
         timeout_seconds: Optional[int] = None,
         execution_slot_variable: Optional[str] = None,
-        uncacheable: bool = False,
+        cache_scope: Optional[ProcessCacheScope] = None,
     ) -> None:
         self.pex = pex
         self.argv = tuple(argv)
@@ -734,11 +729,11 @@ class PexProcess:
         self.output_directories = tuple(output_directories) if output_directories else None
         self.timeout_seconds = timeout_seconds
         self.execution_slot_variable = execution_slot_variable
-        self.uncacheable = uncacheable
+        self.cache_scope = cache_scope
 
 
 @rule
-async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
+def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
     argv = pex_environment.create_argv(
         f"./{request.pex.name}",
         *request.argv,
@@ -748,7 +743,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         **pex_environment.environment_dict(python_configured=request.pex.python is not None),
         **(request.extra_env or {}),
     }
-    process = Process(
+    return Process(
         argv,
         description=request.description,
         level=request.level,
@@ -758,8 +753,8 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         output_directories=request.output_directories,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
+        cache_scope=request.cache_scope,
     )
-    return await Get(Process, UncacheableProcess(process)) if request.uncacheable else process
 
 
 def rules():
