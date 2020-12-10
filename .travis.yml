@@ -595,6 +595,11 @@ jobs:
     - mkdir -p dist/deploy/pex/
     - mv dist/pants*.pex dist/deploy/pex/
     stage: Deploy Pants Pex Unstable
+notifications:
+  webhooks:
+    on_start: always
+    urls:
+    - https://webhooks.toolchain.com/travis/repo/pantsbuild/pants/
 stages:
 - if: type != cron
   name: Bootstrap Pants

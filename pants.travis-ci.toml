@@ -11,5 +11,13 @@ pantsd = false
 [test]
 use_coverage = true
 
+[pytest]
+junit_xml_dir = "dist/test-results/"
+
 [coverage-py]
 report = ["raw", "xml"]
+
+[auth]
+from_env_var = "TOOLCHAIN_AUTH_TOKEN"
+customer = "pantsbuild"
+ci_env_variables = ["TRAVIS", "TRAVIS_JOB_ID", "TRAVIS_BUILD_ID", "TRAVIS_PULL_REQUEST"]
