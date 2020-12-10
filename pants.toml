@@ -23,8 +23,6 @@ plugins = [
   "toolchain.pants.buildsense.plugin==0.1.0",
 ]
 
-streaming_workunits_report_interval = 1
-
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -143,9 +141,6 @@ interpreter_constraints = [">=3.7,<3.9"]
 
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
-
-[run-tracker]
-stats_option_scopes_to_record = ["*"]
 
 [toolchain-setup]
 repo = "pants"

@@ -921,7 +921,7 @@ class GlobalOptions(Subsystem):
         register(
             "--streaming-workunits-report-interval",
             type=float,
-            default=10,
+            default=1,
             advanced=True,
             help="Interval in seconds between when streaming workunit event receivers will be polled.",
         )
