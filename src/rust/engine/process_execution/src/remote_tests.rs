@@ -25,7 +25,7 @@ use workunit_store::{WorkunitState, WorkunitStore};
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  MultiPlatformProcess, Platform, PlatformConstraint, Process, ProcessMetadata,
+  MultiPlatformProcess, Platform, PlatformConstraint, Process, ProcessCacheScope, ProcessMetadata,
 };
 
 const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
@@ -82,7 +82,7 @@ async fn make_execute_request() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: false,
+    cache_scope: ProcessCacheScope::Always,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -163,7 +163,7 @@ async fn make_execute_request_with_instance_name() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: false,
+    cache_scope: ProcessCacheScope::Always,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -257,7 +257,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: false,
+    cache_scope: ProcessCacheScope::Always,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -500,7 +500,7 @@ async fn make_execute_request_with_timeout() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: false,
+    cache_scope: ProcessCacheScope::Always,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();

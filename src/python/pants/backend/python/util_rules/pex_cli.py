@@ -23,7 +23,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import Process
+from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
@@ -66,6 +66,7 @@ class PexCliProcess:
     output_directories: Optional[Tuple[str, ...]]
     python: Optional[PythonExecutable]
     level: LogLevel
+    cache_scope: Optional[ProcessCacheScope]
 
     def __init__(
         self,
@@ -78,6 +79,7 @@ class PexCliProcess:
         output_directories: Optional[Iterable[str]] = None,
         python: Optional[PythonExecutable] = None,
         level: LogLevel = LogLevel.INFO,
+        cache_scope: Optional[ProcessCacheScope] = None,
     ) -> None:
         self.argv = tuple(argv)
         self.description = description
@@ -87,6 +89,7 @@ class PexCliProcess:
         self.output_directories = tuple(output_directories) if output_directories else None
         self.python = python
         self.level = level
+        self.cache_scope = cache_scope
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -172,6 +175,7 @@ async def setup_pex_cli_process(
         output_directories=request.output_directories,
         append_only_caches={"pex_root": pex_root_path},
         level=request.level,
+        cache_scope=request.cache_scope,
     )
 
 
