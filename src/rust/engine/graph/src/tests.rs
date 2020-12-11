@@ -341,17 +341,11 @@ async fn uncacheable_node_only_runs_once() {
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
-  // TNode(0) and TNode(2) are cleared and dirtied (respectively) before completing, and
-  // so run twice each. But the uncacheable node runs once.
+  // TNode(0) is cleared before completing, and so will run twice. But the uncacheable node and its
+  // dependee each run once.
   assert_eq!(
     context.runs(),
-    vec![
-      TNode::new(2),
-      TNode::new(1),
-      TNode::new(0),
-      TNode::new(2),
-      TNode::new(0),
-    ]
+    vec![TNode::new(2), TNode::new(1), TNode::new(0), TNode::new(0),]
   );
 }
 
@@ -483,7 +477,7 @@ async fn retries() {
 }
 
 #[tokio::test]
-async fn canceled_immediately() {
+async fn canceled_on_invalidation() {
   let _logger = env_logger::try_init();
   let invalidation_delay = Duration::from_millis(10);
   let graph = Arc::new(Graph::new_with_invalidation_delay(invalidation_delay));
@@ -529,6 +523,40 @@ async fn canceled_immediately() {
     ],
     context.aborts(),
   );
+}
+
+#[tokio::test]
+async fn canceled_on_loss_of_interest() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new());
+
+  let delay_for_middle = Duration::from_millis(2000);
+  let start_time = Instant::now();
+  let context = {
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(1), delay_for_middle);
+    TContext::new(graph.clone()).with_delays(delays)
+  };
+
+  // Start a run, but cancel it well before the delayed middle node can complete.
+  tokio::select! {
+    _ = delay_for(Duration::from_millis(100)) => {},
+    _ = graph.create(TNode::new(2), &context) => { panic!("Should have timed out.") }
+  }
+
+  // Then start again, and allow to run to completion.
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+
+  // We should have waited more than the delay, but less than the time it would have taken to
+  // run twice.
+  assert!(Instant::now() >= start_time + delay_for_middle);
+  assert!(Instant::now() < start_time + (delay_for_middle * 2));
+
+  // And the top nodes should have seen one abort each.
+  assert_eq!(vec![TNode::new(2), TNode::new(1),], context.aborts(),);
 }
 
 #[tokio::test]

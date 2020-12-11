@@ -1084,6 +1084,7 @@ name = "graph"
 version = "0.0.1"
 dependencies = [
  "async-trait",
+ "async_value",
  "env_logger",
  "fnv",
  "futures 0.3.5",

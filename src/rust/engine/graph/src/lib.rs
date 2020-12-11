@@ -33,7 +33,7 @@ pub mod entry;
 mod node;
 
 pub use crate::entry::{Entry, EntryState};
-use crate::entry::{Generation, RunToken};
+use crate::entry::{Generation, NodeResult, RunToken};
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
@@ -42,6 +42,7 @@ use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::time::Duration;
 
+use async_value::AsyncValueSender;
 use fnv::FnvHasher;
 use futures::future;
 use log::{debug, info, warn};
@@ -78,6 +79,11 @@ impl<N: Node> InnerGraph<N> {
   // TODO: Now that we never delete Entries, we should consider making this infallible.
   fn entry_for_id(&self, id: EntryId) -> Option<&Entry<N>> {
     self.pg.node_weight(id)
+  }
+
+  // TODO: Now that we never delete Entries, we should consider making this infallible.
+  fn entry_for_id_mut(&mut self, id: EntryId) -> Option<&mut Entry<N>> {
+    self.pg.node_weight_mut(id)
   }
 
   fn unsafe_entry_for_id(&self, id: EntryId) -> &Entry<N> {
@@ -271,6 +277,7 @@ impl<N: Node> InnerGraph<N> {
 
   ///
   /// Begins a Walk from the given roots.
+  ///
   /// The Walk will iterate over all nodes that descend from the roots in the direction of
   /// traversal but won't necessarily be in topological order.
   ///
@@ -319,12 +326,25 @@ impl<N: Node> InnerGraph<N> {
         }
       })
       .collect();
+
     // And their transitive dependencies, which will be dirtied.
+    //
+    // NB: We do not dirty "through" a running Uncacheable node and into its dependees: this is
+    // because all Uncacheable nodes are currently also implicitly "not restartable", and thus
+    // shouldn't be interrupted unless all dependees have gone away for other reasons (such as the
+    // Session having ended).
+    //
+    // TODO: As part of #9462, we'll likely want to split the "not restartable" property from the
+    // Uncacheable property, because #9462 will deal with nodes that are Uncacheable/per-Session, but
+    // also restartable.
     let transitive_ids: Vec<_> = self
       .walk(
         root_ids.iter().cloned().collect(),
         Direction::Incoming,
-        |_| false,
+        |&entry_id| {
+          let entry = self.unsafe_entry_for_id(entry_id);
+          !entry.node().cacheable() && entry.is_running()
+        },
       )
       .filter(|eid| !root_ids.contains(eid))
       .collect();
@@ -729,6 +749,19 @@ impl<N: Node> Graph<N> {
   }
 
   ///
+  /// When a Node is canceled because all receivers go away, the Executor for that Node will call
+  /// back to ensure that it is canceled.
+  ///
+  /// See also: `Self::complete`.
+  ///
+  fn cancel(&self, entry_id: EntryId, run_token: RunToken) {
+    let mut inner = self.inner.lock();
+    if let Some(ref mut entry) = inner.entry_for_id_mut(entry_id) {
+      entry.cancel(run_token);
+    }
+  }
+
+  ///
   /// When the Executor finishes executing a Node it calls back to store the result value. We use
   /// the run_token and dirty bits to determine whether the Node changed while we were busy
   /// executing it, so that we can discard the work.
@@ -742,29 +775,14 @@ impl<N: Node> Graph<N> {
   /// reliably the case because Entry happens to require a &mut InnerGraph reference; it would be
   /// great not to violate that in the future.
   ///
-  /// TODO: We don't track which generation actually added which edges, so over time nodes will end
-  /// up with spurious dependencies. This is mostly sound, but may lead to over-invalidation and
-  /// doing more work than is necessary.
-  /// As an example, if generation 0 of X depends on A and B, and generation 1 of X depends on C,
-  /// nothing will prune the dependencies from X onto A and B, so generation 1 of X will have
-  /// dependencies on A, B, and C in the graph, even though running it only depends on C.
-  /// At some point we should address this, but we must be careful with how we do so; anything which
-  /// ties together the generation of a node with specifics of edges would require careful
-  /// consideration of locking (probably it would require merging the EntryState locks and Graph
-  /// locks, or working out something clever).
-  ///
-  /// It would also require careful consideration of nodes in the Running EntryState - these may
-  /// have previous RunToken edges and next RunToken edges which collapse into the same Generation
-  /// edges; when working out whether a dirty node is really clean, care must be taken to avoid
-  /// spurious cycles. Currently we handle this as a special case by, if we detect a cycle that
-  /// contains dirty nodes, clearing those nodes (removing any edges from them). This is a little
-  /// hacky, but will tide us over until we fully solve this problem.
+  /// See also: `Self::cancel`.
   ///
   fn complete(
     &self,
     context: &N::Context,
     entry_id: EntryId,
     run_token: RunToken,
+    sender: AsyncValueSender<NodeResult<N>>,
     result: Option<Result<N::Item, N::Error>>,
   ) {
     let (entry, has_uncacheable_deps, dep_generations) = {
@@ -799,6 +817,7 @@ impl<N: Node> Graph<N> {
         context,
         run_token,
         dep_generations,
+        sender,
         result,
         has_uncacheable_deps,
         &mut inner,

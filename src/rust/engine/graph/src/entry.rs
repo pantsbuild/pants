@@ -4,8 +4,9 @@ use std::sync::Arc;
 use crate::node::{EntryId, Node, NodeContext, NodeError};
 use crate::test_trace_log;
 
+use async_value::{AsyncValue, AsyncValueReceiver, AsyncValueSender};
 use futures::channel::oneshot;
-use futures::future::{self, AbortHandle, Abortable, Aborted, BoxFuture, FutureExt};
+use futures::future::{self, BoxFuture, FutureExt};
 use parking_lot::Mutex;
 
 ///
@@ -151,7 +152,7 @@ impl<N: Node> AsRef<N::Item> for EntryResult<N> {
   }
 }
 
-type Waiter<N> = oneshot::Sender<Result<(<N as Node>::Item, Generation), <N as Node>::Error>>;
+pub type NodeResult<N> = Result<(<N as Node>::Item, Generation), <N as Node>::Error>;
 
 #[derive(Debug)]
 pub enum EntryState<N: Node> {
@@ -170,12 +171,14 @@ pub enum EntryState<N: Node> {
   // A node that is running. A running node that has been marked dirty re-runs rather than
   // completing.
   //
+  // Holds an AsyncValue, which is canceled if either 1) all AsyncValueReceivers go away, 2) the
+  // AsyncValue itself is dropped.
+  //
   // The `previous_result` value for a Running node is not a valid value. See NotStarted.
   Running {
     run_token: RunToken,
-    abort_handle: AbortHandle,
+    pending_value: AsyncValue<NodeResult<N>>,
     generation: Generation,
-    waiters: Vec<Waiter<N>>,
     previous_result: Option<EntryResult<N>>,
   },
   // A node that has completed, and then possibly been marked dirty. Because marking a node
@@ -300,14 +303,15 @@ impl<N: Node> Entry<N> {
     generation: Generation,
     previous_dep_generations: Option<Vec<Generation>>,
     previous_result: Option<EntryResult<N>>,
-  ) -> EntryState<N> {
+  ) -> (EntryState<N>, AsyncValueReceiver<NodeResult<N>>) {
     // Increment the RunToken to uniquely identify this work.
     let run_token = run_token.next();
     let context = context_factory.clone_for(entry_id);
+    let context2 = context.clone();
     let node = node.clone();
-    let (abort_handle, abort_registration) = AbortHandle::new_pair();
+    let (value, mut sender, receiver) = AsyncValue::new();
 
-    context_factory.spawn(async move {
+    let run_or_clean = async move {
       // If we have previous result generations, compare them to all current dependency
       // generations (which, if they are dirty, will cause recursive cleaning). If they
       // match, we can consider the previous result value to be clean for reuse.
@@ -342,31 +346,41 @@ impl<N: Node> Entry<N> {
       if was_clean {
         // No dependencies have changed: we can complete the Node without changing its
         // previous_result or generation.
-        context
-          .graph()
-          .complete(&context, entry_id, run_token, None);
+        None
       } else {
-        // The Node needs to (re-)run! Wrap the potentially long running computation in an
-        // Abortable.
-        let res = match Abortable::new(node.run(context.clone()), abort_registration).await {
-          Ok(r) => r,
-          Err(Aborted) => Err(N::Error::invalidated()),
-        };
-
+        // The Node needs to (re-)run!
+        let res = node.run(context.clone()).await;
         context.stats().ran += 1;
-        context
-          .graph()
-          .complete(&context, entry_id, run_token, Some(res));
+        Some(res)
+      }
+    };
+
+    context_factory.spawn(async move {
+      tokio::select! {
+        _ = sender.closed() => {
+          // We've been explicitly canceled: exit.
+          context2
+            .graph()
+            .cancel(entry_id, run_token);
+        }
+        maybe_res = run_or_clean => {
+          // The node completed.
+          context2
+            .graph()
+            .complete(&context2, entry_id, run_token, sender, maybe_res);
+        }
       }
     });
 
-    EntryState::Running {
-      run_token,
-      abort_handle,
-      waiters: Vec::new(),
-      generation,
-      previous_result,
-    }
+    (
+      EntryState::Running {
+        run_token,
+        pending_value: value,
+        generation,
+        previous_result,
+      },
+      receiver,
+    )
   }
 
   ///
@@ -377,98 +391,135 @@ impl<N: Node> Entry<N> {
   /// need to consume the state (which avoids cloning some of the values held there), so we take it
   /// by value.
   ///
-  #[allow(clippy::type_complexity)] // This return type is not particularly complex.
   pub(crate) fn get_node_result(
     &mut self,
     context: &N::Context,
     entry_id: EntryId,
-  ) -> BoxFuture<Result<(N::Item, Generation), N::Error>> {
-    {
-      let mut state = self.state.lock();
+  ) -> BoxFuture<NodeResult<N>> {
+    let mut state = self.state.lock();
 
-      // First check whether the Node is already complete, or is currently running: in both of these
-      // cases we return early without swapping the state of the Node.
-      match *state {
-        EntryState::Running {
-          ref mut waiters, ..
-        } => {
-          let (send, recv) = oneshot::channel();
-          waiters.push(send);
-          return async move { recv.await.map_err(|_| N::Error::invalidated())? }.boxed();
+    // First check whether the Node is already complete, or is currently running: in both of these
+    // cases we return early without swapping the state of the Node.
+    match *state {
+      EntryState::Running {
+        ref pending_value, ..
+      } => {
+        if let Some(receiver) = pending_value.receiver() {
+          return async move { receiver.recv().await.ok_or_else(N::Error::invalidated)? }.boxed();
         }
-        EntryState::Completed {
-          ref result,
-          generation,
-          ..
-        } if result.is_clean(context) => {
-          return future::ready(Ok((result.as_ref().clone(), generation))).boxed();
-        }
-        _ => (),
-      };
+        // Else: this node was just canceled: fall through to restart it.
+      }
+      EntryState::Completed {
+        ref result,
+        generation,
+        ..
+      } if result.is_clean(context) => {
+        return future::ready(Ok((result.as_ref().clone(), generation))).boxed();
+      }
+      _ => (),
+    };
 
-      // Otherwise, we'll need to swap the state of the Node, so take it by value.
-      let next_state = match mem::replace(&mut *state, EntryState::initial()) {
-        EntryState::NotStarted {
-          run_token,
-          generation,
-          previous_result,
-        } => Self::spawn_node_execution(
+    // Otherwise, we'll need to swap the state of the Node, so take it by value.
+    let (next_state, receiver) = match mem::replace(&mut *state, EntryState::initial()) {
+      EntryState::NotStarted {
+        run_token,
+        generation,
+        previous_result,
+      }
+      | EntryState::Running {
+        run_token,
+        generation,
+        previous_result,
+        ..
+      } => Self::spawn_node_execution(
+        context,
+        &self.node,
+        entry_id,
+        run_token,
+        generation,
+        None,
+        previous_result,
+      ),
+      EntryState::Completed {
+        run_token,
+        generation,
+        result,
+        dep_generations,
+        ..
+      } => {
+        test_trace_log!(
+          "Re-starting node {:?}. It was: previous_result={:?}",
+          self.node,
+          result,
+        );
+        assert!(
+          !result.is_clean(context),
+          "A clean Node should not reach this point: {:?}",
+          result
+        );
+        // The Node has already completed but needs to re-run. If the Node is dirty, we are the
+        // first caller to request it since it was marked dirty. We attempt to clean it (which
+        // will cause it to re-run if the dep_generations mismatch).
+        //
+        // On the other hand, if the Node is uncacheable, we store the previous result as
+        // Uncacheable, which allows its value to be used only within the current Run.
+        Self::spawn_node_execution(
           context,
           &self.node,
           entry_id,
           run_token,
           generation,
-          None,
-          previous_result,
-        ),
-        EntryState::Completed {
-          run_token,
-          generation,
-          result,
-          dep_generations,
-          ..
-        } => {
-          test_trace_log!(
-            "Re-starting node {:?}. It was: previous_result={:?}",
-            self.node,
-            result,
-          );
-          assert!(
-            !result.is_clean(context),
-            "A clean Node should not reach this point: {:?}",
-            result
-          );
-          // The Node has already completed but needs to re-run. If the Node is dirty, we are the
-          // first caller to request it since it was marked dirty. We attempt to clean it (which
-          // will cause it to re-run if the dep_generations mismatch).
-          //
-          // On the other hand, if the Node is uncacheable, we store the previous result as
-          // Uncacheable, which allows its value to be used only within the current Run.
-          Self::spawn_node_execution(
-            context,
-            &self.node,
-            entry_id,
-            run_token,
-            generation,
-            // TODO: This check shouldn't matter... it's whether we recompute the generations that
-            // matters.
-            if self.cacheable_with_output(Some(result.as_ref())) {
-              Some(dep_generations)
-            } else {
-              None
-            },
-            Some(result),
-          )
-        }
-        EntryState::Running { .. } => {
-          panic!("A Running Node should not reach this point.");
-        }
-      };
+          // TODO: This check shouldn't matter... it's whether we recompute the generations that
+          // matters.
+          if self.cacheable_with_output(Some(result.as_ref())) {
+            Some(dep_generations)
+          } else {
+            None
+          },
+          Some(result),
+        )
+      }
+    };
 
-      // Swap in the new state and then recurse.
-      *state = next_state;
+    // Swap in the new state, and return the receiver.
+    *state = next_state;
+
+    async move { receiver.recv().await.ok_or_else(N::Error::invalidated)? }.boxed()
+  }
+
+  ///
+  /// Called from the Executor when a Node is cancelled.
+  ///
+  /// See also: `Self::complete`.
+  ///
+  pub(crate) fn cancel(&mut self, result_run_token: RunToken) {
+    let mut state = self.state.lock();
+
+    // We care about exactly one case: a Running state with the same run_token. All other states
+    // represent various (legal) race conditions. See `RunToken`'s docs for more information.
+    match *state {
+      EntryState::Running { run_token, .. } if result_run_token == run_token => {}
+      _ => {
+        return;
+      }
     }
-    self.get_node_result(context, entry_id)
+
+    *state = match mem::replace(&mut *state, EntryState::initial()) {
+      EntryState::Running {
+        run_token,
+        generation,
+        previous_result,
+        ..
+      } => {
+        test_trace_log!("Canceling {:?} of {}.", run_token, self.node);
+        EntryState::NotStarted {
+          run_token: run_token.next(),
+          generation,
+          previous_result,
+        }
+      }
+      s => s,
+    };
   }
 
   ///
@@ -484,11 +535,14 @@ impl<N: Node> Entry<N> {
   /// complete _while_ a batch of nodes are being marked as dirty, and this exclusive access ensures
   /// that can't happen.
   ///
+  /// See also: `Self::cancel`.
+  ///
   pub(crate) fn complete(
     &mut self,
     context: &N::Context,
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
+    sender: AsyncValueSender<NodeResult<N>>,
     result: Option<Result<N::Item, N::Error>>,
     has_uncacheable_deps: bool,
     _graph: &mut super::InnerGraph<N>,
@@ -513,7 +567,6 @@ impl<N: Node> Entry<N> {
     *state = match mem::replace(&mut *state, EntryState::initial()) {
       EntryState::Running {
         run_token,
-        waiters,
         mut generation,
         mut previous_result,
         ..
@@ -523,7 +576,7 @@ impl<N: Node> Entry<N> {
             if let Some(previous_result) = previous_result.as_mut() {
               previous_result.dirty();
             }
-            self.notify_waiters(waiters, Err(e));
+            sender.send(Err(e));
             EntryState::NotStarted {
               run_token: run_token.next(),
               generation,
@@ -538,7 +591,7 @@ impl<N: Node> Entry<N> {
               // Node was re-executed (ie not cleaned) and had a different result value.
               generation = generation.next()
             };
-            self.notify_waiters(waiters, Ok((next_result.as_ref().clone(), generation)));
+            sender.send(Ok((next_result.as_ref().clone(), generation)));
             EntryState::Completed {
               result: next_result,
               pollers: Vec::new(),
@@ -557,7 +610,7 @@ impl<N: Node> Entry<N> {
               self.cacheable_with_output(Some(result.as_ref())),
               has_uncacheable_deps,
             );
-            self.notify_waiters(waiters, Ok((result.as_ref().clone(), generation)));
+            sender.send(Ok((result.as_ref().clone(), generation)));
             EntryState::Completed {
               result,
               pollers: Vec::new(),
@@ -570,34 +623,6 @@ impl<N: Node> Entry<N> {
       }
       s => s,
     };
-  }
-
-  ///
-  /// Notify the given waiters (ignoring any that have gone away).
-  ///
-  /// A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps due
-  /// to failure of another Future in a `join` or `join_all`, or due to a timeout at the root of
-  /// a request.
-  ///
-  fn notify_waiters(
-    &self,
-    mut waiters: Vec<Waiter<N>>,
-    next_result: Result<(N::Item, Generation), N::Error>,
-  ) {
-    test_trace_log!(
-      "Notifying {} waiters of node {:?}: {:?}",
-      waiters.len(),
-      self.node,
-      next_result,
-    );
-    // We pop off one waiter to avoid cloning for the last waiter (which might be the only waiter).
-    let last_waiter = waiters.pop();
-    for waiter in waiters {
-      let _ = waiter.send(next_result.clone());
-    }
-    if let Some(waiter) = last_waiter {
-      let _ = waiter.send(next_result);
-    }
   }
 
   ///
@@ -651,12 +676,12 @@ impl<N: Node> Entry<N> {
         } => (run_token, generation, previous_result),
         EntryState::Running {
           run_token,
-          abort_handle,
+          pending_value,
           generation,
           previous_result,
           ..
         } => {
-          abort_handle.abort();
+          std::mem::drop(pending_value);
           (run_token, generation, previous_result)
         }
         EntryState::Completed {
@@ -718,14 +743,14 @@ impl<N: Node> Entry<N> {
     *state = match mem::replace(&mut *state, EntryState::initial()) {
       EntryState::Running {
         run_token,
-        abort_handle,
+        pending_value,
         generation,
         previous_result,
         ..
       } => {
         // Dirtying a Running node immediately cancels it.
         test_trace_log!("Node {:?} was dirtied while running.", self.node);
-        abort_handle.abort();
+        std::mem::drop(pending_value);
         EntryState::NotStarted {
           run_token,
           generation,
@@ -740,6 +765,13 @@ impl<N: Node> Entry<N> {
     match *self.state.lock() {
       EntryState::NotStarted { .. } => false,
       EntryState::Completed { .. } | EntryState::Running { .. } => true,
+    }
+  }
+
+  pub fn is_running(&self) -> bool {
+    match *self.state.lock() {
+      EntryState::Running { .. } => true,
+      EntryState::Completed { .. } | EntryState::NotStarted { .. } => false,
     }
   }
 
