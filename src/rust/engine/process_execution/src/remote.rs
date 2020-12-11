@@ -27,17 +27,22 @@ use log::{debug, trace, warn, Level};
 use protobuf::{self, Message, ProtobufEnum};
 use rand::{thread_rng, Rng};
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
+use uuid::Uuid;
 use workunit_store::{with_workunit, SpanId, WorkunitMetadata, WorkunitStore};
 
 use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
-  PlatformConstraint, Process, ProcessMetadata,
+  PlatformConstraint, Process, ProcessCacheScope, ProcessMetadata,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
 // CommandRunner.
 pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
+
+// Environment variable which is used to include a unique value for cache busting of processes that
+// have indicated that they should never be cached.
+pub const CACHE_KEY_SALT_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_SALT";
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -920,7 +925,9 @@ pub fn make_execute_request(
   let mut command = bazel_protos::remote_execution::Command::new();
   command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
   for (name, value) in &req.env {
-    if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME || name == CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+    if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
+      || name == CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+      || name == CACHE_KEY_SALT_ENV_VAR_NAME
     {
       return Err(format!(
         "Cannot set env var with name {} as that is reserved for internal use by pants",
@@ -953,6 +960,16 @@ pub fn make_execute_request(
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_string());
     env.set_value(cache_key_gen_version);
+    command.mut_environment_variables().push(env);
+  }
+
+  if matches!(
+    req.cache_scope,
+    ProcessCacheScope::Never | ProcessCacheScope::PerRestart
+  ) {
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name(CACHE_KEY_SALT_ENV_VAR_NAME.to_string());
+    env.set_value(Uuid::new_v4().to_string());
     command.mut_environment_variables().push(env);
   }
 

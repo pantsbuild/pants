@@ -23,6 +23,7 @@ from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
     Process,
+    ProcessCacheScope,
     ProcessExecutionFailure,
     ProcessResult,
 )
@@ -33,13 +34,18 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, touch
 
 
-@pytest.fixture
-def rule_runner() -> RuleRunner:
+def new_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(BinaryPaths, [BinaryPathRequest]),
+            QueryRule(FallibleProcessResult, [Process]),
         ],
     )
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return new_rule_runner()
 
 
 @dataclass(frozen=True)
@@ -491,3 +497,74 @@ def test_find_binary_on_path_without_bash(rule_runner: RuleRunner) -> None:
         assert os.path.exists(os.path.join(binary_dir_abs, binary_name))
         assert binary_paths.first_path is not None
         assert binary_paths.first_path.path == binary_path_abs
+
+
+def test_cache_scope_always(rule_runner: RuleRunner) -> None:
+    # Should not re-run on failure, even in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM && exit 1"),
+        cache_scope=ProcessCacheScope.ALWAYS,
+        description="failure",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("session two")
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    assert result_one is result_two
+
+
+def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
+    # Should not re-run on success, even in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.SUCCESSFUL,
+        description="success",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("session one")
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    assert result_one is result_two
+
+    # Should re-run on failure, but only in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM && exit 1"),
+        cache_scope=ProcessCacheScope.SUCCESSFUL,
+        description="failure",
+    )
+    result_three = rule_runner.request(FallibleProcessResult, [process])
+    result_four = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("session two")
+    result_five = rule_runner.request(FallibleProcessResult, [process])
+    assert result_three is result_four
+    assert result_four != result_five
+
+
+def test_cache_scope_per_restart() -> None:
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.PER_RESTART,
+        description="random",
+    )
+    runner_one = new_rule_runner()
+    result_one = runner_one.request(FallibleProcessResult, [process])
+    runner_one.new_session("session one")
+    result_two = runner_one.request(FallibleProcessResult, [process])
+    # Should not re-run within the same Scheduler, even with a new Session.
+    assert result_one is result_two
+
+    # Should re-run in a new Scheduler.
+    runner_two = new_rule_runner()
+    result_three = runner_two.request(FallibleProcessResult, [process])
+    assert result_one.stdout != result_three.stdout
+
+
+def test_cache_scope_never(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.NEVER,
+        description="random",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("next attempt")
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    # Should re-run in a new Session.
+    assert result_one.stdout != result_two.stdout

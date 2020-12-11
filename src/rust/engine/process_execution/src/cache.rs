@@ -1,6 +1,6 @@
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessMetadata,
+  ProcessCacheScope, ProcessMetadata,
 };
 use std::sync::Arc;
 
@@ -62,9 +62,14 @@ impl crate::CommandRunner for CommandRunner {
     let digest = crate::digest(req.clone(), &self.metadata);
     let key = digest.0;
 
+    let cache_failures = req
+      .0
+      .values()
+      .any(|process| process.cache_scope == ProcessCacheScope::Always);
+
     let command_runner = self.clone();
     match self.lookup(key).await {
-      Ok(Some(result)) => return Ok(result),
+      Ok(Some(result)) if result.exit_code == 0 || cache_failures => return Ok(result),
       Err(err) => {
         debug!(
           "Error loading process execution result from local cache: {} - continuing to execute",
@@ -72,12 +77,11 @@ impl crate::CommandRunner for CommandRunner {
         );
         // Falling through to re-execute.
       }
-      Ok(None) => {
+      Ok(_) => {
+        // Either we missed, or we hit for a failing result.
         // Falling through to execute.
       }
     }
-
-    let cache_failures = req.0.values().any(|process| process.cache_failures);
 
     let result = command_runner.underlying.run(req, context).await?;
     if result.exit_code == 0 || cache_failures {
