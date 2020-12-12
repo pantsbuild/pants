@@ -71,6 +71,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "async_value"
+version = "0.0.1"
+dependencies = [
+ "futures 0.3.5",
+ "tokio",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
