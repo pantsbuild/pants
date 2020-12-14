@@ -30,6 +30,8 @@ env:
   - AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQ2HFZ5KP7
   - secure: oEmZoB4oP4ygCMRZp86AhB40ppH87pduS0p3zVVAnTLFLkrnA4qP0TvEOqwzc6DFceQuJ6telJOGUnB4ouFIl8aBoRW7KaIuudjVWxcBLEUDdoXlA9hGSY+BOTiBmMVX5g7Wdhfngy4nygrk01cG2UWvfm62VrexeV+48twaBJE=
   - RUST_BACKTRACE="all"
+  # TODO(tonic): Temporary measure until figure out async's that need to be Box'ed.
+  - RUST_MIN_STACK="8388608"
 jobs:
   include:
   - addons:
