@@ -2159,6 +2159,7 @@ dependencies = [
  "log 0.4.8",
  "process_execution",
  "store",
+ "structopt",
  "task_executor",
  "tokio",
  "workunit_store",
