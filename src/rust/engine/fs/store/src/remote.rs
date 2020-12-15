@@ -135,10 +135,10 @@ impl ByteStore {
           match kv_ref {
             KeyAndValueRef::Ascii(key, value) => {
               req_metadata.insert(key, value.clone());
-            },
+            }
             KeyAndValueRef::Binary(key, value) => {
               req_metadata.insert_bin(key, value.clone());
-            },
+            }
           }
         }
         Ok(req)
@@ -207,42 +207,11 @@ impl ByteStore {
       let resource_name = resource_name.clone();
       let chunk_size_bytes = store.chunk_size_bytes;
 
-      // TODO(tonic): The call into the Tonic library wants the slice to last for the 'static
+      // NOTE(tonic): The call into the Tonic library wants the slice to last for the 'static
       // lifetime but the slice passed into this method generally points into the shared memory
       // of the LMDB store which is on the other side of the FFI boundary.
       let bytes = Bytes::copy_from_slice(bytes);
 
-      // let stream = async_stream::stream! {
-      //   // Short-circuit the loop following if the write is empty.
-      //   if bytes.len() == 0 {
-      //     let req = bazel_protos::gen::google::bytestream::WriteRequest {
-      //       resource_name: resource_name.clone(),
-      //       write_offset: 0,
-      //       finish_write: true,
-      //       data: Vec::new(),
-      //     };
-      //     yield req;
-      //     return;
-      //   }
-      //
-      //   let mut offset = 0;
-      //   while offset < bytes.len() {
-      //     let next_offset = min(offset + chunk_size_bytes, bytes.len());
-      //     let req = bazel_protos::gen::google::bytestream::WriteRequest {
-      //       resource_name: resource_name.clone(),
-      //       write_offset: offset as i64,
-      //       finish_write: next_offset == bytes.len(),
-      //       data: Vec::from(&bytes[offset..next_offset]),
-      //     };
-      //     yield req;
-      //     offset = next_offset;
-      //   }
-      // };
-
-      // TODO(tonic): The original version of the stream using `unfold` fails to compile
-      // even with the use of a `Bytes` because of:
-      //   error[E0507]: cannot move out of `bytes`, a captured variable in an `Fn` closure
-      //
       let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
         if offset >= bytes.len() && has_sent_any {
           futures::future::ready(None)
@@ -252,6 +221,8 @@ impl ByteStore {
             resource_name: resource_name.clone(),
             write_offset: offset as i64,
             finish_write: next_offset == bytes.len(),
+            // TODO(tonic): Explore using the unreleased `Bytes` support in Prost from:
+            // https://github.com/danburkert/prost/pull/341
             data: Vec::from(&bytes[offset..next_offset]),
           };
           futures::future::ready(Some((req, (next_offset, true))))
