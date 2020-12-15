@@ -18,11 +18,11 @@ use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
-use tonic::{Code, Request};
+use tonic::{Code, Interceptor, Request};
 use workunit_store::with_workunit;
 
 use super::BackoffConfig;
-use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue};
+use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -31,7 +31,7 @@ pub struct ByteStore {
   upload_timeout: Duration,
   rpc_attempts: usize,
   channel: tonic::transport::Channel,
-  headers: BTreeMap<String, String>,
+  interceptor: Option<Interceptor>,
 }
 
 impl fmt::Debug for ByteStore {
@@ -99,21 +99,59 @@ impl ByteStore {
 
     let channel = tonic::transport::Channel::balance_list(endpoints.iter().cloned());
 
+    let headers = oauth_bearer_token
+      .iter()
+      .map(|t| {
+        (
+          String::from("authorization"),
+          format!("Bearer {}", t.trim()),
+        )
+      })
+      .collect::<BTreeMap<_, _>>();
+
+    let mut metadata = MetadataMap::with_capacity(headers.len());
+    for (key, value) in &headers {
+      let key_ascii = AsciiMetadataKey::from_str(key.as_str()).map_err(|_| {
+        format!(
+          "Header key `{}` must be an ASCII value (as required by gRPC).",
+          key
+        )
+      })?;
+      let value_ascii = AsciiMetadataValue::from_str(value.as_str()).map_err(|_| {
+        format!(
+          "Header value `{}` for key `{}` must be an ASCII value (as required by gRPC).",
+          value, key
+        )
+      })?;
+      metadata.insert(key_ascii, value_ascii);
+    }
+
+    let interceptor = if headers.is_empty() {
+      None
+    } else {
+      Some(Interceptor::new(move |mut req: Request<()>| {
+        let req_metadata = req.metadata_mut();
+        for kv_ref in metadata.iter() {
+          match kv_ref {
+            KeyAndValueRef::Ascii(key, value) => {
+              req_metadata.insert(key, value.clone());
+            },
+            KeyAndValueRef::Binary(key, value) => {
+              req_metadata.insert_bin(key, value.clone());
+            },
+          }
+        }
+        Ok(req)
+      }))
+    };
+
     Ok(ByteStore {
       instance_name,
       chunk_size_bytes,
       upload_timeout,
       channel,
       rpc_attempts: rpc_retries + 1,
-      headers: oauth_bearer_token
-        .iter()
-        .map(|t| {
-          (
-            String::from("authorization"),
-            format!("Bearer {}", t.trim()),
-          )
-        })
-        .collect(),
+      interceptor,
     })
   }
 
@@ -125,30 +163,13 @@ impl ByteStore {
     &self,
     f: F,
   ) -> Result<Value, String> {
-    // retry::all_errors_immediately(&self.serverset, self.rpc_attempts, move |channel| {
-    //   f(bazel_protos::bytestream_grpc::ByteStreamClient::new(
-    //     channel,
-    //   ))
-    // })
-    // .await
-
-    if self.headers.is_empty() {
-      let client = ByteStreamClient::new(self.channel.clone());
-      f(client).await
-    } else {
-      let headers = self.headers.clone();
-      let client =
-        ByteStreamClient::with_interceptor(self.channel.clone(), move |mut req: Request<()>| {
-          let metadata = req.metadata_mut();
-          for (key, value) in &headers {
-            let key_ascii = AsciiMetadataKey::from_str(key.as_str()).unwrap();
-            let value_ascii = AsciiMetadataValue::from_str(value.as_str()).unwrap();
-            metadata.insert(key_ascii, value_ascii);
-          }
-          Ok(req)
-        });
-      f(client).await
-    }
+    let client = match self.interceptor.as_ref() {
+      Some(interceptor) => {
+        ByteStreamClient::with_interceptor(self.channel.clone(), interceptor.clone())
+      }
+      None => ByteStreamClient::new(self.channel.clone()),
+    };
+    f(client).await
   }
 
   async fn with_cas_client<
@@ -159,33 +180,13 @@ impl ByteStore {
     &self,
     f: F,
   ) -> Result<Value, String> {
-    // retry::all_errors_immediately(&self.serverset, self.rpc_attempts, move |channel| {
-    //   f(
-    //     remexec::content_addressable_storage_client::ContentAddressableStorageClient::connect(
-    //       channel,
-    //     ),
-    //   )
-    // })
-    // .await
-    if self.headers.is_empty() {
-      let client = ContentAddressableStorageClient::new(self.channel.clone());
-      f(client).await
-    } else {
-      let headers = self.headers.clone();
-      let client = ContentAddressableStorageClient::with_interceptor(
-        self.channel.clone(),
-        move |mut req: Request<()>| {
-          let metadata = req.metadata_mut();
-          for (key, value) in &headers {
-            let key_ascii = AsciiMetadataKey::from_str(key.as_str()).unwrap();
-            let value_ascii = AsciiMetadataValue::from_str(value.as_str()).unwrap();
-            metadata.insert(key_ascii, value_ascii);
-          }
-          Ok(req)
-        },
-      );
-      f(client).await
-    }
+    let client = match self.interceptor.as_ref() {
+      Some(interceptor) => {
+        ContentAddressableStorageClient::with_interceptor(self.channel.clone(), interceptor.clone())
+      }
+      None => ContentAddressableStorageClient::new(self.channel.clone()),
+    };
+    f(client).await
   }
 
   pub async fn store_bytes(&self, bytes: &[u8]) -> Result<Digest, String> {
