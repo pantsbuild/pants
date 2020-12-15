@@ -1067,10 +1067,7 @@ pub fn make_execute_request(
   }
 
   // Extract `Platform` proto from the `Command` to avoid a partial move of `Command`.
-  let mut command_platform = command
-    .platform
-    .take()
-    .unwrap_or_else(remexec::Platform::default);
+  let mut command_platform = command.platform.take().unwrap_or_default();
 
   // Add configured platform properties to the `Platform`.
   for (name, value) in platform_properties {
