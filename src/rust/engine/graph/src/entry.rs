@@ -316,27 +316,20 @@ impl<N: Node> Entry<N> {
       // generations (which, if they are dirty, will cause recursive cleaning). If they
       // match, we can consider the previous result value to be clean for reuse.
       let was_clean = if let Some(previous_dep_generations) = previous_dep_generations {
-        match context.graph().dep_generations(entry_id, &context).await {
-          Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
-            // Dependencies have not changed: Node is clean.
-            context.stats().cleaning_succeeded += 1;
-            true
-          }
-          // `x` is unused if `test_trace_log`ging is disabled.
-          #[allow(unused_variables)]
-          x => {
-            // If dependency generations mismatched or failed to fetch, clear its
-            // dependencies and indicate that it should re-run.
-            context.graph().clear_deps(entry_id, run_token);
-            context.stats().cleaning_failed += 1;
-            test_trace_log!(
-              "Failed to clean {}: {:?} vs {:?}",
-              node,
-              x,
-              previous_dep_generations
-            );
-            false
-          }
+        if context
+          .graph()
+          .dependencies_changed(entry_id, previous_dep_generations, &context)
+          .await
+        {
+          // If dependency generations mismatched or failed to fetch, clear the node's dependencies
+          // and indicate that it should re-run.
+          context.graph().clear_deps(entry_id, run_token);
+          context.stats().cleaning_failed += 1;
+          false
+        } else {
+          // Dependencies have not changed: Node is clean.
+          context.stats().cleaning_succeeded += 1;
+          true
         }
       } else {
         false

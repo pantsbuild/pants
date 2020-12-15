@@ -696,32 +696,59 @@ impl<N: Node> Graph<N> {
   }
 
   ///
-  /// Gets the generations of the dependencies of the given EntryId, (re)computing or cleaning
-  /// them first if necessary.
+  /// Compares the generations of the dependencies of the given EntryId to their previous
+  /// generation values (re-computing or cleaning them first if necessary), and returns true if any
+  /// dependency has changed.
   ///
-  async fn dep_generations(
+  async fn dependencies_changed(
     &self,
     entry_id: EntryId,
+    previous_dep_generations: Vec<Generation>,
     context: &N::Context,
-  ) -> Result<Vec<Generation>, N::Error> {
-    let generations = {
+  ) -> bool {
+    let generation_matches = {
       let inner = self.inner.lock();
-      inner
+      let dependency_ids = inner
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
-        .map(|dep_id| {
+        .collect::<Vec<_>>();
+
+      if dependency_ids.len() != previous_dep_generations.len() {
+        // If we don't have the same number of current dependencies as there were generations
+        // previously, then they cannot match.
+        return true;
+      }
+
+      dependency_ids
+        .into_iter()
+        .zip(previous_dep_generations.into_iter())
+        .map(|(dep_id, previous_dep_generation)| {
           let mut entry = inner
             .entry_for_id(dep_id)
             .unwrap_or_else(|| panic!("Dependency not present in Graph."))
             .clone();
           async move {
-            let (_, generation) = entry.get_node_result(context, dep_id).await?;
-            Ok(generation)
+            let (_, generation) = entry
+              .get_node_result(context, dep_id)
+              .await
+              .map_err(|_| ())?;
+            if generation == previous_dep_generation {
+              // Matched.
+              Ok(())
+            } else {
+              // Did not match. We error here to trigger fail-fast in `try_join_all`.
+              Err(())
+            }
           }
         })
         .collect::<Vec<_>>()
     };
-    future::try_join_all(generations).await
+
+    // We use try_join_all in order to speculatively execute all branches, and to fail fast if any
+    // generation mismatches. The first mismatch encountered will cause any extraneous cleaning
+    // work to be canceled. See #11290 for more information about the tradeoffs inherent in
+    // speculation.
+    future::try_join_all(generation_matches).await.is_err()
   }
 
   ///

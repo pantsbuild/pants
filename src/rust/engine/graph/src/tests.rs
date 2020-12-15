@@ -561,6 +561,50 @@ async fn canceled_on_loss_of_interest() {
 }
 
 #[tokio::test]
+async fn clean_speculatively() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new());
+
+  // Create a graph with a node with two dependencies, one of which takes much longer
+  // to run.
+  let mut dependencies = vec![
+    (TNode::new(3), vec![TNode::new(2), TNode::new(1)]),
+    (TNode::new(2), vec![TNode::new(0)]),
+    (TNode::new(1), vec![TNode::new(0)]),
+  ]
+  .into_iter()
+  .collect::<HashMap<_, _>>();
+  let delay = Duration::from_millis(2000);
+  let context = {
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(2), delay);
+    TContext::new(graph.clone())
+      .with_delays(delays)
+      .with_dependencies(dependencies.clone())
+  };
+
+  // Run it to completion, and then clear a node at the bottom of the graph to force cleaning of
+  // both dependencies.
+  assert_eq!(
+    graph.create(TNode::new(3), &context).await,
+    Ok(vec![T(0, 0), T(2, 0), T(3, 0)])
+  );
+  graph.invalidate_from_roots(|n| n == &TNode::new(0));
+
+  // Then request again with the slow node removed from the dependencies, and confirm that it is
+  // cleaned much sooner than it would been if it had waited for the slow node.
+  dependencies.insert(TNode::new(3), vec![TNode::new(1)]);
+  let context = context.with_salt(1).with_dependencies(dependencies);
+  let start_time = Instant::now();
+  assert_eq!(
+    graph.create(TNode::new(3), &context).await,
+    Ok(vec![T(0, 1), T(1, 1), T(3, 1)])
+  );
+  assert!(Instant::now() < start_time + delay);
+  assert_eq!(context.stats().cleaning_failed, 3);
+}
+
+#[tokio::test]
 async fn cyclic_failure() {
   // Confirms that an attempt to create a cycle fails.
   let graph = Arc::new(Graph::new());
