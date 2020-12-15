@@ -247,7 +247,7 @@ fn duplicate_path_in_file_and_directory() {
 #[test]
 #[ignore] // this test does nothing
 fn unsorted_path_in_directory() {
-  let directory = Directory {
+  let _directory = Directory {
     directories: vec![
       DirectoryNode {
         name: "dogs".to_owned(),
@@ -271,7 +271,7 @@ fn unsorted_path_in_directory() {
 #[test]
 #[ignore] // this test does nothing
 fn unsorted_path_in_file() {
-  let directory = Directory {
+  let _directory = Directory {
     files: vec![
       FileNode {
         name: "simba".to_owned(),
