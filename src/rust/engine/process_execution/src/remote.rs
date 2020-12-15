@@ -1533,32 +1533,6 @@ pub fn format_error(error: &StatusProto) -> String {
   format!("{}: {}", error_code, error.message)
 }
 
-// fn rpcerror_to_status_or_string(
-//   error: &grpcio::Error,
-// ) -> Result<bazel_protos::status::Status, String> {
-//   match error {
-//     grpcio::Error::RpcFailure(grpcio::RpcStatus {
-//       status_proto_bytes: Some(status_proto_bytes),
-//       ..
-//     }) => {
-//       let mut status_proto = bazel_protos::status::Status::new();
-//       status_proto.merge_from_bytes(&status_proto_bytes).unwrap();
-//       Ok(status_proto)
-//     }
-//     grpcio::Error::RpcFailure(grpcio::RpcStatus {
-//       status, details, ..
-//     }) => Err(format!(
-//       "{:?}: {:?}",
-//       status,
-//       details
-//         .as_ref()
-//         .map(|s| s.as_str())
-//         .unwrap_or_else(|| "[no message]")
-//     )),
-//     err => Err(format!("{:?}", err)),
-//   }
-// }
-
 pub(crate) fn rpcerror_to_string(status: Status) -> String {
   format!("{:?}: {:?}", status.code(), status.message(),)
 }
