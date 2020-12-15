@@ -63,6 +63,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "async_value"
+version = "0.0.1"
+dependencies = [
+ "futures 0.3.5",
+ "tokio",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1067,6 +1075,7 @@ name = "graph"
 version = "0.0.1"
 dependencies = [
  "async-trait",
+ "async_value",
  "env_logger",
  "fnv",
  "futures 0.3.5",
@@ -3141,9 +3150,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.22"
+version = "0.2.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d34ca54d84bf2b5b4d7d31e901a8464f7b60ac145a284fba25ceb801f2ddccd"
+checksum = "099837d3464c16a808060bb3f02263b412f6fafcb5d01c533d309985fbeebe48"
 dependencies = [
  "bytes 0.5.4",
  "fnv",
@@ -3185,9 +3194,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0c3acc6aa564495a0f2e1d59fab677cd7f81a19994cfc7f3ad0e64301560389"
+checksum = "e44da00bfc73a25f814cd8d7e57a68a5c31b74b3152a0a1d1f590c97ed06265a"
 dependencies = [
  "proc-macro2 1.0.12",
  "quote 1.0.4",

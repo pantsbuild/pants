@@ -1,0 +1,10 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "async_value"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+futures = "0.3"
+tokio = { version = "0.2.22", features = ["sync", "macros"] }
