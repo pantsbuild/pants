@@ -8,6 +8,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
+use futures::future;
 use parking_lot::Mutex;
 use rand::{self, Rng};
 use tokio::time::{delay_for, timeout, Elapsed};
@@ -115,7 +116,7 @@ async fn invalidate_with_changed_dependencies() {
 
   // Request with a new context that truncates execution at the middle Node.
   let context = TContext::new(graph.clone())
-    .with_dependencies(vec![(TNode::new(1), None)].into_iter().collect());
+    .with_dependencies(vec![(TNode::new(1), vec![])].into_iter().collect());
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(1, 0), T(2, 0)])
@@ -341,17 +342,11 @@ async fn uncacheable_node_only_runs_once() {
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
-  // TNode(0) and TNode(2) are cleared and dirtied (respectively) before completing, and
-  // so run twice each. But the uncacheable node runs once.
+  // TNode(0) is cleared before completing, and so will run twice. But the uncacheable node and its
+  // dependee each run once.
   assert_eq!(
     context.runs(),
-    vec![
-      TNode::new(2),
-      TNode::new(1),
-      TNode::new(0),
-      TNode::new(2),
-      TNode::new(0),
-    ]
+    vec![TNode::new(2), TNode::new(1), TNode::new(0), TNode::new(0),]
   );
 }
 
@@ -483,7 +478,7 @@ async fn retries() {
 }
 
 #[tokio::test]
-async fn canceled_immediately() {
+async fn canceled_on_invalidation() {
   let _logger = env_logger::try_init();
   let invalidation_delay = Duration::from_millis(10);
   let graph = Arc::new(Graph::new_with_invalidation_delay(invalidation_delay));
@@ -532,13 +527,91 @@ async fn canceled_immediately() {
 }
 
 #[tokio::test]
+async fn canceled_on_loss_of_interest() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new());
+
+  let delay_for_middle = Duration::from_millis(2000);
+  let start_time = Instant::now();
+  let context = {
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(1), delay_for_middle);
+    TContext::new(graph.clone()).with_delays(delays)
+  };
+
+  // Start a run, but cancel it well before the delayed middle node can complete.
+  tokio::select! {
+    _ = delay_for(Duration::from_millis(100)) => {},
+    _ = graph.create(TNode::new(2), &context) => { panic!("Should have timed out.") }
+  }
+
+  // Then start again, and allow to run to completion.
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+
+  // We should have waited more than the delay, but less than the time it would have taken to
+  // run twice.
+  assert!(Instant::now() >= start_time + delay_for_middle);
+  assert!(Instant::now() < start_time + (delay_for_middle * 2));
+
+  // And the top nodes should have seen one abort each.
+  assert_eq!(vec![TNode::new(2), TNode::new(1),], context.aborts(),);
+}
+
+#[tokio::test]
+async fn clean_speculatively() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new());
+
+  // Create a graph with a node with two dependencies, one of which takes much longer
+  // to run.
+  let mut dependencies = vec![
+    (TNode::new(3), vec![TNode::new(2), TNode::new(1)]),
+    (TNode::new(2), vec![TNode::new(0)]),
+    (TNode::new(1), vec![TNode::new(0)]),
+  ]
+  .into_iter()
+  .collect::<HashMap<_, _>>();
+  let delay = Duration::from_millis(2000);
+  let context = {
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(2), delay);
+    TContext::new(graph.clone())
+      .with_delays(delays)
+      .with_dependencies(dependencies.clone())
+  };
+
+  // Run it to completion, and then clear a node at the bottom of the graph to force cleaning of
+  // both dependencies.
+  assert_eq!(
+    graph.create(TNode::new(3), &context).await,
+    Ok(vec![T(0, 0), T(2, 0), T(3, 0)])
+  );
+  graph.invalidate_from_roots(|n| n == &TNode::new(0));
+
+  // Then request again with the slow node removed from the dependencies, and confirm that it is
+  // cleaned much sooner than it would been if it had waited for the slow node.
+  dependencies.insert(TNode::new(3), vec![TNode::new(1)]);
+  let context = context.with_salt(1).with_dependencies(dependencies);
+  let start_time = Instant::now();
+  assert_eq!(
+    graph.create(TNode::new(3), &context).await,
+    Ok(vec![T(0, 1), T(1, 1), T(3, 1)])
+  );
+  assert!(Instant::now() < start_time + delay);
+  assert_eq!(context.stats().cleaning_failed, 3);
+}
+
+#[tokio::test]
 async fn cyclic_failure() {
   // Confirms that an attempt to create a cycle fails.
   let graph = Arc::new(Graph::new());
   let top = TNode::new(2);
   let context = TContext::new(graph.clone()).with_dependencies(
     // Request creation of a cycle by sending the bottom most node to the top.
-    vec![(TNode::new(0), Some(top))].into_iter().collect(),
+    vec![(TNode::new(0), vec![top])].into_iter().collect(),
   );
 
   assert_eq!(
@@ -566,9 +639,12 @@ async fn cyclic_dirtying() {
   graph.invalidate_from_roots(|n| n == &initial_bot);
   let context_up = context_down.with_salt(1).with_dependencies(
     // Reverse the path from bottom to top.
-    vec![(TNode::new(1), None), (TNode::new(0), Some(TNode::new(1)))]
-      .into_iter()
-      .collect(),
+    vec![
+      (TNode::new(1), vec![]),
+      (TNode::new(0), vec![TNode::new(1)]),
+    ]
+    .into_iter()
+    .collect(),
   );
 
   let res = graph.create(initial_bot, &context_up).await;
@@ -719,12 +795,21 @@ impl Node for TNode {
     context.ran(self.clone());
     let token = T(self.0, context.salt());
     context.maybe_delay(&self).await;
-    let res = if let Some(dep) = context.dependency_of(&self) {
-      let mut v = context.get(dep).await?;
-      v.push(token);
-      Ok(v)
-    } else {
-      Ok(vec![token])
+    let res = match context.dependencies_of(&self) {
+      deps if !deps.is_empty() => {
+        // Request all dependencies, but include only the first in our output value.
+        let mut values = future::try_join_all(
+          deps
+            .into_iter()
+            .map(|dep| context.get(dep))
+            .collect::<Vec<_>>(),
+        )
+        .await?;
+        let mut v = values.swap_remove(0);
+        v.push(token);
+        Ok(v)
+      }
+      _ => Ok(vec![token]),
     };
     abort_guard.did_not_abort();
     res
@@ -798,11 +883,10 @@ struct TContext {
   // outside world". A test that wants to "change the outside world" and observe its effect on the
   // graph should change the salt to do so.
   salt: usize,
-  // A mapping from source to optional destination that drives what values each TNode depends on.
+  // A mapping from source to destinations that drives what values each TNode depends on.
   // If there is no entry in this map for a node, then TNode::run will default to requesting
-  // the next smallest node. Finally, if a None entry is present, a node will have no
-  // dependencies.
-  edges: Arc<HashMap<TNode, Option<TNode>>>,
+  // the next smallest node.
+  edges: Arc<HashMap<TNode, Vec<TNode>>>,
   delays: Arc<HashMap<TNode, Duration>>,
   uncacheable: Arc<HashSet<TNode>>,
   graph: Arc<Graph<TNode>>,
@@ -867,7 +951,7 @@ impl TContext {
     }
   }
 
-  fn with_dependencies(mut self, edges: HashMap<TNode, Option<TNode>>) -> TContext {
+  fn with_dependencies(mut self, edges: HashMap<TNode, Vec<TNode>>) -> TContext {
     self.edges = Arc::new(edges);
     self
   }
@@ -928,18 +1012,17 @@ impl TContext {
   ///
   /// If the given TNode should declare a dependency on another TNode, returns that dependency.
   ///
-  fn dependency_of(&self, node: &TNode) -> Option<TNode> {
+  fn dependencies_of(&self, node: &TNode) -> Vec<TNode> {
     match self.edges.get(node) {
-      Some(Some(ref dep)) => Some(dep.clone()),
-      Some(None) => None,
+      Some(deps) => deps.clone(),
       None if node.0 > 0 => {
         let new_node_id = node.0 - 1;
-        Some(TNode(
+        vec![TNode(
           new_node_id,
           !self.uncacheable.contains(&TNode::new(new_node_id)),
-        ))
+        )]
       }
-      None => None,
+      None => vec![],
     }
   }
 
