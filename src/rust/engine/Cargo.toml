@@ -20,6 +20,7 @@ codegen-units = 1
 members = [
   ".",
   "async_semaphore",
+  "async_value",
   "boxfuture",
   "concrete_time",
   "fs",
@@ -56,6 +57,7 @@ members = [
 default-members = [
   ".",
   "async_semaphore",
+  "async_value",
   "boxfuture",
   "concrete_time",
   "fs",
