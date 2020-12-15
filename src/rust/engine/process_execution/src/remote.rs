@@ -33,9 +33,11 @@ use remexec::{
 };
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use tokio_rustls::rustls::ClientConfig;
-use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataValue};
+use tonic::metadata::{
+  AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataValue, KeyAndValueRef, MetadataMap,
+};
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
-use tonic::{Code, Request, Status};
+use tonic::{Code, Interceptor, Request, Status};
 use uuid::Uuid;
 use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
 
@@ -171,23 +173,49 @@ impl CommandRunner {
       );
     }
 
+    let mut grpc_metadata = MetadataMap::with_capacity(headers.len());
+    for (key, value) in &headers {
+      let key_ascii = AsciiMetadataKey::from_str(key.as_str()).map_err(|_| {
+        format!(
+          "Header key `{}` must be an ASCII value (as required by gRPC).",
+          key
+        )
+      })?;
+      let value_ascii = AsciiMetadataValue::from_str(value.as_str()).map_err(|_| {
+        format!(
+          "Header value `{}` for key `{}` must be an ASCII value (as required by gRPC).",
+          value, key
+        )
+      })?;
+      grpc_metadata.insert(key_ascii, value_ascii);
+    }
+
+    let interceptor = if headers.is_empty() {
+      None
+    } else {
+      Some(Interceptor::new(move |mut req: Request<()>| {
+        let req_metadata = req.metadata_mut();
+        for kv_ref in grpc_metadata.iter() {
+          match kv_ref {
+            KeyAndValueRef::Ascii(key, value) => {
+              req_metadata.insert(key, value.clone());
+            }
+            KeyAndValueRef::Binary(key, value) => {
+              req_metadata.insert_bin(key, value.clone());
+            }
+          }
+        }
+        Ok(req)
+      }))
+    };
+
     let address_with_scheme = format!("{}://{}", scheme, address);
 
     let endpoint = Self::create_tonic_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
-    let execution_client = Arc::new(if headers.is_empty() {
-      ExecutionClient::new(channel.clone())
-    } else {
-      let headers = headers.clone();
-      ExecutionClient::with_interceptor(channel.clone(), move |mut req: Request<()>| {
-        let metadata = req.metadata_mut();
-        for (key, value) in &headers {
-          let key_ascii = AsciiMetadataKey::from_str(key.as_str()).unwrap();
-          let value_ascii = AsciiMetadataValue::from_str(value.as_str()).unwrap();
-          metadata.insert(key_ascii, value_ascii);
-        }
-        Ok(req)
-      })
+    let execution_client = Arc::new(match interceptor.as_ref() {
+      Some(interceptor) => ExecutionClient::with_interceptor(channel.clone(), interceptor.clone()),
+      None => ExecutionClient::new(channel.clone()),
     });
 
     let store_servers_with_scheme: Vec<_> = store_servers
@@ -213,34 +241,18 @@ impl CommandRunner {
 
     let store_channel = tonic::transport::Channel::balance_list(store_endpoints.iter().cloned());
 
-    let action_cache_client = Arc::new(if headers.is_empty() {
-      ActionCacheClient::new(store_channel)
-    } else {
-      let headers = headers.clone();
-      ActionCacheClient::with_interceptor(channel.clone(), move |mut req: Request<()>| {
-        let metadata = req.metadata_mut();
-        for (key, value) in &headers {
-          let key_ascii = AsciiMetadataKey::from_str(key.as_str()).unwrap();
-          let value_ascii = AsciiMetadataValue::from_str(value.as_str()).unwrap();
-          metadata.insert(key_ascii, value_ascii);
-        }
-        Ok(req)
-      })
+    let action_cache_client = Arc::new(match interceptor.as_ref() {
+      Some(interceptor) => {
+        ActionCacheClient::with_interceptor(store_channel.clone(), interceptor.clone())
+      }
+      None => ActionCacheClient::new(store_channel.clone()),
     });
 
-    let capabilities_client = Arc::new(if headers.is_empty() {
-      CapabilitiesClient::new(channel.clone())
-    } else {
-      let headers = headers.clone();
-      CapabilitiesClient::with_interceptor(channel.clone(), move |mut req: Request<()>| {
-        let metadata = req.metadata_mut();
-        for (key, value) in &headers {
-          let key_ascii = AsciiMetadataKey::from_str(key.as_str()).unwrap();
-          let value_ascii = AsciiMetadataValue::from_str(value.as_str()).unwrap();
-          metadata.insert(key_ascii, value_ascii);
-        }
-        Ok(req)
-      })
+    let capabilities_client = Arc::new(match interceptor.as_ref() {
+      Some(interceptor) => {
+        CapabilitiesClient::with_interceptor(channel.clone(), interceptor.clone())
+      }
+      None => CapabilitiesClient::new(channel.clone()),
     });
 
     let command_runner = CommandRunner {
