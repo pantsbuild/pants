@@ -563,20 +563,16 @@ impl CommandRunner {
       Code::DeadlineExceeded => Err(ExecutionError::Timeout),
 
       Code::FailedPrecondition => {
-        log::debug!("status={:?}", &status);
         let details = if status.details.is_empty() {
-          log::debug!("details empty");
           return Err(ExecutionError::Fatal(status.message));
         } else if status.details.len() > 1 {
           // TODO(tonic): Should we be able to handle multiple details protos?
-          log::debug!("too many details protos");
           return Err(ExecutionError::Fatal(
             "too many detail protos for precondition failure".into(),
           ));
         } else {
           &status.details[0]
         };
-        log::debug!("decoded details: {:?}", &details);
 
         let full_name = format!("type.googleapis.com/{}", "google.rpc.PreconditionFailure");
         if details.type_url != full_name {
