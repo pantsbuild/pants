@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::convert::{TryFrom, TryInto};
+use std::ffi::OsString;
 use std::path::Component;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -304,7 +305,10 @@ impl CommandRunner {
     directory
       .files
       .iter()
-      .find(|n| n.name == file_base_name.to_string_lossy())
+      .find(|node| {
+        let name = OsString::from(&node.name);
+        name == file_base_name
+      })
       .cloned()
       .ok_or_else(|| format!("File {:?} did not exist locally.", file_path))
   }
