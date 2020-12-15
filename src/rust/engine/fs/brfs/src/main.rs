@@ -36,8 +36,9 @@ use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use futures::future::FutureExt;
-use hashing::{Digest, Fingerprint};
+use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
 use store::Store;
@@ -114,8 +115,8 @@ struct ReaddirEntry {
 }
 
 enum Node {
-  Directory(bazel_protos::remote_execution::DirectoryNode),
-  File(bazel_protos::remote_execution::FileNode),
+  Directory(remexec::DirectoryNode),
+  File(remexec::FileNode),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -155,16 +156,16 @@ impl BuildResultFS {
 impl BuildResultFS {
   pub fn node_for_digest(
     &mut self,
-    directory: &bazel_protos::remote_execution::Directory,
+    directory: &remexec::Directory,
     filename: &str,
   ) -> Option<Node> {
-    for file in directory.get_files() {
-      if file.get_name() == filename {
+    for file in &directory.files {
+      if file.name == filename {
         return Some(Node::File(file.clone()));
       }
     }
-    for child in directory.get_directories() {
-      if child.get_name() == filename {
+    for child in &directory.directories {
+      if child.name == filename {
         return Some(Node::Directory(child.clone()));
       }
     }
@@ -344,28 +345,31 @@ impl BuildResultFS {
                 },
               ];
 
-              let directories = directory.get_directories().iter().map(|directory| {
+              let directories = directory.directories.iter().map(|directory| {
                 (
-                  directory.get_digest(),
-                  directory.get_name(),
+                  directory.digest.clone(),
+                  directory.name.clone(),
                   fuse::FileType::Directory,
                   true,
                 )
               });
-              let files = directory.get_files().iter().map(|file| {
+              let files = directory.files.iter().map(|file| {
                 (
-                  file.get_digest(),
-                  file.get_name(),
+                  file.digest.clone(),
+                  file.name.clone(),
                   fuse::FileType::RegularFile,
-                  file.get_is_executable(),
+                  file.is_executable,
                 )
               });
 
               for (digest, name, filetype, is_executable) in directories.chain(files) {
-                let child_digest = digest.try_into().map_err(|err| {
-                  error!("Error parsing digest: {:?}", err);
-                  libc::ENOENT
-                })?;
+                let child_digest = digest
+                  .map(|d| d.try_into())
+                  .unwrap_or(Ok(EMPTY_DIGEST))
+                  .map_err(|err| {
+                    error!("Error parsing digest: {:?}", err);
+                    libc::ENOENT
+                  })?;
                 let maybe_child_inode = match filetype {
                   fuse::FileType::Directory => self.inode_for_directory(child_digest),
                   fuse::FileType::RegularFile => self.inode_for_file(child_digest, is_executable),
@@ -480,19 +484,27 @@ impl fuse::Filesystem for BuildResultFS {
             })
             .and_then(|node| match node {
               Node::Directory(directory_node) => {
-                let digest = directory_node.get_digest().try_into().map_err(|err| {
-                  error!("Error parsing digest: {:?}", err);
-                  libc::ENOENT
-                })?;
+                let digest = directory_node
+                  .digest
+                  .map(|d| d.try_into())
+                  .unwrap_or(Ok(EMPTY_DIGEST))
+                  .map_err(|err| {
+                    error!("Error parsing digest: {:?}", err);
+                    libc::ENOENT
+                  })?;
                 self.dir_attr_for(digest)
               }
               Node::File(file_node) => {
-                let digest = file_node.get_digest().try_into().map_err(|err| {
-                  error!("Error parsing digest: {:?}", err);
-                  libc::ENOENT
-                })?;
+                let digest = file_node
+                  .digest
+                  .map(|d| d.try_into())
+                  .unwrap_or(Ok(EMPTY_DIGEST))
+                  .map_err(|err| {
+                    error!("Error parsing digest: {:?}", err);
+                    libc::ENOENT
+                  })?;
                 self
-                  .inode_for_file(digest, file_node.get_is_executable())
+                  .inode_for_file(digest, file_node.is_executable)
                   .map_err(|err| {
                     error!("Error loading file by digest {}: {}", filename, err);
                     libc::EINVAL
