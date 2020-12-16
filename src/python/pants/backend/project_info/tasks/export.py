@@ -372,7 +372,9 @@ class ExportTask(ResolveRequirementsTaskBase, CoursierMixin):
             #
             # For now, make our arbitrary historical choice of a default interpreter explicit and use the
             # lowest version.
-            default_interpreter = min(python_interpreter_targets_mapping.keys())
+            default_interpreter = min(
+                python_interpreter_targets_mapping.keys(), key=lambda i: i.version
+            )
 
             interpreters_info = {}
             for interpreter, targets in python_interpreter_targets_mapping.items():

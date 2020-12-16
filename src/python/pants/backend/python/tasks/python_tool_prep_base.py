@@ -153,7 +153,7 @@ class PythonToolPrepBase(Task):
                     tool_subsystem.options_scope, tool_subsystem.get_interpreter_constraints()
                 )
             )
-        interpreter = min(interpreters)
+        interpreter = min(interpreters, key=lambda i: i.version)
 
         pex_path = self._generate_fingerprinted_pex_path(tool_subsystem, interpreter)
         if not os.path.exists(pex_path):
