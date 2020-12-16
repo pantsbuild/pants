@@ -22,6 +22,7 @@ use tonic::{Code, Interceptor, Request};
 use workunit_store::with_workunit;
 
 use super::BackoffConfig;
+use std::sync::Arc;
 use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 
 #[derive(Clone)]
@@ -30,8 +31,10 @@ pub struct ByteStore {
   chunk_size_bytes: usize,
   upload_timeout: Duration,
   rpc_attempts: usize,
-  channel: tonic::transport::Channel,
+  channel: Channel,
   interceptor: Option<Interceptor>,
+  byte_stream_client: Arc<ByteStreamClient<Channel>>,
+  cas_client: Arc<ContentAddressableStorageClient<Channel>>,
 }
 
 impl fmt::Debug for ByteStore {
@@ -152,6 +155,18 @@ impl ByteStore {
       }))
     };
 
+    let byte_stream_client = Arc::new(match interceptor.as_ref() {
+      Some(interceptor) => ByteStreamClient::with_interceptor(channel.clone(), interceptor.clone()),
+      None => ByteStreamClient::new(channel.clone()),
+    });
+
+    let cas_client = Arc::new(match interceptor.as_ref() {
+      Some(interceptor) => {
+        ContentAddressableStorageClient::with_interceptor(channel.clone(), interceptor.clone())
+      }
+      None => ContentAddressableStorageClient::new(channel.clone()),
+    });
+
     Ok(ByteStore {
       instance_name,
       chunk_size_bytes,
@@ -159,41 +174,9 @@ impl ByteStore {
       channel,
       rpc_attempts: rpc_retries + 1,
       interceptor,
+      byte_stream_client,
+      cas_client,
     })
-  }
-
-  async fn with_byte_stream_client<
-    Value: Send,
-    Fut: std::future::Future<Output = Result<Value, String>>,
-    F: Fn(ByteStreamClient<tonic::transport::Channel>) -> Fut,
-  >(
-    &self,
-    f: F,
-  ) -> Result<Value, String> {
-    let client = match self.interceptor.as_ref() {
-      Some(interceptor) => {
-        ByteStreamClient::with_interceptor(self.channel.clone(), interceptor.clone())
-      }
-      None => ByteStreamClient::new(self.channel.clone()),
-    };
-    f(client).await
-  }
-
-  async fn with_cas_client<
-    Value: Send,
-    Fut: std::future::Future<Output = Result<Value, String>>,
-    F: Fn(ContentAddressableStorageClient<Channel>) -> Fut,
-  >(
-    &self,
-    f: F,
-  ) -> Result<Value, String> {
-    let client = match self.interceptor.as_ref() {
-      Some(interceptor) => {
-        ContentAddressableStorageClient::with_interceptor(self.channel.clone(), interceptor.clone())
-      }
-      None => ContentAddressableStorageClient::new(self.channel.clone()),
-    };
-    f(client).await
   }
 
   pub async fn store_bytes(&self, bytes: &[u8]) -> Result<Digest, String> {
@@ -210,51 +193,51 @@ impl ByteStore {
     let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
     let store = self.clone();
 
-    let result_future = self.with_byte_stream_client(move |mut client| {
-      let resource_name = resource_name.clone();
-      let chunk_size_bytes = store.chunk_size_bytes;
+    let mut client = self.byte_stream_client.as_ref().clone();
 
-      // NOTE(tonic): The call into the Tonic library wants the slice to last for the 'static
-      // lifetime but the slice passed into this method generally points into the shared memory
-      // of the LMDB store which is on the other side of the FFI boundary.
-      let bytes = Bytes::copy_from_slice(bytes);
+    let resource_name = resource_name.clone();
+    let chunk_size_bytes = store.chunk_size_bytes;
 
-      let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
-        if offset >= bytes.len() && has_sent_any {
-          futures::future::ready(None)
-        } else {
-          let next_offset = min(offset + chunk_size_bytes, bytes.len());
-          let req = bazel_protos::gen::google::bytestream::WriteRequest {
-            resource_name: resource_name.clone(),
-            write_offset: offset as i64,
-            finish_write: next_offset == bytes.len(),
-            // TODO(tonic): Explore using the unreleased `Bytes` support in Prost from:
-            // https://github.com/danburkert/prost/pull/341
-            data: Vec::from(&bytes[offset..next_offset]),
-          };
-          futures::future::ready(Some((req, (next_offset, true))))
-        }
-      });
+    // NOTE(tonic): The call into the Tonic library wants the slice to last for the 'static
+    // lifetime but the slice passed into this method generally points into the shared memory
+    // of the LMDB store which is on the other side of the FFI boundary.
+    let bytes = Bytes::copy_from_slice(bytes);
 
-      async move {
-        let response = client.write(Request::new(stream)).await.map_err(|err| {
-          format!(
-            "Error from server while uploading digest {:?}: {:?}",
-            digest, err
-          )
-        })?;
-
-        let response = response.into_inner();
-        if response.committed_size == len as i64 {
-          Ok(digest)
-        } else {
-          Err(format!(
-            "Uploading file with digest {:?}: want committed size {} but got {}",
-            digest, len, response.committed_size
-          ))
-        }
+    let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
+      if offset >= bytes.len() && has_sent_any {
+        futures::future::ready(None)
+      } else {
+        let next_offset = min(offset + chunk_size_bytes, bytes.len());
+        let req = bazel_protos::gen::google::bytestream::WriteRequest {
+          resource_name: resource_name.clone(),
+          write_offset: offset as i64,
+          finish_write: next_offset == bytes.len(),
+          // TODO(tonic): Explore using the unreleased `Bytes` support in Prost from:
+          // https://github.com/danburkert/prost/pull/341
+          data: Vec::from(&bytes[offset..next_offset]),
+        };
+        futures::future::ready(Some((req, (next_offset, true))))
       }
     });
+
+    let result_future = async move {
+      let response = client.write(Request::new(stream)).await.map_err(|err| {
+        format!(
+          "Error from server while uploading digest {:?}: {:?}",
+          digest, err
+        )
+      })?;
+
+      let response = response.into_inner();
+      if response.committed_size == len as i64 {
+        Ok(digest)
+      } else {
+        Err(format!(
+          "Uploading file with digest {:?}: want committed size {} but got {}",
+          digest, len, response.committed_size
+        ))
+      }
+    };
 
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
       let store = workunit_state.store;
@@ -281,64 +264,65 @@ impl ByteStore {
     );
     let workunit_name = format!("load_bytes_with({})", resource_name.clone());
     let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
-    let result_future = self.with_byte_stream_client(move |mut client| {
-      let resource_name = resource_name.clone();
-      let f = f.clone();
-      async move {
-        let stream_result = client
-          .read({
-            bazel_protos::gen::google::bytestream::ReadRequest {
-              resource_name: resource_name.clone(),
-              read_offset: 0,
-              // 0 means no limit.
-              read_limit: 0,
-            }
-          })
-          .await;
+    let resource_name = resource_name.clone();
+    let f = f.clone();
 
-        let mut stream = match stream_result {
-          Ok(response) => response.into_inner(),
-          Err(status) => match status.code() {
-            Code::NotFound => return Ok(None),
-            _ => {
-              return Err(format!(
-                "Error making CAS read request for {:?}: {:?}",
-                digest, status
-              ))
-            }
-          },
-        };
+    let mut client = self.byte_stream_client.as_ref().clone();
 
-        let read_result_closure = async {
-          let mut buf = BytesMut::with_capacity(digest.1);
-          while let Some(response) = stream.next().await {
-            buf.extend_from_slice(&(response?).data);
+    let result_future = async move {
+      let stream_result = client
+        .read({
+          bazel_protos::gen::google::bytestream::ReadRequest {
+            resource_name: resource_name.clone(),
+            read_offset: 0,
+            // 0 means no limit.
+            read_limit: 0,
           }
-          Ok(buf.freeze())
-        };
+        })
+        .await;
 
-        let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
-
-        let maybe_bytes = match read_result {
-          Ok(bytes) => Some(bytes),
-          Err(status) => {
-            if status.code() == tonic::Code::NotFound {
-              None
-            } else {
-              return Err(format!(
-                "Error from server in response to CAS read request: {:?}",
-                status
-              ));
-            }
+      let mut stream = match stream_result {
+        Ok(response) => response.into_inner(),
+        Err(status) => match status.code() {
+          Code::NotFound => return Ok(None),
+          _ => {
+            return Err(format!(
+              "Error making CAS read request for {:?}: {:?}",
+              digest, status
+            ))
           }
-        };
+        },
+      };
 
-        match maybe_bytes {
-          Some(b) => f(b).map(Some),
-          None => Ok(None),
+      let read_result_closure = async {
+        let mut buf = BytesMut::with_capacity(digest.1);
+        while let Some(response) = stream.next().await {
+          buf.extend_from_slice(&(response?).data);
         }
+        Ok(buf.freeze())
+      };
+
+      let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
+
+      let maybe_bytes = match read_result {
+        Ok(bytes) => Some(bytes),
+        Err(status) => {
+          if status.code() == tonic::Code::NotFound {
+            None
+          } else {
+            return Err(format!(
+              "Error from server in response to CAS read request: {:?}",
+              status
+            ));
+          }
+        }
+      };
+
+      match maybe_bytes {
+        Some(b) => f(b).map(Some),
+        None => Ok(None),
       }
-    });
+    };
 
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
       let store = workunit_state.store;
@@ -364,29 +348,24 @@ impl ByteStore {
     let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
     let result_future = async move {
       let store2 = store.clone();
-      store2
-        .with_cas_client(move |mut client| {
-          let request = request.clone();
-          async move {
-            let response = client
-              .find_missing_blobs(request)
-              .map_err(|err| {
-                format!(
-                  "Error from server in response to find_missing_blobs_request: {:?}",
-                  err
-                )
-              })
-              .await?;
-
-            response
-              .into_inner()
-              .missing_blob_digests
-              .iter()
-              .map(|digest| digest.try_into())
-              .collect::<Result<HashSet<_>, _>>()
-          }
+      let mut client = store2.cas_client.as_ref().clone();
+      let request = request.clone();
+      let response = client
+        .find_missing_blobs(request)
+        .map_err(|err| {
+          format!(
+            "Error from server in response to find_missing_blobs_request: {:?}",
+            err
+          )
         })
-        .await
+        .await?;
+
+      response
+        .into_inner()
+        .missing_blob_digests
+        .iter()
+        .map(|digest| digest.try_into())
+        .collect::<Result<HashSet<_>, _>>()
     };
     async {
       if let Some(workunit_state) = workunit_store::get_workunit_state() {
