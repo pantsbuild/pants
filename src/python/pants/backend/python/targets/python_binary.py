@@ -4,6 +4,7 @@
 import os
 from typing import cast
 
+from pex.inherit_path import InheritPath
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_target import PythonTarget
@@ -170,7 +171,7 @@ class PythonBinary(PythonTarget):
         info = PexInfo.default()
         info.zip_safe = self.payload.zip_safe
         info.always_write_cache = self.payload.always_write_cache
-        info.inherit_path = self.payload.inherit_path
+        info.inherit_path = InheritPath.for_value(self.payload.inherit_path)
         info.entry_point = self.entry_point
         info.ignore_errors = self.payload.ignore_errors
         info.emit_warnings = self.payload.emit_warnings
