@@ -365,13 +365,14 @@ impl Scheduler {
     let mut execution_task = self.execute_helper(request, session).boxed();
 
     self.core.executor.block_on(async move {
+      let mut refresh_delay = time::delay_for(Self::refresh_delay(interval, deadline));
       let result = loop {
         tokio::select! {
           _ = session.cancelled() => {
             // The Session was cancelled.
             break Err(ExecutionTermination::KeyboardInterrupt)
           }
-          _ = time::delay_for(Self::refresh_delay(interval, deadline)) => {
+          _ = &mut refresh_delay => {
             // It's time to render a new frame (or maybe to time out entirely if the deadline has
             // elapsed).
             if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
@@ -381,6 +382,7 @@ impl Scheduler {
               // Just a receive timeout. render and continue.
               session.maybe_display_render();
             }
+            refresh_delay = time::delay_for(Self::refresh_delay(interval, deadline));
           }
           res = &mut execution_task => {
             // Completed successfully.
