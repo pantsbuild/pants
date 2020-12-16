@@ -1549,6 +1549,7 @@ dependencies = [
  "log 0.4.8",
  "num_enum",
  "parking_lot",
+ "regex",
  "tokio",
  "uuid 0.7.4",
 ]

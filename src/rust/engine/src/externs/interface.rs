@@ -66,6 +66,7 @@ use hashing::Digest;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
+use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
@@ -103,7 +104,7 @@ py_module_initializer!(native_engine, |py, m| {
     "init_logging",
     py_fn!(
       py,
-      init_logging(a: u64, b: bool, c: bool, d: bool, e: PyDict)
+      init_logging(a: u64, b: bool, c: bool, d: bool, e: PyDict, f: Vec<String>)
     ),
   )?;
   m.add(
@@ -1778,6 +1779,7 @@ fn init_logging(
   use_color: bool,
   show_target: bool,
   log_levels_by_target: PyDict,
+  message_regex_filters: Vec<String>,
 ) -> PyUnitResult {
   let log_levels_by_target = log_levels_by_target
     .items(py)
@@ -1788,12 +1790,21 @@ fn init_logging(
       (k, v)
     })
     .collect::<HashMap<_, _>>();
+  let message_regex_filters = message_regex_filters
+    .iter()
+    .map(|re| {
+      Regex::new(re).map_err(|e| {
+        PyErr::new::<exc::Exception, _>(py, (format!("Failed to parse warning filter: {}", e),))
+      })
+    })
+    .collect::<Result<Vec<Regex>, _>>()?;
   Logger::init(
     level,
     show_rust_3rdparty_logs,
     use_color,
     show_target,
     log_levels_by_target,
+    message_regex_filters,
   );
   Ok(None)
 }
