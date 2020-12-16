@@ -8,7 +8,6 @@ from typing import Optional
 from typing_extensions import Protocol
 
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
-from pants.init.logging import setup_warning_filtering
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -77,7 +76,6 @@ class PantsDaemonCore:
             build_config = BuildConfigInitializer.get(options_bootstrapper)
             self._scheduler = EngineInitializer.setup_graph(options_bootstrapper, build_config)
             bootstrap_options_values = options_bootstrapper.bootstrap_options.for_global_scope()
-            setup_warning_filtering(bootstrap_options_values.ignore_pants_warnings or [])
 
             self._services = self._services_constructor(bootstrap_options_values, self._scheduler)
             self._fingerprint = options_fingerprint
