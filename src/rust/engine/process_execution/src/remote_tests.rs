@@ -2384,8 +2384,7 @@ pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_typ
   let rust_type_name = type_name::<T>();
   let proto_type_name = rust_type_name
     .strip_prefix(prefix)
-    .map(|s| s.clone())
-    .unwrap_or_else(|| rust_type_name.clone())
+    .unwrap()
     .replace("::", ".");
 
   let mut buf = Vec::with_capacity(message.encoded_len());
