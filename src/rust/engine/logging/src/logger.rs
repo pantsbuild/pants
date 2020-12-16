@@ -16,6 +16,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use lazy_static::lazy_static;
 use log::{debug, log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
+use regex::Regex;
 use tokio::task_local;
 use uuid::Uuid;
 
@@ -27,6 +28,7 @@ lazy_static! {
   pub static ref PANTS_LOGGER: PantsLogger = PantsLogger::new();
 }
 
+// TODO: The non-atomic portions of this struct should likely be composed into a single RwLock.
 pub struct PantsLogger {
   per_run_logs: Mutex<Option<File>>,
   log_file: Mutex<Option<File>>,
@@ -36,6 +38,7 @@ pub struct PantsLogger {
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
   show_target: AtomicBool,
   log_level_filters: Mutex<HashMap<String, log::LevelFilter>>,
+  message_regex_filters: Mutex<Vec<Regex>>,
 }
 
 impl PantsLogger {
@@ -49,6 +52,7 @@ impl PantsLogger {
       stderr_handlers: Mutex::new(HashMap::new()),
       show_target: AtomicBool::new(false),
       log_level_filters: Mutex::new(HashMap::new()),
+      message_regex_filters: Mutex::new(Vec::new()),
     }
   }
 
@@ -58,6 +62,7 @@ impl PantsLogger {
     use_color: bool,
     show_target: bool,
     log_levels_by_target: HashMap<String, u64>,
+    message_regex_filters: Vec<Regex>,
   ) {
     let log_levels_by_target = log_levels_by_target
       .iter()
@@ -84,6 +89,7 @@ impl PantsLogger {
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
         *PANTS_LOGGER.log_level_filters.lock() = log_levels_by_target;
+        *PANTS_LOGGER.message_regex_filters.lock() = message_regex_filters;
         PANTS_LOGGER
           .show_target
           .store(show_target, Ordering::SeqCst);
@@ -234,6 +240,16 @@ impl Log for PantsLogger {
     } else {
       format!("{} {} {}", time_str, level_marker, record.args())
     };
+
+    {
+      let message_regex_filters = self.message_regex_filters.lock();
+      if message_regex_filters
+        .iter()
+        .any(|re| re.is_match(&log_string))
+      {
+        return;
+      }
+    }
 
     {
       let mut maybe_per_run_file = self.per_run_logs.lock();
