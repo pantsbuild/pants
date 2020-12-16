@@ -14,7 +14,7 @@ use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
 use tokio_rustls::rustls::ClientConfig;
-use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue};
+use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 use tonic::Request;
 use workunit_store::{with_workunit, Level, Metric, WorkunitMetadata};
@@ -70,7 +70,7 @@ impl CommandRunner {
     action_cache_address: &str,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
-    headers: BTreeMap<String, String>,
+    mut headers: BTreeMap<String, String>,
     platform: Platform,
     cache_read: bool,
     cache_write: bool,
@@ -94,12 +94,28 @@ impl CommandRunner {
       "http"
     };
 
-    let mut headers = headers;
     if let Some(oauth_bearer_token) = oauth_bearer_token {
       headers.insert(
         String::from("authorization"),
         format!("Bearer {}", oauth_bearer_token.trim()),
       );
+    }
+
+    let mut grpc_metadata = MetadataMap::with_capacity(headers.len());
+    for (key, value) in &headers {
+      let key_ascii = AsciiMetadataKey::from_str(key.as_str()).map_err(|_| {
+        format!(
+          "Header key `{}` must be an ASCII value (as required by gRPC).",
+          key
+        )
+      })?;
+      let value_ascii = AsciiMetadataValue::from_str(value.as_str()).map_err(|_| {
+        format!(
+          "Header value `{}` for key `{}` must be an ASCII value (as required by gRPC).",
+          value, key
+        )
+      })?;
+      grpc_metadata.insert(key_ascii, value_ascii);
     }
 
     let address_with_scheme = format!("{}://{}", scheme, action_cache_address);
@@ -109,13 +125,17 @@ impl CommandRunner {
     let action_cache_client = Arc::new(if headers.is_empty() {
       ActionCacheClient::new(channel)
     } else {
-      let headers = headers.clone();
       ActionCacheClient::with_interceptor(channel, move |mut req: Request<()>| {
-        let metadata = req.metadata_mut();
-        for (key, value) in &headers {
-          let key_ascii = AsciiMetadataKey::from_str(key.as_str()).unwrap();
-          let value_ascii = AsciiMetadataValue::from_str(value.as_str()).unwrap();
-          metadata.insert(key_ascii, value_ascii);
+        let req_metadata = req.metadata_mut();
+        for kv_ref in grpc_metadata.iter() {
+          match kv_ref {
+            KeyAndValueRef::Ascii(key, value) => {
+              req_metadata.insert(key, value.clone());
+            }
+            KeyAndValueRef::Binary(key, value) => {
+              req_metadata.insert_bin(key, value.clone());
+            }
+          }
         }
         Ok(req)
       })
