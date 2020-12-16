@@ -31,10 +31,7 @@ const STRAGGLER_LOGGING_INTERVAL: Duration = Duration::from_secs(30);
 // Root requests are limited to Select nodes, which produce (python) Values.
 pub type Root = Select;
 
-pub enum ExecutionEvent {
-  Completed(Vec<ObservedValueResult>),
-  Stderr(String),
-}
+pub struct Stderr(pub String);
 
 pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
 
@@ -278,7 +275,7 @@ impl Session {
   pub fn maybe_display_initialize(
     &self,
     executor: &Executor,
-    sender: &mpsc::UnboundedSender<ExecutionEvent>,
+    sender: &mpsc::UnboundedSender<Stderr>,
   ) {
     let result = match *self.0.display.lock() {
       SessionDisplay::ConsoleUI(ref mut ui) => {
@@ -288,9 +285,7 @@ impl Session {
           Box::new(move |msg: &str| {
             // If we fail to send, it's because the execute loop has exited: we fail the callback to
             // have the logging module directly log to stderr at that point.
-            sender
-              .send(ExecutionEvent::Stderr(msg.to_owned()))
-              .map_err(|_| ())
+            sender.send(Stderr(msg.to_owned())).map_err(|_| ())
           }),
         )
       }
