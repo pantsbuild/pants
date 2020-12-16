@@ -90,8 +90,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
             with temporary_file() as fp:
                 fp.write(self.content)
                 fp.close()
-                add = builder.add_source if self.path.endswith(".py") else builder.add_resource
-                add(fp.name, self.path)
+                builder.add_source(fp.name, self.path)
 
     @classmethod
     def subsystem_dependencies(cls):
