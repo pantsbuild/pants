@@ -503,7 +503,6 @@ impl crate::CommandRunner for CommandRunner {
           self.platform,
           &context,
           self.action_cache_client.clone(),
-          &self.headers,
           self.store.clone(),
         ),
         |_, md| md,

@@ -852,7 +852,6 @@ impl crate::CommandRunner for CommandRunner {
         self.platform,
         &context,
         self.action_cache_client.clone(),
-        &self.headers,
         self.store.clone(),
       ),
       |_, md| md,
@@ -1434,7 +1433,6 @@ pub async fn check_action_cache(
   platform: Platform,
   context: &Context,
   action_cache_client: Arc<ActionCacheClient<Channel>>,
-  _headers: &BTreeMap<String, String>,
   store: Store,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
   context
