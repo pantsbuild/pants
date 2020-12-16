@@ -29,24 +29,32 @@ clippy::unseparated_literal_suffix,
 
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-
-use crate::tonic_util::AddrIncomingWithStream;
+use futures::FutureExt;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use parking_lot::Mutex;
 use remexec::action_cache_server::{ActionCache, ActionCacheServer};
 use remexec::{ActionResult, GetActionResultRequest, UpdateActionResultRequest};
-use std::net::SocketAddr;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
+
+use crate::tonic_util::AddrIncomingWithStream;
 
 pub struct StubActionCache {
   pub action_map: Arc<Mutex<HashMap<Fingerprint, ActionResult>>>,
   pub always_errors: Arc<AtomicBool>,
   local_addr: SocketAddr,
+  shutdown_sender: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl Drop for StubActionCache {
+  fn drop(&mut self) {
+    self.shutdown_sender.take().unwrap().send(()).unwrap();
+  }
 }
 
 #[derive(Clone)]
@@ -138,9 +146,6 @@ impl StubActionCache {
       always_errors: always_errors.clone(),
     };
 
-    let mut server = Server::builder();
-    let router = server.add_service(ActionCacheServer::new(responder));
-
     let addr = "127.0.0.1:0"
       .to_string()
       .parse()
@@ -149,13 +154,23 @@ impl StubActionCache {
     let local_addr = incoming.local_addr();
     let incoming = AddrIncomingWithStream(incoming);
 
-    let server_fut = Box::pin(router.serve_with_incoming(incoming));
-    tokio::spawn(server_fut);
+    let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel();
+
+    tokio::spawn(async move {
+      let mut server = Server::builder();
+      let router = server.add_service(ActionCacheServer::new(responder.clone()));
+
+      router
+        .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+        .await
+        .unwrap();
+    });
 
     Ok(StubActionCache {
       action_map,
       always_errors,
       local_addr,
+      shutdown_sender: Some(shutdown_sender),
     })
   }
 

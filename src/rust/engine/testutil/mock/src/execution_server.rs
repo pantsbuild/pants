@@ -17,7 +17,7 @@ use bazel_protos::gen::google::longrunning::{
   DeleteOperationRequest, GetOperationRequest, ListOperationsRequest, ListOperationsResponse,
   Operation,
 };
-use futures::Stream;
+use futures::{FutureExt, Stream};
 use hashing::{Digest, EMPTY_DIGEST};
 use parking_lot::Mutex;
 use remexec::{
@@ -106,6 +106,7 @@ impl MockExecution {
 pub struct TestServer {
   pub mock_responder: MockResponder,
   local_addr: SocketAddr,
+  shutdown_sender: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 impl TestServer {
@@ -121,13 +122,7 @@ impl TestServer {
   ///                      are available for, an error will be returned.
   pub fn new(mock_execution: MockExecution, port: Option<u16>) -> TestServer {
     let mock_responder = MockResponder::new(mock_execution);
-
-    let mut server = Server::builder();
-    let router = server
-      .add_service(ExecutionServer::new(mock_responder.clone()))
-      .add_service(OperationsServer::new(mock_responder.clone()))
-      .add_service(CapabilitiesServer::new(mock_responder.clone()))
-      .add_service(ActionCacheServer::new(mock_responder.clone()));
+    let mock_responder2 = mock_responder.clone();
 
     let addr = format!("127.0.0.1:{}", port.unwrap_or(0))
       .parse()
@@ -136,12 +131,26 @@ impl TestServer {
     let local_addr = incoming.local_addr();
     let incoming = AddrIncomingWithStream(incoming);
 
-    let server_fut = Box::pin(router.serve_with_incoming(incoming));
-    tokio::spawn(server_fut);
+    let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
+
+    tokio::spawn(async move {
+      let mut server = Server::builder();
+      let router = server
+        .add_service(ExecutionServer::new(mock_responder2.clone()))
+        .add_service(OperationsServer::new(mock_responder2.clone()))
+        .add_service(CapabilitiesServer::new(mock_responder2.clone()))
+        .add_service(ActionCacheServer::new(mock_responder2));
+
+      router
+        .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+        .await
+        .unwrap();
+    });
 
     TestServer {
       mock_responder,
       local_addr,
+      shutdown_sender: Some(shutdown_sender),
     }
   }
 
@@ -155,6 +164,8 @@ impl TestServer {
 
 impl Drop for TestServer {
   fn drop(&mut self) {
+    self.shutdown_sender.take().unwrap().send(()).unwrap();
+
     let remaining_expected_responses = self
       .mock_responder
       .mock_execution

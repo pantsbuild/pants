@@ -227,9 +227,7 @@ impl CommandRunner {
     let store_channel = tonic::transport::Channel::balance_list(store_endpoints.iter().cloned());
 
     let action_cache_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => {
-        ActionCacheClient::with_interceptor(store_channel, interceptor.clone())
-      }
+      Some(interceptor) => ActionCacheClient::with_interceptor(store_channel, interceptor.clone()),
       None => ActionCacheClient::new(store_channel),
     });
 

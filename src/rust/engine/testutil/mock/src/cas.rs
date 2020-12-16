@@ -12,7 +12,7 @@ use bazel_protos::gen::google::bytestream::{
 };
 use bytes::{Bytes, BytesMut};
 use futures::stream::StreamExt;
-use futures::Stream;
+use futures::{FutureExt, Stream};
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use remexec::capabilities_server::{Capabilities, CapabilitiesServer};
@@ -39,6 +39,13 @@ pub struct StubCAS {
   pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
   pub blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
   local_addr: SocketAddr,
+  shutdown_sender: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl Drop for StubCAS {
+  fn drop(&mut self) {
+    self.shutdown_sender.take().unwrap().send(()).unwrap();
+  }
 }
 
 pub struct StubCASBuilder {
@@ -170,12 +177,6 @@ impl StubCAS {
       required_auth_header: required_auth_token.map(|t| format!("Bearer {}", t)),
     };
 
-    let mut server = Server::builder();
-    let router = server
-      .add_service(ByteStreamServer::new(responder.clone()))
-      .add_service(ContentAddressableStorageServer::new(responder.clone()))
-      .add_service(CapabilitiesServer::new(responder));
-
     let addr = format!("127.0.0.1:{}", port)
       .parse()
       .expect("failed to parse IP address");
@@ -183,14 +184,27 @@ impl StubCAS {
     let local_addr = incoming.local_addr();
     let incoming = AddrIncomingWithStream(incoming);
 
-    let server_fut = Box::pin(router.serve_with_incoming(incoming));
-    tokio::spawn(server_fut);
+    let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel();
+
+    tokio::spawn(async move {
+      let mut server = Server::builder();
+      let router = server
+        .add_service(ByteStreamServer::new(responder.clone()))
+        .add_service(ContentAddressableStorageServer::new(responder.clone()))
+        .add_service(CapabilitiesServer::new(responder));
+
+      router
+        .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+        .await
+        .unwrap();
+    });
 
     StubCAS {
       read_request_count,
       write_message_sizes,
       blobs,
       local_addr,
+      shutdown_sender: Some(shutdown_sender),
     }
   }
 
