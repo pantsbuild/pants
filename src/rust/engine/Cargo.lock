@@ -2954,6 +2954,7 @@ dependencies = [
  "log 0.4.8",
  "maplit",
  "mock",
+ "num_cpus",
  "parking_lot",
  "protobuf",
  "serde",
@@ -3057,7 +3058,6 @@ version = "0.0.1"
 dependencies = [
  "futures 0.3.5",
  "logging",
- "num_cpus",
  "tokio",
  "workunit_store",
 ]

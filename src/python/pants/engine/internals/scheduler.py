@@ -31,7 +31,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.native_engine import PySessionCancellationLatch, PyTypes
+from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch, PyTypes
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
@@ -100,6 +100,7 @@ class Scheduler:
         rules: FrozenOrderedSet[Rule],
         union_membership: UnionMembership,
         execution_options: ExecutionOptions,
+        executor: PyExecutor,
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
         validate_reachability: bool = True,
@@ -161,6 +162,7 @@ class Scheduler:
             ca_certs_path=ca_certs_path,
             ignore_patterns=ignore_patterns,
             use_gitignore=use_gitignore,
+            executor=executor,
             execution_options=execution_options,
             types=types,
         )

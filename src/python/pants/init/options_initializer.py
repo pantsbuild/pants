@@ -69,6 +69,19 @@ class OptionsInitializer:
     """Initializes options."""
 
     @staticmethod
+    def compute_executor_arguments(bootstrap_options: OptionValueContainer) -> Tuple[int, int]:
+        """Computes the arguments to construct a PyExecutor.
+
+        Does not directly construct a PyExecutor to avoid cycles.
+        """
+        rule_threads_max = (
+            bootstrap_options.rule_threads_max
+            if bootstrap_options.rule_threads_max
+            else 4 * bootstrap_options.rule_threads_core
+        )
+        return bootstrap_options.rule_threads_core, rule_threads_max
+
+    @staticmethod
     def compute_pants_ignore(buildroot, global_options):
         """Computes the merged value of the `--pants-ignore` flag.
 

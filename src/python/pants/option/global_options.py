@@ -547,6 +547,33 @@ class GlobalOptions(Subsystem):
             "Pants's own code, plugins, and `--pants-config-files` are inherently invalidated.",
         )
 
+        process_execution_local_parallelism = "--process-execution-local-parallelism"
+        rule_threads_core = "--rule-threads-core"
+        rule_threads_max = "--rule-threads-max"
+
+        register(
+            rule_threads_core,
+            type=int,
+            default=multiprocessing.cpu_count(),
+            advanced=True,
+            help=(
+                "The number of threads to keep active and ready to execute `@rule` logic (see "
+                f"also: `{rule_threads_max}`). This value is independent of the number of "
+                "processes that may be spawned in parallel locally (controlled by "
+                f"`{process_execution_local_parallelism}`)."
+            ),
+        )
+        register(
+            rule_threads_max,
+            type=int,
+            default=None,
+            advanced=True,
+            help=(
+                "The maximum number of threads to use to execute `@rule` logic. Defaults to "
+                f"a small multiple of `{rule_threads_core}`."
+            ),
+        )
+
         cache_instructions = (
             "The path may be absolute or relative. If the directory is within the build root, be "
             "sure to include it in `--pants-ignore`."
@@ -605,7 +632,7 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--process-execution-local-parallelism",
+            process_execution_local_parallelism,
             type=int,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
             advanced=True,

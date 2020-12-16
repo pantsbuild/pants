@@ -33,12 +33,13 @@ uuid = { version = "0.7.1", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
 
 [dev-dependencies]
+criterion = "0.3"
 maplit = "*"
 mock = { path = "../../testutil/mock" }
+num_cpus = "1"
 testutil = { path = "../../testutil" }
 tokio = { version = "0.2.23", features = ["rt-core", "macros"] }
 walkdir = "2"
-criterion = "0.3"
 
 [[bench]]
 name = "store"

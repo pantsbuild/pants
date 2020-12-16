@@ -17,6 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import setup_logging, setup_logging_to_file
 from pants.init.options_initializer import OptionsInitializer
@@ -57,9 +58,13 @@ class PantsDaemon(PantsDaemonProcessManager):
         native = Native()
         native.override_thread_logging_destination_to_just_pantsd()
 
-        core = PantsDaemonCore(cls._setup_services)
+        executor = PyExecutor(
+            *OptionsInitializer.compute_executor_arguments(bootstrap_options_values)
+        )
+        core = PantsDaemonCore(executor, cls._setup_services)
 
         server = native.new_nailgun_server(
+            executor,
             bootstrap_options_values.pantsd_pailgun_port,
             DaemonPantsRunner(core),
         )
