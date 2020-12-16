@@ -237,44 +237,6 @@ impl ByteStore {
           )
         })?;
 
-        // TODO(tonic): Decide if this commented-out code is still necesssary.
-        // sender.send_all(&mut stream).await.or_else(move |e| {
-        //   match e {
-        //     // Some implementations of the remote execution API early-return if the blob has
-        //     // been concurrently uploaded by another client. In this case, they return a
-        //     // WriteResponse with a committed_size equal to the digest's entire size before
-        //     // closing the stream.
-        //     // Because the server then closes the stream, the client gets an RpcFinished
-        //     // error in this case. We ignore this, and will later on verify that the
-        //     // committed_size we received from the server is equal to the expected one. If
-        //     // these are not equal, the upload will be considered a failure at that point.
-        //     // Whether this type of response will become part of the official API is up for
-        //     // discussion: see
-        //     // https://groups.google.com/d/topic/remote-execution-apis/NXUe3ItCw68/discussion.
-        //     tonic::Status { code: tonic::Code::Unknown, .. } => Ok(()),
-        //     e => Err(format!(
-        //       "Error attempting to upload digest {:?}: {:?}",
-        //       digest, e
-        //     )),
-        //   }
-        // })?;
-
-        // TODO(tonic): Decide if this commented-out code is still necesssary.
-        // // The gRPC library cancels streams on drop; closes must be explicit. Not closing
-        // // the stream caused the BuildGrid CAS server to generate errors on writes
-        // // when the stream was cancelled because it was not closed explicitly.
-        // sender.close().await.or_else(|err| {
-        //   match err {
-        //     // Some servers (e.g., RBE) may have already closed the stream for the early
-        //     // return reason identified previously. Treat this condition as a successful close.
-        //     tonic::Status { code: tonic::Code::Unknown, ..} => Ok(()),
-        //     e => Err(format!(
-        //       "Error from server when uploading digest {:?}: {:?}",
-        //       digest, e
-        //     )),
-        //   }
-        // })?;
-
         let response = response.into_inner();
         if response.committed_size == len as i64 {
           Ok(digest)
@@ -349,11 +311,6 @@ impl ByteStore {
         };
 
         let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
-
-        // TODO(tonic): Is this still relevant?
-        // We ensure that we hold onto the client until after we've consumed the stream as a
-        // workaround for https://github.com/pingcap/grpc-rs/issues/123
-        // std::mem::drop(client);
 
         let maybe_bytes = match read_result {
           Ok(bytes) => Some(bytes),
