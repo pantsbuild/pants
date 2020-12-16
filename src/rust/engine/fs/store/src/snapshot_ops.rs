@@ -735,8 +735,7 @@ pub trait SnapshotOps: StoreWrapper + 'static {
             let digest = require_digest(
               dir.directories[0]
                 .digest
-                .as_ref())?
-                .clone();
+                .as_ref())?;
             already_stripped = already_stripped.join(component_to_strip);
             dir = self.load_directory_or_err(digest).await?;
             prefix = remaining_prefix;

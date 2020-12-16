@@ -228,9 +228,9 @@ impl CommandRunner {
 
     let action_cache_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => {
-        ActionCacheClient::with_interceptor(store_channel.clone(), interceptor.clone())
+        ActionCacheClient::with_interceptor(store_channel, interceptor.clone())
       }
-      None => ActionCacheClient::new(store_channel.clone()),
+      None => ActionCacheClient::new(store_channel),
     });
 
     let capabilities_client = Arc::new(match interceptor.as_ref() {
