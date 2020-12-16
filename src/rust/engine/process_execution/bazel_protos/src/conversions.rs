@@ -9,7 +9,7 @@ impl<'a> From<&'a hashing::Digest> for crate::gen::build::bazel::remote::executi
   }
 }
 
-impl<'a> From<hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
+impl From<hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
   fn from(d: hashing::Digest) -> Self {
     Self {
       hash: d.0.to_hex(),
