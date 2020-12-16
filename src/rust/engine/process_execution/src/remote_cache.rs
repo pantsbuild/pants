@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::ffi::OsString;
 use std::path::Component;
 use std::str::FromStr;
@@ -15,7 +15,7 @@ use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
-use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
+use tonic::transport::Channel;
 use tonic::Request;
 use workunit_store::{with_workunit, Level, Metric, WorkunitMetadata};
 
@@ -46,23 +46,6 @@ pub struct CommandRunner {
 }
 
 impl CommandRunner {
-  fn create_tonic_endpoint(
-    addr: &str,
-    tls_config_opt: Option<&ClientConfig>,
-  ) -> Result<Endpoint, String> {
-    let uri =
-      tonic::transport::Uri::try_from(addr).map_err(|err| format!("invalid address: {}", err))?;
-    let endpoint = Channel::builder(uri);
-    let maybe_tls_endpoint = if let Some(tls_config) = tls_config_opt {
-      endpoint
-        .tls_config(ClientTlsConfig::new().rustls_client_config(tls_config.clone()))
-        .map_err(|e| format!("TLS setup error: {}", e))?
-    } else {
-      endpoint
-    };
-    Ok(maybe_tls_endpoint)
-  }
-
   pub fn new(
     underlying: Arc<dyn crate::CommandRunner>,
     metadata: ProcessMetadata,
@@ -120,7 +103,8 @@ impl CommandRunner {
 
     let address_with_scheme = format!("{}://{}", scheme, action_cache_address);
 
-    let endpoint = Self::create_tonic_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
+    let endpoint =
+      crate::tonic_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let action_cache_client = Arc::new(if headers.is_empty() {
       ActionCacheClient::new(channel)

@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -36,7 +36,7 @@ use tokio_rustls::rustls::ClientConfig;
 use tonic::metadata::{
   AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataValue, KeyAndValueRef, MetadataMap,
 };
-use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
+use tonic::transport::{Channel, Endpoint};
 use tonic::{Code, Interceptor, Request, Status};
 use uuid::Uuid;
 use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
@@ -117,23 +117,6 @@ enum StreamOutcome {
 }
 
 impl CommandRunner {
-  fn create_tonic_endpoint(
-    addr: &str,
-    tls_config_opt: Option<&ClientConfig>,
-  ) -> Result<Endpoint, String> {
-    let uri =
-      tonic::transport::Uri::try_from(addr).map_err(|err| format!("invalid address: {}", err))?;
-    let endpoint = Channel::builder(uri);
-    let maybe_tls_endpoint = if let Some(tls_config) = tls_config_opt {
-      endpoint
-        .tls_config(ClientTlsConfig::new().rustls_client_config(tls_config.clone()))
-        .map_err(|e| format!("TLS setup error: {}", e))?
-    } else {
-      endpoint
-    };
-    Ok(maybe_tls_endpoint)
-  }
-
   /// Construct a new CommandRunner
   pub fn new(
     address: &str,
@@ -212,7 +195,8 @@ impl CommandRunner {
 
     let address_with_scheme = format!("{}://{}", scheme, address);
 
-    let endpoint = Self::create_tonic_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
+    let endpoint =
+      crate::tonic_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let execution_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => ExecutionClient::with_interceptor(channel.clone(), interceptor.clone()),
@@ -227,7 +211,7 @@ impl CommandRunner {
     let (store_endpoints, store_endpoints_errors): (Vec<Endpoint>, Vec<String>) =
       store_servers_with_scheme
         .iter()
-        .map(|addr| Self::create_tonic_endpoint(addr.as_str(), tls_client_config.as_ref()))
+        .map(|addr| crate::tonic_util::create_endpoint(addr.as_str(), tls_client_config.as_ref()))
         .partition_map(|result| match result {
           Ok(endpoint) => Either::Left(endpoint),
           Err(err) => Either::Right(err),

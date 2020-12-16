@@ -69,6 +69,8 @@ pub mod nailgun;
 
 pub mod named_caches;
 
+pub(crate) mod tonic_util;
+
 extern crate uname;
 
 pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
