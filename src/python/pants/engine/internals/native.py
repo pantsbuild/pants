@@ -133,10 +133,16 @@ class Native(metaclass=SingletonMetaclass):
         use_color: bool,
         show_target: bool,
         log_levels_by_target: Mapping[str, LogLevel],
+        message_regex_filters: Iterable[str],
     ):
         log_levels_as_ints = {k: v.level for k, v in log_levels_by_target.items()}
         return self.lib.init_logging(
-            level, log_show_rust_3rdparty, use_color, show_target, log_levels_as_ints
+            level,
+            log_show_rust_3rdparty,
+            use_color,
+            show_target,
+            log_levels_as_ints,
+            tuple(message_regex_filters),
         )
 
     def set_per_run_log_path(self, path: Optional[str]) -> None:
