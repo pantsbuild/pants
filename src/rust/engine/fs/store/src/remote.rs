@@ -77,7 +77,7 @@ impl ByteStore {
       .map(|addr| format!("{}://{}", scheme, addr))
       .collect();
 
-    let (endpoints, _errors): (Vec<Endpoint>, Vec<String>) = cas_addresses_with_scheme
+    let (endpoints, errors): (Vec<Endpoint>, Vec<String>) = cas_addresses_with_scheme
       .iter()
       .map(|addr| {
         let uri = tonic::transport::Uri::try_from(addr)
@@ -96,6 +96,13 @@ impl ByteStore {
         Ok(endpoint) => Either::Left(endpoint),
         Err(err) => Either::Right(err),
       });
+
+    if !errors.is_empty() {
+      return Err(format!(
+        "Errors while creating gRPC endpoints: {}",
+        errors.join(", ")
+      ));
+    }
 
     let channel = tonic::transport::Channel::balance_list(endpoints.iter().cloned());
 
