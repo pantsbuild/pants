@@ -63,7 +63,7 @@ impl ByteStore {
           .map_err(|_| "unexpected state in PEM file add".to_owned())?;
         Some(tls_config)
       }
-      _ => None,
+      None => None,
     };
 
     let scheme = if tls_client_config.is_some() {
