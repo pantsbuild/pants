@@ -33,9 +33,8 @@ def test_warning_filter() -> None:
             GLOBAL_SCOPE_CONFIG_SECTION: {
                 # NB: We do *not* include the exclamation point at the end, which tests that the
                 # regexps match from the beginning of the warning string, and don't require
-                # matching the entire string! We also lowercase the message to check that they are
-                # matched case-insensitively.
-                "ignore_pants_warnings": ["deprecated: this is a test warning"]
+                # matching the entire string!
+                "ignore_pants_warnings": ["DEPRECATED: This is a test warning"]
             },
         },
     )
