@@ -41,3 +41,12 @@ impl TryFrom<crate::gen::build::bazel::remote::execution::v2::Digest> for hashin
       .map(|fingerprint| hashing::Digest(fingerprint, d.size_bytes as usize))
   }
 }
+
+pub fn require_digest(
+  digest_opt: Option<&crate::gen::build::bazel::remote::execution::v2::Digest>,
+) -> Result<hashing::Digest, String> {
+  match digest_opt {
+    Some(digest) => hashing::Digest::try_from(digest),
+    None => Err("Protocol violation: Digest missing from a Remote Execution API protobuf.".into()),
+  }
+}

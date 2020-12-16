@@ -822,6 +822,7 @@ dependencies = [
 name = "fs_util"
 version = "0.0.1"
 dependencies = [
+ "bazel_protos",
  "boxfuture",
  "bytes",
  "clap",

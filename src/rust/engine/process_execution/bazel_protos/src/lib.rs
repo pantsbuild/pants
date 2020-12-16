@@ -4,6 +4,8 @@
 #![deny(unused_must_use)]
 
 mod conversions;
+pub use conversions::require_digest;
+
 #[cfg(test)]
 mod conversions_tests;
 

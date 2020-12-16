@@ -17,8 +17,9 @@ use indexmap::{self, IndexMap};
 use itertools::Itertools;
 use log::log_enabled;
 
+use bazel_protos::require_digest;
 use std::collections::HashSet;
-use std::convert::{From, TryInto};
+use std::convert::From;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -184,11 +185,7 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
     .files
     .iter()
     .map(|file_node| async move {
-      let digest: Digest = file_node
-        .digest
-        .as_ref()
-        .map(|d| d.try_into())
-        .unwrap_or(Ok(EMPTY_DIGEST))?;
+      let digest: Digest = require_digest(file_node.digest.as_ref())?;
       let header = format!("file digest={} size={}:\n\n", digest.0, digest.1);
 
       let contents = store_wrapper
@@ -220,11 +217,8 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
     .iter()
     .map(|dir_node| async move {
       // TODO(tonic): Avoid using .unwrap here!
-      let detail = format!(
-        "dir digest={} size={}:\n\n",
-        dir_node.digest.as_ref().unwrap().hash,
-        dir_node.digest.as_ref().unwrap().size_bytes
-      );
+      let digest = require_digest(dir_node.digest.as_ref())?;
+      let detail = format!("dir digest={} size={}:\n\n", digest.0, digest.1);
       let res: Result<_, String> = Ok((dir_node.name.clone(), detail));
       res
     })
@@ -738,12 +732,11 @@ pub trait SnapshotOps: StoreWrapper + 'static {
             // Must be 0th index, because we've checked that we saw a matching directory, and no
             // others.
             // TODO(tonic): Match safely to access first directory?
-            let digest = to_pants_digest(
+            let digest = require_digest(
               dir.directories[0]
                 .digest
-                .as_ref()
-                .unwrap()
-                .clone());
+                .as_ref())?
+                .clone();
             already_stripped = already_stripped.join(component_to_strip);
             dir = self.load_directory_or_err(digest).await?;
             prefix = remaining_prefix;

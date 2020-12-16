@@ -40,6 +40,7 @@ pub use crate::snapshot_ops::{SnapshotOps, SnapshotOpsError, StoreWrapper, Subse
 
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bazel_protos::require_digest;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{Bytes, BytesMut};
 use concrete_time::TimeSpan;
@@ -47,12 +48,11 @@ use fs::{default_cache_path, FileContent, RelativePath};
 use futures::compat::Future01CompatExt;
 use futures::future::{self as future03, Either, FutureExt, TryFutureExt};
 use futures01::{future, Future};
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::Digest;
 use serde_derive::Serialize;
 pub use serverset::BackoffConfig;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::convert::TryInto;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
@@ -580,11 +580,7 @@ impl Store {
           .iter()
           .map(|file_node| {
             // TODO(tonic): Find better idiom for these conversions.
-            let file_digest_result = file_node
-              .digest
-              .as_ref()
-              .map(|d| d.try_into())
-              .unwrap_or(Ok(EMPTY_DIGEST));
+            let file_digest_result = require_digest(file_node.digest.as_ref());
             let file_digest = match file_digest_result {
               Ok(d) => d,
               Err(e) => return future03::err(e).compat().to_boxed(),
@@ -602,11 +598,7 @@ impl Store {
           .iter()
           .map(move |child_dir| {
             // TODO(tonic): Find better idiom for these conversions.
-            let child_digest_result = child_dir
-              .digest
-              .as_ref()
-              .map(|d| d.try_into())
-              .unwrap_or(Ok(EMPTY_DIGEST));
+            let child_digest_result = require_digest(child_dir.digest.as_ref());
             let child_digest = match child_digest_result {
               Ok(d) => d,
               Err(e) => return future03::err(e).compat().to_boxed(),
@@ -802,12 +794,7 @@ impl Store {
         let mut digest_types = Vec::new();
         digest_types.push((digest, EntryType::Directory));
         for file in &directory.files {
-          // TODO(tonic): Find better idiom for digest conversion here.
-          let file_digest_result = file
-            .digest
-            .as_ref()
-            .map(|d| d.try_into())
-            .unwrap_or(Ok(EMPTY_DIGEST));
+          let file_digest_result = require_digest(file.digest.as_ref());
           let file_digest = match file_digest_result {
             Ok(d) => d,
             Err(e) => return future::err(e).to_boxed(),
@@ -906,11 +893,7 @@ impl Store {
         .map(|file_node| {
           let store = store.clone();
           let path = destination.join(file_node.name.clone());
-          let digest_result = file_node
-            .digest
-            .as_ref()
-            .map(|d| d.try_into())
-            .unwrap_or(Ok(EMPTY_DIGEST));
+          let digest_result = require_digest(file_node.digest.as_ref());
           let digest = match digest_result {
             Ok(d) => d,
             Err(e) => return future::err(e).to_boxed(),
@@ -929,11 +912,7 @@ impl Store {
         .map(|directory_node| {
           let store = store.clone();
           let path = destination.join(directory_node.name.clone());
-          let digest_result = directory_node
-            .digest
-            .as_ref()
-            .map(|d| d.try_into())
-            .unwrap_or(Ok(EMPTY_DIGEST));
+          let digest_result = require_digest(directory_node.digest.as_ref());
           let digest = match digest_result {
             Ok(d) => d,
             Err(e) => return future::err(e).to_boxed(),
@@ -1012,11 +991,7 @@ impl Store {
             .map(|file_node| {
               let path = path_so_far.join(file_node.name.clone());
               let is_executable = file_node.is_executable;
-              let file_node_digest_result = file_node
-                .digest
-                .as_ref()
-                .map(|d| d.try_into())
-                .unwrap_or(Ok(EMPTY_DIGEST));
+              let file_node_digest_result = require_digest(file_node.digest.as_ref());
               let file_node_digest = match file_node_digest_result {
                 Ok(d) => d,
                 Err(e) => return future::err(e).to_boxed(),
@@ -1108,11 +1083,7 @@ impl Store {
               .directories
               .iter()
               .map(move |dir_node| {
-                let subdir_digest_result = dir_node
-                  .digest
-                  .as_ref()
-                  .map(|d| d.try_into())
-                  .unwrap_or(Ok(EMPTY_DIGEST));
+                let subdir_digest_result = require_digest(dir_node.digest.as_ref());
                 let subdir_digest = match subdir_digest_result {
                   Ok(d) => d,
                   Err(e) => return future::err(e).to_boxed(),

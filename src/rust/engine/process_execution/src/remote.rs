@@ -20,7 +20,7 @@ use futures::compat::Future01CompatExt;
 use futures::future::{self, TryFutureExt};
 use futures::{Stream, StreamExt};
 use futures01::Future as Future01;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, Fingerprint};
 use itertools::Either;
 use itertools::Itertools;
 use log::{debug, trace, warn, Level};
@@ -45,6 +45,7 @@ use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
   Process, ProcessCacheScope, ProcessMetadata,
 };
+use bazel_protos::require_digest;
 use std::io::Cursor;
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -1262,12 +1263,7 @@ pub fn extract_output_files(
   if treat_tree_digest_as_final_directory_hack {
     match &action_result.output_directories[..] {
       &[ref directory] => {
-        match directory
-          .tree_digest
-          .as_ref()
-          .map(|d| d.try_into())
-          .unwrap_or(Ok(EMPTY_DIGEST))
-        {
+        match require_digest(directory.tree_digest.as_ref()) {
           Ok(digest) => return futures01::future::result::<Digest, String>(Ok(digest)).to_boxed(),
           Err(err) => return BoxFuture::from(Box::new(futures::future::err(err).compat())),
         };
@@ -1297,10 +1293,7 @@ pub fn extract_output_files(
         // Retrieve the Tree proto and hash its root `Directory` proto to obtain the digest
         // of the output directory needed to construct the series of `Directory` protos needed
         // for the final merge of the output directories.
-        let tree_digest: Digest = dir
-          .tree_digest
-          .map(|d| d.try_into())
-          .unwrap_or(Ok(EMPTY_DIGEST))?;
+        let tree_digest: Digest = require_digest(dir.tree_digest.as_ref())?;
         let root_digest_opt = store.load_tree_from_remote(tree_digest).await?;
         let root_digest = root_digest_opt
           .ok_or_else(|| format!("Tree with digest {:?} was not in remote", tree_digest))?;
@@ -1334,11 +1327,7 @@ pub fn extract_output_files(
     .iter()
     .map(|output_file| {
       let output_file_path_buf = PathBuf::from(output_file.path.clone());
-      let digest: Result<Digest, String> = output_file
-        .digest
-        .as_ref()
-        .map(|d| d.try_into())
-        .unwrap_or(Ok(EMPTY_DIGEST));
+      let digest: Result<Digest, String> = require_digest(output_file.digest.as_ref());
       path_map.insert(output_file_path_buf.clone(), digest?);
       Ok(PathStat::file(
         output_file_path_buf.clone(),

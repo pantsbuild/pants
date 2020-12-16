@@ -28,13 +28,13 @@
 #![allow(clippy::mutex_atomic)]
 #![type_length_limit = "1881109"]
 
-use std::convert::TryInto;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
+use bazel_protos::require_digest;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{Bytes, BytesMut};
 use clap::{value_t, App, Arg, SubCommand};
@@ -44,7 +44,7 @@ use fs::{
 use futures::compat::Future01CompatExt;
 use futures::future::TryFutureExt;
 use futures01::{future, Future};
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use prost::Message;
 use rand::seq::SliceRandom;
@@ -655,23 +655,15 @@ fn expand_files_helper(
         {
           let mut files_unlocked = files.lock();
           for file in &dir.files {
-            let file_digest: Result<Digest, String> = file
-              .digest
-              .as_ref()
-              .map(|d| d.try_into())
-              .unwrap_or(Ok(EMPTY_DIGEST));
-            files_unlocked.push((format!("{}{}", prefix, file.name), file_digest?));
+            let file_digest = require_digest(file.digest.as_ref())?;
+            files_unlocked.push((format!("{}{}", prefix, file.name), file_digest));
           }
         }
         let subdirs_and_digests = dir
           .directories
           .iter()
           .map(move |subdir| {
-            let digest: Result<Digest, String> = subdir
-              .digest
-              .as_ref()
-              .map(|d| d.try_into())
-              .unwrap_or(Ok(EMPTY_DIGEST));
+            let digest = require_digest(subdir.digest.as_ref());
             digest.map(|digest| (subdir, digest))
           })
           .collect::<Result<Vec<_>, _>>()?;
