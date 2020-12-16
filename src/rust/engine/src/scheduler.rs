@@ -11,10 +11,10 @@ use std::time::{Duration, Instant};
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{Select, Visualizer};
-use crate::session::{ExecutionEvent, ObservedValueResult, Root, Session};
+use crate::session::{ObservedValueResult, Root, Session, Stderr};
 
 use futures::compat::Future01CompatExt;
-use futures::future;
+use futures::{future, FutureExt};
 use graph::{InvalidationResult, LastObserved};
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{debug, info, warn};
@@ -294,35 +294,26 @@ impl Scheduler {
   }
 
   ///
-  /// Attempts to complete all of the given roots, and send a FinalResult on the given mpsc Sender,
-  /// which allows the caller to poll a channel for the result without blocking uninterruptibly
-  /// on a Future.
+  /// Attempts to complete all of the given roots.
   ///
-  fn execute_helper(
+  async fn execute_helper(
     &self,
     request: &ExecutionRequest,
     session: &Session,
-    sender: mpsc::UnboundedSender<ExecutionEvent>,
-  ) {
+  ) -> Vec<ObservedValueResult> {
     let context = Context::new(self.core.clone(), session.clone());
     let roots = session.roots_zip_last_observed(&request.roots);
     let poll = request.poll;
     let poll_delay = request.poll_delay;
-    let core = context.core.clone();
-    let _join = core.executor.spawn(async move {
-      let res = future::join_all(
-        roots
-          .into_iter()
-          .map(|(root, last_observed)| {
-            Self::poll_or_create(&context, root, last_observed, poll, poll_delay)
-          })
-          .collect::<Vec<_>>(),
-      )
-      .await;
-
-      // The receiver may have gone away due to timeout.
-      let _ = sender.send(ExecutionEvent::Completed(res));
-    });
+    future::join_all(
+      roots
+        .into_iter()
+        .map(|(root, last_observed)| {
+          Self::poll_or_create(&context, root, last_observed, poll, poll_delay)
+        })
+        .collect::<Vec<_>>(),
+    )
+    .await
   }
 
   fn execute_record_results(
@@ -371,7 +362,7 @@ impl Scheduler {
     // Spawn and wait for all roots to complete.
     let (sender, mut receiver) = mpsc::unbounded_channel();
     session.maybe_display_initialize(&self.core.executor, &sender);
-    self.execute_helper(request, session, sender);
+    let mut execution_task = self.execute_helper(request, session).boxed();
 
     self.core.executor.block_on(async move {
       let result = loop {
@@ -391,17 +382,17 @@ impl Scheduler {
               session.maybe_display_render();
             }
           }
-          execution_event = receiver.recv() => match execution_event {
-            Some(ExecutionEvent::Completed(res)) => {
-              // Completed successfully.
-              break Ok(Self::execute_record_results(&request.roots, &session, res));
-            }
-            Some(ExecutionEvent::Stderr(stderr)) => {
+          res = &mut execution_task => {
+            // Completed successfully.
+            break Ok(Self::execute_record_results(&request.roots, &session, res));
+          }
+          stderr = receiver.recv() => match stderr {
+            Some(Stderr(stderr)) => {
               session.write_stderr(&stderr);
             }
             None => {
               break Err(ExecutionTermination::Fatal(
-                "Execution threads exited early.".to_owned(),
+                "UI task exited early.".to_owned(),
               ));
             }
           }
