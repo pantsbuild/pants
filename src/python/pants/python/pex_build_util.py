@@ -426,9 +426,10 @@ class PexBuilderWrapper:
         )
 
         # Remove all the original top-level requirements in favor of the transitive == requirements.
-        self._builder.info = ipex_launcher.modify_pex_info(self._builder.info, requirements=[])
-        transitive_reqs = [dist.as_requirement() for dist in self._distributions.values()]
-        self.add_direct_requirements(transitive_reqs)
+        transitive_reqs = [str(dist.as_requirement()) for dist in self._distributions.values()]
+        self._builder.info = ipex_launcher.modify_pex_info(
+            self._builder.info, requirements=transitive_reqs
+        )
 
         orig_info = self._builder.info.copy()
 
@@ -560,10 +561,6 @@ class PexBuilderWrapper:
         for constraint_tuple in constraint_tuples:
             for constraint in constraint_tuple:
                 self.add_interpreter_constraint(constraint)
-
-    def add_direct_requirements(self, reqs):
-        for req in reqs:
-            self._builder.add_requirement(str(req))
 
     def add_distribution(self, dist):
         self._builder.add_distribution(dist)
