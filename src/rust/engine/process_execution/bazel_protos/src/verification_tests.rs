@@ -62,43 +62,6 @@ fn canonical_directory() {
   assert_eq!(Ok(()), verify_directory_canonical(EMPTY_DIGEST, &directory));
 }
 
-// TODO(tonic/prost): Does Prost allow access to unknown fields?
-//
-// #[test]
-// fn unknown_field() {
-//   let mut directory = Directory::new();
-//   directory.mut_unknown_fields().add_fixed32(42, 42);
-//   let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
-//   assert!(
-//     error.contains("unknown"),
-//     format!("Bad error message: {}", error)
-//   );
-// }
-//
-// #[test]
-// fn unknown_field_in_file_node() {
-//   let mut directory = Directory::new();
-//
-//   directory.mut_files().push({
-//     let mut file = FileNode::new();
-//     file.set_name("roland".to_owned());
-//     file.set_digest({
-//       let mut digest = Digest::new();
-//       digest.set_size_bytes(FILE_SIZE);
-//       digest.set_hash(HASH.to_owned());
-//       digest
-//     });
-//     file.mut_unknown_fields().add_fixed32(42, 42);
-//     file
-//   });
-//
-//   let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
-//   assert!(
-//     error.contains("unknown"),
-//     format!("Bad error message: {}", error)
-//   );
-// }
-
 #[test]
 fn empty_child_name() {
   let directory = Directory {
