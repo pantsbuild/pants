@@ -34,14 +34,6 @@ fn main() {
   // when needed.
   println!("cargo:rerun-if-env-changed=PY");
 
-  if cfg!(target_os = "linux") {
-    // We depend on grpcio, which uses C++.
-    // On Linux, with g++, some part of that compilation depends on
-    // __gxx_personality_v0 which is present in the C++ standard library.
-    // I don't know why. It shouldn't, and before grpcio 0.2.0, it didn't.
-    println!("cargo:rustc-cdylib-link-arg=-lstdc++");
-  }
-
   if cfg!(target_os = "macos") {
     // N.B. On OSX, we force weak linking by passing the param `-undefined dynamic_lookup` to
     // the underlying linker. This avoids "missing symbol" errors for Python symbols
