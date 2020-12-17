@@ -88,7 +88,7 @@ pub struct Artifacts {}
 impl EngineAwareInformation for Artifacts {
   type MaybeOutput = Vec<(String, Digest)>;
 
-  fn retrieve(types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
+  fn retrieve(_types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
     let artifacts_val = match externs::call_method(&value, "artifacts", &[]) {
       Ok(value) => value,
       Err(py_err) => {
@@ -119,7 +119,7 @@ impl EngineAwareInformation for Artifacts {
           log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
         })
         .ok()?;
-      let digest = match lift_directory_digest(types, &Value::new(digest_value)) {
+      let digest = match lift_directory_digest(&Value::new(digest_value)) {
         Ok(digest) => digest,
         Err(e) => {
           log::error!("Error in EngineAware.artifacts() implementation: {}", e);

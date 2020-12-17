@@ -208,19 +208,8 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_directory_digest(types: &Types, digest: &Value) -> Result<hashing::Digest, String> {
-  if types.directory_digest != externs::get_type_for(digest) {
-    return Err(format!(
-      "{} is not of type {}.",
-      digest, types.directory_digest
-    ));
-  }
-  let fingerprint = externs::getattr_as_string(&digest, "fingerprint");
-  let digest_length: usize = externs::getattr(&digest, "serialized_bytes_length").unwrap();
-  Ok(hashing::Digest(
-    hashing::Fingerprint::from_hex_string(&fingerprint)?,
-    digest_length,
-  ))
+pub fn lift_directory_digest(digest: &Value) -> Result<hashing::Digest, String> {
+  externs::fs::from_py_digest(digest).map_err(|e| format!("{:?}", e))
 }
 
 pub fn lift_file_digest(types: &Types, digest: &Value) -> Result<hashing::Digest, String> {
@@ -244,11 +233,7 @@ pub struct MultiPlatformExecuteProcess {
 }
 
 impl MultiPlatformExecuteProcess {
-  fn lift_process(
-    types: &Types,
-    value: &Value,
-    platform_constraint: Option<Platform>,
-  ) -> Result<Process, String> {
+  fn lift_process(value: &Value, platform_constraint: Option<Platform>) -> Result<Process, String> {
     let env = externs::getattr_from_frozendict(&value, "env");
 
     let working_directory = {
@@ -261,8 +246,8 @@ impl MultiPlatformExecuteProcess {
     };
 
     let py_digest: Value = externs::getattr(&value, "input_digest").unwrap();
-    let digest = lift_directory_digest(types, &py_digest)
-      .map_err(|err| format!("Error parsing digest {}", err))?;
+    let digest =
+      lift_directory_digest(&py_digest).map_err(|err| format!("Error parsing digest {}", err))?;
 
     let output_files = externs::getattr::<Vec<String>>(&value, "output_files")
       .unwrap()
@@ -336,7 +321,7 @@ impl MultiPlatformExecuteProcess {
     })
   }
 
-  pub fn lift(types: &Types, value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+  pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
     let raw_constraints = externs::getattr::<Vec<Option<String>>>(&value, "platform_constraints")?;
     let constraints = raw_constraints
       .into_iter()
@@ -356,8 +341,7 @@ impl MultiPlatformExecuteProcess {
 
     let mut request_by_constraint: BTreeMap<Option<Platform>, Process> = BTreeMap::new();
     for (constraint, execute_process) in constraints.iter().zip(processes.iter()) {
-      let underlying_req =
-        MultiPlatformExecuteProcess::lift_process(types, execute_process, *constraint)?;
+      let underlying_req = MultiPlatformExecuteProcess::lift_process(execute_process, *constraint)?;
       request_by_constraint.insert(*constraint, underlying_req.clone());
     }
 
@@ -640,7 +624,7 @@ impl Snapshot {
   }
 
   pub fn store_directory_digest(item: &hashing::Digest) -> Result<Value, String> {
-    externs::fs::new_py_digest(*item)
+    externs::fs::to_py_digest(*item)
       .map(|d| d.into_object().into())
       .map_err(|e| format!("{:?}", e))
   }
@@ -655,27 +639,10 @@ impl Snapshot {
     )
   }
 
-  pub fn store_snapshot(core: &Arc<Core>, item: &store::Snapshot) -> Result<Value, String> {
-    let mut files = Vec::new();
-    let mut dirs = Vec::new();
-    for ps in &item.path_stats {
-      match ps {
-        &PathStat::File { ref path, .. } => {
-          files.push(Self::store_path(path)?);
-        }
-        &PathStat::Dir { ref path, .. } => {
-          dirs.push(Self::store_path(path)?);
-        }
-      }
-    }
-    Ok(externs::unsafe_call(
-      core.types.snapshot,
-      &[
-        Self::store_directory_digest(&item.digest)?,
-        externs::store_tuple(files),
-        externs::store_tuple(dirs),
-      ],
-    ))
+  pub fn store_snapshot(item: store::Snapshot) -> Result<Value, String> {
+    externs::fs::to_py_snapshot(item)
+      .map(|d| d.into_object().into())
+      .map_err(|e| format!("{:?}", e))
   }
 
   fn store_path(item: &Path) -> Result<Value, String> {

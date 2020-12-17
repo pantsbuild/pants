@@ -412,6 +412,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::PyGeneratorResponseGetMulti>(py)?;
 
   m.add_class::<externs::fs::PyDigest>(py)?;
+  m.add_class::<externs::fs::PySnapshot>(py)?;
 
   Ok(())
 });
@@ -985,7 +986,7 @@ async fn workunit_to_py_value(
       })?;
     artifact_entries.push((
       externs::store_utf8(artifact_name.as_str()),
-      crate::nodes::Snapshot::store_snapshot(core, &snapshot).map_err(|err_str| {
+      crate::nodes::Snapshot::store_snapshot(snapshot).map_err(|err_str| {
         let gil = Python::acquire_gil();
         let py = gil.python();
         PyErr::new::<exc::Exception, _>(py, (err_str,))
@@ -1561,10 +1562,7 @@ fn capture_snapshots(
             if maybe_digest == externs::none() {
               None
             } else {
-              Some(nodes::lift_directory_digest(
-                &core.types,
-                &Value::new(maybe_digest),
-              )?)
+              Some(nodes::lift_directory_digest(&Value::new(maybe_digest))?)
             }
           };
           path_globs.map(|path_globs| (path_globs, root, digest_hint))
@@ -1585,7 +1583,7 @@ fn capture_snapshots(
               digest_hint,
             )
             .await?;
-            nodes::Snapshot::store_snapshot(&core, &snapshot)
+            nodes::Snapshot::store_snapshot(snapshot)
           }
         })
         .collect::<Vec<_>>();
@@ -1614,7 +1612,7 @@ fn ensure_remote_has_recursive(
       .iter(py)
       .map(|item| {
         let value = item.into();
-        crate::nodes::lift_directory_digest(&core.types, &value)
+        crate::nodes::lift_directory_digest(&value)
           .or_else(|_| crate::nodes::lift_file_digest(&core.types, &value))
       })
       .collect::<Result<Vec<Digest>, _>>()
@@ -1695,7 +1693,7 @@ fn run_local_interactive_process(
 
       let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
       let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
-      let input_digest: Digest = nodes::lift_directory_digest(types, &input_digest_value)?;
+      let input_digest: Digest = nodes::lift_directory_digest(&input_digest_value)?;
       let hermetic_env: bool = externs::getattr(&value, "hermetic_env").unwrap();
       let env = externs::getattr_from_frozendict(&value, "env");
 
@@ -1737,7 +1735,7 @@ fn write_digest(
       // TODO: A parent_id should be an explicit argument.
       session.workunit_store().init_thread_state(None);
 
-      let lifted_digest = nodes::lift_directory_digest(&scheduler.core.types, &digest.into())
+      let lifted_digest = nodes::lift_directory_digest(&digest.into())
         .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
 
       // Python will have already validated that path_prefix is a relative path.
