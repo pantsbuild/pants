@@ -203,6 +203,10 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
 
+        __import__(b"pkg_resources")
+        __import__(u"pkg_resources")
+        __import__(b"treat.as.a.regular.import.not.a.string.import")
+
         importlib.import_module(b"dep.from.bytes")
         importlib.import_module(u"dep.from.str")
         """
@@ -211,7 +215,12 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         constraints="==2.7.*",
-        expected_explicit=["demo", "project.demo.Demo"],
+        expected_explicit=[
+            "demo",
+            "project.demo.Demo",
+            "pkg_resources",
+            "treat.as.a.regular.import.not.a.string.import",
+        ],
         expected_string=["dep.from.bytes", "dep.from.str"],
     )
 
@@ -227,6 +236,9 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
 
+        __import__("pkg_resources")
+        __import__("treat.as.a.regular.import.not.a.string.import")
+
         importlib.import_module("dep.from.str")
         """
     )
@@ -234,7 +246,12 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         constraints=">=3.8",
-        expected_explicit=["demo", "project.demo.Demo"],
+        expected_explicit=[
+            "demo",
+            "project.demo.Demo",
+            "pkg_resources",
+            "treat.as.a.regular.import.not.a.string.import",
+        ],
         expected_string=["dep.from.str"],
     )
 
@@ -252,6 +269,9 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
 
+        __import__("pkg_resources")
+        __import__("treat.as.a.regular.import.not.a.string.import")
+
         importlib.import_module("dep.from.str")
         """
     )
@@ -259,6 +279,11 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         constraints=">=3.9",
-        expected_explicit=["demo", "project.demo.Demo"],
+        expected_explicit=[
+            "demo",
+            "project.demo.Demo",
+            "pkg_resources",
+            "treat.as.a.regular.import.not.a.string.import",
+        ],
         expected_string=["dep.from.str"],
     )
