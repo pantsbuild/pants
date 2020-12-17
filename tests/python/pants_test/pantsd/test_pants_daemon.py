@@ -6,6 +6,7 @@ import sys
 import unittest.mock
 
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.pantsd.service.pants_service import PantsServices
@@ -33,7 +34,7 @@ def test_close_stdio(mock_close):
         work_dir="test_work_dir",
         log_level=logging.INFO,
         server=mock_server,
-        core=PantsDaemonCore(create_services),
+        core=PantsDaemonCore(PyExecutor(2, 4), create_services),
         metadata_base_dir="/tmp/pants_test_metadata_dir",
         bootstrap_options=mock_options,
     )

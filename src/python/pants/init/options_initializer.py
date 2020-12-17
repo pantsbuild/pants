@@ -74,6 +74,10 @@ class OptionsInitializer:
 
         Does not directly construct a PyExecutor to avoid cycles.
         """
+        if bootstrap_options.rule_threads_core < 2:
+            # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
+            # at a time, and a `@goal_rule` will only block one thread.
+            raise ValueError("--rule-threads-core values less than 2 are not supported.")
         rule_threads_max = (
             bootstrap_options.rule_threads_max
             if bootstrap_options.rule_threads_max

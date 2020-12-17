@@ -560,9 +560,9 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 "The number of threads to keep active and ready to execute `@rule` logic (see "
-                f"also: `{rule_threads_max}`). This value is independent of the number of "
-                "processes that may be spawned in parallel locally (controlled by "
-                f"`{process_execution_local_parallelism}`)."
+                f"also: `{rule_threads_max}`). Values less than 2 are not currently supported. "
+                "This value is independent of the number of processes that may be spawned in "
+                f"parallel locally (controlled by `{process_execution_local_parallelism}`)."
             ),
         )
         register(
