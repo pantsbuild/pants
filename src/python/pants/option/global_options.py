@@ -556,7 +556,7 @@ class GlobalOptions(Subsystem):
         register(
             rule_threads_core,
             type=int,
-            default=max(1, _CPU_COUNT // 2),
+            default=max(2, _CPU_COUNT // 2),
             advanced=True,
             help=(
                 "The number of threads to keep active and ready to execute `@rule` logic (see "
