@@ -220,7 +220,9 @@ impl ByteStore {
       }
     });
 
-    let result_future = async move {
+    // NOTE: This async closure must be boxed or else it triggers a consistent stack overflow
+    // when awaited with the `with_workunit` call below.
+    let result_future = Box::pin(async move {
       let response = client.write(Request::new(stream)).await.map_err(|err| {
         format!(
           "Error from server while uploading digest {:?}: {:?}",
@@ -237,7 +239,7 @@ impl ByteStore {
           digest, len, response.committed_size
         ))
       }
-    };
+    });
 
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
       let store = workunit_state.store;
