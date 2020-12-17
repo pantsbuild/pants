@@ -16,6 +16,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.engine_testutil import assert_equal_with_printing
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler
 from pants.engine.internals.selectors import GetConstraints, GetParseError
 from pants.engine.rules import (
@@ -35,6 +36,8 @@ from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.util.enums import match
 from pants.util.logging import LogLevel
 
+_EXECUTOR = PyExecutor(2, 4)
+
 
 def create_scheduler(rules, validate=True, native=None):
     """Create a Scheduler."""
@@ -50,6 +53,7 @@ def create_scheduler(rules, validate=True, native=None):
         ca_certs_path=None,
         rules=rules,
         union_membership=UnionMembership({}),
+        executor=_EXECUTOR,
         execution_options=DEFAULT_EXECUTION_OPTIONS,
         validate_reachability=validate,
     )

@@ -7,6 +7,7 @@ from typing import Optional
 
 from typing_extensions import Protocol
 
+from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.option_value_container import OptionValueContainer
@@ -35,7 +36,8 @@ class PantsDaemonCore:
     PantsServices.
     """
 
-    def __init__(self, services_constructor: PantsServicesConstructor):
+    def __init__(self, executor: PyExecutor, services_constructor: PantsServicesConstructor):
+        self._executor = executor
         self._services_constructor = services_constructor
         self._lifecycle_lock = threading.RLock()
         # N.B. This Event is used as nothing more than an atomic flag - nothing waits on it.
@@ -74,7 +76,9 @@ class PantsDaemonCore:
             if self._services:
                 self._services.shutdown()
             build_config = BuildConfigInitializer.get(options_bootstrapper)
-            self._scheduler = EngineInitializer.setup_graph(options_bootstrapper, build_config)
+            self._scheduler = EngineInitializer.setup_graph(
+                options_bootstrapper, build_config, executor=self._executor
+            )
             bootstrap_options_values = options_bootstrapper.bootstrap_options.for_global_scope()
 
             self._services = self._services_constructor(bootstrap_options_values, self._scheduler)

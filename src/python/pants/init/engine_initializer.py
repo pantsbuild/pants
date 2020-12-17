@@ -19,7 +19,7 @@ from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing
 from pants.engine.internals.native import Native
-from pants.engine.internals.native_engine import PySessionCancellationLatch
+from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
@@ -167,14 +167,20 @@ class EngineInitializer:
     def setup_graph(
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
+        executor: Optional[PyExecutor] = None,
     ) -> GraphScheduler:
         native = Native()
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        executor = executor or PyExecutor(
+            *OptionsInitializer.compute_executor_arguments(bootstrap_options)
+        )
         return EngineInitializer.setup_graph_extended(
             options_bootstrapper,
             build_configuration,
             ExecutionOptions.from_bootstrap_options(bootstrap_options),
+            native=native,
+            executor=executor,
             pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
                 build_root, bootstrap_options
             ),
@@ -184,7 +190,6 @@ class EngineInitializer:
             named_caches_dir=bootstrap_options.named_caches_dir,
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
-            native=native,
             include_trace_on_error=bootstrap_options.print_stacktrace,
         )
 
@@ -195,6 +200,7 @@ class EngineInitializer:
         execution_options: ExecutionOptions,
         native: Native,
         *,
+        executor: PyExecutor,
         pants_ignore_patterns: List[str],
         use_gitignore: bool,
         local_store_dir: str,
@@ -284,6 +290,7 @@ class EngineInitializer:
             ca_certs_path=ensure_optional_absolute_path(ca_certs_path),
             rules=rules,
             union_membership=union_membership,
+            executor=executor,
             execution_options=execution_options,
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=bootstrap_options.native_engine_visualize_to,

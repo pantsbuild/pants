@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import multiprocessing
 import os
 import sys
 import tempfile
@@ -124,6 +123,9 @@ class ExecutionOptions:
         )
 
 
+_CPU_COUNT = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+
+
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution=False,
     remote_store_server=[],
@@ -133,7 +135,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
     remote_store_connection_limit=5,
-    process_execution_local_parallelism=multiprocessing.cpu_count(),
+    process_execution_local_parallelism=_CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
     process_execution_cleanup_local_dirs=True,
@@ -547,6 +549,33 @@ class GlobalOptions(Subsystem):
             "Pants's own code, plugins, and `--pants-config-files` are inherently invalidated.",
         )
 
+        process_execution_local_parallelism = "--process-execution-local-parallelism"
+        rule_threads_core = "--rule-threads-core"
+        rule_threads_max = "--rule-threads-max"
+
+        register(
+            rule_threads_core,
+            type=int,
+            default=max(2, _CPU_COUNT // 2),
+            advanced=True,
+            help=(
+                "The number of threads to keep active and ready to execute `@rule` logic (see "
+                f"also: `{rule_threads_max}`). Values less than 2 are not currently supported. "
+                "This value is independent of the number of processes that may be spawned in "
+                f"parallel locally (controlled by `{process_execution_local_parallelism}`)."
+            ),
+        )
+        register(
+            rule_threads_max,
+            type=int,
+            default=None,
+            advanced=True,
+            help=(
+                "The maximum number of threads to use to execute `@rule` logic. Defaults to "
+                f"a small multiple of `{rule_threads_core}`."
+            ),
+        )
+
         cache_instructions = (
             "The path may be absolute or relative. If the directory is within the build root, be "
             "sure to include it in `--pants-ignore`."
@@ -605,7 +634,7 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--process-execution-local-parallelism",
+            process_execution_local_parallelism,
             type=int,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
             advanced=True,

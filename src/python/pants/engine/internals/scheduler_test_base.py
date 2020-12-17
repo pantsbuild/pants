@@ -7,6 +7,7 @@ from dataclasses import asdict
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
@@ -21,6 +22,7 @@ class SchedulerTestBase:
     """
 
     _native = Native()
+    _executor = PyExecutor(2, 4)
 
     def _create_work_dir(self):
         work_dir = safe_mkdtemp()
@@ -73,6 +75,7 @@ class SchedulerTestBase:
             ca_certs_path=ca_certs_path,
             rules=rules,
             union_membership=UnionMembership({}),
+            executor=self._executor,
             execution_options=execution_options or DEFAULT_EXECUTION_OPTIONS,
             include_trace_on_error=include_trace_on_error,
         )

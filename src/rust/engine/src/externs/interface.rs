@@ -215,10 +215,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "nailgun_server_await_shutdown",
-    py_fn!(
-      py,
-      nailgun_server_await_shutdown(a: PyExecutor, b: PyNailgunServer)
-    ),
+    py_fn!(py, nailgun_server_await_shutdown(a: PyNailgunServer)),
   )?;
 
   m.add(
@@ -479,8 +476,8 @@ py_class!(class PyTypes |py| {
 
 py_class!(class PyExecutor |py| {
     data executor: Executor;
-    def __new__(_cls) -> CPyResult<Self> {
-      let executor = Executor::new_owned().map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+    def __new__(_cls, core_threads: usize, max_threads: usize) -> CPyResult<Self> {
+      let executor = Executor::new_owned(core_threads, max_threads).map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
       Self::create_instance(py, executor)
     }
 });
@@ -613,6 +610,7 @@ py_class!(class PySessionCancellationLatch |py| {
 
 py_class!(class PyNailgunServer |py| {
     data server: RefCell<Option<nailgun::Server>>;
+    data executor: Executor;
 
     def port(&self) -> CPyResult<u16> {
         let borrowed_server = self.server(py).borrow();
@@ -821,25 +819,20 @@ fn nailgun_server_create(
     let server = executor
       .block_on(server_future)
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-    PyNailgunServer::create_instance(py, RefCell::new(Some(server)))
+    PyNailgunServer::create_instance(py, RefCell::new(Some(server)), executor.clone())
   })
 }
 
-fn nailgun_server_await_shutdown(
-  py: Python,
-  executor_ptr: PyExecutor,
-  nailgun_server_ptr: PyNailgunServer,
-) -> PyUnitResult {
-  with_executor(py, &executor_ptr, |executor| {
-    with_nailgun_server(py, nailgun_server_ptr, |nailgun_server| {
-      let shutdown_result = if let Some(server) = nailgun_server.borrow_mut().take() {
-        py.allow_threads(|| executor.block_on(server.shutdown()))
-      } else {
-        Ok(())
-      };
-      shutdown_result.map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-      Ok(None)
-    })
+fn nailgun_server_await_shutdown(py: Python, nailgun_server_ptr: PyNailgunServer) -> PyUnitResult {
+  with_nailgun_server(py, nailgun_server_ptr, |nailgun_server, executor| {
+    let executor = executor.clone();
+    let shutdown_result = if let Some(server) = nailgun_server.borrow_mut().take() {
+      py.allow_threads(|| executor.block_on(server.shutdown()))
+    } else {
+      Ok(())
+    };
+    shutdown_result.map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+    Ok(None)
   })
 }
 
@@ -1951,10 +1944,11 @@ where
 ///
 fn with_nailgun_server<F, T>(py: Python, nailgun_server_ptr: PyNailgunServer, f: F) -> T
 where
-  F: FnOnce(&RefCell<Option<nailgun::Server>>) -> T,
+  F: FnOnce(&RefCell<Option<nailgun::Server>>, &Executor) -> T,
 {
   let nailgun_server = nailgun_server_ptr.server(py);
-  f(&nailgun_server)
+  let executor = nailgun_server_ptr.executor(py);
+  f(&nailgun_server, executor)
 }
 
 ///
