@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import multiprocessing
 import os
 import sys
 import tempfile
@@ -124,6 +123,9 @@ class ExecutionOptions:
         )
 
 
+_CPU_COUNT = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+
+
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution=False,
     remote_store_server=[],
@@ -133,7 +135,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
     remote_store_connection_limit=5,
-    process_execution_local_parallelism=multiprocessing.cpu_count(),
+    process_execution_local_parallelism=_CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
     process_execution_cleanup_local_dirs=True,
@@ -554,7 +556,7 @@ class GlobalOptions(Subsystem):
         register(
             rule_threads_core,
             type=int,
-            default=multiprocessing.cpu_count(),
+            default=max(1, _CPU_COUNT // 2),
             advanced=True,
             help=(
                 "The number of threads to keep active and ready to execute `@rule` logic (see "
