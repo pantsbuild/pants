@@ -32,7 +32,6 @@ use remexec::{
   ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
 };
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
-use tokio_rustls::rustls::ClientConfig;
 use tonic::metadata::{
   AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataValue, KeyAndValueRef, MetadataMap,
 };
@@ -131,15 +130,7 @@ impl CommandRunner {
     retry_interval_duration: Duration,
   ) -> Result<Self, String> {
     let tls_client_config = match root_ca_certs {
-      Some(pem_bytes) => {
-        let mut tls_config = ClientConfig::new();
-        let mut reader = std::io::Cursor::new(pem_bytes);
-        tls_config
-          .root_store
-          .add_pem_file(&mut reader)
-          .map_err(|_| "unexpected state in PEM file add".to_owned())?;
-        Some(tls_config)
-      }
+      Some(pem_bytes) => Some(grpc_util::create_tls_config(pem_bytes)?),
       _ => None,
     };
 
@@ -195,8 +186,7 @@ impl CommandRunner {
 
     let address_with_scheme = format!("{}://{}", scheme, address);
 
-    let endpoint =
-      crate::tonic_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
+    let endpoint = grpc_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let execution_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => ExecutionClient::with_interceptor(channel.clone(), interceptor.clone()),
@@ -211,7 +201,7 @@ impl CommandRunner {
     let (store_endpoints, store_endpoints_errors): (Vec<Endpoint>, Vec<String>) =
       store_servers_with_scheme
         .iter()
-        .map(|addr| crate::tonic_util::create_endpoint(addr.as_str(), tls_client_config.as_ref()))
+        .map(|addr| grpc_util::create_endpoint(addr.as_str(), tls_client_config.as_ref()))
         .partition_map(|result| match result {
           Ok(endpoint) => Either::Left(endpoint),
           Err(err) => Either::Right(err),

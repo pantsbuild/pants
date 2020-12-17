@@ -1,6 +1,6 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::fmt;
 use std::str::FromStr;
 use std::time::Duration;
@@ -16,8 +16,7 @@ use hashing::Digest;
 use itertools::{Either, Itertools};
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
-use tokio_rustls::rustls::ClientConfig;
-use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
+use tonic::transport::{Channel, Endpoint};
 use tonic::{Code, Interceptor, Request};
 use workunit_store::with_workunit;
 
@@ -57,15 +56,7 @@ impl ByteStore {
     _connection_limit: usize,
   ) -> Result<ByteStore, String> {
     let tls_client_config = match root_ca_certs {
-      Some(pem_bytes) => {
-        let mut tls_config = ClientConfig::new();
-        let mut reader = std::io::Cursor::new(pem_bytes);
-        tls_config
-          .root_store
-          .add_pem_file(&mut reader)
-          .map_err(|_| "unexpected state in PEM file add".to_owned())?;
-        Some(tls_config)
-      }
+      Some(pem_bytes) => Some(grpc_util::create_tls_config(pem_bytes)?),
       None => None,
     };
 
@@ -82,19 +73,7 @@ impl ByteStore {
 
     let (endpoints, errors): (Vec<Endpoint>, Vec<String>) = cas_addresses_with_scheme
       .iter()
-      .map(|addr| {
-        let uri = tonic::transport::Uri::try_from(addr)
-          .map_err(|err| format!("invalid address: {}", err))?;
-        let endpoint = Channel::builder(uri);
-        let maybe_tls_endpoint = if let Some(ref config) = tls_client_config {
-          endpoint
-            .tls_config(ClientTlsConfig::new().rustls_client_config(config.clone()))
-            .map_err(|e| format!("TLS setup error: {}", e))?
-        } else {
-          endpoint
-        };
-        Ok(maybe_tls_endpoint)
-      })
+      .map(|addr| grpc_util::create_endpoint(addr, tls_client_config.as_ref()))
       .partition_map(|result| match result {
         Ok(endpoint) => Either::Left(endpoint),
         Err(err) => Either::Right(err),

@@ -13,6 +13,7 @@ bazel_protos = { path = "bazel_protos" }
 boxfuture = { path = "../boxfuture" }
 bytes = "0.5"
 derivative = "2.1.1"
+grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
@@ -44,7 +45,7 @@ double-checked-cell-async = "2.0"
 rand = "0.6"
 prost = "0.6"
 prost-types = "0.6"
-tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots"] }
+tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 
 [dev-dependencies]
 maplit = "1.0.1"

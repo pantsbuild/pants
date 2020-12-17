@@ -13,7 +13,6 @@ use hashing::{Digest, EMPTY_DIGEST};
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
-use tokio_rustls::rustls::ClientConfig;
 use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 use tonic::transport::Channel;
 use tonic::Request;
@@ -59,15 +58,7 @@ impl CommandRunner {
     cache_write: bool,
   ) -> Result<Self, String> {
     let tls_client_config = match root_ca_certs {
-      Some(pem_bytes) => {
-        let mut tls_config = ClientConfig::new();
-        let mut reader = std::io::Cursor::new(pem_bytes);
-        tls_config
-          .root_store
-          .add_pem_file(&mut reader)
-          .map_err(|_| "unexpected state in PEM file add".to_owned())?;
-        Some(tls_config)
-      }
+      Some(pem_bytes) => Some(grpc_util::create_tls_config(pem_bytes)?),
       _ => None,
     };
 
@@ -103,8 +94,7 @@ impl CommandRunner {
 
     let address_with_scheme = format!("{}://{}", scheme, action_cache_address);
 
-    let endpoint =
-      crate::tonic_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
+    let endpoint = grpc_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let action_cache_client = Arc::new(if headers.is_empty() {
       ActionCacheClient::new(channel)
