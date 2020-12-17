@@ -37,6 +37,8 @@ class SelectInterpreterTest(TaskTestBase):
             binary = os.path.join(interpreter_dir, "python")
             values = dict(
                 binary=binary,
+                prefix="",
+                base_prefix="",
                 python_tag=python_tag,
                 abi_tag=abi_tag,
                 platform_tag="",

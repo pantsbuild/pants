@@ -25,9 +25,9 @@ class PexBin(ExternalTool):
 
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.14"
+    default_version = "v2.1.24"
     default_known_versions = [
-        f"v2.1.14|{plat}|12937da9ad5ad2c60564aa35cb4b3992ba3cc5ef7efedd44159332873da6fe46|2637138"
+        f"v2.1.24|{plat}|561da5a7c76a8a88567a306fa60dfcb5c6924bb71c18b892080d5c2b3eea7133|2936466"
         for plat in ["darwin", "linux "]
     ]
 

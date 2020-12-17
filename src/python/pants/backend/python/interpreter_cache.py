@@ -117,7 +117,7 @@ class PythonInterpreterCache(Subsystem):
                 )
             )
         # Return the lowest compatible interpreter.
-        return min(allowed_interpreters)
+        return min(allowed_interpreters, key=lambda i: i.version)
 
     def _interpreter_from_relpath(self, path, filters=()):
         path = os.path.join(self._cache_dir, path)

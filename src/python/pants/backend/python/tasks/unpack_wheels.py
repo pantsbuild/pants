@@ -70,7 +70,7 @@ class UnpackWheels(UnpackRemoteSourcesBase):
             unpacked_whls.compatibility
         )
         allowable_interpreters = PythonInterpreterCache.global_instance().setup(filters=constraints)
-        return min(allowable_interpreters)
+        return min(allowable_interpreters, key=lambda i: i.version)
 
     class WheelUnpackingError(TaskError):
         pass

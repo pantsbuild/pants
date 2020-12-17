@@ -362,10 +362,7 @@ class PexBuilderWrapper:
             dest_path = get_chroot_path(relpath)
 
             self._all_added_sources_resources.append(Path(dest_path))
-            if has_resources(tgt):
-                self._builder.add_resource(filename=source_path, env_filename=dest_path)
-            else:
-                self._builder.add_source(filename=source_path, env_filename=dest_path)
+            self._builder.add_source(filename=source_path, env_filename=dest_path)
 
         return dump_source
 
@@ -429,9 +426,10 @@ class PexBuilderWrapper:
         )
 
         # Remove all the original top-level requirements in favor of the transitive == requirements.
-        self._builder.info = ipex_launcher.modify_pex_info(self._builder.info, requirements=[])
-        transitive_reqs = [dist.as_requirement() for dist in self._distributions.values()]
-        self.add_direct_requirements(transitive_reqs)
+        transitive_reqs = [str(dist.as_requirement()) for dist in self._distributions.values()]
+        self._builder.info = ipex_launcher.modify_pex_info(
+            self._builder.info, requirements=transitive_reqs
+        )
 
         orig_info = self._builder.info.copy()
 
@@ -490,14 +488,14 @@ class PexBuilderWrapper:
         with temporary_file(permissions=0o644) as ipex_info_file:
             ipex_info_file.write(json.dumps(ipex_info).encode())
             ipex_info_file.flush()
-            self._builder.add_resource(filename=ipex_info_file.name, env_filename="IPEX-INFO")
+            self._builder.add_source(filename=ipex_info_file.name, env_filename="IPEX-INFO")
 
         # BOOTSTRAP-PEX-INFO: The original PEX-INFO, which should be the PEX-INFO in the hydrated .pex
         #                     file that is generated when the .ipex is first executed.
         with temporary_file(permissions=0o644) as bootstrap_pex_info_file:
             bootstrap_pex_info_file.write(orig_pex_info.dump().encode())
             bootstrap_pex_info_file.flush()
-            self._builder.add_resource(
+            self._builder.add_source(
                 filename=bootstrap_pex_info_file.name, env_filename="BOOTSTRAP-PEX-INFO"
             )
 
@@ -563,10 +561,6 @@ class PexBuilderWrapper:
         for constraint_tuple in constraint_tuples:
             for constraint in constraint_tuple:
                 self.add_interpreter_constraint(constraint)
-
-    def add_direct_requirements(self, reqs):
-        for req in reqs:
-            self._builder.add_requirement(str(req))
 
     def add_distribution(self, dist):
         self._builder.add_distribution(dist)

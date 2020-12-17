@@ -88,7 +88,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         interpreters = self._interpreter_cache.setup(
             filters=[self._MYPY_COMPATIBLE_INTERPRETER_CONSTRAINT]
         )
-        return min(interpreters) if interpreters else None
+        return min(interpreters, key=lambda i: i.version) if interpreters else None
 
     @staticmethod
     def is_non_synthetic_python_target(target):
