@@ -59,6 +59,18 @@ class AstVisitor(ast.NodeVisitor):
         for alias in node.names:
             self.explicit_imports.add("{}.{}".format(abs_module, alias.name))
 
+    def visit_Call(self, node):
+      # Handle __import__("string_literal").  This is commonly used in __init__.py files,
+      # to explicitly mark namespace packages.
+      if (
+          isinstance(node.func, ast.Name)
+          and node.func.id == "__import__"
+          and len(node.args) == 1
+      ):
+          if sys.version_info[0:2] < (3, 8) and isinstance(node.args[0], ast.Str):
+              self.explicit_imports.add(node.args[0].s)
+          elif isinstance(node.args[0], ast.Constant):
+              self.explicit_imports.add(str(node.args[0].value))
 
 # String handling changes a bit depending on Python version. We dynamically add the appropriate
 # logic.

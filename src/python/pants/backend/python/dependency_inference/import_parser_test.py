@@ -80,6 +80,8 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             import subprocess
         except ImportError:
             import subprocess23 as subprocess
+
+        __import__("pkg_resources")
         """
     )
     # We create a second file, in addition to what `assert_imports_parsed` does, to ensure we can
@@ -101,6 +103,7 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "second_import",
             "subprocess",
             "subprocess23",
+            "pkg_resources",
         ],
         expected_string=[],
     )
