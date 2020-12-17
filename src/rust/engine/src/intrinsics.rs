@@ -265,12 +265,11 @@ fn add_prefix_request_to_digest(
 }
 
 fn digest_to_snapshot(context: Context, args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
-  let core = context.core.clone();
   let store = context.core.store();
   async move {
     let digest = lift_directory_digest(&context.core.types, &args[0])?;
     let snapshot = store::Snapshot::from_digest(store, digest).await?;
-    Snapshot::store_snapshot(&core, &snapshot)
+    Snapshot::store_snapshot(snapshot)
   }
   .map_err(|e: String| throw(&e))
   .boxed()

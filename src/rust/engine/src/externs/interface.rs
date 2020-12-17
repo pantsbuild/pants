@@ -412,6 +412,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::PyGeneratorResponseGetMulti>(py)?;
 
   m.add_class::<externs::fs::PyDigest>(py)?;
+  m.add_class::<externs::fs::PySnapshot>(py)?;
 
   Ok(())
 });
@@ -985,7 +986,7 @@ async fn workunit_to_py_value(
       })?;
     artifact_entries.push((
       externs::store_utf8(artifact_name.as_str()),
-      crate::nodes::Snapshot::store_snapshot(core, &snapshot).map_err(|err_str| {
+      crate::nodes::Snapshot::store_snapshot(snapshot).map_err(|err_str| {
         let gil = Python::acquire_gil();
         let py = gil.python();
         PyErr::new::<exc::Exception, _>(py, (err_str,))
@@ -1585,7 +1586,7 @@ fn capture_snapshots(
               digest_hint,
             )
             .await?;
-            nodes::Snapshot::store_snapshot(&core, &snapshot)
+            nodes::Snapshot::store_snapshot(snapshot)
           }
         })
         .collect::<Vec<_>>();

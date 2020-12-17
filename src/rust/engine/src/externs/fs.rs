@@ -38,9 +38,12 @@
 use std::borrow::Cow;
 
 use cpython::{
-  exc, py_class, CompareOp, PyErr, PyObject, PyResult, Python, PythonObject, ToPyObject,
+  exc, py_class, CompareOp, PyErr, PyObject, PyResult, PyString, PyTuple, Python, PythonObject,
+  ToPyObject,
 };
+use fs::PathStat;
 use hashing::{Digest, Fingerprint};
+use store::Snapshot;
 
 /// TODO: See https://github.com/dgrunwald/rust-cpython/issues/242
 pub fn new_py_digest(digest: Digest) -> PyResult<PyDigest> {
@@ -82,5 +85,56 @@ py_class!(pub class PyDigest |py| {
 
     def __hash__(&self) -> PyResult<u64> {
       Ok(self.digest(py).0.prefix_hash())
+    }
+});
+
+/// TODO: See https://github.com/dgrunwald/rust-cpython/issues/242
+pub fn new_py_snapshot(snapshot: Snapshot) -> PyResult<PySnapshot> {
+  let gil = Python::acquire_gil();
+  PySnapshot::create_instance(gil.python(), snapshot)
+}
+
+py_class!(pub class PySnapshot |py| {
+    data snapshot: Snapshot;
+    def __new__(_cls) -> PyResult<Self> {
+      Self::create_instance(py, Snapshot::empty())
+    }
+
+    @property def digest(&self) -> PyResult<PyDigest> {
+      new_py_digest(self.snapshot(py).digest)
+    }
+
+    @property def files(&self) -> PyResult<PyTuple> {
+      let files = self.snapshot(py).path_stats.iter().filter_map(|ps| match ps {
+        PathStat::File { path, .. } => path.to_str(),
+        _ => None,
+      }).map(|ps| PyString::new(py, ps).into_object()).collect::<Vec<_>>();
+      Ok(PyTuple::new(py, &files))
+    }
+
+    @property def dirs(&self) -> PyResult<PyTuple> {
+      let dirs = self.snapshot(py).path_stats.iter().filter_map(|ps| match ps {
+        PathStat::Dir { path, .. } => path.to_str(),
+        _ => None,
+      }).map(|ps| PyString::new(py, ps).into_object()).collect::<Vec<_>>();
+      Ok(PyTuple::new(py, &dirs))
+    }
+
+    def __richcmp__(&self, other: PySnapshot, op: CompareOp) -> PyResult<PyObject> {
+      match op {
+        CompareOp::Eq => {
+          let res = self.snapshot(py).digest == other.snapshot(py).digest;
+          Ok(res.to_py_object(py).into_object())
+        },
+        CompareOp::Ne => {
+          let res = self.snapshot(py).digest != other.snapshot(py).digest;
+          Ok(res.to_py_object(py).into_object())
+        }
+        _ => Ok(py.NotImplemented()),
+      }
+    }
+
+    def __hash__(&self) -> PyResult<u64> {
+      Ok(self.snapshot(py).digest.0.prefix_hash())
     }
 });

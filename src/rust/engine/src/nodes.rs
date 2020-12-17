@@ -655,27 +655,10 @@ impl Snapshot {
     )
   }
 
-  pub fn store_snapshot(core: &Arc<Core>, item: &store::Snapshot) -> Result<Value, String> {
-    let mut files = Vec::new();
-    let mut dirs = Vec::new();
-    for ps in &item.path_stats {
-      match ps {
-        &PathStat::File { ref path, .. } => {
-          files.push(Self::store_path(path)?);
-        }
-        &PathStat::Dir { ref path, .. } => {
-          dirs.push(Self::store_path(path)?);
-        }
-      }
-    }
-    Ok(externs::unsafe_call(
-      core.types.snapshot,
-      &[
-        Self::store_directory_digest(&item.digest)?,
-        externs::store_tuple(files),
-        externs::store_tuple(dirs),
-      ],
-    ))
+  pub fn store_snapshot(item: store::Snapshot) -> Result<Value, String> {
+    externs::fs::new_py_snapshot(item)
+      .map(|d| d.into_object().into())
+      .map_err(|e| format!("{:?}", e))
   }
 
   fn store_path(item: &Path) -> Result<Value, String> {
