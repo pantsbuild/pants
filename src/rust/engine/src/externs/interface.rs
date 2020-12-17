@@ -876,21 +876,26 @@ fn scheduler_create(
     let mut tasks = tasks_ptr.tasks(py).replace(Tasks::new());
     tasks.intrinsics_set(&intrinsics);
 
-    Core::new(
-      executor.clone(),
-      tasks,
-      types,
-      intrinsics,
-      PathBuf::from(build_root_buf),
-      ignore_patterns,
-      use_gitignore,
-      PathBuf::from(local_store_dir_buf),
-      PathBuf::from(local_execution_root_dir_buf),
-      PathBuf::from(named_caches_dir_buf),
-      ca_certs_path_buf.map(PathBuf::from),
-      remoting_options.options(py).clone(),
-      exec_strategy_opts.options(py).clone(),
-    )
+    // NOTE: Enter the Tokio runtime so that libraries like Tonic (for gRPC) are able to
+    // use `tokio::spawn` since Python does not setup Tokio for the main thread. This also
+    // ensures that the correct executor is used by those libraries.
+    executor.enter(|| {
+      Core::new(
+        executor.clone(),
+        tasks,
+        types,
+        intrinsics,
+        PathBuf::from(build_root_buf),
+        ignore_patterns,
+        use_gitignore,
+        PathBuf::from(local_store_dir_buf),
+        PathBuf::from(local_execution_root_dir_buf),
+        PathBuf::from(named_caches_dir_buf),
+        ca_certs_path_buf.map(PathBuf::from),
+        remoting_options.options(py).clone(),
+        exec_strategy_opts.options(py).clone(),
+      )
+    })
   });
   PyScheduler::create_instance(
     py,
