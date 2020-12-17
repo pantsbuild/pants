@@ -11,9 +11,9 @@ from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
+    DeprecatedPexBinarySources,
     PexBinary,
     PexBinaryDependencies,
-    PexBinarySources,
     PexEntryPointField,
     PythonDistribution,
     PythonDistributionDependencies,
@@ -109,7 +109,7 @@ def test_resolve_pex_binary_entry_point() -> None:
         rule_runner.create_file("src/python/project/app.py")
         rule_runner.create_file("src/python/project/f2.py")
         ep_field = PexEntryPointField(entry_point, address=addr)
-        sources = PexBinarySources([source] if source else None, address=addr)
+        sources = DeprecatedPexBinarySources([source] if source else None, address=addr)
         result = rule_runner.request(
             ResolvedPexEntryPoint, [ResolvePexEntryPointRequest(ep_field, sources)]
         )

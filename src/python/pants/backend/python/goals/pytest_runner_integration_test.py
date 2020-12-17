@@ -112,15 +112,13 @@ def create_test_target(
 
 def create_pex_binary_target(rule_runner: RuleRunner, source_file: FileContent) -> None:
     rule_runner.create_file(source_file.path, source_file.content.decode())
+    file_name = PurePath(source_file.path).name
     rule_runner.add_to_build_file(
         relpath=PACKAGE,
         target=dedent(
             f"""\
-            pex_binary(
-              name='bin',
-              sources=['{PurePath(source_file.path).name}'],
-              output_path="bin.pex",
-            )
+            python_library(name='bin_lib', sources=['{file_name}'])
+            pex_binary(name='bin', entry_point='{file_name}', output_path="bin.pex")
             """
         ),
     )

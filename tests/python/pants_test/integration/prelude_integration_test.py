@@ -12,10 +12,10 @@ def test_build_file_prelude() -> None:
         "prelude.py": dedent(
             """\
             def make_binary_macro():
-                pex_binary(name="main", sources=["main.py"])
+                pex_binary(name="main", entry_point="main.py")
             """
         ),
-        "BUILD": "make_binary_macro()",
+        "BUILD": "pex_library()\nmake_binary_macro()",
         "main.py": "print('Hello world!')",
     }
     with setup_tmpdir(sources) as tmpdir:
