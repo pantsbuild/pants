@@ -1,6 +1,5 @@
 use std::any::type_name;
 use std::collections::VecDeque;
-use std::convert::TryInto;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
@@ -9,7 +8,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
-use crate::tonic_util::AddrIncomingWithStream;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::build::bazel::semver::SemVer;
 use bazel_protos::gen::google::longrunning::{
@@ -17,8 +15,9 @@ use bazel_protos::gen::google::longrunning::{
   DeleteOperationRequest, GetOperationRequest, ListOperationsRequest, ListOperationsResponse,
   Operation,
 };
+use bazel_protos::require_digest;
 use futures::{FutureExt, Stream};
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::Digest;
 use parking_lot::Mutex;
 use remexec::{
   action_cache_server::ActionCache, action_cache_server::ActionCacheServer,
@@ -31,6 +30,8 @@ use std::pin::Pin;
 use tonic::metadata::MetadataMap;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
+
+use crate::tonic_util::AddrIncomingWithStream;
 
 ///
 /// Represents an expected API call from the REv2 client. The data carried by each enum
@@ -452,20 +453,16 @@ impl ActionCache for MockResponder {
         action_digest,
         response,
       }) => {
-        let action_digest_from_request: Digest = match request
-          .action_digest
-          .as_ref()
-          .map(|d| d.try_into())
-          .unwrap_or(Ok(EMPTY_DIGEST))
-        {
-          Ok(d) => d,
-          Err(e) => {
-            return Err(Status::invalid_argument(format!(
-              "GetActionResult endpoint called with bad digest: {:?}",
-              e,
-            )));
-          }
-        };
+        let action_digest_from_request: Digest =
+          match require_digest(request.action_digest.as_ref()) {
+            Ok(d) => d,
+            Err(e) => {
+              return Err(Status::invalid_argument(format!(
+                "GetActionResult endpoint called with bad digest: {:?}",
+                e,
+              )));
+            }
+          };
 
         if action_digest_from_request == action_digest {
           match response {

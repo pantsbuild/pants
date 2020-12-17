@@ -251,7 +251,7 @@ impl Store {
   /// Make a store which uses local storage, and if it is missing a value which it tries to load,
   /// will attempt to back-fill its local storage from a remote CAS.
   ///
-  pub fn with_remote<P: AsRef<Path> + Send>(
+  pub fn with_remote<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
     cas_addresses: Vec<String>,

@@ -1,10 +1,15 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::{snapshot::osstring_as_utf8, Snapshot};
+use std::collections::HashSet;
+use std::convert::From;
+use std::iter::Iterator;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bazel_protos::require_digest;
 use bytes::BytesMut;
 use fs::{
   ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob, PreparedPathGlobs, RelativePath,
@@ -12,17 +17,12 @@ use fs::{
 };
 use futures::future::{self as future03, FutureExt, TryFutureExt};
 use glob::Pattern;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use log::log_enabled;
 
-use bazel_protos::require_digest;
-use std::collections::HashSet;
-use std::convert::From;
-use std::iter::Iterator;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use crate::{snapshot::osstring_as_utf8, Snapshot};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum SnapshotOpsError {
@@ -134,11 +134,20 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
         .into_iter()
         .map(move |(child_name, group)| {
           let store = store.clone();
-          let digests: Vec<Digest> = group
-            .map(|d| to_pants_digest_opt(d.digest.clone()))
-            .collect();
+          let (digests, errors): (Vec<Digest>, Vec<String>) =
+            group.partition_map(|d| match require_digest(d.digest.as_ref()) {
+              Ok(digest) => Either::Left(digest),
+              Err(err) => Either::Right(err),
+            });
           let child_path = parent_path.join(&child_name);
           async move {
+            if !errors.is_empty() {
+              return Err(format!(
+                "Errors while parsing digests: {}",
+                errors.join(", ")
+              ));
+            }
+
             let merged_digest = merge_directories_recursive(store, child_path, digests).await?;
             let child_dir = remexec::DirectoryNode {
               name: child_name,
@@ -549,7 +558,9 @@ async fn snapshot_glob_match<T: StoreWrapper>(
         .unwrap()
         .digest
         .clone();
-      let digest = bazel_digest.map(to_pants_digest).unwrap_or(EMPTY_DIGEST);
+      // TODO(tonic): Use require_digest here by figure out how to properly return the error.
+      let digest = require_digest(bazel_digest.as_ref())
+        .map_err(|msg| SnapshotOpsError::String(format!("Failed to parse digest: {}", msg)))?;
       let multiple_globs = MultipleGlobs {
         include: all_path_globs,
         exclude: exclude.clone(),
@@ -799,22 +810,6 @@ fn to_bazel_digest(digest: Digest) -> remexec::Digest {
   remexec::Digest {
     hash: digest.0.to_hex(),
     size_bytes: digest.1 as i64,
-  }
-}
-
-// TODO(tonic): Replace uses of this method with `.into` or equivalent.
-fn to_pants_digest(bazel_digest: remexec::Digest) -> Digest {
-  let fp = Fingerprint::from_hex_string(&bazel_digest.hash)
-    .expect("failed to coerce bazel to pants digest");
-  let size_bytes = bazel_digest.size_bytes as usize;
-  Digest(fp, size_bytes)
-}
-
-// TODO(tonic): Replace use of this method with `.into` or equivalent.
-fn to_pants_digest_opt(bazel_digest: Option<remexec::Digest>) -> Digest {
-  match bazel_digest {
-    Some(d) => to_pants_digest(d),
-    None => EMPTY_DIGEST,
   }
 }
 

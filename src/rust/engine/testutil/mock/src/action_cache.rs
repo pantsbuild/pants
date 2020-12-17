@@ -28,14 +28,14 @@ clippy::unseparated_literal_suffix,
 #![allow(clippy::mutex_atomic)]
 
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bazel_protos::require_digest;
 use futures::FutureExt;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use remexec::action_cache_server::{ActionCache, ActionCacheServer};
 use remexec::{ActionResult, GetActionResultRequest, UpdateActionResultRequest};
@@ -75,11 +75,7 @@ impl ActionCache for ActionCacheResponder {
       return Err(Status::unavailable("unavailable".to_owned()));
     }
 
-    let action_digest: Digest = match request
-      .action_digest
-      .map(|d| d.try_into())
-      .unwrap_or(Ok(EMPTY_DIGEST))
-    {
+    let action_digest: Digest = match require_digest(request.action_digest.as_ref()) {
       Ok(digest) => digest,
       Err(_) => {
         return Err(Status::internal(
@@ -108,11 +104,7 @@ impl ActionCache for ActionCacheResponder {
   ) -> Result<Response<ActionResult>, Status> {
     let request = request.into_inner();
 
-    let action_digest: Digest = match request
-      .action_digest
-      .map(|d| d.try_into())
-      .unwrap_or(Ok(EMPTY_DIGEST))
-    {
+    let action_digest: Digest = match require_digest(request.action_digest.as_ref()) {
       Ok(digest) => digest,
       Err(_) => {
         return Err(Status::internal(

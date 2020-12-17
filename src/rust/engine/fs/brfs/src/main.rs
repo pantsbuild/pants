@@ -30,15 +30,15 @@
 
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bazel_protos::require_digest;
 use futures::future::FutureExt;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
 use store::Store;
@@ -363,13 +363,10 @@ impl BuildResultFS {
               });
 
               for (digest, name, filetype, is_executable) in directories.chain(files) {
-                let child_digest = digest
-                  .map(|d| d.try_into())
-                  .unwrap_or(Ok(EMPTY_DIGEST))
-                  .map_err(|err| {
-                    error!("Error parsing digest: {:?}", err);
-                    libc::ENOENT
-                  })?;
+                let child_digest = require_digest(digest.as_ref()).map_err(|err| {
+                  error!("Error parsing digest: {:?}", err);
+                  libc::ENOENT
+                })?;
                 let maybe_child_inode = match filetype {
                   fuse::FileType::Directory => self.inode_for_directory(child_digest),
                   fuse::FileType::RegularFile => self.inode_for_file(child_digest, is_executable),
@@ -484,25 +481,17 @@ impl fuse::Filesystem for BuildResultFS {
             })
             .and_then(|node| match node {
               Node::Directory(directory_node) => {
-                let digest = directory_node
-                  .digest
-                  .map(|d| d.try_into())
-                  .unwrap_or(Ok(EMPTY_DIGEST))
-                  .map_err(|err| {
-                    error!("Error parsing digest: {:?}", err);
-                    libc::ENOENT
-                  })?;
+                let digest = require_digest(directory_node.digest.as_ref()).map_err(|err| {
+                  error!("Error parsing digest: {:?}", err);
+                  libc::ENOENT
+                })?;
                 self.dir_attr_for(digest)
               }
               Node::File(file_node) => {
-                let digest = file_node
-                  .digest
-                  .map(|d| d.try_into())
-                  .unwrap_or(Ok(EMPTY_DIGEST))
-                  .map_err(|err| {
-                    error!("Error parsing digest: {:?}", err);
-                    libc::ENOENT
-                  })?;
+                let digest = require_digest(file_node.digest.as_ref()).map_err(|err| {
+                  error!("Error parsing digest: {:?}", err);
+                  libc::ENOENT
+                })?;
                 self
                   .inode_for_file(digest, file_node.is_executable)
                   .map_err(|err| {

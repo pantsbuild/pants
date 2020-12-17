@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
-use std::convert::TryInto;
 use std::ffi::OsString;
 use std::path::Component;
 use std::str::FromStr;
@@ -7,9 +6,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bazel_protos::require_digest;
 use fs::RelativePath;
 use futures::compat::Future01CompatExt;
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::Digest;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
@@ -176,11 +176,7 @@ impl CommandRunner {
       // Set the current directory digest to be the digest in the DirectoryNode just found.
       // If there are more path components, then the search will continue there.
       // Otherwise, if this loop ends then the final Directory digest has been found.
-      current_directory_digest = dir_node
-        .digest
-        .as_ref()
-        .map(|d| d.try_into())
-        .unwrap_or(Ok(EMPTY_DIGEST))?;
+      current_directory_digest = require_digest(dir_node.digest.as_ref())?;
     }
 
     // At this point, `current_directory_digest` holds the digest of the output directory.
@@ -204,11 +200,7 @@ impl CommandRunner {
       // Add all of the digests for subdirectories into the queue so they are processed
       // in future iterations of the loop.
       for subdirectory_node in &directory.directories {
-        let subdirectory_digest = subdirectory_node
-          .digest
-          .as_ref()
-          .map(|d| d.try_into())
-          .unwrap_or(Ok(EMPTY_DIGEST))?;
+        let subdirectory_digest = require_digest(subdirectory_node.digest.as_ref())?;
         digest_queue.push_back(subdirectory_digest);
       }
 
@@ -275,11 +267,7 @@ impl CommandRunner {
         // Set the current directory digest to be the digest in the DirectoryNode just found.
         // If there are more path components, then the search will continue there.
         // Otherwise, if this loop ends then the final Directory digest has been found.
-        current_directory_digest = dir_node
-          .digest
-          .as_ref()
-          .map(|d| d.try_into())
-          .unwrap_or(Ok(EMPTY_DIGEST))?;
+        current_directory_digest = require_digest(dir_node.digest.as_ref())?;
       }
     }
 
@@ -359,10 +347,7 @@ impl CommandRunner {
       )
       .await?;
 
-      let digest = file_node
-        .digest
-        .map(|d| d.try_into())
-        .unwrap_or(Ok(EMPTY_DIGEST))?;
+      let digest = require_digest(file_node.digest.as_ref())?;
 
       digests.insert(digest);
 
