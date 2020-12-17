@@ -203,7 +203,6 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
 
-        __import__(b"pkg_resources")
         __import__(u"pkg_resources")
         __import__(b"treat.as.a.regular.import.not.a.string.import")
 
