@@ -45,10 +45,23 @@ use fs::PathStat;
 use hashing::{Digest, Fingerprint};
 use store::Snapshot;
 
+///
+/// Data members and `create_instance` methods are module-private by default, so we expose them
+/// with public top-level functions.
+///
 /// TODO: See https://github.com/dgrunwald/rust-cpython/issues/242
-pub fn new_py_digest(digest: Digest) -> PyResult<PyDigest> {
+///
+
+pub fn to_py_digest(digest: Digest) -> PyResult<PyDigest> {
   let gil = Python::acquire_gil();
   PyDigest::create_instance(gil.python(), digest)
+}
+
+pub fn from_py_digest(digest: &PyObject) -> PyResult<Digest> {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  let py_digest = digest.extract::<PyDigest>(py)?;
+  Ok(*py_digest.digest(py))
 }
 
 py_class!(pub class PyDigest |py| {
@@ -88,8 +101,7 @@ py_class!(pub class PyDigest |py| {
     }
 });
 
-/// TODO: See https://github.com/dgrunwald/rust-cpython/issues/242
-pub fn new_py_snapshot(snapshot: Snapshot) -> PyResult<PySnapshot> {
+pub fn to_py_snapshot(snapshot: Snapshot) -> PyResult<PySnapshot> {
   let gil = Python::acquire_gil();
   PySnapshot::create_instance(gil.python(), snapshot)
 }
@@ -101,7 +113,7 @@ py_class!(pub class PySnapshot |py| {
     }
 
     @property def digest(&self) -> PyResult<PyDigest> {
-      new_py_digest(self.snapshot(py).digest)
+      to_py_digest(self.snapshot(py).digest)
     }
 
     @property def files(&self) -> PyResult<PyTuple> {
