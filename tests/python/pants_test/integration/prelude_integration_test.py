@@ -15,7 +15,7 @@ def test_build_file_prelude() -> None:
                 pex_binary(name="main", entry_point="main.py")
             """
         ),
-        "BUILD": "pex_library()\nmake_binary_macro()",
+        "BUILD": "python_library()\nmake_binary_macro()",
         "main.py": "print('Hello world!')",
     }
     with setup_tmpdir(sources) as tmpdir:
