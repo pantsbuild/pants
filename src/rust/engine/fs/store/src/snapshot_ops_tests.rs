@@ -1,4 +1,12 @@
+use std::collections::HashMap;
+use std::fs::create_dir_all;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
 use async_trait::async_trait;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use fs::{GlobExpansionConjunction, PosixFS, PreparedPathGlobs, StrictGlobMatching};
+use hashing::Digest;
 use parking_lot::Mutex;
 use testutil::make_file;
 
@@ -7,14 +15,6 @@ use crate::{
   snapshot_tests::{expand_all_sorted, setup, STR, STR2},
   OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, SubsetParams,
 };
-use bazel_protos::remote_execution as remexec;
-use fs::{GlobExpansionConjunction, PosixFS, PreparedPathGlobs, StrictGlobMatching};
-use hashing::Digest;
-
-use std::collections::HashMap;
-use std::fs::create_dir_all;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 async fn get_duplicate_rolands<T: StoreWrapper + 'static>(
   store: Store,

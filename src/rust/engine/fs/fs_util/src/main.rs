@@ -28,15 +28,15 @@
 #![allow(clippy::mutex_atomic)]
 #![type_length_limit = "1881109"]
 
-use std::convert::TryInto;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
+use bazel_protos::require_digest;
 use boxfuture::{BoxFuture, Boxable};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use clap::{value_t, App, Arg, SubCommand};
 use fs::{
   GlobExpansionConjunction, GlobMatching, PreparedPathGlobs, RelativePath, StrictGlobMatching,
@@ -46,7 +46,7 @@ use futures::future::TryFutureExt;
 use futures01::{future, Future};
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use protobuf::Message;
+use prost::Message;
 use rand::seq::SliceRandom;
 use serde_derive::Serialize;
 use store::{
@@ -521,7 +521,11 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
           "binary" => {
             let maybe_directory = store.load_directory(digest).await?;
-            maybe_directory.map(|(d, _metadata)| d.write_to_bytes().unwrap())
+            maybe_directory.map(|(d, _metadata)| {
+              let mut buf = Vec::with_capacity(d.encoded_len());
+              d.encode(&mut buf).unwrap();
+              buf
+            })
           }
           "text" => {
             let maybe_p = store.load_directory(digest).await?;
@@ -575,17 +579,17 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .expect("size_bytes must be a non-negative number");
       let digest = Digest(fingerprint, size_bytes);
       let v = match store
-        .load_file_bytes_with(digest, |bytes| bytes.into())
+        .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
         .await?
       {
         None => {
           let maybe_dir = store.load_directory(digest).await?;
           maybe_dir.map(|(dir, _metadata)| {
-            Bytes::from(
-              dir
-                .write_to_bytes()
-                .expect("Error serializing Directory proto"),
-            )
+            let mut buf = BytesMut::with_capacity(dir.encoded_len());
+            dir
+              .encode(&mut buf)
+              .expect("Error serializing Directory proto");
+            buf.freeze()
           })
         }
         Some((bytes, _metadata)) => Some(bytes),
@@ -650,16 +654,16 @@ fn expand_files_helper(
       Some((dir, _metadata)) => {
         {
           let mut files_unlocked = files.lock();
-          for file in dir.get_files() {
-            let file_digest: Result<Digest, String> = file.get_digest().try_into();
-            files_unlocked.push((format!("{}{}", prefix, file.name), file_digest?));
+          for file in &dir.files {
+            let file_digest = require_digest(file.digest.as_ref())?;
+            files_unlocked.push((format!("{}{}", prefix, file.name), file_digest));
           }
         }
         let subdirs_and_digests = dir
-          .get_directories()
+          .directories
           .iter()
           .map(move |subdir| {
-            let digest: Result<Digest, String> = subdir.get_digest().try_into();
+            let digest = require_digest(subdir.digest.as_ref());
             digest.map(|digest| (subdir, digest))
           })
           .collect::<Result<Vec<_>, _>>()?;

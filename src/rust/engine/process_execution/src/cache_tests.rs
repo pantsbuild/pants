@@ -162,10 +162,12 @@ async fn recover_from_missing_store_contents() {
       .unwrap()
       .unwrap();
     let output_child_digest = output_dir
-      .get_files()
+      .files
       .first()
       .unwrap()
-      .get_digest()
+      .digest
+      .as_ref()
+      .unwrap()
       .try_into()
       .unwrap();
     let removed = store.remove_file(output_child_digest).await.unwrap();

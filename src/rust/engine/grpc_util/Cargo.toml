@@ -1,0 +1,14 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "grpc_util"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+futures = { version = "0.3" }
+tokio = { version = "0.2.23", features = ["process", "rt-threaded", "sync", "tcp", "time"] }
+tokio-rustls = "0.14"
+tokio-util = { version = "0.2", features = ["codec"] }
+tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+

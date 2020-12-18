@@ -43,7 +43,7 @@ use store::UploadSummary;
 use workunit_store::{with_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
-use hashing::Digest;
+use hashing::{Digest, EMPTY_FINGERPRINT};
 
 pub mod cache;
 #[cfg(test)]
@@ -433,7 +433,11 @@ pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
     .0
     .values()
     .map(|ref process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
-    .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
+    .map(|(_a, _b, er)| {
+      er.action_digest
+        .map(|d| d.hash)
+        .unwrap_or_else(|| EMPTY_FINGERPRINT.to_hex())
+    })
     .collect();
   hashes.sort();
   Digest::of_bytes(

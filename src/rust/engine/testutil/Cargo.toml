@@ -6,8 +6,10 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+async-stream = "0.2"
 bazel_protos = { path = "../process_execution/bazel_protos" }
-bytes = "0.4.5"
+bytes = "0.5"
 fs = { path = "../fs" }
 hashing = { path = "../hashing" }
+prost = "0.6"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }

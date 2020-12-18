@@ -1,17 +1,21 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
-use std::convert::TryInto;
+use std::ffi::OsString;
 use std::path::Component;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bazel_protos::call_option;
-use bazel_protos::remote_execution::{
-  ActionResult, Command, FileNode, Tree, UpdateActionResultRequest,
-};
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bazel_protos::require_digest;
 use fs::RelativePath;
 use futures::compat::Future01CompatExt;
 use hashing::Digest;
+use remexec::action_cache_client::ActionCacheClient;
+use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
+use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
+use tonic::transport::Channel;
+use tonic::Request;
 use workunit_store::{with_workunit, Level, Metric, WorkunitMetadata};
 
 use crate::remote::make_execute_request;
@@ -33,7 +37,7 @@ pub struct CommandRunner {
   underlying: Arc<dyn crate::CommandRunner>,
   metadata: ProcessMetadata,
   store: Store,
-  action_cache_client: Arc<bazel_protos::remote_execution_grpc::ActionCacheClient>,
+  action_cache_client: Arc<ActionCacheClient<Channel>>,
   headers: BTreeMap<String, String>,
   platform: Platform,
   cache_read: bool,
@@ -48,28 +52,22 @@ impl CommandRunner {
     action_cache_address: &str,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
-    headers: BTreeMap<String, String>,
+    mut headers: BTreeMap<String, String>,
     platform: Platform,
     cache_read: bool,
     cache_write: bool,
   ) -> Result<Self, String> {
-    let env = Arc::new(grpcio::EnvBuilder::new().build());
-    let channel = {
-      let builder = grpcio::ChannelBuilder::new(env);
-      if let Some(ref root_ca_certs) = root_ca_certs {
-        let creds = grpcio::ChannelCredentialsBuilder::new()
-          .root_cert(root_ca_certs.clone())
-          .build();
-        builder.secure_connect(action_cache_address, creds)
-      } else {
-        builder.connect(action_cache_address)
-      }
+    let tls_client_config = match root_ca_certs {
+      Some(pem_bytes) => Some(grpc_util::create_tls_config(pem_bytes)?),
+      _ => None,
     };
-    let action_cache_client = Arc::new(
-      bazel_protos::remote_execution_grpc::ActionCacheClient::new(channel),
-    );
 
-    let mut headers = headers;
+    let scheme = if tls_client_config.is_some() {
+      "https"
+    } else {
+      "http"
+    };
+
     if let Some(oauth_bearer_token) = oauth_bearer_token {
       headers.insert(
         String::from("authorization"),
@@ -77,8 +75,45 @@ impl CommandRunner {
       );
     }
 
-    // Validate any configured static headers.
-    call_option(&headers, None)?;
+    let mut grpc_metadata = MetadataMap::with_capacity(headers.len());
+    for (key, value) in &headers {
+      let key_ascii = AsciiMetadataKey::from_str(key.as_str()).map_err(|_| {
+        format!(
+          "Header key `{}` must be an ASCII value (as required by gRPC).",
+          key
+        )
+      })?;
+      let value_ascii = AsciiMetadataValue::from_str(value.as_str()).map_err(|_| {
+        format!(
+          "Header value `{}` for key `{}` must be an ASCII value (as required by gRPC).",
+          value, key
+        )
+      })?;
+      grpc_metadata.insert(key_ascii, value_ascii);
+    }
+
+    let address_with_scheme = format!("{}://{}", scheme, action_cache_address);
+
+    let endpoint = grpc_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
+    let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
+    let action_cache_client = Arc::new(if headers.is_empty() {
+      ActionCacheClient::new(channel)
+    } else {
+      ActionCacheClient::with_interceptor(channel, move |mut req: Request<()>| {
+        let req_metadata = req.metadata_mut();
+        for kv_ref in grpc_metadata.iter() {
+          match kv_ref {
+            KeyAndValueRef::Ascii(key, value) => {
+              req_metadata.insert(key, value.clone());
+            }
+            KeyAndValueRef::Binary(key, value) => {
+              req_metadata.insert_bin(key, value.clone());
+            }
+          }
+        }
+        Ok(req)
+      })
+    });
 
     Ok(CommandRunner {
       underlying,
@@ -141,12 +176,12 @@ impl CommandRunner {
       // Set the current directory digest to be the digest in the DirectoryNode just found.
       // If there are more path components, then the search will continue there.
       // Otherwise, if this loop ends then the final Directory digest has been found.
-      current_directory_digest = dir_node.get_digest().try_into()?;
+      current_directory_digest = require_digest(dir_node.digest.as_ref())?;
     }
 
     // At this point, `current_directory_digest` holds the digest of the output directory.
     // This will be the root of the Tree. Add it to a queue of digests to traverse.
-    let mut tree = Tree::new();
+    let mut tree = Tree::default();
 
     let mut digest_queue = VecDeque::new();
     digest_queue.push_back(current_directory_digest);
@@ -165,14 +200,15 @@ impl CommandRunner {
       // Add all of the digests for subdirectories into the queue so they are processed
       // in future iterations of the loop.
       for subdirectory_node in &directory.directories {
-        digest_queue.push_back(subdirectory_node.get_digest().try_into()?);
+        let subdirectory_digest = require_digest(subdirectory_node.digest.as_ref())?;
+        digest_queue.push_back(subdirectory_digest);
       }
 
       // Store this directory either as the `root` or one of the `children` if not the root.
       if directory_digest == current_directory_digest {
-        tree.set_root(directory);
+        tree.root = Some(directory);
       } else {
-        tree.mut_children().push(directory)
+        tree.children.push(directory)
       }
     }
 
@@ -231,7 +267,7 @@ impl CommandRunner {
         // Set the current directory digest to be the digest in the DirectoryNode just found.
         // If there are more path components, then the search will continue there.
         // Otherwise, if this loop ends then the final Directory digest has been found.
-        current_directory_digest = dir_node.get_digest().try_into()?;
+        current_directory_digest = require_digest(dir_node.digest.as_ref())?;
       }
     }
 
@@ -251,7 +287,10 @@ impl CommandRunner {
     directory
       .files
       .iter()
-      .find(|n| n.get_name() == file_base_name)
+      .find(|node| {
+        let name = OsString::from(&node.name);
+        name == file_base_name
+      })
       .cloned()
       .ok_or_else(|| format!("File {:?} did not exist locally.", file_path))
   }
@@ -271,13 +310,14 @@ impl CommandRunner {
     // Keep track of digests that need to be uploaded.
     let mut digests = HashSet::new();
 
-    let mut action_result = ActionResult::new();
-    action_result.set_exit_code(result.exit_code);
+    let mut action_result = ActionResult {
+      exit_code: result.exit_code,
+      stdout_digest: Some(result.stdout_digest.into()),
+      stderr_digest: Some(result.stderr_digest.into()),
+      ..ActionResult::default()
+    };
 
-    action_result.set_stdout_digest(result.stdout_digest.into());
     digests.insert(result.stdout_digest);
-
-    action_result.set_stderr_digest(result.stderr_digest.into());
     digests.insert(result.stderr_digest);
 
     for output_directory in &command.output_directories {
@@ -291,12 +331,12 @@ impl CommandRunner {
       let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
       digests.insert(tree_digest);
 
-      action_result.mut_output_directories().push({
-        let mut directory = bazel_protos::remote_execution::OutputDirectory::new();
-        directory.set_path(String::new());
-        directory.set_tree_digest(tree_digest.into());
-        directory
-      });
+      action_result
+        .output_directories
+        .push(remexec::OutputDirectory {
+          path: String::new(),
+          tree_digest: Some(tree_digest.into()),
+        });
     }
 
     for output_file in &command.output_files {
@@ -307,15 +347,17 @@ impl CommandRunner {
       )
       .await?;
 
-      digests.insert(file_node.get_digest().try_into()?);
+      let digest = require_digest(file_node.digest.as_ref())?;
 
-      action_result.mut_output_files().push({
-        let mut file = bazel_protos::remote_execution::OutputFile::new();
-        let digest: Digest = file_node.get_digest().try_into()?;
-        file.set_digest(digest.into());
-        file.set_is_executable(file_node.get_is_executable());
-        file.set_path(output_file.to_owned());
-        file
+      digests.insert(digest);
+
+      action_result.output_files.push({
+        remexec::OutputFile {
+          digest: Some(digest.into()),
+          path: output_file.to_owned(),
+          is_executable: file_node.is_executable,
+          ..remexec::OutputFile::default()
+        }
       })
     }
 
@@ -362,20 +404,20 @@ impl CommandRunner {
       .compat()
       .await?;
 
-    let mut update_action_cache_request = UpdateActionResultRequest::new();
-    if let Some(ref instance_name) = metadata.instance_name {
-      update_action_cache_request.set_instance_name(instance_name.clone());
-    }
-    update_action_cache_request.set_action_digest(action_digest.into());
-    update_action_cache_request.set_action_result(action_result);
+    let update_action_cache_request = remexec::UpdateActionResultRequest {
+      instance_name: metadata
+        .instance_name
+        .as_ref()
+        .cloned()
+        .unwrap_or_else(|| "".to_owned()),
+      action_digest: Some(action_digest.into()),
+      action_result: Some(action_result),
+      ..remexec::UpdateActionResultRequest::default()
+    };
 
-    let call_opt = call_option(&self.headers, Some(context.build_id.clone()))?;
-
-    self
-      .action_cache_client
-      .update_action_result_async_opt(&update_action_cache_request, call_opt)
-      .map_err(crate::remote::rpcerror_to_string)?
-      .compat()
+    let mut client = self.action_cache_client.as_ref().clone();
+    client
+      .update_action_result(update_action_cache_request)
       .await
       .map_err(crate::remote::rpcerror_to_string)?;
 
@@ -420,7 +462,6 @@ impl crate::CommandRunner for CommandRunner {
           self.platform,
           &context,
           self.action_cache_client.clone(),
-          &self.headers,
           self.store.clone(),
         ),
         |_, md| md,

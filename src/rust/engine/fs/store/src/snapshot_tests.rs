@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use hashing::{Digest, Fingerprint};
+use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use task_executor;
 use tempfile;
 use testutil::data::TestDirectory;
@@ -278,8 +278,10 @@ async fn snapshot_merge_two_files() {
   assert_eq!(merged_root_directory.directories.len(), 1);
 
   let merged_child_dirnode = merged_root_directory.directories[0].clone();
-  let merged_child_dirnode_digest: Result<Digest, String> =
-    merged_child_dirnode.get_digest().try_into();
+  let merged_child_dirnode_digest: Result<Digest, String> = merged_child_dirnode
+    .digest
+    .map(|d| d.try_into())
+    .unwrap_or(Ok(EMPTY_DIGEST));
   let merged_child_directory = store
     .load_directory(merged_child_dirnode_digest.unwrap())
     .await
