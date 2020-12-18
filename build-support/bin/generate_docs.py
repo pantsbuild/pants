@@ -39,7 +39,7 @@ class ReferenceGenerator:
     Then:
 
     ./pants run build-support/bin/generate_docs.py -- \
-       --input=/tmp/help_info --api-key=<API_KEY> --sync \
+       --input=/tmp/help_info --sync --api-key=<API_KEY>
 
     where API_KEY is your readme.io API Key, found here:
       https://dash.readme.com/project/pants/v2.0/api-key
