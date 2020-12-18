@@ -141,3 +141,9 @@ workunit_store = { path = "workunit_store" }
 testutil = { path = "./testutil" }
 fs = { path = "./fs" }
 env_logger = "0.5.4"
+
+[patch.crates-io]
+# Patch all transitive uses of Prost to refer to the version with `Bytes` support.
+prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
+prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
+prost-types = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }

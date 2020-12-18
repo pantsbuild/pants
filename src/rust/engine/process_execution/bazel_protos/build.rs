@@ -1,11 +1,17 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use prost_build::Config;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+  let mut config = Config::new();
+  config.bytes(&["."]);
+
   tonic_build::configure()
     .build_client(true)
     .build_server(true)
-    .compile(
+    .compile_with_config(
+      config,
       &[
         "protos/bazelbuild_remote-apis/build/bazel/remote/execution/v2/remote_execution.proto",
         "protos/bazelbuild_remote-apis/build/bazel/semver/semver.proto",

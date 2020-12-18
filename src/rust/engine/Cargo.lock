@@ -145,12 +145,13 @@ name = "bazel_protos"
 version = "0.0.1"
 dependencies = [
  "build_utils",
- "bytes",
+ "bytes 0.5.4",
  "copy_dir",
  "dir-diff",
  "futures 0.1.29",
  "hashing",
- "prost",
+ "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
+ "prost-build",
  "prost-types",
  "tempfile",
  "tonic",
@@ -206,7 +207,7 @@ name = "brfs"
 version = "0.0.1"
 dependencies = [
  "bazel_protos",
- "bytes",
+ "bytes 0.5.4",
  "clap",
  "dirs",
  "env_logger",
@@ -261,6 +262,12 @@ name = "bytes"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "130aac562c0dd69c56b3b1cc8ffd2e17be31d0b6c25b61c96b76231aa23e39e1"
+
+[[package]]
+name = "bytes"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0dcbc35f504eb6fc275a6d20e4ebcda18cf50d40ba6fabff8c711fa16cb3b16"
 
 [[package]]
 name = "cargo_metadata"
@@ -373,9 +380,8 @@ name = "concrete_time"
 version = "0.0.1"
 dependencies = [
  "log 0.4.8",
- "prost",
+ "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=423f5ec5bd165a7007a388edfb2b485d5bbf40c7)",
  "prost-types",
- "protobuf",
  "serde",
  "serde_derive",
 ]
@@ -654,7 +660,7 @@ dependencies = [
  "async_latch",
  "async_semaphore",
  "boxfuture",
- "bytes",
+ "bytes 0.5.4",
  "concrete_time",
  "cpython",
  "crossbeam-channel",
@@ -762,7 +768,7 @@ name = "fs"
 version = "0.0.1"
 dependencies = [
  "async-trait",
- "bytes",
+ "bytes 0.5.4",
  "dirs",
  "futures 0.3.5",
  "glob",
@@ -783,7 +789,7 @@ version = "0.0.1"
 dependencies = [
  "bazel_protos",
  "boxfuture",
- "bytes",
+ "bytes 0.5.4",
  "clap",
  "env_logger",
  "fs",
@@ -791,8 +797,7 @@ dependencies = [
  "futures 0.3.5",
  "hashing",
  "parking_lot",
- "prost",
- "protobuf",
+ "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
  "rand 0.6.5",
  "serde",
  "serde_derive",
@@ -1038,7 +1043,7 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d5c295d1c0c68e4e42003d75f908f5e16a1edd1cbe0b0d02e4dc2006a384f47"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
  "fnv",
  "futures-core",
  "futures-sink",
@@ -1094,7 +1099,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b708cc7f06493459026f53b9a61a7a121a5d1ec6238dee58ea4941132b30156b"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
  "fnv",
  "itoa",
 ]
@@ -1105,7 +1110,7 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13d5ff830006f7646652e057693569bfe0d51760c0085a071769d142a205111b"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
  "http",
 ]
 
@@ -1130,7 +1135,7 @@ version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed6081100e960d9d74734659ffc9cc91daf1c0fc7aceb8eaa94ee1a3f5046f2e"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
  "futures-channel",
  "futures-core",
  "futures-util",
@@ -1154,7 +1159,7 @@ version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac965ea399ec3a25ac7d13b8affd4b8f39325cca00858ddf5eb29b79e6b14b08"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
  "ct-logs",
  "futures-util",
  "hyper",
@@ -1535,16 +1540,15 @@ version = "0.0.1"
 dependencies = [
  "async-stream",
  "bazel_protos",
- "bytes",
+ "bytes 0.5.4",
  "futures 0.1.29",
  "futures 0.3.5",
  "hashing",
  "hyper",
  "log 0.4.8",
  "parking_lot",
- "prost",
+ "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
  "prost-types",
- "protobuf",
  "testutil",
  "tokio",
  "tonic",
@@ -1561,7 +1565,7 @@ name = "nailgun"
 version = "0.0.1"
 dependencies = [
  "async_latch",
- "bytes",
+ "bytes 0.5.4",
  "futures 0.3.5",
  "log 0.4.8",
  "nails",
@@ -1577,7 +1581,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "324d0793d44314222dc61947ffecc0325fb1c824dd6ef6b231b98e0b1f06b11b"
 dependencies = [
  "byteorder",
- "bytes",
+ "bytes 0.5.4",
  "futures 0.3.5",
  "log 0.4.8",
  "tokio",
@@ -1959,7 +1963,7 @@ dependencies = [
  "bazel_protos",
  "bincode",
  "boxfuture",
- "bytes",
+ "bytes 0.5.4",
  "concrete_time",
  "derivative",
  "double-checked-cell-async",
@@ -1976,9 +1980,8 @@ dependencies = [
  "mock",
  "nails",
  "parking_lot",
- "prost",
+ "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
  "prost-types",
- "protobuf",
  "rand 0.6.5",
  "regex",
  "serde",
@@ -2022,26 +2025,33 @@ dependencies = [
 [[package]]
 name = "prost"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce49aefe0a6144a45de32927c77bd2859a5f7677b55f220ae5b744e87389c212"
+source = "git+https://github.com/danburkert/prost?rev=423f5ec5bd165a7007a388edfb2b485d5bbf40c7#423f5ec5bd165a7007a388edfb2b485d5bbf40c7"
 dependencies = [
- "bytes",
- "prost-derive",
+ "bytes 0.6.0",
+ "prost-derive 0.6.1 (git+https://github.com/danburkert/prost?rev=423f5ec5bd165a7007a388edfb2b485d5bbf40c7)",
+]
+
+[[package]]
+name = "prost"
+version = "0.6.1"
+source = "git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391#a1cccbcee343e2c444e1cd2738c7fba2599fc391"
+dependencies = [
+ "bytes 0.5.4",
+ "prost-derive 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
 ]
 
 [[package]]
 name = "prost-build"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02b10678c913ecbd69350e8535c3aef91a8676c0773fc1d7b95cdd196d7f2f26"
+source = "git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391#a1cccbcee343e2c444e1cd2738c7fba2599fc391"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
  "heck",
- "itertools 0.8.2",
+ "itertools 0.9.0",
  "log 0.4.8",
  "multimap",
  "petgraph 0.5.1",
- "prost",
+ "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
  "prost-types",
  "tempfile",
  "which",
@@ -2061,13 +2071,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.6.1"
+source = "git+https://github.com/danburkert/prost?rev=423f5ec5bd165a7007a388edfb2b485d5bbf40c7#423f5ec5bd165a7007a388edfb2b485d5bbf40c7"
+dependencies = [
+ "anyhow",
+ "itertools 0.9.0",
+ "proc-macro2 1.0.24",
+ "quote 1.0.4",
+ "syn 1.0.54",
+]
+
+[[package]]
+name = "prost-derive"
+version = "0.6.1"
+source = "git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391#a1cccbcee343e2c444e1cd2738c7fba2599fc391"
+dependencies = [
+ "anyhow",
+ "itertools 0.9.0",
+ "proc-macro2 1.0.24",
+ "quote 1.0.4",
+ "syn 1.0.54",
+]
+
+[[package]]
 name = "prost-types"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1834f67c0697c001304b75be76f67add9c89742eda3a085ad8ee0bb38c3417aa"
+source = "git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391#a1cccbcee343e2c444e1cd2738c7fba2599fc391"
 dependencies = [
- "bytes",
- "prost",
+ "bytes 0.5.4",
+ "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
 ]
 
 [[package]]
@@ -2076,7 +2109,7 @@ version = "2.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da78e04bc0e40f36df43ecc6575e4f4b180e8156c4efd73f13d5619479b05696"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
 ]
 
 [[package]]
@@ -2376,7 +2409,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02b81e49ddec5109a9dcfc5f2a317ff53377c915e9ae9d4f2fb50914b85614e2"
 dependencies = [
  "base64 0.11.0",
- "bytes",
+ "bytes 0.5.4",
  "encoding_rs",
  "futures-core",
  "futures-util",
@@ -2699,7 +2732,7 @@ dependencies = [
 name = "sharded_lmdb"
 version = "0.0.1"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
  "fs",
  "futures 0.3.5",
  "hashing",
@@ -2781,7 +2814,7 @@ dependencies = [
  "async-trait",
  "bazel_protos",
  "boxfuture",
- "bytes",
+ "bytes 0.5.4",
  "concrete_time",
  "criterion",
  "fs",
@@ -2798,7 +2831,7 @@ dependencies = [
  "mock",
  "num_cpus",
  "parking_lot",
- "prost",
+ "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
  "prost-types",
  "serde",
  "serde_derive",
@@ -2913,11 +2946,10 @@ version = "0.0.1"
 dependencies = [
  "async-stream",
  "bazel_protos",
- "bytes",
+ "bytes 0.5.4",
  "fs",
  "hashing",
- "prost",
- "protobuf",
+ "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
 ]
 
 [[package]]
@@ -2971,7 +3003,7 @@ version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6d7ad61edd59bfcc7e80dababf0f4aed2e6d5e0ba1659356ae889752dfc12ff"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
  "fnv",
  "futures-core",
  "iovec",
@@ -3030,7 +3062,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "571da51182ec208780505a32528fc5512a8fe1443ab960b3f2f3ef093cd16930"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
  "futures-core",
  "futures-sink",
  "log 0.4.8",
@@ -3044,7 +3076,7 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be8242891f2b6cbef26a2d7e8605133c2c554cd35b3e4948ea892d6d68436499"
 dependencies = [
- "bytes",
+ "bytes 0.5.4",
  "futures-core",
  "futures-sink",
  "log 0.4.8",
@@ -3070,7 +3102,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "base64 0.12.3",
- "bytes",
+ "bytes 0.5.4",
  "futures-core",
  "futures-util",
  "http",
@@ -3078,8 +3110,8 @@ dependencies = [
  "hyper",
  "percent-encoding",
  "pin-project",
- "prost",
- "prost-derive",
+ "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
+ "prost-derive 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustls-native-certs 0.4.0",
  "tokio",
  "tokio-rustls 0.14.1",
