@@ -36,13 +36,12 @@ class ReferenceGenerator:
         'pants.backend.awslambda.python']" \
       --no-verify-config help-all > /tmp/help_info
 
-    Then run this (update the version):
+    Then:
 
     ./pants run build-support/bin/generate_docs.py -- \
        --input=/tmp/help_info --api-key=<API_KEY> --sync \
-       --version=2.x
 
-    Where API_KEY is your readme.io API Key, found here:
+    where API_KEY is your readme.io API Key, found here:
       https://dash.readme.com/project/pants/v2.0/api-key
 
     TODO: Integrate this into the release process.
@@ -51,9 +50,6 @@ class ReferenceGenerator:
     @classmethod
     def create(cls) -> ReferenceGenerator:
         parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
-        parser.add_argument(
-            "--version", required=True, help="Which version to update, e.g. `1.30` or `2.2`."
-        )
         # Note that we want to be able to run this script using `./pants run`, so having it
         # invoke `./pants help-all` itself would be unnecessarily complicated.
         # So we require the input to be provided externally.
@@ -85,11 +81,15 @@ class ReferenceGenerator:
     def __init__(self, args):
         self._args = args
 
-        if not VERSION.startswith(args.version):
+        # Set the version based on VERSION, e.g. 2.1.0.dev0 becomes 2.1.
+        self._version = ".".join(VERSION.split(".")[:2])
+        key_confirmation = input(
+            f"Generating docs for Pants {self._version}. Is this the correct version? [Y/n]: "
+        )
+        if key_confirmation and key_confirmation.lower() != "y":
             die(
-                f"Generating docs for {args.version}, but src/python/pants/VERSION is set to "
-                f"{VERSION}. Please git checkout to the appropriate branch. Maybe run "
-                f"`git checkout {args.version}.x`?."
+                "Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change "
+                "src/python/pants/VERSION."
             )
 
         def get_tpl(name: str) -> str:
@@ -174,7 +174,7 @@ class ReferenceGenerator:
     def _access_readme_api(self, url_suffix: str, method: str, payload: str) -> Dict:
         """Sends requests to the readme.io API."""
         url = f"https://dash.readme.io/api/v1/{url_suffix}"
-        headers = {"content-type": "application/json", "x-readme-version": f"v{self._args.version}"}
+        headers = {"content-type": "application/json", "x-readme-version": f"v{self._version}"}
         response = requests.request(
             method, url, data=payload, headers=headers, auth=(self._args.api_key, "")
         )
