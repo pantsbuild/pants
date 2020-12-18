@@ -4,6 +4,13 @@
 This document describes releases leading up to the ``2.1.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.1/docs/release-notes-2-1 for an overview of the changes in this release.
+ 
+2.1.1 (12/18/2020)
+------------------
+
+The second stable release in the 2.1.x series, with no changes since `rc2`.
+
+Thank you to everyone who helped test the rcs!
 
 2.1.1rc2 (12/16/2020)
 ---------------------
