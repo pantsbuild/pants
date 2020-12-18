@@ -535,7 +535,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
                 "Every `pex_binary` used in `.with_binaries()` for the `provides` field for "
                 f"{exported_addr} must explicitly set the `entry_point` field, but "
                 f"{binary.address} left the field off. Set `entry_point` to either "
-                "`app.py:func` or the longhand `path.to.app:func`. See {url}."
+                f"`app.py:func` or the longhand `path.to.app:func`. See {url}."
             )
         if ":" not in entry_point:
             raise InvalidEntryPoint(
