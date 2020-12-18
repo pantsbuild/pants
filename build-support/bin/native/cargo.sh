@@ -20,6 +20,7 @@ export PYTHON_SYS_EXECUTABLE="${PY}"
 # + bootstrap_rust: Bootstraps a Pants-controlled rust toolchain and associated extras.
 # shellcheck source=build-support/bin/native/bootstrap_rust.sh
 source "${REPO_ROOT}/build-support/bin/native/bootstrap_rust.sh"
+cargo_bin="${CARGO_HOME}/bin/cargo"
 
 # Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
@@ -29,25 +30,6 @@ source "${REPO_ROOT}/build-support/bin/native/bootstrap_rust.sh"
 source "${REPO_ROOT}/build-support/pants_venv"
 
 bootstrap_rust >&2
-
 activate_pants_venv
-
-# Exports PATH, GOROOT, PROTOC, AR.
-# shellcheck source=build-support/bin/download_native_build_binaries.sh
-source "${REPO_ROOT}/build-support/bin/download_native_build_binaries.sh"
-
-cargo_bin="${CARGO_HOME}/bin/cargo"
-
-if [[ -n "${CARGO_WRAPPER_DEBUG:-}" ]]; then
-  cat << DEBUG >&2
->>> Executing ${cargo_bin} $@
->>> In ENV:
->>>   GOROOT=${GOROOT}
->>>   PATH=${PATH}
->>>   PROTOC=${PROTOC}
->>>   AR=${AR:-<not explicitly set>}
->>>
-DEBUG
-fi
 
 exec "${cargo_bin}" "$@"
