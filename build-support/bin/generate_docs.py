@@ -15,8 +15,10 @@ from typing import Dict, Iterable, Optional, cast
 
 import pystache
 import requests
+from common import die
 
 from pants.help.help_info_extracter import to_help_str
+from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -24,21 +26,22 @@ logger = logging.getLogger(__name__)
 class ReferenceGenerator:
     """Generates and uploads the Pants reference documentation.
 
-    To run use:
+    To run, first generate the data with:
 
     ./pants \
-      --backend-packages="-['internal_plugins.releases']" \
+      --backend-packages="-['internal_plugins.releases', 'toolchain.pants.auth', \
+        'toolchain.pants.buildsense', 'toolchain.pants.common']" \
       --backend-packages="+['pants.backend.python.lint.bandit', \
         'pants.backend.python.lint.pylint', 'pants.backend.codegen.protobuf.python', \
         'pants.backend.awslambda.python']" \
       --no-verify-config help-all > /tmp/help_info
 
-    to generate the data, and then:
+    Then:
 
     ./pants run build-support/bin/generate_docs.py -- \
-      --input=/tmp/help_info --api-key=<API_KEY> --sync
+       --input=/tmp/help_info --sync --api-key=<API_KEY>
 
-    Where API_KEY is your readme.io API Key, found here:
+    where API_KEY is your readme.io API Key, found here:
       https://dash.readme.com/project/pants/v2.0/api-key
 
     TODO: Integrate this into the release process.
@@ -46,11 +49,10 @@ class ReferenceGenerator:
 
     @classmethod
     def create(cls) -> ReferenceGenerator:
+        parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
         # Note that we want to be able to run this script using `./pants run`, so having it
         # invoke `./pants help-all` itself would be unnecessarily complicated.
         # So we require the input to be provided externally.
-        parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
-        default_output_dir = PosixPath(os.path.sep) / "tmp" / "pants_docs" / "help" / "option"
         parser.add_argument(
             "--input",
             default=None,
@@ -67,19 +69,28 @@ class ReferenceGenerator:
         )
         parser.add_argument(
             "--output",
-            default=default_output_dir,
+            default=PosixPath(os.path.sep) / "tmp" / "pants_docs" / "help" / "option",
             type=Path,
             help="Path to a directory under which we generate the markdown files. "
             "Useful for viewing the files locally when testing and debugging "
             "the renderer.",
         )
-        parser.add_argument(
-            "--api-key", help="The readme.io API key to use. Required for --upload."
-        )
+        parser.add_argument("--api-key", help="The readme.io API key to use. Required for --sync.")
         return ReferenceGenerator(parser.parse_args())
 
     def __init__(self, args):
         self._args = args
+
+        # Set the version based on VERSION, e.g. 2.1.0.dev0 becomes 2.1.
+        self._version = ".".join(VERSION.split(".")[:2])
+        key_confirmation = input(
+            f"Generating docs for Pants {self._version}. Is this the correct version? [Y/n]: "
+        )
+        if key_confirmation and key_confirmation.lower() != "y":
+            die(
+                "Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change "
+                "src/python/pants/VERSION."
+            )
 
         def get_tpl(name: str) -> str:
             # Note that loading relative to __name__ may not always work when __name__=='__main__'.
@@ -163,9 +174,7 @@ class ReferenceGenerator:
     def _access_readme_api(self, url_suffix: str, method: str, payload: str) -> Dict:
         """Sends requests to the readme.io API."""
         url = f"https://dash.readme.io/api/v1/{url_suffix}"
-        version = "v2.0"  # TODO: Don't hardcode this.
-
-        headers = {"content-type": "application/json", "x-readme-version": version}
+        headers = {"content-type": "application/json", "x-readme-version": f"v{self._version}"}
         response = requests.request(
             method, url, data=payload, headers=headers, auth=(self._args.api_key, "")
         )

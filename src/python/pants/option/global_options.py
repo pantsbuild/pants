@@ -651,7 +651,7 @@ class GlobalOptions(Subsystem):
             "--process-execution-cache-namespace",
             advanced=True,
             type=str,
-            default="",
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_cache_namespace,
             help=(
                 "The cache namespace for process execution. "
                 "Change this value to invalidate every artifact's execution, or to prevent "
