@@ -51,16 +51,14 @@ class Peek(Goal):
 _T = TypeVar("_T")
 _U = TypeVar("_U")
 
-_nothing = object()
-
 
 def _intersperse(x: _T, ys: Iterable[_U]) -> Iterable[Union[_T, _U]]:
+    # Use stateful iterator to safely iterate through first item
     it = iter(ys)
-    y = next(it, _nothing)
-    if y is _nothing:
-        return
-    yield cast(_U, y)
-    for x, y in zip(repeat(x), ys):
+    for y in it:
+        yield y
+        break
+    for x, y in zip(repeat(x), it):
         yield x
         yield y
 
@@ -83,6 +81,7 @@ async def peek(
     # TODO: better options for target selection (globs, transitive, etc)?
     targets: Iterable[Target]
     targets = await Get(Targets, Addresses, addresses)
+    # TODO: handle target not found exceptions better here
     build_file_addresses = await MultiGet(
         Get(BuildFileAddress, Address, t.address) for t in targets
     )
@@ -91,7 +90,7 @@ async def peek(
 
     # TODO: programmatically determine correct encoding
     rendereds = map(_render_raw, digest_contents)
-    for output in _intersperse("\n\n", rendereds):
+    for output in _intersperse(os.linesep, rendereds):
         console.print_stdout(output)
 
     return Peek(exit_code=0)
