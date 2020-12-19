@@ -6,7 +6,6 @@ use std::time::Duration;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::longrunning::Operation;
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use maplit::{btreemap, hashset};
@@ -2376,9 +2375,7 @@ async fn extract_output_files_from_response(
     .result
     .as_ref()
     .ok_or_else(|| "No ActionResult found".to_string())?;
-  crate::remote::extract_output_files(store, action_result, false)
-    .compat()
-    .await
+  crate::remote::extract_output_files(store, action_result, false).await
 }
 
 pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {

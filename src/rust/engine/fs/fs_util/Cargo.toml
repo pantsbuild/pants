@@ -7,14 +7,12 @@ publish = false
 
 [dependencies]
 bazel_protos = { path = "../../process_execution/bazel_protos" }
-boxfuture = { path = "../../boxfuture" }
 bytes = "0.5"
 clap = "2"
 env_logger = "0.5.4"
 grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
+futures = { version = "0.3" }
 hashing = { path = "../../hashing" }
 parking_lot = "0.11"
 prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }

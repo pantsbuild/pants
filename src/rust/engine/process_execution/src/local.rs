@@ -1,15 +1,3 @@
-use async_trait::async_trait;
-use boxfuture::{try_future, BoxFuture, Boxable};
-use fs::{
-  self, GlobExpansionConjunction, GlobMatching, PathGlobs, RelativePath, StrictGlobMatching,
-};
-use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
-use futures::stream::{BoxStream, StreamExt, TryStreamExt};
-use log::{debug, info};
-use nails::execution::{ChildOutput, ExitCode};
-use shell_quote::bash;
-
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
@@ -23,19 +11,28 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
 use std::sync::Arc;
-use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
+use async_trait::async_trait;
+use bytes::{Bytes, BytesMut};
+use fs::{
+  self, GlobExpansionConjunction, GlobMatching, PathGlobs, RelativePath, StrictGlobMatching,
+};
+use futures::future::{BoxFuture, FutureExt, TryFutureExt};
+use futures::stream::{BoxStream, StreamExt, TryStreamExt};
+use log::{debug, info};
+use nails::execution::{ChildOutput, ExitCode};
+use shell_quote::bash;
+use store::{OneOffStoreFileByDigest, Snapshot, Store};
 use tokio::process::{Child, Command};
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
+use tryfuture::try_future;
+use workunit_store::Metric;
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
 };
-
-use bytes::{Bytes, BytesMut};
-use workunit_store::Metric;
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
@@ -77,7 +74,7 @@ impl CommandRunner {
     posix_fs: Arc<fs::PosixFS>,
     output_file_paths: BTreeSet<RelativePath>,
     output_dir_paths: BTreeSet<RelativePath>,
-  ) -> BoxFuture<Snapshot, String> {
+  ) -> BoxFuture<'static, Result<Snapshot, String>> {
     let output_paths: Result<Vec<String>, String> = output_dir_paths
       .into_iter()
       .flat_map(|p| {
@@ -117,8 +114,7 @@ impl CommandRunner {
       )
       .await
     })
-    .compat()
-    .to_boxed()
+    .boxed()
   }
 }
 
@@ -193,13 +189,13 @@ pub struct ChildResults {
 
 impl ChildResults {
   pub fn collect_from(
-    mut stream: BoxStream<Result<ChildOutput, String>>,
-  ) -> futures::future::BoxFuture<Result<ChildResults, String>> {
+    mut stream: BoxStream<'static, Result<ChildOutput, String>>,
+  ) -> BoxFuture<'static, Result<ChildResults, String>> {
     let mut stdout = BytesMut::with_capacity(8192);
     let mut stderr = BytesMut::with_capacity(8192);
     let mut exit_code = 1;
 
-    Box::pin(async move {
+    async move {
       while let Some(child_output_res) = stream.next().await {
         match child_output_res? {
           ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
@@ -212,7 +208,8 @@ impl ChildResults {
         stderr: stderr.into(),
         exit_code,
       })
-    })
+    }
+    .boxed()
   }
 }
 
@@ -540,7 +537,6 @@ pub trait CapturedWorkdir {
         req.output_files,
         req.output_directories,
       )
-      .compat()
       .await?
     };
 
