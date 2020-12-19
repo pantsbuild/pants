@@ -193,7 +193,7 @@ impl ByteStore {
           finish_write: next_offset == bytes.len(),
           // TODO(tonic): Explore using the unreleased `Bytes` support in Prost from:
           // https://github.com/danburkert/prost/pull/341
-          data: Vec::from(&bytes[offset..next_offset]),
+          data: bytes.slice(offset..next_offset),
         };
         futures::future::ready(Some((req, (next_offset, true))))
       }

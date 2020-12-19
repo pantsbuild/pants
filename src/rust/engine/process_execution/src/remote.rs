@@ -344,11 +344,8 @@ impl CommandRunner {
       metadata.queued_timestamp.as_ref(),
       metadata.worker_start_timestamp.as_ref(),
     ) {
-      let span_result = TimeSpan::from_start_and_end_prost(
-        queued_timestamp,
-        worker_start_timestamp,
-        "remote queue",
-      );
+      let span_result =
+        TimeSpan::from_start_and_end(queued_timestamp, worker_start_timestamp, "remote queue");
       match span_result {
         Ok(time_span) => maybe_add_workunit(
           result_cached,
@@ -366,7 +363,7 @@ impl CommandRunner {
       metadata.input_fetch_start_timestamp.as_ref(),
       metadata.input_fetch_completed_timestamp.as_ref(),
     ) {
-      let span_result = TimeSpan::from_start_and_end_prost(
+      let span_result = TimeSpan::from_start_and_end(
         input_fetch_start_timestamp,
         input_fetch_completed_timestamp,
         "remote input fetch",
@@ -388,7 +385,7 @@ impl CommandRunner {
       metadata.execution_start_timestamp.as_ref(),
       metadata.execution_completed_timestamp.as_ref(),
     ) {
-      let span_result = TimeSpan::from_start_and_end_prost(
+      let span_result = TimeSpan::from_start_and_end(
         execution_start_timestamp,
         execution_completed_timestamp,
         "remote execution",
@@ -410,7 +407,7 @@ impl CommandRunner {
       metadata.output_upload_start_timestamp.as_ref(),
       metadata.output_upload_completed_timestamp.as_ref(),
     ) {
-      let span_result = TimeSpan::from_start_and_end_prost(
+      let span_result = TimeSpan::from_start_and_end(
         output_upload_start_timestamp,
         output_upload_completed_timestamp,
         "remote output store",

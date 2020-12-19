@@ -16,8 +16,7 @@ futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
 hashing = { path = "../../hashing" }
 parking_lot = "0.11"
-prost = "0.6"
-protobuf = { version = "2.0.6", features = ["with-bytes"] }
+prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 rand = "0.6"
 serde = "1.0"
 serde_json = "1.0"
