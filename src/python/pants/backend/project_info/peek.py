@@ -6,7 +6,7 @@ import os
 from dataclasses import asdict, is_dataclass
 from enum import Enum
 from itertools import repeat
-from typing import Iterable, Tuple, TypeVar, Union, cast
+from typing import Iterable, Mapping, Tuple, TypeVar, Union, cast
 
 from pkg_resources import Requirement
 
@@ -82,31 +82,37 @@ def _render_json(ts: Iterable[Target]) -> str:
 
 
 def _target_to_kv(t: Target) -> Tuple[str, dict]:
-    d = {k.alias: _prepare_value(v.value) for k, v in t.field_values.items()}
+    nothing = object()
+    d = {
+        k.alias: v.value
+        for k, v in t.field_values.items()
+        # don't report default values in normalized output
+        if getattr(k, "default", nothing) != v.value
+    }
     d["alias"] = t.alias
     return t.address.spec, d
-
-
-def _prepare_value(x: object) -> object:
-    """Prepare the value to be JSON-serialized.
-
-    If we can make it a dict, try that.  If not, str() it.
-    """
-    if is_dataclass(x):
-        return asdict(x)
-    else:
-        return x
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
     """Allow us to serialize some commmonly-found types in BUILD files."""
 
+    safe_to_str_types = (Requirement,)
+
     def default(self, o):
         """Return a serializable object for o."""
-        if isinstance(o, Requirement):
+        if is_dataclass(o):
+            return asdict(o)
+        elif isinstance(o, Mapping):
+            return dict(o)
+        elif isinstance(o, self.safe_to_str_types):
             return str(o)
         else:
-            return super().default(o)
+            try:
+                return super().default(o)
+            except TypeError:
+                # punt and just try str()
+                # TODO: can we find a better strategy here?
+                return str(o)
 
 
 @goal_rule
