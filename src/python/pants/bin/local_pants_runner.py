@@ -250,6 +250,7 @@ class LocalPantsRunner:
             callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
             streaming_reporter = StreamingWorkunitHandler(
                 self.graph_session.scheduler_session,
+                run_tracker=run_tracker,
                 callbacks=callbacks,
                 report_interval_seconds=global_options.streaming_workunits_report_interval,
             )

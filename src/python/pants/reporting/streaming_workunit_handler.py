@@ -8,12 +8,19 @@ from typing import Any, Callable, Iterable, Iterator, Optional, Sequence, Tuple
 
 from pants.engine.fs import Digest, DigestContents, Snapshot
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.goal.run_tracker import RunTracker
 from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
 class StreamingWorkunitContext:
     _scheduler: SchedulerSession
+    _run_tracker: RunTracker
+
+    @property
+    def run_tracker(self) -> RunTracker:
+        """Returns the RunTracker for the current run of Pants."""
+        return self._run_tracker
 
     def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes, ...]:
         """Given a list of Digest objects, each representing the contents of a single file, return a
@@ -43,7 +50,8 @@ class StreamingWorkunitHandler:
 
     def __init__(
         self,
-        scheduler: Any,
+        scheduler: SchedulerSession,
+        run_tracker: RunTracker,
         callbacks: Iterable[Callable],
         report_interval_seconds: float,
         max_workunit_verbosity: LogLevel = LogLevel.TRACE,
@@ -52,7 +60,9 @@ class StreamingWorkunitHandler:
         self.report_interval = report_interval_seconds
         self.callbacks = callbacks
         self._thread_runner: Optional[_InnerHandler] = None
-        self._context = StreamingWorkunitContext(_scheduler=self.scheduler)
+        self._context = StreamingWorkunitContext(
+            _scheduler=self.scheduler, _run_tracker=run_tracker
+        )
         # TODO(10092) The max verbosity should be a per-client setting, rather than a global setting.
         self.max_workunit_verbosity = max_workunit_verbosity
 

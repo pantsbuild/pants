@@ -8,7 +8,7 @@ from dataclasses import asdict
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
-from pants.engine.internals.scheduler import Scheduler
+from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.util.contextutil import temporary_file_path
@@ -52,7 +52,7 @@ class SchedulerTestBase:
         should_report_workunits=False,
         execution_options=None,
         ca_certs_path=None,
-    ):
+    ) -> SchedulerSession:
         """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
         rules = rules or []
         work_dir = work_dir or self._create_work_dir()

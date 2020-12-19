@@ -6,7 +6,7 @@ import time
 import unittest
 from dataclasses import dataclass, field
 from textwrap import dedent
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import pytest
 
@@ -24,12 +24,13 @@ from pants.engine.internals.engine_testutil import (
     assert_equal_with_printing,
     remove_locations_from_traceback,
 )
-from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.platform import rules as platform_rules
 from pants.engine.process import MultiPlatformProcess, Process, ProcessResult
 from pants.engine.process import rules as process_rules
 from pants.engine.rules import Get, MultiGet, rule
+from pants.goal.run_tracker import RunTracker
 from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
@@ -277,8 +278,9 @@ class WorkunitTracker:
 
 
 class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
-    def test_streaming_workunits_reporting(self):
-        rules = [fib, QueryRule(Fib, (int,))]
+    def _fixture_for_rules(
+        self, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
+    ) -> Tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -286,10 +288,16 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
             scheduler,
+            run_tracker=RunTracker("run-tracker", None),
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
+            max_workunit_verbosity=max_workunit_verbosity,
         )
+        return (scheduler, tracker, handler)
+
+    def test_streaming_workunits_reporting(self):
+        scheduler, tracker, handler = self._fixture_for_rules([fib, QueryRule(Fib, (int,))])
+
         with handler.session():
             scheduler.product_request(Fib, subjects=[0])
 
@@ -308,16 +316,8 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert tracker.finished
 
     def test_streaming_workunits_parent_id_and_rule_metadata(self):
-        rules = [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
-        )
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
         )
 
         with handler.session():
@@ -373,15 +373,8 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r4["level"] == "INFO"
 
     def test_streaming_workunit_log_levels(self) -> None:
-        rules = [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
-        )
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))],
             max_workunit_verbosity=LogLevel.TRACE,
         )
 
@@ -412,16 +405,8 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
     def test_streaming_workunit_log_level_parent_rewrite(self) -> None:
         rules = [rule_A, rule_B, rule_C, QueryRule(Alpha, (Input,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
-        )
-        tracker = WorkunitTracker()
-        info_level_handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
-        )
+
+        scheduler, tracker, info_level_handler = self._fixture_for_rules(rules)
 
         with info_level_handler.session():
             i = Input()
@@ -440,15 +425,8 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert "parent_id" not in r_A
         assert r_C["parent_id"] == r_A["span_id"]
 
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
-        )
-        tracker = WorkunitTracker()
-        debug_level_handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
+        scheduler, tracker, debug_level_handler = self._fixture_for_rules(
+            rules, max_workunit_verbosity=LogLevel.TRACE
         )
 
         with debug_level_handler.session():
@@ -483,18 +461,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level=LogLevel.ERROR)
 
-        rules = [a_rule, QueryRule(ModifiedOutput, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(ModifiedOutput, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
 
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
         with handler.session():
             scheduler.product_request(ModifiedOutput, subjects=[0])
 
@@ -519,18 +489,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level=None)
 
-        rules = [a_rule, QueryRule(ModifiedOutput, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(ModifiedOutput, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
 
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
         with handler.session():
             scheduler.product_request(ModifiedOutput, subjects=[0])
 
@@ -552,18 +514,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> Output:
             return Output(val=n)
 
-        rules = [a_rule, QueryRule(Output, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
 
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
         with handler.session():
             scheduler.product_request(Output, subjects=[0])
 
@@ -586,18 +540,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> Output:
             return Output(val=n)
 
-        rules = [a_rule, QueryRule(Output, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
 
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
         with handler.session():
             scheduler.product_request(Output, subjects=[0])
 
@@ -625,18 +571,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> Output:
             return Output(val=n)
 
-        rules = [a_rule, QueryRule(Output, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
 
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
         with handler.session():
             scheduler.product_request(Output, subjects=[0])
 
@@ -661,19 +599,11 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             _ = await Get(ProcessResult, MultiPlatformProcess({None: proc}))
             return TrueResult()
 
-        rules = [a_rule, QueryRule(TrueResult, tuple()), *process_rules(), *platform_rules()]
-
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
-        )
-
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(TrueResult, tuple()), *process_rules(), *platform_rules()],
             max_workunit_verbosity=LogLevel.TRACE,
         )
+
         with handler.session():
             scheduler.product_request(TrueResult, subjects=[0])
 
@@ -720,6 +650,7 @@ def test_more_complicated_engine_aware(rule_runner: RuleRunner) -> None:
     tracker = WorkunitTracker()
     handler = StreamingWorkunitHandler(
         rule_runner.scheduler,
+        run_tracker=RunTracker("run-tracker", None),
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.TRACE,
@@ -776,6 +707,7 @@ def test_process_digests_on_streaming_workunits(rule_runner: RuleRunner) -> None
     tracker = WorkunitTracker()
     handler = StreamingWorkunitHandler(
         scheduler,
+        run_tracker=RunTracker("run-tracker", None),
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
@@ -805,6 +737,7 @@ def test_process_digests_on_streaming_workunits(rule_runner: RuleRunner) -> None
     tracker = WorkunitTracker()
     handler = StreamingWorkunitHandler(
         scheduler,
+        run_tracker=RunTracker("run-tracker", None),
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
@@ -861,6 +794,7 @@ def test_context_object_on_streaming_workunits(rule_runner: RuleRunner) -> None:
 
     handler = StreamingWorkunitHandler(
         scheduler,
+        run_tracker=RunTracker("run-tracker", None),
         callbacks=[callback],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
