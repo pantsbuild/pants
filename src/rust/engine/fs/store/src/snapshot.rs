@@ -9,14 +9,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use boxfuture::{BoxFuture, Boxable};
 use fs::{
   Dir, File, GitignoreStyleExcludes, GlobMatching, PathStat, PosixFS, PreparedPathGlobs,
   SymlinkBehavior,
 };
-use futures::compat::Future01CompatExt;
-use futures::future::{self as future03, FutureExt, TryFutureExt};
-use futures01::future;
+use futures::future;
+use futures::FutureExt;
 use hashing::{Digest, EMPTY_DIGEST};
 use itertools::Itertools;
 
@@ -68,9 +66,8 @@ impl Snapshot {
             },
           )
         }));
-        future::ok(path_stats).to_boxed()
+        future::ok(path_stats).boxed()
       })
-      .compat()
       .await?;
 
     let path_stats = Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter))
@@ -101,9 +98,9 @@ impl Snapshot {
     store: Store,
     file_digester: S,
     path_stats: &[PathStat],
-  ) -> future03::BoxFuture<Result<Digest, String>> {
+  ) -> future::BoxFuture<'static, Result<Digest, String>> {
     let mut file_futures = Vec::new();
-    let mut dir_futures: Vec<future03::BoxFuture<Result<remexec::DirectoryNode, String>>> =
+    let mut dir_futures: Vec<future::BoxFuture<'static, Result<remexec::DirectoryNode, String>>> =
       Vec::new();
 
     for (first_component, group) in &path_stats
@@ -126,10 +123,7 @@ impl Snapshot {
             let file_digester = file_digester.clone();
             file_futures.push(async move {
               let digest_future = file_digester.store_by_digest(stat);
-              let digest = digest_future
-                .compat()
-                .await
-                .map_err(|e| format!("{:?}", e))?;
+              let digest = digest_future.await.map_err(|e| format!("{:?}", e))?;
 
               let file_node = remexec::FileNode {
                 name: osstring_as_utf8(first_component)?,
@@ -177,9 +171,9 @@ impl Snapshot {
     }
 
     async move {
-      let (dirs, files) = future03::try_join(
-        future03::try_join_all(dir_futures),
-        future03::try_join_all(file_futures),
+      let (dirs, files) = future::try_join(
+        future::try_join_all(dir_futures),
+        future::try_join_all(file_futures),
       )
       .await?;
 
@@ -327,7 +321,7 @@ pub fn osstring_as_utf8(path: OsString) -> Result<String, String> {
 // It is a separate trait so that caching implementations can be written which wrap the Store (used
 // to store the bytes) and VFS (used to read the files off disk if needed).
 pub trait StoreFileByDigest<Error> {
-  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, Error>;
+  fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, Error>>;
 }
 
 ///
@@ -346,7 +340,7 @@ impl OneOffStoreFileByDigest {
 }
 
 impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
-  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
+  fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, String>> {
     let store = self.store.clone();
     let posix_fs = self.posix_fs.clone();
     let res = async move {
@@ -356,7 +350,7 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
         .map_err(move |err| format!("Error reading file {:?}: {:?}", file, err))?;
       store.store_file_bytes(content.content, true).await
     };
-    res.boxed().compat().to_boxed()
+    res.boxed()
   }
 }
 
@@ -366,13 +360,13 @@ pub struct StoreManyFileDigests {
 }
 
 impl StoreFileByDigest<String> for StoreManyFileDigests {
-  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
-    future::result(self.hash.get(&file.path).copied().ok_or_else(|| {
+  fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, String>> {
+    future::ready(self.hash.get(&file.path).copied().ok_or_else(|| {
       format!(
         "Could not find file {} when storing file by digest",
         file.path.display()
       )
     }))
-    .to_boxed()
+    .boxed()
   }
 }

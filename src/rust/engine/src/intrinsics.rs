@@ -10,7 +10,6 @@ use crate::types::Types;
 use crate::Failure;
 
 use fs::RelativePath;
-use futures::compat::Future01CompatExt;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use indexmap::IndexMap;
 use store::{SnapshotOps, SubsetParams};
@@ -209,7 +208,6 @@ fn directory_digest_to_digest_contents(
       .core
       .store()
       .contents_for_directory(digest)
-      .compat()
       .await
       .and_then(move |digest_contents| Snapshot::store_digest_contents(&context, &digest_contents))
       .map_err(|s| throw(&s))?;

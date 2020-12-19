@@ -8,13 +8,11 @@ edition = "2018"
 async-stream = "0.2"
 async-trait = "0.1"
 bazel_protos = { path = "../../process_execution/bazel_protos" }
-boxfuture = { path = "../../boxfuture" }
 bytes = "0.5"
 concrete_time = { path = "../../concrete_time" }
 grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
+futures = { version = "0.3" }
 glob = "0.2.11"
 hashing = { path = "../../hashing" }
 indexmap = "1.4"

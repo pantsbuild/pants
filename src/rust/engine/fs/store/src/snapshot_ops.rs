@@ -15,7 +15,7 @@ use fs::{
   ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob, PreparedPathGlobs, RelativePath,
   DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
 };
-use futures::future::{self as future03, FutureExt, TryFutureExt};
+use futures::future::{self, FutureExt, TryFutureExt};
 use glob::Pattern;
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
@@ -83,7 +83,7 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
   store_wrapper: T,
   parent_path: PathBuf,
   dir_digests: Vec<Digest>,
-) -> future03::BoxFuture<'static, Result<Digest, String>> {
+) -> future::BoxFuture<'static, Result<Digest, String>> {
   async move {
     if dir_digests.is_empty() {
       return Ok(EMPTY_DIGEST);
@@ -92,14 +92,14 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
       return Ok(dir_digests.pop().unwrap());
     }
 
-    let directories = future03::try_join_all(
+    let directories = future::try_join_all(
       dir_digests
         .into_iter()
         .map(|digest| {
           store_wrapper
             .load_directory(digest)
             .and_then(move |maybe_directory| {
-              future03::ready(
+              future::ready(
                 maybe_directory
                   .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest)),
               )
@@ -160,7 +160,7 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
         .collect::<Vec<_>>()
     };
 
-    let child_directories = future03::try_join_all(child_directory_futures).await?;
+    let child_directories = future::try_join_all(child_directory_futures).await?;
 
     out_dir.directories = child_directories;
 
@@ -234,7 +234,7 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
     .map(|f| f.boxed());
 
   let duplicate_details = async move {
-    let details_by_name = future03::try_join_all(
+    let details_by_name = future::try_join_all(
       file_details_by_name
         .chain(dir_details_by_name)
         .collect::<Vec<_>>(),

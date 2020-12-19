@@ -58,10 +58,9 @@ use cpython::{
   PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
   ToPyObject,
 };
-use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
-use futures01::Future;
+use futures::Future;
 use hashing::Digest;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
@@ -1620,7 +1619,7 @@ fn ensure_remote_has_recursive(
       .allow_threads(|| {
         core
           .executor
-          .block_on(store.ensure_remote_has_recursive(digests).compat())
+          .block_on(store.ensure_remote_has_recursive(digests))
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
     Ok(None)
@@ -1706,7 +1705,6 @@ fn run_local_interactive_process(
             run_in_workspace,
           )
           .boxed_local()
-          .compat()
       })?;
 
       Ok(
@@ -1835,7 +1833,7 @@ fn write_log(py: Python, msg: String, level: u64, path: String) -> PyUnitResult 
 
 fn write_stdout(py: Python, session_ptr: PySession, msg: String) -> PyUnitResult {
   with_session(py, session_ptr, |session| {
-    block_in_place_and_wait(py, || session.write_stdout(&msg).boxed_local().compat())
+    block_in_place_and_wait(py, || session.write_stdout(&msg).boxed_local())
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
     Ok(None)
   })
@@ -1858,11 +1856,7 @@ fn teardown_dynamic_ui(
   with_scheduler(py, scheduler_ptr, |_scheduler| {
     with_session(py, session_ptr, |session| {
       let _ = block_in_place_and_wait(py, || {
-        session
-          .maybe_display_teardown()
-          .unit_error()
-          .boxed_local()
-          .compat()
+        session.maybe_display_teardown().unit_error().boxed_local()
       });
       Ok(None)
     })
@@ -1901,11 +1895,11 @@ fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
 ///
 fn block_in_place_and_wait<T, E, F>(py: Python, f: impl FnOnce() -> F + Sync + Send) -> Result<T, E>
 where
-  F: Future<Item = T, Error = E>,
+  F: Future<Output = Result<T, E>>,
 {
   py.allow_threads(|| {
     let future = f();
-    tokio::task::block_in_place(|| future.wait())
+    tokio::task::block_in_place(|| futures::executor::block_on(future))
   })
 }
 

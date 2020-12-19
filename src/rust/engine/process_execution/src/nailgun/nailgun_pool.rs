@@ -10,8 +10,8 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 
-use boxfuture::{try_future, BoxFuture, Boxable};
-use futures01::future::Future;
+use futures::future::BoxFuture;
+use futures::{FutureExt, TryFutureExt};
 use log::{debug, info};
 use parking_lot::Mutex;
 use regex::Regex;
@@ -49,13 +49,13 @@ impl NailgunPool {
     workdir_for_server: PathBuf,
     requested_jdk_home: PathBuf,
     input_files: Digest,
-  ) -> BoxFuture<(), String> {
+  ) -> BoxFuture<'static, Result<(), String>> {
     // Materialize the directory for running the nailgun server, if we need to.
     let workdir_for_server2 = workdir_for_server.clone();
 
     // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
     store.materialize_directory(workdir_for_server.clone(), input_files)
-    .and_then(move |_metadata| {
+    .and_then(move |_metadata| async move {
       let jdk_home_in_workdir = &workdir_for_server.join(".jdk");
       let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
       let jdk_home_in_workdir3 = jdk_home_in_workdir.clone();
@@ -82,7 +82,7 @@ impl NailgunPool {
       }
     })
     .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &workdir_for_server2))
-    .to_boxed()
+    .boxed()
   }
 
   ///
@@ -101,23 +101,27 @@ impl NailgunPool {
     build_id_requesting_connection: String,
     store: Store,
     input_files: Digest,
-  ) -> BoxFuture<Port, String> {
+  ) -> BoxFuture<'static, Result<Port, String>> {
     let processes = self.processes.clone();
 
-    let jdk_path = try_future!(startup_options.jdk_home.clone().ok_or_else(|| {
+    let jdk_path = match startup_options.jdk_home.clone().ok_or_else(|| {
       format!(
         "jdk_home is not set for nailgun server startup request {:#?}",
         &startup_options
       )
-    }));
-    let requested_server_fingerprint = try_future!(NailgunProcessFingerprint::new(
-      nailgun_req_digest,
-      jdk_path.clone()
-    ));
+    }) {
+      Ok(r) => r,
+      Err(err) => return futures::future::err(err).boxed(),
+    };
+    let requested_server_fingerprint =
+      match NailgunProcessFingerprint::new(nailgun_req_digest, jdk_path.clone()) {
+        Ok(r) => r,
+        Err(err) => return futures::future::err(err).boxed(),
+      };
 
     Self::materialize_workdir_for_server(
       store, workdir_path.clone(), jdk_path, input_files
-    ).and_then(move |_| {
+    ).and_then(move |_| async move {
       debug!("Locking nailgun process pool so that only one can be connecting at a time.");
       let mut processes = processes.lock();
       debug!("Locked!");
@@ -217,7 +221,7 @@ impl NailgunPool {
       debug!("Unlocking nailgun process pool.");
       connection_result
     })
-    .to_boxed()
+    .boxed()
   }
 
   //

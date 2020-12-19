@@ -35,7 +35,6 @@ use std::process::exit;
 use std::time::Duration;
 
 use fs::RelativePath;
-use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
 use process_execution::{Context, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata};
 use store::{BackoffConfig, Store};
@@ -310,7 +309,6 @@ async fn main() {
   if let Some(output) = args.materialize_output_to {
     store
       .materialize_directory(output, result.output_directory)
-      .compat()
       .await
       .unwrap();
   }

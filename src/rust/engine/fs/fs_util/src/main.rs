@@ -396,12 +396,10 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             fs::Stat::File(f) => {
               let digest = store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
                 .store_by_digest(f)
-                .compat()
                 .await
                 .unwrap();
 
               let report = ensure_uploaded_to_remote(&store, store_has_remote, digest)
-                .compat()
                 .await
                 .unwrap();
               print_upload_summary(args.value_of("output-mode"), &report);
@@ -432,7 +430,6 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let digest = Digest(fingerprint, size_bytes);
         store
           .materialize_directory(destination, digest)
-          .compat()
           .await
           .map(|metadata| {
             eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
@@ -476,9 +473,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         )
         .await?;
 
-        let report = ensure_uploaded_to_remote(&store, store_has_remote, snapshot.digest)
-          .compat()
-          .await?;
+        let report = ensure_uploaded_to_remote(&store, store_has_remote, snapshot.digest).await?;
         print_upload_summary(args.value_of("output-mode"), &report);
 
         Ok(())
@@ -691,18 +686,18 @@ fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> 
   .unwrap()
 }
 
-fn ensure_uploaded_to_remote(
+async fn ensure_uploaded_to_remote(
   store: &Store,
   store_has_remote: bool,
   digest: Digest,
-) -> impl Future<Item = SummaryWithDigest, Error = String> {
+) -> Result<SummaryWithDigest, String> {
   let summary = if store_has_remote {
     store
       .ensure_remote_has_recursive(vec![digest])
+      .await
       .map(Some)
-      .to_boxed()
   } else {
-    future::ok(None).to_boxed()
+    Ok(None)
   };
   summary.map(move |summary| SummaryWithDigest { digest, summary })
 }
