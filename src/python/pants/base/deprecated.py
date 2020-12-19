@@ -47,6 +47,10 @@ class BadDecoratorNestingError(DeprecationApplicationError):
     """Indicates the @deprecated decorator was innermost in a sequence of layered decorators."""
 
 
+def is_deprecation_active(deprecation_start_version: Optional[str]) -> bool:
+    return deprecation_start_version is None or Version(deprecation_start_version) <= PANTS_SEMVER
+
+
 def get_deprecated_tense(
     removal_version: str, future_tense: str = "will be", past_tense: str = "was"
 ) -> str:
