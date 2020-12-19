@@ -945,9 +945,16 @@ class GlobalOptions(Subsystem):
             member_type=str,
             default=[],
             advanced=True,
-            help="Use this option to name Subsystems which will receive streaming workunit events. "
-            "For instance, `--streaming-workunits-handlers=\"['pants.reporting.workunit.Workunits']\"` will "
-            'register a Subsystem called Workunits defined in the module "pants.reporting.workunit".',
+            removal_version="2.3.0.dev1",
+            removal_hint=(
+                "To register a StreamingWorkunitHandler callback, install a UnionRule "
+                "for type `WorkunitsCallbackFactoryRequest`."
+            ),
+            help=(
+                "Use this option to name Subsystems which will receive streaming workunit events. "
+                "For instance, `--streaming-workunits-handlers=\"['pants.reporting.workunit.Workunits']\"` will "
+                'register a Subsystem called Workunits defined in the module "pants.reporting.workunit".'
+            ),
         )
 
     @classmethod

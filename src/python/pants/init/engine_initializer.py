@@ -33,6 +33,7 @@ from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
+from pants.reporting.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
 
@@ -252,6 +253,7 @@ class EngineInitializer:
                 *process.rules(),
                 *platform.rules(),
                 *changed_rules(),
+                *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
                 *rules,
             )

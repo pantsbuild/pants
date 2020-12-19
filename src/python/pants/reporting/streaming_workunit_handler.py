@@ -6,8 +6,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Iterator, Optional, Sequence, Tuple
 
+from typing_extensions import Protocol
+
 from pants.engine.fs import Digest, DigestContents, Snapshot
-from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.scheduler import SchedulerSession, Workunit
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.unions import UnionMembership, union
 from pants.goal.run_tracker import RunTracker
 from pants.util.logging import LogLevel
 
@@ -40,19 +44,52 @@ class StreamingWorkunitContext:
         return self._scheduler.ensure_remote_has_recursive(digests)
 
 
-class StreamingWorkunitHandler:
-    """StreamingWorkunitHandler's job is to periodically call each registered callback function with
-    the following kwargs:
+class WorkunitsCallback(Protocol):
+    def __call__(
+        self,
+        *,
+        started_workunits: Tuple[Workunit, ...],
+        completed_workunits: Tuple[Workunit, ...],
+        finished: bool,
+        context: StreamingWorkunitContext,
+    ) -> None:
+        """
+        :started_workunits: Workunits that have started but not completed.
+        :completed_workunits: Workunits that have completed.
+        :finished: True when the last chunk of workunit data is reported to the callback.
+        :context: A context providing access to functionality relevant to the run.
+        """
+        ...
 
-    workunits: Tuple[Dict[str, str], ...] - the workunit data itself
-    finished: bool - this will be set to True when the last chunk of workunit data is reported to the callback
+
+@dataclass(frozen=True)
+class WorkunitsCallbackFactory:
+    """A wrapper around a callable that constructs WorkunitsCallbacks.
+
+    NB: This extra wrapping is because subtyping is not supported in the return position of a
+    rule. See #11354 for discussion of that limitation.
     """
+
+    callback_factory: Callable[[], WorkunitsCallback]
+
+
+class WorkunitsCallbackFactories(Tuple[WorkunitsCallbackFactory, ...]):
+    """A list of registered factories for WorkunitsCallback instances."""
+
+
+@union
+class WorkunitsCallbackFactoryRequest:
+    """A request for a particular WorkunitsCallbackFactory."""
+
+
+class StreamingWorkunitHandler:
+    """Periodically calls each registered WorkunitsCallback in a dedicated thread."""
 
     def __init__(
         self,
         scheduler: SchedulerSession,
         run_tracker: RunTracker,
-        callbacks: Iterable[Callable],
+        callbacks: Iterable[WorkunitsCallback],
         report_interval_seconds: float,
         max_workunit_verbosity: LogLevel = LogLevel.TRACE,
     ):
@@ -81,17 +118,9 @@ class StreamingWorkunitHandler:
         if self._thread_runner:
             self._thread_runner.join()
 
-        # After stopping the thread, poll workunits one last time to make sure
-        # we report any workunits that were added after the last time the thread polled.
-        workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
-        for callback in self.callbacks:
-            callback(
-                workunits=workunits["completed"],
-                started_workunits=workunits["started"],
-                completed_workunits=workunits["completed"],
-                finished=True,
-                context=self._context,
-            )
+            # After stopping the thread, poll workunits one last time to make sure
+            # we report any workunits that were added after the last time the thread polled.
+            self._thread_runner.poll_workunits(finished=True)
 
     @contextmanager
     def session(self) -> Iterator[None]:
@@ -110,7 +139,7 @@ class _InnerHandler(threading.Thread):
         self,
         scheduler: Any,
         context: StreamingWorkunitContext,
-        callbacks: Iterable[Callable],
+        callbacks: Iterable[WorkunitsCallback],
         report_interval: float,
         max_workunit_verbosity: LogLevel,
     ):
@@ -122,18 +151,37 @@ class _InnerHandler(threading.Thread):
         self.callbacks = callbacks
         self.max_workunit_verbosity = max_workunit_verbosity
 
+    def poll_workunits(self, *, finished: bool) -> None:
+        workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
+        for callback in self.callbacks:
+            callback(
+                started_workunits=workunits["started"],
+                completed_workunits=workunits["completed"],
+                finished=finished,
+                context=self._context,
+            )
+
     def run(self):
         while not self.stop_request.isSet():
-            workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
-            for callback in self.callbacks:
-                callback(
-                    started_workunits=workunits["started"],
-                    completed_workunits=workunits["completed"],
-                    finished=False,
-                    context=self._context,
-                )
+            self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)
 
     def join(self, timeout=None):
         self.stop_request.set()
         super(_InnerHandler, self).join(timeout)
+
+
+@rule
+async def construct_workunits_callback_factories(
+    union_membership: UnionMembership,
+) -> WorkunitsCallbackFactories:
+    request_types = union_membership.get(WorkunitsCallbackFactoryRequest)
+    workunit_callback_factories = await MultiGet(
+        Get(WorkunitsCallbackFactory, WorkunitsCallbackFactoryRequest, request_type())
+        for request_type in request_types
+    )
+    return WorkunitsCallbackFactories(workunit_callback_factories)
+
+
+def rules():
+    return [QueryRule(WorkunitsCallbackFactories, (UnionMembership,)), *collect_rules()]

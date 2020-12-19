@@ -130,7 +130,7 @@ def test_fails_ctrl_c_ffi_extern() -> None:
         pants_run = run_pants_with_workdir(
             command=lifecycle_stub_cmdline(),
             workdir=tmpdir,
-            extra_env={"_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS": "True"},
+            extra_env={"_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS": "run_lifecycle_stubs"},
         )
         pants_run.assert_failure()
 
