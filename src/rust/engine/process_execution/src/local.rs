@@ -426,7 +426,6 @@ pub trait CapturedWorkdir {
     // non-determinism when paths overlap.
     let sandbox = store
       .materialize_directory(workdir_path.clone(), req.input_files)
-      .compat()
       .await?;
     let workdir_path2 = workdir_path.clone();
     let output_file_paths = req.output_files.clone();

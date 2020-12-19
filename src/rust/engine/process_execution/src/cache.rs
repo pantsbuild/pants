@@ -171,9 +171,7 @@ impl CommandRunner {
         .boxed(),
       self
         .file_store
-        .ensure_local_has_recursive_directory(result.output_directory)
-        .compat()
-        .boxed(),
+        .ensure_local_has_recursive_directory(result.output_directory),
     ])
     .await?;
 

@@ -13,7 +13,6 @@ use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{Select, Visualizer};
 use crate::session::{ObservedValueResult, Root, Session, Stderr};
 
-use futures::compat::Future01CompatExt;
 use futures::{future, FutureExt};
 use graph::{InvalidationResult, LastObserved};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -211,7 +210,6 @@ impl Scheduler {
           .core
           .store()
           .materialize_directory(destination, input_digest)
-          .compat()
           .await?;
       }
     }

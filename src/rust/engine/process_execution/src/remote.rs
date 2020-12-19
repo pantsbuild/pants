@@ -18,6 +18,7 @@ use double_checked_cell_async::DoubleCheckedCell;
 use fs::{self, File, PathStat};
 use futures::compat::Future01CompatExt;
 use futures::future::{self, TryFutureExt};
+use futures::FutureExt;
 use futures::{Stream, StreamExt};
 use futures01::Future as Future01;
 use grpc_util::prost::MessageExt;
@@ -749,7 +750,6 @@ impl CommandRunner {
             let _ = self
               .store
               .ensure_remote_has_recursive(missing_digests)
-              .compat()
               .await?;
           }
           ExecutionError::Timeout => {
@@ -1324,7 +1324,7 @@ pub fn extract_output_files(
   }
 
   impl StoreFileByDigest<String> for StoreOneOffRemoteDigest {
-    fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
+    fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, String>> {
       match self.map_of_paths_to_digests.get(&file.path) {
         Some(digest) => future::ok(*digest),
         None => future::err(format!(
@@ -1332,8 +1332,7 @@ pub fn extract_output_files(
           file.path
         )),
       }
-      .compat()
-      .to_boxed()
+      .boxed()
     }
   }
 
@@ -1477,7 +1476,6 @@ pub async fn ensure_action_uploaded(
 ) -> Result<(), String> {
   let _ = store
     .ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
-    .compat()
     .await?;
   Ok(())
 }

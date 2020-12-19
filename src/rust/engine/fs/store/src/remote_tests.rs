@@ -1,15 +1,15 @@
-use crate::remote::ByteStore;
-use crate::MEGABYTES;
+use std::collections::HashSet;
+use std::time::Duration;
+
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
 use hashing::Digest;
 use mock::StubCAS;
 use serverset::BackoffConfig;
-use std::collections::HashSet;
-use std::time::Duration;
 use testutil::data::{TestData, TestDirectory};
 
+use crate::remote::ByteStore;
 use crate::tests::{big_file_bytes, big_file_digest, big_file_fingerprint, new_cas};
+use crate::MEGABYTES;
 
 #[tokio::test]
 async fn loads_file() {
@@ -263,7 +263,6 @@ async fn list_missing_digests_none_missing() {
       .list_missing_digests(
         store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
       )
-      .compat()
       .await,
     Ok(HashSet::new())
   );
@@ -283,7 +282,6 @@ async fn list_missing_digests_some_missing() {
   assert_eq!(
     store
       .list_missing_digests(store.find_missing_blobs_request(vec![digest].iter()),)
-      .compat()
       .await,
     Ok(digest_set)
   );
@@ -299,7 +297,6 @@ async fn list_missing_digests_error() {
     .list_missing_digests(
       store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
     )
-    .compat()
     .await
     .expect_err("Want error");
   assert!(
