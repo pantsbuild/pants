@@ -173,6 +173,7 @@ class ReferenceGenerator:
                 field["default_or_required"] = (
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
+            target["fields"] = sorted(target["fields"], key=lambda fld: fld["alias"])
 
         return target_info
 
@@ -282,7 +283,7 @@ class ReferenceGenerator:
         Useful for debugging and iterating on the markdown.
         """
         output_dir = Path(self._args.output)
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         goals = [
             scope
@@ -297,8 +298,7 @@ class ReferenceGenerator:
 
         def write(filename: str, content: str) -> None:
             path = output_dir / filename
-            with open(path, "w") as fp:
-                fp.write(content)
+            path.write_text(content)
             logger.info(f"Wrote {path}")
 
         write("goals-index.md", self._render_parent_page_body(sorted(goals), sync=False))
