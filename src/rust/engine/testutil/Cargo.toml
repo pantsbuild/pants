@@ -9,6 +9,7 @@ publish = false
 async-stream = "0.2"
 bazel_protos = { path = "../process_execution/bazel_protos" }
 bytes = "0.5"
+grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 hashing = { path = "../hashing" }
 prost = "0.6"

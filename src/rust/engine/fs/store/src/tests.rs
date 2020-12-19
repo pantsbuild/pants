@@ -11,10 +11,10 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::{Bytes, BytesMut};
 use fs::RelativePath;
 use futures::compat::Future01CompatExt;
+use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use maplit::btreemap;
 use mock::StubCAS;
-use prost::Message;
 use serverset::BackoffConfig;
 
 use crate::{
@@ -370,13 +370,7 @@ async fn non_canonical_remote_directory_is_error() {
     };
     file
   });
-  let non_canonical_directory_bytes = {
-    let mut buf = BytesMut::with_capacity(non_canonical_directory.encoded_len());
-    non_canonical_directory
-      .encode(&mut buf)
-      .expect("Error serializing proto");
-    buf.freeze()
-  };
+  let non_canonical_directory_bytes = non_canonical_directory.to_bytes();
   let directory_digest = Digest::of_bytes(&non_canonical_directory_bytes);
   let non_canonical_directory_fingerprint = directory_digest.0;
 

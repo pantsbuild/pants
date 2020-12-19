@@ -7,6 +7,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::longrunning::Operation;
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
+use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use maplit::{btreemap, hashset};
 use mock::execution_server::{ExpectedAPICall, MockOperation};
@@ -2387,12 +2388,9 @@ pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_typ
     .unwrap()
     .replace("::", ".");
 
-  let mut buf = Vec::with_capacity(message.encoded_len());
-  message.encode(&mut buf).unwrap(); // TODO(tonic): Return error.
-
   prost_types::Any {
     type_url: format!("type.googleapis.com/{}", proto_type_name),
-    value: buf,
+    value: message.to_bytes().to_vec(),
   }
 }
 
