@@ -5,6 +5,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use futures::{future as future03, FutureExt};
+use grpc_util::prost::MessageExt;
 use hashing::Fingerprint;
 use log::{debug, warn};
 use prost::Message;
@@ -206,14 +207,11 @@ impl CommandRunner {
     // (This isn't super urgent because we don't ever actually GC this store. So also...)
     // TODO: GC the local process execution cache.
 
-    let mut response_bytes = Vec::with_capacity(execute_response.encoded_len());
-    execute_response
-      .encode(&mut response_bytes)
-      .map_err(|err| format!("Error serializing execute process result to cache: {}", err))?;
+    let response_bytes = execute_response.to_bytes();
 
     let bytes_to_store = bincode::serialize(&PlatformAndResponseBytes {
       platform: result.platform,
-      response_bytes,
+      response_bytes: response_bytes.to_vec(),
     })
     .map(Bytes::from)
     .map_err(|err| {

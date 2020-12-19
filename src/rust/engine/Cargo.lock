@@ -795,6 +795,7 @@ dependencies = [
  "fs",
  "futures 0.1.29",
  "futures 0.3.5",
+ "grpc_util",
  "hashing",
  "parking_lot",
  "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
@@ -1030,7 +1031,10 @@ dependencies = [
 name = "grpc_util"
 version = "0.0.1"
 dependencies = [
+ "bytes",
  "futures 0.3.5",
+ "prost",
+ "prost-types",
  "tokio",
  "tokio-rustls 0.14.1",
  "tokio-util 0.2.0",
@@ -2948,6 +2952,7 @@ dependencies = [
  "bazel_protos",
  "bytes 0.5.4",
  "fs",
+ "grpc_util",
  "hashing",
  "prost 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
 ]

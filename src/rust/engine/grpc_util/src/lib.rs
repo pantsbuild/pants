@@ -32,6 +32,8 @@ use std::convert::TryFrom;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 
+pub mod prost;
+
 /// Create a Tonic `Endpoint` from a string containing a schema and IP address/name.
 pub fn create_endpoint(
   addr: &str,

@@ -42,12 +42,13 @@ use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::require_digest;
 use boxfuture::{BoxFuture, Boxable};
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use concrete_time::TimeSpan;
 use fs::{default_cache_path, FileContent, RelativePath};
 use futures::compat::Future01CompatExt;
 use futures::future::{self as future03, Either, FutureExt, TryFutureExt};
 use futures01::{future, Future};
+use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use serde_derive::Serialize;
 pub use serverset::BackoffConfig;
@@ -379,12 +380,8 @@ impl Store {
     initial_lease: bool,
   ) -> Result<Digest, String> {
     let local = self.local.clone();
-    let mut buf = BytesMut::with_capacity(directory.encoded_len());
-    directory
-      .encode(&mut buf)
-      .map_err(|e| format!("protobuf conversion error: {}", e))?;
     local
-      .store_bytes(EntryType::Directory, buf.freeze(), initial_lease)
+      .store_bytes(EntryType::Directory, directory.to_bytes(), initial_lease)
       .await
   }
 

@@ -12,7 +12,7 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::longrunning::Operation;
 use bazel_protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
 use boxfuture::{try_future, BoxFuture, Boxable};
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use concrete_time::TimeSpan;
 use double_checked_cell_async::DoubleCheckedCell;
 use fs::{self, File, PathStat};
@@ -20,6 +20,7 @@ use futures::compat::Future01CompatExt;
 use futures::future::{self, TryFutureExt};
 use futures::{Stream, StreamExt};
 use futures01::Future as Future01;
+use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use itertools::Either;
 use itertools::Itertools;
@@ -1374,17 +1375,10 @@ fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Request<T> {
     ..remexec::RequestMetadata::default()
   };
 
-  let bytes = {
-    let mut buf = BytesMut::with_capacity(reapi_request_metadata.encoded_len());
-    // TODO(tonic): Handle encode errors?
-    reapi_request_metadata.encode(&mut buf).unwrap();
-    buf.freeze()
-  };
-
   let md = request.metadata_mut();
   md.insert_bin(
     "google.devtools.remoteexecution.v1test.requestmetadata-bin",
-    BinaryMetadataValue::try_from_bytes(&bytes).unwrap(),
+    BinaryMetadataValue::try_from_bytes(&reapi_request_metadata.to_bytes()).unwrap(),
   );
 
   request
@@ -1455,12 +1449,8 @@ pub async fn store_proto_locally<P: prost::Message>(
   store: &Store,
   proto: &P,
 ) -> Result<Digest, String> {
-  let mut buf = BytesMut::with_capacity(proto.encoded_len());
-  proto
-    .encode(&mut buf)
-    .map_err(|e| format!("Error serializing proto {:?}", e))?;
   store
-    .store_file_bytes(buf.freeze(), true)
+    .store_file_bytes(proto.to_bytes(), true)
     .await
     .map_err(|e| format!("Error saving proto to local store: {:?}", e))
 }
@@ -1506,9 +1496,5 @@ pub(crate) fn rpcerror_to_string(status: Status) -> String {
 }
 
 pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {
-  let mut buf = BytesMut::with_capacity(message.encoded_len());
-  message
-    .encode(&mut buf)
-    .map_err(|e| format!("Protobuf encode error: {}", e))?;
-  Ok(Digest::of_bytes(&buf.freeze()))
+  Ok(Digest::of_bytes(&message.to_bytes()))
 }

@@ -6,7 +6,10 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+bytes = "0.5"
 futures = { version = "0.3" }
+prost = "0.6"
+prost-types = "0.6"
 tokio = { version = "0.2.23", features = ["process", "rt-threaded", "sync", "tcp", "time"] }
 tokio-rustls = "0.14"
 tokio-util = { version = "0.2", features = ["codec"] }

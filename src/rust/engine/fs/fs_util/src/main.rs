@@ -36,7 +36,7 @@ use std::time::Duration;
 
 use bazel_protos::require_digest;
 use boxfuture::{BoxFuture, Boxable};
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
 use fs::{
   GlobExpansionConjunction, GlobMatching, PreparedPathGlobs, RelativePath, StrictGlobMatching,
@@ -44,9 +44,9 @@ use fs::{
 use futures::compat::Future01CompatExt;
 use futures::future::TryFutureExt;
 use futures01::{future, Future};
+use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use prost::Message;
 use rand::seq::SliceRandom;
 use serde_derive::Serialize;
 use store::{
@@ -521,11 +521,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
           "binary" => {
             let maybe_directory = store.load_directory(digest).await?;
-            maybe_directory.map(|(d, _metadata)| {
-              let mut buf = Vec::with_capacity(d.encoded_len());
-              d.encode(&mut buf).unwrap();
-              buf
-            })
+            maybe_directory.map(|(d, _metadata)| d.to_bytes().to_vec())
           }
           "text" => {
             let maybe_p = store.load_directory(digest).await?;
@@ -584,13 +580,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
       {
         None => {
           let maybe_dir = store.load_directory(digest).await?;
-          maybe_dir.map(|(dir, _metadata)| {
-            let mut buf = BytesMut::with_capacity(dir.encoded_len());
-            dir
-              .encode(&mut buf)
-              .expect("Error serializing Directory proto");
-            buf.freeze()
-          })
+          maybe_dir.map(|(dir, _metadata)| dir.to_bytes())
         }
         Some((bytes, _metadata)) => Some(bytes),
       };
