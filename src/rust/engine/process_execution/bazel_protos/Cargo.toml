@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 bytes = "0.5"
-futures = "^0.1.16"
 hashing = { path = "../../hashing" }
 prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }

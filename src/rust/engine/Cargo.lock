@@ -148,7 +148,6 @@ dependencies = [
  "bytes",
  "copy_dir",
  "dir-diff",
- "futures 0.1.29",
  "hashing",
  "prost",
  "prost-build",
@@ -3350,7 +3349,6 @@ checksum = "6d2783fe2d6b8c1101136184eb41be8b1ad379e4657050b8aaff0c79ee7575f9"
 name = "ui"
 version = "0.0.1"
 dependencies = [
- "futures 0.1.29",
  "futures 0.3.5",
  "indexmap",
  "indicatif",
