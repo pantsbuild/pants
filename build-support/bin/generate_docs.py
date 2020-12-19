@@ -11,7 +11,7 @@ import os
 import pkgutil
 import sys
 from pathlib import Path, PosixPath
-from typing import Dict, Iterable, Optional, cast
+from typing import Any, Dict, Iterable, Optional, cast
 
 import pystache
 import requests
@@ -101,12 +101,12 @@ class ReferenceGenerator:
 
         options_scope_tpl = get_tpl("options_scope_reference.md.mustache")
         single_option_tpl = get_tpl("single_option_reference.md.mustache")
-        targets_tpl = get_tpl("targets_reference.md.mustache")
+        target_tpl = get_tpl("target_reference.md.mustache")
         self._renderer = pystache.Renderer(
             partials={
                 "scoped_options": options_scope_tpl,
                 "single_option": single_option_tpl,
-                "targets": targets_tpl,
+                "target": target_tpl,
             }
         )
         self._category_id = None  # Fetched lazily.
@@ -117,7 +117,6 @@ class ReferenceGenerator:
         )
         self._options_info = self.process_options_input(json_str, sync=self._args.sync)
         self._targets_info = self.process_targets_input(json_str)
-        # logger.info(json.dumps(self._targets_info, indent=2))
 
     @staticmethod
     def _link(scope: str, *, sync: bool) -> str:
@@ -165,16 +164,17 @@ class ReferenceGenerator:
         return cast(Dict, help_info)
 
     @classmethod
-    def process_targets_input(cls, json_str: str) -> Dict:
-        target_info = json.loads(json_str)["name_to_target_type_info"].values()
-        for target in target_info:
+    def process_targets_input(cls, json_str: str) -> Dict[str, Dict[str, Any]]:
+        target_info = json.loads(json_str)["name_to_target_type_info"]
+        for target in target_info.values():
             for field in target["fields"]:
                 # Combine the `default` and `required` properties.
+                default_str = html.escape(str(field['default']), quote=False)
                 field["default_or_required"] = (
-                    "required" if field["required"] else f"default: {field['default']}"
+                    "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
 
-        return {"targets": target_info}
+        return target_info
 
     @property
     def category_id(self) -> str:
@@ -262,8 +262,8 @@ class ReferenceGenerator:
         """Returns the id of the entity at the specified readme.io API url."""
         return cast(str, self._access_readme_api(url, "GET", "")["_id"])
 
-    def _render_targets(self) -> str:
-        return cast(str, self._renderer.render("{{> targets}}", self._targets_info))
+    def _render_target(self, alias: str) -> str:
+        return cast(str, self._renderer.render("{{> target}}", self._targets_info[alias]))
 
     def _render_options_body(self, scope_help_info: Dict) -> str:
         """Renders the body of a single options help page."""
@@ -303,9 +303,15 @@ class ReferenceGenerator:
 
         write("goals-index.md", self._render_parent_page_body(sorted(goals), sync=False))
         write("subsystems-index.md", self._render_parent_page_body(sorted(subsystems), sync=False))
-        write("target-types.md", self._render_targets())
         for shi in self._options_info["scope_to_help_info"].values():
             write(f"{shi['scope'] or 'GLOBAL'}.md", self._render_options_body(shi))
+
+        write(
+            "targets-index.md",
+            self._render_parent_page_body(sorted(self._targets_info.keys()), sync=False),
+        )
+        for alias in self._targets_info.keys():
+            write(f"{alias}.md", self._render_target(alias))
 
     def sync(self) -> None:
         """Render the pages and sync them to the live docsite.
@@ -356,24 +362,22 @@ class ReferenceGenerator:
             parent_doc_id=None,
             slug_suffix="all-goals",
             title="Goals",
-            body=self._render_parent_page_body(sorted(scope for scope in goals.keys()), sync=True),
+            body=self._render_parent_page_body(sorted(goals.keys()), sync=True),
         )
         self._create(
             parent_doc_id=None,
             slug_suffix="all-subsystems",
             title="Subsystems",
-            body=self._render_parent_page_body(
-                sorted(scope for scope in subsystems.keys()), sync=True
-            ),
+            body=self._render_parent_page_body(sorted(subsystems.keys()), sync=True),
         )
         self._create(
             parent_doc_id=None,
-            slug_suffix="targets",
+            slug_suffix="all-targets",
             title="Targets",
-            body=self._render_targets(),
+            body=self._render_parent_page_body(sorted(self._targets_info.keys()), sync=True),
         )
 
-        # Create the individual goal/subsystem docs.
+        # Create the individual goal/subsystem/target docs.
         all_goals_doc_id = self._get_id("docs/reference-all-goals")
         for scope, shi in sorted(goals.items()):
             self._create(
@@ -390,6 +394,15 @@ class ReferenceGenerator:
                 slug_suffix=scope,
                 title=scope,
                 body=self._render_options_body(shi),
+            )
+
+        all_targets_doc_id = self._get_id("docs/reference-all-targets")
+        for alias, data in sorted(self._targets_info.items()):
+            self._create(
+                parent_doc_id=all_targets_doc_id,
+                slug_suffix=alias,
+                title=alias,
+                body=self._render_target(alias),
             )
 
     def main(self) -> None:
