@@ -6,7 +6,7 @@ name = "concrete_time"
 publish = false
 
 [dependencies]
-prost = { git = "https://github.com/danburkert/prost", rev = "423f5ec5bd165a7007a388edfb2b485d5bbf40c7" }
+prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 prost-types = "0.6"
 serde_derive = "1.0.98"
 serde = "1.0.98"
