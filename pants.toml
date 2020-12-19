@@ -61,6 +61,7 @@ root_patterns = [
 ]
 
 [python-setup]
+resolver_version = "pip-2020-resolver"
 requirement_constraints = "3rdparty/python/constraints.txt"
 resolve_all_constraints = "nondeployables"
 interpreter_constraints = [">=3.7,<3.9"]
