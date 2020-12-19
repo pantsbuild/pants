@@ -32,6 +32,17 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 
 class PythonAwsLambdaSources(PythonSources):
     expected_num_files = range(0, 2)
+    deprecated_removal_version = "2.3.0.dev0"
+    deprecated_removal_hint = (
+        "Remove the `sources` field and create a `python_library` target with the handler "
+        "file included (if it does not yet exist). Pants will infer a dependency, which you can "
+        "check with `./pants dependencies path/to:lambda`. See "
+        "https://www.pantsbuild.org/v2.2/docs/awslambda-python for an example.\n\nYou can also "
+        "update the `handler` field to use the file name, "
+        "e.g. `handler='lambda.py:handler_func'`. This will allow file arguments to still work "
+        "with this target, meaning you can still use `./pants package path/to/lambda.py` instead "
+        "of needing to use `./pants package path/to:lambda`."
+    )
 
 
 class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
@@ -175,6 +186,16 @@ class PythonAwsLambdaRuntime(StringField):
         return int(mo.group("major")), int(mo.group("minor"))
 
 
+class DeprecatedAwsLambdaInterpreterConstraints(InterpreterConstraintsField):
+    deprecated_removal_version = "2.3.0.dev0"
+    deprecated_removal_hint = (
+        "Because the `sources` field will be removed from `python_awslambda` targets, it no longer "
+        "makes sense to also have an `interpreter_constraints` field. Instead, set the "
+        "`interpreter_constraints` field on the `python_library` target containing the lambda's "
+        "handler code."
+    )
+
+
 class PythonAWSLambda(Target):
     """A self-contained Python function suitable for uploading to AWS Lambda.
 
@@ -185,7 +206,7 @@ class PythonAWSLambda(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PythonAwsLambdaSources,
-        InterpreterConstraintsField,
+        DeprecatedAwsLambdaInterpreterConstraints,
         OutputPathField,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,

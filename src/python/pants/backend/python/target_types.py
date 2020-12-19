@@ -100,7 +100,7 @@ class PexBinaryDefaults(Subsystem):
         return cast(bool, self.options.emit_warnings)
 
 
-class PexBinarySources(PythonSources):
+class DeprecatedPexBinarySources(PythonSources):
     """A single file containing the executable, such as ['app.py'].
 
     You can leave this off if you include the executable file in one of this target's
@@ -111,6 +111,14 @@ class PexBinarySources(PythonSources):
     """
 
     expected_num_files = range(0, 2)
+    deprecated_removal_version = "2.3.0.dev0"
+    deprecated_removal_hint = (
+        "Remove the `sources` field and set the `entry_point` field to the file name, "
+        "e.g. `entry_point='app.py'` or `entry_point='app.py:func'`. Create a `python_library` "
+        "target with the entry point's file included (if it does not yet exist). Pants will infer "
+        "a dependency, which you can check with `./pants dependencies path/to:app`. See "
+        "https://www.pantsbuild.org/v2.2/docs/python-package-goal for more instructions."
+    )
 
 
 # See `target_types_rules.py` for a dependency injection rule.
@@ -156,7 +164,7 @@ class ResolvePexEntryPointRequest:
     """Determine the `entry_point` for a `pex_binary` after applying all syntactic sugar."""
 
     entry_point_field: PexEntryPointField
-    sources: PexBinarySources
+    sources: DeprecatedPexBinarySources
 
 
 class PexPlatformsField(StringSequenceField):
@@ -252,6 +260,16 @@ class PexEmitWarningsField(BoolField):
         return self.value
 
 
+class DeprecatedPexBinaryInterpreterConstraints(InterpreterConstraintsField):
+    deprecated_removal_version = "2.3.0.dev0"
+    deprecated_removal_hint = (
+        "Because the `sources` field will be removed from `pex_binary` targets, it no longer makes "
+        "sense to also have an `interpreter_constraints` field. Instead, set the "
+        "`interpreter_constraints` field on the `python_library` target containing the binary's "
+        "entry point."
+    )
+
+
 class PexBinary(Target):
     """A Python target that can be converted into an executable PEX file.
 
@@ -262,9 +280,9 @@ class PexBinary(Target):
     alias = "pex_binary"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        InterpreterConstraintsField,
         OutputPathField,
-        PexBinarySources,
+        DeprecatedPexBinaryInterpreterConstraints,
+        DeprecatedPexBinarySources,
         PexBinaryDependencies,
         PexEntryPointField,
         PexPlatformsField,

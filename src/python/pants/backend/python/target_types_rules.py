@@ -12,8 +12,8 @@ import os.path
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
 from pants.backend.python.target_types import (
+    DeprecatedPexBinarySources,
     PexBinaryDependencies,
-    PexBinarySources,
     PexEntryPointField,
     PythonDistributionDependencies,
     PythonProvidesField,
@@ -53,8 +53,8 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     #  3) `path.to.module:func` => preserve exactly.
     #  4) `app.py` => convert into `path.to.app`.
     #  5) `app.py:func` => convert into `path.to.app:func`.
-    #  6) `:func` => if there's a sources field, convert to `path.to.sources:func` (soon to be deprecated).
-    #  7) no entry point field, but `sources` field => convert to `path.to.sources` (soon to be deprecated).
+    #  6) `:func` => if there's a sources field, convert to `path.to.sources:func` (deprecated).
+    #  7) no entry point field, but `sources` field => convert to `path.to.sources` (deprecated).
 
     # Handle deprecated cases #6 and #7, which are the only cases where the `sources` field matters
     # for calculating the entry point.
@@ -75,7 +75,7 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
                 f"{repr(ep_val)}, but the `sources` field is not set. Pants requires the "
                 "`sources` field to expand the entry point to the normalized form "
                 f"`path.to.module:{ep_val}`. Please either set the `sources` field to exactly one "
-                f"file or set `{ep_alias}='my_file.py:{ep_val}'`. See "
+                f"file (deprecated) or set `{ep_alias}='my_file.py:{ep_val}'`. See "
                 f"{instructions_url}."
             )
         entry_point_path = binary_source_paths.files[0]
@@ -144,7 +144,7 @@ async def inject_pex_binary_entry_point_dependency(
     entry_point = await Get(
         ResolvedPexEntryPoint,
         ResolvePexEntryPointRequest(
-            original_tgt.target[PexEntryPointField], original_tgt.target[PexBinarySources]
+            original_tgt.target[PexEntryPointField], original_tgt.target[DeprecatedPexBinarySources]
         ),
     )
     if entry_point.val is None:
