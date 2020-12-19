@@ -19,4 +19,27 @@ where
   }
 }
 
+// Blanket implementation of MessageExt for all prost::Message types.
 impl<M: ::prost::Message> MessageExt for M {}
+
+#[cfg(test)]
+mod tests {
+  use prost::Message;
+  use prost_types::Timestamp;
+
+  use super::MessageExt;
+
+  #[test]
+  fn to_bytes_roundtrip_test() {
+    let t1 = Timestamp {
+      seconds: 500,
+      nanos: 10000,
+    };
+
+    let bytes = t1.to_bytes();
+
+    let t2 = Timestamp::decode(bytes).unwrap();
+
+    assert_eq!(t1, t2);
+  }
+}

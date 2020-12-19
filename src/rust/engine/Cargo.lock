@@ -1029,6 +1029,7 @@ dependencies = [
  "bytes",
  "futures 0.3.5",
  "prost",
+ "prost-types",
  "tokio",
  "tokio-rustls 0.14.1",
  "tokio-util 0.2.0",
