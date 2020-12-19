@@ -1,10 +1,14 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import json
 import os
+from dataclasses import asdict, is_dataclass
 from enum import Enum
 from itertools import repeat
-from typing import Iterable, TypeVar, Union, cast
+from typing import Iterable, Tuple, TypeVar, Union, cast
+
+from pkg_resources import Requirement
 
 from pants.engine.addresses import Address, Addresses, BuildFileAddress
 from pants.engine.console import Console
@@ -72,6 +76,39 @@ def _render_raw(fc: FileContent, encoding: str = "utf-8") -> str:
     return os.linesep.join(parts)
 
 
+def _render_json(ts: Iterable[Target]) -> str:
+    data = dict(map(_target_to_kv, ts))
+    return json.dumps(data, indent=2, cls=_PeekJsonEncoder)
+
+
+def _target_to_kv(t: Target) -> Tuple[str, dict]:
+    d = {k.alias: _prepare_value(v.value) for k, v in t.field_values.items()}
+    d["alias"] = t.alias
+    return t.address.spec, d
+
+
+def _prepare_value(x: object) -> object:
+    """Prepare the value to be JSON-serialized.
+
+    If we can make it a dict, try that.  If not, str() it.
+    """
+    if is_dataclass(x):
+        return asdict(x)
+    else:
+        return x
+
+
+class _PeekJsonEncoder(json.JSONEncoder):
+    """Allow us to serialize some commmonly-found types in BUILD files."""
+
+    def default(self, o):
+        """Return a serializable object for o."""
+        if isinstance(o, Requirement):
+            return str(o)
+        else:
+            return super().default(o)
+
+
 @goal_rule
 async def peek(
     console: Console,
@@ -80,18 +117,21 @@ async def peek(
 ) -> Peek:
     # TODO: better options for target selection (globs, transitive, etc)?
     targets: Iterable[Target]
-    targets = await Get(Targets, Addresses, addresses)
     # TODO: handle target not found exceptions better here
-    build_file_addresses = await MultiGet(
-        Get(BuildFileAddress, Address, t.address) for t in targets
-    )
-    build_file_paths = {a.rel_path for a in build_file_addresses}
-    digest_contents = await Get(DigestContents, PathGlobs(build_file_paths))
+    targets = await Get(Targets, Addresses, addresses)
 
-    # TODO: programmatically determine correct encoding
-    rendereds = map(_render_raw, digest_contents)
-    for output in _intersperse(os.linesep, rendereds):
-        console.print_stdout(output)
+    if subsys.output == OutputOptions.RAW:
+        build_file_addresses = await MultiGet(
+            Get(BuildFileAddress, Address, t.address) for t in targets
+        )
+        build_file_paths = {a.rel_path for a in build_file_addresses}
+        digest_contents = await Get(DigestContents, PathGlobs(build_file_paths))
+        # TODO: programmatically determine correct encoding
+        rendereds = map(_render_raw, digest_contents)
+        for output in _intersperse(os.linesep, rendereds):
+            console.print_stdout(output)
+    elif subsys.output == OutputOptions.JSON:
+        console.print_stdout(_render_json(targets))
 
     return Peek(exit_code=0)
 
