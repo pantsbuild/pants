@@ -144,6 +144,7 @@ env_logger = "0.5.4"
 
 [patch.crates-io]
 # Patch all transitive uses of Prost to refer to the version with `Bytes` support.
+# Specifically, this Prost commit: https://github.com/danburkert/prost/commit/a1cccbcee343e2c444e1cd2738c7fba2599fc391
 prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 prost-types = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
