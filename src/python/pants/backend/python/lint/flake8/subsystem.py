@@ -12,7 +12,10 @@ class Flake8(PythonToolBase):
 
     options_scope = "flake8"
     default_version = "flake8>=3.7.9,<3.9"
-    default_extra_requirements = ["setuptools<45"]  # NB: `<45` is for Python 2 support
+    default_extra_requirements = [
+        "setuptools<45; python_full_version == '2.7.*'",
+        "setuptools; python_version > '2.7'",
+    ]
     default_entry_point = "flake8"
 
     @classmethod

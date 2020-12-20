@@ -497,8 +497,8 @@ async def create_pex(
         "--no-pypi",
         *(f"--index={index}" for index in python_repos.indexes),
         *(f"--repo={repo}" for repo in python_repos.repos),
-        "--cache-ttl",
-        str(python_setup.resolver_http_cache_ttl),
+        "--resolver-version",
+        python_setup.resolver_version.value,
         *request.additional_args,
     ]
 

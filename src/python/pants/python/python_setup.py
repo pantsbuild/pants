@@ -37,6 +37,13 @@ class ResolveAllConstraintsOption(Enum):
     ALWAYS = "always"
 
 
+class ResolverVersion(Enum):
+    """The resolver implementation to use when resolving Python requirements."""
+
+    PIP_LEGACY = "pip-legacy-resolver"
+    PIP_2020 = "pip-2020-resolver"
+
+
 class PythonSetup(Subsystem):
     """A Python environment."""
 
@@ -108,6 +115,22 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--resolver-version",
+            advanced=True,
+            type=ResolverVersion,
+            default=ResolverVersion.PIP_LEGACY,
+            deprecation_start_version="2.3.0.dev1",
+            removal_version="2.5.0.dev1",
+            removal_hint="",
+            help=(
+                "The resolver implementation to use when resolving Python requirements. Support "
+                f"for the {ResolverVersion.PIP_LEGACY.value!r} will be removed in Pants 2.5; so "
+                f"you're encouraged to start using the {ResolverVersion.PIP_2020.value!r} early. "
+                "For more information on this change see "
+                "https://pip.pypa.io/en/latest/user_guide/#changes-to-the-pip-dependency-resolver-in-20-2-2020"
+            ),
+        )
+        register(
             "--resolver-manylinux",
             advanced=True,
             type=str,
@@ -132,13 +155,11 @@ class PythonSetup(Subsystem):
         register(
             "--resolver-http-cache-ttl",
             type=int,
-            default=3_600,  # This matches PEX's default.
+            default=0,
             advanced=True,
-            help=(
-                "The maximum time (in seconds) for items in the HTTP cache. When the cache expires,"
-                "the PEX resolver will make network requests to see if new versions of your "
-                "requirements are available."
-            ),
+            removal_version="2.4.0.dev1",
+            removal_hint="Unused.",
+            help="Unused.",
         )
 
     @property
@@ -162,6 +183,10 @@ class PythonSetup(Subsystem):
         return self.expand_interpreter_search_paths(self.options.interpreter_search_paths)
 
     @property
+    def resolver_version(self) -> ResolverVersion:
+        return cast(ResolverVersion, self.options.resolver_version)
+
+    @property
     def manylinux(self) -> Optional[str]:
         manylinux = cast(Optional[str], self.options.resolver_manylinux)
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
@@ -171,10 +196,6 @@ class PythonSetup(Subsystem):
     @property
     def resolver_jobs(self) -> int:
         return cast(int, self.options.resolver_jobs)
-
-    @property
-    def resolver_http_cache_ttl(self) -> int:
-        return cast(int, self.options.resolver_http_cache_ttl)
 
     @property
     def scratch_dir(self):
