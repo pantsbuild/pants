@@ -13,7 +13,7 @@ from pkg_resources import Requirement
 from pants.engine.addresses import Address, Addresses, BuildFileAddress
 from pants.engine.console import Console
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
-from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Target, UnexpandedTargets
 
@@ -23,7 +23,7 @@ class OutputOptions(Enum):
     JSON = "json"
 
 
-class PeekSubsystem(GoalSubsystem):
+class PeekSubsystem(Outputting, GoalSubsystem):
     """Display BUILD file info to the console.
 
     In its most basic form, `peek` just prints the contents of a BUILD file. It can also display
@@ -44,7 +44,11 @@ class PeekSubsystem(GoalSubsystem):
         )
 
     @property
-    def output(self) -> OutputOptions:
+    def output_type(self) -> OutputOptions:
+        """Get the output type from options.
+
+        Must be renamed here because `output` conflicts with `Outputting` class.
+        """
         return cast(OutputOptions, self.options.output)
 
 
@@ -121,16 +125,19 @@ async def peek(
     # TODO: handle target not found exceptions better here
     targets = await Get(UnexpandedTargets, Addresses, addresses)
 
-    if subsys.output == OutputOptions.RAW:
+    if subsys.output_type == OutputOptions.RAW:
         build_file_addresses = await MultiGet(
             Get(BuildFileAddress, Address, t.address) for t in targets
         )
         build_file_paths = {a.rel_path for a in build_file_addresses}
         digest_contents = await Get(DigestContents, PathGlobs(build_file_paths))
         # TODO: programmatically determine correct encoding
-        console.print_stdout(_render_raw(digest_contents))
-    elif subsys.output == OutputOptions.JSON:
-        console.print_stdout(_render_json(targets))
+        output = _render_raw(digest_contents)
+    elif subsys.output_type == OutputOptions.JSON:
+        output = _render_json(targets)
+
+    with subsys.output(console) as write_stdout:
+        write_stdout(output)
 
     return Peek(exit_code=0)
 
