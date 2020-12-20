@@ -2805,6 +2805,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.14.1",
  "tonic",
+ "tryfuture",
  "uuid",
  "walkdir 2.3.1",
  "workunit_store",
