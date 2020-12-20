@@ -30,6 +30,7 @@ task_executor = { path = "../../task_executor" }
 tempfile = "3"
 tokio-rustls = "0.14"
 tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tryfuture = { path = "../../tryfuture" }
 uuid = { version = "0.7.1", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
 

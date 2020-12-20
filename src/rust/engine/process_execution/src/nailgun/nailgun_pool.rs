@@ -12,16 +12,16 @@ use std::sync::Arc;
 
 use futures::future::BoxFuture;
 use futures::{FutureExt, TryFutureExt};
+use hashing::{Digest, Fingerprint};
+use lazy_static::lazy_static;
 use log::{debug, info};
 use parking_lot::Mutex;
 use regex::Regex;
-
-use hashing::{Digest, Fingerprint};
-use lazy_static::lazy_static;
-
-use crate::Process;
 use sha2::{Digest as Sha256Digest, Sha256};
 use store::Store;
+use tryfuture::try_future;
+
+use crate::Process;
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -104,20 +104,16 @@ impl NailgunPool {
   ) -> BoxFuture<'static, Result<Port, String>> {
     let processes = self.processes.clone();
 
-    let jdk_path = match startup_options.jdk_home.clone().ok_or_else(|| {
+    let jdk_path = try_future!(startup_options.jdk_home.clone().ok_or_else(|| {
       format!(
         "jdk_home is not set for nailgun server startup request {:#?}",
         &startup_options
       )
-    }) {
-      Ok(r) => r,
-      Err(err) => return futures::future::err(err).boxed(),
-    };
-    let requested_server_fingerprint =
-      match NailgunProcessFingerprint::new(nailgun_req_digest, jdk_path.clone()) {
-        Ok(r) => r,
-        Err(err) => return futures::future::err(err).boxed(),
-      };
+    }));
+    let requested_server_fingerprint = try_future!(NailgunProcessFingerprint::new(
+      nailgun_req_digest,
+      jdk_path.clone()
+    ));
 
     Self::materialize_workdir_for_server(
       store, workdir_path.clone(), jdk_path, input_files
