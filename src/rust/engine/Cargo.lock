@@ -195,13 +195,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "boxfuture"
-version = "0.0.1"
-dependencies = [
- "futures 0.1.29",
-]
-
-[[package]]
 name = "brfs"
 version = "0.0.1"
 dependencies = [
@@ -652,7 +645,6 @@ dependencies = [
  "async-trait",
  "async_latch",
  "async_semaphore",
- "boxfuture",
  "bytes",
  "concrete_time",
  "cpython",
@@ -660,7 +652,6 @@ dependencies = [
  "env_logger",
  "fnv",
  "fs",
- "futures 0.1.29",
  "futures 0.3.5",
  "graph",
  "hashing",
@@ -685,6 +676,7 @@ dependencies = [
  "testutil",
  "time",
  "tokio",
+ "tryfuture",
  "ui",
  "url",
  "uuid",
@@ -781,12 +773,10 @@ name = "fs_util"
 version = "0.0.1"
 dependencies = [
  "bazel_protos",
- "boxfuture",
  "bytes",
  "clap",
  "env_logger",
  "fs",
- "futures 0.1.29",
  "futures 0.3.5",
  "grpc_util",
  "hashing",
@@ -1538,7 +1528,6 @@ dependencies = [
  "async-stream",
  "bazel_protos",
  "bytes",
- "futures 0.1.29",
  "futures 0.3.5",
  "hashing",
  "hyper",
@@ -1959,13 +1948,11 @@ dependencies = [
  "async_semaphore",
  "bazel_protos",
  "bincode",
- "boxfuture",
  "bytes",
  "concrete_time",
  "derivative",
  "double-checked-cell-async",
  "fs",
- "futures 0.1.29",
  "futures 0.3.5",
  "grpc_util",
  "hashing",
@@ -1994,6 +1981,7 @@ dependencies = [
  "tokio-rustls 0.14.1",
  "tokio-util 0.2.0",
  "tonic",
+ "tryfuture",
  "uname",
  "uuid",
  "walkdir 2.3.1",
@@ -3338,6 +3326,13 @@ name = "try-lock"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
+
+[[package]]
+name = "tryfuture"
+version = "0.0.1"
+dependencies = [
+ "futures 0.3.5",
+]
 
 [[package]]
 name = "typenum"

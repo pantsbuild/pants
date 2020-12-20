@@ -35,15 +35,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bazel_protos::require_digest;
-use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
 use fs::{
   GlobExpansionConjunction, GlobMatching, PreparedPathGlobs, RelativePath, StrictGlobMatching,
 };
-use futures::compat::Future01CompatExt;
-use futures::future::TryFutureExt;
-use futures01::{future, Future};
+use futures::future::{self, BoxFuture};
+use futures::FutureExt;
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
@@ -523,7 +521,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())
           }
           "recursive-file-list" => {
-            let maybe_v = expand_files(store, digest).compat().await?;
+            let maybe_v = expand_files(store, digest).await?;
             maybe_v
               .map(|v| {
                 v.into_iter()
@@ -534,7 +532,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .map(String::into_bytes)
           }
           "recursive-file-list-with-digests" => {
-            let maybe_v = expand_files(store, digest).compat().await?;
+            let maybe_v = expand_files(store, digest).await?;
             maybe_v
               .map(|v| {
                 v.into_iter()
@@ -613,18 +611,17 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
   }
 }
 
-fn expand_files(
+async fn expand_files(
   store: Store,
   digest: Digest,
-) -> impl Future<Item = Option<Vec<(String, Digest)>>, Error = String> {
+) -> Result<Option<Vec<(String, Digest)>>, String> {
   let files = Arc::new(Mutex::new(Vec::new()));
-  expand_files_helper(store, digest, String::new(), files.clone()).map(|maybe| {
-    maybe.map(|()| {
-      let mut v = Arc::try_unwrap(files).unwrap().into_inner();
-      v.sort_by(|(l, _), (r, _)| l.cmp(r));
-      v
-    })
-  })
+  let vec_opt = expand_files_helper(store, digest, String::new(), files.clone()).await?;
+  Ok(vec_opt.map(|_| {
+    let mut v = Arc::try_unwrap(files).unwrap().into_inner();
+    v.sort_by(|(l, _), (r, _)| l.cmp(r));
+    v
+  }))
 }
 
 fn expand_files_helper(
@@ -632,8 +629,8 @@ fn expand_files_helper(
   digest: Digest,
   prefix: String,
   files: Arc<Mutex<Vec<(String, Digest)>>>,
-) -> BoxFuture<Option<()>, String> {
-  Box::pin(async move {
+) -> BoxFuture<'static, Result<Option<()>, String>> {
+  async move {
     let maybe_dir = store.load_directory(digest).await?;
     match maybe_dir {
       Some((dir, _metadata)) => {
@@ -652,7 +649,7 @@ fn expand_files_helper(
             digest.map(|digest| (subdir, digest))
           })
           .collect::<Result<Vec<_>, _>>()?;
-        future::join_all(
+        future::try_join_all(
           subdirs_and_digests
             .into_iter()
             .map(move |(subdir, digest)| {
@@ -665,15 +662,13 @@ fn expand_files_helper(
             })
             .collect::<Vec<_>>(),
         )
-        .map(|_| Some(()))
-        .compat()
         .await
+        .map(|_| Some(()))
       }
       None => Ok(None),
     }
-  })
-  .compat()
-  .to_boxed()
+  }
+  .boxed()
 }
 
 fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> fs::PosixFS {
