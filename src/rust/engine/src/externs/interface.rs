@@ -1049,29 +1049,6 @@ async fn workunit_to_py_value(
     ));
   }
 
-  if !workunit.observations.is_empty() {
-    let observation_entries = workunit
-      .observations
-      .iter()
-      .map(|(observation_name, observations)| {
-        (
-          externs::store_utf8(observation_name.as_str()),
-          externs::store_tuple(
-            observations
-              .iter()
-              .map(|o| externs::store_i64(*o))
-              .collect(),
-          ),
-        )
-      })
-      .collect();
-
-    dict_entries.push((
-      externs::store_utf8("observations"),
-      externs::store_dict(observation_entries)?,
-    ));
-  }
-
   externs::store_dict(dict_entries)
 }
 

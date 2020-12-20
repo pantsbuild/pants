@@ -73,7 +73,6 @@ pub struct Workunit {
   pub state: WorkunitState,
   pub metadata: WorkunitMetadata,
   pub counters: HashMap<Metric, u64>,
-  pub observations: HashMap<ObservationMetric, Vec<i64>>,
 }
 
 impl Workunit {
@@ -181,7 +180,6 @@ enum StoreMsg {
     Option<WorkunitMetadata>,
     SystemTime,
     HashMap<Metric, u64>,
-    HashMap<ObservationMetric, Vec<i64>>,
   ),
   Canceled(SpanId),
 }
@@ -227,8 +225,8 @@ impl StreamingWorkunitData {
         while let Ok(msg) = receiver.try_recv() {
           match msg {
             StoreMsg::Started(started) => started_messages.push(started),
-            StoreMsg::Completed(span, metadata, time, new_counters, new_observations) => {
-              completed_messages.push((span, metadata, time, new_counters, new_observations))
+            StoreMsg::Completed(span, metadata, time, new_counters) => {
+              completed_messages.push((span, metadata, time, new_counters))
             }
             StoreMsg::Canceled(..) => (),
           }
@@ -249,9 +247,7 @@ impl StreamingWorkunitData {
       }
 
       let mut completed_workunits: Vec<Workunit> = vec![];
-      for (span_id, new_metadata, end_time, new_counters, new_observations) in
-        completed_messages.into_iter()
-      {
+      for (span_id, new_metadata, end_time, new_counters) in completed_messages.into_iter() {
         match workunit_records.entry(span_id) {
           Entry::Vacant(_) => {
             log::warn!("No previously-started workunit found for id: {}", span_id);
@@ -274,7 +270,6 @@ impl StreamingWorkunitData {
               workunit.metadata = metadata;
             }
             workunit.counters = new_counters;
-            workunit.observations = new_observations;
             workunit_records.insert(span_id, workunit.clone());
 
             if should_emit(&workunit) {
@@ -333,7 +328,6 @@ impl HeavyHittersData {
     new_metadata: Option<WorkunitMetadata>,
     end_time: SystemTime,
     new_counters: HashMap<Metric, u64>,
-    new_observations: HashMap<ObservationMetric, Vec<i64>>,
     inner_store: &mut HeavyHittersInnerStore,
   ) {
     match inner_store.workunit_records.entry(span_id) {
@@ -357,7 +351,6 @@ impl HeavyHittersData {
           workunit.metadata = metadata;
         }
         workunit.counters = new_counters;
-        workunit.observations = new_observations;
         inner_store.workunit_records.insert(span_id, workunit);
       }
     }
@@ -369,13 +362,12 @@ impl HeavyHittersData {
     while let Ok(msg) = receiver.try_recv() {
       match msg {
         StoreMsg::Started(started) => Self::add_started_workunit_to_store(started, &mut inner),
-        StoreMsg::Completed(span_id, new_metadata, time, new_counters, new_observations) => {
+        StoreMsg::Completed(span_id, new_metadata, time, new_counters) => {
           Self::add_completed_workunit_to_store(
             span_id,
             new_metadata,
             time,
             new_counters,
-            new_observations,
             &mut inner,
           )
         }
@@ -565,7 +557,6 @@ impl WorkunitStore {
       },
       metadata,
       counters: HashMap::new(),
-      observations: HashMap::new(),
     };
 
     self
@@ -615,22 +606,12 @@ impl WorkunitStore {
     };
     workunit.counters = workunit_counters.clone();
 
-    let workunit_observations = {
-      let mut observations = self.observation_data.observations.lock();
-      match observations.entry(span_id) {
-        Entry::Vacant(_) => HashMap::new(),
-        Entry::Occupied(entry) => entry.remove(),
-      }
-    };
-    workunit.observations = workunit_observations.clone();
-
     let tx = self.streaming_workunit_data.msg_tx.lock();
     tx.send(StoreMsg::Completed(
       span_id,
       new_metadata.clone(),
       end_time,
       workunit_counters.clone(),
-      workunit_observations.clone(),
     ))
     .unwrap();
 
@@ -643,7 +624,6 @@ impl WorkunitStore {
         new_metadata,
         end_time,
         workunit_counters,
-        workunit_observations,
       ))
       .unwrap();
 
@@ -677,7 +657,6 @@ impl WorkunitStore {
       state: WorkunitState::Started { start_time },
       metadata,
       counters: HashMap::new(),
-      observations: HashMap::new(),
     };
 
     self
@@ -725,24 +704,21 @@ impl WorkunitStore {
     }
   }
 
-  pub fn record_observation(&self, observation_name: ObservationMetric, value: i64) {
-    let workunit_state = expect_workunit_state();
-    if let Some(span_id) = workunit_state.parent_id {
-      let mut observations = self.observation_data.observations.lock();
-      observations
-        .entry(span_id)
-        .and_modify(|entry_for_map| {
-          entry_for_map
-            .entry(observation_name)
-            .and_modify(|obs| obs.push(value))
-            .or_insert_with(|| vec![value]);
-        })
-        .or_insert_with(|| {
-          let mut m = HashMap::new();
-          m.insert(observation_name, vec![value]);
-          m
-        });
-    }
+  ///
+  /// Records an observation of a time-like metric into a histogram.
+  ///
+  pub fn record_observation(&self, metric: ObservationMetric, value: u64) {
+    let mut histograms_by_metric = self.observation_data.observations.lock();
+    histograms_by_metric
+      .entry(metric)
+      .and_modify(|h| {
+        let _ = h.record(value);
+      })
+      .or_insert_with(|| {
+        let mut h = hdrhistogram::Histogram::<u64>::new(3).expect("Failed to allocate histogram");
+        let _ = h.record(value);
+        h
+      });
   }
 }
 
@@ -861,8 +837,8 @@ impl Default for MetricsData {
 
 #[derive(Clone)]
 struct ObservationsData {
-  #[allow(clippy::type_complexity)]
-  observations: Arc<Mutex<HashMap<SpanId, HashMap<ObservationMetric, Vec<i64>>>>>,
+  /// Histograms for supported observation metrics.
+  observations: Arc<Mutex<HashMap<ObservationMetric, hdrhistogram::Histogram<u64>>>>,
 }
 
 impl Default for ObservationsData {

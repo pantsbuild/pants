@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
+use std::io::Cursor;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -11,6 +12,7 @@ use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::longrunning::Operation;
 use bazel_protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
+use bazel_protos::require_digest;
 use bytes::Bytes;
 use concrete_time::TimeSpan;
 use double_checked_cell_async::DoubleCheckedCell;
@@ -31,7 +33,6 @@ use remexec::{
   ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
 };
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
-<<<<<<< HEAD
 use tonic::metadata::{
   AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataValue, KeyAndValueRef, MetadataMap,
 };
@@ -39,19 +40,14 @@ use tonic::transport::{Channel, Endpoint};
 use tonic::{Code, Interceptor, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
-use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
-=======
 use workunit_store::{
   with_workunit, Metric, ObservationMetric, SpanId, WorkunitMetadata, WorkunitStore,
 };
->>>>>>> 3e166a239 (observation metric support)
 
 use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
   Process, ProcessCacheScope, ProcessMetadata,
 };
-use bazel_protos::require_digest;
-use std::io::Cursor;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -282,7 +278,12 @@ impl CommandRunner {
   // Outputs progress reported by the server and returns the next actionable operation
   // or gRPC status back to the main loop (plus the operation name so the main loop can
   // reconnect).
-  async fn wait_on_operation_stream<S>(&self, mut stream: S, context: &Context) -> StreamOutcome
+  async fn wait_on_operation_stream<S>(
+    &self,
+    mut stream: S,
+    build_id: &str,
+    context: &Context,
+  ) -> StreamOutcome
   where
     S: Stream<Item = Result<Operation, Status>> + Unpin,
   {
@@ -291,7 +292,7 @@ impl CommandRunner {
 
     trace!(
       "wait_on_operation_stream (build_id={}): monitoring stream",
-      context.build_id
+      build_id
     );
 
     loop {
@@ -303,9 +304,10 @@ impl CommandRunner {
           .as_millis()
           .try_into();
         if let Ok(obs) = timing {
-          context
-            .workunit_store
-            .record_observation(ObservationMetric::RemoteExecutionRPCFirstResponseTime, obs);
+          context.workunit_store.record_observation(
+            ObservationMetric::RemoteExecutionRPCFirstResponseTime,
+            obs as u64,
+          );
         }
       }
 
@@ -313,7 +315,7 @@ impl CommandRunner {
         Some(Ok(operation)) => {
           trace!(
             "wait_on_operation_stream (build_id={}): got operation: {:?}",
-            context.build_id,
+            build_id,
             &operation
           );
 
@@ -684,15 +686,10 @@ impl CommandRunner {
         Ok(operation_stream_response) => {
           // Monitor the operation stream until there is an actionable operation
           // or status to interpret.
-<<<<<<< HEAD
           let operation_stream = operation_stream_response.into_inner();
           let stream_outcome = self
-            .wait_on_operation_stream(operation_stream, &context.build_id)
+            .wait_on_operation_stream(operation_stream, &context.build_id, &context)
             .await;
-=======
-          let compat_stream = operation_stream.compat();
-          let stream_outcome = self.wait_on_operation_stream(compat_stream, &context).await;
->>>>>>> 3e166a239 (observation metric support)
 
           match stream_outcome {
             StreamOutcome::Complete(status) => {
