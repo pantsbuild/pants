@@ -6,8 +6,7 @@ import json
 import os
 from dataclasses import asdict, is_dataclass
 from enum import Enum
-from itertools import repeat
-from typing import Iterable, Tuple, TypeVar, Union, cast
+from typing import Iterable, Tuple, cast
 
 from pkg_resources import Requirement
 
@@ -53,22 +52,13 @@ class Peek(Goal):
     subsystem_cls = PeekSubsystem
 
 
-_T = TypeVar("_T")
-_U = TypeVar("_U")
+def _render_raw(fcs: Iterable[FileContent]) -> str:
+    sorted_fcs = sorted(fcs, key=lambda fc: fc.path)
+    rendereds = map(_render_raw_build_file, sorted_fcs)
+    return os.linesep.join(rendereds)
 
 
-def _intersperse(x: _T, ys: Iterable[_U]) -> Iterable[Union[_T, _U]]:
-    # Use stateful iterator to safely iterate through first item
-    it = iter(ys)
-    for y in it:
-        yield y
-        break
-    for x, y in zip(repeat(x), it):
-        yield x
-        yield y
-
-
-def _render_raw(fc: FileContent, encoding: str = "utf-8") -> str:
+def _render_raw_build_file(fc: FileContent, encoding: str = "utf-8") -> str:
     dashes = "-" * len(fc.path)
     content = fc.content.decode(encoding)
     parts = [dashes, fc.path, dashes, content]
@@ -138,9 +128,7 @@ async def peek(
         build_file_paths = {a.rel_path for a in build_file_addresses}
         digest_contents = await Get(DigestContents, PathGlobs(build_file_paths))
         # TODO: programmatically determine correct encoding
-        rendereds = map(_render_raw, digest_contents)
-        for output in _intersperse(os.linesep, rendereds):
-            console.print_stdout(output)
+        console.print_stdout(_render_raw(digest_contents))
     elif subsys.output == OutputOptions.JSON:
         console.print_stdout(_render_json(targets))
 
