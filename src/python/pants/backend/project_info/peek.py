@@ -6,7 +6,7 @@ import json
 import os
 from dataclasses import asdict, is_dataclass
 from enum import Enum
-from typing import Iterable, Tuple, cast
+from typing import Iterable, cast
 
 from pkg_resources import Requirement
 
@@ -42,6 +42,12 @@ class PeekSubsystem(Outputting, GoalSubsystem):
             default=OutputOptions.JSON,
             help="which output style peek should use",
         )
+        register(
+            "--exclude-defaults",
+            type=bool,
+            default=False,
+            help="whether to exclude values matching default field values from normalized output",
+        )
 
     @property
     def output_type(self) -> OutputOptions:
@@ -50,6 +56,10 @@ class PeekSubsystem(Outputting, GoalSubsystem):
         Must be renamed here because `output` conflicts with `Outputting` class.
         """
         return cast(OutputOptions, self.options.output)
+
+    @property
+    def exclude_defaults(self) -> bool:
+        return cast(bool, self.options.exclude_defaults)
 
 
 class Peek(Goal):
@@ -71,23 +81,26 @@ def _render_raw_build_file(fc: FileContent, encoding: str = "utf-8") -> str:
     return os.linesep.join(parts)
 
 
-def _render_json(ts: Iterable[Target]) -> str:
-    data = dict(map(_target_to_kv, ts))
+def _render_json(ts: Iterable[Target], exclude_defaults: bool = False) -> str:
+    targets = [_target_to_dict(t, exclude_defaults) for t in ts]
+    data = dict(targets=targets)
     return json.dumps(data, indent=2, cls=_PeekJsonEncoder)
 
 
 _nothing = object()
 
 
-def _target_to_kv(t: Target, _nothing: object = _nothing) -> Tuple[str, dict]:
-    d = {
-        k.alias: v.value
-        for k, v in t.field_values.items()
-        # don't report default values in normalized output
-        if getattr(k, "default", _nothing) != v.value
+def _target_to_dict(t: Target, exclude_defaults: bool = False, _nothing: object = _nothing) -> dict:
+    return {
+        "address": t.address.spec,
+        "target_type": t.alias,
+        **{
+            k.alias: v.value
+            for k, v in t.field_values.items()
+            # don't report default values in normalized output
+            if not (exclude_defaults and getattr(k, "default", _nothing) == v.value)
+        },
     }
-    d.update(address=t.address.spec, target_type=t.alias)
-    return t.address.spec, d
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
@@ -134,7 +147,7 @@ async def peek(
         # TODO: programmatically determine correct encoding
         output = _render_raw(digest_contents)
     elif subsys.output_type == OutputOptions.JSON:
-        output = _render_json(targets)
+        output = _render_json(targets, subsys.exclude_defaults)
 
     with subsys.output(console) as write_stdout:
         write_stdout(output)
