@@ -15,7 +15,7 @@ from pants.engine.console import Console
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import Target, Targets
+from pants.engine.target import Target, UnexpandedTargets
 
 
 class OutputOptions(Enum):
@@ -81,15 +81,17 @@ def _render_json(ts: Iterable[Target]) -> str:
     return json.dumps(data, indent=2, cls=_PeekJsonEncoder)
 
 
-def _target_to_kv(t: Target) -> Tuple[str, dict]:
-    nothing = object()
+_nothing = object()
+
+
+def _target_to_kv(t: Target, _nothing: object = _nothing) -> Tuple[str, dict]:
     d = {
         k.alias: v.value
         for k, v in t.field_values.items()
         # don't report default values in normalized output
-        if getattr(k, "default", nothing) != v.value
+        if getattr(k, "default", _nothing) != v.value
     }
-    d["alias"] = t.alias
+    d.update(address=t.address.spec, target_type=t.alias)
     return t.address.spec, d
 
 
@@ -124,7 +126,7 @@ async def peek(
     # TODO: better options for target selection (globs, transitive, etc)?
     targets: Iterable[Target]
     # TODO: handle target not found exceptions better here
-    targets = await Get(Targets, Addresses, addresses)
+    targets = await Get(UnexpandedTargets, Addresses, addresses)
 
     if subsys.output == OutputOptions.RAW:
         build_file_addresses = await MultiGet(
