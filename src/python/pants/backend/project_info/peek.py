@@ -1,12 +1,13 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import collections.abc
 import json
 import os
 from dataclasses import asdict, is_dataclass
 from enum import Enum
 from itertools import repeat
-from typing import Iterable, Mapping, Tuple, TypeVar, Union, cast
+from typing import Iterable, Tuple, TypeVar, Union, cast
 
 from pkg_resources import Requirement
 
@@ -39,7 +40,7 @@ class PeekSubsystem(GoalSubsystem):
         register(
             "--output",
             type=OutputOptions,
-            default=OutputOptions.RAW,
+            default=OutputOptions.JSON,
             help="which output style peek should use",
         )
 
@@ -104,8 +105,10 @@ class _PeekJsonEncoder(json.JSONEncoder):
         """Return a serializable object for o."""
         if is_dataclass(o):
             return asdict(o)
-        elif isinstance(o, Mapping):
+        elif isinstance(o, collections.abc.Mapping):
             return dict(o)
+        elif isinstance(o, collections.abc.Sequence):
+            return list(o)
         elif isinstance(o, self.safe_to_str_types):
             return str(o)
         else:
