@@ -83,7 +83,7 @@ def _render_raw_build_file(fc: FileContent, encoding: str = "utf-8") -> str:
 
 def _render_json(ts: Iterable[Target], exclude_defaults: bool = False) -> str:
     targets = [_target_to_dict(t, exclude_defaults) for t in ts]
-    data = dict(targets=targets)
+    data = dict(targets=targets, excludeDefaults=exclude_defaults)
     return json.dumps(data, indent=2, cls=_PeekJsonEncoder)
 
 
