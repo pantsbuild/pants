@@ -3797,6 +3797,7 @@ dependencies = [
 name = "workunit_store"
 version = "0.0.1"
 dependencies = [
+ "bytes",
  "concrete_time",
  "hashing",
  "log 0.4.11",

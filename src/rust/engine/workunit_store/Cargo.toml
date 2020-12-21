@@ -6,6 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+bytes = "0.5"
 concrete_time = { path = "../concrete_time" }
 hashing = { path = "../hashing" }
 hdrhistogram = "7.2"

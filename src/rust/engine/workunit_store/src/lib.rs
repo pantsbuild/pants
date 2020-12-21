@@ -45,6 +45,9 @@ use rand::Rng;
 use tokio::task_local;
 
 mod metrics;
+use bytes::buf::BufMutExt;
+use bytes::{Bytes, BytesMut};
+use hdrhistogram::serialization::Serializer;
 pub use metrics::{Metric, ObservationMetric};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -719,6 +722,36 @@ impl WorkunitStore {
         let _ = h.record(value);
         h
       });
+  }
+
+  ///
+  /// Return all observations in binary encoded format.
+  ///
+  pub fn encode_observations(&self) -> Result<HashMap<String, Bytes>, String> {
+    use hdrhistogram::serialization::V2Serializer;
+
+    let mut serializer = V2Serializer::new();
+
+    let mut result = HashMap::new();
+
+    let histograms_by_metric = self.observation_data.observations.lock();
+    for (metric, histogram) in histograms_by_metric.iter() {
+      let mut writer = BytesMut::new().writer();
+
+      serializer
+        .serialize(&histogram, &mut writer)
+        .map_err(|err| {
+          format!(
+            "Failed to encode histogram for key `{}`: {}",
+            metric.as_str(),
+            err
+          )
+        })?;
+
+      result.insert(metric.as_str().to_owned(), writer.into_inner().freeze());
+    }
+
+    Ok(result)
   }
 }
 

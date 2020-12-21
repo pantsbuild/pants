@@ -80,6 +80,7 @@ impl Metric {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum ObservationMetric {
+  TestObservation,
   RemoteExecutionRPCFirstResponseTime,
 }
 
@@ -88,6 +89,7 @@ impl ObservationMetric {
     use ObservationMetric::*;
 
     match *self {
+      TestObservation => "test_observation",
       RemoteExecutionRPCFirstResponseTime => "remote_execution_rpc_first_response_time",
     }
   }
