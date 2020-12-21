@@ -381,12 +381,12 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
             self.assertEqual(pants_run.stdout.strip(), "")
 
     @ensure_daemon
-    def test_list_changed(self):
+    def test_list_changed(self, use_pantsd: bool) -> None:
         deleted_file = "src/python/sources/sources.py"
 
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, deleted_file))
-            pants_run = self.run_pants(["--changed-since=HEAD", "list"])
+            pants_run = self.run_pants(["--changed-since=HEAD", "list"], use_pantsd=use_pantsd)
             pants_run.assert_success()
             self.assertEqual(pants_run.stdout.strip(), "src/python/sources")
 
