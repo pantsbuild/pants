@@ -175,14 +175,14 @@ class ReferenceGenerator:
                 )
             target["fields"] = sorted(target["fields"], key=lambda fld: fld["alias"])
 
-        return target_info
+        return cast(Dict[str, Dict[str, Any]], target_info)
 
     @property
     def category_id(self) -> str:
         """The id of the "Reference" category on the docsite."""
         if self._category_id is None:
             self._category_id = self._get_id("categories/reference")
-        return self._category_id
+        return cast(str, self._category_id)
 
     def _access_readme_api(self, url_suffix: str, method: str, payload: str) -> Dict:
         """Sends requests to the readme.io API."""
