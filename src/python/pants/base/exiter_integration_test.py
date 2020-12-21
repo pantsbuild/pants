@@ -5,13 +5,14 @@ from pants.testutil.pants_integration_test import ensure_daemon, run_pants
 
 
 @ensure_daemon
-def test_unicode_containing_exception():
+def test_unicode_containing_exception(use_pantsd: bool) -> None:
     pants_run = run_pants(
         [
             "--backend-packages=pants.backend.python",
             "run",
             "testprojects/src/python/unicode/compilation_failure/main.py",
-        ]
+        ],
+        use_pantsd=use_pantsd,
     )
     pants_run.assert_failure()
     assert "import sys¡" in pants_run.stderr

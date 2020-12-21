@@ -12,12 +12,7 @@ from typing import Iterator, List, Optional
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_integration_test import (
-    PantsResult,
-    ensure_daemon,
-    run_pants,
-    run_pants_with_workdir,
-)
+from pants.testutil.pants_integration_test import PantsResult, run_pants, run_pants_with_workdir
 from pants.testutil.test_base import AbstractTestGenerator
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
@@ -380,8 +375,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
             pants_run.assert_success()
             self.assertEqual(pants_run.stdout.strip(), "")
 
-    @ensure_daemon
-    def test_list_changed(self):
+    def test_list_changed(self) -> None:
         deleted_file = "src/python/sources/sources.py"
 
         with create_isolated_git_repo() as worktree:

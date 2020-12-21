@@ -25,13 +25,14 @@ def test_visualize_to():
 
 
 @ensure_daemon
-def test_graceful_termination():
+def test_graceful_termination(use_pantsd: bool) -> None:
     result = run_pants(
         [
             "--backend-packages=['pants.backend.python', 'internal_plugins.rules_for_testing']",
             "list-and-die-for-testing",
             "testprojects/src/python/hello/greet",
-        ]
+        ],
+        use_pantsd=use_pantsd,
     )
     result.assert_failure()
     assert result.stdout == "testprojects/src/python/hello/greet\n"
