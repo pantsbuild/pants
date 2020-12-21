@@ -49,7 +49,7 @@ class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMi
     alias = "handler"
     required = True
     value: str
-    description = (
+    help = (
         "Entry point to the AWS Lambda handler.\n\nYou can specify a full module like "
         "'path.to.module:handler_func' or use a shorthand to specify a file name, using the same "
         "syntax as the `sources` field, e.g. 'lambda.py:handler_func'.\n\nYou must use the file "
@@ -162,7 +162,7 @@ class PythonAwsLambdaRuntime(StringField):
     alias = "runtime"
     required = True
     value: str
-    description = (
+    help = (
         "The identifier of the AWS Lambda runtime to target (pythonX.Y). See "
         "https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html."
     )
@@ -204,7 +204,7 @@ class PythonAWSLambda(Target):
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaRuntime,
     )
-    description = (
+    help = (
         "A self-contained Python function suitable for uploading to AWS Lambda.\n\nSee "
         "https://www.pantsbuild.org/docs/awslambda-python."
     )

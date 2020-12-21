@@ -47,7 +47,7 @@ class PythonSources(Sources):
 
 class InterpreterConstraintsField(StringSequenceField):
     alias = "interpreter_constraints"
-    description = (
+    help = (
         "The Python interpreters this code is compatible with.\n\nEach element should be written "
         "in pip-style format, e.g. 'CPython==2.7.*' or 'CPython>=3.6,<4'. You can leave off "
         "`CPython` as a shorthand, e.g. '>=2.7' will be expanded to 'CPython>=2.7'.\n\nSpecify "
@@ -114,7 +114,7 @@ class PexBinaryDependencies(Dependencies):
 
 class PexEntryPointField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     alias = "entry_point"
-    description = (
+    help = (
         "The entry point for the binary, i.e. what gets run when executing `./my_binary.pex`.\n\n"
         "You can specify a full module like 'path.to.module' and 'path.to.module:func', or use a "
         "shorthand to specify a file name, using the same syntax as the `sources` field:\n\n    1) "
@@ -150,7 +150,7 @@ class ResolvePexEntryPointRequest:
 
 class PexPlatformsField(StringSequenceField):
     alias = "platforms"
-    description = (
+    help = (
         "The platforms the built PEX should be compatible with.\n\nThis defaults to the current "
         "platform, but can be overridden to different platforms. You can give a list of multiple "
         "platforms to create a multiplatform PEX.\n\nTo use wheels for specific "
@@ -167,7 +167,7 @@ class PexPlatformsField(StringSequenceField):
 class PexInheritPathField(StringField):
     alias = "inherit_path"
     valid_choices = ("false", "fallback", "prefer")
-    description = (
+    help = (
         "Whether to inherit the `sys.path` (aka PYTHONPATH) of the environment that the binary "
         "runs in.\n\nUse `false` to not inherit `sys.path`; use `fallback` to inherit `sys.path` "
         "after packaged dependencies; and use `prefer` to inherit `sys.path` before packaged "
@@ -188,7 +188,7 @@ class PexZipSafeField(BoolField):
     alias = "zip_safe"
     default = True
     value: bool
-    description = (
+    help = (
         "Whether or not this binary is safe to run in compacted (zip-file) form.\n\nIf the PEX is "
         "not zip safe, it will be written to disk prior to execution. You may need to mark "
         "`zip_safe=False` if you're having issues loading your code."
@@ -199,7 +199,7 @@ class PexAlwaysWriteCacheField(BoolField):
     alias = "always_write_cache"
     default = False
     value: bool
-    description = (
+    help = (
         "Whether PEX should always write the .deps cache of the .pex file to disk or not. This "
         "can use less memory in RAM-constrained environments."
     )
@@ -209,12 +209,12 @@ class PexIgnoreErrorsField(BoolField):
     alias = "ignore_errors"
     default = False
     value: bool
-    description = "Should PEX ignore when it cannot resolve dependencies?"
+    help = "Should PEX ignore when it cannot resolve dependencies?"
 
 
 class PexShebangField(StringField):
     alias = "shebang"
-    description = (
+    help = (
         "Set the generated PEX to use this shebang, rather than the default of PEX choosing a "
         "shebang based on the interpreter constraints.\n\nThis influences the behavior of running "
         "`./result.pex`. You can ignore the shebang by instead running "
@@ -224,7 +224,7 @@ class PexShebangField(StringField):
 
 class PexEmitWarningsField(BoolField):
     alias = "emit_warnings"
-    description = (
+    help = (
         "Whether or not to emit PEX warnings at runtime.\n\nThe default is determined by the "
         "option `emit_warnings` in the `[pex-binary-defaults]` scope."
     )
@@ -262,7 +262,7 @@ class PexBinary(Target):
         PexShebangField,
         PexEmitWarningsField,
     )
-    description = (
+    help = (
         "A Python target that can be converted into an executable PEX file.\n\nPEX files are "
         "self-contained executable files that contain a complete Python environment capable of "
         "running the target. For more information, see https://www.pantsbuild.org/docs/pex-files."
@@ -292,7 +292,7 @@ class PythonTestsDependencies(Dependencies):
 
 class PythonRuntimePackageDependencies(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
-    description = (
+    help = (
         "Addresses to targets that can be built with the `./pants package` goal and whose "
         "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
         "as if you had run `./pants package`. It will include the results in your test's chroot, "
@@ -304,7 +304,7 @@ class PythonRuntimePackageDependencies(SpecialCasedDependencies):
 
 class PythonTestsTimeout(IntField):
     alias = "timeout"
-    description = (
+    help = (
         "A timeout (in seconds) which covers the total runtime of all tests in this target.\n\n"
         "This only applies if the option `--pytest-timeouts` is set to True."
     )
@@ -344,7 +344,7 @@ class PythonTests(Target):
         PythonRuntimePackageDependencies,
         PythonTestsTimeout,
     )
-    description = (
+    help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
         "other than `conftest.py`, should go into a dedicated `python_library()` target and then "
         "be included in the `dependencies` field.\n\nSee "
@@ -369,7 +369,7 @@ class PythonLibrary(Target):
         Dependencies,
         PythonLibrarySources,
     )
-    description = (
+    help = (
         "Python source code.\n\nA `python_library` does not necessarily correspond to a "
         "distribution you publish (see `python_distribution` and `pex_binary` for that); multiple "
         "`python_library` targets may be packaged into a distribution or binary."
@@ -416,7 +416,7 @@ class PythonRequirementsField(Field):
     alias = "requirements"
     required = True
     value: Tuple[Requirement, ...]
-    description = (
+    help = (
         "A sequence of pip-style requirement strings, e.g. ['foo==1.8', "
         "'bar<=3 ; python_version<'3']."
     )
@@ -461,7 +461,7 @@ class PythonRequirementsField(Field):
 
 class ModuleMappingField(DictStringToStringSequenceField):
     alias = "module_mapping"
-    description = (
+    help = (
         "A mapping of requirement names to a list of the modules they provide.\n\nFor example, "
         '`{"ansicolors": ["colors"]}`. Any unspecified requirements will use the requirement '
         'name as the default module, e.g. "Django" will default to `["django"]`.\n\nThis is '
@@ -472,7 +472,7 @@ class ModuleMappingField(DictStringToStringSequenceField):
 class PythonRequirementLibrary(Target):
     alias = "python_requirement_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonRequirementsField, ModuleMappingField)
-    description = (
+    help = (
         "Python requirements installable by pip.\n\nThis target is useful when you want to declare "
         "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "
         "already, you can instead use the macro `python_requirements()` to convert each "
@@ -493,7 +493,7 @@ class PythonRequirementsFileSources(Sources):
 class PythonRequirementsFile(Target):
     alias = "_python_requirements_file"
     core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSources)
-    description = "A private, helper target type for requirements.txt files."
+    help = "A private, helper target type for requirements.txt files."
 
 
 # -----------------------------------------------------------------------------------------------
@@ -508,10 +508,10 @@ class PythonDistributionDependencies(Dependencies):
 
 class PythonProvidesField(ScalarField, ProvidesField):
     expected_type = PythonArtifact
-    expected_type_description = "setup_py(name='my-dist', **kwargs)"
+    expected_type_help = "setup_py(name='my-dist', **kwargs)"
     value: PythonArtifact
     required = True
-    description = (
+    help = (
         "The setup.py kwargs for the external artifact built from this target.\n\nSee "
         "https://www.pantsbuild.org/docs/python-setup-py-goal."
     )
@@ -525,11 +525,11 @@ class PythonProvidesField(ScalarField, ProvidesField):
 
 class SetupPyCommandsField(StringSequenceField):
     alias = "setup_py_commands"
-    expected_type_description = (
+    expected_type_help = (
         "an iterable of string commands to invoke setup.py with, or "
         "an empty list to just create a chroot with a setup() function."
     )
-    description = (
+    help = (
         "The runtime commands to invoke setup.py with to create the distribution, e.g. "
         '["bdist_wheel", "--python-tag=py36.py37", "sdist"].\n\nIf empty or unspecified, '
         "will just create a chroot with a setup() function.\n\nSee "
@@ -545,4 +545,4 @@ class PythonDistribution(Target):
         PythonProvidesField,
         SetupPyCommandsField,
     )
-    description = "A publishable Python setuptools distribution (e.g. an sdist or wheel)."
+    help = "A publishable Python setuptools distribution (e.g. an sdist or wheel)."

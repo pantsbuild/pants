@@ -166,8 +166,8 @@ class TargetFieldHelpInfo:
         # This is a an awkward edge of our heuristic and it's not intentional since these core
         # `Field` types have documentation oriented to the plugin author and not the end user
         # filling in fields in a BUILD file.
-        if hasattr(field, "description"):
-            description = field.description
+        if hasattr(field, "help"):
+            description = field.help  # type: ignore[attr-defined]
         else:
             description = get_docstring(
                 field,
@@ -231,8 +231,9 @@ class TargetTypeHelpInfo:
     def create(
         cls, target_type: Type[Target], *, union_membership: UnionMembership
     ) -> TargetTypeHelpInfo:
-        if hasattr(target_type, "description"):
-            description = target_type.description
+        summary: Optional[str]
+        if hasattr(target_type, "help"):
+            description = target_type.help  # type: ignore[attr-defined]
             summary = first_paragraph(description)
         else:
             description = get_docstring(target_type)
