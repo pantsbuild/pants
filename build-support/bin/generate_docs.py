@@ -169,7 +169,7 @@ class ReferenceGenerator:
         for target in target_info.values():
             for field in target["fields"]:
                 # Combine the `default` and `required` properties.
-                default_str = html.escape(str(field['default']), quote=False)
+                default_str = html.escape(str(field["default"]), quote=False)
                 field["default_or_required"] = (
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
