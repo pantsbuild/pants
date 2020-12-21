@@ -11,7 +11,7 @@ import os
 import pkgutil
 import sys
 from pathlib import Path, PosixPath
-from typing import Dict, Iterable, Optional, cast
+from typing import Any, Dict, Iterable, Optional, cast
 
 import pystache
 import requests
@@ -101,27 +101,30 @@ class ReferenceGenerator:
 
         options_scope_tpl = get_tpl("options_scope_reference.md.mustache")
         single_option_tpl = get_tpl("single_option_reference.md.mustache")
+        target_tpl = get_tpl("target_reference.md.mustache")
         self._renderer = pystache.Renderer(
-            partials={"scoped_options": options_scope_tpl, "single_option": single_option_tpl}
+            partials={
+                "scoped_options": options_scope_tpl,
+                "single_option": single_option_tpl,
+                "target": target_tpl,
+            }
         )
         self._category_id = None  # Fetched lazily.
 
         # Load the data.
-        if self._args.input is None:
-            json_bytes = sys.stdin.read()
-        else:
-            json_bytes = Path(self._args.input).read_bytes()
-        self._help_info = self.process_input(json_bytes.decode(), self._args.sync)
+        json_str = (
+            sys.stdin.read() if self._args.input is None else Path(self._args.input).read_text()
+        )
+        self._options_info = self.process_options_input(json_str, sync=self._args.sync)
+        self._targets_info = self.process_targets_input(json_str)
 
     @staticmethod
-    def _link(scope: str, sync: bool) -> str:
+    def _link(scope: str, *, sync: bool) -> str:
         # docsite pages link to the slug, local pages to the .md source.
         return f"reference-{scope}" if sync else f"{scope}.md"
 
     @classmethod
-    def process_input(cls, json_str: str, sync: bool) -> Dict:
-        """Process the input, to make it easier to work with in the mustache template."""
-
+    def process_options_input(cls, json_str: str, *, sync: bool) -> Dict:
         help_info = json.loads(json_str)
         scope_to_help_info = help_info["scope_to_help_info"]
 
@@ -131,7 +134,7 @@ class ReferenceGenerator:
         for goal, goal_info in help_info["name_to_goal_info"].items():
             consumed_scopes = sorted(goal_info["consumed_scopes"])
             linked_consumed_scopes = [
-                f"[{cs}]({cls._link(cs, sync)})" for cs in consumed_scopes if cs
+                f"[{cs}]({cls._link(cs, sync=sync)})" for cs in consumed_scopes if cs
             ]
             comma_separated_consumed_scopes = ", ".join(linked_consumed_scopes)
             scope_to_help_info[goal][
@@ -160,16 +163,26 @@ class ReferenceGenerator:
 
         return cast(Dict, help_info)
 
+    @classmethod
+    def process_targets_input(cls, json_str: str) -> Dict[str, Dict[str, Any]]:
+        target_info = json.loads(json_str)["name_to_target_type_info"]
+        for target in target_info.values():
+            for field in target["fields"]:
+                # Combine the `default` and `required` properties.
+                default_str = html.escape(str(field["default"]), quote=False)
+                field["default_or_required"] = (
+                    "required" if field["required"] else f"default: <code>{default_str}</code>"
+                )
+            target["fields"] = sorted(target["fields"], key=lambda fld: fld["alias"])
+
+        return cast(Dict[str, Dict[str, Any]], target_info)
+
     @property
-    def category_id(self):
+    def category_id(self) -> str:
         """The id of the "Reference" category on the docsite."""
         if self._category_id is None:
             self._category_id = self._get_id("categories/reference")
-        return self._category_id
-
-    def _render_body(self, scope_help_info: Dict) -> str:
-        """Renders the body of a single options help page."""
-        return cast(str, self._renderer.render("{{> scoped_options}}", scope_help_info))
+        return cast(str, self._category_id)
 
     def _access_readme_api(self, url_suffix: str, method: str, payload: str) -> Dict:
         """Sends requests to the readme.io API."""
@@ -250,42 +263,57 @@ class ReferenceGenerator:
         """Returns the id of the entity at the specified readme.io API url."""
         return cast(str, self._access_readme_api(url, "GET", "")["_id"])
 
+    def _render_target(self, alias: str) -> str:
+        return cast(str, self._renderer.render("{{> target}}", self._targets_info[alias]))
+
+    def _render_options_body(self, scope_help_info: Dict) -> str:
+        """Renders the body of a single options help page."""
+        return cast(str, self._renderer.render("{{> scoped_options}}", scope_help_info))
+
     @classmethod
-    def _render_parent_page_body(cls, items: Iterable[str], sync: bool) -> str:
+    def _render_parent_page_body(cls, items: Iterable[str], *, sync: bool) -> str:
         """Returns the body of a parent page for the given items."""
         # The page just lists the items, with links to the page for each one.
-        lines = [f"- [{item}]({cls._link(item, sync)})\n" for item in items]
+        lines = [f"- [{item}]({cls._link(item, sync=sync)})" for item in items]
         return "\n".join(lines)
 
-    def render(self):
+    def render(self) -> None:
         """Renders the pages to local disk.
 
         Useful for debugging and iterating on the markdown.
         """
         output_dir = Path(self._args.output)
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         goals = [
-            scope for scope, shi in self._help_info["scope_to_help_info"].items() if shi["is_goal"]
+            scope
+            for scope, shi in self._options_info["scope_to_help_info"].items()
+            if shi["is_goal"]
         ]
         subsystems = [
             scope
-            for scope, shi in self._help_info["scope_to_help_info"].items()
+            for scope, shi in self._options_info["scope_to_help_info"].items()
             if scope and not shi["is_goal"]
         ]
 
-        def write(filename, content):
+        def write(filename: str, content: str) -> None:
             path = output_dir / filename
-            with open(str(path), "w") as fp:
-                fp.write(content)
+            path.write_text(content)
             logger.info(f"Wrote {path}")
 
         write("goals-index.md", self._render_parent_page_body(sorted(goals), sync=False))
         write("subsystems-index.md", self._render_parent_page_body(sorted(subsystems), sync=False))
-        for shi in self._help_info["scope_to_help_info"].values():
-            write(f"{shi['scope'] or 'GLOBAL'}.md", self._render_body(shi))
+        for shi in self._options_info["scope_to_help_info"].values():
+            write(f"{shi['scope'] or 'GLOBAL'}.md", self._render_options_body(shi))
 
-    def sync(self):
+        write(
+            "targets-index.md",
+            self._render_parent_page_body(sorted(self._targets_info.keys()), sync=False),
+        )
+        for alias in self._targets_info.keys():
+            write(f"{alias}.md", self._render_target(alias))
+
+    def sync(self) -> None:
         """Render the pages and sync them to the live docsite.
 
         All pages live under the "reference" category.
@@ -315,7 +343,7 @@ class ReferenceGenerator:
         # Partition the scopes into goals and subsystems.
         goals = {}
         subsystems = {}
-        for scope, shi in self._help_info["scope_to_help_info"].items():
+        for scope, shi in self._options_info["scope_to_help_info"].items():
             if scope == "":
                 continue  # We handle the global scope separately.
             if shi["is_goal"]:
@@ -327,32 +355,36 @@ class ReferenceGenerator:
         self._create(
             parent_doc_id=None,
             slug_suffix="global",
-            title="Global",
-            body=self._render_body(self._help_info["scope_to_help_info"][""]),
+            title="Global options",
+            body=self._render_options_body(self._options_info["scope_to_help_info"][""]),
         )
         self._create(
             parent_doc_id=None,
             slug_suffix="all-goals",
             title="Goals",
-            body=self._render_parent_page_body(sorted(scope for scope in goals.keys()), sync=True),
+            body=self._render_parent_page_body(sorted(goals.keys()), sync=True),
         )
         self._create(
             parent_doc_id=None,
             slug_suffix="all-subsystems",
             title="Subsystems",
-            body=self._render_parent_page_body(
-                sorted(scope for scope in subsystems.keys()), sync=True
-            ),
+            body=self._render_parent_page_body(sorted(subsystems.keys()), sync=True),
+        )
+        self._create(
+            parent_doc_id=None,
+            slug_suffix="all-targets",
+            title="Targets",
+            body=self._render_parent_page_body(sorted(self._targets_info.keys()), sync=True),
         )
 
-        # Create the individual goal/subsystem docs.
+        # Create the individual goal/subsystem/target docs.
         all_goals_doc_id = self._get_id("docs/reference-all-goals")
         for scope, shi in sorted(goals.items()):
             self._create(
                 parent_doc_id=all_goals_doc_id,
                 slug_suffix=scope,
                 title=scope,
-                body=self._render_body(shi),
+                body=self._render_options_body(shi),
             )
 
         all_subsystems_doc_id = self._get_id("docs/reference-all-subsystems")
@@ -361,10 +393,19 @@ class ReferenceGenerator:
                 parent_doc_id=all_subsystems_doc_id,
                 slug_suffix=scope,
                 title=scope,
-                body=self._render_body(shi),
+                body=self._render_options_body(shi),
             )
 
-    def main(self):
+        all_targets_doc_id = self._get_id("docs/reference-all-targets")
+        for alias, data in sorted(self._targets_info.items()):
+            self._create(
+                parent_doc_id=all_targets_doc_id,
+                slug_suffix=alias,
+                title=alias,
+                body=self._render_target(alias),
+            )
+
+    def main(self) -> None:
         if self._args.sync:
             self.sync()
         else:
