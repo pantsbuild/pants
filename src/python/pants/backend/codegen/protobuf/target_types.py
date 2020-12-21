@@ -16,17 +16,15 @@ class ProtobufSources(Sources):
 
 
 class ProtobufGrpcToggle(BoolField):
-    """Whether to generate gRPC code or not."""
-
     alias = "grpc"
     default = False
+    description = "Whether to generate gRPC code or not."
 
 
 class ProtobufLibrary(Target):
-    """Protobuf files used to generate various languages.
-
-    See https://www.pantsbuild.org/docs/protobuf.
-    """
-
     alias = "protobuf_library"
     core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources, ProtobufGrpcToggle)
+    description = (
+        "Protobuf files used to generate various languages.\n\nSee "
+        "https://www.pantsbuild.org/docs/protobuf."
+    )

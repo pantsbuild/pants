@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from textwrap import dedent
 
 from pants.core.goals.package import (
     BuiltPackage,
@@ -42,15 +43,14 @@ class FilesSources(Sources):
 
 
 class Files(Target):
-    """Loose files that live outside code packages.
-
-    Files are placed directly in archives, outside of code artifacts such as Python wheels or JVM
-    JARs. The sources of a `files` target are accessed via filesystem APIs, such as Python's
-    `open()`, via paths relative to the repo root.
-    """
-
     alias = "files"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FilesSources)
+    description = (
+        "Loose files that live outside code packages.\n\nFiles are placed directly in archives, "
+        "outside of code artifacts such as Python wheels or JVM JARs. The sources of a `files` "
+        "target are accessed via filesystem APIs, such as Python's `open()`, via paths relative to "
+        "the repo root."
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -65,77 +65,37 @@ class RelocatedFilesSources(Sources):
 
 
 class RelocatedFilesOriginalTargets(SpecialCasedDependencies):
-    """Addresses to the original `files()` targets that you want to relocate, such as
-    `['//:json_files']`.
-
-    Every target will be relocated using the same mapping. This means that every target must include
-    the value from the `src` field in their original path.
-    """
-
     alias = "files_targets"
     required = True
+    description = (
+        "Addresses to the original `files()` targets that you want to relocate, such as "
+        "`['//:json_files']`.\n\nEvery target will be relocated using the same mapping. This means "
+        "that every target must include the value from the `src` field in their original path."
+    )
 
 
 class RelocatedFilesSrcField(StringField):
-    """The original prefix that you want to replace, such as `src/resources`.
-
-    You can set this field to `""` to preserve the original path; the value in the `dest` field will
-    then be added to the beginning of this original path.
-    """
-
     alias = "src"
     required = True
+    description = (
+        "The original prefix that you want to replace, such as `src/resources`.\n\nYou can set "
+        "this field to `"
+        "` to preserve the original path; the value in the `dest` field will "
+        "then be added to the beginning of this original path."
+    )
 
 
 class RelocatedFilesDestField(StringField):
-    """The new prefix that you want to add to the beginning of the path, such as `data`.
-
-    You can set this field to `""` to avoid adding any new values to the path; the value in the
-    `src` field will then be stripped, rather than replaced.
-    """
-
     alias = "dest"
     required = True
+    description = (
+        "The new prefix that you want to add to the beginning of the path, such as `data`.\n\nYou "
+        'can set this field to "" to avoid adding any new values to the path; the value in the '
+        "`src` field will then be stripped, rather than replaced."
+    )
 
 
 class RelocatedFiles(Target):
-    """Loose files with path manipulation applied.
-
-    Allows you to relocate the files at runtime to something more convenient than
-    their actual paths in your project.
-
-    For example, you can relocate `src/resources/project1/data.json` to instead be
-    `resources/data.json`. Your other target types can then add this target to their
-    `dependencies` field, rather than using the original `files` target.
-
-    To remove a prefix:
-
-        # Results in `data.json`.
-        relocated_files(
-            file_targets=["src/resources/project1:target"],
-            src="src/resources/project1",
-            dest="",
-        )
-
-    To add a prefix:
-
-        # Results in `images/logo.svg`.
-        relocated_files(
-            file_targets=["//:logo"],
-            src="",
-            dest="images",
-        )
-
-    To replace a prefix:
-
-        # Results in `new_prefix/project1/data.json`.
-        relocated_files(
-            file_targets=["src/resources/project1:target"],
-            src="src/resources",
-            dest="new_prefix",
-        )
-    """
-
     alias = "relocated_files"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -143,6 +103,42 @@ class RelocatedFiles(Target):
         RelocatedFilesOriginalTargets,
         RelocatedFilesSrcField,
         RelocatedFilesDestField,
+    )
+    description = (
+        "Loose files with path manipulation applied.\n\nAllows you to relocate the files at "
+        "runtime to something more convenient than their actual paths in your project.\n\nFor "
+        "example, you can relocate `src/resources/project1/data.json` to instead be "
+        "`resources/data.json`. Your other target types can then add this target to their "
+        "`dependencies` field, rather than using the original `files` target.\n\n"
+    ) + dedent(
+        """\
+        To remove a prefix:
+
+            # Results in `data.json`.
+            relocated_files(
+                file_targets=["src/resources/project1:target"],
+                src="src/resources/project1",
+                dest="",
+            )
+
+        To add a prefix:
+
+            # Results in `images/logo.svg`.
+            relocated_files(
+                file_targets=["//:logo"],
+                src="",
+                dest="images",
+            )
+
+        To replace a prefix:
+
+            # Results in `new_prefix/project1/data.json`.
+            relocated_files(
+                file_targets=["src/resources/project1:target"],
+                src="src/resources",
+                dest="new_prefix",
+            )
+        """
     )
 
 
@@ -195,15 +191,14 @@ class ResourcesSources(Sources):
 
 
 class Resources(Target):
-    """Data emebdded in a code package and accessed in a location-independent manner.
-
-    Resources are embedded in code artifacts such as Python wheels or JVM JARs. The sources of a
-    `resources` target are accessed via language-specific resource APIs, such as Python's pkgutil or
-    JVM's ClassLoader, via paths relative to the target's source root.
-    """
-
     alias = "resources"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourcesSources)
+    description = (
+        "Data embedded in a code package and accessed in a location-independent manner.\n\n"
+        "Resources are embedded in code artifacts such as Python wheels or JVM JARs. The sources "
+        "of a `resources` target are accessed via language-specific resource APIs, such as "
+        "Python's pkgutil or JVM's ClassLoader, via paths relative to the target's source root."
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -212,14 +207,13 @@ class Resources(Target):
 
 
 class GenericTarget(Target):
-    """A generic target with no specific type.
-
-    This can be used as a generic "bag of dependencies", i.e. you can group several different
-    targets into one single target so that your other targets only need to depend on one thing.
-    """
-
     alias = "target"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies)
+    description = (
+        'A generic target with no specific type.\n\nThis can be used as a generic "bag of '
+        'dependencies", i.e. you can group several different targets into one single target so '
+        "that your other targets only need to depend on one thing."
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -228,45 +222,38 @@ class GenericTarget(Target):
 
 
 class ArchivePackages(SpecialCasedDependencies):
-    """Addresses to any targets that can be built with `./pants package`.
-
-    Pants will build the assets as if you had run `./pants package`. It will include the
-    results in your archive using the same name they would normally have, but without the
-    `--distdir` prefix (e.g. `dist/`).
-
-    You can include anything that can be built by `./pants package`, e.g. a `pex_binary`,
-    `python_awslambda`, or even another `archive`.
-    """
-
     alias = "packages"
+    description = (
+        "Addresses to any targets that can be built with `./pants package`, e.g. "
+        '`["project:app"]`.\n\nPants will build the assets as if you had run `./pants package`. '
+        "It will include the results in your archive using the same name they would normally have, "
+        "but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can "
+        "be built by `./pants package`, e.g. a `pex_binary`, `python_awslambda`, or even another "
+        "`archive`."
+    )
 
 
 class ArchiveFiles(SpecialCasedDependencies):
-    """Addresses to any `files` or `relocated_files` targets to include in the archive, e.g.
-    `["resources:logo"]`.
-
-    This is useful to include any loose files, like data files, image assets, or config files.
-
-    This will ignore any targets that are not `files` or `relocated_files` targets. If you instead
-    want those files included in any packages specified in the `packages` field for this target,
-    then use a `resources` target and have the original package depend on the resources.
-    """
-
     alias = "files"
+    description = (
+        "Addresses to any `files` or `relocated_files` targets to include in the archive, e.g. "
+        '`["resources:logo"]`.\n\nThis is useful to include any loose files, like data files, '
+        "image assets, or config files.\n\nThis will ignore any targets that are not `files` or "
+        "`relocated_files` targets. If you instead want those files included in any packages "
+        "specified in the `packages` field for this target, then use a `resources` target and have "
+        "the original package depend on the resources."
+    )
 
 
 class ArchiveFormatField(StringField):
-    """The type of archive file to be generated."""
-
     alias = "format"
     valid_choices = ArchiveFormat
     required = True
     value: str
+    description = "The type of archive file to be generated."
 
 
 class ArchiveTarget(Target):
-    """A ZIP or TAR file containing loose files and code packages."""
-
     alias = "archive"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -275,6 +262,7 @@ class ArchiveTarget(Target):
         ArchiveFiles,
         ArchiveFormatField,
     )
+    description = "A ZIP or TAR file containing loose files and code packages."
 
 
 @dataclass(frozen=True)

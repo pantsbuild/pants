@@ -46,17 +46,15 @@ class PythonAwsLambdaSources(PythonSources):
 
 
 class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
-    """Entry point to the AWS Lambda handler.
-
-    You can specify a full module like 'path.to.module:handler_func' or use a shorthand to specify a
-    file name, using the same syntax as the `sources` field, e.g. 'lambda.py:handler_func'.
-
-    You must use the file name shorthand for file arguments to work with this target.
-    """
-
     alias = "handler"
     required = True
     value: str
+    description = (
+        "Entry point to the AWS Lambda handler.\n\nYou can specify a full module like "
+        "'path.to.module:handler_func' or use a shorthand to specify a file name, using the same "
+        "syntax as the `sources` field, e.g. 'lambda.py:handler_func'.\n\nYou must use the file "
+        "name shorthand for file arguments to work with this target."
+    )
 
     @classmethod
     def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
@@ -159,16 +157,15 @@ async def inject_lambda_handler_dependency(
 
 
 class PythonAwsLambdaRuntime(StringField):
-    """The identifier of the AWS Lambda runtime to target (pythonX.Y).
-
-    See https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html.
-    """
-
     PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
 
     alias = "runtime"
     required = True
     value: str
+    description = (
+        "The identifier of the AWS Lambda runtime to target (pythonX.Y). See "
+        "https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html."
+    )
 
     @classmethod
     def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
@@ -197,11 +194,6 @@ class DeprecatedAwsLambdaInterpreterConstraints(InterpreterConstraintsField):
 
 
 class PythonAWSLambda(Target):
-    """A self-contained Python function suitable for uploading to AWS Lambda.
-
-    See https://www.pantsbuild.org/docs/awslambda-python.
-    """
-
     alias = "python_awslambda"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -211,6 +203,10 @@ class PythonAWSLambda(Target):
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaRuntime,
+    )
+    description = (
+        "A self-contained Python function suitable for uploading to AWS Lambda.\n\nSee "
+        "https://www.pantsbuild.org/docs/awslambda-python."
     )
 
 
