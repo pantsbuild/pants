@@ -49,9 +49,6 @@ pub mod gen {
   }
 }
 
-mod metadata;
-pub use metadata::call_option;
-
 mod verification;
 pub use crate::verification::verify_directory_canonical;
 #[cfg(test)]

@@ -10,7 +10,7 @@ def test_unicode_containing_exception():
         [
             "--backend-packages=pants.backend.python",
             "run",
-            "testprojects/src/python/unicode/compilation_failure",
+            "testprojects/src/python/unicode/compilation_failure/main.py",
         ]
     )
     pants_run.assert_failure()

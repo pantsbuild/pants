@@ -10,18 +10,15 @@ async-trait = "0.1"
 walkdir = "2"
 async_semaphore = { path = "../async_semaphore" }
 bazel_protos = { path = "bazel_protos" }
-boxfuture = { path = "../boxfuture" }
 bytes = "0.5"
 derivative = "2.1.1"
 grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
-futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
 hashing = { path = "../hashing" }
 libc = "0.2.39"
 log = "0.4"
 nails = "0.8"
-protobuf = { version = "2.0.6", features = ["with-bytes"] }
 sha2 = "0.9"
 sharded_lmdb = {  path = "../sharded_lmdb" }
 shell-quote = "0.1.0"
@@ -43,9 +40,10 @@ serde = "1.0.104"
 bincode = "1.2.1"
 double-checked-cell-async = "2.0"
 rand = "0.6"
-prost = "0.6"
+prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 prost-types = "0.6"
 tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tryfuture = { path = "../tryfuture" }
 
 [dev-dependencies]
 maplit = "1.0.1"

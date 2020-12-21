@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.target_types import (
+    DeprecatedPexBinarySources,
     PexAlwaysWriteCacheField,
     PexBinaryDefaults,
-    PexBinarySources,
     PexEmitWarningsField,
     PexEntryPointField,
     PexIgnoreErrorsField,
@@ -39,9 +39,9 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
-    required_fields = (PexEntryPointField, PexBinarySources)
+    required_fields = (PexEntryPointField, DeprecatedPexBinarySources)
 
-    sources: PexBinarySources
+    sources: DeprecatedPexBinarySources
     entry_point: PexEntryPointField
 
     output_path: OutputPathField

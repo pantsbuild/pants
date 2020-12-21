@@ -1,7 +1,5 @@
-use prost::Message;
-
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bytes::BytesMut;
+use grpc_util::prost::MessageExt;
 
 #[derive(Clone)]
 pub struct TestData {
@@ -303,12 +301,7 @@ impl TestDirectory {
   }
 
   pub fn bytes(&self) -> bytes::Bytes {
-    let mut buf = BytesMut::with_capacity(self.directory.encoded_len());
-    self
-      .directory
-      .encode(&mut buf)
-      .expect("Error serializing proto");
-    buf.freeze()
+    self.directory.to_bytes()
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
@@ -336,9 +329,7 @@ impl TestTree {
 
 impl TestTree {
   pub fn bytes(&self) -> bytes::Bytes {
-    let mut buf = BytesMut::with_capacity(self.tree.encoded_len());
-    self.tree.encode(&mut buf).expect("Error serializing proto");
-    buf.freeze()
+    self.tree.to_bytes()
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {

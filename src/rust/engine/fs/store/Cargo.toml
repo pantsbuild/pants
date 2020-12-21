@@ -8,13 +8,11 @@ edition = "2018"
 async-stream = "0.2"
 async-trait = "0.1"
 bazel_protos = { path = "../../process_execution/bazel_protos" }
-boxfuture = { path = "../../boxfuture" }
 bytes = "0.5"
 concrete_time = { path = "../../concrete_time" }
 grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
+futures = { version = "0.3" }
 glob = "0.2.11"
 hashing = { path = "../../hashing" }
 indexmap = "1.4"
@@ -22,7 +20,7 @@ itertools = "0.7.2"
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
 log = "0.4"
 parking_lot = "0.11"
-prost = "0.6"
+prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 prost-types = "0.6"
 serverset = { path = "../../serverset" }
 serde = "1.0"
@@ -32,6 +30,7 @@ task_executor = { path = "../../task_executor" }
 tempfile = "3"
 tokio-rustls = "0.14"
 tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tryfuture = { path = "../../tryfuture" }
 uuid = { version = "0.7.1", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
 

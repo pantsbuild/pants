@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
@@ -237,17 +236,15 @@ impl CapturedWorkdir for CommandRunner {
       .clone()
       .with_acquired(move |_id| {
         // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
-        nailgun_pool
-          .connect(
-            nailgun_name.clone(),
-            nailgun_req,
-            workdir_for_this_nailgun,
-            nailgun_req_digest,
-            build_id,
-            store,
-            req.input_files,
-          )
-          .compat()
+        nailgun_pool.connect(
+          nailgun_name.clone(),
+          nailgun_req,
+          workdir_for_this_nailgun,
+          nailgun_req_digest,
+          build_id,
+          store,
+          req.input_files,
+        )
       })
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))

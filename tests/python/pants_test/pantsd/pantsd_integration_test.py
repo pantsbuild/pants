@@ -77,7 +77,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             # Run target that throws an exception in pants.
             self.run_pants_with_workdir(
-                ["lint", "testprojects/src/python/unicode/compilation_failure"],
+                ["lint", "testprojects/src/python/unicode/compilation_failure/main:lib"],
                 workdir=workdir,
                 config=pantsd_config,
             ).assert_failure()

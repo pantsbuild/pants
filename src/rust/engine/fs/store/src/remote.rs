@@ -9,9 +9,9 @@ use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use bazel_protos::{self};
 use bytes::{Bytes, BytesMut};
-use futures::future::{FutureExt, TryFutureExt};
+use futures::future::TryFutureExt;
+use futures::Future;
 use futures::StreamExt;
-use futures01::Future;
 use hashing::Digest;
 use itertools::{Either, Itertools};
 use log::Level;
@@ -193,7 +193,7 @@ impl ByteStore {
           finish_write: next_offset == bytes.len(),
           // TODO(tonic): Explore using the unreleased `Bytes` support in Prost from:
           // https://github.com/danburkert/prost/pull/341
-          data: Vec::from(&bytes[offset..next_offset]),
+          data: bytes.slice(offset..next_offset),
         };
         futures::future::ready(Some((req, (next_offset, true))))
       }
@@ -320,7 +320,7 @@ impl ByteStore {
   pub fn list_missing_digests(
     &self,
     request: remexec::FindMissingBlobsRequest,
-  ) -> impl Future<Item = HashSet<Digest>, Error = String> {
+  ) -> impl Future<Output = Result<HashSet<Digest>, String>> {
     let store = self.clone();
     let workunit_name = format!(
       "list_missing_digests({})",
@@ -356,8 +356,6 @@ impl ByteStore {
         result_future.await
       }
     }
-    .boxed()
-    .compat()
   }
 
   pub(super) fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(

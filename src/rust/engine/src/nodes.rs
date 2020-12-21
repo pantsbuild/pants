@@ -22,7 +22,6 @@ use crate::externs::engine_aware::{self, EngineAwareInformation};
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
-use boxfuture::{BoxFuture, Boxable};
 use bytes::buf::BufMutExt;
 use cpython::{PyObject, Python, PythonObject};
 use fs::{
@@ -62,12 +61,12 @@ impl VFS<Failure> for Context {
 }
 
 impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
+  fn store_by_digest(
+    &self,
+    file: File,
+  ) -> future::BoxFuture<'static, Result<hashing::Digest, Failure>> {
     let context = self.clone();
-    async move { context.get(DigestFile(file)).await }
-      .boxed()
-      .compat()
-      .to_boxed()
+    async move { context.get(DigestFile(file)).await }.boxed()
   }
 }
 

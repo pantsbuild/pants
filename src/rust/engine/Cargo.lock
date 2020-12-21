@@ -148,9 +148,9 @@ dependencies = [
  "bytes",
  "copy_dir",
  "dir-diff",
- "futures 0.1.29",
  "hashing",
  "prost",
+ "prost-build",
  "prost-types",
  "tempfile",
  "tonic",
@@ -192,13 +192,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4"
 dependencies = [
  "generic-array",
-]
-
-[[package]]
-name = "boxfuture"
-version = "0.0.1"
-dependencies = [
- "futures 0.1.29",
 ]
 
 [[package]]
@@ -375,7 +368,6 @@ dependencies = [
  "log 0.4.8",
  "prost",
  "prost-types",
- "protobuf",
  "serde",
  "serde_derive",
 ]
@@ -653,7 +645,6 @@ dependencies = [
  "async-trait",
  "async_latch",
  "async_semaphore",
- "boxfuture",
  "bytes",
  "concrete_time",
  "cpython",
@@ -661,7 +652,6 @@ dependencies = [
  "env_logger",
  "fnv",
  "fs",
- "futures 0.1.29",
  "futures 0.3.5",
  "graph",
  "hashing",
@@ -686,6 +676,7 @@ dependencies = [
  "testutil",
  "time",
  "tokio",
+ "tryfuture",
  "ui",
  "url",
  "uuid",
@@ -782,17 +773,15 @@ name = "fs_util"
 version = "0.0.1"
 dependencies = [
  "bazel_protos",
- "boxfuture",
  "bytes",
  "clap",
  "env_logger",
  "fs",
- "futures 0.1.29",
  "futures 0.3.5",
+ "grpc_util",
  "hashing",
  "parking_lot",
  "prost",
- "protobuf",
  "rand 0.6.5",
  "serde",
  "serde_derive",
@@ -1025,7 +1014,10 @@ dependencies = [
 name = "grpc_util"
 version = "0.0.1"
 dependencies = [
+ "bytes",
  "futures 0.3.5",
+ "prost",
+ "prost-types",
  "tokio",
  "tokio-rustls 0.14.1",
  "tokio-util 0.2.0",
@@ -1536,7 +1528,6 @@ dependencies = [
  "async-stream",
  "bazel_protos",
  "bytes",
- "futures 0.1.29",
  "futures 0.3.5",
  "hashing",
  "hyper",
@@ -1544,7 +1535,6 @@ dependencies = [
  "parking_lot",
  "prost",
  "prost-types",
- "protobuf",
  "testutil",
  "tokio",
  "tonic",
@@ -1958,13 +1948,11 @@ dependencies = [
  "async_semaphore",
  "bazel_protos",
  "bincode",
- "boxfuture",
  "bytes",
  "concrete_time",
  "derivative",
  "double-checked-cell-async",
  "fs",
- "futures 0.1.29",
  "futures 0.3.5",
  "grpc_util",
  "hashing",
@@ -1978,7 +1966,6 @@ dependencies = [
  "parking_lot",
  "prost",
  "prost-types",
- "protobuf",
  "rand 0.6.5",
  "regex",
  "serde",
@@ -1994,6 +1981,7 @@ dependencies = [
  "tokio-rustls 0.14.1",
  "tokio-util 0.2.0",
  "tonic",
+ "tryfuture",
  "uname",
  "uuid",
  "walkdir 2.3.1",
@@ -2022,22 +2010,20 @@ dependencies = [
 [[package]]
 name = "prost"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce49aefe0a6144a45de32927c77bd2859a5f7677b55f220ae5b744e87389c212"
+source = "git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391#a1cccbcee343e2c444e1cd2738c7fba2599fc391"
 dependencies = [
  "bytes",
- "prost-derive",
+ "prost-derive 0.6.1 (git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391)",
 ]
 
 [[package]]
 name = "prost-build"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02b10678c913ecbd69350e8535c3aef91a8676c0773fc1d7b95cdd196d7f2f26"
+source = "git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391#a1cccbcee343e2c444e1cd2738c7fba2599fc391"
 dependencies = [
  "bytes",
  "heck",
- "itertools 0.8.2",
+ "itertools 0.9.0",
  "log 0.4.8",
  "multimap",
  "petgraph 0.5.1",
@@ -2061,10 +2047,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.6.1"
+source = "git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391#a1cccbcee343e2c444e1cd2738c7fba2599fc391"
+dependencies = [
+ "anyhow",
+ "itertools 0.9.0",
+ "proc-macro2 1.0.24",
+ "quote 1.0.4",
+ "syn 1.0.54",
+]
+
+[[package]]
 name = "prost-types"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1834f67c0697c001304b75be76f67add9c89742eda3a085ad8ee0bb38c3417aa"
+source = "git+https://github.com/danburkert/prost?rev=a1cccbcee343e2c444e1cd2738c7fba2599fc391#a1cccbcee343e2c444e1cd2738c7fba2599fc391"
 dependencies = [
  "bytes",
  "prost",
@@ -2780,12 +2777,10 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bazel_protos",
- "boxfuture",
  "bytes",
  "concrete_time",
  "criterion",
  "fs",
- "futures 0.1.29",
  "futures 0.3.5",
  "glob",
  "grpc_util",
@@ -2810,6 +2805,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.14.1",
  "tonic",
+ "tryfuture",
  "uuid",
  "walkdir 2.3.1",
  "workunit_store",
@@ -2915,9 +2911,9 @@ dependencies = [
  "bazel_protos",
  "bytes",
  "fs",
+ "grpc_util",
  "hashing",
  "prost",
- "protobuf",
 ]
 
 [[package]]
@@ -3079,7 +3075,7 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost",
- "prost-derive",
+ "prost-derive 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustls-native-certs 0.4.0",
  "tokio",
  "tokio-rustls 0.14.1",
@@ -3333,6 +3329,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 
 [[package]]
+name = "tryfuture"
+version = "0.0.1"
+dependencies = [
+ "futures 0.3.5",
+]
+
+[[package]]
 name = "typenum"
 version = "1.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3342,7 +3345,6 @@ checksum = "6d2783fe2d6b8c1101136184eb41be8b1ad379e4657050b8aaff0c79ee7575f9"
 name = "ui"
 version = "0.0.1"
 dependencies = [
- "futures 0.1.29",
  "futures 0.3.5",
  "indexmap",
  "indicatif",

@@ -3,7 +3,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
 use futures::{future as future03, FutureExt};
 use hashing::Fingerprint;
 use log::{debug, warn};
@@ -149,7 +148,6 @@ impl CommandRunner {
           platform,
           true,
         )
-        .compat()
         .await?
       } else {
         return Err("action result missing from ExecuteResponse".into());
@@ -170,9 +168,7 @@ impl CommandRunner {
         .boxed(),
       self
         .file_store
-        .ensure_local_has_recursive_directory(result.output_directory)
-        .compat()
-        .boxed(),
+        .ensure_local_has_recursive_directory(result.output_directory),
     ])
     .await?;
 

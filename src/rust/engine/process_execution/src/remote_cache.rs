@@ -8,7 +8,6 @@ use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::require_digest;
 use fs::RelativePath;
-use futures::compat::Future01CompatExt;
 use hashing::Digest;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
@@ -401,7 +400,6 @@ impl CommandRunner {
     self
       .store
       .ensure_remote_has_recursive(digests_for_action_result)
-      .compat()
       .await?;
 
     let update_action_cache_request = remexec::UpdateActionResultRequest {

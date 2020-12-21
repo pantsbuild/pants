@@ -94,6 +94,7 @@ class OptionHelpInfo:
     typ: Type
     default: Any
     help: str
+    deprecation_active: bool
     deprecated_message: Optional[str]
     removal_version: Optional[str]
     removal_hint: Optional[str]
@@ -385,7 +386,7 @@ class HelpInfoExtracter:
             history = parser.history(kwargs["dest"])
             ohi = self.get_option_help_info(args, kwargs)
             ohi = dataclasses.replace(ohi, value_history=history)
-            if kwargs.get("removal_version"):
+            if ohi.deprecation_active:
                 deprecated_options.append(ohi)
             elif kwargs.get("advanced") or (
                 kwargs.get("recursive") and not kwargs.get("recursive_root")
@@ -439,12 +440,21 @@ class HelpInfoExtracter:
         typ = kwargs.get("type", str)
         default = self.compute_default(**kwargs)
         help_msg = kwargs.get("help", "No help available.")
+        deprecation_start_version = kwargs.get("deprecation_start_version")
         removal_version = kwargs.get("removal_version")
+        deprecation_active = removal_version is not None and deprecated.is_deprecation_active(
+            deprecation_start_version
+        )
         deprecated_message = None
         if removal_version:
             deprecated_tense = deprecated.get_deprecated_tense(removal_version)
+            message_start = (
+                "Deprecated"
+                if deprecation_active
+                else f"Upcoming deprecation in version: {deprecation_start_version}"
+            )
             deprecated_message = (
-                f"Deprecated, {deprecated_tense} removed in version: {removal_version}"
+                f"{message_start}, {deprecated_tense} removed in version: {removal_version}."
             )
         removal_hint = kwargs.get("removal_hint")
         choices = self.compute_choices(kwargs)
@@ -463,6 +473,7 @@ class HelpInfoExtracter:
             typ=typ,
             default=default,
             help=help_msg,
+            deprecation_active=deprecation_active,
             deprecated_message=deprecated_message,
             removal_version=removal_version,
             removal_hint=removal_hint,

@@ -152,6 +152,27 @@ def test_deprecated():
     assert "999.99.9" == ohi.removal_version
     assert "do not use this" == ohi.removal_hint
     assert ohi.deprecated_message is not None
+    assert ohi.deprecation_active
+
+
+def test_not_deprecated():
+    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], {})
+    assert ohi.removal_version is None
+    assert not ohi.deprecation_active
+
+
+def test_deprecation_start_version_past():
+    kwargs = {"deprecation_start_version": "1.0.0", "removal_version": "999.99.9"}
+    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    assert "999.99.9" == ohi.removal_version
+    assert ohi.deprecation_active
+
+
+def test_deprecation_start_version_future():
+    kwargs = {"deprecation_start_version": "999.99.8", "removal_version": "999.99.9"}
+    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    assert "999.99.9" == ohi.removal_version
+    assert not ohi.deprecation_active
 
 
 def test_passthrough():
@@ -297,6 +318,7 @@ def test_get_all_help_info():
                         "typ": int,
                         "default": 42,
                         "help": "Option 1",
+                        "deprecation_active": False,
                         "deprecated_message": None,
                         "removal_version": None,
                         "removal_hint": None,
@@ -328,6 +350,7 @@ def test_get_all_help_info():
                         "typ": bool,
                         "default": True,
                         "help": "Option 2",
+                        "deprecation_active": False,
                         "deprecated_message": None,
                         "removal_version": None,
                         "removal_hint": None,
@@ -349,6 +372,7 @@ def test_get_all_help_info():
                         "typ": str,
                         "default": None,
                         "help": "No help available.",
+                        "deprecation_active": False,
                         "deprecated_message": None,
                         "removal_version": None,
                         "removal_hint": None,

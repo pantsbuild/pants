@@ -7,9 +7,9 @@ publish = false
 
 [dependencies]
 bytes = "0.5"
-futures = "^0.1.16"
 hashing = { path = "../../hashing" }
-prost = "0.6"
+prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
+prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 prost-types = "0.6"
 tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots"] }
 
@@ -18,5 +18,6 @@ build_utils = { path = "../../build_utils" }
 copy_dir = "0.1.2"
 dir-diff = "0.3.1"
 tempfile = "3"
+prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 tonic-build = { version = "0.3", features = ["prost"] }
 walkdir = "2"

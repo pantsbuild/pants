@@ -12,8 +12,8 @@ from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
     "tgt_content",
     [
         "pex_binary(sources=['app.py'])",
-        "pex_binary(sources=['app.py'], entry_point='project.app')",
-        "pex_binary(sources=['app.py'], entry_point='project.app:main')",
+        "python_library(name='lib')\npex_binary(entry_point='app.py')",
+        "python_library(name='lib')\npex_binary(entry_point='app.py:main')",
     ],
 )
 def test_run_sample_script(tgt_content: str) -> None:

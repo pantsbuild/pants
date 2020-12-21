@@ -6,7 +6,7 @@ use std::time::Duration;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::longrunning::Operation;
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
+use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use maplit::{btreemap, hashset};
 use mock::execution_server::{ExpectedAPICall, MockOperation};
@@ -1577,8 +1577,8 @@ async fn execute_missing_file_errors_if_unknown() {
 #[tokio::test]
 async fn extract_execute_response_success() {
   let wanted_exit_code = 17;
-  let wanted_stdout = "roland".as_bytes();
-  let wanted_stderr = "simba".as_bytes();
+  let wanted_stdout = Bytes::from_static(b"roland");
+  let wanted_stderr = Bytes::from_static(b"simba");
 
   let operation = Operation {
     name: "cat".to_owned(),
@@ -1588,8 +1588,8 @@ async fn extract_execute_response_success() {
         &remexec::ExecuteResponse {
           result: Some(remexec::ActionResult {
             exit_code: wanted_exit_code,
-            stdout_raw: wanted_stdout.to_vec(),
-            stderr_raw: wanted_stderr.to_vec(),
+            stdout_raw: wanted_stdout.clone(),
+            stderr_raw: wanted_stderr.clone(),
             output_files: vec![remexec::OutputFile {
               path: "cats/roland".into(),
               digest: Some((&TestData::roland().digest()).into()),
@@ -2096,7 +2096,7 @@ pub(crate) fn make_action_result(
   let mut action_result = remexec::ActionResult::default();
   match stdout {
     StdoutType::Raw(stdout_raw) => {
-      action_result.stdout_raw = stdout_raw.into_bytes();
+      action_result.stdout_raw = stdout_raw.into_bytes().into();
     }
     StdoutType::Digest(stdout_digest) => {
       action_result.stdout_digest = Some((&stdout_digest).into());
@@ -2104,7 +2104,7 @@ pub(crate) fn make_action_result(
   }
   match stderr {
     StderrType::Raw(stderr_raw) => {
-      action_result.stderr_raw = stderr_raw.into_bytes();
+      action_result.stderr_raw = stderr_raw.into_bytes().into();
     }
     StderrType::Digest(stderr_digest) => {
       action_result.stderr_digest = Some((&stderr_digest).into());
@@ -2375,9 +2375,7 @@ async fn extract_output_files_from_response(
     .result
     .as_ref()
     .ok_or_else(|| "No ActionResult found".to_string())?;
-  crate::remote::extract_output_files(store, action_result, false)
-    .compat()
-    .await
+  crate::remote::extract_output_files(store, action_result, false).await
 }
 
 pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
@@ -2387,12 +2385,9 @@ pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_typ
     .unwrap()
     .replace("::", ".");
 
-  let mut buf = Vec::with_capacity(message.encoded_len());
-  message.encode(&mut buf).unwrap(); // TODO(tonic): Return error.
-
   prost_types::Any {
     type_url: format!("type.googleapis.com/{}", proto_type_name),
-    value: buf,
+    value: message.to_bytes().to_vec(),
   }
 }
 

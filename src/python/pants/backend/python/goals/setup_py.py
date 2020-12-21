@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
-    PexBinarySources,
+    DeprecatedPexBinarySources,
     PexEntryPointField,
     PythonProvidesField,
     PythonRequirementsField,
@@ -522,7 +522,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     )
     entry_point_requests = []
     for binary in binaries:
-        if not binary.has_fields([PexEntryPointField, PexBinarySources]):
+        if not binary.has_fields([PexEntryPointField, DeprecatedPexBinarySources]):
             raise InvalidEntryPoint(
                 "Expected addresses to `pex_binary` targets in `.with_binaries()` for the "
                 f"`provides` field for {exported_addr}, but found {binary.address} with target "
@@ -535,21 +535,19 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
                 "Every `pex_binary` used in `.with_binaries()` for the `provides` field for "
                 f"{exported_addr} must explicitly set the `entry_point` field, but "
                 f"{binary.address} left the field off. Set `entry_point` to either "
-                "`path.to.module:func`, or the shorthand `:func` (requires setting the `sources` "
-                f"field to exactly one file). See {url}."
+                f"`app.py:func` or the longhand `path.to.app:func`. See {url}."
             )
         if ":" not in entry_point:
-            # We already validated that `entry_point` was set, so we can assume that we're not
-            # using the shorthand `:my_func` because they would have already used the `:` char.
             raise InvalidEntryPoint(
                 "Every `pex_binary` used in `with_binaries()` for the `provides()` field for "
                 f"{exported_addr} must end in the format `:my_func` for the `entry_point` field, "
                 f"but {binary.address} set it to {repr(entry_point)}. For example, set "
-                f"`entry_point='{entry_point}:main'. You may also use the shorthand "
-                f"`entry_point=':func'` if you set the `sources` field to a single file. See {url}."
+                f"`entry_point='{entry_point}:main'. See {url}."
             )
         entry_point_requests.append(
-            ResolvePexEntryPointRequest(binary[PexEntryPointField], binary[PexBinarySources])
+            ResolvePexEntryPointRequest(
+                binary[PexEntryPointField], binary[DeprecatedPexBinarySources]
+            )
         )
     binary_entry_points = await MultiGet(
         Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest, request)

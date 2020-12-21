@@ -307,7 +307,9 @@ impl StubCASResponder {
       Some(bytes) => Ok(
         bytes
           .chunks(self.chunk_size_bytes as usize)
-          .map(|b| ReadResponse { data: Vec::from(b) })
+          .map(|b| ReadResponse {
+            data: bytes.slice_ref(b),
+          })
           .collect(),
       ),
       None => Err(Status::not_found(format!(
