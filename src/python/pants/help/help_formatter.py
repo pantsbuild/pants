@@ -9,6 +9,7 @@ from typing import List, Optional
 from pants.help.help_info_extracter import OptionHelpInfo, OptionScopeHelpInfo, to_help_str
 from pants.help.maybe_color import MaybeColor
 from pants.option.ranked_value import Rank, RankedValue
+from pants.util.strutil import hard_wrap
 
 
 class HelpFormatter(MaybeColor):
@@ -108,11 +109,7 @@ class HelpFormatter(MaybeColor):
             for rv in interesting_ranked_values
             for line in format_value(rv, "overrode: ", f"{indent}    ")
         ]
-        description_lines = ohi.help.splitlines()
-        # wrap() returns [] for an empty line, but we want to emit those, hence the "or [line]".
-        description_lines = [
-            f"{indent}{s}" for line in description_lines for s in wrap(line, 96) or [line]
-        ]
+        description_lines = hard_wrap(ohi.help, indent=len(indent))
         lines = [
             *arg_lines,
             *choices_lines,

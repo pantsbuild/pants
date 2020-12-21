@@ -53,13 +53,14 @@ def test_help_specific_target() -> None:
     assert (
         textwrap.dedent(
             """
-    archive
-    -------
+            archive
+            -------
 
-    A ZIP or TAR file containing loose files and code packages.
+            A ZIP or TAR file containing loose files and code packages.
 
-    Valid fields:
-    """
+
+            Valid fields:
+            """
         )
         in pants_run.stdout
     )
@@ -67,11 +68,11 @@ def test_help_specific_target() -> None:
     assert (
         textwrap.dedent(
             """
-    format
-        type: 'tar' | 'tar.bz2' | 'tar.gz' | 'tar.xz' | 'zip'
-        required
-        The type of archive file to be generated.
-    """
+            format
+                type: 'tar' | 'tar.bz2' | 'tar.gz' | 'tar.xz' | 'zip'
+                required
+                The type of archive file to be generated.
+            """
         )
         in pants_run.stdout
     )

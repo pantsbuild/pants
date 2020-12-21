@@ -11,12 +11,11 @@ class ProtobufPythonInterpreterConstraints(InterpreterConstraintsField):
 
 
 class PythonSourceRootField(StringField):
-    """The source root to generate Python sources under.
-
-    If unspecified, the source root the protobuf_library is under will be used.
-    """
-
     alias = "python_source_root"
+    help = (
+        "The source root to generate Python sources under.\n\nIf unspecified, the source root the "
+        "protobuf_library is under will be used."
+    )
 
 
 def rules():

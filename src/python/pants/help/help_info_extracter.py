@@ -32,6 +32,7 @@ from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
 from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
+from pants.util.strutil import first_paragraph
 
 
 class HelpJSONEncoder(json.JSONEncoder):
@@ -165,25 +166,28 @@ class TargetFieldHelpInfo:
         # This is a an awkward edge of our heuristic and it's not intentional since these core
         # `Field` types have documentation oriented to the plugin author and not the end user
         # filling in fields in a BUILD file.
-        description = get_docstring(
-            field,
-            flatten=True,
-            fallback_to_ancestors=True,
-            ignored_ancestors={
-                *Field.mro(),
-                AsyncFieldMixin,
-                BoolField,
-                DictStringToStringField,
-                DictStringToStringSequenceField,
-                FloatField,
-                Generic,  # type: ignore[arg-type]
-                IntField,
-                ScalarField,
-                SequenceField,
-                StringField,
-                StringSequenceField,
-            },
-        )
+        if hasattr(field, "help"):
+            description = field.help  # type: ignore[attr-defined]
+        else:
+            description = get_docstring(
+                field,
+                flatten=True,
+                fallback_to_ancestors=True,
+                ignored_ancestors={
+                    *Field.mro(),
+                    AsyncFieldMixin,
+                    BoolField,
+                    DictStringToStringField,
+                    DictStringToStringSequenceField,
+                    FloatField,
+                    Generic,  # type: ignore[arg-type]
+                    IntField,
+                    ScalarField,
+                    SequenceField,
+                    StringField,
+                    StringSequenceField,
+                },
+            )
         raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
 
@@ -227,10 +231,17 @@ class TargetTypeHelpInfo:
     def create(
         cls, target_type: Type[Target], *, union_membership: UnionMembership
     ) -> TargetTypeHelpInfo:
+        summary: Optional[str]
+        if hasattr(target_type, "help"):
+            description = target_type.help  # type: ignore[attr-defined]
+            summary = first_paragraph(description)
+        else:
+            description = get_docstring(target_type)
+            summary = get_docstring_summary(target_type)
         return cls(
             alias=target_type.alias,
-            summary=get_docstring_summary(target_type),
-            description=get_docstring(target_type),
+            summary=summary,
+            description=description,
             fields=tuple(
                 TargetFieldHelpInfo.create(field)
                 for field in target_type.class_field_types(union_membership=union_membership)

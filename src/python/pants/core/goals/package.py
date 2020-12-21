@@ -47,17 +47,14 @@ class BuiltPackage:
 
 
 class OutputPathField(StringField):
-    """Where the built asset should be located.
-
-    If undefined, this will use the path to the the BUILD, followed by the target name. For
-    example, `src/python/project:app` would be `src.python.project/app.ext`.
-
-    When running `./pants package`, this path will be prefixed by `--distdir` (e.g. `dist/`).
-
-    Warning: setting this value risks naming collisions with other package targets you may have.
-    """
-
     alias = "output_path"
+    description = (
+        "Where the built asset should be located.\n\nIf undefined, this will use the path to the "
+        "BUILD file, followed by the target name. For example, `src/python/project:app` would be "
+        "`src.python.project/app.ext.\n\nWhen running `./pants package`, this path will be "
+        "prefixed by `--distdir` (e.g. `dist/`).\n\nWarning: setting this value risks naming "
+        "collisions with other package targets you may have."
+    )
 
     def value_or_default(self, address: Address, *, file_ending: str) -> str:
         assert not file_ending.startswith("."), "`file_ending` should not start with `.`"

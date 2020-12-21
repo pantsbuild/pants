@@ -1228,6 +1228,11 @@ class Sources(StringSequenceField, AsyncFieldMixin):
     alias = "sources"
     expected_file_extensions: ClassVar[Optional[Tuple[str, ...]]] = None
     expected_num_files: ClassVar[Optional[Union[int, range]]] = None
+    description = (
+        "A list of files and globs that belong to this target.\n\nPaths are relative to the BUILD "
+        "file's directory. You can ignore files/globs by prefixing them with `!`.\n\nExample: "
+        "`sources=['example.py', 'test_*.py', '!test_ignore.py']`."
+    )
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         """Perform any additional validation on the resulting source files, e.g. ensuring that
@@ -1519,23 +1524,26 @@ class SecondaryOwnerMixin(ABC):
 # `Dependencies` field
 # -----------------------------------------------------------------------------------------------
 
-# NB: To hydrate the dependencies, use one of:
-#   await Get(Addresses, DependenciesRequest(tgt[Dependencies])
-#   await Get(Targets, DependenciesRequest(tgt[Dependencies])
+
 class Dependencies(StringSequenceField, AsyncFieldMixin):
-    """Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib'].
+    """The dependencies field.
 
-    Alternatively, you may include file names. Pants will find which target owns that file, and
-    create a new target from that which only includes the file in its `sources` field. For files
-    relative to the current BUILD file, prefix with `./`; otherwise, put the full path, e.g.
-    ['./sibling.txt', 'resources/demo.json'].
-
-    You may exclude dependencies by prefixing with `!`, e.g. `['!helloworld/subdir:lib',
-    '!./sibling.txt']`. Ignores are intended for false positives with dependency inference;
-    otherwise, simply leave off the dependency from the BUILD file.
+    To resolve all dependencies—including the results of dependency injection and inference—use
+    either `await Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
+    DependenciesRequest(tgt[Dependencies])`.
     """
 
     alias = "dependencies"
+    description = (
+        "Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib']."
+        "\n\nAlternatively, you may include file names. Pants will find which target owns that "
+        "file, and create a new target from that which only includes the file in its `sources` "
+        "field. For files relative to the current BUILD file, prefix with `./`; otherwise, put the "
+        "full path, e.g. ['./sibling.txt', 'resources/demo.json'].\n\nYou may exclude dependencies "
+        "by prefixing with `!`, e.g. `['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are "
+        "intended for false positives with dependency inference; otherwise, simply leave off the "
+        "dependency from the BUILD file."
+    )
     supports_transitive_excludes = False
 
     @memoized_property
@@ -1721,22 +1729,20 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 
 class Tags(StringSequenceField):
-    """Arbitrary strings that you can use to describe a target.
-
-    For example, you may tag some test targets with 'integration_test' so that you could run
-    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
-    """
-
     alias = "tags"
+    description = (
+        "Arbitrary strings to describe a target.\n\nFor example, you may tag some test targets "
+        "with 'integration_test' so that you could run `./pants --tags='integration_test' test ::` "
+        "to only run on targets with that tag."
+    )
 
 
 class DescriptionField(StringField):
-    """A human-readable description of the target.
-
-    Use `./pants list --documented ::` to see all targets with descriptions.
-    """
-
     alias = "description"
+    description = (
+        "A human-readable description of the target.\n\nUse `./pants list --documented ::` to see "
+        "all targets with descriptions."
+    )
 
 
 COMMON_TARGET_FIELDS = (Tags, DescriptionField)
@@ -1745,8 +1751,7 @@ COMMON_TARGET_FIELDS = (Tags, DescriptionField)
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
 #  Artifact, there is no common Artifact interface.
 class ProvidesField(Field):
-    """An `artifact`, such as `setup_py`, that describes how to represent this target to the outside
-    world."""
+    """An `artifact` that describes how to represent this target to the outside world."""
 
     alias = "provides"
     default: ClassVar[Optional[Any]] = None

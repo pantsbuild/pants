@@ -22,6 +22,7 @@ from pants.option.arg_splitter import (
     VersionHelp,
 )
 from pants.option.scope import GLOBAL_SCOPE
+from pants.util.strutil import hard_wrap
 
 
 class HelpPrinter(MaybeColor):
@@ -249,8 +250,9 @@ class HelpPrinter(MaybeColor):
         self._print_title(target_alias)
         tinfo = self._all_help_info.name_to_target_type_info[target_alias]
         if tinfo.description:
-            print(tinfo.description)
-        print("\nValid fields:")
+            formatted_desc = "\n".join(hard_wrap(tinfo.description))
+            print(formatted_desc)
+        print("\n\nValid fields:")
         for field in sorted(tinfo.fields, key=lambda x: x.alias):
             print()
             print(self.maybe_magenta(field.alias))
@@ -259,8 +261,8 @@ class HelpPrinter(MaybeColor):
             print(self.maybe_cyan(f"{indent}type: {field.type_hint}"))
             print(self.maybe_cyan(f"{indent}{required_or_default}"))
             if field.description:
-                for line in textwrap.wrap(field.description, 80):
-                    print(f"{indent}{line}")
+                formatted_desc = "\n".join(hard_wrap(field.description, indent=len(indent)))
+                print(formatted_desc)
         print()
 
     def _get_help_json(self) -> str:
