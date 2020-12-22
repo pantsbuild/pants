@@ -92,7 +92,7 @@ dependencies = [
 name = "async_semaphore"
 version = "0.0.1"
 dependencies = [
- "futures 0.3.5",
+ "futures",
  "parking_lot",
  "tokio",
 ]
@@ -101,7 +101,7 @@ dependencies = [
 name = "async_value"
 version = "0.0.1"
 dependencies = [
- "futures 0.3.5",
+ "futures",
  "tokio",
 ]
 
@@ -205,7 +205,7 @@ dependencies = [
  "env_logger",
  "errno",
  "fuse",
- "futures 0.3.5",
+ "futures",
  "hashing",
  "libc",
  "log 0.4.8",
@@ -652,7 +652,7 @@ dependencies = [
  "env_logger",
  "fnv",
  "fs",
- "futures 0.3.5",
+ "futures",
  "graph",
  "hashing",
  "indexmap",
@@ -755,7 +755,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "dirs",
- "futures 0.3.5",
+ "futures",
  "glob",
  "ignore",
  "lazy_static",
@@ -777,7 +777,7 @@ dependencies = [
  "clap",
  "env_logger",
  "fs",
- "futures 0.3.5",
+ "futures",
  "grpc_util",
  "hashing",
  "parking_lot",
@@ -845,12 +845,6 @@ dependencies = [
  "thread-scoped",
  "time",
 ]
-
-[[package]]
-name = "futures"
-version = "0.1.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b980f2816d6ee8673b6517b52cb0e808a180efc92e5c19d02cdda79066703ef"
 
 [[package]]
 name = "futures"
@@ -933,7 +927,6 @@ version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8764574ff08b701a084482c3c7031349104b07ac897393010494beaa18ce32c6"
 dependencies = [
- "futures 0.1.29",
  "futures-channel",
  "futures-core",
  "futures-io",
@@ -1002,7 +995,7 @@ dependencies = [
  "async_value",
  "env_logger",
  "fnv",
- "futures 0.3.5",
+ "futures",
  "log 0.4.8",
  "parking_lot",
  "petgraph 0.4.13",
@@ -1015,7 +1008,7 @@ name = "grpc_util"
 version = "0.0.1"
 dependencies = [
  "bytes",
- "futures 0.3.5",
+ "futures",
  "prost",
  "prost-types",
  "tokio",
@@ -1528,7 +1521,7 @@ dependencies = [
  "async-stream",
  "bazel_protos",
  "bytes",
- "futures 0.3.5",
+ "futures",
  "hashing",
  "hyper",
  "log 0.4.8",
@@ -1552,7 +1545,7 @@ version = "0.0.1"
 dependencies = [
  "async_latch",
  "bytes",
- "futures 0.3.5",
+ "futures",
  "log 0.4.8",
  "nails",
  "os_pipe",
@@ -1568,7 +1561,7 @@ checksum = "324d0793d44314222dc61947ffecc0325fb1c824dd6ef6b231b98e0b1f06b11b"
 dependencies = [
  "byteorder",
  "bytes",
- "futures 0.3.5",
+ "futures",
  "log 0.4.8",
  "tokio",
  "tokio-util 0.2.0",
@@ -1953,7 +1946,7 @@ dependencies = [
  "derivative",
  "double-checked-cell-async",
  "fs",
- "futures 0.3.5",
+ "futures",
  "grpc_util",
  "hashing",
  "itertools 0.8.2",
@@ -1996,7 +1989,7 @@ dependencies = [
  "dirs",
  "env_logger",
  "fs",
- "futures 0.3.5",
+ "futures",
  "hashing",
  "log 0.4.8",
  "process_execution",
@@ -2672,7 +2665,7 @@ dependencies = [
 name = "serverset"
 version = "0.0.1"
 dependencies = [
- "futures 0.3.5",
+ "futures",
  "maplit",
  "parking_lot",
  "testutil",
@@ -2698,7 +2691,7 @@ version = "0.0.1"
 dependencies = [
  "bytes",
  "fs",
- "futures 0.3.5",
+ "futures",
  "hashing",
  "lmdb",
  "log 0.4.8",
@@ -2781,7 +2774,7 @@ dependencies = [
  "concrete_time",
  "criterion",
  "fs",
- "futures 0.3.5",
+ "futures",
  "glob",
  "grpc_util",
  "hashing",
@@ -2865,7 +2858,7 @@ dependencies = [
 name = "task_executor"
 version = "0.0.1"
 dependencies = [
- "futures 0.3.5",
+ "futures",
  "logging",
  "tokio",
  "workunit_store",
@@ -3332,7 +3325,7 @@ checksum = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 name = "tryfuture"
 version = "0.0.1"
 dependencies = [
- "futures 0.3.5",
+ "futures",
 ]
 
 [[package]]
@@ -3345,7 +3338,7 @@ checksum = "6d2783fe2d6b8c1101136184eb41be8b1ad379e4657050b8aaff0c79ee7575f9"
 name = "ui"
 version = "0.0.1"
 dependencies = [
- "futures 0.3.5",
+ "futures",
  "indexmap",
  "indicatif",
  "logging",
@@ -3578,7 +3571,7 @@ version = "0.0.1"
 dependencies = [
  "crossbeam-channel",
  "fs",
- "futures 0.3.5",
+ "futures",
  "hashing",
  "log 0.4.8",
  "logging",

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::Bytes;
-use futures::{future as future03, FutureExt};
+use futures::{future, FutureExt};
 use hashing::Fingerprint;
 use log::{debug, warn};
 use prost::Message;
@@ -157,7 +157,7 @@ impl CommandRunner {
     };
 
     // Ensure that all digests in the result are loadable, erroring if any are not.
-    let _ = future03::try_join_all(vec![
+    let _ = future::try_join_all(vec![
       self
         .file_store
         .ensure_local_has_file(result.stdout_digest)

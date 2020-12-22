@@ -12,7 +12,7 @@ bytes = "0.5"
 concrete_time = { path = "../../concrete_time" }
 grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
-futures = { version = "0.3" }
+futures = "0.3"
 glob = "0.2.11"
 hashing = { path = "../../hashing" }
 indexmap = "1.4"

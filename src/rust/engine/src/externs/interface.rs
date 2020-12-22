@@ -59,7 +59,7 @@ use cpython::{
   ToPyObject,
 };
 use futures::future::FutureExt;
-use futures::future::{self as future03, TryFutureExt};
+use futures::future::{self, TryFutureExt};
 use futures::Future;
 use hashing::Digest;
 use log::{self, debug, error, warn, Log};
@@ -1586,7 +1586,7 @@ fn capture_snapshots(
         .collect::<Vec<_>>();
       py.allow_threads(|| {
         core.executor.block_on(
-          future03::try_join_all(snapshot_futures)
+          future::try_join_all(snapshot_futures)
             .map_ok(|values| externs::store_tuple(values).into()),
         )
       })
@@ -1659,7 +1659,7 @@ fn single_file_digests_to_bytes(
     let bytes_values: Vec<PyObject> = py
       .allow_threads(|| {
         core.executor.block_on(
-          future03::try_join_all(digest_futures)
+          future::try_join_all(digest_futures)
             .map_ok(|values: Vec<Value>| values.into_iter().map(|val| val.into()).collect()),
         )
       })
