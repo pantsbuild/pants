@@ -110,7 +110,7 @@ def run_pants_help_all() -> Dict:
             f"\n\nstderr:\n{run.stderr}"
         )
         raise
-    return json.loads(run.stdout)
+    return cast(Dict, json.loads(run.stdout))
 
 
 class ReferenceGenerator:
@@ -135,7 +135,7 @@ class ReferenceGenerator:
                 "target": target_tpl,
             }
         )
-        self._category_id = None  # Fetched lazily.
+        self._category_id: Optional[str] = None  # Fetched lazily.
 
         # Load the data.
         self._options_info = self.process_options_input(help_info, sync=self._args.sync)
@@ -183,7 +183,7 @@ class ReferenceGenerator:
             for opt in shi["deprecated"]:
                 munge_option(opt)
 
-        return cast(Dict, help_info)
+        return help_info
 
     @classmethod
     def process_targets_input(cls, help_info: Dict) -> Dict[str, Dict[str, Any]]:
@@ -204,7 +204,7 @@ class ReferenceGenerator:
         """The id of the "Reference" category on the docsite."""
         if self._category_id is None:
             self._category_id = self._get_id("categories/reference")
-        return cast(str, self._category_id)
+        return self._category_id
 
     def _access_readme_api(self, url_suffix: str, method: str, payload: str) -> Dict:
         """Sends requests to the readme.io API."""
