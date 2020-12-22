@@ -1,6 +1,20 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Generates and uploads the Pants reference documentation.
+
+Dry run:
+
+    ./pants run build-support/bin/generate_docs.py
+
+Live run:
+
+    ./pants run build-support/bin/generate_docs.py -- --sync --api-key=<API_KEY>
+
+where API_KEY is your readme.io API Key, found here:
+  https://dash.readme.com/project/pants/v2.0/api-key
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -9,7 +23,7 @@ import json
 import logging
 import os
 import pkgutil
-import sys
+import subprocess
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, Optional, cast
 
@@ -27,7 +41,8 @@ def main() -> None:
     logging.basicConfig(format="[%(levelname)s]: %(message)s", level=logging.INFO)
     version = determine_pants_version()
     args = create_parser().parse_args()
-    generator = ReferenceGenerator(args, version)
+    help_info = run_pants_help_all()
+    generator = ReferenceGenerator(args, version, help_info)
     if args.sync:
         generator.sync()
     else:
@@ -50,15 +65,6 @@ def determine_pants_version() -> str:
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
-    # Note that we want to be able to run this script using `./pants run`, so having it
-    # invoke `./pants help-all` itself would be unnecessarily complicated.
-    # So we require the input to be provided externally.
-    parser.add_argument(
-        "--input",
-        default=None,
-        help="Path to a file containing the output of `./pants help-all`. "
-        "If unspecified, reads from stdin.",
-    )
     parser.add_argument(
         "--sync",
         action="store_true",
@@ -79,31 +85,36 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def run_pants_help_all() -> Dict:
+    deactivated_backends = [
+        "internal_plugins.releases",
+        "toolchain.pants.auth",
+        "toolchain.pants.buildsense",
+        "toolchain.pants.common",
+    ]
+    activated_backends = ["pants.backend.python.lint.bandit", "pants.backend.python.lint.pylint"]
+    argv = [
+        "./pants",
+        "--concurrent",
+        f"--backend-packages=-[{', '.join(map(repr, deactivated_backends))}]",
+        f"--backend-packages=+[{', '.join(map(repr, activated_backends))}]",
+        "--no-verify-config",
+        "help-all",
+    ]
+    run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+    try:
+        run.check_returncode()
+    except subprocess.CalledProcessError:
+        logger.error(
+            f"Running {argv} failed with exit code {run.returncode}.\n\nstdout:\n{run.stdout}"
+            f"\n\nstderr:\n{run.stderr}"
+        )
+        raise
+    return json.loads(run.stdout)
+
+
 class ReferenceGenerator:
-    """Generates and uploads the Pants reference documentation.
-
-    To run, first generate the data with:
-
-    ./pants \
-      --backend-packages="-['internal_plugins.releases', 'toolchain.pants.auth', \
-        'toolchain.pants.buildsense', 'toolchain.pants.common']" \
-      --backend-packages="+['pants.backend.python.lint.bandit', \
-        'pants.backend.python.lint.pylint', 'pants.backend.codegen.protobuf.python', \
-        'pants.backend.awslambda.python']" \
-      --no-verify-config help-all > /tmp/help_info
-
-    Then:
-
-    ./pants run build-support/bin/generate_docs.py -- \
-       --input=/tmp/help_info --sync --api-key=<API_KEY>
-
-    where API_KEY is your readme.io API Key, found here:
-      https://dash.readme.com/project/pants/v2.0/api-key
-
-    TODO: Integrate this into the release process.
-    """
-
-    def __init__(self, args: argparse.Namespace, version: str) -> None:
+    def __init__(self, args: argparse.Namespace, version: str, help_info: Dict) -> None:
         self._args = args
         self._version = version
 
@@ -127,9 +138,6 @@ class ReferenceGenerator:
         self._category_id = None  # Fetched lazily.
 
         # Load the data.
-        help_info = json.loads(
-            sys.stdin.read() if self._args.input is None else Path(self._args.input).read_text()
-        )
         self._options_info = self.process_options_input(help_info, sync=self._args.sync)
         self._targets_info = self.process_targets_input(help_info)
 
