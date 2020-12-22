@@ -155,9 +155,8 @@ class LintRequest(StyleRequest):
 
 
 class LintSubsystem(GoalSubsystem):
-    """Run all linters and/or formatters in check mode."""
-
     name = "lint"
+    help = "Run all linters and/or formatters in check mode."
 
     required_union_implementations = (LintRequest,)
 

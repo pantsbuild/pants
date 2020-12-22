@@ -38,9 +38,8 @@ class DetailLevel(Enum):
 
 
 class ValidateSubsystem(GoalSubsystem):
-    """Validate sources against regexes."""
-
     name = "validate"
+    help = "Validate sources against regexes."
 
     @classmethod
     def register_options(cls, register):
@@ -92,9 +91,8 @@ class ValidationConfig:
 
 
 class SourceFileValidation(Subsystem):
-    """Configuration for source file validation."""
-
     options_scope = "sourcefile-validation"
+    help = "Configuration for source file validation."
 
     @classmethod
     def register_options(cls, register):

@@ -33,10 +33,10 @@ from pants.util.strutil import create_path_env_var
 
 
 class PexBinary(TemplatedExternalTool):
-    """The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."""
-
     options_scope = "download-pex-bin"
     name = "pex"
+    help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
+
     default_version = "v2.1.24"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
 

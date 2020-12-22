@@ -253,9 +253,8 @@ class CoverageReports(EngineAwareReturnType):
 
 
 class TestSubsystem(GoalSubsystem):
-    """Run tests."""
-
     name = "test"
+    help = "Run tests."
 
     required_union_implementations = (TestFieldSet,)
 

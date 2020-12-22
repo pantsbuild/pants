@@ -95,9 +95,9 @@ class CoverageReportType(Enum):
 
 
 class CoverageSubsystem(PythonToolBase):
-    """Configuration for Python test coverage measurement."""
-
     options_scope = "coverage-py"
+    help = "Configuration for Python test coverage measurement."
+
     default_version = "coverage>=5.0.3,<5.1"
     default_entry_point = "coverage"
     register_interpreter_constraints = True

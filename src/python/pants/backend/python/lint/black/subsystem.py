@@ -8,9 +8,9 @@ from pants.option.custom_types import file_option, shell_str
 
 
 class Black(PythonToolBase):
-    """The Black Python code formatter (https://black.readthedocs.io/)."""
-
     options_scope = "black"
+    help = "The Black Python code formatter (https://black.readthedocs.io/)."
+
     default_version = "black==20.8b1"
     default_extra_requirements = ["setuptools"]
     default_entry_point = "black:patched_main"

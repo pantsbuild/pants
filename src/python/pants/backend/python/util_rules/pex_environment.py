@@ -24,9 +24,8 @@ from pants.util.strutil import create_path_env_var
 
 
 class PexRuntimeEnvironment(Subsystem):
-    """How Pants uses Pex to run Python subprocesses."""
-
     options_scope = "pex"
+    help = "How Pants uses Pex to run Python subprocesses."
 
     @classmethod
     def register_options(cls, register):

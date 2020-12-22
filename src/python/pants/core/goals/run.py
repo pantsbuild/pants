@@ -53,13 +53,11 @@ class RunRequest:
 
 
 class RunSubsystem(GoalSubsystem):
-    """Runs a binary target.
-
-    This goal propagates the return code of the underlying executable. Run `echo $?` to inspect the
-    resulting return code.
-    """
-
     name = "run"
+    help = (
+        "Runs a binary target.\n\nThis goal propagates the return code of the underlying "
+        "executable. Run `echo $?` to inspect the resulting return code."
+    )
 
     required_union_implementations = (RunFieldSet,)
 

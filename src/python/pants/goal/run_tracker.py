@@ -42,9 +42,8 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
 
 
 class RunTracker(Subsystem):
-    """Tracks and times the execution of a pants run."""
-
     options_scope = "run-tracker"
+    help = "Tracks and times the execution of a pants run."
 
     # The name of the tracking root for the main thread (and the foreground worker threads).
     DEFAULT_ROOT_NAME = "main"

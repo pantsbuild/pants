@@ -21,9 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class ExportCodegenSubsystem(GoalSubsystem):
-    """Write generated files to `dist/codegen` for use outside of Pants."""
-
     name = "export-codegen"
+    help = "Write generated files to `dist/codegen` for use outside of Pants."
 
     required_union_implementations = (GenerateSourcesRequest,)
 

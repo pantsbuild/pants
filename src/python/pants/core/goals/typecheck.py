@@ -132,9 +132,8 @@ class TypecheckRequest(StyleRequest):
 
 
 class TypecheckSubsystem(GoalSubsystem):
-    """Run type checkers."""
-
     name = "typecheck"
+    help = "Run type checkers."
 
     required_union_implementations = (TypecheckRequest,)
 

@@ -26,18 +26,16 @@ class TargetGranularity(Enum):
 
 
 class FilterSubsystem(LineOriented, GoalSubsystem):
-    """Filter the input targets based on various criteria.
-
-    Most of the filtering options below are comma-separated lists of filtering criteria, with an
-    implied logical OR between them, so that a target passes the filter if it matches any of the
-    criteria in the list.  A '-' prefix inverts the sense of the entire comma-separated list, so
-    that a target passes the filter only if it matches none of the criteria in the list.
-
-    Each of the filtering options may be specified multiple times, with an implied logical AND
-    between them.
-    """
-
     name = "filter"
+    help = (
+        "Filter the input targets based on various criteria.\n\nMost of the filtering options "
+        "below are comma-separated lists of filtering criteria, with an implied logical OR between "
+        "them, so that a target passes the filter if it matches any of the criteria in the list. "
+        "A '-' prefix inverts the sense of the entire comma-separated list, so that a target "
+        "passes the filter only if it matches none of the criteria in the list.\n\nEach of the "
+        "filtering options may be specified multiple times, with an implied logical AND between "
+        "them."
+    )
 
     @classmethod
     def register_options(cls, register):

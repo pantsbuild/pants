@@ -45,9 +45,8 @@ class ResolverVersion(Enum):
 
 
 class PythonSetup(Subsystem):
-    """A Python environment."""
-
     options_scope = "python-setup"
+    help = "Options for Pants's Python support."
 
     @classmethod
     def register_options(cls, register):

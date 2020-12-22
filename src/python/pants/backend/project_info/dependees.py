@@ -96,9 +96,8 @@ class DependeesOutputFormat(Enum):
 
 
 class DependeesSubsystem(LineOriented, GoalSubsystem):
-    """List all targets that depend on any of the input files/targets."""
-
     name = "dependees"
+    help = "List all targets that depend on any of the input files/targets."
 
     @classmethod
     def register_options(cls, register):

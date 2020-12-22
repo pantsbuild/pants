@@ -91,9 +91,8 @@ class SourceRootPatternMatcher:
 
 
 class SourceRootConfig(Subsystem):
-    """Configuration for roots of source trees."""
-
     options_scope = "source"
+    help = "Configuration for roots of source trees."
 
     DEFAULT_ROOT_PATTERNS = ["/", "src", "src/python", "src/py"]
 

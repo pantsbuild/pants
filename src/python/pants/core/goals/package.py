@@ -64,9 +64,8 @@ class OutputPathField(StringField):
 
 
 class PackageSubsystem(GoalSubsystem):
-    """Create a distributable package."""
-
     name = "package"
+    help = "Create a distributable package."
 
     required_union_implementations = (PackageFieldSet,)
 

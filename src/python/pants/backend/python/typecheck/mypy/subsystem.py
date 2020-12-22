@@ -9,9 +9,9 @@ from pants.option.custom_types import file_option, shell_str, target_option
 
 
 class MyPy(PythonToolBase):
-    """The MyPy Python type checker (http://mypy-lang.org/)."""
-
     options_scope = "mypy"
+    help = "The MyPy Python type checker (http://mypy-lang.org/)."
+
     default_version = "mypy==0.782"
     default_entry_point = "mypy"
     # See `mypy/rules.py`. We only use these default constraints in some situations. Technically,

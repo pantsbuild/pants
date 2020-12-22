@@ -286,12 +286,10 @@ class HelpInfoExtracter:
                 )
                 raise ValueError(
                     f"Subsystem {cls_name} with scope `{scope_info.scope}` has no description. "
-                    f"Add a docstring or implement get_description()."
+                    f"Add a class property `help`."
                 )
             is_goal = optionable_cls is not None and issubclass(optionable_cls, GoalSubsystem)
-            oshi: OptionScopeHelpInfo = HelpInfoExtracter(
-                scope_info.scope
-            ).get_option_scope_help_info(
+            oshi = HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                 scope_info.description, options.get_parser(scope_info.scope), is_goal
             )
             scope_to_help_info[oshi.scope] = oshi

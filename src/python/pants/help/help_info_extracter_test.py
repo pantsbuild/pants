@@ -226,18 +226,16 @@ def test_grouping():
 
 def test_get_all_help_info():
     class Global(Subsystem):
-        """Global options."""
-
         options_scope = GLOBAL_SCOPE
+        help = "Global options."
 
         @classmethod
         def register_options(cls, register):
             register("-o", "--opt1", type=int, default=42, help="Option 1")
 
     class Foo(Subsystem):
-        """A foo."""
-
         options_scope = "foo"
+        help = "A foo."
 
         @classmethod
         def register_options(cls, register):
@@ -245,32 +243,22 @@ def test_get_all_help_info():
             register("--opt3", advanced=True, choices=["a", "b", "c"])
 
     class Bar(GoalSubsystem):
-        """The bar goal."""
-
         name = "bar"
+        help = "The bar goal."
 
     class QuxField(StringField):
-        """A qux string."""
-
         alias = "qux"
         default = "blahblah"
+        help = "A qux string."
 
     class QuuxField(IntField):
-        """A quux int.
-
-        Must be non-zero. Or zero. Whatever you like really.
-        """
-
         alias = "quux"
         required = True
+        help = "A quux int.\n\nMust be non-zero. Or zero. Whatever you like really."
 
     class BazLibrary(Target):
-        """A library of baz-es.
-
-        Use it however you like.
-        """
-
         alias = "baz_library"
+        help = "A library of baz-es.\n\nUse it however you like."
 
         core_fields = [QuxField, QuuxField]
 
@@ -415,7 +403,7 @@ def test_get_all_help_info():
                     {
                         "alias": "quux",
                         "default": None,
-                        "description": "A quux int. Must be non-zero. Or zero. "
+                        "description": "A quux int.\n\nMust be non-zero. Or zero. "
                         "Whatever you like really.",
                         "required": True,
                         "type_hint": "int",
