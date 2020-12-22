@@ -4,7 +4,7 @@
 remote_cache_read = true
 remote_cache_write = true
 
-remote_store_server = "build.toolchain.com:443"
+remote_store_server = "build2.toolchain.com:443"
 remote_store_initial_timeout=250
 remote_store_timeout_multiplier=1.5
 remote_store_maximum_timeout=5000
