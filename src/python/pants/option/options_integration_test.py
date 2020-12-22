@@ -42,7 +42,7 @@ def test_invalid_options() -> None:
 
 
 @ensure_daemon
-def test_deprecation_and_ignore_pants_warnings() -> None:
+def test_deprecation_and_ignore_pants_warnings(use_pantsd: bool) -> None:
     plugin = dedent(
         """\
         from pants.option.subsystem import Subsystem
@@ -73,7 +73,7 @@ def test_deprecation_and_ignore_pants_warnings() -> None:
             },
             "mock-options": {"deprecated": "foo"},
         }
-        result = run_pants(["help"], config=config)
+        result = run_pants(["help"], config=config, use_pantsd=use_pantsd)
         result.assert_success()
         assert (
             "DEPRECATED: option 'deprecated' in scope 'mock-options' will be removed in version "
@@ -82,7 +82,7 @@ def test_deprecation_and_ignore_pants_warnings() -> None:
 
         # Now use `ignore_pants_warnings`.
         config["GLOBAL"]["ignore_pants_warnings"] = ["DEPRECATED: option 'deprecated'"]  # type: ignore[index]
-        ignore_result = run_pants(["help"], config=config)
+        ignore_result = run_pants(["help"], config=config, use_pantsd=use_pantsd)
         ignore_result.assert_success()
         assert "DEPRECATED: option 'deprecated'" not in ignore_result.stderr
 

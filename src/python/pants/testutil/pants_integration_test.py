@@ -9,13 +9,15 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Iterator, List, Mapping, Optional, Union
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
 from pants.testutil._process_handler import SubprocessProcessHandler
-from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_file_dump, safe_mkdir, safe_open
 from pants.util.osutil import Pid
 from pants.util.strutil import ensure_binary
@@ -284,31 +286,9 @@ def kill_daemon(pid_dir=None):
         pantsd_client.terminate()
 
 
-def ensure_daemon(f):
-    """A decorator for running an integration test with and without the daemon enabled."""
-
-    def wrapper(*args, **kwargs):
-        for enable_daemon in [False, True]:
-            enable_daemon_str = str(enable_daemon)
-            env = {
-                "HERMETIC_ENV": "PANTS_PANTSD,PANTS_SUBPROCESSDIR",
-                "PANTS_PANTSD": enable_daemon_str,
-            }
-            with environment_as(**env):
-                try:
-                    f(*args, **kwargs)
-                except Exception:
-                    print(f"Test failed with enable-pantsd={enable_daemon}:")
-                    if not enable_daemon:
-                        print(
-                            "Skipping run with pantsd=true because it already "
-                            "failed with pantsd=false."
-                        )
-                    raise
-                finally:
-                    kill_daemon()
-
-    return wrapper
+def ensure_daemon(func):
+    """A decorator to assist with running tests with and without the daemon enabled."""
+    return pytest.mark.parametrize("use_pantsd", [True, False])(func)
 
 
 def render_logs(workdir: str) -> None:
