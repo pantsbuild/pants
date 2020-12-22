@@ -32,6 +32,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.docutil import docs_url
 
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` rules
@@ -63,7 +64,9 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
             Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
         )
         if len(binary_source_paths.files) != 1:
-            instructions_url = "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
+            instructions_url = docs_url(
+                "python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
+            )
             if not ep_val:
                 raise InvalidFieldException(
                     f"The `{ep_alias}` field is not set for the target {address}. Run "

@@ -3,6 +3,7 @@
 
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Target
+from pants.util.docutil import docs_url
 
 
 class PylintPluginSources(PythonSources):
@@ -13,7 +14,7 @@ class PylintPluginDependencies(Dependencies):
     help = (
         "Addresses to other targets that this plugin depends on.\n\nDue to restrictions with "
         "Pylint plugins, these targets must either be third-party Python dependencies "
-        "(https://www.pantsbuild.org/docs/python-third-party-dependencies) or be located within "
+        f"({docs_url('python-third-party-dependencies')}) or be located within "
         "this target's same directory or a subdirectory."
     )
 
