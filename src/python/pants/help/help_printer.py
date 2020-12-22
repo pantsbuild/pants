@@ -22,7 +22,7 @@ from pants.option.arg_splitter import (
     VersionHelp,
 )
 from pants.option.scope import GLOBAL_SCOPE
-from pants.util.strutil import hard_wrap
+from pants.util.strutil import first_paragraph, hard_wrap
 
 
 class HelpPrinter(MaybeColor):
@@ -144,7 +144,7 @@ class HelpPrinter(MaybeColor):
         subsystem_description: Dict[str, str] = {}
         for alias, help_info in self._all_help_info.scope_to_help_info.items():
             if not help_info.is_goal and alias:
-                subsystem_description[alias] = help_info.description
+                subsystem_description[alias] = first_paragraph(help_info.description)
 
         longest_subsystem_alias = max(len(alias) for alias in subsystem_description.keys())
         chars_before_description = longest_subsystem_alias + 2

@@ -5,9 +5,9 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 
 
 class IPython(PythonToolBase):
-    """The IPython enhanced REPL (https://ipython.org/)."""
-
     options_scope = "ipython"
+    help = "The IPython enhanced REPL (https://ipython.org/)."
+
     default_version = "ipython==7.16.1"  # The last version to support Python 3.6.
     default_entry_point = "IPython:start_ipython"
 

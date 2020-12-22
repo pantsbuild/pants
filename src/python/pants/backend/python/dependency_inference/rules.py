@@ -33,9 +33,8 @@ from pants.python.python_setup import PythonSetup
 
 
 class PythonInferSubsystem(Subsystem):
-    """Options controlling which dependencies will be inferred for Python targets."""
-
     options_scope = "python-infer"
+    help = "Options controlling which dependencies will be inferred for Python targets."
 
     @classmethod
     def register_options(cls, register):

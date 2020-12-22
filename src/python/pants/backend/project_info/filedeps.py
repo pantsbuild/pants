@@ -23,9 +23,8 @@ from pants.engine.target import (
 
 
 class FiledepsSubsystem(LineOriented, GoalSubsystem):
-    """List all source and BUILD files a target depends on."""
-
     name = "filedeps"
+    help = "List all source and BUILD files a target depends on."
 
     @classmethod
     def register_options(cls, register):

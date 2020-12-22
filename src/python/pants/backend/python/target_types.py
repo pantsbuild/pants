@@ -71,9 +71,8 @@ class InterpreterConstraintsField(StringSequenceField):
 
 
 class PexBinaryDefaults(Subsystem):
-    """Default settings for creating PEX executables."""
-
     options_scope = "pex-binary-defaults"
+    help = "Default settings for creating PEX executables."
 
     @classmethod
     def register_options(cls, register):

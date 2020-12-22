@@ -86,12 +86,11 @@ class ChangedOptions:
 
 
 class Changed(Subsystem):
-    """Tell Pants to detect what files and targets have changed from Git.
-
-    See https://www.pantsbuild.org/docs/advanced-target-selection.
-    """
-
     options_scope = "changed"
+    help = (
+        "Tell Pants to detect what files and targets have changed from Git.\n\nSee "
+        "https://www.pantsbuild.org/docs/advanced-target-selection."
+    )
 
     @classmethod
     def register_options(cls, register):

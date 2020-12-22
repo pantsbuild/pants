@@ -33,9 +33,8 @@ class HelpFormatter(MaybeColor):
                 # The basic options section gets the description and options scope info.
                 # No need to repeat those in the advanced section.
                 title = f"{display_scope} options"
-                lines.append(self.maybe_green(f"{title}\n{'-' * len(title)}"))
-                if oshi.description:
-                    lines.append(f"\n{oshi.description}")
+                lines.append(self.maybe_green(f"{title}\n{'-' * len(title)}\n"))
+                lines.extend(hard_wrap(oshi.description))
                 lines.append(" ")
                 config_section = f"[{oshi.scope or 'GLOBAL'}]"
                 lines.append(f"Config section: {self.maybe_magenta(config_section)}")

@@ -7,12 +7,11 @@ from pants.option.subsystem import Subsystem
 
 
 class PythonRepos(Subsystem):
-    """External Python code repositories, such as PyPI.
-
-    These options may be used to point to custom cheeseshops when resolving requirements.
-    """
-
     options_scope = "python-repos"
+    help = (
+        "External Python code repositories, such as PyPI.\n\nThese options may be used to point to "
+        "custom cheeseshops when resolving requirements."
+    )
 
     @classmethod
     def register_options(cls, register):

@@ -154,9 +154,8 @@ class LanguageFmtResults:
 
 
 class FmtSubsystem(GoalSubsystem):
-    """Autoformat source code."""
-
     name = "fmt"
+    help = "Autoformat source code."
 
     required_union_implementations = (LanguageFmtTargets,)
 

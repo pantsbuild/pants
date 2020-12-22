@@ -309,9 +309,8 @@ class FirstPartyDependencyVersionScheme(enum.Enum):
 
 
 class SetupPyGeneration(Subsystem):
-    """Options to control how setup.py is generated from a `python_distribution` target."""
-
     options_scope = "setup-py-generation"
+    help = "Options to control how setup.py is generated from a `python_distribution` target."
 
     @classmethod
     def register_options(cls, register):

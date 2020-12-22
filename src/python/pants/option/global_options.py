@@ -158,9 +158,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 
 
 class GlobalOptions(Subsystem):
-    """Options to control the overall behavior of Pants."""
-
     options_scope = GLOBAL_SCOPE
+    help = "Options to control the overall behavior of Pants."
 
     @classmethod
     def register_bootstrap_options(cls, register):

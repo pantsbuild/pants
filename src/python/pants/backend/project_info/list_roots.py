@@ -8,9 +8,8 @@ from pants.source.source_root import AllSourceRoots
 
 
 class RootsSubsystem(LineOriented, GoalSubsystem):
-    """List the repo's registered source roots."""
-
     name = "roots"
+    help = "List the repo's registered source roots."
 
 
 class Roots(Goal):

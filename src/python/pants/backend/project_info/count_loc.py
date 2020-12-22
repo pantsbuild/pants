@@ -20,9 +20,9 @@ from pants.util.strutil import pluralize
 
 
 class SuccinctCodeCounter(TemplatedExternalTool):
-    """The Succinct Code Counter, aka `scc` (https://github.com/boyter/scc)."""
-
     options_scope = "scc"
+    help = "The Succinct Code Counter, aka `scc` (https://github.com/boyter/scc)."
+
     default_version = "2.12.0"
     default_known_versions = [
         "2.12.0|darwin|70b7002cd1e4541cb37b7b9cbc0eeedd13ceacb49628e82ab46332bb2e65a5a6|1842530",
@@ -60,9 +60,8 @@ class SuccinctCodeCounter(TemplatedExternalTool):
 
 
 class CountLinesOfCodeSubsystem(GoalSubsystem):
-    """Count lines of code."""
-
     name = "count-loc"
+    help = "Count lines of code."
 
 
 class CountLinesOfCode(Goal):
