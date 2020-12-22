@@ -605,7 +605,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         with handler.session():
             scheduler.record_test_observation(128)
             scheduler.product_request(TrueResult, subjects=[0])
-            histograms = scheduler.get_timeseries_histograms()
+            histograms = scheduler.get_observation_histograms()
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunits_with_counters = [item for item in finished if "counters" in item]

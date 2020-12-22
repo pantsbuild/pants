@@ -278,12 +278,7 @@ impl CommandRunner {
   // Outputs progress reported by the server and returns the next actionable operation
   // or gRPC status back to the main loop (plus the operation name so the main loop can
   // reconnect).
-  async fn wait_on_operation_stream<S>(
-    &self,
-    mut stream: S,
-    build_id: &str,
-    context: &Context,
-  ) -> StreamOutcome
+  async fn wait_on_operation_stream<S>(&self, mut stream: S, context: &Context) -> StreamOutcome
   where
     S: Stream<Item = Result<Operation, Status>> + Unpin,
   {
@@ -292,7 +287,7 @@ impl CommandRunner {
 
     trace!(
       "wait_on_operation_stream (build_id={}): monitoring stream",
-      build_id
+      &context.build_id
     );
 
     loop {
@@ -315,7 +310,7 @@ impl CommandRunner {
         Some(Ok(operation)) => {
           trace!(
             "wait_on_operation_stream (build_id={}): got operation: {:?}",
-            build_id,
+            &context.build_id,
             &operation
           );
 
@@ -688,7 +683,7 @@ impl CommandRunner {
           // or status to interpret.
           let operation_stream = operation_stream_response.into_inner();
           let stream_outcome = self
-            .wait_on_operation_stream(operation_stream, &context.build_id, &context)
+            .wait_on_operation_stream(operation_stream, &context)
             .await;
 
           match stream_outcome {

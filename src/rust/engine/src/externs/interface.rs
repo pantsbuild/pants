@@ -303,10 +303,10 @@ py_module_initializer!(native_engine, |py, m| {
   )?;
   m.add(
     py,
-    "session_get_timeseries_histograms",
+    "session_get_observation_histograms",
     py_fn!(
       py,
-      session_get_timeseries_histograms(a: PyScheduler, b: PySession)
+      session_get_observation_histograms(a: PyScheduler, b: PySession)
     ),
   )?;
   m.add(
@@ -1364,7 +1364,7 @@ fn session_cancel_all(py: Python) -> PyUnitResult {
   })
 }
 
-fn session_get_timeseries_histograms(
+fn session_get_observation_histograms(
   py: Python,
   scheduler_ptr: PyScheduler,
   session_ptr: PySession,
