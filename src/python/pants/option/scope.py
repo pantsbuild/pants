@@ -37,7 +37,7 @@ class ScopeInfo:
     @property
     def description(self) -> str:
         if hasattr(self.optionable_cls, "help"):
-            return getattr(self.optionable_cls, "help")
+            return cast(str, getattr(self.optionable_cls, "help"))
         return cast(str, self._optionable_cls_attr("get_description", lambda: "")())
 
     @property
