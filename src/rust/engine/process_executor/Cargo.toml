@@ -10,7 +10,7 @@ clap = "2"
 dirs = "1"
 env_logger = "0.5.4"
 fs = { path = "../fs" }
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
 hashing = { path = "../hashing" }
 log = "0.4"
 process_execution = { path = "../process_execution" }

@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 async_latch = { path = "../async_latch" }
 bytes = "0.5"
-futures = "0.3.5"
+futures = "0.3"
 log = "0.4"
 nails = "0.8"
 os_pipe = "0.9"
