@@ -56,17 +56,23 @@ async fn handle_client_output(
   loop {
     tokio::select! {
       output = stdio_read.next() => {
-        let io_result = match output {
-          Some(ChildOutput::Stdout(bytes)) => stdout.write_all(&bytes).await,
-          Some(ChildOutput::Stderr(bytes)) => stderr.write_all(&bytes).await,
-          Some(ChildOutput::Exit(_)) | None => {
-            // NB: We ignore exit here and allow the main thread to handle exiting.
-            break;
+        match output {
+          Some(ChildOutput::Stdout(bytes)) => {
+            stdout.write_all(&bytes).await.map_err(|err| {
+              NailgunClientError::PostConnect(format!("Failed to flush stdout: {}", err))
+            })?
+          },
+          Some(ChildOutput::Stderr(bytes)) => {
+            stderr.write_all(&bytes).await.map_err(|err| {
+              NailgunClientError::PostConnect(format!("Failed to flush stderr: {}", err))
+            })?
+          },
+          Some(ChildOutput::Exit(_)) => {
+            // NB: We ignore exit here and allow the main thread to handle exiting. This API is
+            // error prone: see https://github.com/stuhood/nails/issues/1 for more info.
           }
-        };
-        io_result.map_err(|err| {
-          NailgunClientError::PostConnect(format!("Failed to flush stdio: {}", err))
-        })?;
+          None => break,
+        }
       }
       _ = signal_stream.recv() => {
           if is_exiting {
