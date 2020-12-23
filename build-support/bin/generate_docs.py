@@ -1,6 +1,20 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Generates and uploads the Pants reference documentation.
+
+Dry run:
+
+    ./pants run build-support/bin/generate_docs.py
+
+Live run:
+
+    ./pants run build-support/bin/generate_docs.py -- --sync --api-key=<API_KEY>
+
+where API_KEY is your readme.io API Key, found here:
+  https://dash.readme.com/project/pants/v2.0/api-key
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -9,7 +23,7 @@ import json
 import logging
 import os
 import pkgutil
-import sys
+import subprocess
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, Optional, cast
 
@@ -23,74 +37,86 @@ from pants.version import VERSION
 logger = logging.getLogger(__name__)
 
 
+def main() -> None:
+    logging.basicConfig(format="[%(levelname)s]: %(message)s", level=logging.INFO)
+    version = determine_pants_version()
+    args = create_parser().parse_args()
+    help_info = run_pants_help_all()
+    generator = ReferenceGenerator(args, version, help_info)
+    if args.sync:
+        generator.sync()
+    else:
+        generator.render()
+
+
+def determine_pants_version() -> str:
+    # Set the version based on VERSION, e.g. 2.1.0.dev0 becomes 2.1.
+    version = ".".join(VERSION.split(".")[:2])
+    key_confirmation = input(
+        f"Generating docs for Pants {version}. Is this the correct version? [Y/n]: "
+    )
+    if key_confirmation and key_confirmation.lower() != "y":
+        die(
+            "Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change "
+            "src/python/pants/VERSION."
+        )
+    return version
+
+
+def create_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
+    parser.add_argument(
+        "--sync",
+        action="store_true",
+        default=False,
+        help="Whether to sync the generated reference docs to the docsite. "
+        "If unset, will generate markdown files to the path in --output "
+        "instead.  If set, --api-key must be set.",
+    )
+    parser.add_argument(
+        "--output",
+        default=PosixPath(os.path.sep) / "tmp" / "pants_docs" / "help" / "option",
+        type=Path,
+        help="Path to a directory under which we generate the markdown files. "
+        "Useful for viewing the files locally when testing and debugging "
+        "the renderer.",
+    )
+    parser.add_argument("--api-key", help="The readme.io API key to use. Required for --sync.")
+    return parser
+
+
+def run_pants_help_all() -> Dict:
+    deactivated_backends = [
+        "internal_plugins.releases",
+        "toolchain.pants.auth",
+        "toolchain.pants.buildsense",
+        "toolchain.pants.common",
+    ]
+    activated_backends = ["pants.backend.python.lint.bandit", "pants.backend.python.lint.pylint"]
+    argv = [
+        "./pants",
+        "--concurrent",
+        f"--backend-packages=-[{', '.join(map(repr, deactivated_backends))}]",
+        f"--backend-packages=+[{', '.join(map(repr, activated_backends))}]",
+        "--no-verify-config",
+        "help-all",
+    ]
+    run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+    try:
+        run.check_returncode()
+    except subprocess.CalledProcessError:
+        logger.error(
+            f"Running {argv} failed with exit code {run.returncode}.\n\nstdout:\n{run.stdout}"
+            f"\n\nstderr:\n{run.stderr}"
+        )
+        raise
+    return cast(Dict, json.loads(run.stdout))
+
+
 class ReferenceGenerator:
-    """Generates and uploads the Pants reference documentation.
-
-    To run, first generate the data with:
-
-    ./pants \
-      --backend-packages="-['internal_plugins.releases', 'toolchain.pants.auth', \
-        'toolchain.pants.buildsense', 'toolchain.pants.common']" \
-      --backend-packages="+['pants.backend.python.lint.bandit', \
-        'pants.backend.python.lint.pylint', 'pants.backend.codegen.protobuf.python', \
-        'pants.backend.awslambda.python']" \
-      --no-verify-config help-all > /tmp/help_info
-
-    Then:
-
-    ./pants run build-support/bin/generate_docs.py -- \
-       --input=/tmp/help_info --sync --api-key=<API_KEY>
-
-    where API_KEY is your readme.io API Key, found here:
-      https://dash.readme.com/project/pants/v2.0/api-key
-
-    TODO: Integrate this into the release process.
-    """
-
-    @classmethod
-    def create(cls) -> ReferenceGenerator:
-        parser = argparse.ArgumentParser(description="Generate the Pants reference markdown files.")
-        # Note that we want to be able to run this script using `./pants run`, so having it
-        # invoke `./pants help-all` itself would be unnecessarily complicated.
-        # So we require the input to be provided externally.
-        parser.add_argument(
-            "--input",
-            default=None,
-            help="Path to a file containing the output of `./pants help-all`. "
-            "If unspecified, reads from stdin.",
-        )
-        parser.add_argument(
-            "--sync",
-            action="store_true",
-            default=False,
-            help="Whether to sync the generated reference docs to the docsite. "
-            "If unset, will generate markdown files to the path in --output "
-            "instead.  If set, --api-key must be set.",
-        )
-        parser.add_argument(
-            "--output",
-            default=PosixPath(os.path.sep) / "tmp" / "pants_docs" / "help" / "option",
-            type=Path,
-            help="Path to a directory under which we generate the markdown files. "
-            "Useful for viewing the files locally when testing and debugging "
-            "the renderer.",
-        )
-        parser.add_argument("--api-key", help="The readme.io API key to use. Required for --sync.")
-        return ReferenceGenerator(parser.parse_args())
-
-    def __init__(self, args):
+    def __init__(self, args: argparse.Namespace, version: str, help_info: Dict) -> None:
         self._args = args
-
-        # Set the version based on VERSION, e.g. 2.1.0.dev0 becomes 2.1.
-        self._version = ".".join(VERSION.split(".")[:2])
-        key_confirmation = input(
-            f"Generating docs for Pants {self._version}. Is this the correct version? [Y/n]: "
-        )
-        if key_confirmation and key_confirmation.lower() != "y":
-            die(
-                "Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change "
-                "src/python/pants/VERSION."
-            )
+        self._version = version
 
         def get_tpl(name: str) -> str:
             # Note that loading relative to __name__ may not always work when __name__=='__main__'.
@@ -109,14 +135,11 @@ class ReferenceGenerator:
                 "target": target_tpl,
             }
         )
-        self._category_id = None  # Fetched lazily.
+        self._category_id: Optional[str] = None  # Fetched lazily.
 
         # Load the data.
-        json_str = (
-            sys.stdin.read() if self._args.input is None else Path(self._args.input).read_text()
-        )
-        self._options_info = self.process_options_input(json_str, sync=self._args.sync)
-        self._targets_info = self.process_targets_input(json_str)
+        self._options_info = self.process_options_input(help_info, sync=self._args.sync)
+        self._targets_info = self.process_targets_input(help_info)
 
     @staticmethod
     def _link(scope: str, *, sync: bool) -> str:
@@ -124,8 +147,7 @@ class ReferenceGenerator:
         return f"reference-{scope}" if sync else f"{scope}.md"
 
     @classmethod
-    def process_options_input(cls, json_str: str, *, sync: bool) -> Dict:
-        help_info = json.loads(json_str)
+    def process_options_input(cls, help_info: Dict, *, sync: bool) -> Dict:
         scope_to_help_info = help_info["scope_to_help_info"]
 
         # Process the list of consumed_scopes into a comma-separated list, and add it to the option
@@ -161,11 +183,11 @@ class ReferenceGenerator:
             for opt in shi["deprecated"]:
                 munge_option(opt)
 
-        return cast(Dict, help_info)
+        return help_info
 
     @classmethod
-    def process_targets_input(cls, json_str: str) -> Dict[str, Dict[str, Any]]:
-        target_info = json.loads(json_str)["name_to_target_type_info"]
+    def process_targets_input(cls, help_info: Dict) -> Dict[str, Dict[str, Any]]:
+        target_info = help_info["name_to_target_type_info"]
         for target in target_info.values():
             for field in target["fields"]:
                 # Combine the `default` and `required` properties.
@@ -182,7 +204,7 @@ class ReferenceGenerator:
         """The id of the "Reference" category on the docsite."""
         if self._category_id is None:
             self._category_id = self._get_id("categories/reference")
-        return cast(str, self._category_id)
+        return self._category_id
 
     def _access_readme_api(self, url_suffix: str, method: str, payload: str) -> Dict:
         """Sends requests to the readme.io API."""
@@ -405,13 +427,6 @@ class ReferenceGenerator:
                 body=self._render_target(alias),
             )
 
-    def main(self) -> None:
-        if self._args.sync:
-            self.sync()
-        else:
-            self.render()
-
 
 if __name__ == "__main__":
-    logging.basicConfig(format="[%(levelname)s]: %(message)s", level=logging.INFO)
-    ReferenceGenerator.create().main()
+    main()
