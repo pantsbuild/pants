@@ -84,8 +84,8 @@ class PexBinaryDefaults(Subsystem):
             type=bool,
             default=True,
             help=(
-                "Whether built PEX binaries should emit PEX warnings at runtime by default. "
-                "Can be overridden by specifying the `emit_warnings` parameter of individual "
+                "Whether built PEX binaries should emit PEX warnings at runtime by default."
+                "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
                 "`pex_binary` targets"
             ),
         )
@@ -117,8 +117,8 @@ class PexEntryPointField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     help = (
         "The entry point for the binary, i.e. what gets run when executing `./my_binary.pex`.\n\n"
         "You can specify a full module like 'path.to.module' and 'path.to.module:func', or use a "
-        "shorthand to specify a file name, using the same syntax as the `sources` field:\n\n    1) "
-        "'app.py', Pants will convert into the module `path.to.app`;\n    2) 'app.py:func', Pants "
+        "shorthand to specify a file name, using the same syntax as the `sources` field:\n\n  1) "
+        "'app.py', Pants will convert into the module `path.to.app`;\n  2) 'app.py:func', Pants "
         "will convert into `path.to.app:func`.\n\nYou must use the file name shorthand for file "
         "arguments to work with this target.\n\nTo leave off an entry point, set to '<none>'."
     )
@@ -156,10 +156,10 @@ class PexPlatformsField(StringSequenceField):
         "platforms to create a multiplatform PEX.\n\nTo use wheels for specific "
         "interpreter/platform tags, you can append them to the platform with hyphens like: "
         'PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-27-cp27mu", '
-        '"macosx_10.12_x86_64-cp-36-cp36m"):\n\n    - PLATFORM: the host platform, e.g. '
-        '"linux-x86_64", "macosx-10.12-x86_64".\n    - IMPL: the Python implementation '
-        'abbreviation, e.g. "cp", "pp", "jp".\n    - PYVER: a two-digit string representing '
-        'the Python version, e.g. "27", "36".\n    - ABI: the ABI tag, e.g. "cp36m", '
+        '"macosx_10.12_x86_64-cp-36-cp36m"):\n\n  - PLATFORM: the host platform, e.g. '
+        '"linux-x86_64", "macosx-10.12-x86_64".\n  - IMPL: the Python implementation '
+        'abbreviation, e.g. "cp", "pp", "jp".\n  - PYVER: a two-digit string representing '
+        'the Python version, e.g. "27", "36".\n  - ABI: the ABI tag, e.g. "cp36m", '
         '"cp27mu", "abi3", "none".'
     )
 

@@ -40,8 +40,8 @@ class PexRuntimeEnvironment(Subsystem):
             metavar="<binary-paths>",
             help=(
                 "The PATH value that will be used by the PEX subprocess and any subprocesses it "
-                'spawns. The special string "<PATH>" will expand to the contents of the PATH env '
-                "var."
+                'spawns.\n\nThe special string "<PATH>" will expand to the contents of the PATH '
+                "env var."
             ),
         )
         register(
@@ -51,9 +51,9 @@ class PexRuntimeEnvironment(Subsystem):
             default=["python", "python3", "python2"],
             metavar="<bootstrap-python-names>",
             help=(
-                "The names of Python binaries to search for to bootstrap PEX files with. This does "
-                "not impact which Python interpreter is used to run your code, only what is used "
-                "to run the PEX tool. See the `interpreter_search_paths` option in "
+                "The names of Python binaries to search for to bootstrap PEX files with.\n\nThis "
+                "does not impact which Python interpreter is used to run your code, only what is "
+                "used to run the PEX tool. See the `interpreter_search_paths` option in "
                 "`[python-setup]` to influence where interpreters are searched for."
             ),
         )
@@ -62,7 +62,9 @@ class PexRuntimeEnvironment(Subsystem):
             advanced=True,
             type=int,
             default=0,
-            help="Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging).",
+            help=(
+                "Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging)."
+            ),
         )
 
     @memoized_property

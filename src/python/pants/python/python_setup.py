@@ -58,10 +58,10 @@ class PythonSetup(Subsystem):
             default=["CPython>=3.6"],
             metavar="<requirement>",
             help=(
-                "The Python interpreters your codebase is compatible with. Specify with "
+                "The Python interpreters your codebase is compatible with.\n\nSpecify with "
                 "requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with version "
                 ">=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple "
-                "constraint strings will be ORed together. These constraints are used as the "
+                "constraint strings will be ORed together.\n\nThese constraints are used as the "
                 "default value for the `interpreter_constraints` field of Python targets."
             ),
         )
@@ -71,7 +71,7 @@ class PythonSetup(Subsystem):
             type=file_option,
             help=(
                 "When resolving third-party requirements, use this "
-                "constraints file to determine which versions to use. See "
+                "constraints file to determine which versions to use.\n\nSee "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
                 "on the format of constraint files and how constraints are applied in Pex and pip."
             ),
@@ -122,7 +122,7 @@ class PythonSetup(Subsystem):
             removal_version="2.5.0.dev1",
             removal_hint="",
             help=(
-                "The resolver implementation to use when resolving Python requirements. Support "
+                "The resolver implementation to use when resolving Python requirements.\n\nSupport "
                 f"for the {ResolverVersion.PIP_LEGACY.value!r} will be removed in Pants 2.5; so "
                 f"you're encouraged to start using the {ResolverVersion.PIP_2020.value!r} early. "
                 "For more information on this change see "
