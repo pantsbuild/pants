@@ -253,13 +253,13 @@ class Platform(Enum):
         return str(self.value)
 
 
-def _install_rust(homedir: str = "${HOME") -> List[str]:
+def _install_rust(homedir: str = "${HOME}") -> List[str]:
     rustup = (
         "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y "
         "--default-toolchain none"
     )
     # This will mutate the PATH to add `rustup` and `cargo`.
-    activate_rustup = f'source {homedir}/.cargo/env'
+    activate_rustup = f"source {homedir}/.cargo/env"
     return [rustup, activate_rustup]
 
 

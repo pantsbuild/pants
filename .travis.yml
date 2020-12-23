@@ -196,7 +196,7 @@ jobs:
     - sudo chown root:$USER /etc/fuse.conf
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
-    - source ${HOME/.cargo/env
+    - source ${HOME}/.cargo/env
     before_script:
     - ulimit -n 8192
     cache:
@@ -283,7 +283,7 @@ jobs:
     - sudo chown root:$USER /etc/fuse.conf
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
-    - source ${HOME/.cargo/env
+    - source ${HOME}/.cargo/env
     before_script:
     - ulimit -n 8192
     cache:
@@ -315,7 +315,7 @@ jobs:
     - brew cask install osxfuse
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
-    - source ${HOME/.cargo/env
+    - source ${HOME}/.cargo/env
     before_script:
     - ulimit -n 8192
     cache:
