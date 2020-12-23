@@ -169,10 +169,10 @@ class FmtSubsystem(GoalSubsystem):
             default=False,
             help=(
                 "Rather than formatting all files in a single batch, format each file as a "
-                "separate process. Why do this? You'll get many more cache hits. Why not do this? "
-                "Formatters both have substantial startup overhead and are cheap to add one "
+                "separate process.\n\nWhy do this? You'll get many more cache hits. Why not do "
+                "this? Formatters both have substantial startup overhead and are cheap to add one "
                 "additional file to the run. On a cold cache, it is much faster to use "
-                "`--no-per-file-caching`. We only recommend using `--per-file-caching` if you "
+                "`--no-per-file-caching`.\n\nWe only recommend using `--per-file-caching` if you "
                 "are using a remote cache or if you have benchmarked that this option will be "
                 "faster than `--no-per-file-caching` for your use case."
             ),
