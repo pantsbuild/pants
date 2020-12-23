@@ -412,7 +412,7 @@ SKIP_WHEELS_CONDITION = (
 
 def _bootstrap_commands(*, python_version: PythonVersion) -> List[str]:
     rustup = (
-        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y "
+        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y -v "
         "--default-toolchain none"
     )
     # This will mutate the PATH to add `rustup` and `cargo`.
