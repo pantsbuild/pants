@@ -8,10 +8,10 @@
   <span style="color: green">one of: <code>{{comma_separated_choices}}</code></span><br>
   {{/comma_separated_choices}}
   <span style="color: green">default: {{{marked_up_default}}}</span>
-  {{! Mark each of these as paragraphs to render as plain text, rather than markdown. }}
-  {{#deprecated_message}}<br><p style="color: darkred">{{deprecated_message}}</p>{{/deprecated_message}}
-  {{#removal_hint}}<br><p style="color: darkred">{{removal_hint}}</p>{{/removal_hint}}
-  <br><p>{{help}}</p>
+  {{! Mark both of these as paragraphs to render as plain text, rather than markdown. }}
+  {{! NB: We assume there's a removal_hint if deprecated_message is set. }}
+  {{#deprecated_message}}<p style="color: darkred">{{deprecated_message}}<br>{{removal_hint}}</p>{{/deprecated_message}}
+  <p>{{help}}</p>
 </div>
 <br>
 
