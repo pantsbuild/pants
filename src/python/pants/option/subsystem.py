@@ -76,25 +76,17 @@ class Subsystem(Optionable):
     Subsystems encapsulate the configuration and initialization of things like JVMs,
     Python interpreters, SCMs and so on.
 
-    Subsystem instances can be global or per-optionable. Global instances are useful for representing
-    global concepts, such as the SCM used in the workspace. Per-optionable instances allow individual
-    Optionable objects (notably, tasks) to have their own configuration for things such as artifact
-    caches.
-
-    Each subsystem type has an option scope. The global instance of that subsystem initializes
-    itself from options in that scope. An optionable-specific instance initializes itself from options
-    in an appropriate subscope, which defaults back to the global scope.
-
-    For example, the global artifact cache options would be in scope `cache`, but the
-    compile.java task can override those options in scope `cache.compile.java`.
-
-    Subsystems may depend on other subsystems.
+    Set the `help` class property with a description, which will be used in `./pants help`. For the
+    best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but
+    hard wrapping (`\n`) to separate distinct paragraphs and/or lists.
 
     :API: public
     """
 
     scope: str
     options: OptionValueContainer
+
+    help: ClassVar[str]
 
     # TODO: The full Options object for this pants run for use by `global_instance` and
     # `scoped_instance`.

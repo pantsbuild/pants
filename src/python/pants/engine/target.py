@@ -81,6 +81,10 @@ class Field:
     than `Any`. The type hint for `raw_value` is used to generate documentation, e.g. for
     `./pants help $target_type`.
 
+    Set the `help` class property with a description, which will be used in `./pants help`. For the
+    best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but
+    hard wrapping (`\n`) to separate distinct paragraphs and/or lists.
+
     Example:
 
         # NB: Really, this should subclass IntField. We only use Field as an example.
@@ -88,7 +92,7 @@ class Field:
             alias = "timeout"
             value: Optional[int]
             default = None
-            help = "A timeout field."
+            help = "A timeout field.\n\nMore information."
 
             @classmethod
             def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int:
@@ -267,7 +271,12 @@ _F = TypeVar("_F", bound=Field)
 
 @frozen_after_init
 class Target:
-    """A Target represents a combination of fields that are valid _together_."""
+    """A Target represents a combination of fields that are valid _together_.
+
+    Set the `help` class property with a description, which will be used in `./pants help`. For the
+    best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but
+    hard wrapping (`\n`) to separate distinct paragraphs and/or lists.
+    """
 
     # Subclasses must define these
     alias: ClassVar[str]
