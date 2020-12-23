@@ -88,6 +88,7 @@ class Field:
             alias = "timeout"
             value: Optional[int]
             default = None
+            help = "A timeout field."
 
             @classmethod
             def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int:
@@ -100,11 +101,14 @@ class Field:
                 return value_or_default
     """
 
-    # Subclasses must define this.
+    # Subclasses must define these.
     alias: ClassVar[str]
+    help: ClassVar[str]
+
     # Subclasses must define at least one of these two.
     default: ClassVar[ImmutableValue]
     required: ClassVar[bool] = False
+
     # Subclasses may define these.
     deprecated_removal_version: ClassVar[Optional[str]] = None
     deprecated_removal_hint: ClassVar[Optional[str]] = None
@@ -113,6 +117,17 @@ class Field:
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
         self._check_deprecated(raw_value, address)
         self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address=address)
+
+        if not address.is_file_target and not hasattr(self, "help"):
+            warn_or_error(
+                removal_version="2.3.0.dev0",
+                deprecated_entity_description="not setting `help` on a `Field`",
+                hint=(
+                    "Please set the class property `help: str` for the field "
+                    f"`{self.__class__}`. In Pants 2.3, Pants will no longer look at the docstring "
+                    "for help messages and it will error if `help` is not defined."
+                ),
+            )
 
     @classmethod
     def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
@@ -257,6 +272,7 @@ class Target:
     # Subclasses must define these
     alias: ClassVar[str]
     core_fields: ClassVar[Tuple[Type[Field], ...]]
+    help: ClassVar[str]
 
     # Subclasses may define these.
     deprecated_removal_version: ClassVar[Optional[str]] = None
@@ -290,6 +306,17 @@ class Target:
                 hint=(
                     f"Using the `{self.alias}` target type for {address}. "
                     f"{self.deprecated_removal_hint}"
+                ),
+            )
+
+        if not address.is_file_target and not hasattr(self, "help"):
+            warn_or_error(
+                removal_version="2.3.0.dev0",
+                deprecated_entity_description="not setting `help` on a `Target`",
+                hint=(
+                    "Please set the class property `help: str` for the target type "
+                    f"`{self.__class__}`. In Pants 2.3, Pants will no longer look at the docstring "
+                    "for help messages and it will error if `help` is not defined."
                 ),
             )
 
