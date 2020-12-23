@@ -80,9 +80,10 @@ jobs:
       -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
-      | sh -s -- -y -v --default-toolchain none && source ${HOME}/.cargo/env && ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py
-      --python-version 3.7 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix
-      ${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
+      | sh -s -- -y --default-toolchain none && source /travis/home/.cargo/env &&
+      ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.7
+      --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
+      --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     services:
     - docker
     stage: Bootstrap Pants
@@ -123,7 +124,7 @@ jobs:
     os: osx
     osx_image: xcode8
     script:
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y -v --default-toolchain
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
     - source ${HOME}/.cargo/env
     - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.7

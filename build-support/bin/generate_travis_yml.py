@@ -410,13 +410,13 @@ SKIP_WHEELS_CONDITION = (
 # ----------------------------------------------------------------------
 
 
-def _bootstrap_commands(*, python_version: PythonVersion) -> List[str]:
+def _bootstrap_commands(*, python_version: PythonVersion, homedir: str = "${HOME}") -> List[str]:
     rustup = (
-        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y -v "
+        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y "
         "--default-toolchain none"
     )
     # This will mutate the PATH to add `rustup` and `cargo`.
-    activate_rustup = 'source ${HOME}/.cargo/env'
+    activate_rustup = f'source {homedir}/.cargo/env'
     bootstrap_script = (
         "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version "
         f"{python_version.decimal} --aws-bucket ${{AWS_BUCKET}} --native-engine-so-key-prefix "
@@ -442,7 +442,9 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
         "script": [
             docker_build_travis_ci_image(),
             docker_run_travis_ci_image(
-                " && ".join(_bootstrap_commands(python_version=python_version))
+                " && ".join(
+                    _bootstrap_commands(python_version=python_version, homedir="/travis/home")
+                )
             ),
         ],
     }
