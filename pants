@@ -62,8 +62,8 @@ source "${HERE}/build-support/pants_venv"
 
 # Exposes:
 # + bootstrap_native_code: Builds target-specific native engine binaries.
-# shellcheck source=build-support/bin/native/bootstrap_code.sh
-source "${HERE}/build-support/bin/native/bootstrap_code.sh"
+# shellcheck source=build-support/bin/rust/bootstrap_code.sh
+source "${HERE}/build-support/bin/rust/bootstrap_code.sh"
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 

@@ -17,7 +17,7 @@ case "$MODE" in
   *) MODE_FLAG="--release" ;;
 esac
 
-RUST_TOOLCHAIN="$(cat "${REPO_ROOT}/rust-toolchain")"
+RUST_TOOLCHAIN_CONTENTS="$(cat "${REPO_ROOT}/rust-toolchain")"
 
 function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
@@ -30,13 +30,13 @@ function calculate_current_hash() {
   (
    cd "${REPO_ROOT}" || exit 1
    (echo "${MODE_FLAG}"
-    echo "${RUST_TOOLCHAIN}"
+    echo "${RUST_TOOLCHAIN_CONTENTS}"
     uname
     python --version 2>&1
     git ls-files --cached --others --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/rust-toolchain" \
-     "${REPO_ROOT}/build-support/bin/native" \
+     "${REPO_ROOT}/build-support/bin/rust" \
    | grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" \
    | git hash-object --stdin-paths) | fingerprint_data
   )

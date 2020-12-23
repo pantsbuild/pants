@@ -16,8 +16,8 @@ source "${REPO_ROOT}/build-support/common.sh"
 # + MODE_FLAG: The string to pass to Cargo to determine if we're in debug or release mode.
 # Exposes:
 # + calculate_current_hash: Generate a stable hash to determine if we need to rebuild the engine.
-# shellcheck source=build-support/bin/native/calculate_engine_hash.sh
-source "${REPO_ROOT}/build-support/bin/native/calculate_engine_hash.sh"
+# shellcheck source=build-support/bin/rust/calculate_engine_hash.sh
+source "${REPO_ROOT}/build-support/bin/rust/calculate_engine_hash.sh"
 
 KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "${KERNEL}" in
@@ -28,7 +28,7 @@ case "${KERNEL}" in
     readonly LIB_EXTENSION=dylib
     ;;
   *)
-    die "Unknown kernel ${KERNEL}, cannot bootstrap pants native code!"
+    die "Unknown kernel ${KERNEL}, cannot bootstrap Pants native code!"
     ;;
 esac
 
@@ -38,16 +38,8 @@ readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
 readonly NATIVE_ENGINE_CACHE_DIR=${CACHE_ROOT}/bin/native-engine
 
 function _build_native_code() {
-  # Builds the native code, and echos the path of the built binary.
-
-  (
-    # Change into $REPO_ROOT in a subshell. This is necessary so that we're in a child of a
-    # directory containing the rust-toolchain file, so that rustup knows which version of rust we
-    # should be using.
-    # NB: See Cargo.toml with regard to the `extension-module` feature.
-    cd "${REPO_ROOT}"
-    "${REPO_ROOT}/cargo" build --features=extension-module ${MODE_FLAG} -p engine
-  ) || die
+  # NB: See Cargo.toml with regard to the `extension-module` feature.
+  "${REPO_ROOT}/cargo" build --features=extension-module ${MODE_FLAG} -p engine || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
 
