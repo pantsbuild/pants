@@ -156,19 +156,20 @@ class TargetFieldHelpInfo:
 
     @classmethod
     def create(cls, field: Type[Field]) -> TargetFieldHelpInfo:
-        # NB: It is very common (and encouraged) to subclass Fields to give custom behavior, e.g.
-        # `PythonSources` subclassing `Sources`. Here, we set `fallback_to_ancestors=True` so that
-        # we can still generate meaningful documentation for all these custom fields without
-        # requiring the Field author to rewrite the docstring.
-        #
-        # However, if the original plugin author did not define docstring, then this means we
-        # would typically fall back to the docstring for `Field` or a template like `StringField`.
-        # This is a an awkward edge of our heuristic and it's not intentional since these core
-        # `Field` types have documentation oriented to the plugin author and not the end user
-        # filling in fields in a BUILD file.
+        description: Optional[str]
         if hasattr(field, "help"):
-            description = field.help  # type: ignore[attr-defined]
+            description = field.help
         else:
+            # NB: It is very common (and encouraged) to subclass Fields to give custom behavior, e.g.
+            # `PythonSources` subclassing `Sources`. Here, we set `fallback_to_ancestors=True` so that
+            # we can still generate meaningful documentation for all these custom fields without
+            # requiring the Field author to rewrite the docstring.
+            #
+            # However, if the original plugin author did not define docstring, then this means we
+            # would typically fall back to the docstring for `Field` or a template like `StringField`.
+            # This is a an awkward edge of our heuristic and it's not intentional since these core
+            # `Field` types have documentation oriented to the plugin author and not the end user
+            # filling in fields in a BUILD file.
             description = get_docstring(
                 field,
                 flatten=True,
@@ -231,9 +232,10 @@ class TargetTypeHelpInfo:
     def create(
         cls, target_type: Type[Target], *, union_membership: UnionMembership
     ) -> TargetTypeHelpInfo:
+        description: Optional[str]
         summary: Optional[str]
         if hasattr(target_type, "help"):
-            description = target_type.help  # type: ignore[attr-defined]
+            description = target_type.help
             summary = first_paragraph(description)
         else:
             description = get_docstring(target_type)
