@@ -225,7 +225,7 @@ class RunTracker(Subsystem):
         stats = {
             "run_info": self.run_information(),
             "pantsd_stats": self.pantsd_scheduler_metrics,
-            "cumulative_timings": self.cumulative_timings.get_all(),
+            "cumulative_timings": self.get_cumulative_timings(),
             "recorded_options": self.get_options_to_record(),
         }
         return stats
@@ -286,13 +286,16 @@ class RunTracker(Subsystem):
             self.self_timings.add_timing(path, self_time, is_tool)
             self.outcomes[path] = workunit.outcome_string(workunit.outcome())
 
+    def get_cumulative_timings(self) -> List[dict]:
+        return self.cumulative_timings.get_all()
+
     def get_critical_path_timings(self):
         """Get the cumulative timings of each goal and all of the goals it (transitively) depended
         on."""
         setup_workunit = WorkUnitLabel.SETUP.lower()
         transitive_dependencies = dict()
         raw_timings = dict()
-        for entry in self.cumulative_timings.get_all():
+        for entry in self.get_cumulative_timings():
             raw_timings[entry["label"]] = entry["timing"]
 
         critical_path_timings = AggregatedTimings()
