@@ -35,6 +35,7 @@ from pants.engine.target import (
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
+from pants.util.docutil import docs_url
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
@@ -54,7 +55,7 @@ class InterpreterConstraintsField(StringSequenceField):
         "more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']` "
         "means either PyPy 3.7 _or_ CPython 3.7.\n\nIf the field is not set, it will default to "
         "the option `[python-setup].interpreter_constraints`.\n\nSee "
-        "https://www.pantsbuild.org/docs/python-interpreter-compatibility."
+        f"{docs_url('python-interpreter-compatibility')}."
     )
 
     def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
@@ -102,7 +103,7 @@ class DeprecatedPexBinarySources(PythonSources):
         "e.g. `entry_point='app.py'` or `entry_point='app.py:func'`. Create a `python_library` "
         "target with the entry point's file included (if it does not yet exist). Pants will infer "
         "a dependency, which you can check with `./pants dependencies path/to:app`. See "
-        "https://www.pantsbuild.org/v2.2/docs/python-package-goal for more instructions."
+        f"{docs_url('python-package-goal')} for more instructions."
     )
 
 
@@ -264,7 +265,7 @@ class PexBinary(Target):
     help = (
         "A Python target that can be converted into an executable PEX file.\n\nPEX files are "
         "self-contained executable files that contain a complete Python environment capable of "
-        "running the target. For more information, see https://www.pantsbuild.org/docs/pex-files."
+        f"running the target. For more information, see {docs_url('pex-files')}."
     )
 
 
@@ -346,8 +347,7 @@ class PythonTests(Target):
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
         "other than `conftest.py`, should go into a dedicated `python_library()` target and then "
-        "be included in the `dependencies` field.\n\nSee "
-        "https://www.pantsbuild.org/docs/python-test-goal."
+        f"be included in the `dependencies` field.\n\nSee {docs_url('python-test-goal')}."
     )
 
 
@@ -476,7 +476,7 @@ class PythonRequirementLibrary(Target):
         "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "
         "already, you can instead use the macro `python_requirements()` to convert each "
         "requirement into a `python_requirement_library()` target automatically.\n\nSee "
-        "https://www.pantsbuild.org/docs/python-third-party-dependencies."
+        f"{docs_url('python-third-party-dependencies')}."
     )
 
 
@@ -512,7 +512,7 @@ class PythonProvidesField(ScalarField, ProvidesField):
     required = True
     help = (
         "The setup.py kwargs for the external artifact built from this target.\n\nSee "
-        "https://www.pantsbuild.org/docs/python-setup-py-goal."
+        f"{docs_url('python-distributions')}."
     )
 
     @classmethod
@@ -532,7 +532,7 @@ class SetupPyCommandsField(StringSequenceField):
         "The runtime commands to invoke setup.py with to create the distribution, e.g. "
         '["bdist_wheel", "--python-tag=py36.py37", "sdist"].\n\nIf empty or unspecified, '
         "will just create a chroot with a setup() function.\n\nSee "
-        "https://www.pantsbuild.org/docs/python-setup-py-goal."
+        f"{docs_url('python-distributions')}."
     )
 
 

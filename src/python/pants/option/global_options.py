@@ -18,6 +18,7 @@ from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import docs_url
 from pants.util.logging import LogLevel
 
 
@@ -278,7 +279,7 @@ class GlobalOptions(Subsystem):
             help="Use this Pants version. Note that Pants only uses this to verify that you are "
             "using the requested version, as Pants cannot dynamically change the version it "
             "is using once the program is already running.\n\nIf you use the `./pants` script from "
-            "https://www.pantsbuild.org/docs/installation, however, changing the value in your "
+            f"{docs_url('installation')}, however, changing the value in your "
             "`pants.toml` will cause the new version to be installed and run automatically.\n\n"
             "Run `./pants --version` to check what is being used.",
         )
@@ -845,7 +846,7 @@ class GlobalOptions(Subsystem):
             metavar="[+-]tag1,tag2,...",
             help=(
                 "Include only targets with these tags (optional '+' prefix) or without these "
-                "tags ('-' prefix). See https://www.pantsbuild.org/docs/advanced-target-selection."
+                f"tags ('-' prefix). See {docs_url('advanced-target-selection')}."
             ),
         )
         register(
@@ -905,7 +906,7 @@ class GlobalOptions(Subsystem):
             default=[],
             help=(
                 "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
-                "See https://www.pantsbuild.org/docs/macros."
+                f"See {docs_url('macros')}."
             ),
         )
         register(

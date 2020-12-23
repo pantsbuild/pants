@@ -32,7 +32,7 @@ import requests
 from common import die
 
 from pants.help.help_info_extracter import to_help_str
-from pants.version import VERSION
+from pants.version import MAJOR_MINOR
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +50,7 @@ def main() -> None:
 
 
 def determine_pants_version() -> str:
-    # Set the version based on VERSION, e.g. 2.1.0.dev0 becomes 2.1.
-    version = ".".join(VERSION.split(".")[:2])
+    version = MAJOR_MINOR
     key_confirmation = input(
         f"Generating docs for Pants {version}. Is this the correct version? [Y/n]: "
     )

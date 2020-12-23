@@ -67,6 +67,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
+from pants.util.docutil import docs_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
@@ -92,7 +93,7 @@ class OwnershipError(Exception):
 
     def __init__(self, msg: str):
         super().__init__(
-            f"{msg} See https://www.pantsbuild.org/v2.0/docs/python-setup-py-goal for "
+            f"{msg} See {docs_url('python-distributions')} for "
             f"how python_library targets are mapped to distributions."
         )
 

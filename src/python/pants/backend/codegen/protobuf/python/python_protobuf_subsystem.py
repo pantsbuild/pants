@@ -10,14 +10,12 @@ from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import target_option
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import docs_url
 
 
 class PythonProtobufSubsystem(Subsystem):
     options_scope = "python-protobuf"
-    help = (
-        "Options related to the Protobuf Python backend.\n\nSee "
-        "https://www.pantsbuild.org/docs/protobuf."
-    )
+    help = f"Options related to the Protobuf Python backend.\n\nSee {docs_url('protobuf')}."
 
     @classmethod
     def register_options(cls, register):

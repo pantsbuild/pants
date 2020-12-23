@@ -28,6 +28,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.docutil import docs_url
 
 
 class PythonAwsLambdaSources(PythonSources):
@@ -37,7 +38,7 @@ class PythonAwsLambdaSources(PythonSources):
         "Remove the `sources` field and create a `python_library` target with the handler "
         "file included (if it does not yet exist). Pants will infer a dependency, which you can "
         "check with `./pants dependencies path/to:lambda`. See "
-        "https://www.pantsbuild.org/v2.2/docs/awslambda-python for an example.\n\nYou can also "
+        f"{docs_url('awslambda-python')} for an example.\n\nYou can also "
         "update the `handler` field to use the file name, "
         "e.g. `handler='lambda.py:handler_func'`. This will allow file arguments to still work "
         "with this target, meaning you can still use `./pants package path/to/lambda.py` instead "
@@ -206,7 +207,7 @@ class PythonAWSLambda(Target):
     )
     help = (
         "A self-contained Python function suitable for uploading to AWS Lambda.\n\nSee "
-        "https://www.pantsbuild.org/docs/awslambda-python."
+        f"{docs_url('awslambda-python')}."
     )
 
 

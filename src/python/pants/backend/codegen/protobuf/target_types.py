@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.engine.target import COMMON_TARGET_FIELDS, BoolField, Dependencies, Sources, Target
+from pants.util.docutil import docs_url
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
@@ -24,7 +25,4 @@ class ProtobufGrpcToggle(BoolField):
 class ProtobufLibrary(Target):
     alias = "protobuf_library"
     core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources, ProtobufGrpcToggle)
-    help = (
-        "Protobuf files used to generate various languages.\n\nSee "
-        "https://www.pantsbuild.org/docs/protobuf."
-    )
+    help = f"Protobuf files used to generate various languages.\n\nSee {docs_url('protobuf')}."
