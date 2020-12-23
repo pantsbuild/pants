@@ -37,7 +37,7 @@ use std::net::Ipv4Addr;
 use tokio::io::AsyncWriteExt;
 
 use futures::channel::mpsc;
-use futures::{SinkExt, Stream, StreamExt};
+use futures::{try_join, SinkExt, Stream, StreamExt};
 
 pub enum NailgunClientError {
   PreConnect(String),
@@ -59,12 +59,12 @@ async fn handle_client_output(
         match output {
           Some(ChildOutput::Stdout(bytes)) => {
             stdout.write_all(&bytes).await.map_err(|err| {
-              NailgunClientError::PostConnect(format!("Failed to flush stdout: {}", err))
+              NailgunClientError::PostConnect(format!("Failed to write to stdout: {}", err))
             })?
           },
           Some(ChildOutput::Stderr(bytes)) => {
             stderr.write_all(&bytes).await.map_err(|err| {
-              NailgunClientError::PostConnect(format!("Failed to flush stderr: {}", err))
+              NailgunClientError::PostConnect(format!("Failed to write to stderr: {}", err))
             })?
           },
           None => break,
@@ -84,6 +84,8 @@ async fn handle_client_output(
       }
     }
   }
+  try_join!(stdout.flush(), stderr.flush())
+    .map_err(|e| NailgunClientError::PostConnect(format!("Failed to flush stdio: {}", e)))?;
   Ok(())
 }
 
