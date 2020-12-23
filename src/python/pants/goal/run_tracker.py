@@ -95,7 +95,7 @@ class RunTracker(Subsystem):
         # Initialized in `start()`.
         self.report = None
         self._main_root_workunit = None
-        self._all_options = None
+        self._all_options: Optional[Options] = None
 
         # A lock to ensure that adding to stats at the end of a workunit
         # operates thread-safely.
@@ -118,6 +118,10 @@ class RunTracker(Subsystem):
         self.native = Native()
 
         self.run_logs_file: Optional[Path] = None
+
+    @property
+    def goals(self) -> List[str]:
+        return self._all_options.goals if self._all_options else []
 
     @property
     def v2_goals_rule_names(self) -> Tuple[str, ...]:
@@ -315,7 +319,7 @@ class RunTracker(Subsystem):
         recorded_options = {}
         scopes = self.options.stats_option_scopes_to_record
         if "*" in scopes:
-            scopes = self._all_options.known_scope_to_info.keys()
+            scopes = self._all_options.known_scope_to_info.keys() if self._all_options else []
         for scope in scopes:
             scope_and_maybe_option = scope.split("^")
             if scope == GLOBAL_SCOPE:
