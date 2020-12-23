@@ -6,10 +6,10 @@ use async_trait::async_trait;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
-use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
+use nails::execution::{self, child_channel, ChildInput, Command};
 use tokio::net::TcpStream;
 
-use crate::local::CapturedWorkdir;
+use crate::local::{CapturedWorkdir, ChildOutput};
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
@@ -276,12 +276,19 @@ impl CapturedWorkdir for CommandRunner {
       })
       .await?;
 
-    let output_stream = child.output_stream.take().unwrap();
+    let output_stream = child
+      .output_stream
+      .take()
+      .unwrap()
+      .map(|output| match output {
+        execution::ChildOutput::Stdout(bytes) => Ok(ChildOutput::Stdout(bytes)),
+        execution::ChildOutput::Stderr(bytes) => Ok(ChildOutput::Stderr(bytes)),
+      });
     let exit_code = child
       .wait()
       .map_ok(ChildOutput::Exit)
       .map_err(|e| format!("Error communicating with server: {}", e));
 
-    Ok(futures::stream::select(output_stream.map(Ok), exit_code.into_stream()).boxed())
+    Ok(futures::stream::select(output_stream, exit_code.into_stream()).boxed())
   }
 }
