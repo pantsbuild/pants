@@ -179,6 +179,7 @@ class RunTracker(Subsystem):
         self._main_root_workunit.start(run_start_time)
         self.report.start_workunit(self._main_root_workunit)
 
+        self.run_info.add_info("goals", all_options.goals)
         goal_names: Tuple[str, ...] = tuple(all_options.goals)
         self._v2_goal_rule_names = goal_names
 
