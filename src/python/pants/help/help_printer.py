@@ -22,6 +22,7 @@ from pants.option.arg_splitter import (
     VersionHelp,
 )
 from pants.option.scope import GLOBAL_SCOPE
+from pants.util.docutil import terminal_width
 from pants.util.strutil import first_paragraph, hard_wrap
 
 
@@ -112,7 +113,7 @@ class HelpPrinter(MaybeColor):
 
     @staticmethod
     def _format_summary_description(descr: str, chars_before_description: int) -> str:
-        lines = textwrap.wrap(descr, 96 - chars_before_description)
+        lines = textwrap.wrap(descr, terminal_width() - chars_before_description)
         if len(lines) > 1:
             lines = [
                 lines[0],
@@ -257,7 +258,7 @@ class HelpPrinter(MaybeColor):
         self._print_title(target_alias)
         tinfo = self._all_help_info.name_to_target_type_info[target_alias]
         if tinfo.description:
-            formatted_desc = "\n".join(hard_wrap(tinfo.description))
+            formatted_desc = "\n".join(hard_wrap(tinfo.description, width=terminal_width()))
             print(formatted_desc)
         print("\n\nValid fields:")
         for field in sorted(tinfo.fields, key=lambda x: x.alias):
@@ -268,7 +269,9 @@ class HelpPrinter(MaybeColor):
             print(self.maybe_cyan(f"{indent}type: {field.type_hint}"))
             print(self.maybe_cyan(f"{indent}{required_or_default}"))
             if field.description:
-                formatted_desc = "\n".join(hard_wrap(field.description, indent=len(indent)))
+                formatted_desc = "\n".join(
+                    hard_wrap(field.description, indent=len(indent), width=terminal_width())
+                )
                 print(formatted_desc)
         print()
 

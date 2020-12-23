@@ -1,7 +1,15 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import shutil
+
+from pants.util.memo import memoized
 from pants.version import MAJOR_MINOR
+
+
+@memoized
+def terminal_width() -> int:
+    return shutil.get_terminal_size().columns
 
 
 def docs_url(slug: str) -> str:
