@@ -194,6 +194,9 @@ jobs:
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
+      none
+    - source ${HOME/.cargo/env
     before_script:
     - ulimit -n 8192
     cache:
@@ -278,6 +281,9 @@ jobs:
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
+      none
+    - source ${HOME/.cargo/env
     before_script:
     - ulimit -n 8192
     cache:
@@ -307,6 +313,9 @@ jobs:
     before_install:
     - ./build-support/bin/install_python_for_ci.sh "${MACOS_PYENV_PY37_VERSION}"
     - brew cask install osxfuse
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
+      none
+    - source ${HOME/.cargo/env
     before_script:
     - ulimit -n 8192
     cache:
@@ -383,7 +392,9 @@ jobs:
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
       -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest sh -c "./build-support/bin/release.sh -n && USE_PY38=true ./build-support/bin/release.sh
+      travis_ci:latest sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
+      | sh -s -- -y --default-toolchain none && source /travis/home/.cargo/env &&
+      ./build-support/bin/release.sh -n && USE_PY38=true ./build-support/bin/release.sh
       -n && ./build-support/bin/release.sh -f"
     services:
     - docker
@@ -427,6 +438,9 @@ jobs:
     os: osx
     osx_image: xcode8
     script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
+      none
+    - source ${HOME}/.cargo/env
     - ./build-support/bin/release.sh -n
     - USE_PY38=true ./build-support/bin/release.sh -n
     - ./build-support/bin/release.sh -f

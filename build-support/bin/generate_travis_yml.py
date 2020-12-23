@@ -253,6 +253,16 @@ class Platform(Enum):
         return str(self.value)
 
 
+def _install_rust(homedir: str = "${HOME") -> List[str]:
+    rustup = (
+        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y "
+        "--default-toolchain none"
+    )
+    # This will mutate the PATH to add `rustup` and `cargo`.
+    activate_rustup = f'source {homedir}/.cargo/env'
+    return [rustup, activate_rustup]
+
+
 def _linux_before_install(
     include_test_config: bool = True, install_travis_wait: bool = False, *, xenial: bool = False
 ) -> List[str]:
@@ -340,6 +350,7 @@ def linux_fuse_shard() -> Dict:
             "sudo modprobe fuse",
             "sudo chmod 666 /dev/fuse",
             "sudo chown root:$USER /etc/fuse.conf",
+            *_install_rust(),
         ],
     }
 
@@ -411,19 +422,13 @@ SKIP_WHEELS_CONDITION = (
 
 
 def _bootstrap_commands(*, python_version: PythonVersion, homedir: str = "${HOME}") -> List[str]:
-    rustup = (
-        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y "
-        "--default-toolchain none"
-    )
-    # This will mutate the PATH to add `rustup` and `cargo`.
-    activate_rustup = f'source {homedir}/.cargo/env'
     bootstrap_script = (
         "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version "
         f"{python_version.decimal} --aws-bucket ${{AWS_BUCKET}} --native-engine-so-key-prefix "
         "${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key "
         "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     )
-    return [rustup, activate_rustup, bootstrap_script]
+    return [*_install_rust(homedir), bootstrap_script]
 
 
 def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List[str]:
@@ -517,6 +522,7 @@ def clippy() -> Dict:
 
 def cargo_audit() -> Dict:
     return {
+        **CACHE_NATIVE_ENGINE,
         **linux_fuse_shard(),
         "name": "Cargo audit",
         "stage": Stage.test_cron.value,
@@ -550,8 +556,9 @@ def python_tests(python_version: PythonVersion) -> Dict:
 # ----------------------------------------------------------------------
 
 
-def _build_wheels_command() -> List[str]:
+def _build_wheels_command(homedir: str = "${HOME}") -> List[str]:
     return [
+        *_install_rust(homedir=homedir),
         "./build-support/bin/release.sh -n",
         "USE_PY38=true ./build-support/bin/release.sh -n",
         # NB: We also build `fs_util` in this shard to leverage having had compiled the engine.
@@ -564,7 +571,7 @@ def _build_wheels_env(*, platform: Platform) -> List[str]:
 
 
 def build_wheels_linux() -> Dict:
-    command = " && ".join(_build_wheels_command())
+    command = " && ".join(_build_wheels_command(homedir="/travis/home"))
     shard: Dict = {
         **CACHE_NATIVE_ENGINE,
         **linux_shard(use_docker=True),
@@ -644,6 +651,7 @@ def rust_tests_osx() -> Dict:
             # We don't need to install openssl because it already happens to be installed on this
             # image. This is good, because both `brew install openssl` and the Travis Brew addon
             # would trigger the same issues as noted above.
+            *_install_rust(),
         ],
         "env": [*_osx_env_with_pyenv(), "CACHE_NAME=rust_tests.osx"],
     }
