@@ -247,7 +247,7 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
 
         # But for a compatible interpreter the exact resolve results should be re-used and load
         # directly from the still in-tact cache.
-        with plugin_resolution(  # type: ignore[unreachable]
+        with plugin_resolution(
             rule_runner,
             interpreter=python36,
             chroot=chroot,
