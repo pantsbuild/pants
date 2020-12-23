@@ -67,10 +67,6 @@ async fn handle_client_output(
               NailgunClientError::PostConnect(format!("Failed to flush stderr: {}", err))
             })?
           },
-          Some(ChildOutput::Exit(_)) => {
-            // NB: We ignore exit here and allow the main thread to handle exiting. This API is
-            // error prone: see https://github.com/stuhood/nails/issues/1 for more info.
-          }
           None => break,
         }
       }
@@ -100,10 +96,6 @@ async fn handle_client_input(mut stdin_write: mpsc::Sender<ChildInput>) -> Resul
       .await
       .map_err(send_to_io)?;
   }
-  stdin_write
-    .send(ChildInput::StdinEOF)
-    .await
-    .map_err(send_to_io)?;
   Ok(())
 }
 

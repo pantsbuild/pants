@@ -36,10 +36,12 @@ use std::sync::Arc;
 
 use async_latch::AsyncLatch;
 use bytes::Bytes;
-use futures::channel::{mpsc, oneshot};
+use futures::channel::oneshot;
 use futures::{future, sink, stream, FutureExt, SinkExt, StreamExt, TryStreamExt};
-use log::{debug, error, info};
-use nails::execution::{self, sink_for, stream_for, ChildInput, ChildOutput, ExitCode};
+use log::{debug, info};
+use nails::execution::{
+  self, child_channel, sink_for, stream_for, ChildInput, ChildOutput, ExitCode,
+};
 use nails::Nail;
 use task_executor::Executor;
 use tokio::fs::File;
@@ -227,85 +229,67 @@ struct RawFdNail {
 }
 
 impl Nail for RawFdNail {
-  fn spawn(
-    &self,
-    cmd: execution::Command,
-    input_stream: mpsc::Receiver<ChildInput>,
-  ) -> Result<nails::server::Child, io::Error> {
+  fn spawn(&self, cmd: execution::Command) -> Result<nails::server::Child, io::Error> {
     let env = cmd.env.iter().cloned().collect::<HashMap<_, _>>();
 
-    // Handle stdin. If the input stream closes, the run is cancelled.
-    let cancelled = AsyncLatch::new();
+    // Handle stdin.
     let (stdin_handle, stdin_sink) = Self::input(Self::ttypath_from_env(&env, 0))?;
-    let accepts_stdin = {
-      let (accepts_stdin, input_stream_fut) = if let Some(mut stdin_sink) = stdin_sink {
-        // Forward all stdin to the child process.
-        (
-          true,
-          async move {
-            let mut input_stream = input_stream.filter_map(|child_input| {
-              Box::pin(async move {
-                match child_input {
-                  ChildInput::Stdin(bytes) => Some(Ok(bytes)),
-                  ChildInput::StdinEOF => None,
-                }
-              })
-            });
-            let _ = stdin_sink.send_all(&mut input_stream).await;
-          }
-          .boxed(),
-        )
-      } else {
-        // Stdin will be handled directly by the TTY. Only propagate cancellation.
-        (false, input_stream.fold((), |(), _| async {}).boxed())
-      };
-      // Spawn a task that will propagate the input stream, and then trigger cancellation.
-      let cancelled = cancelled.clone();
-      let _join = self.executor.spawn(input_stream_fut.map(move |_| {
-        cancelled.trigger();
-      }));
-      accepts_stdin
+    let maybe_stdin_write = if let Some(mut stdin_sink) = stdin_sink {
+      let (stdin_write, stdin_read) = child_channel::<ChildInput>();
+      // Spawn a task that will propagate the input stream.
+      let _join = self.executor.spawn(async move {
+        let mut input_stream = stdin_read.map(|child_input| match child_input {
+          ChildInput::Stdin(bytes) => Ok(bytes),
+        });
+        let _ = stdin_sink.send_all(&mut input_stream).await;
+      });
+      Some(stdin_write)
+    } else {
+      // Stdin will be handled directly by the TTY.
+      None
     };
 
     // And stdout/stderr.
     let (stdout_stream, stdout_handle) = Self::output(Self::ttypath_from_env(&env, 1))?;
     let (stderr_stream, stderr_handle) = Self::output(Self::ttypath_from_env(&env, 2))?;
 
+    // Set up a cancellation token that is triggered on client shutdown.
+    let cancelled = AsyncLatch::new();
+    let shutdown = {
+      let cancelled = cancelled.clone();
+      async move {
+        cancelled.trigger();
+      }
+    };
+
     // Spawn the underlying function as a blocking task, and capture its exit code to append to the
     // output stream.
     let nail = self.clone();
-    let exit_code_future = self.executor.spawn_blocking(move || {
-      // NB: This closure captures the stdio handles, and will drop/close them when it completes.
-      (nail.runner)(RawFdExecution {
-        cmd,
-        cancelled,
-        stdin_fd: stdin_handle.as_raw_fd(),
-        stdout_fd: stdout_handle.as_raw_fd(),
-        stderr_fd: stderr_handle.as_raw_fd(),
-      })
-    });
-
-    // Fully consume the stdout/stderr streams before waiting on the exit stream.
-    let stdout_stream = stdout_stream.map_ok(ChildOutput::Stdout);
-    let stderr_stream = stderr_stream.map_ok(ChildOutput::Stderr);
-    let exit_stream = exit_code_future
-      .into_stream()
-      .map(|exit_code| Ok(ChildOutput::Exit(exit_code)));
-    let output_stream = stream::select(stdout_stream, stderr_stream)
-      .chain(exit_stream)
-      .map(|res| match res {
-        Ok(o) => o,
-        Err(e) => {
-          error!("IO error interacting with the runner: {:?}", e);
-          ChildOutput::Exit(ExitCode(-1))
-        }
+    let exit_code = self
+      .executor
+      .spawn_blocking(move || {
+        // NB: This closure captures the stdio handles, and will drop/close them when it completes.
+        (nail.runner)(RawFdExecution {
+          cmd,
+          cancelled,
+          stdin_fd: stdin_handle.as_raw_fd(),
+          stdout_fd: stdout_handle.as_raw_fd(),
+          stderr_fd: stderr_handle.as_raw_fd(),
+        })
       })
       .boxed();
 
-    Ok(nails::server::Child {
+    // Select a single stdout/stderr stream.
+    let stdout_stream = stdout_stream.map_ok(ChildOutput::Stdout);
+    let stderr_stream = stderr_stream.map_ok(ChildOutput::Stderr);
+    let output_stream = stream::select(stdout_stream, stderr_stream).boxed();
+
+    Ok(nails::server::Child::new(
       output_stream,
-      accepts_stdin,
-    })
+      maybe_stdin_write,
+      exit_code,
+      Some(shutdown.boxed()),
+    ))
   }
 }
 

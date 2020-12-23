@@ -20,7 +20,7 @@ use fs::{
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use log::{debug, info};
-use nails::execution::{ChildOutput, ExitCode};
+use nails::execution::ExitCode;
 use shell_quote::bash;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 use tokio::process::{Child, Command};
@@ -176,6 +176,16 @@ impl HermeticCommand {
       .stderr(stderr)
       .spawn()
   }
+}
+
+// TODO: A Stream that ends with `Exit` is error prone: we should consider creating a Child struct
+// similar to nails::server::Child (which is itself shaped like `std::process::Child`).
+// See https://github.com/stuhood/nails/issues/1 for more info.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ChildOutput {
+  Stdout(Bytes),
+  Stderr(Bytes),
+  Exit(ExitCode),
 }
 
 ///
