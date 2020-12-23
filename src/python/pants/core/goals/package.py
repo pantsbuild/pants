@@ -48,7 +48,7 @@ class BuiltPackage:
 
 class OutputPathField(StringField):
     alias = "output_path"
-    description = (
+    help = (
         "Where the built asset should be located.\n\nIf undefined, this will use the path to the "
         "BUILD file, followed by the target name. For example, `src/python/project:app` would be "
         "`src.python.project/app.ext.\n\nWhen running `./pants package`, this path will be "

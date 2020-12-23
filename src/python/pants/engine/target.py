@@ -1219,16 +1219,10 @@ class DictStringToStringSequenceField(Field):
 
 
 class Sources(StringSequenceField, AsyncFieldMixin):
-    """A list of files and globs that belong to this target.
-
-    Paths are relative to the BUILD file's directory. You can ignore files/globs by prefixing them
-    with `!`. Example: `sources=['example.py', 'test_*.py', '!test_ignore.py']`.
-    """
-
     alias = "sources"
     expected_file_extensions: ClassVar[Optional[Tuple[str, ...]]] = None
     expected_num_files: ClassVar[Optional[Union[int, range]]] = None
-    description = (
+    help = (
         "A list of files and globs that belong to this target.\n\nPaths are relative to the BUILD "
         "file's directory. You can ignore files/globs by prefixing them with `!`.\n\nExample: "
         "`sources=['example.py', 'test_*.py', '!test_ignore.py']`."
@@ -1534,7 +1528,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     alias = "dependencies"
-    description = (
+    help = (
         "Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib']."
         "\n\nAlternatively, you may include file names. Pants will find which target owns that "
         "file, and create a new target from that which only includes the file in its `sources` "
@@ -1730,7 +1724,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 class Tags(StringSequenceField):
     alias = "tags"
-    description = (
+    help = (
         "Arbitrary strings to describe a target.\n\nFor example, you may tag some test targets "
         "with 'integration_test' so that you could run `./pants --tags='integration_test' test ::` "
         "to only run on targets with that tag."
@@ -1739,7 +1733,7 @@ class Tags(StringSequenceField):
 
 class DescriptionField(StringField):
     alias = "description"
-    description = (
+    help = (
         "A human-readable description of the target.\n\nUse `./pants list --documented ::` to see "
         "all targets with descriptions."
     )
