@@ -94,11 +94,11 @@ class HelpPrinter(MaybeColor):
         if things:
             for thing in sorted(things):
                 if thing == "goals":
-                    self._print_goals_help()
+                    self._print_all_goals()
                 elif thing == "subsystems":
-                    self._print_subsystems_help()
+                    self._print_all_subsystems()
                 elif thing == "targets":
-                    self._print_targets_help()
+                    self._print_all_targets()
                 elif thing == "global":
                     self._print_options_help(GLOBAL_SCOPE, help_request.advanced)
                 elif thing in self._all_help_info.scope_to_help_info:
@@ -110,7 +110,17 @@ class HelpPrinter(MaybeColor):
         else:
             self._print_global_help()
 
-    def _print_goals_help(self) -> None:
+    @staticmethod
+    def _format_summary_description(descr: str, chars_before_description: int) -> str:
+        lines = textwrap.wrap(descr, 96 - chars_before_description)
+        if len(lines) > 1:
+            lines = [
+                lines[0],
+                *(f"{' ' * chars_before_description}{line}" for line in lines[1:]),
+            ]
+        return "\n".join(lines)
+
+    def _print_all_goals(self) -> None:
         goal_descriptions: Dict[str, str] = {}
 
         for goal_info in self._all_help_info.name_to_goal_info.values():
@@ -124,21 +134,15 @@ class HelpPrinter(MaybeColor):
 
         def format_goal(name: str, descr: str) -> str:
             name = self.maybe_cyan(name.ljust(chars_before_description))
-            description_lines = textwrap.wrap(descr, 80 - chars_before_description)
-            if len(description_lines) > 1:
-                description_lines = [
-                    description_lines[0],
-                    *(f"{' ' * chars_before_description}{line}" for line in description_lines[1:]),
-                ]
-            formatted_descr = "\n".join(description_lines)
-            return f"{name}{formatted_descr}\n"
+            descr = self._format_summary_description(descr, chars_before_description)
+            return f"{name}{descr}\n"
 
         for name, description in sorted(goal_descriptions.items()):
-            print(format_goal(name, description))
+            print(format_goal(name, first_paragraph(description)))
         specific_help_cmd = f"{self._bin_name} help $goal"
         print(f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal.\n")
 
-    def _print_subsystems_help(self) -> None:
+    def _print_all_subsystems(self) -> None:
         self._print_title("Subsystems")
 
         subsystem_description: Dict[str, str] = {}
@@ -149,13 +153,35 @@ class HelpPrinter(MaybeColor):
         longest_subsystem_alias = max(len(alias) for alias in subsystem_description.keys())
         chars_before_description = longest_subsystem_alias + 2
         for alias, description in sorted(subsystem_description.items()):
-            alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
-            print(f"{alias_str}{description}\n")
+            alias = self.maybe_cyan(alias.ljust(chars_before_description))
+            description = self._format_summary_description(description, chars_before_description)
+            print(f"{alias}{description}\n")
 
         specific_help_cmd = f"{self._bin_name} help $subsystem"
         print(
             f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a "
             f"specific subsystem.\n"
+        )
+
+    def _print_all_targets(self) -> None:
+        self._print_title("Target types")
+
+        longest_target_alias = max(
+            len(alias) for alias in self._all_help_info.name_to_target_type_info.keys()
+        )
+        chars_before_description = longest_target_alias + 2
+        for alias, target_type_info in sorted(
+            self._all_help_info.name_to_target_type_info.items(), key=lambda x: x[0]
+        ):
+            alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
+            summary = self._format_summary_description(
+                target_type_info.summary or "<no description>", chars_before_description
+            )
+            print(f"{alias_str}{summary}\n")
+        specific_help_cmd = f"{self._bin_name} help $target_type"
+        print(
+            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific "
+            f"target type.\n"
         )
 
     def _print_global_help(self):
@@ -226,25 +252,6 @@ class HelpPrinter(MaybeColor):
                 formatted_lines.append("")
         for line in formatted_lines:
             print(line)
-
-    def _print_targets_help(self) -> None:
-        self._print_title("Target types")
-
-        longest_target_alias = max(
-            len(alias) for alias in self._all_help_info.name_to_target_type_info.keys()
-        )
-        chars_before_description = longest_target_alias + 2
-        for alias, target_type_info in sorted(
-            self._all_help_info.name_to_target_type_info.items(), key=lambda x: x[0]
-        ):
-            alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
-            summary = target_type_info.summary or "<no description>"
-            print(f"{alias_str}{summary}\n")
-        specific_help_cmd = f"{self._bin_name} help $target_type"
-        print(
-            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific "
-            f"target type.\n"
-        )
 
     def _print_target_help(self, target_alias: str) -> None:
         self._print_title(target_alias)
