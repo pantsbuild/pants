@@ -36,9 +36,8 @@ SETTABLE_ENV_VARS = (
 #  Can be done via scoped subsystems, possibly.  However we should only do this if there
 #  is a real need.
 class SubprocessEnvironment(Subsystem):
-    """Environment settings for forked subprocesses."""
-
     options_scope = "subprocess-environment"
+    help = "Environment settings for forked subprocesses."
 
     @classmethod
     def register_options(cls, register):

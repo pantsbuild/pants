@@ -4,19 +4,17 @@ fasteners==0.15.0
 
 # The MyPy requirement should be maintained in lockstep with the requirement the Pants repo uses
 # for the mypy task since it configures custom MyPy plugins. That requirement can be found via:
-#
-#   ./pants \
-#       options \
-#         --output-format=json \
-#         --scope=mypy \
-#         --name=version \
-#     | jq -r '."mypy.version".value'
+#   ./pants help-all | \
+#   jq -r '
+#     .scope_to_help_info.mypy.advanced[] | select(.config_key == "version") |
+#     .value_history.ranked_values[-1].value
+#   '
 #
 mypy==0.782
 
-packaging==20.4
+packaging==20.8
 pathspec==0.8.0
-pex==2.1.21
+pex==2.1.24
 psutil==5.7.0
 pystache==0.5.4
 # This should be kept in sync with `pytest.py`.

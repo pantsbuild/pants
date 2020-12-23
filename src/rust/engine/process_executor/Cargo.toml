@@ -10,11 +10,12 @@ clap = "2"
 dirs = "1"
 env_logger = "0.5.4"
 fs = { path = "../fs" }
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
 hashing = { path = "../hashing" }
 log = "0.4"
 process_execution = { path = "../process_execution" }
 store = { path = "../fs/store" }
+structopt = "0.2.18"
 task_executor = { path = "../task_executor" }
 tokio = { version = "0.2.23", features = ["rt-threaded", "macros"] }
 workunit_store = { path = "../workunit_store"}

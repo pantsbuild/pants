@@ -134,10 +134,10 @@ def test_address_specs_filter() -> None:
             type_alias="", name=parsed_address.target_name, address=parsed_address, **kwargs
         )
 
-    untagged_target = make_target(target_name="//:untagged")
-    b_tagged_target = make_target(target_name="//:b-tagged", tags=["b"])
-    a_and_b_tagged_target = make_target(target_name="//:a-and-b-tagged", tags=["a", "b"])
-    none_tagged_target = make_target(target_name="//:none-tagged-target", tags=None)
+    untagged_target = make_target(target_name="untagged")
+    b_tagged_target = make_target(target_name="b-tagged", tags=["b"])
+    a_and_b_tagged_target = make_target(target_name="a-and-b-tagged", tags=["a", "b"])
+    none_tagged_target = make_target(target_name="none-tagged-target", tags=None)
 
     specs_filter = AddressSpecsFilter(tags=["-a", "+b"])
 

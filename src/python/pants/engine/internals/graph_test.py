@@ -2,14 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Set, Tuple, Type
+from typing import Iterable, List, Set, Tuple, Type, cast
 
 import pytest
 
 from pants.base.specs import (
+    AddressLiteralSpec,
+    AddressSpecs,
     FilesystemGlobSpec,
     FilesystemLiteralSpec,
     FilesystemSpec,
@@ -40,6 +43,7 @@ from pants.engine.internals.graph import (
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
+    AsyncFieldMixin,
     Dependencies,
     DependenciesRequest,
     DependenciesRequestLite,
@@ -52,10 +56,13 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    NoApplicableTargetsBehavior,
+    SecondaryOwnerMixin,
     Sources,
     SourcesPaths,
     SourcesPathsRequest,
     SpecialCasedDependencies,
+    StringField,
     Tags,
     Target,
     TargetRootsToFieldSets,
@@ -66,6 +73,7 @@ from pants.engine.target import (
     TransitiveTargetsRequestLite,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.source.filespec import Filespec
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -462,9 +470,26 @@ def test_resolve_specs_snapshot() -> None:
     assert result.snapshot.files == ("demo/BUILD", "demo/f1.txt", "demo/f2.txt")
 
 
+class MockSecondaryOwnerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
+    alias = "secondary_owner_field"
+    required = True
+
+    @property
+    def filespec(self) -> Filespec:
+        return {"includes": [os.path.join(self.address.spec_path, cast(str, self.value))]}
+
+
+class MockSecondaryOwnerTarget(Target):
+    alias = "secondary_owner"
+    core_fields = (MockSecondaryOwnerField,)
+
+
 @pytest.fixture
 def owners_rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[QueryRule(Owners, (OwnersRequest,))], target_types=[MockTarget])
+    return RuleRunner(
+        rules=[QueryRule(Owners, (OwnersRequest,))],
+        target_types=[MockTarget, MockSecondaryOwnerTarget],
+    )
 
 
 def assert_owners(
@@ -478,34 +503,41 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
     """Test when a source file belongs to a target, even though the file does not actually exist.
 
     This happens, for example, when the file is deleted and we're computing `--changed-since`. In
-    this case, we should not attempt to generate a subtarget and should use the original target.
+    this case, we should use the BUILD target as we can't use a more precise file target.
     """
     owners_rule_runner.create_file("demo/f.txt")
-    owners_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
-    assert_owners(
-        owners_rule_runner, ["demo/deleted.txt"], expected={Address("demo", target_name="demo")}
+    owners_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])\n")
+    owners_rule_runner.add_to_build_file(
+        "demo", "secondary_owner(name='secondary', secondary_owner_field='deleted.txt')"
     )
 
-    # For files that do exist, we should still use a generated subtarget, though.
+    assert_owners(
+        owners_rule_runner,
+        ["demo/deleted.txt"],
+        expected={Address("demo", target_name="demo"), Address("demo", target_name="secondary")},
+    )
+
+    # For files that do exist, we should still use a file target, though.
     assert_owners(
         owners_rule_runner,
         ["demo/f.txt"],
         expected={Address("demo", relative_file_path="f.txt", target_name="demo")},
     )
 
-    # If a sibling file uses the original target, then both should be used.
+    # If a sibling file uses the BUILD target, then both should be used.
     assert_owners(
         owners_rule_runner,
         ["demo/f.txt", "demo/deleted.txt"],
         expected={
             Address("demo", relative_file_path="f.txt", target_name="demo"),
             Address("demo"),
+            Address("demo", target_name="secondary"),
         },
     )
 
 
 def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
-    """Even if there are multiple owners of the same file, we still use generated subtargets."""
+    """Even if there are multiple owners of the same file, we still use file targets."""
     owners_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
     owners_rule_runner.add_to_build_file(
         "demo",
@@ -513,13 +545,19 @@ def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
             """\
             target(name='all', sources=['*.txt'])
             target(name='f2', sources=['f2.txt'])
+            secondary_owner(name='secondary', secondary_owner_field='f1.txt')
             """
         ),
     )
     assert_owners(
         owners_rule_runner,
         ["demo/f1.txt"],
-        expected={Address("demo", relative_file_path="f1.txt", target_name="all")},
+        expected={
+            Address("demo", relative_file_path="f1.txt", target_name="all"),
+            # This target matches through "secondary ownership", rather than through a `sources`
+            # field, so it uses a BUILD target instead of file target.
+            Address("demo", target_name="secondary"),
+        },
     )
     assert_owners(
         owners_rule_runner,
@@ -541,6 +579,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
             target(name='f1', sources=['f1.txt'])
             target(name='f2_first', sources=['f2.txt'])
             target(name='f2_second', sources=['f2.txt'])
+            secondary_owner(name='secondary', secondary_owner_field='f1.txt')
             """
         ),
     )
@@ -551,6 +590,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
             Address("demo", relative_file_path="f1.txt", target_name="f1"),
             Address("demo", relative_file_path="f2.txt", target_name="f2_first"),
             Address("demo", relative_file_path="f2.txt", target_name="f2_second"),
+            Address("demo", target_name="secondary"),
         },
     )
 
@@ -654,7 +694,7 @@ def test_resolve_addresses_from_specs() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-def test_find_valid_field_sets() -> None:
+def test_find_valid_field_sets(caplog) -> None:
     class FortranSources(Sources):
         pass
 
@@ -684,35 +724,46 @@ def test_find_valid_field_sets() -> None:
 
     rule_runner = RuleRunner(
         rules=[
-            QueryRule(TargetRootsToFieldSets, (TargetRootsToFieldSetsRequest, Targets)),
+            QueryRule(TargetRootsToFieldSets, [TargetRootsToFieldSetsRequest, Specs]),
             UnionRule(FieldSetSuperclass, FieldSetSubclass1),
             UnionRule(FieldSetSuperclass, FieldSetSubclass2),
         ],
         target_types=[FortranTarget, InvalidTarget],
     )
 
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            fortran_target(name="valid")
+            fortran_target(name="valid2")
+            invalid_target(name="invalid")
+            """
+        ),
+    )
     valid_tgt = FortranTarget({}, address=Address("", target_name="valid"))
-    invalid_tgt = InvalidTarget({}, address=Address("", target_name="invalid"))
+    valid_spec = AddressLiteralSpec("", "valid")
+    invalid_spec = AddressLiteralSpec("", "invalid")
 
     def find_valid_field_sets(
         superclass: Type,
-        targets: Iterable[Target],
+        address_specs: Iterable[AddressLiteralSpec],
         *,
-        error_if_no_applicable_targets: bool = False,
+        no_applicable_behavior: NoApplicableTargetsBehavior = NoApplicableTargetsBehavior.ignore,
         expect_single_config: bool = False,
     ) -> TargetRootsToFieldSets:
         request = TargetRootsToFieldSetsRequest(
             superclass,
             goal_description="fake",
-            error_if_no_applicable_targets=error_if_no_applicable_targets,
+            no_applicable_targets_behavior=no_applicable_behavior,
             expect_single_field_set=expect_single_config,
         )
         return rule_runner.request(
             TargetRootsToFieldSets,
-            [request, Targets(targets)],
+            [request, Specs(AddressSpecs(address_specs), FilesystemSpecs([]))],
         )
 
-    valid = find_valid_field_sets(FieldSetSuperclass, [valid_tgt, invalid_tgt])
+    valid = find_valid_field_sets(FieldSetSuperclass, [valid_spec, invalid_spec])
     assert valid.targets == (valid_tgt,)
     assert valid.field_sets == (
         FieldSetSubclass1.create(valid_tgt),
@@ -720,26 +771,129 @@ def test_find_valid_field_sets() -> None:
     )
 
     with pytest.raises(ExecutionError) as exc:
-        find_valid_field_sets(FieldSetSuperclass, [valid_tgt], expect_single_config=True)
+        find_valid_field_sets(FieldSetSuperclass, [valid_spec], expect_single_config=True)
     assert AmbiguousImplementationsException.__name__ in str(exc.value)
 
     with pytest.raises(ExecutionError) as exc:
         find_valid_field_sets(
             FieldSetSuperclass,
-            [valid_tgt, FortranTarget({}, address=Address("", target_name="valid2"))],
+            [valid_spec, AddressLiteralSpec("", "valid2")],
             expect_single_config=True,
         )
     assert TooManyTargetsException.__name__ in str(exc.value)
 
-    no_valid_targets = find_valid_field_sets(FieldSetSuperclass, [invalid_tgt])
+    no_valid_targets = find_valid_field_sets(FieldSetSuperclass, [invalid_spec])
     assert no_valid_targets.targets == ()
     assert no_valid_targets.field_sets == ()
 
     with pytest.raises(ExecutionError) as exc:
         find_valid_field_sets(
-            FieldSetSuperclass, [invalid_tgt], error_if_no_applicable_targets=True
+            FieldSetSuperclass,
+            [invalid_spec],
+            no_applicable_behavior=NoApplicableTargetsBehavior.error,
         )
     assert NoApplicableTargetsException.__name__ in str(exc.value)
+
+    caplog.clear()
+    find_valid_field_sets(
+        FieldSetSuperclass,
+        [invalid_spec],
+        no_applicable_behavior=NoApplicableTargetsBehavior.warn,
+    )
+    assert len(caplog.records) == 1
+    assert "No applicable files or targets matched." in caplog.text
+
+
+def test_no_applicable_targets_exception() -> None:
+    # Check that we correctly render the error message.
+    class Tgt1(Target):
+        alias = "tgt1"
+        core_fields = ()
+
+    class Tgt2(Target):
+        alias = "tgt2"
+        core_fields = (Sources,)
+
+    class Tgt3(Target):
+        alias = "tgt3"
+        core_fields = ()
+
+    # No targets/files specified. Because none of the relevant targets have a sources field, we do
+    # not give the filedeps command.
+    exc = NoApplicableTargetsException(
+        [],
+        Specs(AddressSpecs([]), FilesystemSpecs([])),
+        UnionMembership({}),
+        applicable_target_types=[Tgt1],
+        goal_description="the `foo` goal",
+    )
+    remedy = (
+        "Please specify relevant files and/or targets. Run `./pants filter --target-type=tgt1 ::` "
+        "to find all applicable targets in your project."
+    )
+    assert (
+        dedent(
+            f"""\
+            No files or targets specified. The `foo` goal works with these target types:
+
+              * tgt1
+
+            {remedy}"""
+        )
+        in str(exc)
+    )
+
+    invalid_tgt = Tgt3({}, address=Address("blah"))
+    exc = NoApplicableTargetsException(
+        [invalid_tgt],
+        Specs(AddressSpecs([]), FilesystemSpecs([FilesystemLiteralSpec("foo.ext")])),
+        UnionMembership({}),
+        applicable_target_types=[Tgt1, Tgt2],
+        goal_description="the `foo` goal",
+    )
+    remedy = (
+        "Please specify relevant files and/or targets. Run `./pants filter "
+        "--target-type=tgt1,tgt2 ::` to find all applicable targets in your project, or run "
+        "`./pants filter --target-type=tgt1,tgt2 :: | xargs ./pants filedeps` to find all "
+        "applicable files."
+    )
+    assert (
+        dedent(
+            f"""\
+            No applicable files or targets matched. The `foo` goal works with these target types:
+
+              * tgt1
+              * tgt2
+
+            However, you only specified files with these target types:
+
+              * tgt3
+
+            {remedy}"""
+        )
+        in str(exc)
+    )
+
+    # Test handling of `Specs`.
+    exc = NoApplicableTargetsException(
+        [invalid_tgt],
+        Specs(AddressSpecs([AddressLiteralSpec("foo", "bar")]), FilesystemSpecs([])),
+        UnionMembership({}),
+        applicable_target_types=[Tgt1],
+        goal_description="the `foo` goal",
+    )
+    assert "However, you only specified targets with these target types:" in str(exc)
+    exc = NoApplicableTargetsException(
+        [invalid_tgt],
+        Specs(
+            AddressSpecs([AddressLiteralSpec("foo", "bar")]),
+            FilesystemSpecs([FilesystemLiteralSpec("foo.ext")]),
+        ),
+        UnionMembership({}),
+        applicable_target_types=[Tgt1],
+        goal_description="the `foo` goal",
+    )
+    assert "However, you only specified files and targets with these target types:" in str(exc)
 
 
 # -----------------------------------------------------------------------------------------------

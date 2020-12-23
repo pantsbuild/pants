@@ -1,6 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+import multiprocessing
 import os
 from dataclasses import dataclass
 from io import StringIO
@@ -34,6 +37,7 @@ from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Get, Params
 from pants.engine.internals.session import SessionValues
@@ -67,6 +71,9 @@ from pants.util.ordered_set import FrozenOrderedSet
 _O = TypeVar("_O")
 
 
+_EXECUTOR = PyExecutor(multiprocessing.cpu_count(), multiprocessing.cpu_count() * 4)
+
+
 @dataclass(frozen=True)
 class GoalRuleResult:
     exit_code: int
@@ -74,7 +81,7 @@ class GoalRuleResult:
     stderr: str
 
     @staticmethod
-    def noop() -> "GoalRuleResult":
+    def noop() -> GoalRuleResult:
         return GoalRuleResult(0, stdout="", stderr="")
 
 
@@ -141,6 +148,7 @@ class RuleRunner:
             options_bootstrapper=options_bootstrapper,
             build_root=self.build_root,
             build_configuration=self.build_config,
+            executor=_EXECUTOR,
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
             ca_certs_path=ca_certs_path,
         ).new_session(
@@ -171,6 +179,10 @@ class RuleRunner:
     def union_membership(self) -> UnionMembership:
         """An instance of `UnionMembership` with all the test's registered `UnionRule`s."""
         return self.request(UnionMembership, [])
+
+    def new_session(self, build_id: str) -> None:
+        """Mutates this RuleRunner to begin a new Session with the same Scheduler."""
+        self.scheduler = self.scheduler.scheduler.new_session(build_id)
 
     def request(self, output_type: Type[_O], inputs: Iterable[Any]) -> _O:
         result = assert_single_element(

@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from typing import Any, ClassVar, Iterable, Tuple, TypeVar, Union, cast, overload
 
 from pants.util.ordered_set import FrozenOrderedSet
@@ -28,7 +30,7 @@ class Collection(Tuple[T, ...]):
         ...
 
     @overload  # noqa: F811
-    def __getitem__(self, index: slice) -> "Collection[T]":
+    def __getitem__(self, index: slice) -> Collection[T]:
         ...
 
     def __getitem__(self, index: Union[int, slice]) -> Union[T, "Collection[T]"]:  # noqa: F811

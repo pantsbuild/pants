@@ -1,20 +1,21 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import hashlib
 import logging
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union, cast
-from uuid import UUID
+from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union
 
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.internals.uuid import UUIDRequest, UUIDScope
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
 from pants.util.frozendict import FrozenDict
@@ -38,6 +39,17 @@ class ProductDescription:
     value: str
 
 
+class ProcessCacheScope(Enum):
+    # Cached in all locations, regardless of success or failure.
+    ALWAYS = "always"
+    # Cached in all locations, but only if the process exits successfully.
+    SUCCESSFUL = "successful"
+    # Cached only in memory (i.e. memoized in pantsd), but never persistently.
+    PER_RESTART = "per_restart"
+    # Never cached anywhere: will run once per Session (i.e. once per run of Pants).
+    NEVER = "never"
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Process:
@@ -54,7 +66,7 @@ class Process:
     jdk_home: Optional[str]
     is_nailgunnable: bool
     execution_slot_variable: Optional[str]
-    cache_failures: bool
+    cache_scope: ProcessCacheScope
 
     def __init__(
         self,
@@ -72,7 +84,8 @@ class Process:
         jdk_home: Optional[str] = None,
         is_nailgunnable: bool = False,
         execution_slot_variable: Optional[str] = None,
-        cache_failures: bool = False,
+        cache_scope: Optional[ProcessCacheScope] = None,
+        cache_failures: Optional[bool] = None,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -111,7 +124,18 @@ class Process:
         self.jdk_home = jdk_home
         self.is_nailgunnable = is_nailgunnable
         self.execution_slot_variable = execution_slot_variable
-        self.cache_failures = cache_failures
+
+        deprecated_conditional(
+            predicate=lambda: cache_failures is not None,
+            removal_version="2.4.0.dev1",
+            entity_description="Process.cache_failures",
+            hint_message="Use `Process.cache_scope` instead.",
+        )
+        if cache_failures is not None:
+            cache_scope = (
+                ProcessCacheScope.ALWAYS if cache_failures else ProcessCacheScope.SUCCESSFUL
+            )
+        self.cache_scope = cache_scope or ProcessCacheScope.SUCCESSFUL
 
 
 @frozen_after_init
@@ -300,7 +324,7 @@ class InteractiveProcess:
     @classmethod
     def from_process(
         cls, process: Process, *, hermetic_env: bool = True, forward_signals_to_process: bool = True
-    ) -> "InteractiveProcess":
+    ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
@@ -382,7 +406,7 @@ class BinaryPath:
     @classmethod
     def fingerprinted(
         cls, path: str, representative_content: Union[bytes, bytearray, memoryview]
-    ) -> "BinaryPath":
+    ) -> BinaryPath:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 
@@ -408,43 +432,6 @@ class BinaryPaths(EngineAwareReturnType):
     def first_path(self) -> Optional[BinaryPath]:
         """Return the first path to the binary that was discovered, if any."""
         return next(iter(self.paths), None)
-
-
-class ProcessScope(Enum):
-    PER_CALL = UUIDScope.PER_CALL
-    PER_SESSION = UUIDScope.PER_SESSION
-
-
-@dataclass(frozen=True)
-class UncacheableProcess:
-    """Ensures the wrapped Process will be run once per scope and its results never re-used.
-
-    By default the scope is PER_CALL which ensures the Process is re-run on every call.
-    """
-
-    process: Process
-    scope: ProcessScope = ProcessScope.PER_CALL
-
-
-@rule
-async def make_process_uncacheable(uncacheable_process: UncacheableProcess) -> Process:
-    uuid = await Get(
-        UUID, UUIDRequest, UUIDRequest.scoped(cast(UUIDScope, uncacheable_process.scope.value))
-    )
-
-    process = uncacheable_process.process
-    env = dict(process.env)
-
-    # This is a slightly hacky way to force the process to run: since the env var
-    #  value is unique, this input combination will never have been seen before,
-    #  and therefore never cached. The two downsides are:
-    #  1. This leaks into the process' environment, albeit with a funky var name that is
-    #     unlikely to cause problems in practice.
-    #  2. This run will be cached even though it can never be re-used.
-    # TODO: A more principled way of forcing rules to run?
-    env["__PANTS_FORCE_PROCESS_RUN__"] = str(uuid)
-
-    return dataclasses.replace(process, env=FrozenDict(env))
 
 
 class BinaryNotFoundError(EnvironmentError):
@@ -516,16 +503,14 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         # We use a volatile process to force re-run since any binary found on the host system today
         # could be gone tomorrow. Ideally we'd only do this for local processes since all known
         # remoting configurations include a static container image as part of their cache key which
-        # automatically avoids this problem.
-        UncacheableProcess(
-            Process(
-                description=f"Searching for `{request.binary_name}` on PATH={search_path}",
-                level=LogLevel.DEBUG,
-                input_digest=script_digest,
-                argv=[script_path, request.binary_name],
-                env={"PATH": search_path},
-            ),
-            scope=ProcessScope.PER_SESSION,
+        # automatically avoids this problem. See #10769 for a solution that is less of a tradeoff.
+        Process(
+            description=f"Searching for `{request.binary_name}` on PATH={search_path}",
+            level=LogLevel.DEBUG,
+            input_digest=script_digest,
+            argv=[script_path, request.binary_name],
+            env={"PATH": search_path},
+            cache_scope=ProcessCacheScope.PER_RESTART,
         ),
     )
 
@@ -537,13 +522,11 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     results = await MultiGet(
         Get(
             FallibleProcessResult,
-            UncacheableProcess(
-                Process(
-                    description=f"Test binary {path}.",
-                    level=LogLevel.DEBUG,
-                    argv=[path, *request.test.args],
-                ),
-                scope=ProcessScope.PER_SESSION,
+            Process(
+                description=f"Test binary {path}.",
+                level=LogLevel.DEBUG,
+                argv=[path, *request.test.args],
+                cache_scope=ProcessCacheScope.PER_RESTART,
             ),
         )
         for path in found_paths

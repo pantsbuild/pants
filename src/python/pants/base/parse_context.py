@@ -57,8 +57,8 @@ class ParseContext:
 
         :param alias: Either the type alias or the type itself.
         :type alias: string|type
-        :param *args: These pass through to the underlying callable object.
-        :param **kwargs: These pass through to the underlying callable object.
+        :param args: These pass through to the underlying callable object.
+        :param kwargs: These pass through to the underlying callable object.
         :returns: The created object.
         """
         object_type = self._type_aliases.get(alias)

@@ -1,19 +1,18 @@
-use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
-  Process, ProcessMetadata,
-};
-
 use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
 
-use futures::compat::Future01CompatExt;
 use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::relative_paths;
 use workunit_store::WorkunitStore;
+
+use crate::{
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
+  Process, ProcessMetadata,
+};
 
 struct RoundtripResults {
   uncached: Result<FallibleProcessResultWithPlatform, String>,
@@ -162,17 +161,18 @@ async fn recover_from_missing_store_contents() {
       .unwrap()
       .unwrap();
     let output_child_digest = output_dir
-      .get_files()
+      .files
       .first()
       .unwrap()
-      .get_digest()
+      .digest
+      .as_ref()
+      .unwrap()
       .try_into()
       .unwrap();
     let removed = store.remove_file(output_child_digest).await.unwrap();
     assert!(removed);
     assert!(store
       .contents_for_directory(output_dir_digest)
-      .compat()
       .await
       .err()
       .is_some())
@@ -187,7 +187,6 @@ async fn recover_from_missing_store_contents() {
   // And that the entire output directory can be loaded.
   assert!(store
     .contents_for_directory(second_result.output_directory)
-    .compat()
     .await
     .ok()
     .is_some())

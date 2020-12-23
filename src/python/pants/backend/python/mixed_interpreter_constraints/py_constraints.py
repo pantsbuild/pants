@@ -29,9 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 class PyConstraintsSubsystem(Outputting, GoalSubsystem):
-    """Determine what Python interpreter constraints are used by files/targets."""
-
     name = "py-constraints"
+    help = "Determine what Python interpreter constraints are used by files/targets."
 
     @classmethod
     def register_options(cls, register) -> None:

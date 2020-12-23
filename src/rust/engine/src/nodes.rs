@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashMap};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::fmt::Display;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -22,14 +22,15 @@ use crate::externs::engine_aware::{self, EngineAwareInformation};
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
-use boxfuture::{BoxFuture, Boxable};
-use bytes::{self, BufMut};
+use bytes::buf::BufMutExt;
 use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
 };
-use process_execution::{self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process};
+use process_execution::{
+  self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process, ProcessCacheScope,
+};
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
@@ -60,12 +61,12 @@ impl VFS<Failure> for Context {
 }
 
 impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
+  fn store_by_digest(
+    &self,
+    file: File,
+  ) -> future::BoxFuture<'static, Result<hashing::Digest, Failure>> {
     let context = self.clone();
-    async move { context.get(DigestFile(file)).await }
-      .boxed()
-      .compat()
-      .to_boxed()
+    async move { context.get(DigestFile(file)).await }.boxed()
   }
 }
 
@@ -206,19 +207,8 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_directory_digest(types: &Types, digest: &Value) -> Result<hashing::Digest, String> {
-  if types.directory_digest != externs::get_type_for(digest) {
-    return Err(format!(
-      "{} is not of type {}.",
-      digest, types.directory_digest
-    ));
-  }
-  let fingerprint = externs::getattr_as_string(&digest, "fingerprint");
-  let digest_length: usize = externs::getattr(&digest, "serialized_bytes_length").unwrap();
-  Ok(hashing::Digest(
-    hashing::Fingerprint::from_hex_string(&fingerprint)?,
-    digest_length,
-  ))
+pub fn lift_directory_digest(digest: &Value) -> Result<hashing::Digest, String> {
+  externs::fs::from_py_digest(digest).map_err(|e| format!("{:?}", e))
 }
 
 pub fn lift_file_digest(types: &Types, digest: &Value) -> Result<hashing::Digest, String> {
@@ -237,16 +227,12 @@ pub fn lift_file_digest(types: &Types, digest: &Value) -> Result<hashing::Digest
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct MultiPlatformExecuteProcess {
-  cache_failures: bool,
+  cache_scope: ProcessCacheScope,
   process: MultiPlatformProcess,
 }
 
 impl MultiPlatformExecuteProcess {
-  fn lift_process(
-    types: &Types,
-    value: &Value,
-    platform_constraint: Option<Platform>,
-  ) -> Result<Process, String> {
+  fn lift_process(value: &Value, platform_constraint: Option<Platform>) -> Result<Process, String> {
     let env = externs::getattr_from_frozendict(&value, "env");
 
     let working_directory = {
@@ -259,8 +245,8 @@ impl MultiPlatformExecuteProcess {
     };
 
     let py_digest: Value = externs::getattr(&value, "input_digest").unwrap();
-    let digest = lift_directory_digest(types, &py_digest)
-      .map_err(|err| format!("Error parsing digest {}", err))?;
+    let digest =
+      lift_directory_digest(&py_digest).map_err(|err| format!("Error parsing digest {}", err))?;
 
     let output_files = externs::getattr::<Vec<String>>(&value, "output_files")
       .unwrap()
@@ -311,7 +297,9 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let cache_failures: bool = externs::getattr(&value, "cache_failures").unwrap();
+    let cache_scope =
+      externs::getattr_as_string(&externs::getattr(&value, "cache_scope").unwrap(), "name")
+        .try_into()?;
 
     Ok(process_execution::Process {
       argv: externs::getattr(&value, "argv").unwrap(),
@@ -328,11 +316,11 @@ impl MultiPlatformExecuteProcess {
       platform_constraint,
       is_nailgunnable,
       execution_slot_variable,
-      cache_failures,
+      cache_scope,
     })
   }
 
-  pub fn lift(types: &Types, value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+  pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
     let raw_constraints = externs::getattr::<Vec<Option<String>>>(&value, "platform_constraints")?;
     let constraints = raw_constraints
       .into_iter()
@@ -350,19 +338,19 @@ impl MultiPlatformExecuteProcess {
       ));
     }
 
-    let mut cache_failures = true;
-
     let mut request_by_constraint: BTreeMap<Option<Platform>, Process> = BTreeMap::new();
     for (constraint, execute_process) in constraints.iter().zip(processes.iter()) {
-      let underlying_req =
-        MultiPlatformExecuteProcess::lift_process(types, execute_process, *constraint)?;
-      if !underlying_req.cache_failures {
-        cache_failures = false;
-      }
+      let underlying_req = MultiPlatformExecuteProcess::lift_process(execute_process, *constraint)?;
       request_by_constraint.insert(*constraint, underlying_req.clone());
     }
+
+    let cache_scope = request_by_constraint
+      .values()
+      .next()
+      .map(|p| p.cache_scope)
+      .unwrap();
     Ok(MultiPlatformExecuteProcess {
-      cache_failures,
+      cache_scope,
       process: MultiPlatformProcess(request_by_constraint),
     })
   }
@@ -635,7 +623,7 @@ impl Snapshot {
   }
 
   pub fn store_directory_digest(item: &hashing::Digest) -> Result<Value, String> {
-    externs::fs::new_py_digest(*item)
+    externs::fs::to_py_digest(*item)
       .map(|d| d.into_object().into())
       .map_err(|e| format!("{:?}", e))
   }
@@ -650,27 +638,10 @@ impl Snapshot {
     )
   }
 
-  pub fn store_snapshot(core: &Arc<Core>, item: &store::Snapshot) -> Result<Value, String> {
-    let mut files = Vec::new();
-    let mut dirs = Vec::new();
-    for ps in &item.path_stats {
-      match ps {
-        &PathStat::File { ref path, .. } => {
-          files.push(Self::store_path(path)?);
-        }
-        &PathStat::Dir { ref path, .. } => {
-          dirs.push(Self::store_path(path)?);
-        }
-      }
-    }
-    Ok(externs::unsafe_call(
-      core.types.snapshot,
-      &[
-        Self::store_directory_digest(&item.digest)?,
-        externs::store_tuple(files),
-        externs::store_tuple(dirs),
-      ],
-    ))
+  pub fn store_snapshot(item: store::Snapshot) -> Result<Value, String> {
+    externs::fs::to_py_snapshot(item)
+      .map(|d| d.into_object().into())
+      .map_err(|e| format!("{:?}", e))
   }
 
   fn store_path(item: &Path) -> Result<Value, String> {
@@ -1372,14 +1343,11 @@ impl Node for NodeKey {
   fn cacheable_item(&self, output: &NodeOutput) -> bool {
     match self {
       NodeKey::MultiPlatformExecuteProcess(ref mp) => match output {
-        NodeOutput::ProcessResult(ref process_result) => {
-          let process_succeeded = process_result.0.exit_code == 0;
-          if mp.cache_failures {
-            true
-          } else {
-            process_succeeded
-          }
-        }
+        NodeOutput::ProcessResult(ref process_result) => match mp.cache_scope {
+          ProcessCacheScope::Always | ProcessCacheScope::PerRestart => true,
+          ProcessCacheScope::Successful => process_result.0.exit_code == 0,
+          ProcessCacheScope::Never => false,
+        },
         _ => true,
       },
       _ => true,

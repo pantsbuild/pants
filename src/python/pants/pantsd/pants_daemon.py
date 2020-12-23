@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import os
 import sys
@@ -15,8 +17,9 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import GraphScheduler
-from pants.init.logging import setup_logging, setup_logging_to_file, setup_warning_filtering
+from pants.init.logging import setup_logging, setup_logging_to_file
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
@@ -45,20 +48,23 @@ class PantsDaemon(PantsDaemonProcessManager):
         """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
     @classmethod
-    def create(cls, options_bootstrapper: OptionsBootstrapper) -> "PantsDaemon":
-
+    def create(cls, options_bootstrapper: OptionsBootstrapper) -> PantsDaemon:
+        # Any warnings that would be triggered here are re-triggered later per-run of Pants, so we
+        # silence them.
         with warnings.catch_warnings(record=True):
             bootstrap_options = options_bootstrapper.bootstrap_options
             bootstrap_options_values = bootstrap_options.for_global_scope()
 
-        setup_warning_filtering(bootstrap_options_values.ignore_pants_warnings or [])
-
         native = Native()
         native.override_thread_logging_destination_to_just_pantsd()
 
-        core = PantsDaemonCore(cls._setup_services)
+        executor = PyExecutor(
+            *OptionsInitializer.compute_executor_arguments(bootstrap_options_values)
+        )
+        core = PantsDaemonCore(executor, cls._setup_services)
 
         server = native.new_nailgun_server(
+            executor,
             bootstrap_options_values.pantsd_pailgun_port,
             DaemonPantsRunner(core),
         )

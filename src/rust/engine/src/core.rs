@@ -3,7 +3,6 @@
 
 use fnv::FnvHasher;
 
-use std::collections::HashSet;
 use std::convert::AsRef;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -11,8 +10,9 @@ use std::{fmt, hash};
 
 use crate::externs;
 
-use cpython::{FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, Python, ToPyObject};
-use indexmap::{IndexMap, IndexSet};
+use cpython::{
+  FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, PyType, Python, ToPyObject,
+};
 use smallvec::SmallVec;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
@@ -114,15 +114,33 @@ impl fmt::Display for Params {
 
 pub type Id = u64;
 
-// The type of a python object (which itself has a type, but which is not represented
-// by a Key, because that would result in a infinitely recursive structure.)
-#[repr(C)]
+///
+/// A pointer to an underlying PyTypeObject instance.
+///
+/// NB: This is a void pointer because the `cpython::ffi::PyTypeObject` is not public.
+///
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TypeId(pub Id);
+pub struct TypeId(*mut std::ffi::c_void);
+
+unsafe impl Send for TypeId {}
+unsafe impl Sync for TypeId {}
 
 impl TypeId {
+  pub fn as_py_type(&self, py: Python) -> PyType {
+    // NB: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
+    // type is not unloaded. That is true today, but would not be if we implemented support for hot
+    // reloading of plugins.
+    unsafe { PyType::from_type_ptr(py, self.0 as _) }
+  }
+
   fn pretty_print(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", externs::type_to_str(self))
+  }
+}
+
+impl From<&PyType> for TypeId {
+  fn from(py_type: &PyType) -> Self {
+    TypeId(py_type.as_type_ptr() as *mut std::ffi::c_void)
   }
 }
 
@@ -425,56 +443,4 @@ pub fn throw(msg: &str) -> Failure {
     python_traceback: Failure::native_traceback(msg),
     engine_traceback: Vec::new(),
   }
-}
-
-///
-/// Given a graph represented as an adjacency list, return a collection of cyclic paths.
-///
-pub fn cyclic_paths<N: hash::Hash + Eq + Copy>(adjacencies: IndexMap<N, Vec<N>>) -> Vec<Vec<N>> {
-  let mut cyclic_paths = Vec::new();
-  let mut path_stack = IndexSet::new();
-  let mut visited = HashSet::new();
-
-  for node in adjacencies.keys() {
-    cyclic_paths_visit(
-      *node,
-      &adjacencies,
-      &mut cyclic_paths,
-      &mut path_stack,
-      &mut visited,
-    );
-  }
-
-  cyclic_paths
-}
-
-fn cyclic_paths_visit<N: hash::Hash + Eq + Copy>(
-  node: N,
-  adjacencies: &IndexMap<N, Vec<N>>,
-  cyclic_paths: &mut Vec<Vec<N>>,
-  path_stack: &mut IndexSet<N>,
-  visited: &mut HashSet<N>,
-) {
-  if visited.contains(&node) {
-    if path_stack.contains(&node) {
-      cyclic_paths.push(
-        path_stack
-          .iter()
-          .cloned()
-          .chain(std::iter::once(node))
-          .collect::<Vec<_>>(),
-      );
-    }
-    return;
-  }
-  path_stack.insert(node);
-  visited.insert(node);
-
-  if let Some(adjacent) = adjacencies.get(&node) {
-    for dep_node in adjacent {
-      cyclic_paths_visit(*dep_node, adjacencies, cyclic_paths, path_stack, visited);
-    }
-  }
-
-  path_stack.remove(&node);
 }

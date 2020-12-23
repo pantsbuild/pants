@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
 import os.path
 import textwrap
@@ -217,7 +219,7 @@ class MockFieldSet(FieldSet):
     interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
-    def create_for_test(cls, address: Address, compat: Optional[str]) -> "MockFieldSet":
+    def create_for_test(cls, address: Address, compat: Optional[str]) -> MockFieldSet:
         return cls(
             address=address,
             interpreter_constraints=InterpreterConstraintsField(
@@ -283,7 +285,7 @@ class ExactRequirement:
     version: str
 
     @classmethod
-    def parse(cls, requirement: str) -> "ExactRequirement":
+    def parse(cls, requirement: str) -> ExactRequirement:
         req = Requirement.parse(requirement)
         assert len(req.specs) == 1, (
             f"Expected an exact requirement with only 1 specifier, given {requirement} with "

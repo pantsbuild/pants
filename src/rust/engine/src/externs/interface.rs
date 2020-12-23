@@ -58,15 +58,14 @@ use cpython::{
   PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
   ToPyObject,
 };
-use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
-use futures::future::{self as future03, TryFutureExt};
-use futures01::Future;
+use futures::future::{self, TryFutureExt};
+use futures::Future;
 use hashing::Digest;
-use indexmap::IndexMap;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
+use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
@@ -74,8 +73,8 @@ use workunit_store::{UserMetadataItem, Workunit, WorkunitState};
 
 use crate::{
   externs, nodes, sessions_cancel, Core, ExecutionRequest, ExecutionStrategyOptions,
-  ExecutionTermination, Failure, Function, Intrinsics, Key, Params, RemotingOptions, Rule,
-  Scheduler, Session, Tasks, Types, Value,
+  ExecutionTermination, Failure, Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler,
+  Session, Tasks, Types, Value,
 };
 
 py_exception!(native_engine, PollTimeout);
@@ -99,16 +98,12 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(py, "default_cache_path", py_fn!(py, default_cache_path()))?;
 
-  m.add(py, "default_config_path", py_fn!(py, default_config_path()))?;
-
-  m.add(py, "cyclic_paths", py_fn!(py, cyclic_paths(a: PyDict)))?;
-
   m.add(
     py,
     "init_logging",
     py_fn!(
       py,
-      init_logging(a: u64, b: bool, c: bool, d: bool, e: PyDict)
+      init_logging(a: u64, b: bool, c: bool, d: bool, e: PyDict, f: Vec<String>)
     ),
   )?;
   m.add(
@@ -219,10 +214,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "nailgun_server_await_shutdown",
-    py_fn!(
-      py,
-      nailgun_server_await_shutdown(a: PyExecutor, b: PyNailgunServer)
-    ),
+    py_fn!(py, nailgun_server_await_shutdown(a: PyNailgunServer)),
   )?;
 
   m.add(
@@ -416,6 +408,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::PyGeneratorResponseGetMulti>(py)?;
 
   m.add_class::<externs::fs::PyDigest>(py)?;
+  m.add_class::<externs::fs::PySnapshot>(py)?;
 
   Ok(())
 });
@@ -482,8 +475,8 @@ py_class!(class PyTypes |py| {
 
 py_class!(class PyExecutor |py| {
     data executor: Executor;
-    def __new__(_cls) -> CPyResult<Self> {
-      let executor = Executor::new_owned().map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+    def __new__(_cls, core_threads: usize, max_threads: usize) -> CPyResult<Self> {
+      let executor = Executor::new_owned(core_threads, max_threads).map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
       Self::create_instance(py, executor)
     }
 });
@@ -616,6 +609,7 @@ py_class!(class PySessionCancellationLatch |py| {
 
 py_class!(class PyNailgunServer |py| {
     data server: RefCell<Option<nailgun::Server>>;
+    data executor: Executor;
 
     def port(&self) -> CPyResult<u16> {
         let borrowed_server = self.server(py).borrow();
@@ -824,25 +818,20 @@ fn nailgun_server_create(
     let server = executor
       .block_on(server_future)
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-    PyNailgunServer::create_instance(py, RefCell::new(Some(server)))
+    PyNailgunServer::create_instance(py, RefCell::new(Some(server)), executor.clone())
   })
 }
 
-fn nailgun_server_await_shutdown(
-  py: Python,
-  executor_ptr: PyExecutor,
-  nailgun_server_ptr: PyNailgunServer,
-) -> PyUnitResult {
-  with_executor(py, &executor_ptr, |executor| {
-    with_nailgun_server(py, nailgun_server_ptr, |nailgun_server| {
-      let shutdown_result = if let Some(server) = nailgun_server.borrow_mut().take() {
-        py.allow_threads(|| executor.block_on(server.shutdown()))
-      } else {
-        Ok(())
-      };
-      shutdown_result.map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-      Ok(None)
-    })
+fn nailgun_server_await_shutdown(py: Python, nailgun_server_ptr: PyNailgunServer) -> PyUnitResult {
+  with_nailgun_server(py, nailgun_server_ptr, |nailgun_server, executor| {
+    let executor = executor.clone();
+    let shutdown_result = if let Some(server) = nailgun_server.borrow_mut().take() {
+      py.allow_threads(|| executor.block_on(server.shutdown()))
+    } else {
+      Ok(())
+    };
+    shutdown_result.map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+    Ok(None)
   })
 }
 
@@ -881,21 +870,26 @@ fn scheduler_create(
     let mut tasks = tasks_ptr.tasks(py).replace(Tasks::new());
     tasks.intrinsics_set(&intrinsics);
 
-    Core::new(
-      executor.clone(),
-      tasks,
-      types,
-      intrinsics,
-      PathBuf::from(build_root_buf),
-      ignore_patterns,
-      use_gitignore,
-      PathBuf::from(local_store_dir_buf),
-      PathBuf::from(local_execution_root_dir_buf),
-      PathBuf::from(named_caches_dir_buf),
-      ca_certs_path_buf.map(PathBuf::from),
-      remoting_options.options(py).clone(),
-      exec_strategy_opts.options(py).clone(),
-    )
+    // NOTE: Enter the Tokio runtime so that libraries like Tonic (for gRPC) are able to
+    // use `tokio::spawn` since Python does not setup Tokio for the main thread. This also
+    // ensures that the correct executor is used by those libraries.
+    executor.enter(|| {
+      Core::new(
+        executor.clone(),
+        tasks,
+        types,
+        intrinsics,
+        PathBuf::from(build_root_buf),
+        ignore_patterns,
+        use_gitignore,
+        PathBuf::from(local_store_dir_buf),
+        PathBuf::from(local_execution_root_dir_buf),
+        PathBuf::from(named_caches_dir_buf),
+        ca_certs_path_buf.map(PathBuf::from),
+        remoting_options.options(py).clone(),
+        exec_strategy_opts.options(py).clone(),
+      )
+    })
   });
   PyScheduler::create_instance(
     py,
@@ -989,7 +983,7 @@ async fn workunit_to_py_value(
       })?;
     artifact_entries.push((
       externs::store_utf8(artifact_name.as_str()),
-      crate::nodes::Snapshot::store_snapshot(core, &snapshot).map_err(|err_str| {
+      crate::nodes::Snapshot::store_snapshot(snapshot).map_err(|err_str| {
         let gil = Python::acquire_gil();
         let py = gil.python();
         PyErr::new::<exc::Exception, _>(py, (err_str,))
@@ -1565,10 +1559,7 @@ fn capture_snapshots(
             if maybe_digest == externs::none() {
               None
             } else {
-              Some(nodes::lift_directory_digest(
-                &core.types,
-                &Value::new(maybe_digest),
-              )?)
+              Some(nodes::lift_directory_digest(&Value::new(maybe_digest))?)
             }
           };
           path_globs.map(|path_globs| (path_globs, root, digest_hint))
@@ -1589,13 +1580,13 @@ fn capture_snapshots(
               digest_hint,
             )
             .await?;
-            nodes::Snapshot::store_snapshot(&core, &snapshot)
+            nodes::Snapshot::store_snapshot(snapshot)
           }
         })
         .collect::<Vec<_>>();
       py.allow_threads(|| {
         core.executor.block_on(
-          future03::try_join_all(snapshot_futures)
+          future::try_join_all(snapshot_futures)
             .map_ok(|values| externs::store_tuple(values).into()),
         )
       })
@@ -1618,7 +1609,7 @@ fn ensure_remote_has_recursive(
       .iter(py)
       .map(|item| {
         let value = item.into();
-        crate::nodes::lift_directory_digest(&core.types, &value)
+        crate::nodes::lift_directory_digest(&value)
           .or_else(|_| crate::nodes::lift_file_digest(&core.types, &value))
       })
       .collect::<Result<Vec<Digest>, _>>()
@@ -1628,7 +1619,7 @@ fn ensure_remote_has_recursive(
       .allow_threads(|| {
         core
           .executor
-          .block_on(store.ensure_remote_has_recursive(digests).compat())
+          .block_on(store.ensure_remote_has_recursive(digests))
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
     Ok(None)
@@ -1668,7 +1659,7 @@ fn single_file_digests_to_bytes(
     let bytes_values: Vec<PyObject> = py
       .allow_threads(|| {
         core.executor.block_on(
-          future03::try_join_all(digest_futures)
+          future::try_join_all(digest_futures)
             .map_ok(|values: Vec<Value>| values.into_iter().map(|val| val.into()).collect()),
         )
       })
@@ -1699,7 +1690,7 @@ fn run_local_interactive_process(
 
       let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
       let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
-      let input_digest: Digest = nodes::lift_directory_digest(types, &input_digest_value)?;
+      let input_digest: Digest = nodes::lift_directory_digest(&input_digest_value)?;
       let hermetic_env: bool = externs::getattr(&value, "hermetic_env").unwrap();
       let env = externs::getattr_from_frozendict(&value, "env");
 
@@ -1714,7 +1705,6 @@ fn run_local_interactive_process(
             run_in_workspace,
           )
           .boxed_local()
-          .compat()
       })?;
 
       Ok(
@@ -1741,7 +1731,7 @@ fn write_digest(
       // TODO: A parent_id should be an explicit argument.
       session.workunit_store().init_thread_state(None);
 
-      let lifted_digest = nodes::lift_directory_digest(&scheduler.core.types, &digest.into())
+      let lifted_digest = nodes::lift_directory_digest(&digest.into())
         .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
 
       // Python will have already validated that path_prefix is a relative path.
@@ -1776,54 +1766,6 @@ fn default_cache_path(py: Python) -> CPyResult<String> {
     })
 }
 
-fn default_config_path(py: Python) -> CPyResult<String> {
-  fs::default_config_path()
-    .into_os_string()
-    .into_string()
-    .map_err(|s| {
-      PyErr::new::<exc::Exception, _>(
-        py,
-        (format!(
-          "Default config path {:?} could not be converted to a string.",
-          s
-        ),),
-      )
-    })
-}
-
-fn cyclic_paths(py: Python, adjacencies: PyDict) -> CPyResult<Vec<PyTuple>> {
-  let adjacencies = adjacencies
-    .items(py)
-    .into_iter()
-    .map(|(k, v)| {
-      let node = externs::key_for(k.into())?;
-      let adjacent = v
-        .extract::<Vec<PyObject>>(py)?
-        .into_iter()
-        .map(|v| externs::key_for(v.into()))
-        .collect::<Result<Vec<Key>, _>>()?;
-      let res: Result<_, PyErr> = Ok((node, adjacent));
-      res
-    })
-    .collect::<Result<IndexMap<Key, Vec<Key>>, _>>()?;
-  let paths = py.allow_threads(move || crate::core::cyclic_paths(adjacencies));
-
-  Ok(
-    paths
-      .into_iter()
-      .map(|path| {
-        let gil = Python::acquire_gil();
-        let path_vec = path
-          .iter()
-          .map(externs::val_for)
-          .map(|node| node.consume_into_py_object(gil.python()))
-          .collect::<Vec<_>>();
-        PyTuple::new(gil.python(), &path_vec)
-      })
-      .collect(),
-  )
-}
-
 fn init_logging(
   py: Python,
   level: u64,
@@ -1831,6 +1773,7 @@ fn init_logging(
   use_color: bool,
   show_target: bool,
   log_levels_by_target: PyDict,
+  message_regex_filters: Vec<String>,
 ) -> PyUnitResult {
   let log_levels_by_target = log_levels_by_target
     .items(py)
@@ -1841,12 +1784,21 @@ fn init_logging(
       (k, v)
     })
     .collect::<HashMap<_, _>>();
+  let message_regex_filters = message_regex_filters
+    .iter()
+    .map(|re| {
+      Regex::new(re).map_err(|e| {
+        PyErr::new::<exc::Exception, _>(py, (format!("Failed to parse warning filter: {}", e),))
+      })
+    })
+    .collect::<Result<Vec<Regex>, _>>()?;
   Logger::init(
     level,
     show_rust_3rdparty_logs,
     use_color,
     show_target,
     log_levels_by_target,
+    message_regex_filters,
   );
   Ok(None)
 }
@@ -1881,7 +1833,7 @@ fn write_log(py: Python, msg: String, level: u64, path: String) -> PyUnitResult 
 
 fn write_stdout(py: Python, session_ptr: PySession, msg: String) -> PyUnitResult {
   with_session(py, session_ptr, |session| {
-    block_in_place_and_wait(py, || session.write_stdout(&msg).boxed_local().compat())
+    block_in_place_and_wait(py, || session.write_stdout(&msg).boxed_local())
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
     Ok(None)
   })
@@ -1904,11 +1856,7 @@ fn teardown_dynamic_ui(
   with_scheduler(py, scheduler_ptr, |_scheduler| {
     with_session(py, session_ptr, |session| {
       let _ = block_in_place_and_wait(py, || {
-        session
-          .maybe_display_teardown()
-          .unit_error()
-          .boxed_local()
-          .compat()
+        session.maybe_display_teardown().unit_error().boxed_local()
       });
       Ok(None)
     })
@@ -1947,11 +1895,11 @@ fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
 ///
 fn block_in_place_and_wait<T, E, F>(py: Python, f: impl FnOnce() -> F + Sync + Send) -> Result<T, E>
 where
-  F: Future<Item = T, Error = E>,
+  F: Future<Output = Result<T, E>>,
 {
   py.allow_threads(|| {
     let future = f();
-    tokio::task::block_in_place(|| future.wait())
+    tokio::task::block_in_place(|| futures::executor::block_on(future))
   })
 }
 
@@ -1995,10 +1943,11 @@ where
 ///
 fn with_nailgun_server<F, T>(py: Python, nailgun_server_ptr: PyNailgunServer, f: F) -> T
 where
-  F: FnOnce(&RefCell<Option<nailgun::Server>>) -> T,
+  F: FnOnce(&RefCell<Option<nailgun::Server>>, &Executor) -> T,
 {
   let nailgun_server = nailgun_server_ptr.server(py);
-  f(&nailgun_server)
+  let executor = nailgun_server_ptr.executor(py);
+  f(&nailgun_server, executor)
 }
 
 ///

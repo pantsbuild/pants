@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import argparse
 import os
 import re
@@ -373,7 +375,7 @@ class PrebuiltWheel(NamedTuple):
     url: str
 
     @classmethod
-    def create(cls, path: str) -> "PrebuiltWheel":
+    def create(cls, path: str) -> PrebuiltWheel:
         return cls(path, quote_plus(path))
 
 

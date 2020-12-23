@@ -7,7 +7,7 @@ import collections.abc
 import dataclasses
 import itertools
 import os.path
-from abc import ABC, ABCMeta
+from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
@@ -659,7 +659,7 @@ class RegisteredTargetTypes:
         self.aliases_to_types = FrozenDict(aliases_to_types)
 
     @classmethod
-    def create(cls, target_types: Iterable[Type[Target]]) -> "RegisteredTargetTypes":
+    def create(cls, target_types: Iterable[Type[Target]]) -> RegisteredTargetTypes:
         return cls(
             {
                 target_type.alias: target_type
@@ -796,6 +796,7 @@ def _get_field_set_fields_from_target(
         for dataclass_field in dataclasses.fields(field_set)
         if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[unreachable]
     }
+
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
@@ -871,12 +872,18 @@ class TargetRootsToFieldSets(Generic[_AFS]):
         return tuple(self.mapping.keys())
 
 
+class NoApplicableTargetsBehavior(Enum):
+    ignore = "ignore"
+    warn = "warn"
+    error = "error"
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSetsRequest(Generic[_AFS]):
     field_set_superclass: Type[_AFS]
     goal_description: str
-    error_if_no_applicable_targets: bool
+    no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
     # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
     #  `util_rules/filter_empty_sources.py`.
@@ -886,12 +893,12 @@ class TargetRootsToFieldSetsRequest(Generic[_AFS]):
         field_set_superclass: Type[_AFS],
         *,
         goal_description: str,
-        error_if_no_applicable_targets: bool,
+        no_applicable_targets_behavior: NoApplicableTargetsBehavior,
         expect_single_field_set: bool = False,
     ) -> None:
         self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
-        self.error_if_no_applicable_targets = error_if_no_applicable_targets
+        self.no_applicable_targets_behavior = no_applicable_targets_behavior
         self.expect_single_field_set = expect_single_field_set
 
 
@@ -1221,6 +1228,11 @@ class Sources(StringSequenceField, AsyncFieldMixin):
     alias = "sources"
     expected_file_extensions: ClassVar[Optional[Tuple[str, ...]]] = None
     expected_num_files: ClassVar[Optional[Union[int, range]]] = None
+    description = (
+        "A list of files and globs that belong to this target.\n\nPaths are relative to the BUILD "
+        "file's directory. You can ignore files/globs by prefixing them with `!`.\n\nExample: "
+        "`sources=['example.py', 'test_*.py', '!test_ignore.py']`."
+    )
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         """Perform any additional validation on the resulting source files, e.g. ensuring that
@@ -1273,8 +1285,8 @@ class Sources(StringSequenceField, AsyncFieldMixin):
     @final
     def _prefix_glob_with_address(self, glob: str) -> str:
         if glob.startswith("!"):
-            return f"!{PurePath(self.address.spec_path, glob[1:])}"
-        return str(PurePath(self.address.spec_path, glob))
+            return f"!{os.path.join(self.address.spec_path, glob[1:])}"
+        return os.path.join(self.address.spec_path, glob)
 
     @final
     def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
@@ -1476,27 +1488,62 @@ class SourcesPathsRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
+class SecondaryOwnerMixin(ABC):
+    """Add to a Field for the target to work with file arguments and `--changed-since`, without it
+    needing a `Sources` field.
+
+    Why use this? In a dependency inference world, multiple targets including the same file in the
+    `sources` field causes issues due to ambiguity over which target to use. So, only one target
+    should have "primary ownership" of the file. However, you may still want other targets to be
+    used when that file is included in file arguments. For example, a `python_library` target
+    being the primary owner of the `.py` file, but a `pex_binary` still working with file
+    arguments for that file. Secondary ownership means that the target won't be used for things like
+    dependency inference and hydrating sources, but file arguments will still work.
+
+    There should be a primary owner of the file(s), e.g. the `python_library` in the above example.
+    Typically, you will want to add a dependency injection rule to infer a dep on that primary
+    owner.
+
+    All associated files must live in the BUILD target's directory or a subdirectory to work
+    properly, like the `sources` field.
+    """
+
+    @property
+    @abstractmethod
+    def filespec(self) -> Filespec:
+        """A dictionary in the form {'globs': ['full/path/to/f.ext']} representing the field's
+        associated files.
+
+        Typically, users should use a file name/glob relative to the BUILD file, like the `sources`
+        field. Then, you can use `os.path.join(self.address.spec_path, self.value)` to relative to
+        the build root.
+        """
+
+
 # -----------------------------------------------------------------------------------------------
 # `Dependencies` field
 # -----------------------------------------------------------------------------------------------
 
-# NB: To hydrate the dependencies, use one of:
-#   await Get(Addresses, DependenciesRequest(tgt[Dependencies])
-#   await Get(Targets, DependenciesRequest(tgt[Dependencies])
+
 class Dependencies(StringSequenceField, AsyncFieldMixin):
-    """Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib'].
+    """The dependencies field.
 
-    Alternatively, you may include file names. Pants will find which target owns that file, and
-    create a new target from that which only includes the file in its `sources` field. For files
-    relative to the current BUILD file, prefix with `./`; otherwise, put the full path, e.g.
-    ['./sibling.txt', 'resources/demo.json'].
-
-    You may exclude dependencies by prefixing with `!`, e.g. `['!helloworld/subdir:lib',
-    '!./sibling.txt']`. Ignores are intended for false positives with dependency inference;
-    otherwise, simply leave off the dependency from the BUILD file.
+    To resolve all dependencies—including the results of dependency injection and inference—use
+    either `await Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
+    DependenciesRequest(tgt[Dependencies])`.
     """
 
     alias = "dependencies"
+    description = (
+        "Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib']."
+        "\n\nAlternatively, you may include file names. Pants will find which target owns that "
+        "file, and create a new target from that which only includes the file in its `sources` "
+        "field. For files relative to the current BUILD file, prefix with `./`; otherwise, put the "
+        "full path, e.g. ['./sibling.txt', 'resources/demo.json'].\n\nYou may exclude dependencies "
+        "by prefixing with `!`, e.g. `['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are "
+        "intended for false positives with dependency inference; otherwise, simply leave off the "
+        "dependency from the BUILD file."
+    )
     supports_transitive_excludes = False
 
     @memoized_property
@@ -1682,22 +1729,20 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 
 class Tags(StringSequenceField):
-    """Arbitrary strings that you can use to describe a target.
-
-    For example, you may tag some test targets with 'integration_test' so that you could run
-    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
-    """
-
     alias = "tags"
+    description = (
+        "Arbitrary strings to describe a target.\n\nFor example, you may tag some test targets "
+        "with 'integration_test' so that you could run `./pants --tags='integration_test' test ::` "
+        "to only run on targets with that tag."
+    )
 
 
 class DescriptionField(StringField):
-    """A human-readable description of the target.
-
-    Use `./pants list --documented ::` to see all targets with descriptions.
-    """
-
     alias = "description"
+    description = (
+        "A human-readable description of the target.\n\nUse `./pants list --documented ::` to see "
+        "all targets with descriptions."
+    )
 
 
 COMMON_TARGET_FIELDS = (Tags, DescriptionField)
@@ -1706,8 +1751,7 @@ COMMON_TARGET_FIELDS = (Tags, DescriptionField)
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
 #  Artifact, there is no common Artifact interface.
 class ProvidesField(Field):
-    """An `artifact`, such as `setup_py`, that describes how to represent this target to the outside
-    world."""
+    """An `artifact` that describes how to represent this target to the outside world."""
 
     alias = "provides"
     default: ClassVar[Optional[Any]] = None

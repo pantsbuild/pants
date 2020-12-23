@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
@@ -14,7 +13,7 @@ use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
-  ProcessMetadata,
+  ProcessCacheScope, ProcessMetadata,
 };
 
 #[cfg(test)]
@@ -65,7 +64,7 @@ fn construct_nailgun_server_request(
     platform_constraint,
     is_nailgunnable: true,
     execution_slot_variable: None,
-    cache_failures: false,
+    cache_scope: ProcessCacheScope::Never,
   }
 }
 
@@ -237,17 +236,15 @@ impl CapturedWorkdir for CommandRunner {
       .clone()
       .with_acquired(move |_id| {
         // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
-        nailgun_pool
-          .connect(
-            nailgun_name.clone(),
-            nailgun_req,
-            workdir_for_this_nailgun,
-            nailgun_req_digest,
-            build_id,
-            store,
-            req.input_files,
-          )
-          .compat()
+        nailgun_pool.connect(
+          nailgun_name.clone(),
+          nailgun_req,
+          workdir_for_this_nailgun,
+          nailgun_req_digest,
+          build_id,
+          store,
+          req.input_files,
+        )
       })
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))

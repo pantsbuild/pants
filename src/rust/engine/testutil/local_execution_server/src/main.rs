@@ -28,8 +28,8 @@
 #![allow(clippy::mutex_atomic)]
 
 use bazel_protos::{
-  operations::Operation,
-  remote_execution::{Digest, ExecuteRequest},
+  gen::build::bazel::remote::execution::v2::{Digest, ExecuteRequest},
+  gen::google::longrunning::Operation,
 };
 use mock::execution_server::{ExpectedAPICall, MockExecution, MockOperation, TestServer};
 use std::io::Read;
@@ -61,16 +61,18 @@ fn main() {
 
   // When the request is executed, perform this operation
   let operation = MockOperation {
-    op: Ok(Some(Operation::new())),
+    op: Ok(Some(Operation::default())),
     duration: None,
   };
 
   // The request our server expects to receive
-  let mut request = ExecuteRequest::new();
-  let mut digest = Digest::new();
-  digest.set_hash(options.request_hash);
-  digest.set_size_bytes(options.request_size);
-  request.set_action_digest(digest);
+  let request = ExecuteRequest {
+    action_digest: Some(Digest {
+      hash: options.request_hash,
+      size_bytes: options.request_size,
+    }),
+    ..ExecuteRequest::default()
+  };
 
   let execution = MockExecution::new(vec![ExpectedAPICall::Execute {
     execute_request: request,

@@ -13,7 +13,7 @@ from pants.util.dirutil import read_file
 
 
 @ensure_daemon
-def test_fmt_then_edit():
+def test_fmt_then_edit(use_pantsd: bool) -> None:
     f = "testprojects/src/python/hello/greet/greet.py"
     with temporary_workdir() as workdir:
 
@@ -25,6 +25,7 @@ def test_fmt_then_edit():
                     f,
                 ],
                 workdir=workdir,
+                use_pantsd=use_pantsd,
             ).assert_success()
 
         # Run once to start up, and then capture the file content.

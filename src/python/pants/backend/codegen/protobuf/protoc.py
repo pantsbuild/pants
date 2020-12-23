@@ -8,9 +8,9 @@ from pants.engine.platform import Platform
 
 
 class Protoc(TemplatedExternalTool):
-    """The protocol buffer compiler (https://developers.google.com/protocol-buffers)."""
-
     options_scope = "protoc"
+    help = "The protocol buffer compiler (https://developers.google.com/protocol-buffers)."
+
     default_version = "3.11.4"
     default_known_versions = [
         "3.11.4|darwin|8c6af11e1058efe953830ecb38324c0e0fd2fb67df3891896d138c535932e7db|2482119",

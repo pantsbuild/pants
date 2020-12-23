@@ -6,6 +6,45 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release, and
 https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
 
+2.0.1 (12/18/2020)
+------------------
+
+The second stable release in the 2.0.x series, with no changes since `rc4`.
+
+Thank you for everyone's feedback!
+
+2.0.1rc4 (12/16/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix filtering of log messages generated in native code. (cherrypick of #11313) (#11318)
+  `PR #11318 <https://github.com/pantsbuild/pants/pull/11318>`_
+
+* Upgrade to Pex 2.1.24 to fix macOS Big Sur. (cherrypick of #11312) (#11314)
+  `PR #11314 <https://github.com/pantsbuild/pants/pull/11314>`_
+
+* Clean the graph speculatively, and cancel nodes when interest is lost (cherrypick of #11308) (#11310)
+  `PR #11310 <https://github.com/pantsbuild/pants/pull/11310>`_
+
+* Implement native Process cache scoping to fix --test-force (cherrypick of #11291) (#11299)
+  `PR #11299 <https://github.com/pantsbuild/pants/pull/11299>`_
+
+* Revert "Move graph cycle detection to rust. (#11202)" (cherrypick of #11272) (#11277)
+  `PR #11202 <https://github.com/pantsbuild/pants/pull/11202>`_
+  `PR #11277 <https://github.com/pantsbuild/pants/pull/11277>`_
+
+* Increase Pants' python recursion limit by default, and allow it to be overridden. (cherrypick of #11271) (#11276)
+  `PR #11276 <https://github.com/pantsbuild/pants/pull/11276>`_
+
+Internal
+~~~~~~~~
+
+* [tests] Use a bandit version that works with older python versions. (cherrypick of #11268) (#11279)
+  `PR #11279 <https://github.com/pantsbuild/pants/pull/11279>`_
+
+
 2.0.1rc3 (11/24/2020)
 ---------------------
 

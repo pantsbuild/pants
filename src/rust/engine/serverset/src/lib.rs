@@ -37,9 +37,9 @@ pub mod retry;
 
 ///
 /// A collection of resources which are observed to be healthy or unhealthy.
-/// Getting the next resource skips any which are mark_bad_as_baded unhealthy, and will re-try unhealthy
-/// resources at an exponentially backed off interval. Unhealthy resources mark_bad_as_baded healthy will ease
-/// back into rotation with exponential ease-in.
+/// Getting the next resource skips any which are marked as unhealthy, and will re-try unhealthy
+/// resources at an exponentially backed off interval. Unhealthy resources marked as healthy
+/// will ease back into rotation with exponential ease-in.
 ///
 pub struct Serverset<T: Clone> {
   inner: Arc<Mutex<Inner<T>>>,

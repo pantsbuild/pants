@@ -1,6 +1,8 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Tuple, cast
@@ -62,7 +64,7 @@ class ChangedOptions:
     dependees: DependeesOption
 
     @classmethod
-    def from_options(cls, options: OptionValueContainer) -> "ChangedOptions":
+    def from_options(cls, options: OptionValueContainer) -> ChangedOptions:
         return cls(options.since, options.diffspec, options.dependees)
 
     @property
@@ -84,12 +86,11 @@ class ChangedOptions:
 
 
 class Changed(Subsystem):
-    """Tell Pants to detect what files and targets have changed from Git.
-
-    See https://www.pantsbuild.org/docs/advanced-target-selection.
-    """
-
     options_scope = "changed"
+    help = (
+        "Tell Pants to detect what files and targets have changed from Git.\n\nSee "
+        "https://www.pantsbuild.org/docs/advanced-target-selection."
+    )
 
     @classmethod
     def register_options(cls, register):

@@ -42,9 +42,8 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
 
 
 class RunTracker(Subsystem):
-    """Tracks and times the execution of a pants run."""
-
     options_scope = "run-tracker"
+    help = "Tracks and times the execution of a pants run."
 
     # The name of the tracking root for the main thread (and the foreground worker threads).
     DEFAULT_ROOT_NAME = "main"
@@ -64,7 +63,7 @@ class RunTracker(Subsystem):
             "--stats-option-scopes-to-record",
             advanced=True,
             type=list,
-            default=[],
+            default=["*"],
             help="Option scopes to record in stats on run completion. "
             "Options may be selected by joining the scope and the option with a ^ character, "
             "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "

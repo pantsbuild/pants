@@ -43,7 +43,7 @@ use store::UploadSummary;
 use workunit_store::{with_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
-use hashing::Digest;
+use hashing::{Digest, EMPTY_FINGERPRINT};
 
 pub mod cache;
 #[cfg(test)]
@@ -111,6 +111,31 @@ impl TryFrom<String> for Platform {
         "Unknown platform {:?} encountered in parsing",
         other
       )),
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum ProcessCacheScope {
+  // Cached in all locations, regardless of success or failure.
+  Always,
+  // Cached in all locations, but only if the process exits successfully.
+  Successful,
+  // Cached only in memory (i.e. memoized in pantsd), but never persistently.
+  PerRestart,
+  // Never cached anywhere: will run once per Session (i.e. once per run of Pants).
+  Never,
+}
+
+impl TryFrom<String> for ProcessCacheScope {
+  type Error = String;
+  fn try_from(variant_candidate: String) -> Result<Self, Self::Error> {
+    match variant_candidate.to_lowercase().as_ref() {
+      "always" => Ok(ProcessCacheScope::Always),
+      "successful" => Ok(ProcessCacheScope::Successful),
+      "per_restart" => Ok(ProcessCacheScope::PerRestart),
+      "never" => Ok(ProcessCacheScope::Never),
+      other => Err(format!("Unknown Process cache scope: {:?}", other)),
     }
   }
 }
@@ -189,7 +214,7 @@ pub struct Process {
 
   pub is_nailgunnable: bool,
 
-  pub cache_failures: bool,
+  pub cache_scope: ProcessCacheScope,
 }
 
 impl Process {
@@ -219,7 +244,7 @@ impl Process {
       platform_constraint: None,
       is_nailgunnable: false,
       execution_slot_variable: None,
-      cache_failures: false,
+      cache_scope: ProcessCacheScope::Successful,
     }
   }
 
@@ -408,7 +433,11 @@ pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
     .0
     .values()
     .map(|ref process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
-    .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
+    .map(|(_a, _b, er)| {
+      er.action_digest
+        .map(|d| d.hash)
+        .unwrap_or_else(|| EMPTY_FINGERPRINT.to_hex())
+    })
     .collect();
   hashes.sort();
   Digest::of_bytes(

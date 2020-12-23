@@ -7,6 +7,8 @@ from textwrap import dedent
 from pants.util.strutil import (
     ensure_binary,
     ensure_text,
+    first_paragraph,
+    hard_wrap,
     pluralize,
     strip_prefix,
     strip_v2_chroot_path,
@@ -87,3 +89,44 @@ def test_strip_chroot_path() -> None:
     # Confirm we can handle values with no chroot path.
     assert strip_v2_chroot_path("") == ""
     assert strip_v2_chroot_path("hello world") == "hello world"
+
+
+def test_hard_wrap() -> None:
+    assert hard_wrap("Hello world!", width=6) == ["Hello", "world!"]
+
+    # Indents play into the width.
+    assert hard_wrap("Hello world!", width=6, indent=2) == ["  Hell", "  o wo", "  rld!"]
+    assert hard_wrap("Hello world!", width=8, indent=2) == ["  Hello", "  world!"]
+
+    # Preserve prior newlines.
+    assert hard_wrap("- 1\n- 2\n\n") == ["- 1", "- 2", ""]
+    assert hard_wrap("Hello world!\n\n- 1 some text\n- 2\n\nHola mundo!", width=6) == [
+        "Hello",
+        "world!",
+        "",
+        "- 1",
+        "some",
+        "text",
+        "- 2",
+        "",
+        "Hola",
+        "mundo!",
+    ]
+
+
+def test_first_paragraph() -> None:
+    assert (
+        first_paragraph(
+            dedent(
+                """\
+            Hello! I'm spread out
+            over multiple
+               lines.
+
+            Second paragraph.
+            """
+            )
+        )
+        == "Hello! I'm spread out over multiple    lines."
+    )
+    assert first_paragraph("Only one paragraph.") == "Only one paragraph."

@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, Mapping, Optional, Pattern, Tuple
@@ -32,7 +34,7 @@ class AddressMap:
         build_file_content: str,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
-    ) -> "AddressMap":
+    ) -> AddressMap:
         """Parses a source for targets.
 
         The target adaptors are all 'thin': any targets they point to in other namespaces or even in
@@ -79,7 +81,7 @@ class AddressFamily:
     name_to_target_adaptors: Dict[str, Tuple[str, TargetAdaptor]]
 
     @classmethod
-    def create(cls, spec_path: str, address_maps: Iterable[AddressMap]) -> "AddressFamily":
+    def create(cls, spec_path: str, address_maps: Iterable[AddressMap]) -> AddressFamily:
         """Creates an address family from the given set of address maps.
 
         :param spec_path: The directory prefix shared by all address_maps.

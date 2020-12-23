@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import multiprocessing
 import os
 import sys
 import tempfile
@@ -13,10 +12,8 @@ from pants.base.build_environment import (
     get_buildroot,
     get_default_pants_config_file,
     get_pants_cachedir,
-    get_pants_configdir,
     pants_version,
 )
-from pants.base.deprecated import resolve_conflicting_options
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE
@@ -110,14 +107,7 @@ class ExecutionOptions:
             process_execution_speculation_delay=bootstrap_options.process_execution_speculation_delay,
             process_execution_speculation_strategy=bootstrap_options.process_execution_speculation_strategy,
             process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
-            process_execution_cache_namespace=resolve_conflicting_options(
-                old_option="remote_execution_process_cache_namespace",
-                new_option="process_execution_cache_namespace",
-                old_scope=GLOBAL_SCOPE,
-                new_scope=GLOBAL_SCOPE,
-                old_container=bootstrap_options,
-                new_container=bootstrap_options,
-            ),
+            process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             remote_instance_name=bootstrap_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
@@ -133,6 +123,9 @@ class ExecutionOptions:
         )
 
 
+_CPU_COUNT = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+
+
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution=False,
     remote_store_server=[],
@@ -142,7 +135,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
     remote_store_connection_limit=5,
-    process_execution_local_parallelism=multiprocessing.cpu_count(),
+    process_execution_local_parallelism=_CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
     process_execution_cleanup_local_dirs=True,
@@ -165,9 +158,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 
 
 class GlobalOptions(Subsystem):
-    """Options to control the overall behavior of Pants."""
-
     options_scope = GLOBAL_SCOPE
+    help = "Options to control the overall behavior of Pants."
 
     @classmethod
     def register_bootstrap_options(cls, register):
@@ -302,15 +294,19 @@ class GlobalOptions(Subsystem):
             "--pants-bootstrapdir",
             advanced=True,
             metavar="<dir>",
-            default=get_pants_cachedir(),
-            help="Unused. Will be deprecated in 2.2.0.",
+            default=None,
+            removal_version="2.3.0.dev1",
+            removal_hint="Unused.",
+            help="Unused.",
         )
         register(
             "--pants-configdir",
             advanced=True,
             metavar="<dir>",
-            default=get_pants_configdir(),
-            help="Unused. Will be deprecated in 2.2.0.",
+            default=None,
+            removal_version="2.3.0.dev1",
+            removal_hint="Unused.",
+            help="Unused.",
         )
         register(
             "--pants-workdir",
@@ -552,6 +548,33 @@ class GlobalOptions(Subsystem):
             "Pants's own code, plugins, and `--pants-config-files` are inherently invalidated.",
         )
 
+        process_execution_local_parallelism = "--process-execution-local-parallelism"
+        rule_threads_core = "--rule-threads-core"
+        rule_threads_max = "--rule-threads-max"
+
+        register(
+            rule_threads_core,
+            type=int,
+            default=max(2, _CPU_COUNT // 2),
+            advanced=True,
+            help=(
+                "The number of threads to keep active and ready to execute `@rule` logic (see "
+                f"also: `{rule_threads_max}`). Values less than 2 are not currently supported. "
+                "This value is independent of the number of processes that may be spawned in "
+                f"parallel locally (controlled by `{process_execution_local_parallelism}`)."
+            ),
+        )
+        register(
+            rule_threads_max,
+            type=int,
+            default=None,
+            advanced=True,
+            help=(
+                "The maximum number of threads to use to execute `@rule` logic. Defaults to "
+                f"a small multiple of `{rule_threads_core}`."
+            ),
+        )
+
         cache_instructions = (
             "The path may be absolute or relative. If the directory is within the build root, be "
             "sure to include it in `--pants-ignore`."
@@ -610,7 +633,7 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--process-execution-local-parallelism",
+            process_execution_local_parallelism,
             type=int,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
             advanced=True,
@@ -627,7 +650,7 @@ class GlobalOptions(Subsystem):
             "--process-execution-cache-namespace",
             advanced=True,
             type=str,
-            default="",
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_cache_namespace,
             help=(
                 "The cache namespace for process execution. "
                 "Change this value to invalidate every artifact's execution, or to prevent "
@@ -753,16 +776,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_maximum_timeout,
             help="Maximum timeout (in millseconds) to allow between retry attempts in accessing a remote store.",
-        )
-        register(
-            "--remote-execution-process-cache-namespace",
-            advanced=True,
-            removal_version="2.2.0.dev1",
-            removal_hint="Use the `--process-execution-cache-namespace` option instead.",
-            help="The cache namespace for remote process execution. "
-            "Bump this to invalidate every artifact's remote execution. "
-            "This is the remote execution equivalent of the legacy cache-key-gen-version "
-            "flag.",
         )
         register(
             "--remote-instance-name",
@@ -921,7 +934,7 @@ class GlobalOptions(Subsystem):
         register(
             "--streaming-workunits-report-interval",
             type=float,
-            default=10,
+            default=1,
             advanced=True,
             help="Interval in seconds between when streaming workunit event receivers will be polled.",
         )

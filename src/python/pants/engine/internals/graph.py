@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import functools
 import itertools
 import logging
@@ -34,7 +36,6 @@ from pants.engine.fs import (
     Snapshot,
     SpecsSnapshot,
 )
-from pants.engine.internals.native_engine import cyclic_paths
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -52,7 +53,9 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    NoApplicableTargetsBehavior,
     RegisteredTargetTypes,
+    SecondaryOwnerMixin,
     Sources,
     SourcesPaths,
     SourcesPathsRequest,
@@ -187,18 +190,21 @@ class CycleException(Exception):
         self.path = path
 
 
-def _detect_cycles(dependency_mapping: Dict[Address, Tuple[Address, ...]]) -> None:
-    for path in cyclic_paths(dependency_mapping):
-        address = path[-1]
+def _detect_cycles(
+    roots: Tuple[Address, ...], dependency_mapping: Dict[Address, Tuple[Address, ...]]
+) -> None:
+    path_stack: OrderedSet[Address] = OrderedSet()
+    visited: Set[Address] = set()
 
+    def maybe_report_cycle(address: Address) -> None:
         # NB: File-level dependencies are cycle tolerant.
-        if address.is_file_target:
+        if address.is_file_target or address not in path_stack:
             return
 
         # The path of the cycle is shorter than the entire path to the cycle: if the suffix of
         # the path representing the cycle contains a file dep, it is ignored.
         in_cycle = False
-        for path_address in path:
+        for path_address in path_stack:
             if in_cycle and path_address.is_file_target:
                 # There is a file address inside the cycle: do not report it.
                 return
@@ -210,7 +216,27 @@ def _detect_cycles(dependency_mapping: Dict[Address, Tuple[Address, ...]]) -> No
                 # the address in question.
                 in_cycle = path_address == address
         # If we did not break out early, it's because there were no file addresses in the cycle.
-        raise CycleException(address, path)
+        raise CycleException(address, (*path_stack, address))
+
+    def visit(address: Address):
+        if address in visited:
+            maybe_report_cycle(address)
+            return
+        path_stack.add(address)
+        visited.add(address)
+
+        for dep_address in dependency_mapping[address]:
+            visit(dep_address)
+
+        path_stack.remove(address)
+
+    for root in roots:
+        visit(root)
+        if path_stack:
+            raise AssertionError(
+                f"The stack of visited nodes should have been empty at the end of recursion, "
+                f"but it still contained: {path_stack}"
+            )
 
 
 @rule(desc="Resolve transitive targets")
@@ -249,7 +275,10 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
         )
         visited.update(queued)
 
-    _detect_cycles(dependency_mapping)
+    # NB: We use `roots_as_targets` to get the root addresses, rather than `request.roots`. This
+    # is because expanding from the `Addresses` -> `Targets` may have resulted in generated
+    # subtargets being used, so we need to use `roots_as_targets` to have this expansion.
+    _detect_cycles(tuple(t.address for t in roots_as_targets), dependency_mapping)
 
     # Apply any transitive excludes (`!!` ignores).
     transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
@@ -306,7 +335,7 @@ async def transitive_targets_lite(request: TransitiveTargetsRequestLite) -> Tran
     # NB: We use `roots_as_targets` to get the root addresses, rather than `request.roots`. This
     # is because expanding from the `Addresses` -> `Targets` may have resulted in generated
     # subtargets being used, so we need to use `roots_as_targets` to have this expansion.
-    _detect_cycles(dependency_mapping)
+    _detect_cycles(tuple(t.address for t in roots_as_targets), dependency_mapping)
 
     # Apply any transitive excludes (`!!` ignores).
     wrapped_transitive_excludes = await MultiGet(
@@ -356,35 +385,48 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     live_dirs = FrozenOrderedSet(os.path.dirname(s) for s in live_files)
     deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
 
+    # Walk up the buildroot looking for targets that would conceivably claim changed sources.
+    # For live files, we use expanded Targets, which have file level precision but which are
+    # only created for existing files. For deleted files we use UnexpandedTargets, which have
+    # the original declared glob.
+    live_candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
+    deleted_candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
+    live_candidate_tgts, deleted_candidate_tgts = await MultiGet(
+        Get(Targets, AddressSpecs(live_candidate_specs)),
+        Get(UnexpandedTargets, AddressSpecs(deleted_candidate_specs)),
+    )
+
     matching_addresses: OrderedSet[Address] = OrderedSet()
     unmatched_sources = set(owners_request.sources)
     for live in (True, False):
-        # Walk up the buildroot looking for targets that would conceivably claim changed sources.
-        # For live files, we use expanded Targets, which have file level precision but which are
-        # only created for existing files. For deleted files we use UnexpandedTargets, which have
-        # the original declared glob.
-        candidate_targets: Iterable[Target]
+        candidate_tgts: Sequence[Target]
         if live:
-            if not live_dirs:
-                continue
+            candidate_tgts = live_candidate_tgts
             sources_set = live_files
-            candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
-            candidate_targets = await Get(Targets, AddressSpecs(candidate_specs))
         else:
-            if not deleted_dirs:
-                continue
+            candidate_tgts = deleted_candidate_tgts
             sources_set = deleted_files
-            candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
-            candidate_targets = await Get(UnexpandedTargets, AddressSpecs(candidate_specs))
 
         build_file_addresses = await MultiGet(
-            Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_targets
+            Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_tgts
         )
 
-        for candidate_tgt, bfa in zip(candidate_targets, build_file_addresses):
+        for candidate_tgt, bfa in zip(candidate_tgts, build_file_addresses):
             matching_files = set(
                 matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
             )
+            # Also consider secondary ownership, meaning it's not a `Sources` field with primary
+            # ownership, but the target still should match the file. We can't use `tgt.get()`
+            # because this is a mixin, and there technically may be >1 field.
+            secondary_owner_fields = tuple(
+                field  # type: ignore[misc]
+                for field in candidate_tgt.field_values.values()
+                if isinstance(field, SecondaryOwnerMixin)
+            )
+            for secondary_owner_field in secondary_owner_fields:
+                matching_files.update(
+                    matches_filespec(secondary_owner_field.filespec, paths=sources_set)
+                )
             if not matching_files and bfa.rel_path not in sources_set:
                 continue
 
@@ -902,7 +944,9 @@ async def resolve_unparsed_address_inputs(
 class NoApplicableTargetsException(Exception):
     def __init__(
         self,
-        targets: Targets,
+        targets: Iterable[Target],
+        specs: Specs,
+        union_membership: UnionMembership,
         *,
         applicable_target_types: Iterable[Type[Target]],
         goal_description: str,
@@ -912,33 +956,72 @@ class NoApplicableTargetsException(Exception):
         )
         inapplicable_target_aliases = sorted({tgt.alias for tgt in targets})
         bulleted_list_sep = "\n  * "
+
         msg = (
-            f"{goal_description.capitalize()} only works with these target types:"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(applicable_target_aliases)}\n\n"
+            "No applicable files or targets matched."
+            if inapplicable_target_aliases
+            else "No files or targets specified."
         )
+        msg += (
+            f" {goal_description.capitalize()} works "
+            f"with these target types:\n{bulleted_list_sep}"
+            f"{bulleted_list_sep.join(applicable_target_aliases)}\n\n"
+        )
+
+        # Explain what was specified, if relevant.
         if inapplicable_target_aliases:
+            if bool(specs.filesystem_specs) and bool(specs.address_specs):
+                specs_description = " files and targets with "
+            elif bool(specs.filesystem_specs):
+                specs_description = " files with "
+            elif bool(specs.address_specs):
+                specs_description = " targets with "
+            else:
+                specs_description = " "
             msg += (
-                "However, you only specified files/targets with these target types:"
-                f"{bulleted_list_sep}{bulleted_list_sep.join(inapplicable_target_aliases)}"
+                f"However, you only specified{specs_description}these target types:\n"
+                f"{bulleted_list_sep}{bulleted_list_sep.join(inapplicable_target_aliases)}\n\n"
+            )
+
+        # Add a remedy.
+        #
+        # We sometimes suggest using `./pants filedeps` to find applicable files. However, this
+        # command only works if at least one of the targets has a Sources field.
+        #
+        # NB: Even with the "secondary owners" mechanism - used by target types like `pex_binary`
+        # and `python_awslambda` to still work with file args - those targets will not show the
+        # associated files when using filedeps.
+        filedeps_goal_works = any(
+            tgt.class_has_field(Sources, union_membership) for tgt in applicable_target_types
+        )
+        pants_filter_command = (
+            f"./pants filter --target-type={','.join(applicable_target_aliases)} ::"
+        )
+        remedy = (
+            f"Please specify relevant files and/or targets. Run `{pants_filter_command}` to "
+            "find all applicable targets in your project"
+        )
+        if filedeps_goal_works:
+            remedy += (
+                f", or run `{pants_filter_command} | xargs ./pants filedeps` to find all "
+                "applicable files."
             )
         else:
-            msg += "However, you did not specify any files/targets."
-        msg += (
-            f"\n\nRun `./pants filter --target-type={','.join(applicable_target_aliases)} ::` to "
-            "find all applicable targets in your project."
-        )
+            remedy += "."
+        msg += remedy
         super().__init__(msg)
 
     @classmethod
     def create_from_field_sets(
         cls,
-        targets: Targets,
+        targets: Iterable[Target],
+        specs: Specs,
+        union_membership: UnionMembership,
+        registered_target_types: RegisteredTargetTypes,
         *,
         field_set_types: Iterable[Type[_AbstractFieldSet]],
         goal_description: str,
-        union_membership: UnionMembership,
-        registered_target_types: RegisteredTargetTypes,
-    ) -> "NoApplicableTargetsException":
+    ) -> NoApplicableTargetsException:
         applicable_target_types = {
             target_type
             for field_set_type in field_set_types
@@ -948,6 +1031,8 @@ class NoApplicableTargetsException(Exception):
         }
         return cls(
             targets,
+            specs,
+            union_membership,
             applicable_target_types=applicable_target_types,
             goal_description=goal_description,
         )
@@ -989,26 +1074,37 @@ class AmbiguousImplementationsException(Exception):
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
-    targets: Targets,
+    specs: Specs,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> TargetRootsToFieldSets:
+    # NB: This must be in an `await Get`, rather than the rule signature, to avoid a rule graph
+    # issue.
+    targets = await Get(Targets, Specs, specs)
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
     )
-    targets_to_valid_field_sets = {}
+    targets_to_applicable_field_sets = {}
     for tgt, field_sets in zip(targets, field_sets_per_target.collection):
         if field_sets:
-            targets_to_valid_field_sets[tgt] = field_sets
-    if request.error_if_no_applicable_targets and not targets_to_valid_field_sets:
-        raise NoApplicableTargetsException.create_from_field_sets(
+            targets_to_applicable_field_sets[tgt] = field_sets
+
+    # Possibly warn or error if no targets were applicable.
+    if not targets_to_applicable_field_sets:
+        no_applicable_exception = NoApplicableTargetsException.create_from_field_sets(
             targets,
+            specs,
+            union_membership,
+            registered_target_types,
             field_set_types=union_membership.union_rules[request.field_set_superclass],
             goal_description=request.goal_description,
-            union_membership=union_membership,
-            registered_target_types=registered_target_types,
         )
-    result = TargetRootsToFieldSets(targets_to_valid_field_sets)
+        if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
+            raise no_applicable_exception
+        if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn:
+            logger.warning(str(no_applicable_exception))
+
+    result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
     if not request.expect_single_field_set:
         return result
     if len(result.targets) > 1:

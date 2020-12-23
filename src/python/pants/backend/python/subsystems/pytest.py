@@ -8,9 +8,8 @@ from pants.option.subsystem import Subsystem
 
 
 class PyTest(Subsystem):
-    """The pytest Python test framework (https://docs.pytest.org/)."""
-
     options_scope = "pytest"
+    help = "The pytest Python test framework (https://docs.pytest.org/)."
 
     @classmethod
     def register_options(cls, register):

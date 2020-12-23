@@ -1,16 +1,18 @@
 <div style="color: purple">
-<code>{{comma_separated_display_args}}</code><br>
-<code>{{env_var}}</code><br>
-<code>{{config_key}}</code>
+  <code>{{comma_separated_display_args}}</code><br>
+  <code>{{env_var}}</code><br>
+  <code>{{config_key}}</code>
 </div>
+{{! NB: This div causes the help message + deprecation to render as plain text, rather than markdown. }}
 <div style="padding-left: 2em;">
-{{#comma_separated_choices}}
-<span style="color: green">one of: <code>{{comma_separated_choices}}</code></span><br>
-{{/comma_separated_choices}}
-<span style="color: green">default: {{{marked_up_default}}}
-</span>{{#deprecated_message}}<br><span style="color: darkred">{{deprecated_message}}
-</span>{{/deprecated_message}}{{#removal_hint}}<br><span style="color: darkred">{{removal_hint}}
-</span>{{/removal_hint}}
-<br>{{help}}
+  {{#comma_separated_choices}}
+  <span style="color: green">one of: <code>{{comma_separated_choices}}</code></span><br>
+  {{/comma_separated_choices}}
+  <span style="color: green">default: {{{marked_up_default}}}
+  </span>{{#deprecated_message}}<br><span style="color: darkred">{{deprecated_message}}
+  </span>{{/deprecated_message}}{{#removal_hint}}<br><span style="color: darkred">{{removal_hint}}
+  </span>{{/removal_hint}}
+  <br>{{help}}
 </div>
 <br>
+

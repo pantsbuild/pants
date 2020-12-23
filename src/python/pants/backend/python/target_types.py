@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections.abc
-import logging
 import os.path
 from dataclasses import dataclass
 from textwrap import dedent
@@ -13,36 +12,29 @@ from pkg_resources import Requirement
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.core.goals.package import OutputPathField
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     BoolField,
     Dependencies,
     DictStringToStringSequenceField,
     Field,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     IntField,
     InvalidFieldException,
     InvalidFieldTypeException,
     ProvidesField,
     ScalarField,
+    SecondaryOwnerMixin,
     Sources,
     SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
-    WrappedTarget,
 )
-from pants.engine.unions import UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
-from pants.source.source_root import SourceRoot, SourceRootRequest
-
-logger = logging.getLogger(__name__)
+from pants.source.filespec import Filespec
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
@@ -54,21 +46,16 @@ class PythonSources(Sources):
 
 
 class InterpreterConstraintsField(StringSequenceField):
-    """The Python interpreters this code is compatible with.
-
-    Each element should be written in pip-style format, e.g. 'CPython==2.7.*' or 'CPython>=3.6,<4'.
-    You can leave off `CPython` as a shorthand, e.g. '>=2.7' will be expanded to 'CPython>=2.7'.
-
-    Specify more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']`
-    means either PyPy 3.7 _or_ CPython 3.7.
-
-    If the field is not set, it will default to the option
-    `[python-setup].interpreter_constraints]`.
-
-    See https://www.pantsbuild.org/docs/python-interpreter-compatibility.
-    """
-
     alias = "interpreter_constraints"
+    help = (
+        "The Python interpreters this code is compatible with.\n\nEach element should be written "
+        "in pip-style format, e.g. 'CPython==2.7.*' or 'CPython>=3.6,<4'. You can leave off "
+        "`CPython` as a shorthand, e.g. '>=2.7' will be expanded to 'CPython>=2.7'.\n\nSpecify "
+        "more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']` "
+        "means either PyPy 3.7 _or_ CPython 3.7.\n\nIf the field is not set, it will default to "
+        "the option `[python-setup].interpreter_constraints`.\n\nSee "
+        "https://www.pantsbuild.org/docs/python-interpreter-compatibility."
+    )
 
     def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
@@ -84,9 +71,8 @@ class InterpreterConstraintsField(StringSequenceField):
 
 
 class PexBinaryDefaults(Subsystem):
-    """Default settings for creating PEX executables."""
-
     options_scope = "pex-binary-defaults"
+    help = "Default settings for creating PEX executables."
 
     @classmethod
     def register_options(cls, register):
@@ -108,35 +94,46 @@ class PexBinaryDefaults(Subsystem):
         return cast(bool, self.options.emit_warnings)
 
 
-class PexBinarySources(PythonSources):
-    """A single file containing the executable, such as ['app.py'].
-
-    You can leave this off if you include the executable file in one of this target's
-    `dependencies` and explicitly set this target's `entry_point`.
-
-    This must have 0 or 1 files, but no more. If you depend on more files, put them in a
-    `python_library` target and include that target in the `dependencies` field.
-    """
-
+class DeprecatedPexBinarySources(PythonSources):
     expected_num_files = range(0, 2)
+    deprecated_removal_version = "2.3.0.dev0"
+    deprecated_removal_hint = (
+        "Remove the `sources` field and set the `entry_point` field to the file name, "
+        "e.g. `entry_point='app.py'` or `entry_point='app.py:func'`. Create a `python_library` "
+        "target with the entry point's file included (if it does not yet exist). Pants will infer "
+        "a dependency, which you can check with `./pants dependencies path/to:app`. See "
+        "https://www.pantsbuild.org/v2.2/docs/python-package-goal for more instructions."
+    )
 
 
+# See `target_types_rules.py` for a dependency injection rule.
 class PexBinaryDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PexEntryPointField(StringField):
-    """The entry point for the binary.
-
-    If omitted, Pants will use the module name from the `sources` field, e.g. `project/app.py` will
-    become the entry point `project.app` .
-
-    You can set `entry_point='<none>'` to leave off an entry point from the built PEX.
-    """
-
+class PexEntryPointField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     alias = "entry_point"
+    help = (
+        "The entry point for the binary, i.e. what gets run when executing `./my_binary.pex`.\n\n"
+        "You can specify a full module like 'path.to.module' and 'path.to.module:func', or use a "
+        "shorthand to specify a file name, using the same syntax as the `sources` field:\n\n    1) "
+        "'app.py', Pants will convert into the module `path.to.app`;\n    2) 'app.py:func', Pants "
+        "will convert into `path.to.app:func`.\n\nYou must use the file name shorthand for file "
+        "arguments to work with this target.\n\nTo leave off an entry point, set to '<none>'."
+    )
+
+    @property
+    def filespec(self) -> Filespec:
+        if not self.value:
+            return {"includes": []}
+        path, _, func = self.value.partition(":")
+        if not path.endswith(".py"):
+            return {"includes": []}
+        full_glob = os.path.join(self.address.spec_path, path)
+        return {"includes": [full_glob]}
 
 
+# See `target_types_rules.py` for the `ResolvePexEntryPointRequest -> ResolvedPexEntryPoint` rule.
 @dataclass(frozen=True)
 class ResolvedPexEntryPoint:
     val: Optional[str]
@@ -144,91 +141,37 @@ class ResolvedPexEntryPoint:
 
 @dataclass(frozen=True)
 class ResolvePexEntryPointRequest:
-    """Determine the entry_point by looking at both `PexEntryPointField` and and the sources field.
-
-    In order of precedence, this can be calculated by:
-
-    1. The `entry_point` field having a well-formed value.
-    2. The `entry_point` using a shorthand `:my_func`, and the `sources` field being set. We
-        combine these into `path.to.module:my_func`.
-    3. The `entry_point` being left off, but `sources` defined. We will use `path.to.module`.
-
-    Users can set `entry_point='<none>'` to leave off the entry point.
-    """
+    """Determine the `entry_point` for a `pex_binary` after applying all syntactic sugar."""
 
     entry_point_field: PexEntryPointField
-    sources: PexBinarySources
-
-
-@rule
-async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
-    entry_point_value = request.entry_point_field.value
-    if entry_point_value and not entry_point_value.startswith(":"):
-        if entry_point_value in ("<none>", "<None>"):
-            return ResolvedPexEntryPoint(None)
-        return ResolvedPexEntryPoint(entry_point_value)
-    binary_source_paths = await Get(
-        Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
-    )
-    if len(binary_source_paths.files) != 1:
-        instructions_url = "https://www.pantsbuild.org/docs/python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
-        if not entry_point_value:
-            raise InvalidFieldException(
-                "Both the `entry_point` and `sources` fields are not set for the target "
-                f"{request.sources.address}, so Pants cannot determine an entry point. Please "
-                "either explicitly set the `entry_point` field and/or the `sources` field to "
-                "exactly one file. You can set `entry_point='<none>' to leave off the entry point."
-                f"See {instructions_url}."
-            )
-        else:
-            raise InvalidFieldException(
-                f"The `entry_point` field for the target {request.sources.address} is set to "
-                f"the short-hand value {repr(entry_point_value)}, but the `sources` field is not "
-                "set. Pants requires the `sources` field to expand the entry point to the "
-                f"normalized form `path.to.module:{entry_point_value}`. Please either set the "
-                "`sources` field to exactly one file or use a full value for `entry_point`. See "
-                f"{instructions_url}."
-            )
-    entry_point_path = binary_source_paths.files[0]
-    source_root = await Get(
-        SourceRoot,
-        SourceRootRequest,
-        SourceRootRequest.for_file(entry_point_path),
-    )
-    stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
-    module_base, _ = os.path.splitext(stripped_source_path)
-    normalized_path = module_base.replace(os.path.sep, ".")
-    return ResolvedPexEntryPoint(
-        f"{normalized_path}{entry_point_value}" if entry_point_value else normalized_path
-    )
+    sources: DeprecatedPexBinarySources
 
 
 class PexPlatformsField(StringSequenceField):
-    """The platforms the built PEX should be compatible with.
-
-    This defaults to the current platform, but can be overridden to different platforms. You can
-    give a list of multiple platforms to create a multiplatform PEX.
-
-    To use wheels for specific interpreter/platform tags, you can append them to the platform with
-    hyphens like: PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-27-cp27mu",
-    "macosx_10.12_x86_64-cp-36-cp36m"). PLATFORM is the host platform e.g. "linux-x86_64",
-    "macosx-10.12-x86_64", etc". IMPL is the Python implementation abbreviation
-    (e.g. "cp", "pp", "jp"). PYVER is a two-digit string representing the python version
-    (e.g. "27", "36"). ABI is the ABI tag (e.g. "cp36m", "cp27mu", "abi3", "none").
-    """
-
     alias = "platforms"
+    help = (
+        "The platforms the built PEX should be compatible with.\n\nThis defaults to the current "
+        "platform, but can be overridden to different platforms. You can give a list of multiple "
+        "platforms to create a multiplatform PEX.\n\nTo use wheels for specific "
+        "interpreter/platform tags, you can append them to the platform with hyphens like: "
+        'PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-27-cp27mu", '
+        '"macosx_10.12_x86_64-cp-36-cp36m"):\n\n    - PLATFORM: the host platform, e.g. '
+        '"linux-x86_64", "macosx-10.12-x86_64".\n    - IMPL: the Python implementation '
+        'abbreviation, e.g. "cp", "pp", "jp".\n    - PYVER: a two-digit string representing '
+        'the Python version, e.g. "27", "36".\n    - ABI: the ABI tag, e.g. "cp36m", '
+        '"cp27mu", "abi3", "none".'
+    )
 
 
 class PexInheritPathField(StringField):
-    """Whether to inherit the `sys.path` of the environment that the binary runs in.
-
-    Use `false` to not inherit `sys.path`; use `fallback` to inherit `sys.path` after packaged
-    dependencies; and use `prefer` to inherit `sys.path` before packaged dependencies.
-    """
-
     alias = "inherit_path"
     valid_choices = ("false", "fallback", "prefer")
+    help = (
+        "Whether to inherit the `sys.path` (aka PYTHONPATH) of the environment that the binary "
+        "runs in.\n\nUse `false` to not inherit `sys.path`; use `fallback` to inherit `sys.path` "
+        "after packaged dependencies; and use `prefer` to inherit `sys.path` before packaged "
+        "dependencies."
+    )
 
     # TODO(#9388): deprecate allowing this to be a `bool`.
     @classmethod
@@ -241,54 +184,49 @@ class PexInheritPathField(StringField):
 
 
 class PexZipSafeField(BoolField):
-    """Whether or not this binary is safe to run in compacted (zip-file) form.
-
-    If the PEX is not zip safe, it will be written to disk prior to execution. You may need to mark
-    `zip_safe=False` if you're having issues loading your code.
-    """
-
     alias = "zip_safe"
     default = True
     value: bool
+    help = (
+        "Whether or not this binary is safe to run in compacted (zip-file) form.\n\nIf the PEX is "
+        "not zip safe, it will be written to disk prior to execution. You may need to mark "
+        "`zip_safe=False` if you're having issues loading your code."
+    )
 
 
 class PexAlwaysWriteCacheField(BoolField):
-    """Whether PEX should always write the .deps cache of the .pex file to disk or not.
-
-    This can use less memory in RAM constrained environments.
-    """
-
     alias = "always_write_cache"
     default = False
     value: bool
+    help = (
+        "Whether PEX should always write the .deps cache of the .pex file to disk or not. This "
+        "can use less memory in RAM-constrained environments."
+    )
 
 
 class PexIgnoreErrorsField(BoolField):
-    """Should we ignore when PEX cannot resolve dependencies?"""
-
     alias = "ignore_errors"
     default = False
     value: bool
+    help = "Should PEX ignore when it cannot resolve dependencies?"
 
 
 class PexShebangField(StringField):
-    """Set the generated PEX to use this shebang, rather than the default of PEX choosing a shebang
-    based on the interpreter constraints.
-
-    This influences the behavior of running `./result.pex`. You can ignore the shebang by instead
-    running `/path/to/python_interpreter ./result.pex`.
-    """
-
     alias = "shebang"
+    help = (
+        "Set the generated PEX to use this shebang, rather than the default of PEX choosing a "
+        "shebang based on the interpreter constraints.\n\nThis influences the behavior of running "
+        "`./result.pex`. You can ignore the shebang by instead running "
+        "`/path/to/python_interpreter ./result.pex`."
+    )
 
 
 class PexEmitWarningsField(BoolField):
-    """Whether or not to emit PEX warnings at runtime.
-
-    The default is determined by the option `emit_warnings` in the `[pex-binary-defaults]` scope.
-    """
-
     alias = "emit_warnings"
+    help = (
+        "Whether or not to emit PEX warnings at runtime.\n\nThe default is determined by the "
+        "option `emit_warnings` in the `[pex-binary-defaults]` scope."
+    )
 
     def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
         if self.value is None:
@@ -296,19 +234,23 @@ class PexEmitWarningsField(BoolField):
         return self.value
 
 
+class DeprecatedPexBinaryInterpreterConstraints(InterpreterConstraintsField):
+    deprecated_removal_version = "2.3.0.dev0"
+    deprecated_removal_hint = (
+        "Because the `sources` field will be removed from `pex_binary` targets, it no longer makes "
+        "sense to also have an `interpreter_constraints` field. Instead, set the "
+        "`interpreter_constraints` field on the `python_library` target containing the binary's "
+        "entry point."
+    )
+
+
 class PexBinary(Target):
-    """A Python target that can be converted into an executable PEX file.
-
-    PEX files are self-contained executable files that contain a complete Python environment capable
-    of running the target. For more information, see https://www.pantsbuild.org/docs/pex-files.
-    """
-
     alias = "pex_binary"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        InterpreterConstraintsField,
         OutputPathField,
-        PexBinarySources,
+        DeprecatedPexBinaryInterpreterConstraints,
+        DeprecatedPexBinarySources,
         PexBinaryDependencies,
         PexEntryPointField,
         PexPlatformsField,
@@ -318,6 +260,11 @@ class PexBinary(Target):
         PexIgnoreErrorsField,
         PexShebangField,
         PexEmitWarningsField,
+    )
+    help = (
+        "A Python target that can be converted into an executable PEX file.\n\nPEX files are "
+        "self-contained executable files that contain a complete Python environment capable of "
+        "running the target. For more information, see https://www.pantsbuild.org/docs/pex-files."
     )
 
 
@@ -343,27 +290,23 @@ class PythonTestsDependencies(Dependencies):
 
 
 class PythonRuntimePackageDependencies(SpecialCasedDependencies):
-    """Addresses to targets that can be built with the `./pants package` goal and whose resulting
-    assets should be included in the test run.
-
-    Pants will build the assets as if you had run `./pants package`. It will include the
-    results in your archive using the same name they would normally have, but without the
-    `--distdir` prefix (e.g. `dist/`).
-
-    You can include anything that can be built by `./pants package`, e.g. a `pex_binary`,
-    `python_awslambda`, or an `archive`.
-    """
-
     alias = "runtime_package_dependencies"
+    help = (
+        "Addresses to targets that can be built with the `./pants package` goal and whose "
+        "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
+        "as if you had run `./pants package`. It will include the results in your test's chroot, "
+        "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
+        "`dist/`).\n\nYou can include anything that can be built by `./pants package`, e.g. a "
+        "`pex_binary`, `python_awslambda`, or an `archive`."
+    )
 
 
 class PythonTestsTimeout(IntField):
-    """A timeout (in seconds) which covers the total runtime of all tests in this target.
-
-    This only applies if the option `--pytest-timeouts` is set to True.
-    """
-
     alias = "timeout"
+    help = (
+        "A timeout (in seconds) which covers the total runtime of all tests in this target.\n\n"
+        "This only applies if the option `--pytest-timeouts` is set to True."
+    )
 
     @classmethod
     def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
@@ -391,16 +334,6 @@ class PythonTestsTimeout(IntField):
 
 
 class PythonTests(Target):
-    """Python tests.
-
-    These may be written in either Pytest-style or unittest style.
-
-    All test util code, other than `conftest.py`, should go into a dedicated `python_library()`
-    target and then be included in the `dependencies` field.
-
-    See https://www.pantsbuild.org/docs/python-test-goal.
-    """
-
     alias = "python_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -409,6 +342,12 @@ class PythonTests(Target):
         PythonTestsDependencies,
         PythonRuntimePackageDependencies,
         PythonTestsTimeout,
+    )
+    help = (
+        "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
+        "other than `conftest.py`, should go into a dedicated `python_library()` target and then "
+        "be included in the `dependencies` field.\n\nSee "
+        "https://www.pantsbuild.org/docs/python-test-goal."
     )
 
 
@@ -422,19 +361,17 @@ class PythonLibrarySources(PythonSources):
 
 
 class PythonLibrary(Target):
-    """Python source code.
-
-    A `python_library` does not necessarily correspond to a distribution you publish (see
-    `python_distribution` and `pex_binary` for that); multiple `python_library` targets may be
-    packaged into a distribution or binary.
-    """
-
     alias = "python_library"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
         PythonLibrarySources,
+    )
+    help = (
+        "Python source code.\n\nA `python_library` does not necessarily correspond to a "
+        "distribution you publish (see `python_distribution` and `pex_binary` for that); multiple "
+        "`python_library` targets may be packaged into a distribution or binary."
     )
 
 
@@ -475,12 +412,13 @@ def format_invalid_requirement_string_error(
 
 
 class PythonRequirementsField(Field):
-    """A sequence of pip-style requirement strings, e.g. ['foo==1.8', 'bar<=3 ;
-    python_version<'3']."""
-
     alias = "requirements"
     required = True
     value: Tuple[Requirement, ...]
+    help = (
+        "A sequence of pip-style requirement strings, e.g. ['foo==1.8', "
+        "'bar<=3 ; python_version<'3']."
+    )
 
     @classmethod
     def compute_value(
@@ -521,30 +459,25 @@ class PythonRequirementsField(Field):
 
 
 class ModuleMappingField(DictStringToStringSequenceField):
-    """A mapping of requirement names to a list of the modules they provide.
-
-    For example, `{"ansicolors": ["colors"]}`. Any unspecified requirements will use the
-    requirement name as the default module, e.g. "Django" will default to ["django"]`.
-
-    This is used for Pants to be able to infer dependencies in BUILD files.
-    """
-
     alias = "module_mapping"
+    help = (
+        "A mapping of requirement names to a list of the modules they provide.\n\nFor example, "
+        '`{"ansicolors": ["colors"]}`. Any unspecified requirements will use the requirement '
+        'name as the default module, e.g. "Django" will default to `["django"]`.\n\nThis is '
+        "used for Pants to be able to infer dependencies in BUILD files."
+    )
 
 
 class PythonRequirementLibrary(Target):
-    """Python requirements installable by pip.
-
-    This target is useful when you want to declare Python requirements inline in a BUILD file. If
-    you have a `requirements.txt` file already, you can instead use the macro
-    `python_requirements()` to convert each requirement into a `python_requirement_library()` target
-    automatically.
-
-    See https://www.pantsbuild.org/docs/python-third-party-dependencies.
-    """
-
     alias = "python_requirement_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonRequirementsField, ModuleMappingField)
+    help = (
+        "Python requirements installable by pip.\n\nThis target is useful when you want to declare "
+        "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "
+        "already, you can instead use the macro `python_requirements()` to convert each "
+        "requirement into a `python_requirement_library()` target automatically.\n\nSee "
+        "https://www.pantsbuild.org/docs/python-third-party-dependencies."
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -557,10 +490,9 @@ class PythonRequirementsFileSources(Sources):
 
 
 class PythonRequirementsFile(Target):
-    """A private, helper target type for requirements.txt files."""
-
     alias = "_python_requirements_file"
     core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSources)
+    help = "A private, helper target type for requirements.txt files."
 
 
 # -----------------------------------------------------------------------------------------------
@@ -568,20 +500,20 @@ class PythonRequirementsFile(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+# See `target_types_rules.py` for a dependency injection rule.
 class PythonDistributionDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
 class PythonProvidesField(ScalarField, ProvidesField):
-    """The setup.py kwargs for the external artifact built from this target.
-
-    See https://www.pantsbuild.org/docs/python-setup-py-goal.
-    """
-
     expected_type = PythonArtifact
-    expected_type_description = "setup_py(name='my-dist', **kwargs)"
+    expected_type_help = "setup_py(name='my-dist', **kwargs)"
     value: PythonArtifact
     required = True
+    help = (
+        "The setup.py kwargs for the external artifact built from this target.\n\nSee "
+        "https://www.pantsbuild.org/docs/python-setup-py-goal."
+    )
 
     @classmethod
     def compute_value(
@@ -591,25 +523,20 @@ class PythonProvidesField(ScalarField, ProvidesField):
 
 
 class SetupPyCommandsField(StringSequenceField):
-    """The runtime commands to invoke setup.py with to create the distribution.
-
-    E.g., ["bdist_wheel", "--python-tag=py36.py37", "sdist"]
-
-    If empty or unspecified, will just create a chroot with a setup() function.
-
-    See https://www.pantsbuild.org/docs/python-setup-py-goal.
-    """
-
     alias = "setup_py_commands"
-    expected_type_description = (
+    expected_type_help = (
         "an iterable of string commands to invoke setup.py with, or "
         "an empty list to just create a chroot with a setup() function."
+    )
+    help = (
+        "The runtime commands to invoke setup.py with to create the distribution, e.g. "
+        '["bdist_wheel", "--python-tag=py36.py37", "sdist"].\n\nIf empty or unspecified, '
+        "will just create a chroot with a setup() function.\n\nSee "
+        "https://www.pantsbuild.org/docs/python-setup-py-goal."
     )
 
 
 class PythonDistribution(Target):
-    """A publishable Python setuptools distribution (e.g. an sdist or wheel)."""
-
     alias = "python_distribution"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -617,35 +544,4 @@ class PythonDistribution(Target):
         PythonProvidesField,
         SetupPyCommandsField,
     )
-
-
-class InjectPythonDistributionDependencies(InjectDependenciesRequest):
-    inject_for = PythonDistributionDependencies
-
-
-@rule
-async def inject_python_distribution_dependencies(
-    request: InjectPythonDistributionDependencies,
-) -> InjectedDependencies:
-    """Inject any `.with_binaries()` values, as it would be redundant to have to include in the
-    `dependencies` field."""
-    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    with_binaries = original_tgt.target[PythonProvidesField].value.binaries
-    if not with_binaries:
-        return InjectedDependencies()
-    # Note that we don't validate that these are all `pex_binary` targets; we don't care about
-    # that here. `setup_py.py` will do that validation.
-    addresses = await Get(
-        Addresses,
-        UnparsedAddressInputs(
-            with_binaries.values(), owning_address=request.dependencies_field.address
-        ),
-    )
-    return InjectedDependencies(addresses)
-
-
-def rules():
-    return (
-        *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
-    )
+    help = "A publishable Python setuptools distribution (e.g. an sdist or wheel)."

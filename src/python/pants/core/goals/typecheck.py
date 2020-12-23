@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple
 
@@ -35,7 +37,7 @@ class TypecheckResult(EngineAwareReturnType):
         *,
         partition_description: Optional[str] = None,
         strip_chroot_path: bool = False,
-    ) -> "TypecheckResult":
+    ) -> TypecheckResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
@@ -130,9 +132,8 @@ class TypecheckRequest(StyleRequest):
 
 
 class TypecheckSubsystem(GoalSubsystem):
-    """Run type checkers."""
-
     name = "typecheck"
+    help = "Run type checkers."
 
     required_union_implementations = (TypecheckRequest,)
 

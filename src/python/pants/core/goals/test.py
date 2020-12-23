@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import logging
 from abc import ABC, ABCMeta
@@ -25,6 +27,7 @@ from pants.engine.process import FallibleProcessResult, InteractiveProcess, Inte
 from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
+    NoApplicableTargetsBehavior,
     Sources,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -49,7 +52,7 @@ class TestResult:
     __test__ = False
 
     @classmethod
-    def skip(cls, address: Address) -> "TestResult":
+    def skip(cls, address: Address) -> TestResult:
         return cls(exit_code=None, stdout="", stderr="", address=address)
 
     @classmethod
@@ -60,7 +63,7 @@ class TestResult:
         *,
         coverage_data: Optional["CoverageData"] = None,
         xml_results: Optional[Snapshot] = None,
-    ) -> "TestResult":
+    ) -> TestResult:
         return cls(
             exit_code=process_result.exit_code,
             stdout=process_result.stdout.decode(),
@@ -250,9 +253,8 @@ class CoverageReports(EngineAwareReturnType):
 
 
 class TestSubsystem(GoalSubsystem):
-    """Run tests."""
-
     name = "test"
+    help = "Run tests."
 
     required_union_implementations = (TestFieldSet,)
 
@@ -353,7 +355,9 @@ async def run_tests(
         targets_to_valid_field_sets = await Get(
             TargetRootsToFieldSets,
             TargetRootsToFieldSetsRequest(
-                TestFieldSet, goal_description="`test --debug`", error_if_no_applicable_targets=True
+                TestFieldSet,
+                goal_description="`test --debug`",
+                no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
             ),
         )
         debug_requests = await MultiGet(
@@ -374,7 +378,7 @@ async def run_tests(
         TargetRootsToFieldSetsRequest(
             TestFieldSet,
             goal_description=f"the `{test_subsystem.name}` goal",
-            error_if_no_applicable_targets=False,
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
         ),
     )
     field_sets_with_sources = await Get(

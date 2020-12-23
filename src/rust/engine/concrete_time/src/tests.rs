@@ -35,11 +35,18 @@ fn time_span_from_start_and_duration_in_seconds(
   start: i64,
   duration: i64,
 ) -> Result<TimeSpan, String> {
-  use protobuf::well_known_types::Timestamp;
-  let mut start_timestamp = Timestamp::new();
-  start_timestamp.set_seconds(start);
-  let mut end_timestamp = Timestamp::new();
-  end_timestamp.set_seconds(start + duration);
+  use prost_types::Timestamp;
+
+  let start_timestamp = Timestamp {
+    seconds: start,
+    nanos: 0,
+  };
+
+  let end_timestamp = Timestamp {
+    seconds: start + duration,
+    nanos: 0,
+  };
+
   TimeSpan::from_start_and_end(&start_timestamp, &end_timestamp, "")
 }
 

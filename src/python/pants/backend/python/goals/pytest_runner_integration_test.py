@@ -9,6 +9,7 @@ from typing import List, Mapping, Optional
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_coverage_config
@@ -18,7 +19,6 @@ from pants.backend.python.target_types import (
     PythonLibrary,
     PythonRequirementLibrary,
     PythonTests,
-    resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
@@ -41,7 +41,7 @@ def rule_runner() -> RuleRunner:
             *distdir.rules(),
             *package_pex_binary.rules(),
             get_filtered_environment,
-            resolve_pex_entry_point,
+            *target_types_rules.rules(),
             QueryRule(TestResult, (PythonTestFieldSet,)),
             QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
         ],
@@ -112,15 +112,13 @@ def create_test_target(
 
 def create_pex_binary_target(rule_runner: RuleRunner, source_file: FileContent) -> None:
     rule_runner.create_file(source_file.path, source_file.content.decode())
+    file_name = PurePath(source_file.path).name
     rule_runner.add_to_build_file(
         relpath=PACKAGE,
         target=dedent(
             f"""\
-            pex_binary(
-              name='bin',
-              sources=['{PurePath(source_file.path).name}'],
-              output_path="bin.pex",
-            )
+            python_library(name='bin_lib', sources=['{file_name}'])
+            pex_binary(name='bin', entry_point='{file_name}', output_path="bin.pex")
             """
         ),
     )
@@ -145,6 +143,7 @@ def run_pytest(
     execution_slot_var: Optional[str] = None,
     extra_env_vars: Optional[str] = None,
     env: Optional[Mapping[str, str]] = None,
+    force: bool = False,
 ) -> TestResult:
     args = [
         "--backend-packages=pants.backend.python",
@@ -163,6 +162,8 @@ def run_pytest(
         args.append("--test-use-coverage")
     if execution_slot_var:
         args.append(f"--pytest-execution-slot-var={execution_slot_var}")
+    if force:
+        args.append("--test-force")
     rule_runner.set_options(args, env=env)
 
     inputs = [PythonTestFieldSet.create(test_target)]
@@ -179,6 +180,23 @@ def test_single_passing_test(rule_runner: RuleRunner) -> None:
     result = run_pytest(rule_runner, tgt)
     assert result.exit_code == 0
     assert f"{PACKAGE}/test_good.py ." in result.stdout
+
+
+def test_force(rule_runner: RuleRunner) -> None:
+    tgt = create_test_target(rule_runner, [GOOD_SOURCE])
+
+    # Should not receive a memoized result if force=True.
+    result_one = run_pytest(rule_runner, tgt, force=True)
+    result_two = run_pytest(rule_runner, tgt, force=True)
+    assert result_one.exit_code == 0
+    assert result_two.exit_code == 0
+    assert result_one is not result_two
+
+    # But should if force=False.
+    result_one = run_pytest(rule_runner, tgt, force=False)
+    result_two = run_pytest(rule_runner, tgt, force=False)
+    assert result_one.exit_code == 0
+    assert result_one is result_two
 
 
 def test_single_failing_test(rule_runner: RuleRunner) -> None:

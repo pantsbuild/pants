@@ -4,6 +4,7 @@ print_stacktrace = true
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
+  "pants.backend.awslambda.python",
   "pants.backend.python",
   "pants.backend.codegen.protobuf.python",
   "pants.backend.python.lint.black",
@@ -13,6 +14,13 @@ backend_packages.add = [
   "pants.backend.python.typecheck.mypy",
   "pants.backend.python.mixed_interpreter_constraints",
   "internal_plugins.releases",
+  "toolchain.pants.auth",
+  "toolchain.pants.buildsense",
+  "toolchain.pants.common",
+]
+
+plugins = [
+  "toolchain.pants.plugin==0.1.0",
 ]
 
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
@@ -51,6 +59,7 @@ root_patterns = [
 ]
 
 [python-setup]
+resolver_version = "pip-2020-resolver"
 requirement_constraints = "3rdparty/python/constraints.txt"
 resolve_all_constraints = "nondeployables"
 interpreter_constraints = [">=3.7,<3.9"]
@@ -126,5 +135,11 @@ pytest_plugins.add = [
 ]
 timeout_default = 60
 
+[coverage-py]
+interpreter_constraints = [">=3.7,<3.9"]
+
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
+
+[toolchain-setup]
+repo = "pants"

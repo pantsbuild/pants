@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from colors import cyan, green, magenta, red
+from colors import cyan, green, magenta, red, yellow
 
 
 class MaybeColor:
@@ -14,6 +14,7 @@ class MaybeColor:
         self.maybe_green = green if color else noop
         self.maybe_red = red if color else noop
         self.maybe_magenta = magenta if color else noop
+        self.maybe_yellow = yellow if color else noop
 
     @property
     def color(self) -> bool:

@@ -1,0 +1,10 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "tryfuture"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+futures = "0.3"
+

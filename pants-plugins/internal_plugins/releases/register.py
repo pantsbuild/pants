@@ -14,9 +14,8 @@ from pants.version import PANTS_SEMVER, VERSION
 
 
 class PantsReleases(Subsystem):
-    """Options for Pants's release process."""
-
     options_scope = "pants-releases"
+    help = "Options for Pants's release process."
 
     @classmethod
     def register_options(cls, register):

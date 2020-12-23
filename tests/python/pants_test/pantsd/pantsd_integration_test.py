@@ -8,7 +8,7 @@ import threading
 import time
 import unittest
 from textwrap import dedent
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 import psutil
 import pytest
@@ -77,7 +77,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             # Run target that throws an exception in pants.
             self.run_pants_with_workdir(
-                ["lint", "testprojects/src/python/unicode/compilation_failure"],
+                ["lint", "testprojects/src/python/unicode/compilation_failure/main:lib"],
                 workdir=workdir,
                 config=pantsd_config,
             ).assert_failure()
@@ -155,14 +155,20 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
         cmds = [["help", "goals"], ["help", "targets"], ["roots"]]
 
-        non_daemon_runs = [self.run_pants(cmd) for cmd in cmds]
+        config = {
+            "GLOBAL": {
+                # These must match the ones we configure in pantsd_integration_test_base.py.
+                "backend_packages": ["pants.backend.python", "pants.backend.python.lint.flake8"],
+            }
+        }
+        non_daemon_runs = [self.run_pants(cmd, config=config) for cmd in cmds]
 
         with self.pantsd_successful_run_context() as ctx:
             daemon_runs = [ctx.runner(cmd) for cmd in cmds]
             ctx.checker.assert_started()
 
         for cmd, run in zip(cmds, daemon_runs):
-            print(f"(cmd, run) = ({cmd}, {run.stdout}, {run.stderr_data})")
+            print(f"(cmd, run) = ({cmd}, {run.stdout}, {run.stderr})")
             self.assertNotEqual(run.stdout, "", f"Empty stdout for {cmd}")
 
         for run_pair in zip(non_daemon_runs, daemon_runs):
@@ -191,8 +197,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             join()
 
     def test_pantsd_client_env_var_is_inherited_by_pantsd_runner_children(self):
-        EXPECTED_KEY = "TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST"
-        EXPECTED_VALUE = "333"
+        expected_key = "TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST"
+        expected_value = "333"
         with self.pantsd_successful_run_context() as ctx:
             # First, launch the daemon without any local env vars set.
             ctx.runner(["help"])
@@ -202,16 +208,16 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             # We additionally set the `HERMETIC_ENV` env var to allow the integration test harness
             # to pass this variable through.
             env = {
-                EXPECTED_KEY: EXPECTED_VALUE,
-                "HERMETIC_ENV": EXPECTED_KEY,
+                expected_key: expected_value,
+                "HERMETIC_ENV": expected_key,
             }
             with environment_as(**env):
                 result = ctx.runner(
-                    ["run", "testprojects/src/python/print_env", "--", EXPECTED_KEY]
+                    ["run", "testprojects/src/python/print_env", "--", expected_key]
                 )
                 ctx.checker.assert_running()
 
-            self.assertEqual(EXPECTED_VALUE, "".join(result.stdout).strip())
+            self.assertEqual(expected_value, "".join(result.stdout).strip())
 
     def test_pantsd_launch_env_var_is_not_inherited_by_pantsd_runner_children(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -420,7 +426,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 with self.pantsd_run_context(success=False) as ctx:
                     result = ctx.runner(["list", "testprojects::"])
                     ctx.checker.assert_started()
-                    self.assertIn(invalid_symbol, result.stderr_data)
+                    self.assertIn(invalid_symbol, result.stderr)
         finally:
             rm_rf(test_path)
 
@@ -445,7 +451,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             creator_handle.join().assert_success()
             waiter_handle.join().assert_success()
 
-    def _launch_waiter(self, workdir: str, config) -> Tuple[PantsJoinHandle, int, str]:
+    @classmethod
+    def _launch_waiter(cls, workdir: str, config) -> Tuple[PantsJoinHandle, int, str]:
         """Launch a process via pantsd that will wait forever for the a file to be created.
 
         Returns the pid of the pantsd client, the pid of the waiting child process, and the file to
@@ -461,9 +468,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             file_to_make,
             waiter_pid_file,
         ]
-        client_handle = self.run_pants_with_workdir_without_waiting(
+        client_handle = cls.run_pants_with_workdir_without_waiting(
             argv, workdir=workdir, config=config
         )
+        waiter_pid = -1
         for _ in attempts("The waiter process should have written its pid."):
             waiter_pid_str = maybe_read_file(waiter_pid_file)
             if waiter_pid_str:
@@ -471,12 +479,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 break
         return client_handle, waiter_pid, file_to_make
 
-    def _assert_pantsd_keyboardinterrupt_signal(self, signum, regexps=[]):
+    def _assert_pantsd_keyboardinterrupt_signal(
+        self, signum: int, regexps: Optional[List[str]] = None
+    ):
         """Send a signal to the thin pailgun client and observe the error messaging.
 
-        :param int signum: The signal to send.
+        :param signum: The signal to send.
         :param regexps: Assert that all of these regexps match somewhere in stderr.
-        :type regexps: list of str
         """
         with self.pantsd_test_context() as (workdir, config, checker):
             client_handle, waiter_process_pid, _ = self._launch_waiter(workdir, config)
@@ -492,7 +501,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             client_run = client_handle.join()
             client_run.assert_failure()
 
-            for regexp in regexps:
+            for regexp in regexps or []:
                 self.assertRegex(client_run.stderr, regexp)
 
             # pantsd should still be running, but the waiter process should have been killed.
@@ -612,13 +621,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             ctx.checker.assert_running()
             result.assert_failure()
             # Assert that the desired exception has been triggered once.
-            self.assertRegex(result.stderr_data, r"ERROR:.*badreq==99.99.99")
+            self.assertRegex(result.stderr, r"ERROR:.*badreq==99.99.99")
             # Assert that it has only been triggered once.
             self.assertNotIn(
                 "During handling of the above exception, another exception occurred:",
-                result.stderr_data,
+                result.stderr,
             )
             self.assertNotIn(
                 "pants.bin.daemon_pants_runner._PantsRunFinishedWithFailureException: Terminated with 1",
-                result.stderr_data,
+                result.stderr,
             )

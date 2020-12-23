@@ -1,12 +1,13 @@
-use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
-use crate::{NamedCaches, Platform, Process, ProcessMetadata};
-use futures::compat::Future01CompatExt;
-use hashing::EMPTY_DIGEST;
 use std::fs::read_link;
 use std::os::unix::fs::symlink;
 use std::path::PathBuf;
+
+use hashing::EMPTY_DIGEST;
 use store::Store;
 use tempfile::TempDir;
+
+use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
+use crate::{NamedCaches, Platform, Process, ProcessMetadata};
 
 fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
   let store_dir = TempDir::new().unwrap();
@@ -116,7 +117,7 @@ async fn materialize_with_jdk(
     jdk_path,
     EMPTY_DIGEST,
   );
-  materializer.compat().await
+  materializer.await
 }
 
 #[tokio::test]

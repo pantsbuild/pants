@@ -18,6 +18,7 @@ def test_file_logging() -> None:
         use_color=False,
         show_target=False,
         log_levels_by_target={},
+        message_regex_filters=(),
     )
     logger = logging.getLogger("my_file_logger")
     with temporary_dir() as tmpdir:
@@ -48,6 +49,7 @@ def test_log_filtering_by_rule() -> None:
         log_levels_by_target={
             "debug_target": LogLevel.DEBUG,
         },
+        message_regex_filters=(),
     )
     with temporary_dir() as tmpdir:
         setup_logging_to_file(LogLevel.INFO, log_dir=tmpdir)

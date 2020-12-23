@@ -116,7 +116,6 @@ class Native(metaclass=SingletonMetaclass):
     def __init__(self):
         self.externs = Externs(self.lib)
         self.lib.externs_set(self.externs)
-        self._executor = PyExecutor()
 
     class BinaryLocationError(Exception):
         pass
@@ -133,10 +132,16 @@ class Native(metaclass=SingletonMetaclass):
         use_color: bool,
         show_target: bool,
         log_levels_by_target: Mapping[str, LogLevel],
+        message_regex_filters: Iterable[str],
     ):
         log_levels_as_ints = {k: v.level for k, v in log_levels_by_target.items()}
         return self.lib.init_logging(
-            level, log_show_rust_3rdparty, use_color, show_target, log_levels_as_ints
+            level,
+            log_show_rust_3rdparty,
+            use_color,
+            show_target,
+            log_levels_as_ints,
+            tuple(message_regex_filters),
         )
 
     def set_per_run_log_path(self, path: Optional[str]) -> None:
@@ -146,9 +151,6 @@ class Native(metaclass=SingletonMetaclass):
 
     def default_cache_path(self) -> str:
         return cast(str, self.lib.default_cache_path())
-
-    def default_config_path(self) -> str:
-        return cast(str, self.lib.default_config_path())
 
     def setup_pantsd_logger(self, log_file_path):
         return self.lib.setup_pantsd_logger(log_file_path)
@@ -191,17 +193,19 @@ class Native(metaclass=SingletonMetaclass):
 
         Raises an exception if the server exited abnormally
         """
-        self.lib.nailgun_server_await_shutdown(self._executor, nailgun_server)
+        self.lib.nailgun_server_await_shutdown(nailgun_server)
 
-    def new_nailgun_server(self, port: int, runner: RawFdRunner) -> PyNailgunServer:
+    def new_nailgun_server(
+        self, executor: PyExecutor, port: int, runner: RawFdRunner
+    ) -> PyNailgunServer:
         """Creates a nailgun server with a requested port.
 
         Returns the server and the actual port it bound to.
         """
-        return cast(PyNailgunServer, self.lib.nailgun_server_create(self._executor, port, runner))
+        return cast(PyNailgunServer, self.lib.nailgun_server_create(executor, port, runner))
 
-    def new_nailgun_client(self, port: int) -> PyNailgunClient:
-        return cast(PyNailgunClient, self.lib.nailgun_client_create(self._executor, port))
+    def new_nailgun_client(self, executor: PyExecutor, port: int) -> PyNailgunClient:
+        return cast(PyNailgunClient, self.lib.nailgun_client_create(executor, port))
 
     def new_tasks(self) -> PyTasks:
         return PyTasks()
@@ -237,6 +241,7 @@ class Native(metaclass=SingletonMetaclass):
         ca_certs_path: Optional[str],
         ignore_patterns: List[str],
         use_gitignore: bool,
+        executor: PyExecutor,
         execution_options,
         types: PyTypes,
     ) -> PyScheduler:
@@ -283,7 +288,7 @@ class Native(metaclass=SingletonMetaclass):
         return cast(
             PyScheduler,
             self.lib.scheduler_create(
-                self._executor,
+                executor,
                 tasks,
                 types,
                 # Project tree.

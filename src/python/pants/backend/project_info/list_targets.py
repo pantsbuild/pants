@@ -11,9 +11,8 @@ from pants.engine.target import DescriptionField, ProvidesField, UnexpandedTarge
 
 
 class ListSubsystem(LineOriented, GoalSubsystem):
-    """Lists all targets matching the file or target arguments."""
-
     name = "list"
+    help = "Lists all targets matching the file or target arguments."
 
     @classmethod
     def register_options(cls, register):

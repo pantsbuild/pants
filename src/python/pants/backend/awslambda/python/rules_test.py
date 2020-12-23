@@ -11,6 +11,7 @@ import pytest
 from pants.backend.awslambda.python.rules import PythonAwsLambdaFieldSet
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
+from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
@@ -23,6 +24,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *awslambda_python_rules(),
+            *target_rules(),
             QueryRule(BuiltPackage, (PythonAwsLambdaFieldSet,)),
         ],
         target_types=[PythonAWSLambda, PythonLibrary],
@@ -69,7 +71,7 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
             python_awslambda(
                 name='lambda',
                 dependencies=[':lib'],
-                handler='foo.bar.hello_world',
+                handler='foo.bar.hello_world:handler',
                 runtime='python3.7',
             )
             """

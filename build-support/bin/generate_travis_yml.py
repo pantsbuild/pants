@@ -781,6 +781,12 @@ def main() -> None:
             # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1
             "conditions": "v1",
             "env": {"global": GLOBAL_ENV_VARS},
+            "notifications": {
+                "webhooks": {
+                    "on_start": "always",
+                    "urls": ["https://webhooks.toolchain.com/travis/repo/pantsbuild/pants/"],
+                }
+            },
             "stages": Stage.all_entries(),
             "deploy": DEPLOY_SETTINGS,
             "jobs": {

@@ -115,7 +115,7 @@ function pkg_testutil_install_test() {
   shift
   local PIP_ARGS=("$@")
   pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testutil==${version}" && \
-  python -c "import pants.testutil.option_util"
+  python -c "import pants.testutil.option_util, pants.testutil.rule_runner, pants.testutil.pants_integration_test"
 }
 
 #
@@ -143,6 +143,7 @@ function execute_packaged_pants_with_internal_backends() {
     --no-verify-config \
     --no-pantsd \
     --pythonpath="['pants-plugins']" \
+    --streaming-workunits-handlers="[]" \
     --backend-packages="[\
         'pants.backend.awslambda.python',\
         'pants.backend.python',\
