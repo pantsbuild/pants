@@ -7,8 +7,9 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # shellcheck source=build-support/common.sh
 source "${REPO_ROOT}/build-support/common.sh"
 
-# Consumed by the cpython crate.
-export PYTHON_SYS_EXECUTABLE="$(determine_python)"
+PY="$(determine_python)"
+export PY
+export PYTHON_SYS_EXECUTABLE="${PY}"  # Consumed by the cpython crate.
 
 if ! command -v rustup &> /dev/null; then
   die "Please install Rustup and ensure \`rustup\` is on your PATH (usually by adding ~/.cargo/bin). See https://rustup.rs."
