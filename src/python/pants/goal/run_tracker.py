@@ -287,7 +287,7 @@ class RunTracker(Subsystem):
             self.outcomes[path] = workunit.outcome_string(workunit.outcome())
 
     def get_cumulative_timings(self) -> TimingData:
-        return self.cumulative_timings.get_all()
+        return self.cumulative_timings.get_all()  # type: ignore[no-any-return]
 
     def get_critical_path_timings(self):
         """Get the cumulative timings of each goal and all of the goals it (transitively) depended
