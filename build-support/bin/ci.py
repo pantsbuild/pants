@@ -21,38 +21,33 @@ def main() -> None:
     args = create_parser().parse_args()
     setup_environment(python_version=args.python_version)
 
-    with maybe_get_remote_execution_oauth_token_path(
-        remote_execution_enabled=args.remote_execution_enabled
-    ) as remote_execution_oauth_token_path:
+    if args.bootstrap:
+        bootstrap(
+            clean=args.bootstrap_clean,
+            try_to_skip_rust_compilation=args.bootstrap_try_to_skip_rust_compilation,
+            python_version=args.python_version,
+        )
+    set_run_from_pex()
 
-        if args.bootstrap:
-            bootstrap(
-                clean=args.bootstrap_clean,
-                try_to_skip_rust_compilation=args.bootstrap_try_to_skip_rust_compilation,
-                python_version=args.python_version,
-            )
-        set_run_from_pex()
-
-        if args.githooks:
-            run_githooks()
-        if args.smoke_tests:
-            run_smoke_tests()
-        if args.lint:
-            run_lint(oauth_token_path=remote_execution_oauth_token_path)
-        if args.clippy:
-            run_clippy()
-        if args.cargo_audit:
-            run_cargo_audit()
-        if args.unit_tests or args.integration_tests:
-            run_python_tests(
-                include_unit=args.unit_tests,
-                include_integration=args.integration_tests,
-                oauth_token_path=remote_execution_oauth_token_path,
-            )
-        if args.rust_tests:
-            run_rust_tests()
-        if args.platform_specific_tests:
-            run_platform_specific_tests()
+    if args.githooks:
+        run_githooks()
+    if args.smoke_tests:
+        run_smoke_tests()
+    if args.lint:
+        run_lint()
+    if args.clippy:
+        run_clippy()
+    if args.cargo_audit:
+        run_cargo_audit()
+    if args.unit_tests or args.integration_tests:
+        run_python_tests(
+            include_unit=args.unit_tests,
+            include_integration=args.integration_tests,
+        )
+    if args.rust_tests:
+        run_rust_tests()
+    if args.platform_specific_tests:
+        run_platform_specific_tests()
 
     banner("CI ENDS")
     print()
@@ -79,14 +74,6 @@ def create_parser() -> argparse.ArgumentParser:
         choices=list(PythonVersion),
         default=PythonVersion.py37,
         help="Run Pants with this version.",
-    )
-    parser.add_argument(
-        "--remote-execution-enabled",
-        action="store_true",
-        help="Pants will use remote build execution remote where possible (for now, the V2 unit tests). "
-        "If running locally, you must be logged in via the `gcloud` CLI to an account with remote "
-        "build execution permissions. If running in CI, the script will ping the secure token "
-        "generator at https://github.com/pantsbuild/rbe-token-server.",
     )
     parser.add_argument(
         "--bootstrap", action="store_true", help="Bootstrap a pants.pex from local sources."
@@ -158,34 +145,7 @@ def setup_python_interpreter(version: PythonVersion) -> None:
 
 
 def set_run_from_pex() -> None:
-    # Even though our Python integration tests and commands in this file directly invoke `pants.pex`,
-    # some places like the JVM tests may still directly call the script `./pants`. When this happens,
-    # we want to ensure that the script immediately breaks out to `./pants.pex` to avoid
-    # re-bootstrapping Pants in CI.
     os.environ["RUN_PANTS_FROM_PEX"] = "1"
-
-
-@contextmanager
-def maybe_get_remote_execution_oauth_token_path(
-    *, remote_execution_enabled: bool
-) -> Iterator[Optional[str]]:
-    if not remote_execution_enabled:
-        yield None
-        return
-    command = (
-        ["./pants.pex", "run", "build-support/bin:get_rbe_token"]
-        if os.getenv("CI")
-        else ["gcloud", "auth", "application-default", "print-access-token"]
-    )
-    token: str = subprocess.run(
-        command, encoding="utf-8", stdout=subprocess.PIPE, check=True
-    ).stdout
-    if not os.getenv("CI"):
-        token = token.splitlines()[0]
-    with tempfile.NamedTemporaryFile(mode="w+") as tf:
-        tf.write(token)
-        tf.seek(0)
-        yield tf.name
 
 
 # -------------------------------------------------------------------------
@@ -235,13 +195,6 @@ def check_pants_pex_exists() -> None:
 # -------------------------------------------------------------------------
 
 
-def _use_remote_execution(oauth_token_path: str) -> List[str]:
-    return [
-        "--pants-config-files=pants.remote.toml",
-        f"--remote-oauth-bearer-token-path={oauth_token_path}",
-    ]
-
-
 def _run_command(
     command: List[str],
     *,
@@ -259,15 +212,11 @@ def _run_command(
             die(die_message)
 
 
-def _test_command(
-    *, oauth_token_path: Optional[str] = None, extra_args: Optional[List[str]] = None
-) -> List[str]:
+def _test_command(*, extra_args: Optional[List[str]] = None) -> List[str]:
     targets = ["build-support::", "src::", "tests::", "pants-plugins::"]
     command = ["./pants.pex", "test", *targets]
     if extra_args:
         command.extend(extra_args)
-    if oauth_token_path:
-        command.extend(_use_remote_execution(oauth_token_path))
     return command
 
 
@@ -305,11 +254,9 @@ def run_smoke_tests() -> None:
             run_check(check)
 
 
-def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
+def run_lint() -> None:
     targets = ["build-support::", "src::", "tests::"]
     command = ["./pants.pex", "--tag=-nolint", "lint", "typecheck", *targets]
-    if oauth_token_path:
-        command.extend(_use_remote_execution(oauth_token_path))
     _run_command(
         command,
         slug="Lint",
@@ -381,9 +328,7 @@ def run_rust_tests() -> None:
             die("Rust test failure.")
 
 
-def run_python_tests(
-    *, include_unit: bool, include_integration: bool, oauth_token_path: Optional[str] = None
-) -> None:
+def run_python_tests(*, include_unit: bool, include_integration: bool) -> None:
     if include_unit and include_integration:
         extra_args = []
     elif include_unit and not include_integration:
@@ -395,7 +340,7 @@ def run_python_tests(
             "Must specify True for at least one of `include_unit` and `include_integration`."
         )
     _run_command(
-        command=_test_command(oauth_token_path=oauth_token_path, extra_args=extra_args),
+        command=_test_command(extra_args=extra_args),
         slug="PythonTests",
         start_message="Running Python tests.",
         die_message="Python test failure.",
