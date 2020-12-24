@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnit
 from pants.engine.internals.native import Native
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.option.config import Config
