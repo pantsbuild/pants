@@ -16,7 +16,7 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.base.run_info import RunInfo
 from pants.base.workunit import WorkUnit
 from pants.engine.internals.native import Native
-from pants.goal.aggregated_timings import AggregatedTimings
+from pants.goal.aggregated_timings import AggregatedTimings, TimingData
 from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
@@ -225,7 +225,7 @@ class RunTracker(Subsystem):
         stats = {
             "run_info": self.run_information(),
             "pantsd_stats": self.pantsd_scheduler_metrics,
-            "cumulative_timings": self.cumulative_timings.get_all(),
+            "cumulative_timings": self.get_cumulative_timings(),
             "recorded_options": self.get_options_to_record(),
         }
         return stats
@@ -285,6 +285,9 @@ class RunTracker(Subsystem):
             self.cumulative_timings.add_timing(path, duration, is_tool)
             self.self_timings.add_timing(path, self_time, is_tool)
             self.outcomes[path] = workunit.outcome_string(workunit.outcome())
+
+    def get_cumulative_timings(self) -> TimingData:
+        return self.cumulative_timings.get_all()  # type: ignore[no-any-return]
 
     def get_options_to_record(self) -> dict:
         recorded_options = {}
