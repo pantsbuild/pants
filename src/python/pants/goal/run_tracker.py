@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnit
 from pants.engine.internals.native import Native
 from pants.goal.aggregated_timings import AggregatedTimings, TimingData
 from pants.option.config import Config
@@ -288,35 +288,6 @@ class RunTracker(Subsystem):
 
     def get_cumulative_timings(self) -> TimingData:
         return self.cumulative_timings.get_all()  # type: ignore[no-any-return]
-
-    def get_critical_path_timings(self):
-        """Get the cumulative timings of each goal and all of the goals it (transitively) depended
-        on."""
-        setup_workunit = WorkUnitLabel.SETUP.lower()
-        transitive_dependencies = dict()
-        raw_timings = dict()
-        for entry in self.get_cumulative_timings():
-            raw_timings[entry["label"]] = entry["timing"]
-
-        critical_path_timings = AggregatedTimings()
-
-        def add_to_timings(goal, dep):
-            tracking_label = get_label(goal)
-            timing_label = get_label(dep)
-            critical_path_timings.add_timing(tracking_label, raw_timings.get(timing_label, 0.0))
-
-        def get_label(dep):
-            return f"{RunTracker.DEFAULT_ROOT_NAME}:{dep}"
-
-        # Add setup workunit to critical_path_timings manually, as its unaccounted for, otherwise.
-        add_to_timings(setup_workunit, setup_workunit)
-
-        for goal, deps in transitive_dependencies.items():
-            add_to_timings(goal, goal)
-            for dep in deps:
-                add_to_timings(goal, dep)
-
-        return critical_path_timings
 
     def get_options_to_record(self) -> dict:
         recorded_options = {}
