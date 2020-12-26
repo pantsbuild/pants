@@ -49,7 +49,6 @@ class SchedulerTestBase:
         project_tree=None,
         work_dir=None,
         include_trace_on_error=True,
-        should_report_workunits=False,
         execution_options=None,
         ca_certs_path=None,
     ) -> SchedulerSession:
@@ -81,7 +80,6 @@ class SchedulerTestBase:
         )
         return scheduler.new_session(
             build_id="buildid_for_test",
-            should_report_workunits=should_report_workunits,
         )
 
     def execute(self, scheduler, product, *subjects):

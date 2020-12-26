@@ -218,7 +218,6 @@ class Native(metaclass=SingletonMetaclass):
         scheduler,
         dynamic_ui: bool,
         build_id,
-        should_report_workunits: bool,
         session_values: SessionValues,
         cancellation_latch: PySessionCancellationLatch,
     ) -> PySession:
@@ -226,7 +225,6 @@ class Native(metaclass=SingletonMetaclass):
             scheduler=scheduler,
             should_render_ui=dynamic_ui,
             build_id=build_id,
-            should_report_workunits=should_report_workunits,
             session_values=session_values,
             cancellation_latch=cancellation_latch,
         )

@@ -281,9 +281,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
     def _fixture_for_rules(
         self, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
     ) -> Tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
-        )
+        scheduler = self.mk_scheduler(rules, include_trace_on_error=False)
 
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(

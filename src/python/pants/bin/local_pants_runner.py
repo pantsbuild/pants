@@ -81,12 +81,10 @@ class LocalPantsRunner:
             cls._handle_unknown_flags(err, options_bootstrapper)
             raise
 
-        stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
         return graph_scheduler_helper.new_session(
             RunTracker.global_instance().run_id,
             dynamic_ui=global_scope.dynamic_ui,
             use_colors=global_scope.get("colors", True),
-            should_report_workunits=stream_workunits,
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,

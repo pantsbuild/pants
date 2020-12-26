@@ -156,7 +156,6 @@ class RuleRunner:
             session_values=SessionValues(
                 {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment()}
             ),
-            should_report_workunits=True,
         )
         self.scheduler = graph_session.scheduler_session
 
@@ -236,7 +235,6 @@ class RuleRunner:
         options_bootstrapper = create_options_bootstrapper(args=args, env=env)
         self.scheduler = self.scheduler.scheduler.new_session(
             build_id="buildid_for_test",
-            should_report_workunits=True,
             session_values=SessionValues(
                 {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment(env)}
             ),
