@@ -945,7 +945,7 @@ class GlobalOptions(Subsystem):
             member_type=str,
             default=[],
             advanced=True,
-            removal_version="2.3.0.dev1",
+            removal_version="2.3.0.dev0",
             removal_hint=(
                 "To register a StreamingWorkunitHandler callback, install a UnionRule "
                 "for type `WorkunitsCallbackFactoryRequest`."

@@ -155,7 +155,7 @@ class Subsystem(Optionable):
         # updated to access it in other ways.
         deprecated_conditional(
             predicate=lambda: not silent,
-            removal_version="2.3.0.dev1",
+            removal_version="2.3.0.dev0",
             entity_description="Subsystem.global_instance()",
             hint_message=(
                 "Note that `global_instance` is a v1-idiom only. v2 @rules should request a "
@@ -167,7 +167,7 @@ class Subsystem(Optionable):
 
     @classmethod
     @deprecated(
-        removal_version="2.3.0.dev1",
+        removal_version="2.3.0.dev0",
         subject="Subsystem.scoped_instance(..)",
         hint_message=(
             "Scoped Subsystem instances were a v1 idiom, which do not have a v2 equivalent. "
