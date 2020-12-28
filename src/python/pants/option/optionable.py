@@ -1,11 +1,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import functools
 import inspect
 import re
 from abc import ABC, ABCMeta, abstractmethod
-from typing import Optional, Type
+from typing import Optional, Type, cast
 
 from pants.engine.internals.selectors import Get, GetConstraints
 from pants.option.errors import OptionsError
@@ -29,7 +31,7 @@ class OptionableFactory(ABC):
 
     @property
     @abstractmethod
-    def optionable_cls(self) -> Type["Optionable"]:
+    def optionable_cls(self) -> Type[Optionable]:
         """The Optionable class that is constructed by this OptionableFactory."""
 
     @property
@@ -94,14 +96,14 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
             )
 
     @classmethod
-    def get_scope_info(cls):
+    def get_scope_info(cls) -> ScopeInfo:
         """Returns a ScopeInfo instance representing this Optionable's options scope."""
         if cls.options_scope is None:
             raise OptionsError(f"{cls.__name__} must set options_scope.")
-        return ScopeInfo(cls.options_scope, cls)
+        return ScopeInfo(scope=cast(str, cls.options_scope), optionable_cls=cls)
 
     @classmethod
-    def subscope(cls, scope):
+    def subscope(cls, scope) -> str:
         """Create a subscope under this Optionable's scope."""
         return f"{cls.options_scope}.{scope}"
 
