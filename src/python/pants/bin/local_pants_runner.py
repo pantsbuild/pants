@@ -86,7 +86,7 @@ class LocalPantsRunner:
             raise
 
         return graph_scheduler_helper.new_session(
-            RunTracker.global_instance().run_id,
+            RunTracker.global_instance(silent=True).run_id,
             dynamic_ui=global_scope.dynamic_ui,
             use_colors=global_scope.get("colors", True),
             session_values=SessionValues(
@@ -253,7 +253,7 @@ class LocalPantsRunner:
         return tuple(callbacks)
 
     def run(self, start_time: float) -> ExitCode:
-        run_tracker = RunTracker.global_instance()
+        run_tracker = RunTracker.global_instance(silent=True)
         self._start_run(run_tracker, start_time)
 
         with maybe_profiled(self.profile_path):
