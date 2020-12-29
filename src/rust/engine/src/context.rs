@@ -213,8 +213,20 @@ impl Core {
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
   ) -> Result<Box<dyn CommandRunner>, String> {
+    let remote_caching_used =
+      exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write;
+
+    // If remote caching is used with eager validation, we do not want to use the remote store
+    // with the local command runner. This reduces the surface area of where the remote store is
+    // used to only be the remote cache command runner.
+    let local_only_store = if remote_caching_used && remoting_opts.store_eager_fetch {
+      store.clone().into_local_only()
+    } else {
+      store.clone()
+    };
+
     let local_command_runner = Core::make_local_execution_runner(
-      store,
+      &local_only_store,
       executor,
       local_execution_root_dir,
       named_caches_dir,
@@ -253,7 +265,7 @@ impl Core {
           "none" => remote_execution_command_runner,
           _ => unreachable!(),
         }
-      } else if exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write {
+      } else if remote_caching_used {
         let action_cache_address = remote_store_servers
           .first()
           .ok_or_else(|| "At least one remote store must be specified".to_owned())?;
