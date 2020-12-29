@@ -114,7 +114,6 @@ struct InnerSession {
   // purposes, each iteration of a loop should be considered to be a new Session, but for now the
   // Session/build_id would be stable.
   run_id: Mutex<Uuid>,
-  should_report_workunits: bool,
   workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
 }
 
@@ -136,7 +135,6 @@ impl Session {
     scheduler: &Scheduler,
     should_render_ui: bool,
     build_id: String,
-    should_report_workunits: bool,
     session_values: Value,
     cancelled: AsyncLatch,
   ) -> Session {
@@ -165,7 +163,6 @@ impl Session {
       build_id,
       session_values: Mutex::new(session_values),
       run_id: Mutex::new(Uuid::new_v4()),
-      should_report_workunits,
       workunit_metadata_map: RwLock::new(HashMap::new()),
     });
     sessions_add(&inner_session);
@@ -224,10 +221,6 @@ impl Session {
 
   pub fn preceding_graph_size(&self) -> usize {
     self.0.preceding_graph_size
-  }
-
-  pub fn should_report_workunits(&self) -> bool {
-    self.0.should_report_workunits
   }
 
   pub fn workunit_store(&self) -> WorkunitStore {

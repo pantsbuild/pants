@@ -580,7 +580,6 @@ py_class!(class PySession |py| {
           scheduler: PyScheduler,
           should_render_ui: bool,
           build_id: String,
-          should_report_workunits: bool,
           session_values: PyObject,
           cancellation_latch: PySessionCancellationLatch,
     ) -> CPyResult<Self> {
@@ -588,7 +587,6 @@ py_class!(class PySession |py| {
           scheduler.scheduler(py),
           should_render_ui,
           build_id,
-          should_report_workunits,
           session_values.into(),
           cancellation_latch.cancelled(py).clone(),
         )

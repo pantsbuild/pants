@@ -24,6 +24,7 @@ from typing import (
     cast,
 )
 
+from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable, OptionableFactory
 from pants.option.options import Options
@@ -139,7 +140,7 @@ class Subsystem(Optionable):
         return cls._options is not None
 
     @classmethod
-    def global_instance(cls: Type[_S]) -> _S:
+    def global_instance(cls: Type[_S], silent: bool = False) -> _S:
         """Returns the global instance of this subsystem.
 
         :API: public
@@ -149,9 +150,31 @@ class Subsystem(Optionable):
         Note that `global_instance` is a v1-idiom only. v2 rules should always request a subsystem as a rule input, rather than
         trying to call <subsystem>.global_instance() in the body of an `@rule`.
         """
+        # NB: This entire method is deprecated, but the deprecation only triggers if `not silent` in
+        # order to allow the RunTracker to continue to be a Subsystem until consumers have been
+        # updated to access it in other ways.
+        deprecated_conditional(
+            predicate=lambda: not silent,
+            removal_version="2.3.0.dev0",
+            entity_description="Subsystem.global_instance()",
+            hint_message=(
+                "Note that `global_instance` is a v1-idiom only. v2 @rules should request a "
+                "Subsystem as a @rule argument, and callers outside of @rules should use "
+                "`Scheduler.product_request(<subsystem_cls>, [Params()])` to get an instance."
+            ),
+        )
         return cls._instance_for_scope(cls.options_scope)  # type: ignore[arg-type]  # MyPy is treating cls.options_scope as a Callable, rather than `str`
 
     @classmethod
+    @deprecated(
+        removal_version="2.3.0.dev0",
+        subject="Subsystem.scoped_instance(..)",
+        hint_message=(
+            "Scoped Subsystem instances were a v1 idiom, which do not have a v2 equivalent. "
+            "If you have a usecase for scoped Subsystems, please open an issue at "
+            "https://github.com/pantsbuild/pants/issues/new."
+        ),
+    )
     def scoped_instance(cls: Type[_S], optionable: Union[Optionable, Type[Optionable]]) -> _S:
         """Returns an instance of this subsystem for exclusive use by the given `optionable`.
 
