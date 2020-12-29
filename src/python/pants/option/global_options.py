@@ -999,16 +999,26 @@ class GlobalOptions(Subsystem):
                 "`--remote-store-server` to work properly."
             )
 
+        if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
+            raise OptionsError(
+                "`--remote-execution` cannot be set at the same time as either "
+                "`--remote-cache-read` or `--remote-cache-write`.\n\nIf remote execution is "
+                "enabled, it will already use remote caching."
+            )
+
         # Ensure that timeout values are non-zero.
         if opts.remote_store_initial_timeout <= 0:
             raise OptionsError(
-                "The --remote-store-initial-timeout option requires a positive number of milliseconds."
+                "The --remote-store-initial-timeout option requires a positive number of "
+                "milliseconds."
             )
         if opts.remote_store_timeout_multiplier <= 0.0:
             raise OptionsError(
-                "The --remote-store-timeout-multiplier option requires a positive number for the multiplier."
+                "The --remote-store-timeout-multiplier option requires a positive number for the "
+                "multiplier."
             )
         if opts.remote_store_maximum_timeout <= 0:
             raise OptionsError(
-                "The --remote-store-initial-timeout option requires a positive number of milliseconds."
+                "The --remote-store-initial-timeout option requires a positive number of "
+                "milliseconds."
             )
