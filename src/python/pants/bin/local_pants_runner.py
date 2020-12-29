@@ -34,7 +34,11 @@ from pants.option.errors import UnknownFlagsError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
-from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
+from pants.reporting.streaming_workunit_handler import (
+    StreamingWorkunitHandler,
+    WorkunitsCallback,
+    WorkunitsCallbackFactories,
+)
 from pants.util.contextutil import maybe_profiled
 
 logger = logging.getLogger(__name__)
@@ -81,12 +85,10 @@ class LocalPantsRunner:
             cls._handle_unknown_flags(err, options_bootstrapper)
             raise
 
-        stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
         return graph_scheduler_helper.new_session(
-            RunTracker.global_instance().run_id,
+            RunTracker.global_instance(silent=True).run_id,
             dynamic_ui=global_scope.dynamic_ui,
             use_colors=global_scope.get("colors", True),
-            should_report_workunits=stream_workunits,
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
@@ -236,8 +238,22 @@ class LocalPantsRunner:
         )
         return help_printer.print_help()
 
+    def _get_workunits_callbacks(self) -> Tuple[WorkunitsCallback, ...]:
+        # Load WorkunitsCallbacks with the legacy `get_streaming_workunit_callbacks` method, and with
+        # the new WorkunitsCallbackFactories method.
+        # NB: When the `--streaming-workunits-handlers` deprecation triggers, the first method will be
+        # removed.
+        streaming_handlers = self.options.for_global_scope().streaming_workunits_handlers
+        callbacks = list(Subsystem.get_streaming_workunit_callbacks(streaming_handlers))
+        (workunits_callback_factories,) = self.graph_session.scheduler_session.product_request(
+            WorkunitsCallbackFactories, [self.union_membership]
+        )
+        for wcf in workunits_callback_factories:
+            callbacks.append(wcf.callback_factory())
+        return tuple(callbacks)
+
     def run(self, start_time: float) -> ExitCode:
-        run_tracker = RunTracker.global_instance()
+        run_tracker = RunTracker.global_instance(silent=True)
         self._start_run(run_tracker, start_time)
 
         with maybe_profiled(self.profile_path):
@@ -246,11 +262,10 @@ class LocalPantsRunner:
             if self.options.help_request:
                 return self._print_help(self.options.help_request)
 
-            streaming_handlers = global_options.streaming_workunits_handlers
-            callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
             streaming_reporter = StreamingWorkunitHandler(
                 self.graph_session.scheduler_session,
-                callbacks=callbacks,
+                run_tracker=run_tracker,
+                callbacks=self._get_workunits_callbacks(),
                 report_interval_seconds=global_options.streaming_workunits_report_interval,
             )
 

@@ -344,7 +344,6 @@ class Scheduler:
         self,
         build_id,
         dynamic_ui: bool = False,
-        should_report_workunits: bool = False,
         session_values: Optional[SessionValues] = None,
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> SchedulerSession:
@@ -355,7 +354,6 @@ class Scheduler:
                 self._scheduler,
                 dynamic_ui,
                 build_id,
-                should_report_workunits,
                 session_values or SessionValues(),
                 cancellation_latch or PySessionCancellationLatch(),
             ),

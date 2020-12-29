@@ -177,6 +177,9 @@ jobs:
     - '3.6'
     - '3.7'
     script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
+      none
+    - source ${HOME}/.cargo/env
     - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
       --githooks --smoke-tests --lint --python-version 3.7
     stage: Test Pants

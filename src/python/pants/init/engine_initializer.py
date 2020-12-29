@@ -33,6 +33,7 @@ from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
+from pants.reporting.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
 
@@ -51,14 +52,12 @@ class GraphScheduler:
         build_id,
         dynamic_ui: bool = False,
         use_colors=True,
-        should_report_workunits=False,
         session_values: Optional[SessionValues] = None,
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> GraphSession:
         session = self.scheduler.new_session(
             build_id,
             dynamic_ui,
-            should_report_workunits,
             session_values=session_values,
             cancellation_latch=cancellation_latch,
         )
@@ -254,6 +253,7 @@ class EngineInitializer:
                 *process.rules(),
                 *platform.rules(),
                 *changed_rules(),
+                *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
                 *rules,
             )

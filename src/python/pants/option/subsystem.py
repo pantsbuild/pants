@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import importlib
 import inspect
 import logging
@@ -11,8 +13,10 @@ from typing import (
     ClassVar,
     Dict,
     Iterable,
+    Iterator,
     List,
     Optional,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -20,6 +24,7 @@ from typing import (
     cast,
 )
 
+from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable, OptionableFactory
 from pants.option.options import Options
@@ -41,8 +46,8 @@ class SubsystemClientError(Exception):
 class SubsystemDependency(OptionableFactory):
     """Indicates intent to use an instance of `subsystem_cls` scoped to `scope`."""
 
-    subsystem_cls: Any
-    scope: Any
+    subsystem_cls: Type[Optionable]
+    scope: str
     removal_version: Optional[Any] = None
     removal_hint: Optional[Any] = None
 
@@ -55,14 +60,14 @@ class SubsystemDependency(OptionableFactory):
         return self.subsystem_cls
 
     @property
-    def options_scope(self):
+    def options_scope(self) -> str:
         """The subscope for options of `subsystem_cls` scoped to `scope`.
 
         This is the scope that option values are read from when initializing the instance indicated
         by this dependency.
         """
         if self.is_global():
-            return self.subsystem_cls.options_scope
+            return cast(str, self.subsystem_cls.options_scope)
         else:
             return self.subsystem_cls.subscope(self.scope)
 
@@ -104,11 +109,11 @@ class Subsystem(Optionable):
             super().__init__(f'Subsystem "{class_name}" not initialized for scope "{scope}"')
 
     @classmethod
-    def is_subsystem_type(cls, obj):
+    def is_subsystem_type(cls, obj) -> bool:
         return inspect.isclass(obj) and issubclass(obj, cls)
 
     @classmethod
-    def scoped(cls, optionable, removal_version=None, removal_hint=None):
+    def scoped(cls, optionable, removal_version=None, removal_hint=None) -> SubsystemDependency:
         """Returns a dependency on this subsystem, scoped to `optionable`.
 
         :param removal_version: An optional deprecation version for this scoped Subsystem dependency.
@@ -119,8 +124,8 @@ class Subsystem(Optionable):
         return SubsystemDependency(cls, optionable.options_scope, removal_version, removal_hint)
 
     @classmethod
-    def get_scope_info(cls, subscope=None):
-        cls.validate_scope_name_component(cls.options_scope)
+    def get_scope_info(cls, subscope=None) -> ScopeInfo:
+        cls.validate_scope_name_component(cast(str, cls.options_scope))
         if subscope is None:
             return super().get_scope_info()
         else:
@@ -135,7 +140,7 @@ class Subsystem(Optionable):
         return cls._options is not None
 
     @classmethod
-    def global_instance(cls: Type[_S]) -> _S:
+    def global_instance(cls: Type[_S], silent: bool = False) -> _S:
         """Returns the global instance of this subsystem.
 
         :API: public
@@ -145,9 +150,31 @@ class Subsystem(Optionable):
         Note that `global_instance` is a v1-idiom only. v2 rules should always request a subsystem as a rule input, rather than
         trying to call <subsystem>.global_instance() in the body of an `@rule`.
         """
+        # NB: This entire method is deprecated, but the deprecation only triggers if `not silent` in
+        # order to allow the RunTracker to continue to be a Subsystem until consumers have been
+        # updated to access it in other ways.
+        deprecated_conditional(
+            predicate=lambda: not silent,
+            removal_version="2.3.0.dev0",
+            entity_description="Subsystem.global_instance()",
+            hint_message=(
+                "Note that `global_instance` is a v1-idiom only. v2 @rules should request a "
+                "Subsystem as a @rule argument, and callers outside of @rules should use "
+                "`Scheduler.product_request(<subsystem_cls>, [Params()])` to get an instance."
+            ),
+        )
         return cls._instance_for_scope(cls.options_scope)  # type: ignore[arg-type]  # MyPy is treating cls.options_scope as a Callable, rather than `str`
 
     @classmethod
+    @deprecated(
+        removal_version="2.3.0.dev0",
+        subject="Subsystem.scoped_instance(..)",
+        hint_message=(
+            "Scoped Subsystem instances were a v1 idiom, which do not have a v2 equivalent. "
+            "If you have a usecase for scoped Subsystems, please open an issue at "
+            "https://github.com/pantsbuild/pants/issues/new."
+        ),
+    )
     def scoped_instance(cls: Type[_S], optionable: Union[Optionable, Type[Optionable]]) -> _S:
         """Returns an instance of this subsystem for exclusive use by the given `optionable`.
 
@@ -241,7 +268,7 @@ class Subsystem(Optionable):
         return callables
 
     @classmethod
-    def subsystem_dependencies(cls):
+    def subsystem_dependencies(cls) -> Tuple[Union[SubsystemDependency, Type[Subsystem]], ...]:
         """The subsystems this object uses.
 
         Override to specify your subsystem dependencies. Always add them to your superclass's value.
@@ -258,7 +285,7 @@ class Subsystem(Optionable):
         return tuple()
 
     @classmethod
-    def subsystem_dependencies_iter(cls):
+    def subsystem_dependencies_iter(cls) -> Iterator[SubsystemDependency]:
         """Iterate over the direct subsystem dependencies of this Optionable."""
         for dep in cls.subsystem_dependencies():
             if isinstance(dep, SubsystemDependency):
@@ -269,15 +296,14 @@ class Subsystem(Optionable):
                 )
 
     @classmethod
-    def subsystem_closure_iter(cls):
+    def subsystem_closure_iter(cls) -> Iterator[SubsystemDependency]:
         """Iterate over the transitive closure of subsystem dependencies of this Optionable.
 
-        :rtype: :class:`collections.Iterator` of :class:`SubsystemDependency`
         :raises: :class:`Subsystem.CycleException`
                  if a dependency cycle is detected.
         """
         seen = set()
-        dep_path = OrderedSet()
+        dep_path: OrderedSet = OrderedSet()
 
         def iter_subsystem_closure(subsystem_cls):
             if subsystem_cls in dep_path:
@@ -309,17 +335,15 @@ class Subsystem(Optionable):
             super().__init__(message)
 
     @classmethod
-    def known_scope_infos(cls):
+    def known_scope_infos(cls) -> Set[ScopeInfo]:
         """Yield ScopeInfo for all known scopes for this optionable, in no particular order.
 
-        :rtype: set of :class:`pants.option.scope.ScopeInfo`
         :raises: :class:`Subsystem.CycleException`
                  if a dependency cycle is detected.
         """
         known_scope_infos = set()
-        optionables_path = (
-            OrderedSet()
-        )  # To check for cycles at the Optionable level, ignoring scope.
+        # To check for cycles at the Optionable level, ignoring scope.
+        optionables_path: OrderedSet = OrderedSet()
 
         def collect_scope_infos(optionable_cls, scoped_to, removal_version=None, removal_hint=None):
             if optionable_cls in optionables_path:
