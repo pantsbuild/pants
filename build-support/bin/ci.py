@@ -6,11 +6,9 @@ import argparse
 import os
 import platform
 import subprocess
-import tempfile
-from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import Iterator, List, Optional
+from typing import List, Optional
 
 from common import banner, die, green, travis_section
 
