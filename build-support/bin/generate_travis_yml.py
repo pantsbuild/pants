@@ -488,14 +488,7 @@ def lint(python_version: PythonVersion) -> Dict:
             *_install_rust(),
             (
                 "travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py "
-                f"--githooks --smoke-tests --python-version {python_version.decimal}"
-            ),
-            # NB: We split up `--lint` into its own shard because it uses remote execution. The
-            # RBE token expires after 60 minutes, so we don't want to generate the token until all
-            # local execution has finished.
-            (
-                "travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py "
-                f"--lint --python-version {python_version.decimal}"
+                f"--githooks --smoke-tests --lint --python-version {python_version.decimal}"
             ),
         ],
     }
