@@ -279,6 +279,7 @@ impl Core {
           Platform::current()?,
           exec_strategy_opts.remote_cache_read,
           exec_strategy_opts.remote_cache_write,
+          remoting_opts.store_eager_fetch,
         )?)
       } else {
         command_runner
@@ -392,20 +393,18 @@ impl Core {
       return Err("Remote store required but none provided".into());
     }
 
-    let store = safe_create_dir_all_ioerror(&local_store_dir)
-      .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
-      .and_then(|_| {
-        Core::make_store(
-          &executor,
-          &local_store_dir,
-          need_remote_store,
-          &remoting_opts,
-          &remote_store_servers,
-          &root_ca_certs,
-          &oauth_bearer_token,
-        )
-      })
-      .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
+    safe_create_dir_all_ioerror(&local_store_dir)
+      .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))?;
+    let store = Core::make_store(
+      &executor,
+      &local_store_dir,
+      need_remote_store,
+      &remoting_opts,
+      &remote_store_servers,
+      &root_ca_certs,
+      &oauth_bearer_token,
+    )
+    .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
     let process_execution_metadata = ProcessMetadata {
       instance_name: remoting_opts.instance_name.clone(),

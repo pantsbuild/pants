@@ -820,6 +820,7 @@ impl crate::CommandRunner for CommandRunner {
         &context,
         self.action_cache_client.clone(),
         self.store.clone(),
+        false,
       ),
       |_, md| md,
     )
@@ -1389,6 +1390,7 @@ pub async fn check_action_cache(
   context: &Context,
   action_cache_client: Arc<ActionCacheClient<Channel>>,
   store: Store,
+  eager_fetch: bool,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
   context
     .workunit_store
@@ -1417,6 +1419,16 @@ pub async fn check_action_cache(
       context
         .workunit_store
         .increment_counter(Metric::RemoteCacheRequestsCached, 1);
+      if eager_fetch {
+        future::try_join_all(vec![
+          store.ensure_local_has_file(response.stdout_digest).boxed(),
+          store.ensure_local_has_file(response.stderr_digest).boxed(),
+          store
+            .ensure_local_has_recursive_directory(response.output_directory)
+            .boxed(),
+        ])
+        .await?;
+      };
       Ok(Some(response))
     }
     Err(status) => match status.code() {
