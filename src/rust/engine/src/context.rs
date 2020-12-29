@@ -85,6 +85,7 @@ pub struct RemotingOptions {
   pub store_initial_timeout: Duration,
   pub store_timeout_multiplier: f64,
   pub store_maximum_timeout: Duration,
+  pub store_eager_fetch: bool,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,

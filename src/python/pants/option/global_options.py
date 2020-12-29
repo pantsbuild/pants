@@ -90,6 +90,7 @@ class ExecutionOptions:
     remote_store_initial_timeout: int
     remote_store_timeout_multiplier: float
     remote_store_maximum_timeout: int
+    remote_store_eager_fetch: bool
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
@@ -121,6 +122,7 @@ class ExecutionOptions:
             remote_store_initial_timeout=bootstrap_options.remote_store_initial_timeout,
             remote_store_timeout_multiplier=bootstrap_options.remote_store_timeout_multiplier,
             remote_store_maximum_timeout=bootstrap_options.remote_store_maximum_timeout,
+            remote_store_eager_fetch=bootstrap_options.remote_store_eager_fetch,
         )
 
 
@@ -155,6 +157,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_initial_timeout=10,
     remote_store_timeout_multiplier=2.0,
     remote_store_maximum_timeout=10,
+    remote_store_eager_fetch=False,
 )
 
 
@@ -777,6 +780,19 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_maximum_timeout,
             help="Maximum timeout (in millseconds) to allow between retry attempts in accessing a remote store.",
+        )
+        register(
+            "--remote-store-eager-fetch",
+            type=bool,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_eager_fetch,
+            help=(
+                "When using remote caching without remote execution, eagerly fetch from the "
+                "remote store instead of lazily fetching.\n\nThis results in worse performance, "
+                "but reduces the frequency of errors encountered.\n\nThis is meant to be a "
+                "short-term mechanism. As we make Pants's remote caching client more robust, we "
+                "plan to remove this mechanism."
+            ),
         )
         register(
             "--remote-instance-name",
