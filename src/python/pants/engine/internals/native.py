@@ -264,7 +264,7 @@ class Native(metaclass=SingletonMetaclass):
             store_initial_timeout=execution_options.remote_store_initial_timeout,
             store_timeout_multiplier=execution_options.remote_store_timeout_multiplier,
             store_maximum_timeout=execution_options.remote_store_maximum_timeout,
-            store_eager_fetch=execution_options.remote_store_eager_fetch,
+            cache_eager_fetch=execution_options.remote_cache_eager_fetch,
             execution_extra_platform_properties=tuple(
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties

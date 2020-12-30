@@ -85,7 +85,7 @@ pub struct RemotingOptions {
   pub store_initial_timeout: Duration,
   pub store_timeout_multiplier: f64,
   pub store_maximum_timeout: Duration,
-  pub store_eager_fetch: bool,
+  pub cache_eager_fetch: bool,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
@@ -219,7 +219,7 @@ impl Core {
     // If remote caching is used with eager validation, we do not want to use the remote store
     // with the local command runner. This reduces the surface area of where the remote store is
     // used to only be the remote cache command runner.
-    let local_only_store = if remote_caching_used && remoting_opts.store_eager_fetch {
+    let local_only_store = if remote_caching_used && remoting_opts.cache_eager_fetch {
       store.clone().into_local_only()
     } else {
       store.clone()
@@ -280,7 +280,7 @@ impl Core {
           Platform::current()?,
           exec_strategy_opts.remote_cache_read,
           exec_strategy_opts.remote_cache_write,
-          remoting_opts.store_eager_fetch,
+          remoting_opts.cache_eager_fetch,
         )?)
       } else {
         local_command_runner

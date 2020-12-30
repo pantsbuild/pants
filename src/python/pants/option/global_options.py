@@ -90,7 +90,7 @@ class ExecutionOptions:
     remote_store_initial_timeout: int
     remote_store_timeout_multiplier: float
     remote_store_maximum_timeout: int
-    remote_store_eager_fetch: bool
+    remote_cache_eager_fetch: bool
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
@@ -119,10 +119,10 @@ class ExecutionOptions:
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             remote_cache_read=bootstrap_options.remote_cache_read,
             remote_cache_write=bootstrap_options.remote_cache_write,
+            remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
             remote_store_initial_timeout=bootstrap_options.remote_store_initial_timeout,
             remote_store_timeout_multiplier=bootstrap_options.remote_store_timeout_multiplier,
             remote_store_maximum_timeout=bootstrap_options.remote_store_maximum_timeout,
-            remote_store_eager_fetch=bootstrap_options.remote_store_eager_fetch,
         )
 
 
@@ -154,10 +154,10 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_enable_nailgun=False,
     remote_cache_read=False,
     remote_cache_write=False,
+    remote_cache_eager_fetch=False,
     remote_store_initial_timeout=10,
     remote_store_timeout_multiplier=2.0,
     remote_store_maximum_timeout=10,
-    remote_store_eager_fetch=False,
 )
 
 
@@ -695,21 +695,43 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
-            help="Enables remote workers for increased parallelism. (Alpha)",
+            help=(
+                "Enables remote workers for increased parallelism. (Alpha)\n\nAlternatively, you "
+                "can use `--remote-cache-read` and `--remote-cache-write` to still run everything "
+                "locally, but to use a remote cache."
+            ),
         )
         register(
             "--remote-cache-read",
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read,
             advanced=True,
-            help="Whether to enable reading from a remote cache",
+            help=(
+                "Whether to enable reading from a remote cache.\n\nThis cannot be used at the same "
+                "time as `--remote-execution`."
+            ),
         )
         register(
             "--remote-cache-write",
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.remote_cache_write,
             advanced=True,
-            help="Whether to enable writing results to a remote cache",
+            help=(
+                "Whether to enable writing results to a remote cache.\n\nThis cannot be used at "
+                "the same time as `--remote-execution`."
+            ),
+        )
+        register(
+            "--remote-cache-eager-fetch",
+            type=bool,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_eager_fetch,
+            help=(
+                "Eagerly fetch from the remote store instead of lazily fetching.\n\nThis results "
+                "in worse performance, but reduces the frequency of errors encountered.\n\nThis is "
+                "meant to be a short-term mechanism. As we make Pants's remote caching client more "
+                "robust, we plan to remove this mechanism."
+            ),
         )
 
         register(
@@ -780,19 +802,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_maximum_timeout,
             help="Maximum timeout (in millseconds) to allow between retry attempts in accessing a remote store.",
-        )
-        register(
-            "--remote-store-eager-fetch",
-            type=bool,
-            advanced=True,
-            default=DEFAULT_EXECUTION_OPTIONS.remote_store_eager_fetch,
-            help=(
-                "When using remote caching without remote execution, eagerly fetch from the "
-                "remote store instead of lazily fetching.\n\nThis results in worse performance, "
-                "but reduces the frequency of errors encountered.\n\nThis is meant to be a "
-                "short-term mechanism. As we make Pants's remote caching client more robust, we "
-                "plan to remove this mechanism."
-            ),
         )
         register(
             "--remote-instance-name",
