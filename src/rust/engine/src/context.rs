@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::core::Failure;
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
-use crate::session::Session;
+use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
@@ -66,6 +66,7 @@ pub struct Core {
   pub watcher: Arc<InvalidationWatcher>,
   pub build_root: PathBuf,
   pub local_parallelism: usize,
+  pub sessions: Sessions,
 }
 
 #[derive(Clone, Debug)]
@@ -458,6 +459,8 @@ impl Core {
     let watcher = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
     watcher.start(&graph);
 
+    let sessions = Sessions::new(&executor)?;
+
     Ok(Core {
       graph,
       tasks,
@@ -475,6 +478,7 @@ impl Core {
       build_root,
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
+      sessions,
     })
   }
 

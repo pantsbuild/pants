@@ -4,8 +4,6 @@ from typing import Any, Callable, Dict, List, Tuple
 #   see https://github.com/psf/black/issues/1548
 # flake8: noqa: E302
 
-def session_cancel_all() -> None: ...
-
 class PyDigest:
     def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
     @property

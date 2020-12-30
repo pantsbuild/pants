@@ -34,8 +34,8 @@ use tokio::sync::{oneshot, watch};
 ///
 /// A cancellable value computed by one sender, and broadcast to multiple receivers.
 ///
-/// Supports canceling the work associated with the pool either:
-///   1. explicitly if the pool is dropped
+/// Supports canceling the work associated with the value either:
+///   1. explicitly if the value is dropped
 ///   2. implicitly if all receivers go away
 ///
 /// NB: This is currently a `tokio::sync::watch` (which supports the second case), plus a

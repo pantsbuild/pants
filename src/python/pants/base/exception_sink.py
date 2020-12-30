@@ -15,7 +15,6 @@ from typing import Callable, Dict, Iterator
 import psutil
 import setproctitle
 
-from pants.engine.internals.native_engine import session_cancel_all
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.osutil import Pid
 
@@ -75,7 +74,6 @@ class SignalHandler:
             child_process.send_signal(received_signal)
 
     def handle_sigint(self, signum: int, _frame):
-        session_cancel_all()
         self._send_signal_to_children(signum, "SIGINT")
         raise KeyboardInterrupt("User interrupted execution with control-c!")
 
@@ -102,12 +100,10 @@ class SignalHandler:
                 )
 
     def handle_sigquit(self, signum, _frame):
-        session_cancel_all()
         self._send_signal_to_children(signum, "SIGQUIT")
         raise self.SignalHandledNonLocalExit(signum, "SIGQUIT")
 
     def handle_sigterm(self, signum, _frame):
-        session_cancel_all()
         self._send_signal_to_children(signum, "SIGTERM")
         raise self.SignalHandledNonLocalExit(signum, "SIGTERM")
 
