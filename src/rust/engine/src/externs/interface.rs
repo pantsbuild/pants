@@ -72,9 +72,8 @@ use task_executor::Executor;
 use workunit_store::{UserMetadataItem, Workunit, WorkunitState};
 
 use crate::{
-  externs, nodes, sessions_cancel, Core, ExecutionRequest, ExecutionStrategyOptions,
-  ExecutionTermination, Failure, Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler,
-  Session, Tasks, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
+  Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
 };
 
 py_exception!(native_engine, PollTimeout);
@@ -294,12 +293,6 @@ py_module_initializer!(native_engine, |py, m| {
     "session_new_run_id",
     py_fn!(py, session_new_run_id(a: PySession)),
   )?;
-  m.add(
-    py,
-    "session_cancel",
-    py_fn!(py, session_cancel(a: PySession)),
-  )?;
-  m.add(py, "session_cancel_all", py_fn!(py, session_cancel_all()))?;
   m.add(
     py,
     "session_poll_workunits",
@@ -1335,20 +1328,6 @@ fn graph_visualize(
 fn session_new_run_id(py: Python, session_ptr: PySession) -> PyUnitResult {
   with_session(py, session_ptr, |session| {
     session.new_run_id();
-    Ok(None)
-  })
-}
-
-fn session_cancel(py: Python, session_ptr: PySession) -> PyUnitResult {
-  with_session(py, session_ptr, |session| {
-    session.core().executor.block_on(session.cancel());
-    Ok(None)
-  })
-}
-
-fn session_cancel_all(py: Python) -> PyUnitResult {
-  py.allow_threads(|| {
-    sessions_cancel();
     Ok(None)
   })
 }
