@@ -1416,9 +1416,6 @@ pub async fn check_action_cache(
       let response =
         populate_fallible_execution_result(store.clone(), &action_result, vec![], platform, false)
           .await?;
-      context
-        .workunit_store
-        .increment_counter(Metric::RemoteCacheRequestsCached, 1);
       if eager_fetch {
         future::try_join_all(vec![
           store.ensure_local_has_file(response.stdout_digest).boxed(),
@@ -1429,6 +1426,9 @@ pub async fn check_action_cache(
         ])
         .await?;
       };
+      context
+        .workunit_store
+        .increment_counter(Metric::RemoteCacheRequestsCached, 1);
       Ok(Some(response))
     }
     Err(status) => match status.code() {

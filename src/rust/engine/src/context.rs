@@ -216,17 +216,17 @@ impl Core {
     let remote_caching_used =
       exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write;
 
-    // If remote caching is used with eager validation, we do not want to use the remote store
+    // If remote caching is used with eager_fetch, we do not want to use the remote store
     // with the local command runner. This reduces the surface area of where the remote store is
     // used to only be the remote cache command runner.
-    let local_only_store = if remote_caching_used && remoting_opts.cache_eager_fetch {
+    let store_for_local_runner = if remote_caching_used && remoting_opts.cache_eager_fetch {
       store.clone().into_local_only()
     } else {
       store.clone()
     };
 
     let local_command_runner = Core::make_local_execution_runner(
-      &local_only_store,
+      &store_for_local_runner,
       executor,
       local_execution_root_dir,
       named_caches_dir,
