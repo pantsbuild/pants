@@ -48,6 +48,6 @@ pub use crate::context::{Core, ExecutionStrategyOptions, RemotingOptions};
 pub use crate::core::{Failure, Function, Key, Params, TypeId, Value};
 pub use crate::intrinsics::Intrinsics;
 pub use crate::scheduler::{ExecutionRequest, ExecutionTermination, Scheduler};
-pub use crate::session::{sessions_cancel, Session};
+pub use crate::session::Session;
 pub use crate::tasks::{Rule, Tasks};
 pub use crate::types::Types;
