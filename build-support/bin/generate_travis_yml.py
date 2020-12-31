@@ -799,8 +799,7 @@ def main() -> None:
                     *[bootstrap_osx(v) for v in supported_python_versions],
                     *[lint(v) for v in supported_python_versions],
                     clippy(),
-                    # TODO: fix Cargo audit. Run `build-support/bin/ci.py --cargo-audit` locally.
-                    # cargo_audit(),
+                    cargo_audit(),
                     *[python_tests(v) for v in supported_python_versions],
                     rust_tests_linux(),
                     rust_tests_osx(),

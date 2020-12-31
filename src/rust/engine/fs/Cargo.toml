@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 async-trait = "0.1"
 bytes = "0.5"
-dirs = "1"
+dirs-next = "2"
 futures = "0.3"
 glob = "0.2.11"
 ignore = "0.4.11"
