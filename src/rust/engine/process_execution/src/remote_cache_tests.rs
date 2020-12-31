@@ -62,6 +62,7 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir, StubCA
 fn create_cached_runner(
   local: Box<dyn CommandRunnerTrait>,
   store: Store,
+  eager_fetch: bool,
 ) -> (Box<dyn CommandRunnerTrait>, TempDir, StubActionCache) {
   let cache_dir = TempDir::new().unwrap();
 
@@ -85,6 +86,7 @@ fn create_cached_runner(
       Platform::current().unwrap(),
       true,
       true,
+      eager_fetch,
     )
     .expect("caching command runner"),
   );
@@ -121,7 +123,7 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
 
   let local_result = local.run(process.clone().into(), Context::default()).await;
 
-  let (caching, _cache_dir, _stub_action_cache) = create_cached_runner(local, store.clone());
+  let (caching, _cache_dir, _stub_action_cache) = create_cached_runner(local, store.clone(), false);
 
   let uncached_result = caching
     .run(process.clone().into(), Context::default())
@@ -167,7 +169,7 @@ async fn skip_cache_on_error() {
   workunit_store.init_thread_state(None);
 
   let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
-  let (caching, _cache_dir, stub_action_cache) = create_cached_runner(local, store.clone());
+  let (caching, _cache_dir, stub_action_cache) = create_cached_runner(local, store.clone(), false);
   let (process, _script_path, _script_dir) = create_script(0);
 
   stub_action_cache
@@ -181,6 +183,36 @@ async fn skip_cache_on_error() {
     .unwrap();
 
   assert_eq!(result.exit_code, 0);
+}
+
+/// With eager_fetch enabled, we should skip the remote cache if any of the process result's
+/// digests are invalid. This will force rerunning the process locally. Otherwise, we should use
+/// the cached result with its non-existent digests.
+#[tokio::test]
+async fn eager_fetch() {
+  async fn run_process(eager_fetch: bool) -> FallibleProcessResultWithPlatform {
+    let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
+    let (caching, _cache_dir, stub_action_cache) =
+      create_cached_runner(local, store.clone(), eager_fetch);
+
+    // TODO: how to insert a cache entry without actually running it? I think
+    // `stub_action_cache.action_map.clone().lock().insert()`? I need the Process's digest
+    // to be the same as the below `process` var, but the ProcessResult digests should be fake.
+
+    // Note that this will return an error code of 1, whereas the cached entry will use 0.
+    let (process, _script_path, _script_dir) = create_script(1);
+    caching
+      .run(process.clone().into(), Context::default())
+      .await
+      .unwrap()
+  }
+
+  let lazy_result = run_process(false).await;
+  assert_eq!(lazy_result.exit_code, 0);
+  // TODO: how to assert the digests are what we expect. I'm not sure how to compute the digest.
+
+  let eager_result = run_process(true).await;
+  assert_eq!(eager_result.exit_code, 1);
 }
 
 #[tokio::test]
@@ -351,6 +383,7 @@ async fn make_action_result_basic() {
     Platform::current().unwrap(),
     true,
     true,
+    false,
   )
   .expect("caching command runner");
 
