@@ -519,7 +519,7 @@ def cargo_audit() -> Dict:
         **CACHE_NATIVE_ENGINE,
         **linux_fuse_shard(),
         "name": "Cargo audit",
-        "stage": Stage.test_cron.value,
+        "stage": Stage.test.value,
         "script": ["./build-support/bin/ci.py --cargo-audit"],
         "env": ["CACHE_NAME=cargo_audit"],
     }

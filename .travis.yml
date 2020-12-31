@@ -250,7 +250,7 @@ jobs:
     os: linux
     script:
     - ./build-support/bin/ci.py --cargo-audit
-    stage: Test Pants (Cron)
+    stage: Test Pants
     sudo: required
   - addons:
       apt:
