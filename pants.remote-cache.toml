@@ -7,8 +7,7 @@
 #  - `remote_ca_certs_path`, which is usually "/etc/ssl/certs/ca-certificates.crt" on Linux and
 #      "/usr/local/etc/openssl/cert.pem" on macOS.
 #
-# You may want to set those values in an `.envrc` file and use `direnv` (https://direnv.net/) to automatically set the
-# values.
+# You may want to set those values in a pantsrc file or an an `.envrc` file and use `direnv` (https://direnv.net/).
 
 [GLOBAL]
 remote_cache_read = true
