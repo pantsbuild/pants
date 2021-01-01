@@ -1,0 +1,24 @@
+# Enable remote caching by running `./pants --pants-config-files=pants.remote-cache.toml`.
+#
+# You must also set:
+#
+#  - `remote_store_store`
+#  - `remote_oauth_bearer_token_path`
+#  - `remote_ca_certs_path`, which is usually "/etc/ssl/certs/ca-certificates.crt" on Linux and
+#      "/usr/local/etc/openssl/cert.pem" on macOS.
+#
+# You may want to set those values in a pantsrc file or an an `.envrc` file and use `direnv` (https://direnv.net/).
+
+[GLOBAL]
+remote_cache_read = true
+remote_cache_write = true
+
+remote_store_initial_timeout = 250
+remote_store_timeout_multiplier = 1.5
+remote_store_maximum_timeout = 5000
+
+# NB: this is used for Toolchain's remote caching and may need to change for other implementations.
+remote_instance_name = "main"
+
+# Normally, we wouldn't want this, but it's helpful while we iterate on remote caching to force the remote to be used.
+process_execution_use_local_cache = false
