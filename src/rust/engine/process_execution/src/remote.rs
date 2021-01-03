@@ -1263,7 +1263,7 @@ pub fn extract_output_files(
 
         let mut digest = root_digest;
 
-        if dir.path != "" {
+        if !dir.path.is_empty() {
           for component in dir.path.rsplit('/') {
             let component = component.to_owned();
             let directory = remexec::Directory {
