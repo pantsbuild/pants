@@ -84,7 +84,7 @@ impl<'x> Params {
       .binary_search_by(|probe| probe.type_id().cmp(&type_id))
   }
 
-  pub fn type_ids(&self) -> impl Iterator<Item = TypeId> + '_ {
+  pub fn type_ids<'a>(&'a self) -> impl Iterator<Item = TypeId> + 'a {
     self.0.iter().map(|k| *k.type_id())
   }
 }
