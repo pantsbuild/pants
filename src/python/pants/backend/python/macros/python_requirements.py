@@ -67,7 +67,7 @@ class PythonRequirements:
 
         req_file = Path(get_buildroot(), self._parse_context.rel_path, requirements_relpath)
         requirements = parse_requirements_file(
-            req_file.read_text(), rel_path=req_file.relative_to(get_buildroot())
+            req_file.read_text(), rel_path=str(req_file.relative_to(get_buildroot()))
         )
         for parsed_req in requirements:
             req_module_mapping = (
