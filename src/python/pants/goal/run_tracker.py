@@ -48,9 +48,6 @@ class RunTracker(Subsystem):
     # The name of the tracking root for the main thread (and the foreground worker threads).
     DEFAULT_ROOT_NAME = "main"
 
-    # The name of the tracking root for the background worker threads.
-    BACKGROUND_ROOT_NAME = "background"
-
     @classmethod
     def register_options(cls, register):
         register(
@@ -108,9 +105,6 @@ class RunTracker(Subsystem):
         # Note that multiple threads may share a name (e.g., all the threads in a pool).
         self._threadlocal = threading.local()
 
-        # For background work.  Created lazily if needed.
-        self._background_root_workunit = None
-
         self._aborted = False
 
         self._end_memoized_result: Optional[ExitCode] = None
@@ -133,13 +127,6 @@ class RunTracker(Subsystem):
         Multiple threads may have the same parent (e.g., all the threads in a pool).
         """
         self._threadlocal.current_workunit = parent_workunit
-
-    def is_under_background_root(self, workunit):
-        """Is the workunit running under the background thread's root."""
-        return workunit.is_background(self._background_root_workunit)
-
-    def is_background_root_workunit(self, workunit):
-        return workunit is self._background_root_workunit
 
     def start(self, all_options: Options, run_start_time: float) -> None:
         """Start tracking this pants run."""
@@ -248,8 +235,6 @@ class RunTracker(Subsystem):
         self.end_workunit(self._main_root_workunit)
 
         outcome = self._main_root_workunit.outcome()
-        if self._background_root_workunit:
-            outcome = min(outcome, self._background_root_workunit.outcome())
         outcome_str = WorkUnit.outcome_string(outcome)
 
         if self.run_info.get_info("outcome") is None:

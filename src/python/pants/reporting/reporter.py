@@ -78,10 +78,6 @@ class Reporter:
         """
         pass
 
-    def is_under_background_root(self, workunit):
-        """Is the workunit running under the main thread's root."""
-        return self.run_tracker.is_under_background_root(workunit)
-
     def level_for_workunit(self, workunit: WorkUnit, default_level: int) -> int:
         if workunit.log_config:
             # The value of the level option is a string defined in global_options.py
