@@ -12,7 +12,6 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
 from pants.base.workunit import WorkUnit
 from pants.engine.internals.native import Native
@@ -47,9 +46,6 @@ class RunTracker(Subsystem):
 
     # The name of the tracking root for the main thread (and the foreground worker threads).
     DEFAULT_ROOT_NAME = "main"
-
-    # The name of the tracking root for the background worker threads.
-    BACKGROUND_ROOT_NAME = "background"
 
     @classmethod
     def register_options(cls, register):
@@ -101,19 +97,13 @@ class RunTracker(Subsystem):
         # operates thread-safely.
         self._stats_lock = threading.Lock()
 
-        # Log of success/failure/aborted for each workunit.
-        self.outcomes = {}
-
         # self._threadlocal.current_workunit contains the current workunit for the calling thread.
         # Note that multiple threads may share a name (e.g., all the threads in a pool).
         self._threadlocal = threading.local()
 
-        # For background work.  Created lazily if needed.
-        self._background_root_workunit = None
-
         self._aborted = False
 
-        self._end_memoized_result: Optional[ExitCode] = None
+        self._has_ended: bool = False
 
         self.native = Native()
 
@@ -133,13 +123,6 @@ class RunTracker(Subsystem):
         Multiple threads may have the same parent (e.g., all the threads in a pool).
         """
         self._threadlocal.current_workunit = parent_workunit
-
-    def is_under_background_root(self, workunit):
-        """Is the workunit running under the background thread's root."""
-        return workunit.is_background(self._background_root_workunit)
-
-    def is_background_root_workunit(self, workunit):
-        return workunit is self._background_root_workunit
 
     def start(self, all_options: Options, run_start_time: float) -> None:
         """Start tracking this pants run."""
@@ -189,10 +172,6 @@ class RunTracker(Subsystem):
         self.run_logs_file = Path(self.run_info_dir, "logs")
         self.native.set_per_run_log_path(str(self.run_logs_file))
 
-    def set_root_outcome(self, outcome):
-        """Useful for setup code that doesn't have a reference to a workunit."""
-        self._main_root_workunit.set_outcome(outcome)
-
     def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
         self._pantsd_metrics = metrics
 
@@ -201,13 +180,9 @@ class RunTracker(Subsystem):
         return dict(self._pantsd_metrics)  # defensive copy
 
     @classmethod
-    def _json_dump_options(cls, stats: dict) -> str:
-        return json.dumps(stats, cls=RunTrackerOptionEncoder)
-
-    @classmethod
     def write_stats_to_json(cls, file_name: str, stats: dict) -> None:
         """Write stats to a local json file."""
-        params = cls._json_dump_options(stats)
+        params = json.dumps(stats, cls=RunTrackerOptionEncoder)
         try:
             safe_file_dump(file_name, params, mode="w")
         except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
@@ -221,18 +196,15 @@ class RunTracker(Subsystem):
         run_information = self.run_info.get_as_dict()
         return run_information
 
-    def _stats(self) -> dict:
+    def store_stats(self) -> None:
+        """Store stats about this run in local and optionally remote stats dbs."""
+
         stats = {
             "run_info": self.run_information(),
             "pantsd_stats": self.pantsd_scheduler_metrics,
             "cumulative_timings": self.get_cumulative_timings(),
             "recorded_options": self.get_options_to_record(),
         }
-        return stats
-
-    def store_stats(self):
-        """Store stats about this run in local and optionally remote stats dbs."""
-        stats = self._stats()
 
         # Write stats to user-defined json file.
         stats_json_file_name = self.options.stats_local_json_file
@@ -240,23 +212,26 @@ class RunTracker(Subsystem):
             self.write_stats_to_json(stats_json_file_name, stats)
 
     def has_ended(self) -> bool:
-        return self._end_memoized_result is not None
+        return self._has_ended
 
-    def end(self) -> ExitCode:
+    def end_run(self, outcome: int) -> None:
         """This pants run is over, so stop tracking it.
 
-        Note: If end() has been called once, subsequent calls are no-ops.
+        Note: If end_run() has been called once, subsequent calls are no-ops.
 
         :return: PANTS_SUCCEEDED_EXIT_CODE or PANTS_FAILED_EXIT_CODE
         """
-        if self._end_memoized_result is not None:
-            return self._end_memoized_result
 
-        self.end_workunit(self._main_root_workunit)
+        if self.has_ended():
+            return
 
-        outcome = self._main_root_workunit.outcome()
-        if self._background_root_workunit:
-            outcome = min(outcome, self._background_root_workunit.outcome())
+        self._has_ended = True
+
+        path, duration, self_time, _is_tool = self._main_root_workunit.end()
+        self.report.end_workunit(self._main_root_workunit)
+        self.cumulative_timings.add_timing(path, duration)
+        self.self_timings.add_timing(path, self_time)
+
         outcome_str = WorkUnit.outcome_string(outcome)
 
         if self.run_info.get_info("outcome") is None:
@@ -266,25 +241,9 @@ class RunTracker(Subsystem):
         self.report.close()
         self.store_stats()
 
-        run_failed = outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED]
-        result = PANTS_FAILED_EXIT_CODE if run_failed else PANTS_SUCCEEDED_EXIT_CODE
-        self._end_memoized_result = result
-
         self.native.set_per_run_log_path(None)
 
-        return self._end_memoized_result
-
-    def end_workunit(self, workunit):
-        path, duration, self_time, is_tool = workunit.end()
-        self.report.end_workunit(workunit)
-        workunit.cleanup()
-
-        # These three operations may not be thread-safe, and workunits may run in separate threads
-        # and thus end concurrently, so we want to lock these operations.
-        with self._stats_lock:
-            self.cumulative_timings.add_timing(path, duration, is_tool)
-            self.self_timings.add_timing(path, self_time, is_tool)
-            self.outcomes[path] = workunit.outcome_string(workunit.outcome())
+        return
 
     def get_cumulative_timings(self) -> TimingData:
         return self.cumulative_timings.get_all()  # type: ignore[no-any-return]
