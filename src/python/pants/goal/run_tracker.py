@@ -201,13 +201,9 @@ class RunTracker(Subsystem):
         return dict(self._pantsd_metrics)  # defensive copy
 
     @classmethod
-    def _json_dump_options(cls, stats: dict) -> str:
-        return json.dumps(stats, cls=RunTrackerOptionEncoder)
-
-    @classmethod
     def write_stats_to_json(cls, file_name: str, stats: dict) -> None:
         """Write stats to a local json file."""
-        params = cls._json_dump_options(stats)
+        params = json.dumps(stats, cls=RunTrackerOptionEncoder)
         try:
             safe_file_dump(file_name, params, mode="w")
         except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
@@ -221,18 +217,15 @@ class RunTracker(Subsystem):
         run_information = self.run_info.get_as_dict()
         return run_information
 
-    def _stats(self) -> dict:
+    def store_stats(self) -> None:
+        """Store stats about this run in local and optionally remote stats dbs."""
+
         stats = {
             "run_info": self.run_information(),
             "pantsd_stats": self.pantsd_scheduler_metrics,
             "cumulative_timings": self.get_cumulative_timings(),
             "recorded_options": self.get_options_to_record(),
         }
-        return stats
-
-    def store_stats(self):
-        """Store stats about this run in local and optionally remote stats dbs."""
-        stats = self._stats()
 
         # Write stats to user-defined json file.
         stats_json_file_name = self.options.stats_local_json_file
