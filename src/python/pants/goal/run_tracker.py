@@ -227,10 +227,11 @@ class RunTracker(Subsystem):
 
         self._has_ended = True
 
-        self._main_root_workunit.set_outcome(outcome)
-        self.end_workunit(self._main_root_workunit)
+        path, duration, self_time, _is_tool = self._main_root_workunit.end()
+        self.report.end_workunit(self._main_root_workunit)
+        self.cumulative_timings.add_timing(path, duration)
+        self.self_timings.add_timing(path, self_time)
 
-        outcome = self._main_root_workunit.outcome()
         outcome_str = WorkUnit.outcome_string(outcome)
 
         if self.run_info.get_info("outcome") is None:
@@ -243,17 +244,6 @@ class RunTracker(Subsystem):
         self.native.set_per_run_log_path(None)
 
         return
-
-    def end_workunit(self, workunit):
-        path, duration, self_time, _is_tool = workunit.end()
-        self.report.end_workunit(workunit)
-        workunit.cleanup()
-
-        # These three operations may not be thread-safe, and workunits may run in separate threads
-        # and thus end concurrently, so we want to lock these operations.
-        with self._stats_lock:
-            self.cumulative_timings.add_timing(path, duration)
-            self.self_timings.add_timing(path, self_time)
 
     def get_cumulative_timings(self) -> TimingData:
         return self.cumulative_timings.get_all()  # type: ignore[no-any-return]
