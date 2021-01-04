@@ -12,7 +12,6 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
 from pants.base.workunit import WorkUnit
 from pants.engine.internals.native import Native
@@ -107,7 +106,7 @@ class RunTracker(Subsystem):
 
         self._aborted = False
 
-        self._end_memoized_result: Optional[ExitCode] = None
+        self._has_ended: bool = False
 
         self.native = Native()
 
@@ -176,10 +175,6 @@ class RunTracker(Subsystem):
         self.run_logs_file = Path(self.run_info_dir, "logs")
         self.native.set_per_run_log_path(str(self.run_logs_file))
 
-    def set_root_outcome(self, outcome):
-        """Useful for setup code that doesn't have a reference to a workunit."""
-        self._main_root_workunit.set_outcome(outcome)
-
     def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
         self._pantsd_metrics = metrics
 
@@ -220,18 +215,22 @@ class RunTracker(Subsystem):
             self.write_stats_to_json(stats_json_file_name, stats)
 
     def has_ended(self) -> bool:
-        return self._end_memoized_result is not None
+        return self._has_ended
 
-    def end(self) -> ExitCode:
+    def end_run(self, outcome: int) -> None:
         """This pants run is over, so stop tracking it.
 
-        Note: If end() has been called once, subsequent calls are no-ops.
+        Note: If end_run() has been called once, subsequent calls are no-ops.
 
         :return: PANTS_SUCCEEDED_EXIT_CODE or PANTS_FAILED_EXIT_CODE
         """
-        if self._end_memoized_result is not None:
-            return self._end_memoized_result
 
+        if self.has_ended():
+            return
+
+        self._has_ended = True
+
+        self._main_root_workunit.set_outcome(outcome)
         self.end_workunit(self._main_root_workunit)
 
         outcome = self._main_root_workunit.outcome()
@@ -244,13 +243,9 @@ class RunTracker(Subsystem):
         self.report.close()
         self.store_stats()
 
-        run_failed = outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED]
-        result = PANTS_FAILED_EXIT_CODE if run_failed else PANTS_SUCCEEDED_EXIT_CODE
-        self._end_memoized_result = result
-
         self.native.set_per_run_log_path(None)
 
-        return self._end_memoized_result
+        return
 
     def end_workunit(self, workunit):
         path, duration, self_time, is_tool = workunit.end()
