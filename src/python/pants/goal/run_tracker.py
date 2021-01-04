@@ -97,9 +97,6 @@ class RunTracker(Subsystem):
         # operates thread-safely.
         self._stats_lock = threading.Lock()
 
-        # Log of success/failure/aborted for each workunit.
-        self.outcomes = {}
-
         # self._threadlocal.current_workunit contains the current workunit for the calling thread.
         # Note that multiple threads may share a name (e.g., all the threads in a pool).
         self._threadlocal = threading.local()
@@ -248,16 +245,15 @@ class RunTracker(Subsystem):
         return
 
     def end_workunit(self, workunit):
-        path, duration, self_time, is_tool = workunit.end()
+        path, duration, self_time, _is_tool = workunit.end()
         self.report.end_workunit(workunit)
         workunit.cleanup()
 
         # These three operations may not be thread-safe, and workunits may run in separate threads
         # and thus end concurrently, so we want to lock these operations.
         with self._stats_lock:
-            self.cumulative_timings.add_timing(path, duration, is_tool)
-            self.self_timings.add_timing(path, self_time, is_tool)
-            self.outcomes[path] = workunit.outcome_string(workunit.outcome())
+            self.cumulative_timings.add_timing(path, duration)
+            self.self_timings.add_timing(path, self_time)
 
     def get_cumulative_timings(self) -> TimingData:
         return self.cumulative_timings.get_all()  # type: ignore[no-any-return]
