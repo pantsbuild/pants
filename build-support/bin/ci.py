@@ -276,7 +276,7 @@ def run_clippy() -> None:
 def run_cargo_audit() -> None:
     with travis_section("CargoAudit", "Running Cargo audit on Rust code"):
         try:
-            subprocess.run(["./cargo", "install", "cargo-audit"], check=True)
+            subprocess.run(["./cargo", "install", "--version", "0.13.1", "cargo-audit"], check=True)
             subprocess.run(["./cargo", "audit"], check=True)
         except subprocess.CalledProcessError:
             die("Cargo audit failure")
