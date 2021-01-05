@@ -3,7 +3,7 @@
 
 import os
 from collections import defaultdict
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Union
 
 from pants.util.dirutil import safe_mkdir_for
 
@@ -16,24 +16,19 @@ class AggregatedTimings:
     If filepath is not none, stores the timings in that file. Useful for finding bottlenecks.
     """
 
-    def __init__(self, path: Optional[str] = None) -> None:
+    def __init__(self, path: str) -> None:
         # Map path -> timing in seconds (a float)
         self._timings_by_path: Dict[str, float] = defaultdict(float)
-        self._tool_labels: Set[str] = set()
         self._path = path
-        if path:
-            safe_mkdir_for(path)
+        safe_mkdir_for(path)
 
-    def add_timing(self, label: str, secs: float, is_tool: bool = False) -> None:
+    def add_timing(self, label: str, secs: float) -> None:
         """Aggregate timings by label.
 
         secs - a double, so fractional seconds are allowed.
-        is_tool - whether this label represents a tool invocation.
         """
         self._timings_by_path[label] += secs
-        if is_tool:
-            self._tool_labels.add(label)
-        if not self._path or not os.path.exists(os.path.dirname(self._path)):
+        if not os.path.exists(os.path.dirname(self._path)):
             # Check existence in case we're a clean-all. We don't want to write anything in that case.
             return
         with open(self._path, "w") as fl:
@@ -45,7 +40,8 @@ class AggregatedTimings:
 
         Each value is a dict: { path: <path>, timing: <timing in seconds> }
         """
+        # The "is_tool" key is legacy, and is only kept around for the moment to support tools that might expect it.
         return [
-            {"label": row[0], "timing": row[1], "is_tool": row[0] in self._tool_labels}
+            {"label": row[0], "timing": row[1], "is_tool": False}
             for row in sorted(self._timings_by_path.items(), key=lambda x: x[1], reverse=True)
         ]

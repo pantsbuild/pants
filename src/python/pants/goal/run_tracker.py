@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import sys
-import threading
 import time
 import uuid
 from collections import OrderedDict
@@ -21,7 +20,6 @@ from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.subsystem import Subsystem
-from pants.reporting.report import Report
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
 logger = logging.getLogger(__name__)
@@ -89,17 +87,8 @@ class RunTracker(Subsystem):
         self.self_timings = None
 
         # Initialized in `start()`.
-        self.report = None
         self._main_root_workunit = None
         self._all_options: Optional[Options] = None
-
-        # A lock to ensure that adding to stats at the end of a workunit
-        # operates thread-safely.
-        self._stats_lock = threading.Lock()
-
-        # self._threadlocal.current_workunit contains the current workunit for the calling thread.
-        # Note that multiple threads may share a name (e.g., all the threads in a pool).
-        self._threadlocal = threading.local()
 
         self._aborted = False
 
@@ -116,13 +105,6 @@ class RunTracker(Subsystem):
     @property
     def v2_goals_rule_names(self) -> Tuple[str, ...]:
         return self._v2_goal_rule_names
-
-    def register_thread(self, parent_workunit):
-        """Register the parent workunit for all work in the calling thread.
-
-        Multiple threads may have the same parent (e.g., all the threads in a pool).
-        """
-        self._threadlocal.current_workunit = parent_workunit
 
     def start(self, all_options: Options, run_start_time: float) -> None:
         """Start tracking this pants run."""
@@ -154,17 +136,12 @@ class RunTracker(Subsystem):
 
         self._all_options = all_options
 
-        self.report = Report()
-        self.report.open()
-
         # And create the workunit.
         self._main_root_workunit = WorkUnit(
             run_info_dir=self.run_info_dir, parent=None, name=RunTracker.DEFAULT_ROOT_NAME, cmd=None
         )
-        self.register_thread(self._main_root_workunit)
         # Set the true start time in the case of e.g. the daemon.
         self._main_root_workunit.start(run_start_time)
-        self.report.start_workunit(self._main_root_workunit)
 
         goal_names: Tuple[str, ...] = tuple(all_options.goals)
         self._v2_goal_rule_names = goal_names
@@ -228,7 +205,6 @@ class RunTracker(Subsystem):
         self._has_ended = True
 
         path, duration, self_time, _is_tool = self._main_root_workunit.end()
-        self.report.end_workunit(self._main_root_workunit)
         self.cumulative_timings.add_timing(path, duration)
         self.self_timings.add_timing(path, self_time)
 
@@ -238,7 +214,6 @@ class RunTracker(Subsystem):
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
             self.run_info.add_info("outcome", outcome_str, ignore_errors=True)
 
-        self.report.close()
         self.store_stats()
 
         self.native.set_per_run_log_path(None)
