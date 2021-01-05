@@ -51,17 +51,11 @@ fn create_cached_runner(
   )
   .unwrap();
 
-  let metadata = ProcessMetadata {
-    instance_name: None,
-    cache_key_gen_version: None,
-    platform_properties: vec![],
-  };
-
   let runner = Box::new(crate::cache::CommandRunner::new(
     local.into(),
     process_execution_store,
     store,
-    metadata,
+    ProcessMetadata::default(),
   ));
 
   (runner, cache_dir)

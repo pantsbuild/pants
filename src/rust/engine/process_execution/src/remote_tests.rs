@@ -134,7 +134,7 @@ async fn make_execute_request() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, empty_request_metadata()),
+    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -373,7 +373,7 @@ async fn make_execute_request_with_jdk() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, empty_request_metadata()),
+    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -539,7 +539,7 @@ async fn make_execute_request_with_timeout() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, empty_request_metadata()),
+    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -554,7 +554,7 @@ async fn successful_with_only_call_to_execute() {
   let mock_server = {
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
     let action_digest = digest(&action).unwrap();
@@ -603,7 +603,7 @@ async fn successful_after_reconnect_with_wait_execution() {
   let mock_server = {
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
     let action_digest = digest(&action).unwrap();
@@ -654,7 +654,7 @@ async fn successful_after_reconnect_from_retryable_error() {
   let mock_server = {
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
 
@@ -712,7 +712,7 @@ async fn successful_served_from_action_cache() {
   let mock_server = {
     let (action, _, _) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
 
@@ -767,7 +767,7 @@ async fn server_rejecting_execute_request_gives_error() {
       ExpectedAPICall::Execute {
         execute_request: crate::remote::make_execute_request(
           &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
-          empty_request_metadata(),
+          ProcessMetadata::default(),
         )
         .unwrap()
         .2,
@@ -794,7 +794,7 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
   let mock_server = {
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
 
@@ -832,7 +832,7 @@ async fn sends_headers() {
   let mock_server = {
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
 
@@ -882,7 +882,7 @@ async fn sends_headers() {
   let command_runner = CommandRunner::new(
     &mock_server.address(),
     vec![mock_server.address().clone()],
-    empty_request_metadata(),
+    ProcessMetadata::default(),
     None,
     Some(String::from("catnip-will-get-you-anywhere")),
     btreemap! {
@@ -1030,7 +1030,7 @@ async fn ensure_inline_stdio_is_stored() {
 
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &echo_roland_request().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
 
@@ -1082,7 +1082,7 @@ async fn ensure_inline_stdio_is_stored() {
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
     vec![mock_server.address().clone()],
-    empty_request_metadata(),
+    ProcessMetadata::default(),
     None,
     None,
     BTreeMap::new(),
@@ -1140,7 +1140,7 @@ async fn bad_result_bytes() {
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
         execute_request: crate::remote::make_execute_request(
           &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
+          ProcessMetadata::default(),
         )
         .unwrap()
         .2,
@@ -1183,7 +1183,7 @@ async fn initial_response_error() {
 
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
 
@@ -1238,7 +1238,7 @@ async fn initial_response_missing_response_and_error() {
 
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
 
@@ -1282,7 +1282,7 @@ async fn fails_after_retry_limit_exceeded() {
   let mock_server = {
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
 
@@ -1344,7 +1344,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
     let op_name = "foo-bar".to_owned();
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
 
@@ -1409,7 +1409,7 @@ async fn execute_missing_file_uploads_if_known() {
 
     let (action, _, execute_request) = crate::remote::make_execute_request(
       &cat_roland_request().try_into().unwrap(),
-      empty_request_metadata(),
+      ProcessMetadata::default(),
     )
     .unwrap();
 
@@ -1433,7 +1433,7 @@ async fn execute_missing_file_uploads_if_known() {
         ExpectedAPICall::Execute {
           execute_request: crate::remote::make_execute_request(
             &cat_roland_request().try_into().unwrap(),
-            empty_request_metadata(),
+            ProcessMetadata::default(),
           )
           .unwrap()
           .2,
@@ -1482,7 +1482,7 @@ async fn execute_missing_file_uploads_if_known() {
   let command_runner = CommandRunner::new(
     &mock_server.address(),
     vec![mock_server.address().clone()],
-    empty_request_metadata(),
+    ProcessMetadata::default(),
     None,
     None,
     BTreeMap::new(),
@@ -1556,7 +1556,7 @@ async fn execute_missing_file_errors_if_unknown() {
   let runner = CommandRunner::new(
     &mock_server.address(),
     vec![mock_server.address().clone()],
-    empty_request_metadata(),
+    ProcessMetadata::default(),
     None,
     None,
     BTreeMap::new(),
@@ -2257,7 +2257,7 @@ fn create_command_runner(
   let command_runner = CommandRunner::new(
     &address,
     vec![address.clone()],
-    empty_request_metadata(),
+    ProcessMetadata::default(),
     None,
     None,
     BTreeMap::new(),
@@ -2427,14 +2427,6 @@ pub(crate) fn echo_roland_request() -> MultiPlatformProcess {
   req.timeout = one_second();
   req.description = "unleash a roaring meow".to_string();
   req.into()
-}
-
-pub(crate) fn empty_request_metadata() -> ProcessMetadata {
-  ProcessMetadata {
-    instance_name: None,
-    cache_key_gen_version: None,
-    platform_properties: vec![],
-  }
 }
 
 pub(crate) fn assert_cancellation_requests(
