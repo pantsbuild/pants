@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from pkg_resources import Requirement, parse_requirements
+from pkg_resources import Requirement
 
-from pants.backend.python.target_types import PythonRequirementsField
+from pants.backend.python.target_types import PythonRequirementsField, parse_requirements_file
 from pants.backend.python.util_rules.pex import (
     PexInterpreterConstraints,
     PexPlatforms,
@@ -246,7 +246,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             ),
         )
         constraints_file_reqs = set(
-            parse_requirements(next(iter(constraints_file_contents)).content.decode())
+            parse_requirements_file(
+                constraints_file_contents[0].content.decode(),
+                rel_path=python_setup.requirement_constraints,
+            )
         )
         constraint_file_projects = {
             canonicalize_project_name(req.project_name) for req in constraints_file_reqs
