@@ -20,7 +20,6 @@ from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.subsystem import Subsystem
-from pants.reporting.report import Report
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
 logger = logging.getLogger(__name__)
@@ -88,7 +87,6 @@ class RunTracker(Subsystem):
         self.self_timings = None
 
         # Initialized in `start()`.
-        self.report = None
         self._main_root_workunit = None
         self._all_options: Optional[Options] = None
 
@@ -138,16 +136,12 @@ class RunTracker(Subsystem):
 
         self._all_options = all_options
 
-        self.report = Report()
-        self.report.open()
-
         # And create the workunit.
         self._main_root_workunit = WorkUnit(
             run_info_dir=self.run_info_dir, parent=None, name=RunTracker.DEFAULT_ROOT_NAME, cmd=None
         )
         # Set the true start time in the case of e.g. the daemon.
         self._main_root_workunit.start(run_start_time)
-        self.report.start_workunit(self._main_root_workunit)
 
         goal_names: Tuple[str, ...] = tuple(all_options.goals)
         self._v2_goal_rule_names = goal_names
@@ -211,7 +205,6 @@ class RunTracker(Subsystem):
         self._has_ended = True
 
         path, duration, self_time, _is_tool = self._main_root_workunit.end()
-        self.report.end_workunit(self._main_root_workunit)
         self.cumulative_timings.add_timing(path, duration)
         self.self_timings.add_timing(path, self_time)
 
@@ -221,7 +214,6 @@ class RunTracker(Subsystem):
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
             self.run_info.add_info("outcome", outcome_str, ignore_errors=True)
 
-        self.report.close()
         self.store_stats()
 
         self.native.set_per_run_log_path(None)
