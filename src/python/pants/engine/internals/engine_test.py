@@ -616,7 +616,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert histograms_info["version"] == 0
         assert "histograms" in histograms_info
         assert "test_observation" in histograms_info["histograms"]
-        assert len(histograms_info["histograms"]["test_observation"]) > 0
+        assert (
+            histograms_info["histograms"]["test_observation"]
+            == b"\x1c\x84\x93\x13\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02?\xf0\x00\x00\x00\x00\x00\x00\xff\x01\x02"
+        )
 
 
 @dataclass(frozen=True)
