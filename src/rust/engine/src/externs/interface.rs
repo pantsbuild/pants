@@ -1350,20 +1350,6 @@ fn session_new_run_id(py: Python, session_ptr: PySession) -> PyUnitResult {
   })
 }
 
-fn session_cancel(py: Python, session_ptr: PySession) -> PyUnitResult {
-  with_session(py, session_ptr, |session| {
-    session.core().executor.block_on(session.cancel());
-    Ok(None)
-  })
-}
-
-fn session_cancel_all(py: Python) -> PyUnitResult {
-  py.allow_threads(|| {
-    sessions_cancel();
-    Ok(None)
-  })
-}
-
 fn session_get_observation_histograms(
   py: Python,
   scheduler_ptr: PyScheduler,
