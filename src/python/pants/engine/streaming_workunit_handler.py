@@ -43,7 +43,7 @@ class StreamingWorkunitContext:
         ByteStore, if it exists, has a copy of the files fingerprinted by each Digest."""
         return self._scheduler.ensure_remote_has_recursive(digests)
 
-    def get_observation_histograms(self) -> Dict[str, Any]:
+    def get_observation_histograms(self):
         """Invoke the internal get_observation_histograms function, which serializes histograms
         generated from Pants-internal observation metrics observed during the current run of Pants.
 
