@@ -1354,7 +1354,7 @@ fn session_get_observation_histograms(
   py: Python,
   scheduler_ptr: PyScheduler,
   session_ptr: PySession,
-) -> CPyResult<PyTuple> {
+) -> CPyResult<PyDict> {
   // Encoding version to return to callers. This should be bumped when the encoded histograms
   // are encoded in a backwards-incompatible manner.
   const OBSERVATIONS_VERSION: u64 = 0;
@@ -1375,13 +1375,17 @@ fn session_get_observation_histograms(
         )?;
       }
 
-      let result = PyTuple::new(
+      let result = PyDict::new(py);
+      result.set_item(
         py,
-        &[
-          OBSERVATIONS_VERSION.into_py_object(py).into_object(),
-          encoded_observations.into_object(),
-        ],
-      );
+        PyString::new(py, "version"),
+        OBSERVATIONS_VERSION.into_py_object(py).into_object(),
+      )?;
+      result.set_item(
+        py,
+        PyString::new(py, "histograms"),
+        encoded_observations.into_object(),
+      )?;
 
       Ok(result)
     })
