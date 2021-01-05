@@ -12,12 +12,13 @@ use crate::nodes::{NodeKey, Select};
 use crate::scheduler::Scheduler;
 
 use async_latch::AsyncLatch;
+use futures::future::{AbortHandle, Abortable};
 use futures::FutureExt;
 use graph::LastObserved;
-use lazy_static::lazy_static;
 use log::warn;
 use parking_lot::{Mutex, RwLock};
 use task_executor::Executor;
+use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::mpsc;
 use ui::ConsoleUI;
 use uuid::Uuid;
@@ -46,38 +47,6 @@ enum SessionDisplay {
     straggler_threshold: Duration,
     straggler_deadline: Option<Instant>,
   },
-}
-
-lazy_static! {
-  // A collection of all live Sessions. Completed Sessions (i.e., those for which the Weak
-  // reference is dead) are removed from this collection on a best effort basis.
-  static ref SESSIONS: Mutex<Vec<Weak<InnerSession>>> = Mutex::default();
-}
-
-fn sessions_add(session: &Arc<InnerSession>) {
-  let mut sessions = SESSIONS.lock();
-  sessions.retain(|weak_session| weak_session.upgrade().is_some());
-  sessions.push(Arc::downgrade(session));
-}
-
-///
-/// Cancel all live Sessions.
-///
-/// In the case of pantsd, Sessions are generally canceled one at a time if their associated clients
-/// disconnect. But if a pants process receives a Unix signal, it might use this method to attempt to
-/// cancel ongoing work before exiting.
-///
-pub fn sessions_cancel() {
-  let sessions = {
-    let sessions = SESSIONS.lock();
-    sessions
-      .iter()
-      .filter_map(|weak_session| weak_session.upgrade())
-      .collect::<Vec<_>>()
-  };
-  for session in sessions {
-    session.core.executor.block_on(session.cancel());
-  }
 }
 
 ///
@@ -114,7 +83,6 @@ struct InnerSession {
   // purposes, each iteration of a loop should be considered to be a new Session, but for now the
   // Session/build_id would be stable.
   run_id: Mutex<Uuid>,
-  should_report_workunits: bool,
   workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
 }
 
@@ -122,8 +90,7 @@ impl InnerSession {
   ///
   /// Cancels this Session.
   ///
-  pub async fn cancel(&self) {
-    // TODO: If this sticks, this function doesn't need to be async.
+  pub fn cancel(&self) {
     self.cancelled.trigger();
   }
 }
@@ -136,7 +103,6 @@ impl Session {
     scheduler: &Scheduler,
     should_render_ui: bool,
     build_id: String,
-    should_report_workunits: bool,
     session_values: Value,
     cancelled: AsyncLatch,
   ) -> Session {
@@ -165,10 +131,9 @@ impl Session {
       build_id,
       session_values: Mutex::new(session_values),
       run_id: Mutex::new(Uuid::new_v4()),
-      should_report_workunits,
       workunit_metadata_map: RwLock::new(HashMap::new()),
     });
-    sessions_add(&inner_session);
+    scheduler.core.sessions.add(&inner_session);
     Session(inner_session)
   }
 
@@ -179,8 +144,8 @@ impl Session {
   ///
   /// Cancels this Session.
   ///
-  pub async fn cancel(&self) {
-    self.0.cancel().await;
+  pub fn cancel(&self) {
+    self.0.cancel();
   }
 
   ///
@@ -224,10 +189,6 @@ impl Session {
 
   pub fn preceding_graph_size(&self) -> usize {
     self.0.preceding_graph_size
-  }
-
-  pub fn should_report_workunits(&self) -> bool {
-    self.0.should_report_workunits
   }
 
   pub fn workunit_store(&self) -> WorkunitStore {
@@ -337,5 +298,61 @@ impl Session {
         }
       }
     }
+  }
+}
+
+///
+/// A collection of all live Sessions.
+///
+/// The `Sessions` struct maintains a task monitoring SIGINT, and cancels all current Sessions each time
+/// it arrives.
+///
+pub struct Sessions {
+  /// Live sessions. Completed Sessions (i.e., those for which the Weak reference is dead) are
+  /// removed from this collection on a best effort when new Sessions are created.
+  sessions: Arc<Mutex<Vec<Weak<InnerSession>>>>,
+  /// Handle to kill the signal monitoring task when this object is killed.
+  signal_task_abort_handle: AbortHandle,
+}
+
+impl Sessions {
+  pub fn new(executor: &Executor) -> Result<Sessions, String> {
+    let sessions: Arc<Mutex<Vec<Weak<InnerSession>>>> = Arc::default();
+    let signal_task_abort_handle = {
+      let mut signal_stream = signal(SignalKind::interrupt())
+        .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
+      let (abort_handle, abort_registration) = AbortHandle::new_pair();
+      let sessions = sessions.clone();
+      let _ = executor.spawn(Abortable::new(
+        async move {
+          loop {
+            let _ = signal_stream.recv().await;
+            for session in &*sessions.lock() {
+              if let Some(session) = session.upgrade() {
+                session.cancel();
+              }
+            }
+          }
+        },
+        abort_registration,
+      ));
+      abort_handle
+    };
+    Ok(Sessions {
+      sessions,
+      signal_task_abort_handle,
+    })
+  }
+
+  fn add(&self, session: &Arc<InnerSession>) {
+    let mut sessions = self.sessions.lock();
+    sessions.retain(|weak_session| weak_session.upgrade().is_some());
+    sessions.push(Arc::downgrade(session));
+  }
+}
+
+impl Drop for Sessions {
+  fn drop(&mut self) {
+    self.signal_task_abort_handle.abort();
   }
 }

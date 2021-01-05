@@ -177,10 +177,11 @@ jobs:
     - '3.6'
     - '3.7'
     script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
+      none
+    - source ${HOME}/.cargo/env
     - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
-      --githooks --smoke-tests --python-version 3.7
-    - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
-      --lint --python-version 3.7
+      --githooks --smoke-tests --lint --python-version 3.7
     stage: Test Pants
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
@@ -217,6 +218,39 @@ jobs:
     script:
     - ./build-support/bin/ci.py --clippy
     stage: Test Pants
+    sudo: required
+  - before_cache:
+    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
+    before_install:
+    - sudo sysctl fs.inotify.max_user_watches=524288
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv global 2.7.15 3.6.7 3.7.1
+    - sudo apt-get install -y pkg-config fuse libfuse-dev
+    - sudo modprobe fuse
+    - sudo chmod 666 /dev/fuse
+    - sudo chown root:$USER /etc/fuse.conf
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
+      none
+    - source ${HOME}/.cargo/env
+    cache:
+      directories:
+      - ${AWS_CLI_ROOT}
+      - ${PYENV_ROOT_OSX}
+      - ${HOME}/.rustup
+      - ${HOME}/.cargo
+      - build-support/virtualenvs
+      - src/rust/engine/target
+      timeout: 500
+    dist: xenial
+    env:
+    - CACHE_NAME=cargo_audit
+    name: Cargo audit
+    os: linux
+    script:
+    - ./build-support/bin/ci.py --cargo-audit
+    stage: Test Pants (Cron)
     sudo: required
   - addons:
       apt:

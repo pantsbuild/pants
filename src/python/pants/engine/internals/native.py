@@ -46,7 +46,7 @@ class Externs:
     def __init__(self, lib):
         self.lib = lib
 
-    _do_raise_keyboardinterrupt = bool(os.environ.get("_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS", False))
+    _do_raise_keyboardinterrupt_in = os.environ.get("_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS", None)
 
     def is_union(self, input_type):
         """Return whether or not a type is a member of a union."""
@@ -62,7 +62,10 @@ class Externs:
         self, func, arg
     ) -> Union[PyGeneratorResponseGet, PyGeneratorResponseGetMulti, PyGeneratorResponseBreak]:
         """Given a generator, send it the given value and return a response."""
-        if self._do_raise_keyboardinterrupt:
+        if (
+            self._do_raise_keyboardinterrupt_in
+            and self._do_raise_keyboardinterrupt_in in func.__name__
+        ):
             raise KeyboardInterrupt("ctrl-c interrupted execution of a ffi method!")
         try:
             res = func.send(arg)
@@ -219,7 +222,6 @@ class Native(metaclass=SingletonMetaclass):
         scheduler,
         dynamic_ui: bool,
         build_id,
-        should_report_workunits: bool,
         session_values: SessionValues,
         cancellation_latch: PySessionCancellationLatch,
     ) -> PySession:
@@ -227,7 +229,6 @@ class Native(metaclass=SingletonMetaclass):
             scheduler=scheduler,
             should_render_ui=dynamic_ui,
             build_id=build_id,
-            should_report_workunits=should_report_workunits,
             session_values=session_values,
             cancellation_latch=cancellation_latch,
         )

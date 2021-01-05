@@ -21,14 +21,14 @@ fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
     NamedCaches::new(named_cache_dir.path().to_owned()),
     true,
   );
-  let metadata = ProcessMetadata {
-    instance_name: None,
-    cache_key_gen_version: None,
-    platform_properties: vec![],
-  };
   let workdir_base = workdir_base.unwrap_or(std::env::temp_dir());
 
-  CommandRunner::new(local_runner, metadata, workdir_base, executor.clone())
+  CommandRunner::new(
+    local_runner,
+    ProcessMetadata::default(),
+    workdir_base,
+    executor.clone(),
+  )
 }
 
 fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {

@@ -5,7 +5,7 @@ import collections.abc
 import os.path
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Iterable, Optional, Tuple, Union, cast
+from typing import Iterable, Iterator, Optional, Tuple, Union, cast
 
 from pkg_resources import Requirement
 
@@ -483,6 +483,26 @@ class PythonRequirementLibrary(Target):
 # -----------------------------------------------------------------------------------------------
 # `_python_requirements_file` target
 # -----------------------------------------------------------------------------------------------
+
+
+def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirement]:
+    """Parse all `Requirement` objects from a requirements.txt-style file.
+
+    This will safely ignore any options starting with `--` and will ignore comments. Any pip-style
+    VCS requirements will fail, with a helpful error message describing how to use PEP 440.
+    """
+    for i, line in enumerate(content.splitlines()):
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("-"):
+            continue
+        try:
+            yield Requirement.parse(line)
+        except Exception as e:
+            raise ValueError(
+                format_invalid_requirement_string_error(
+                    line, e, description_of_origin=f"{rel_path} at line {i + 1}"
+                )
+            )
 
 
 class PythonRequirementsFileSources(Sources):

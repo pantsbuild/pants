@@ -47,6 +47,11 @@ pants_ignore.add = [
   "!/pants.pex",
 ]
 
+ignore_pants_warnings.add = [
+  "DEPRECATED: Subsystem.global_instance()",
+  "DEPRECATED: not setting `help` on a `Subsystem`",
+]
+
 [source]
 root_patterns = [
   "src/*",

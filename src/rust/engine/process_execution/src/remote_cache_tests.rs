@@ -65,19 +65,11 @@ fn create_cached_runner(
   eager_fetch: bool,
 ) -> (Box<dyn CommandRunnerTrait>, TempDir, StubActionCache) {
   let cache_dir = TempDir::new().unwrap();
-
-  let metadata = ProcessMetadata {
-    instance_name: None,
-    cache_key_gen_version: None,
-    platform_properties: vec![],
-  };
-
   let action_cache = StubActionCache::new().unwrap();
-
   let runner = Box::new(
     crate::remote_cache::CommandRunner::new(
       local.into(),
-      metadata,
+      ProcessMetadata::default(),
       store,
       &action_cache.address(),
       None,
@@ -90,7 +82,6 @@ fn create_cached_runner(
     )
     .expect("caching command runner"),
   );
-
   (runner, cache_dir, action_cache)
 }
 
@@ -363,18 +354,10 @@ async fn make_action_result_basic() {
     .expect("Error saving directory");
 
   let mock_command_runner = Arc::new(MockCommandRunner);
-
-  let metadata = ProcessMetadata {
-    instance_name: None,
-    cache_key_gen_version: None,
-    platform_properties: vec![],
-  };
-
   let action_cache = StubActionCache::new().unwrap();
-
   let runner = crate::remote_cache::CommandRunner::new(
     mock_command_runner.clone(),
-    metadata,
+    ProcessMetadata::default(),
     store.clone(),
     &action_cache.address(),
     None,
