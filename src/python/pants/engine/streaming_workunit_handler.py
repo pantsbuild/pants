@@ -4,7 +4,7 @@
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Iterator, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Sequence, Tuple
 
 from typing_extensions import Protocol
 
@@ -42,6 +42,14 @@ class StreamingWorkunitContext:
         """Invoke the internal ensure_remote_has_recursive function, which ensures that a remote
         ByteStore, if it exists, has a copy of the files fingerprinted by each Digest."""
         return self._scheduler.ensure_remote_has_recursive(digests)
+
+    def get_observation_histograms(self) -> Tuple[int, Dict[str, bytes]]:
+        """Invoke the internal get_observation_histograms function, which serializes histograms
+        generated from Pants-internal observation metrics observed during the current run of Pants.
+
+        These metrics are useful for debugging Pants internals.
+        """
+        return self._scheduler.get_observation_histograms()
 
 
 class WorkunitsCallback(Protocol):
