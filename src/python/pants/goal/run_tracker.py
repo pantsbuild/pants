@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import sys
-import threading
 import time
 import uuid
 from collections import OrderedDict
@@ -93,14 +92,6 @@ class RunTracker(Subsystem):
         self._main_root_workunit = None
         self._all_options: Optional[Options] = None
 
-        # A lock to ensure that adding to stats at the end of a workunit
-        # operates thread-safely.
-        self._stats_lock = threading.Lock()
-
-        # self._threadlocal.current_workunit contains the current workunit for the calling thread.
-        # Note that multiple threads may share a name (e.g., all the threads in a pool).
-        self._threadlocal = threading.local()
-
         self._aborted = False
 
         self._has_ended: bool = False
@@ -116,13 +107,6 @@ class RunTracker(Subsystem):
     @property
     def v2_goals_rule_names(self) -> Tuple[str, ...]:
         return self._v2_goal_rule_names
-
-    def register_thread(self, parent_workunit):
-        """Register the parent workunit for all work in the calling thread.
-
-        Multiple threads may have the same parent (e.g., all the threads in a pool).
-        """
-        self._threadlocal.current_workunit = parent_workunit
 
     def start(self, all_options: Options, run_start_time: float) -> None:
         """Start tracking this pants run."""
@@ -161,7 +145,6 @@ class RunTracker(Subsystem):
         self._main_root_workunit = WorkUnit(
             run_info_dir=self.run_info_dir, parent=None, name=RunTracker.DEFAULT_ROOT_NAME, cmd=None
         )
-        self.register_thread(self._main_root_workunit)
         # Set the true start time in the case of e.g. the daemon.
         self._main_root_workunit.start(run_start_time)
         self.report.start_workunit(self._main_root_workunit)
