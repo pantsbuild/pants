@@ -1354,21 +1354,35 @@ fn session_get_observation_histograms(
   py: Python,
   scheduler_ptr: PyScheduler,
   session_ptr: PySession,
-) -> CPyResult<PyDict> {
+) -> CPyResult<PyTuple> {
+  // Encoding version to return to callers. This should be bumped when the encoded histograms
+  // are encoded in a backwards-incompatible manner.
+  const OBSERVATIONS_VERSION: u64 = 0;
+
   with_scheduler(py, scheduler_ptr, |_scheduler| {
     with_session(py, session_ptr, |session| {
-      let encoded_observations = session
+      let observations = session
         .workunit_store()
         .encode_observations()
         .map_err(|err| PyErr::new::<exc::Exception, _>(py, (err,)))?;
-      let result = PyDict::new(py);
-      for (metric, encoded_histogram) in &encoded_observations {
-        result.set_item(
+
+      let encoded_observations = PyDict::new(py);
+      for (metric, encoded_histogram) in &observations {
+        encoded_observations.set_item(
           py,
           PyString::new(py, metric.as_str()),
           PyBytes::new(py, &encoded_histogram[..]),
         )?;
       }
+
+      let result = PyTuple::new(
+        py,
+        &[
+          OBSERVATIONS_VERSION.into_py_object(py).into_object(),
+          encoded_observations.into_object(),
+        ],
+      );
+
       Ok(result)
     })
   })
