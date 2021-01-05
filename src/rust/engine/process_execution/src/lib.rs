@@ -338,7 +338,7 @@ impl From<Process> for MultiPlatformProcess {
 /// externally from the engine graph (e.g. when using remote execution or an external process
 /// cache).
 ///
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ProcessMetadata {
   pub instance_name: Option<String>,
   pub cache_key_gen_version: Option<String>,
