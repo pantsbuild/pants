@@ -12,12 +12,14 @@ use fs::RelativePath;
 use hashing::Digest;
 use maplit::hashset;
 use mock::{StubActionCache, StubCAS};
+use remexec::ActionResult;
 use store::{BackoffConfig, Store};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::relative_paths;
 use workunit_store::WorkunitStore;
 
+use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, NamedCaches, Platform, Process, ProcessMetadata,
@@ -181,29 +183,51 @@ async fn skip_cache_on_error() {
 /// the cached result with its non-existent digests.
 #[tokio::test]
 async fn eager_fetch() {
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
+
   async fn run_process(eager_fetch: bool) -> FallibleProcessResultWithPlatform {
     let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
     let (caching, _cache_dir, stub_action_cache) =
       create_cached_runner(local, store.clone(), eager_fetch);
 
-    // TODO: how to insert a cache entry without actually running it? I think
-    // `stub_action_cache.action_map.clone().lock().insert()`? I need the Process's digest
-    // to be the same as the below `process` var, but the ProcessResult digests should be fake.
-
-    // Note that this will return an error code of 1, whereas the cached entry will use 0.
+    // Get the `action_digest` for the Process that we're going to run. This will allow us to
+    // insert a bogus value into the `stub_action_cache`.
     let (process, _script_path, _script_dir) = create_script(1);
+    let (action, command, _exec_request) =
+      make_execute_request(&process, ProcessMetadata::default()).unwrap();
+    let (action_digest, _command_digest) = ensure_action_stored_locally(&store, &command, &action)
+      .await
+      .unwrap();
+
+    // Insert an ActionResult with missing digests and a return code of 0 (instead of 1).
+    let bogus_action_result = ActionResult {
+      exit_code: 0,
+      stdout_digest: Some(TestData::roland().digest().into()),
+      stderr_digest: Some(TestData::roland().digest().into()),
+      ..ActionResult::default()
+    };
+    stub_action_cache
+      .action_map
+      .lock()
+      .insert(action_digest.0, bogus_action_result);
+
+    // Run the process, possibly by pulling from the `ActionCache`.
     caching
       .run(process.clone().into(), Context::default())
       .await
       .unwrap()
   }
 
+  // TODO: Why is the cache not being used?
   let lazy_result = run_process(false).await;
   assert_eq!(lazy_result.exit_code, 0);
-  // TODO: how to assert the digests are what we expect. I'm not sure how to compute the digest.
+  assert_eq!(lazy_result.stdout_digest, TestData::roland().digest());
+  assert_eq!(lazy_result.stderr_digest, TestData::roland().digest());
 
   let eager_result = run_process(true).await;
   assert_eq!(eager_result.exit_code, 1);
+  // TODO: assert the digests are what they'd be when running the Process.
 }
 
 #[tokio::test]
