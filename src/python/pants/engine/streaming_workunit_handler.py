@@ -4,7 +4,7 @@
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterable, Iterator, Optional, Sequence, Tuple
 
 from typing_extensions import Protocol
 
