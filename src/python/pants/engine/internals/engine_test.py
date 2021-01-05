@@ -605,7 +605,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         with handler.session():
             scheduler.record_test_observation(128)
             scheduler.product_request(TrueResult, subjects=[0])
-            histograms = scheduler.get_observation_histograms()
+            histograms_version, histograms = scheduler.get_observation_histograms()
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunits_with_counters = [item for item in finished if "counters" in item]
@@ -613,7 +613,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert workunits_with_counters[1]["counters"]["local_cache_requests"] == 1
         assert workunits_with_counters[1]["counters"]["local_cache_requests_uncached"] == 1
 
+        assert histograms_version == 0
         assert "test_observation" in histograms
+        assert len(histograms["test_observation"]) > 0
 
 
 @dataclass(frozen=True)
