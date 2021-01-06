@@ -20,7 +20,7 @@ backend_packages.add = [
 ]
 
 plugins = [
-  "toolchain.pants.plugin==0.1.0",
+  "toolchain.pants.plugin==0.2.0",
 ]
 
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
@@ -45,11 +45,6 @@ pants_ignore.add = [
   "!*.class",
   # We also want to override the .gitignore'd pants.pex file
   "!/pants.pex",
-]
-
-ignore_pants_warnings.add = [
-  "DEPRECATED: Subsystem.global_instance()",
-  "DEPRECATED: not setting `help` on a `Subsystem`",
 ]
 
 [source]
