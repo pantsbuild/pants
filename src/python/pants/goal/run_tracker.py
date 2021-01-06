@@ -66,15 +66,12 @@ class RunTracker(Subsystem):
         :API: public
         """
         super().__init__(*args, **kwargs)
-        self._run_timestamp = time.time()
-        self._cmd_line = " ".join(["pants"] + sys.argv[1:])
 
-        self.run_uuid = uuid.uuid4().hex
-        # Select a globally unique ID for the run, that sorts by time.
-        millis = int((self._run_timestamp * 1000) % 1000)
-        # run_uuid is used as a part of run_id and also as a trace_id for Zipkin tracing
-        str_time = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime(self._run_timestamp))
-        self.run_id = f"pants_run_{str_time}_{millis}_{self.run_uuid}"
+        run_timestamp = time.time()
+        run_uuid = uuid.uuid4().hex
+        str_time = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime(run_timestamp))
+        millis = int((run_timestamp * 1000) % 1000)
+        self.run_id = f"pants_run_{str_time}_{millis}_{run_uuid}"
 
         # Initialized in `initialize()`.
         self.run_info_dir = None
@@ -84,15 +81,9 @@ class RunTracker(Subsystem):
         # Initialized in `start()`.
 
         self._run_start_time = None
-
         self._all_options: Optional[Options] = None
-
-        self._aborted = False
-
         self._has_ended: bool = False
-
         self.native = Native()
-
         self.run_logs_file: Optional[Path] = None
 
     @property
@@ -111,8 +102,10 @@ class RunTracker(Subsystem):
         info_dir = os.path.join(self.options.pants_workdir, self.options_scope)
         self.run_info_dir = os.path.join(info_dir, self.run_id)
         self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
-        self.run_info.add_basic_info(self.run_id, self._run_timestamp)
-        self.run_info.add_info("cmd_line", self._cmd_line)
+        self.run_info.add_basic_info(self.run_id, run_start_time)
+
+        cmd_line = " ".join(["pants"] + sys.argv[1:])
+        self.run_info.add_info("cmd_line", cmd_line)
 
         # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
         link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")

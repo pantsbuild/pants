@@ -75,7 +75,7 @@ class RunInfo:
             if not kwargs.get("ignore_errors", False):
                 raise
 
-    def add_basic_info(self, run_id, timestamp):
+    def add_basic_info(self, run_id: str, timestamp: float) -> None:
         """Adds basic build info."""
         datetime = time.strftime("%A %b %d, %Y %H:%M:%S", time.localtime(timestamp))
         user = getpass.getuser()
