@@ -11,8 +11,8 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
-from pants.base.workunit import WorkUnit
 from pants.engine.internals.native import Native
 from pants.goal.aggregated_timings import AggregatedTimings, TimingData
 from pants.option.config import Config
@@ -167,12 +167,10 @@ class RunTracker(Subsystem):
     def has_ended(self) -> bool:
         return self._has_ended
 
-    def end_run(self, outcome: int) -> None:
+    def end_run(self, exit_code: ExitCode) -> None:
         """This pants run is over, so stop tracking it.
 
         Note: If end_run() has been called once, subsequent calls are no-ops.
-
-        :return: PANTS_SUCCEEDED_EXIT_CODE or PANTS_FAILED_EXIT_CODE
         """
 
         if self.has_ended():
@@ -187,7 +185,7 @@ class RunTracker(Subsystem):
 
         self.cumulative_timings.add_timing(label="main", secs=duration)
 
-        outcome_str = WorkUnit.outcome_string(outcome)
+        outcome_str = "SUCCESS" if exit_code == PANTS_SUCCEEDED_EXIT_CODE else "FAILURE"
 
         if self.run_info.get_info("outcome") is None:
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
