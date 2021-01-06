@@ -3,25 +3,10 @@
 
 from __future__ import annotations
 
-import importlib
 import inspect
 import logging
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, ClassVar, Iterator, Optional, Set, Tuple, Type, TypeVar, Union, cast
 
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable, OptionableFactory
@@ -117,58 +102,6 @@ class Subsystem(Optionable):
         super().__init__()
         self.scope = scope
         self.options = options
-
-    @staticmethod
-    def get_streaming_workunit_callbacks(subsystem_names: Iterable[str]) -> List[Callable]:
-        """This method is used to dynamically generate a list of callables intended to be passed to
-        StreamingWorkunitHandler. The caller provides a collection of strings representing a Python
-        import path to a class that implements the `Subsystem` class. It will then inspect these
-        classes for the presence of a special method called `handle_workunits`, which will.
-
-        be called with a set of kwargs - see the docstring for StreamingWorkunitHandler.
-
-        For instance, you might invoke this method with something like:
-
-        `Subsystem.get_streaming_workunit_callbacks(["pants.reporting.workunits.Workunit"])`
-
-        And this will result in the method attempting to dynamically-import a
-        module called "pants.reporting.workunits", inspecting it for the presence
-        of a class called `Workunit`, getting a global instance of this Subsystem,
-        and returning a list containing a single reference to the
-        `handle_workunits` method defined on it - and returning an empty list and
-        emitting warnings if any of these steps fail.
-        """
-
-        callables = []
-
-        for name in subsystem_names:
-            try:
-                name_components = name.split(".")
-                module_name = ".".join(name_components[:-1])
-                class_name = name_components[-1]
-                module = importlib.import_module(module_name)
-                subsystem_class = getattr(module, class_name)
-            except (IndexError, AttributeError, ModuleNotFoundError, ValueError) as e:
-                logger.warning(f"Invalid module name: {name}: {e}")
-                continue
-            except ImportError as e:
-                logger.warning(f"Could not import {module_name}: {e}")
-                continue
-            try:
-                subsystem = subsystem_class.global_instance()
-            except AttributeError:
-                logger.warning(f"{subsystem_class} is not a global subsystem.")
-                continue
-
-            try:
-                callables.append(subsystem.handle_workunits)
-            except AttributeError:
-                logger.warning(
-                    f"{subsystem_class} does not have a method named `handle_workunits` defined."
-                )
-                continue
-
-        return callables
 
     @classmethod
     def subsystem_dependencies(cls) -> Tuple[Union[SubsystemDependency, Type[Subsystem]], ...]:

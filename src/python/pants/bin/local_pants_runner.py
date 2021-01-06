@@ -37,7 +37,6 @@ from pants.option.arg_splitter import HelpRequest
 from pants.option.errors import UnknownFlagsError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.subsystem import Subsystem
 from pants.util.contextutil import maybe_profiled
 
 logger = logging.getLogger(__name__)
@@ -241,18 +240,12 @@ class LocalPantsRunner:
         return help_printer.print_help()
 
     def _get_workunits_callbacks(self) -> Tuple[WorkunitsCallback, ...]:
-        # Load WorkunitsCallbacks with the legacy `get_streaming_workunit_callbacks` method, and with
-        # the new WorkunitsCallbackFactories method.
-        # NB: When the `--streaming-workunits-handlers` deprecation triggers, the first method will be
-        # removed.
-        streaming_handlers = self.options.for_global_scope().streaming_workunits_handlers
-        callbacks = list(Subsystem.get_streaming_workunit_callbacks(streaming_handlers))
+        # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing
+        # a per-run instance of each WorkunitsCallback.
         (workunits_callback_factories,) = self.graph_session.scheduler_session.product_request(
             WorkunitsCallbackFactories, [self.union_membership]
         )
-        for wcf in workunits_callback_factories:
-            callbacks.append(wcf.callback_factory())
-        return tuple(callbacks)
+        return tuple(wcf.callback_factory() for wcf in workunits_callback_factories)
 
     def run(self, start_time: float) -> ExitCode:
         self._start_run(start_time)
