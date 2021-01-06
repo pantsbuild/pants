@@ -9,7 +9,7 @@ import time
 import uuid
 from collections import OrderedDict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from pants.base.run_info import RunInfo
 from pants.base.workunit import WorkUnit
@@ -71,7 +71,6 @@ class RunTracker(Subsystem):
         super().__init__(*args, **kwargs)
         self._run_timestamp = time.time()
         self._cmd_line = " ".join(["pants"] + sys.argv[1:])
-        self._v2_goal_rule_names: Tuple[str, ...] = tuple()
 
         self.run_uuid = uuid.uuid4().hex
         # Select a globally unique ID for the run, that sorts by time.
@@ -100,10 +99,6 @@ class RunTracker(Subsystem):
     @property
     def goals(self) -> List[str]:
         return self._all_options.goals if self._all_options else []
-
-    @property
-    def v2_goals_rule_names(self) -> Tuple[str, ...]:
-        return self._v2_goal_rule_names
 
     def start(self, all_options: Options, run_start_time: float) -> None:
         """Start tracking this pants run."""
@@ -139,9 +134,6 @@ class RunTracker(Subsystem):
         )
         # Set the true start time in the case of e.g. the daemon.
         self._main_root_workunit.start(run_start_time)
-
-        goal_names: Tuple[str, ...] = tuple(all_options.goals)
-        self._v2_goal_rule_names = goal_names
 
         self.run_logs_file = Path(self.run_info_dir, "logs")
         self.native.set_per_run_log_path(str(self.run_logs_file))
