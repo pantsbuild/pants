@@ -84,7 +84,6 @@ class RunTracker(Subsystem):
         self.run_info_dir = None
         self.run_info = None
         self.cumulative_timings = None
-        self.self_timings = None
 
         # Initialized in `start()`.
         self._main_root_workunit = None
@@ -129,8 +128,6 @@ class RunTracker(Subsystem):
             os.path.join(self.run_info_dir, "cumulative_timings")
         )
 
-        # Time spent in a workunit, not including its children.
-        self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, "self_timings"))
         # pantsd stats.
         self._pantsd_metrics: Dict[str, int] = dict()
 
@@ -204,9 +201,8 @@ class RunTracker(Subsystem):
 
         self._has_ended = True
 
-        path, duration, self_time, _is_tool = self._main_root_workunit.end()
+        path, duration, _self_time, _is_tool = self._main_root_workunit.end()
         self.cumulative_timings.add_timing(path, duration)
-        self.self_timings.add_timing(path, self_time)
 
         outcome_str = WorkUnit.outcome_string(outcome)
 
