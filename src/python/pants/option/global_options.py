@@ -727,10 +727,9 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_cache_eager_fetch,
             help=(
-                "Eagerly fetch from the remote store instead of lazily fetching.\n\nThis results "
-                "in worse performance, but reduces the frequency of errors encountered.\n\nThis is "
-                "meant to be a short-term mechanism. As we make Pants's remote caching client more "
-                "robust, we plan to remove this mechanism."
+                "Eagerly fetch relevant content from the remote store instead of lazily fetching."
+                "\n\nThis may result in worse performance, but reduce the frequency of errors "
+                "encountered by reducing the surface area of when remote caching is used."
             ),
         )
 
