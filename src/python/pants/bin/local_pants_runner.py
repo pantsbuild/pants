@@ -20,6 +20,11 @@ from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
+from pants.engine.streaming_workunit_handler import (
+    StreamingWorkunitHandler,
+    WorkunitsCallback,
+    WorkunitsCallbackFactories,
+)
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
@@ -34,11 +39,6 @@ from pants.option.errors import UnknownFlagsError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
-from pants.reporting.streaming_workunit_handler import (
-    StreamingWorkunitHandler,
-    WorkunitsCallback,
-    WorkunitsCallbackFactories,
-)
 from pants.util.contextutil import maybe_profiled
 
 logger = logging.getLogger(__name__)

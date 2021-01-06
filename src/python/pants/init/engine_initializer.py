@@ -26,6 +26,7 @@ from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule, collect_rules, rule
+from pants.engine.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
@@ -33,7 +34,6 @@ from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
-from pants.reporting.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
 

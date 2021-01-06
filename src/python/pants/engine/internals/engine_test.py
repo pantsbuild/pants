@@ -30,11 +30,11 @@ from pants.engine.platform import rules as platform_rules
 from pants.engine.process import MultiPlatformProcess, Process, ProcessResult
 from pants.engine.process import rules as process_rules
 from pants.engine.rules import Get, MultiGet, rule
-from pants.goal.run_tracker import RunTracker
-from pants.reporting.streaming_workunit_handler import (
+from pants.engine.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
 )
+from pants.goal.run_tracker import RunTracker
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.logging import LogLevel
 
