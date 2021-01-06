@@ -42,9 +42,6 @@ class RunTracker(Subsystem):
     options_scope = "run-tracker"
     help = "Tracks and times the execution of a pants run."
 
-    # The name of the tracking root for the main thread (and the foreground worker threads).
-    DEFAULT_ROOT_NAME = "main"
-
     @classmethod
     def register_options(cls, register):
         register(
@@ -85,7 +82,9 @@ class RunTracker(Subsystem):
         self.cumulative_timings = None
 
         # Initialized in `start()`.
-        self._main_root_workunit = None
+
+        self._run_start_time = None
+
         self._all_options: Optional[Options] = None
 
         self._aborted = False
@@ -107,6 +106,8 @@ class RunTracker(Subsystem):
 
         # Initialize the run.
 
+        self._run_start_time = run_start_time
+
         info_dir = os.path.join(self.options.pants_workdir, self.options_scope)
         self.run_info_dir = os.path.join(info_dir, self.run_id)
         self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
@@ -127,13 +128,6 @@ class RunTracker(Subsystem):
         self._pantsd_metrics: Dict[str, int] = dict()
 
         self._all_options = all_options
-
-        # And create the workunit.
-        self._main_root_workunit = WorkUnit(
-            run_info_dir=self.run_info_dir, parent=None, name=RunTracker.DEFAULT_ROOT_NAME, cmd=None
-        )
-        # Set the true start time in the case of e.g. the daemon.
-        self._main_root_workunit.start(run_start_time)
 
         self.run_logs_file = Path(self.run_info_dir, "logs")
         self.native.set_per_run_log_path(str(self.run_logs_file))
@@ -193,8 +187,12 @@ class RunTracker(Subsystem):
 
         self._has_ended = True
 
-        path, duration, _self_time, _is_tool = self._main_root_workunit.end()
-        self.cumulative_timings.add_timing(path, duration)
+        if self._run_start_time is None:
+            raise Exception("RunTracker.end_run() called without calling .start()")
+
+        duration = time.time() - self._run_start_time
+
+        self.cumulative_timings.add_timing(label="main", secs=duration)
 
         outcome_str = WorkUnit.outcome_string(outcome)
 
