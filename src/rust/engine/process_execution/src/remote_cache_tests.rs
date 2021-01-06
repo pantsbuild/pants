@@ -196,7 +196,7 @@ async fn eager_fetch() {
     let (process, _script_path, _script_dir) = create_script(1);
     let (action, command, _exec_request) =
       make_execute_request(&process, ProcessMetadata::default()).unwrap();
-    let (action_digest, _command_digest) = ensure_action_stored_locally(&store, &command, &action)
+    let (_command_digest, action_digest) = ensure_action_stored_locally(&store, &command, &action)
       .await
       .unwrap();
 
@@ -219,7 +219,6 @@ async fn eager_fetch() {
       .unwrap()
   }
 
-  // TODO: Why is the cache not being used?
   let lazy_result = run_process(false).await;
   assert_eq!(lazy_result.exit_code, 0);
   assert_eq!(lazy_result.stdout_digest, TestData::roland().digest());
@@ -227,7 +226,8 @@ async fn eager_fetch() {
 
   let eager_result = run_process(true).await;
   assert_eq!(eager_result.exit_code, 1);
-  // TODO: assert the digests are what they'd be when running the Process.
+  assert_ne!(eager_result.stdout_digest, TestData::roland().digest());
+  assert_ne!(eager_result.stderr_digest, TestData::roland().digest());
 }
 
 #[tokio::test]
