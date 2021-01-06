@@ -22,3 +22,5 @@ remote_instance_name = "main"
 
 # Normally, we wouldn't want this, but it's helpful while we iterate on remote caching to force the remote to be used.
 process_execution_use_local_cache = false
+
+remote_cache_eager_fetch = true
