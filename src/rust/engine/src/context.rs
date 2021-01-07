@@ -22,8 +22,7 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
-  self, BoundedCommandRunner, CommandRunner, NamedCaches,
-  Platform, ProcessMetadata,
+  self, BoundedCommandRunner, CommandRunner, NamedCaches, Platform, ProcessMetadata,
 };
 use rand::seq::SliceRandom;
 use regex::Regex;
@@ -238,15 +237,15 @@ impl Core {
     let maybe_remote_enabled_command_runner: Box<dyn CommandRunner> =
       if remoting_opts.execution_enable {
         Box::new(BoundedCommandRunner::new(
-            Core::make_remote_execution_runner(
-              store,
-              process_execution_metadata,
-              &remoting_opts,
-              root_ca_certs,
-              oauth_bearer_token,
-            )?,
-            exec_strategy_opts.remote_parallelism,
-          ))
+          Core::make_remote_execution_runner(
+            store,
+            process_execution_metadata,
+            &remoting_opts,
+            root_ca_certs,
+            oauth_bearer_token,
+          )?,
+          exec_strategy_opts.remote_parallelism,
+        ))
       } else if remote_caching_used {
         let action_cache_address = remote_store_servers
           .first()
