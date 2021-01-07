@@ -4,9 +4,10 @@
 from abc import ABCMeta
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Mapping, Optional, Tuple
+from typing import Iterable, List, Mapping, Optional, Tuple, cast
 
 from pants.base.build_root import BuildRoot
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.console import Console
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -72,10 +73,25 @@ class RunSubsystem(GoalSubsystem):
             help="Arguments to pass directly to the executed target, e.g. "
             '`--run-args="val1 val2 --debug"`',
         )
+        register(
+            "--env-vars",
+            type=list,
+            member_type=str,
+            default=[],
+            help=(
+                "Environment variables to set in the running process. "
+                "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
+                "`ENV_VAR` to copy the value of a variable in Pants's own environment."
+            ),
+        )
 
     @property
     def args(self) -> Tuple[str, ...]:
         return tuple(self.options.args)
+
+    @property
+    def env_vars(self) -> List[str]:
+        return cast(List[str], self.options.env_vars)
 
 
 class Run(Goal):
@@ -90,6 +106,7 @@ async def run(
     interactive_runner: InteractiveRunner,
     workspace: Workspace,
     build_root: BuildRoot,
+    pants_env: PantsEnvironment,
 ) -> Run:
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
@@ -110,6 +127,22 @@ async def run(
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
         extra_env = {k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}
+        user_env = (
+            pants_env.get_subset(run_subsystem.env_vars)
+            if run_subsystem.env_vars
+            else FrozenDict({})
+        )
+        conflicting_env_keys = set(user_env.keys()) & set(extra_env.keys())
+        if conflicting_env_keys:
+            raise ValueError(
+                f"The following environment variables cannot be set using the `env_vars` option "
+                f"in the `[run]` scope, as they are already set via other mechanisms (such as the "
+                f"`env_vars` option in the [subprocess-environment] scope: "
+                f"{', '.join(sorted(conflicting_env_keys))}."
+            )
+
+        extra_env.update(**{k: v.format(chroot=tmpdir) for k, v in user_env.items()})
+
         try:
             result = interactive_runner.run(
                 InteractiveProcess(

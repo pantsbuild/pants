@@ -1,13 +1,14 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 import os
-from typing import cast
+import textwrap
+from typing import List, Mapping, Optional, cast
 
 import pytest
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.run import Run, RunFieldSet, RunRequest, RunSubsystem, run
+from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveRunner
@@ -27,7 +28,11 @@ def create_mock_run_request(rule_runner: RuleRunner, program_text: bytes) -> Run
         Digest,
         [CreateDigest([FileContent(path="program.py", content=program_text, is_executable=True)])],
     )
-    return RunRequest(digest=digest, args=(os.path.join("{chroot}", "program.py"),))
+    return RunRequest(
+        digest=digest,
+        args=(os.path.join("{chroot}", "program.py"),),
+        extra_env={"COLLIDING_ENV_VAR": ""},
+    )
 
 
 def single_target_run(
@@ -36,6 +41,8 @@ def single_target_run(
     console: MockConsole,
     *,
     program_text: bytes,
+    env_var_option: Optional[List[str]] = None,
+    pants_env: Optional[Mapping[str, str]] = None,
 ) -> Run:
     workspace = Workspace(rule_runner.scheduler)
     interactive_runner = InteractiveRunner(rule_runner.scheduler)
@@ -46,6 +53,7 @@ def single_target_run(
     class TestBinaryTarget(Target):
         alias = "binary"
         core_fields = ()
+        help = "test binary target"
 
     target = TestBinaryTarget({}, address=address)
     field_set = TestRunFieldSet.create(target)
@@ -53,12 +61,13 @@ def single_target_run(
     res = run_rule_with_mocks(
         run,
         rule_args=[
-            create_goal_subsystem(RunSubsystem, args=[]),
+            create_goal_subsystem(RunSubsystem, args=[], env_vars=env_var_option or []),
             create_subsystem(GlobalOptions, pants_workdir=rule_runner.pants_workdir),
             console,
             interactive_runner,
             workspace,
             BuildRoot(),
+            PantsEnvironment(env=pants_env),
         ],
         mock_gets=[
             MockGet(
@@ -86,6 +95,48 @@ def test_normal_run(rule_runner: RuleRunner) -> None:
         program_text=program_text,
     )
     assert res.exit_code == 0
+
+
+def test_env_vars(rule_runner: RuleRunner) -> None:
+    console = MockConsole(use_colors=False)
+    env_vars_output_path = os.path.join(rule_runner.build_root, "env.txt")
+    program_text = textwrap.dedent(
+        f"""\
+        #!/usr/bin/python
+        import os
+        import sys
+        with open("{env_vars_output_path}", "w") as fp:
+            for k, v in os.environ.items():
+                fp.write("{{}}={{}}\\n".format(k, v))
+        """
+    ).encode()
+
+    res = single_target_run(
+        rule_runner,
+        Address("some/addr"),
+        console,
+        program_text=program_text,
+        env_var_option=["FOO=bar", "BAZ"],
+        pants_env={"BAZ": "from_pants_environment"},
+    )
+    assert res.exit_code == 0
+    with open(env_vars_output_path) as fp:
+        env_vars = list(fp)
+    assert "FOO=bar\n" in env_vars
+    assert "BAZ=from_pants_environment\n" in env_vars
+
+    # Test that we correctly validate that user-set env vars don't collide with ones that
+    # Pants sets.
+    with pytest.raises(ValueError) as excinfo:
+        single_target_run(
+            rule_runner,
+            Address("some/addr"),
+            console,
+            program_text=program_text,
+            env_var_option=["COLLIDING_ENV_VAR=dummy"],
+        )
+    assert "The following environment variables cannot be set" in str(excinfo.value)
+    assert "COLLIDING_ENV_VAR" in str(excinfo.value)
 
 
 def test_materialize_input_files(rule_runner: RuleRunner) -> None:
