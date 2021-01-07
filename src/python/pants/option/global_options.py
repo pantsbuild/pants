@@ -421,6 +421,25 @@ class GlobalOptions(Subsystem):
         )
 
         register(
+            "--stats-json-file",
+            advanced=True,
+            default=None,
+            help="Write stats to this local json file on run completion.",
+        )
+        register(
+            "--stats-record-option-scopes",
+            advanced=True,
+            type=list,
+            default=["*"],
+            help=(
+                "Option scopes to record in stats on run completion. "
+                "Options may be selected by joining the scope and the option with a ^ character, "
+                "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "
+                "Add a '*' to the list to capture all known scopes."
+            ),
+        )
+
+        register(
             "--pants-ignore",
             advanced=True,
             type=list,
@@ -962,23 +981,6 @@ class GlobalOptions(Subsystem):
             default=1,
             advanced=True,
             help="Interval in seconds between when streaming workunit event receivers will be polled.",
-        )
-        register(
-            "--streaming-workunits-handlers",
-            type=list,
-            member_type=str,
-            default=[],
-            advanced=True,
-            removal_version="2.3.0.dev0",
-            removal_hint=(
-                "To register a StreamingWorkunitHandler callback, install a UnionRule "
-                "for type `WorkunitsCallbackFactoryRequest`."
-            ),
-            help=(
-                "Use this option to name Subsystems which will receive streaming workunit events. "
-                "For instance, `--streaming-workunits-handlers=\"['pants.reporting.workunit.Workunits']\"` will "
-                'register a Subsystem called Workunits defined in the module "pants.reporting.workunit".'
-            ),
         )
 
     @classmethod

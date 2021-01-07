@@ -38,7 +38,7 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
         return super().default(o)
 
 
-class RunTracker(Subsystem):
+class DeprecatedRunTracker(Subsystem):
     options_scope = "run-tracker"
     help = "Tracks and times the execution of a pants run."
 
@@ -48,6 +48,10 @@ class RunTracker(Subsystem):
             "--stats-local-json-file",
             advanced=True,
             default=None,
+            removal_version="2.3.0.dev0",
+            removal_hint=(
+                "This option is now a noop: instead, use global option " "`--stats-json-file`."
+            ),
             help="Write stats to this local json file on run completion.",
         )
         register(
@@ -55,62 +59,41 @@ class RunTracker(Subsystem):
             advanced=True,
             type=list,
             default=["*"],
+            removal_version="2.3.0.dev0",
+            removal_hint=(
+                "This option is now a noop: instead, use global option "
+                "`--stats-record-option-scopes`."
+            ),
             help="Option scopes to record in stats on run completion. "
             "Options may be selected by joining the scope and the option with a ^ character, "
             "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "
             "Add a '*' to the list to capture all known scopes.",
         )
 
-    def __init__(self, *args, **kwargs):
+
+class RunTracker:
+    """Tracks and times the execution of a single Pants run."""
+
+    def __init__(self, options: Options):
         """
         :API: public
         """
-        super().__init__(*args, **kwargs)
+        self.native = Native()
 
+        self._has_started: bool = False
+        self._has_ended: bool = False
+
+        # Select a globally unique ID for the run, that sorts by time.
         run_timestamp = time.time()
         run_uuid = uuid.uuid4().hex
         str_time = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime(run_timestamp))
         millis = int((run_timestamp * 1000) % 1000)
         self.run_id = f"pants_run_{str_time}_{millis}_{run_uuid}"
 
-        # Initialized in `initialize()`.
-        self.run_info_dir = None
-        self.run_info = None
-        self.cumulative_timings = None
-
-        # Initialized in `start()`.
-
-        self._run_start_time = None
-        self._all_options: Optional[Options] = None
-        self._has_ended: bool = False
-        self.native = Native()
-        self.run_logs_file: Optional[Path] = None
-
-    @property
-    def goals(self) -> List[str]:
-        return self._all_options.goals if self._all_options else []
-
-    def start(self, all_options: Options, run_start_time: float) -> None:
-        """Start tracking this pants run."""
-        if self.run_info:
-            raise AssertionError("RunTracker.start must not be called multiple times.")
-
-        # Initialize the run.
-
-        self._run_start_time = run_start_time
-
-        info_dir = os.path.join(self.options.pants_workdir, self.options_scope)
+        self._all_options = options
+        info_dir = os.path.join(self._all_options.for_global_scope().pants_workdir, "run-tracker")
         self.run_info_dir = os.path.join(info_dir, self.run_id)
         self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
-        self.run_info.add_basic_info(self.run_id, run_start_time)
-
-        cmd_line = " ".join(["pants"] + sys.argv[1:])
-        self.run_info.add_info("cmd_line", cmd_line)
-
-        # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
-        link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")
-
-        relative_symlink(self.run_info_dir, link_to_latest)
 
         # Time spent in a workunit, including its children.
         self.cumulative_timings = AggregatedTimings(
@@ -120,10 +103,31 @@ class RunTracker(Subsystem):
         # pantsd stats.
         self._pantsd_metrics: Dict[str, int] = dict()
 
-        self._all_options = all_options
-
         self.run_logs_file = Path(self.run_info_dir, "logs")
         self.native.set_per_run_log_path(str(self.run_logs_file))
+
+        # Initialized in `start()`.
+        self._run_start_time: Optional[float] = None
+
+    @property
+    def goals(self) -> List[str]:
+        return self._all_options.goals if self._all_options else []
+
+    def start(self, run_start_time: float) -> None:
+        """Start tracking this pants run."""
+        if self._has_started:
+            raise AssertionError("RunTracker.start must not be called multiple times.")
+        self._has_started = True
+
+        # Initialize the run.
+        self._run_start_time = run_start_time
+        self.run_info.add_basic_info(self.run_id, run_start_time)
+        cmd_line = " ".join(["pants"] + sys.argv[1:])
+        self.run_info.add_info("cmd_line", cmd_line)
+
+        # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
+        link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")
+        relative_symlink(self.run_info_dir, link_to_latest)
 
     def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
         self._pantsd_metrics = metrics
@@ -160,7 +164,7 @@ class RunTracker(Subsystem):
         }
 
         # Write stats to user-defined json file.
-        stats_json_file_name = self.options.stats_local_json_file
+        stats_json_file_name = self._all_options.for_global_scope().stats_json_file
         if stats_json_file_name:
             self.write_stats_to_json(stats_json_file_name, stats)
 
@@ -175,7 +179,6 @@ class RunTracker(Subsystem):
 
         if self.has_ended():
             return
-
         self._has_ended = True
 
         if self._run_start_time is None:
@@ -198,11 +201,11 @@ class RunTracker(Subsystem):
         return
 
     def get_cumulative_timings(self) -> TimingData:
-        return self.cumulative_timings.get_all()  # type: ignore[no-any-return]
+        return self.cumulative_timings.get_all()
 
     def get_options_to_record(self) -> dict:
         recorded_options = {}
-        scopes = self.options.stats_option_scopes_to_record
+        scopes = self._all_options.for_global_scope().stats_record_option_scopes
         if "*" in scopes:
             scopes = self._all_options.known_scope_to_info.keys() if self._all_options else []
         for scope in scopes:

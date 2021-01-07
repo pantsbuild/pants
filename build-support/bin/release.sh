@@ -143,7 +143,6 @@ function execute_packaged_pants_with_internal_backends() {
     --no-verify-config \
     --no-pantsd \
     --pythonpath="['pants-plugins']" \
-    --streaming-workunits-handlers="[]" \
     --backend-packages="[\
         'pants.backend.awslambda.python',\
         'pants.backend.python',\

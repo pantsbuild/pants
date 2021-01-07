@@ -3,31 +3,13 @@
 
 from __future__ import annotations
 
-import importlib
 import inspect
 import logging
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, ClassVar, Iterator, Optional, Set, Tuple, Type, TypeVar, Union, cast
 
-from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable, OptionableFactory
-from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.ordered_set import OrderedSet
 
@@ -93,21 +75,6 @@ class Subsystem(Optionable):
 
     help: ClassVar[str]
 
-    # TODO: The full Options object for this pants run for use by `global_instance` and
-    # `scoped_instance`.
-    _options: ClassVar[Optional[Options]] = None
-
-    # TODO: A cache of (cls, scope) -> the instance of cls tied to that scope.
-    # NB: it would be ideal to use `_S` rather than `Subsystem`, but we can't do this because
-    # MyPy complains that `_S` would not be properly constrained. Specifically, it suggests that we'd
-    # have to use typing.Generic or typing.Protocol to properly constrain the type var, which we
-    # don't want to do.
-    _scoped_instances: ClassVar[Dict[Tuple[Type["Subsystem"], str], "Subsystem"]] = {}
-
-    class UninitializedSubsystemError(SubsystemError):
-        def __init__(self, class_name, scope):
-            super().__init__(f'Subsystem "{class_name}" not initialized for scope "{scope}"')
-
     @classmethod
     def is_subsystem_type(cls, obj) -> bool:
         return inspect.isclass(obj) and issubclass(obj, cls)
@@ -131,141 +98,10 @@ class Subsystem(Optionable):
         else:
             return ScopeInfo(cls.subscope(subscope), cls)
 
-    @classmethod
-    def set_options(cls, options: Options) -> None:
-        cls._options = options
-
-    @classmethod
-    def is_initialized(cls) -> bool:
-        return cls._options is not None
-
-    @classmethod
-    def global_instance(cls: Type[_S], silent: bool = False) -> _S:
-        """Returns the global instance of this subsystem.
-
-        :API: public
-
-        :returns: The global subsystem instance.
-
-        Note that `global_instance` is a v1-idiom only. v2 rules should always request a subsystem as a rule input, rather than
-        trying to call <subsystem>.global_instance() in the body of an `@rule`.
-        """
-        # NB: This entire method is deprecated, but the deprecation only triggers if `not silent` in
-        # order to allow the RunTracker to continue to be a Subsystem until consumers have been
-        # updated to access it in other ways.
-        deprecated_conditional(
-            predicate=lambda: not silent,
-            removal_version="2.3.0.dev0",
-            entity_description="Subsystem.global_instance()",
-            hint_message=(
-                "Note that `global_instance` is a v1-idiom only. v2 @rules should request a "
-                "Subsystem as a @rule argument, and callers outside of @rules should use "
-                "`Scheduler.product_request(<subsystem_cls>, [Params()])` to get an instance."
-            ),
-        )
-        return cls._instance_for_scope(cls.options_scope)  # type: ignore[arg-type]  # MyPy is treating cls.options_scope as a Callable, rather than `str`
-
-    @classmethod
-    @deprecated(
-        removal_version="2.3.0.dev0",
-        subject="Subsystem.scoped_instance(..)",
-        hint_message=(
-            "Scoped Subsystem instances were a v1 idiom, which do not have a v2 equivalent. "
-            "If you have a usecase for scoped Subsystems, please open an issue at "
-            "https://github.com/pantsbuild/pants/issues/new."
-        ),
-    )
-    def scoped_instance(cls: Type[_S], optionable: Union[Optionable, Type[Optionable]]) -> _S:
-        """Returns an instance of this subsystem for exclusive use by the given `optionable`.
-
-        :API: public
-
-        :param optionable: An optionable type or instance to scope this subsystem under.
-        :returns: The scoped subsystem instance.
-        """
-        if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):
-            raise TypeError(
-                "Can only scope an instance against an Optionable, given {} of type {}.".format(
-                    optionable, type(optionable)
-                )
-            )
-        return cls._instance_for_scope(cls.subscope(optionable.options_scope))
-
-    @classmethod
-    def _instance_for_scope(cls: Type[_S], scope: str) -> _S:
-        if cls._options is None:
-            raise cls.UninitializedSubsystemError(cls.__name__, scope)
-        key = (cls, scope)
-        if key not in cls._scoped_instances:
-            cls._scoped_instances[key] = cls(scope, cls._options.for_scope(scope))
-        return cast(_S, cls._scoped_instances[key])
-
-    @classmethod
-    def reset(cls, reset_options: bool = True) -> None:
-        """Forget all option values and cached subsystem instances.
-
-        Used primarily for test isolation and to reset subsystem state for pantsd.
-        """
-        if reset_options:
-            cls._options = None
-        cls._scoped_instances = {}
-
     def __init__(self, scope: str, options: OptionValueContainer) -> None:
         super().__init__()
         self.scope = scope
         self.options = options
-
-    @staticmethod
-    def get_streaming_workunit_callbacks(subsystem_names: Iterable[str]) -> List[Callable]:
-        """This method is used to dynamically generate a list of callables intended to be passed to
-        StreamingWorkunitHandler. The caller provides a collection of strings representing a Python
-        import path to a class that implements the `Subsystem` class. It will then inspect these
-        classes for the presence of a special method called `handle_workunits`, which will.
-
-        be called with a set of kwargs - see the docstring for StreamingWorkunitHandler.
-
-        For instance, you might invoke this method with something like:
-
-        `Subsystem.get_streaming_workunit_callbacks(["pants.reporting.workunits.Workunit"])`
-
-        And this will result in the method attempting to dynamically-import a
-        module called "pants.reporting.workunits", inspecting it for the presence
-        of a class called `Workunit`, getting a global instance of this Subsystem,
-        and returning a list containing a single reference to the
-        `handle_workunits` method defined on it - and returning an empty list and
-        emitting warnings if any of these steps fail.
-        """
-
-        callables = []
-
-        for name in subsystem_names:
-            try:
-                name_components = name.split(".")
-                module_name = ".".join(name_components[:-1])
-                class_name = name_components[-1]
-                module = importlib.import_module(module_name)
-                subsystem_class = getattr(module, class_name)
-            except (IndexError, AttributeError, ModuleNotFoundError, ValueError) as e:
-                logger.warning(f"Invalid module name: {name}: {e}")
-                continue
-            except ImportError as e:
-                logger.warning(f"Could not import {module_name}: {e}")
-                continue
-            try:
-                subsystem = subsystem_class.global_instance()
-            except AttributeError:
-                logger.warning(f"{subsystem_class} is not a global subsystem.")
-                continue
-
-            try:
-                callables.append(subsystem.handle_workunits)
-            except AttributeError:
-                logger.warning(
-                    f"{subsystem_class} does not have a method named `handle_workunits` defined."
-                )
-                continue
-
-        return callables
 
     @classmethod
     def subsystem_dependencies(cls) -> Tuple[Union[SubsystemDependency, Type[Subsystem]], ...]:
