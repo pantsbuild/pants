@@ -53,8 +53,13 @@ class TarBinary(BinaryPath):
     def create_archive_argv(self, request: "CreateArchive") -> Tuple[str, ...]:
         # Note that the parent directory for the output_filename must already exist.
         #
-        # The `a` arg means `tar` will choose the compression based on the file ending.
-        return (self.path, "caf", request.output_filename, *request.snapshot.files)
+        # We do not use `-a` (auto-set compression) because it does not work with older tar
+        # versions. Not all tar implementations will support these compression formats - in that
+        # case, the user will need to choose a different format.
+        compression = {ArchiveFormat.TGZ: "z", ArchiveFormat.TBZ2: "j", ArchiveFormat.TXZ: "J"}.get(
+            request.format, ""
+        )
+        return (self.path, f"c{compression}f", request.output_filename, *request.snapshot.files)
 
     def extract_archive_argv(self, *, archive_path: str, output_dir: str) -> Tuple[str, ...]:
         # Note that the `output_dir` must already exist.
