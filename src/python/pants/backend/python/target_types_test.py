@@ -23,6 +23,7 @@ from pants.backend.python.target_types import (
     PythonTestsTimeout,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
+    parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
     InjectPexBinaryEntryPointDependency,
@@ -265,6 +266,25 @@ def test_requirements_field() -> None:
             ["git+https://github.com/pypa/pip.git#egg=pip"], address=Address("demo")
         )
     assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
+
+
+def test_parse_requirements_file() -> None:
+    content = dedent(
+        """\
+        # Comment.
+        --find-links=https://duckduckgo.com
+        ansicolors>=1.18.0
+        Django==3.2 ; python_version>'3'
+        Un-Normalized-PROJECT  # Inline comment.
+        pip@ git+https://github.com/pypa/pip.git
+        """
+    )
+    assert set(parse_requirements_file(content, rel_path="foo.txt")) == {
+        Requirement.parse("ansicolors>=1.18.0"),
+        Requirement.parse("Django==3.2 ; python_version>'3'"),
+        Requirement.parse("Un-Normalized-PROJECT"),
+        Requirement.parse("pip@ git+https://github.com/pypa/pip.git"),
+    }
 
 
 def test_python_distribution_dependency_injection() -> None:
