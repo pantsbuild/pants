@@ -13,7 +13,6 @@ from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
-from pants.base.workunit import WorkUnit
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.internals.native import Native
@@ -217,8 +216,7 @@ class LocalPantsRunner:
 
         metrics = self.graph_session.scheduler_session.metrics()
         run_tracker.set_pantsd_scheduler_metrics(metrics)
-        outcome = WorkUnit.SUCCESS if code == PANTS_SUCCEEDED_EXIT_CODE else WorkUnit.FAILURE
-        run_tracker.end_run(outcome)
+        run_tracker.end_run(code)
 
     def _print_help(self, request: HelpRequest) -> ExitCode:
         global_options = self.options.for_global_scope()

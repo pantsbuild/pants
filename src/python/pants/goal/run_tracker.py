@@ -9,10 +9,10 @@ import time
 import uuid
 from collections import OrderedDict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
-from pants.base.workunit import WorkUnit
 from pants.engine.internals.native import Native
 from pants.goal.aggregated_timings import AggregatedTimings, TimingData
 from pants.option.config import Config
@@ -42,9 +42,6 @@ class RunTracker(Subsystem):
     options_scope = "run-tracker"
     help = "Tracks and times the execution of a pants run."
 
-    # The name of the tracking root for the main thread (and the foreground worker threads).
-    DEFAULT_ROOT_NAME = "main"
-
     @classmethod
     def register_options(cls, register):
         register(
@@ -69,42 +66,29 @@ class RunTracker(Subsystem):
         :API: public
         """
         super().__init__(*args, **kwargs)
-        self._run_timestamp = time.time()
-        self._cmd_line = " ".join(["pants"] + sys.argv[1:])
-        self._v2_goal_rule_names: Tuple[str, ...] = tuple()
 
-        self.run_uuid = uuid.uuid4().hex
-        # Select a globally unique ID for the run, that sorts by time.
-        millis = int((self._run_timestamp * 1000) % 1000)
-        # run_uuid is used as a part of run_id and also as a trace_id for Zipkin tracing
-        str_time = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime(self._run_timestamp))
-        self.run_id = f"pants_run_{str_time}_{millis}_{self.run_uuid}"
+        run_timestamp = time.time()
+        run_uuid = uuid.uuid4().hex
+        str_time = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime(run_timestamp))
+        millis = int((run_timestamp * 1000) % 1000)
+        self.run_id = f"pants_run_{str_time}_{millis}_{run_uuid}"
 
         # Initialized in `initialize()`.
         self.run_info_dir = None
         self.run_info = None
         self.cumulative_timings = None
-        self.self_timings = None
 
         # Initialized in `start()`.
-        self._main_root_workunit = None
+
+        self._run_start_time = None
         self._all_options: Optional[Options] = None
-
-        self._aborted = False
-
         self._has_ended: bool = False
-
         self.native = Native()
-
         self.run_logs_file: Optional[Path] = None
 
     @property
     def goals(self) -> List[str]:
         return self._all_options.goals if self._all_options else []
-
-    @property
-    def v2_goals_rule_names(self) -> Tuple[str, ...]:
-        return self._v2_goal_rule_names
 
     def start(self, all_options: Options, run_start_time: float) -> None:
         """Start tracking this pants run."""
@@ -113,11 +97,15 @@ class RunTracker(Subsystem):
 
         # Initialize the run.
 
+        self._run_start_time = run_start_time
+
         info_dir = os.path.join(self.options.pants_workdir, self.options_scope)
         self.run_info_dir = os.path.join(info_dir, self.run_id)
         self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
-        self.run_info.add_basic_info(self.run_id, self._run_timestamp)
-        self.run_info.add_info("cmd_line", self._cmd_line)
+        self.run_info.add_basic_info(self.run_id, run_start_time)
+
+        cmd_line = " ".join(["pants"] + sys.argv[1:])
+        self.run_info.add_info("cmd_line", cmd_line)
 
         # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
         link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")
@@ -129,22 +117,10 @@ class RunTracker(Subsystem):
             os.path.join(self.run_info_dir, "cumulative_timings")
         )
 
-        # Time spent in a workunit, not including its children.
-        self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, "self_timings"))
         # pantsd stats.
         self._pantsd_metrics: Dict[str, int] = dict()
 
         self._all_options = all_options
-
-        # And create the workunit.
-        self._main_root_workunit = WorkUnit(
-            run_info_dir=self.run_info_dir, parent=None, name=RunTracker.DEFAULT_ROOT_NAME, cmd=None
-        )
-        # Set the true start time in the case of e.g. the daemon.
-        self._main_root_workunit.start(run_start_time)
-
-        goal_names: Tuple[str, ...] = tuple(all_options.goals)
-        self._v2_goal_rule_names = goal_names
 
         self.run_logs_file = Path(self.run_info_dir, "logs")
         self.native.set_per_run_log_path(str(self.run_logs_file))
@@ -191,12 +167,10 @@ class RunTracker(Subsystem):
     def has_ended(self) -> bool:
         return self._has_ended
 
-    def end_run(self, outcome: int) -> None:
+    def end_run(self, exit_code: ExitCode) -> None:
         """This pants run is over, so stop tracking it.
 
         Note: If end_run() has been called once, subsequent calls are no-ops.
-
-        :return: PANTS_SUCCEEDED_EXIT_CODE or PANTS_FAILED_EXIT_CODE
         """
 
         if self.has_ended():
@@ -204,11 +178,14 @@ class RunTracker(Subsystem):
 
         self._has_ended = True
 
-        path, duration, self_time, _is_tool = self._main_root_workunit.end()
-        self.cumulative_timings.add_timing(path, duration)
-        self.self_timings.add_timing(path, self_time)
+        if self._run_start_time is None:
+            raise Exception("RunTracker.end_run() called without calling .start()")
 
-        outcome_str = WorkUnit.outcome_string(outcome)
+        duration = time.time() - self._run_start_time
+
+        self.cumulative_timings.add_timing(label="main", secs=duration)
+
+        outcome_str = "SUCCESS" if exit_code == PANTS_SUCCEEDED_EXIT_CODE else "FAILURE"
 
         if self.run_info.get_info("outcome") is None:
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
