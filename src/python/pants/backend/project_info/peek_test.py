@@ -1,12 +1,13 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import pytest
 from textwrap import dedent
 
-from pants.core.target_types import Files
+import pytest
+
 from pants.backend.project_info import peek
 from pants.backend.project_info.peek import Peek
+from pants.core.target_types import Files
 from pants.testutil.rule_runner import RuleRunner
 
 

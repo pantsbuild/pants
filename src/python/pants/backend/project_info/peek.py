@@ -6,7 +6,7 @@ import json
 import os
 from dataclasses import asdict, is_dataclass
 from enum import Enum
-from typing import Iterable, cast
+from typing import Any, Iterable, Mapping, cast
 
 from pkg_resources import Requirement
 
@@ -40,13 +40,19 @@ class PeekSubsystem(Outputting, GoalSubsystem):
             "--output",
             type=OutputOptions,
             default=OutputOptions.JSON,
-            help="which output style peek should use",
+            help=(
+                "Which output style peek should use: `json` will show each target as a seperate "
+                "entry, whereas `raw` will simply show the original non-normalized BUILD files."
+            ),
         )
         register(
             "--exclude-defaults",
             type=bool,
             default=False,
-            help="whether to exclude values matching default field values from normalized output",
+            help=(
+                "Whether to leave off values that match the target-defined default values "
+                "when using `json` output."
+            ),
         )
 
     @property
@@ -81,26 +87,24 @@ def _render_raw_build_file(fc: FileContent, encoding: str = "utf-8") -> str:
     return os.linesep.join(parts)
 
 
-def _render_json(ts: Iterable[Target], exclude_defaults: bool = False) -> str:
-    targets = [_target_to_dict(t, exclude_defaults) for t in ts]
-    data = dict(targets=targets, excludeDefaults=exclude_defaults)
-    return json.dumps(data, indent=2, cls=_PeekJsonEncoder)
-
-
 _nothing = object()
 
 
-def _target_to_dict(t: Target, exclude_defaults: bool = False, _nothing: object = _nothing) -> dict:
-    return {
-        "address": t.address.spec,
-        "target_type": t.alias,
-        **{
-            k.alias: v.value
-            for k, v in t.field_values.items()
-            # don't report default values in normalized output
-            if not (exclude_defaults and getattr(k, "default", _nothing) == v.value)
-        },
-    }
+def _render_json(ts: Iterable[Target], exclude_defaults: bool = False) -> str:
+    targets: Iterable[Mapping[str, Any]] = [
+        {
+            "address": t.address.spec,
+            "target_type": t.alias,
+            **{
+                k.alias: v.value
+                for k, v in t.field_values.items()
+                if not (exclude_defaults and getattr(k, "default", _nothing) == v.value)
+            },
+        }
+        for t in ts
+    ]
+    data = dict(targets=targets, excludeDefaults=exclude_defaults)
+    return json.dumps(data, indent=2, cls=_PeekJsonEncoder)
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
@@ -112,19 +116,14 @@ class _PeekJsonEncoder(json.JSONEncoder):
         """Return a serializable object for o."""
         if is_dataclass(o):
             return asdict(o)
-        elif isinstance(o, collections.abc.Mapping):
+        if isinstance(o, collections.abc.Mapping):
             return dict(o)
-        elif isinstance(o, collections.abc.Sequence):
+        if isinstance(o, collections.abc.Sequence):
             return list(o)
-        elif isinstance(o, self.safe_to_str_types):
+        try:
+            return super().default(o)
+        except TypeError:
             return str(o)
-        else:
-            try:
-                return super().default(o)
-            except TypeError:
-                # punt and just try str()
-                # TODO: can we find a better strategy here?
-                return str(o)
 
 
 @goal_rule
@@ -133,9 +132,7 @@ async def peek(
     subsys: PeekSubsystem,
     addresses: Addresses,
 ) -> Peek:
-    # TODO: better options for target selection (globs, transitive, etc)?
     targets: Iterable[Target]
-    # TODO: handle target not found exceptions better here
     targets = await Get(UnexpandedTargets, Addresses, addresses)
 
     if subsys.output_type == OutputOptions.RAW:
@@ -144,10 +141,11 @@ async def peek(
         )
         build_file_paths = {a.rel_path for a in build_file_addresses}
         digest_contents = await Get(DigestContents, PathGlobs(build_file_paths))
-        # TODO: programmatically determine correct encoding
         output = _render_raw(digest_contents)
     elif subsys.output_type == OutputOptions.JSON:
         output = _render_json(targets, subsys.exclude_defaults)
+    else:
+        raise AssertionError(f"output_type not one of {tuple(OutputOptions)}")
 
     with subsys.output(console) as write_stdout:
         write_stdout(output)
