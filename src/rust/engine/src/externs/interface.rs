@@ -538,6 +538,7 @@ py_class!(class PyRemotingOptions |py| {
     store_initial_timeout: u64,
     store_timeout_multiplier: f64,
     store_maximum_timeout: u64,
+    cache_eager_fetch: bool,
     execution_extra_platform_properties: Vec<(String, String)>,
     execution_headers: Vec<(String, String)>,
     execution_overall_deadline_secs: u64
@@ -559,6 +560,7 @@ py_class!(class PyRemotingOptions |py| {
         store_initial_timeout: Duration::from_millis(store_initial_timeout),
         store_timeout_multiplier,
         store_maximum_timeout: Duration::from_millis(store_maximum_timeout),
+        cache_eager_fetch,
         execution_extra_platform_properties,
         execution_headers: execution_headers.into_iter().collect(),
         execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),

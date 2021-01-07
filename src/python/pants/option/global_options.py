@@ -90,6 +90,7 @@ class ExecutionOptions:
     remote_store_initial_timeout: int
     remote_store_timeout_multiplier: float
     remote_store_maximum_timeout: int
+    remote_cache_eager_fetch: bool
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
@@ -118,6 +119,7 @@ class ExecutionOptions:
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             remote_cache_read=bootstrap_options.remote_cache_read,
             remote_cache_write=bootstrap_options.remote_cache_write,
+            remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
             remote_store_initial_timeout=bootstrap_options.remote_store_initial_timeout,
             remote_store_timeout_multiplier=bootstrap_options.remote_store_timeout_multiplier,
             remote_store_maximum_timeout=bootstrap_options.remote_store_maximum_timeout,
@@ -152,6 +154,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_enable_nailgun=False,
     remote_cache_read=False,
     remote_cache_write=False,
+    remote_cache_eager_fetch=True,
     remote_store_initial_timeout=10,
     remote_store_timeout_multiplier=2.0,
     remote_store_maximum_timeout=10,
@@ -692,21 +695,42 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
-            help="Enables remote workers for increased parallelism. (Alpha)",
+            help=(
+                "Enables remote workers for increased parallelism. (Alpha)\n\nAlternatively, you "
+                "can use `--remote-cache-read` and `--remote-cache-write` to still run everything "
+                "locally, but to use a remote cache."
+            ),
         )
         register(
             "--remote-cache-read",
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read,
             advanced=True,
-            help="Whether to enable reading from a remote cache",
+            help=(
+                "Whether to enable reading from a remote cache.\n\nThis cannot be used at the same "
+                "time as `--remote-execution`."
+            ),
         )
         register(
             "--remote-cache-write",
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.remote_cache_write,
             advanced=True,
-            help="Whether to enable writing results to a remote cache",
+            help=(
+                "Whether to enable writing results to a remote cache.\n\nThis cannot be used at "
+                "the same time as `--remote-execution`."
+            ),
+        )
+        register(
+            "--remote-cache-eager-fetch",
+            type=bool,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_eager_fetch,
+            help=(
+                "Eagerly fetch relevant content from the remote store instead of lazily fetching."
+                "\n\nThis may result in worse performance, but reduce the frequency of errors "
+                "encountered by reducing the surface area of when remote caching is used."
+            ),
         )
 
         register(
@@ -990,16 +1014,26 @@ class GlobalOptions(Subsystem):
                 "`--remote-store-server` to work properly."
             )
 
+        if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
+            raise OptionsError(
+                "`--remote-execution` cannot be set at the same time as either "
+                "`--remote-cache-read` or `--remote-cache-write`.\n\nIf remote execution is "
+                "enabled, it will already use remote caching."
+            )
+
         # Ensure that timeout values are non-zero.
         if opts.remote_store_initial_timeout <= 0:
             raise OptionsError(
-                "The --remote-store-initial-timeout option requires a positive number of milliseconds."
+                "The --remote-store-initial-timeout option requires a positive number of "
+                "milliseconds."
             )
         if opts.remote_store_timeout_multiplier <= 0.0:
             raise OptionsError(
-                "The --remote-store-timeout-multiplier option requires a positive number for the multiplier."
+                "The --remote-store-timeout-multiplier option requires a positive number for the "
+                "multiplier."
             )
         if opts.remote_store_maximum_timeout <= 0:
             raise OptionsError(
-                "The --remote-store-initial-timeout option requires a positive number of milliseconds."
+                "The --remote-store-initial-timeout option requires a positive number of "
+                "milliseconds."
             )

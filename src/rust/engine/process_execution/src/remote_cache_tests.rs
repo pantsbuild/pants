@@ -12,12 +12,14 @@ use fs::RelativePath;
 use hashing::Digest;
 use maplit::hashset;
 use mock::{StubActionCache, StubCAS};
+use remexec::ActionResult;
 use store::{BackoffConfig, Store};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::relative_paths;
 use workunit_store::WorkunitStore;
 
+use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, NamedCaches, Platform, Process, ProcessMetadata,
@@ -62,6 +64,7 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir, StubCA
 fn create_cached_runner(
   local: Box<dyn CommandRunnerTrait>,
   store: Store,
+  eager_fetch: bool,
 ) -> (Box<dyn CommandRunnerTrait>, TempDir, StubActionCache) {
   let cache_dir = TempDir::new().unwrap();
   let action_cache = StubActionCache::new().unwrap();
@@ -77,6 +80,7 @@ fn create_cached_runner(
       Platform::current().unwrap(),
       true,
       true,
+      eager_fetch,
     )
     .expect("caching command runner"),
   );
@@ -112,7 +116,7 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
 
   let local_result = local.run(process.clone().into(), Context::default()).await;
 
-  let (caching, _cache_dir, _stub_action_cache) = create_cached_runner(local, store.clone());
+  let (caching, _cache_dir, _stub_action_cache) = create_cached_runner(local, store.clone(), false);
 
   let uncached_result = caching
     .run(process.clone().into(), Context::default())
@@ -158,7 +162,7 @@ async fn skip_cache_on_error() {
   workunit_store.init_thread_state(None);
 
   let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
-  let (caching, _cache_dir, stub_action_cache) = create_cached_runner(local, store.clone());
+  let (caching, _cache_dir, stub_action_cache) = create_cached_runner(local, store.clone(), false);
   let (process, _script_path, _script_dir) = create_script(0);
 
   stub_action_cache
@@ -172,6 +176,58 @@ async fn skip_cache_on_error() {
     .unwrap();
 
   assert_eq!(result.exit_code, 0);
+}
+
+/// With eager_fetch enabled, we should skip the remote cache if any of the process result's
+/// digests are invalid. This will force rerunning the process locally. Otherwise, we should use
+/// the cached result with its non-existent digests.
+#[tokio::test]
+async fn eager_fetch() {
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
+
+  async fn run_process(eager_fetch: bool) -> FallibleProcessResultWithPlatform {
+    let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
+    let (caching, _cache_dir, stub_action_cache) =
+      create_cached_runner(local, store.clone(), eager_fetch);
+
+    // Get the `action_digest` for the Process that we're going to run. This will allow us to
+    // insert a bogus value into the `stub_action_cache`.
+    let (process, _script_path, _script_dir) = create_script(1);
+    let (action, command, _exec_request) =
+      make_execute_request(&process, ProcessMetadata::default()).unwrap();
+    let (_command_digest, action_digest) = ensure_action_stored_locally(&store, &command, &action)
+      .await
+      .unwrap();
+
+    // Insert an ActionResult with missing digests and a return code of 0 (instead of 1).
+    let bogus_action_result = ActionResult {
+      exit_code: 0,
+      stdout_digest: Some(TestData::roland().digest().into()),
+      stderr_digest: Some(TestData::roland().digest().into()),
+      ..ActionResult::default()
+    };
+    stub_action_cache
+      .action_map
+      .lock()
+      .insert(action_digest.0, bogus_action_result);
+
+    // Run the process, possibly by pulling from the `ActionCache`.
+    caching
+      .run(process.clone().into(), Context::default())
+      .await
+      .unwrap()
+  }
+
+  let lazy_result = run_process(false).await;
+  assert_eq!(lazy_result.exit_code, 0);
+  assert_eq!(lazy_result.stdout_digest, TestData::roland().digest());
+  assert_eq!(lazy_result.stderr_digest, TestData::roland().digest());
+
+  let eager_result = run_process(true).await;
+  assert_eq!(eager_result.exit_code, 1);
+  assert_ne!(eager_result.stdout_digest, TestData::roland().digest());
+  assert_ne!(eager_result.stderr_digest, TestData::roland().digest());
 }
 
 #[tokio::test]
@@ -334,6 +390,7 @@ async fn make_action_result_basic() {
     Platform::current().unwrap(),
     true,
     true,
+    false,
   )
   .expect("caching command runner");
 

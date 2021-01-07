@@ -41,6 +41,7 @@ pub struct CommandRunner {
   platform: Platform,
   cache_read: bool,
   cache_write: bool,
+  eager_fetch: bool,
 }
 
 impl CommandRunner {
@@ -55,6 +56,7 @@ impl CommandRunner {
     platform: Platform,
     cache_read: bool,
     cache_write: bool,
+    eager_fetch: bool,
   ) -> Result<Self, String> {
     let tls_client_config = match root_ca_certs {
       Some(pem_bytes) => Some(grpc_util::create_tls_config(pem_bytes)?),
@@ -123,6 +125,7 @@ impl CommandRunner {
       platform,
       cache_read,
       cache_write,
+      eager_fetch,
     })
   }
 
@@ -461,6 +464,7 @@ impl crate::CommandRunner for CommandRunner {
           &context,
           self.action_cache_client.clone(),
           self.store.clone(),
+          self.eager_fetch,
         ),
         |_, md| md,
       )

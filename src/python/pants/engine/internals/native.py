@@ -29,6 +29,7 @@ from pants.engine.internals.native_engine import (
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import Get
 from pants.engine.unions import union
+from pants.option.global_options import ExecutionOptions
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
@@ -243,7 +244,7 @@ class Native(metaclass=SingletonMetaclass):
         ignore_patterns: List[str],
         use_gitignore: bool,
         executor: PyExecutor,
-        execution_options,
+        execution_options: ExecutionOptions,
         types: PyTypes,
     ) -> PyScheduler:
         """Create and return a native Scheduler."""
@@ -264,6 +265,7 @@ class Native(metaclass=SingletonMetaclass):
             store_initial_timeout=execution_options.remote_store_initial_timeout,
             store_timeout_multiplier=execution_options.remote_store_timeout_multiplier,
             store_maximum_timeout=execution_options.remote_store_maximum_timeout,
+            cache_eager_fetch=execution_options.remote_cache_eager_fetch,
             execution_extra_platform_properties=tuple(
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties

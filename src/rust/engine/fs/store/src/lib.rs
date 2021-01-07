@@ -239,7 +239,7 @@ impl Store {
   /// Because both underlying stores are reference counted, this is cheap, and has no effect on
   /// other clones of the Store.
   ///
-  fn into_local_only(self) -> Store {
+  pub fn into_local_only(self) -> Store {
     Store {
       local: self.local,
       remote: None,
