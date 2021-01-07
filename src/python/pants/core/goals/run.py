@@ -74,14 +74,14 @@ class RunSubsystem(GoalSubsystem):
             '`--run-args="val1 val2 --debug"`',
         )
         register(
-            "--env-vars",
+            "--extra-env-vars",
             type=list,
             member_type=str,
             default=[],
             help=(
-                "Environment variables to set in the running process. "
-                "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
-                "`ENV_VAR` to copy the value of a variable in Pants's own environment."
+                "Extra environment variables to set in the running process. "
+                "Entries are strings of the form `ENV_VAR=value`. "
+                "Note that Pants's own environment is also passed through to the run process."
             ),
         )
 
