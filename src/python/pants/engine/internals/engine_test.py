@@ -35,6 +35,7 @@ from pants.engine.streaming_workunit_handler import (
     StreamingWorkunitHandler,
 )
 from pants.goal.run_tracker import RunTracker
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.logging import LogLevel
 
@@ -277,6 +278,17 @@ class WorkunitTracker:
             self.finished_workunit_chunks.append(completed_workunits)
 
 
+def new_run_tracker() -> RunTracker:
+    # NB: A RunTracker usually observes "all options" (`get_full_options`), but it only actually
+    # directly consumes bootstrap options.
+    return RunTracker(create_options_bootstrapper([]).bootstrap_options)
+
+
+@pytest.fixture
+def run_tracker() -> RunTracker:
+    return new_run_tracker()
+
+
 class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
     def _fixture_for_rules(
         self, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
@@ -286,7 +298,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
             scheduler,
-            run_tracker=RunTracker(None),  # type: ignore[arg-type]
+            run_tracker=new_run_tracker(),
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
             max_workunit_verbosity=max_workunit_verbosity,
@@ -644,11 +656,11 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_more_complicated_engine_aware(rule_runner: RuleRunner) -> None:
+def test_more_complicated_engine_aware(rule_runner: RuleRunner, run_tracker: RunTracker) -> None:
     tracker = WorkunitTracker()
     handler = StreamingWorkunitHandler(
         rule_runner.scheduler,
-        run_tracker=RunTracker(None),  # type: ignore[arg-type]
+        run_tracker=run_tracker,
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.TRACE,
@@ -699,13 +711,15 @@ def test_more_complicated_engine_aware(rule_runner: RuleRunner) -> None:
     assert len(tuple(x for x in digest_contents_2 if x.content == b"gamma")) == 1
 
 
-def test_process_digests_on_streaming_workunits(rule_runner: RuleRunner) -> None:
+def test_process_digests_on_streaming_workunits(
+    rule_runner: RuleRunner, run_tracker: RunTracker
+) -> None:
     scheduler = rule_runner.scheduler
 
     tracker = WorkunitTracker()
     handler = StreamingWorkunitHandler(
         scheduler,
-        run_tracker=RunTracker(None),  # type: ignore[arg-type]
+        run_tracker=run_tracker,
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
@@ -735,7 +749,7 @@ def test_process_digests_on_streaming_workunits(rule_runner: RuleRunner) -> None
     tracker = WorkunitTracker()
     handler = StreamingWorkunitHandler(
         scheduler,
-        run_tracker=RunTracker(None),  # type: ignore[arg-type]
+        run_tracker=run_tracker,
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
@@ -776,7 +790,9 @@ def test_process_digests_on_streaming_workunits(rule_runner: RuleRunner) -> None
     assert byte_outputs[1] == result.stderr
 
 
-def test_context_object_on_streaming_workunits(rule_runner: RuleRunner) -> None:
+def test_context_object_on_streaming_workunits(
+    rule_runner: RuleRunner, run_tracker: RunTracker
+) -> None:
     scheduler = rule_runner.scheduler
 
     def callback(**kwargs) -> None:
@@ -792,7 +808,7 @@ def test_context_object_on_streaming_workunits(rule_runner: RuleRunner) -> None:
 
     handler = StreamingWorkunitHandler(
         scheduler,
-        run_tracker=RunTracker(None),  # type: ignore[arg-type]
+        run_tracker=run_tracker,
         callbacks=[callback],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
