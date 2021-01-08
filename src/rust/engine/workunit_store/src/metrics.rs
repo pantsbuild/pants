@@ -48,6 +48,8 @@ pub enum Metric {
   RemoteExecutionRPCWaitExecution,
   RemoteExecutionSuccess,
   RemoteExecutionTimeouts,
+  SpeculationLocalExecutionCompletedFirst,
+  SpeculationRemoteCacheCompletedFirst,
 }
 
 impl Metric {
@@ -74,6 +76,8 @@ impl Metric {
       RemoteExecutionRPCWaitExecution => "remote_execution_rpc_wait_execution",
       RemoteExecutionSuccess => "remote_execution_success",
       RemoteExecutionTimeouts => "remote_execution_timeouts",
+      SpeculationLocalExecutionCompletedFirst => "speculation_local_execution_completed_first",
+      SpeculationRemoteCacheCompletedFirst => "speculation_remote_cache_completed_first",
     }
   }
 }
