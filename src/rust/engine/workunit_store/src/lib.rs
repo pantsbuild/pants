@@ -728,9 +728,9 @@ impl WorkunitStore {
   /// Return all observations in binary encoded format.
   ///
   pub fn encode_observations(&self) -> Result<HashMap<String, Bytes>, String> {
-    use hdrhistogram::serialization::V2Serializer;
+    use hdrhistogram::serialization::V2DeflateSerializer;
 
-    let mut serializer = V2Serializer::new();
+    let mut serializer = V2DeflateSerializer::new();
 
     let mut result = HashMap::new();
 
