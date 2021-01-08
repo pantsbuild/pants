@@ -131,25 +131,13 @@ class RunTracker:
     def pantsd_scheduler_metrics(self) -> Dict[str, int]:
         return dict(self._pantsd_metrics)  # defensive copy
 
-    @classmethod
-    def write_stats_to_json(cls, file_name: str, stats: dict) -> None:
-        """Write stats to a local json file."""
-        params = json.dumps(stats, cls=RunTrackerOptionEncoder)
-        try:
-            safe_file_dump(file_name, params, mode="w")
-        except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
-            print(
-                f"WARNING: Failed to write stats to {file_name} due to Error: {e!r}",
-                file=sys.stderr,
-            )
-
     def run_information(self):
         """Basic information about this run."""
         run_information = self.run_info.get_as_dict()
         return run_information
 
-    def store_stats(self) -> None:
-        """Store stats about this run in local and optionally remote stats dbs."""
+    def store_stats(self, filename: str) -> None:
+        """Store stats about this run to a specified JSON file."""
 
         stats = {
             "run_info": self.run_information(),
@@ -158,10 +146,12 @@ class RunTracker:
             "recorded_options": self.get_options_to_record(),
         }
 
-        # Write stats to user-defined json file.
-        stats_json_file_name = self._all_options.for_global_scope().stats_json_file
-        if stats_json_file_name:
-            self.write_stats_to_json(stats_json_file_name, stats)
+        params = json.dumps(stats, cls=RunTrackerOptionEncoder)
+
+        try:
+            safe_file_dump(filename, params, mode="w")
+        except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
+            logger.warning(f"WARNING: Failed to write stats to {filename} due to Error: {e!r}")
 
     def has_ended(self) -> bool:
         return self._has_ended
@@ -188,7 +178,9 @@ class RunTracker:
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
             self.run_info.add_info("outcome", outcome_str, ignore_errors=True)
 
-        self.store_stats()
+        stats_json_filename = self._all_options.for_global_scope().stats_json_file
+        if stats_json_filename:
+            self.store_stats(stats_json_filename)
 
         self.native.set_per_run_log_path(None)
 
