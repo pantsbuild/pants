@@ -61,10 +61,6 @@ pub mod remote_cache;
 #[cfg(test)]
 mod remote_cache_tests;
 
-pub mod speculate;
-#[cfg(test)]
-mod speculate_tests;
-
 pub mod nailgun;
 
 pub mod named_caches;

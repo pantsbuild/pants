@@ -75,8 +75,6 @@ class ExecutionOptions:
     process_execution_remote_parallelism: Any
     process_execution_cache_namespace: Any
     process_execution_cleanup_local_dirs: Any
-    process_execution_speculation_delay: Any
-    process_execution_speculation_strategy: Any
     process_execution_use_local_cache: Any
     remote_instance_name: Any
     remote_ca_certs_path: Any
@@ -106,8 +104,6 @@ class ExecutionOptions:
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
             process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
-            process_execution_speculation_delay=bootstrap_options.process_execution_speculation_delay,
-            process_execution_speculation_strategy=bootstrap_options.process_execution_speculation_strategy,
             process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             remote_instance_name=bootstrap_options.remote_instance_name,
@@ -142,8 +138,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
     process_execution_cleanup_local_dirs=True,
-    process_execution_speculation_delay=1,
-    process_execution_speculation_strategy="none",
     process_execution_use_local_cache=True,
     remote_instance_name=None,
     remote_ca_certs_path=None,
@@ -683,15 +677,20 @@ class GlobalOptions(Subsystem):
         register(
             "--process-execution-speculation-delay",
             type=float,
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_speculation_delay,
+            default=1,
             advanced=True,
             help="Number of seconds to wait before speculating a second request for a slow process. "
             " see `--process-execution-speculation-strategy`",
+            removal_version="2.4.0.dev0",
+            removal_hint=(
+                "This option now no-ops, as speculation has been removed. It will be "
+                "re-implemented in the future."
+            ),
         )
         register(
             "--process-execution-speculation-strategy",
             choices=["remote_first", "local_first", "none"],
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_speculation_strategy,
+            default="none",
             help="Speculate a second request for an underlying process if the first one does not complete within "
             "`--process-execution-speculation-delay` seconds.\n"
             "`local_first` (default): Try to run the process locally first, "
@@ -700,6 +699,11 @@ class GlobalOptions(Subsystem):
             "and fall back to the local host if remote calls take longer than the speculation timeout.\n"
             "`none`: Do not speculate about long running processes.",
             advanced=True,
+            removal_version="2.4.0.dev0",
+            removal_hint=(
+                "This option now no-ops, as speculation has been removed. It will be "
+                "re-implemented in the future."
+            ),
         )
         register(
             "--process-execution-local-enable-nailgun",

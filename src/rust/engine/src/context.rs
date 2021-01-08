@@ -22,8 +22,7 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
-  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, CommandRunner, NamedCaches,
-  Platform, ProcessMetadata,
+  self, BoundedCommandRunner, CommandRunner, NamedCaches, Platform, ProcessMetadata,
 };
 use rand::seq::SliceRandom;
 use regex::Regex;
@@ -97,8 +96,6 @@ pub struct ExecutionStrategyOptions {
   pub local_parallelism: usize,
   pub remote_parallelism: usize,
   pub cleanup_local_dirs: bool,
-  pub speculation_delay: Duration,
-  pub speculation_strategy: String,
   pub use_local_cache: bool,
   pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
@@ -239,33 +236,16 @@ impl Core {
     // `global_options.py` already validates that both are not set at the same time.
     let maybe_remote_enabled_command_runner: Box<dyn CommandRunner> =
       if remoting_opts.execution_enable {
-        let remote_execution_command_runner = {
-          Box::new(BoundedCommandRunner::new(
-            Core::make_remote_execution_runner(
-              store,
-              process_execution_metadata,
-              &remoting_opts,
-              root_ca_certs,
-              oauth_bearer_token,
-            )?,
-            exec_strategy_opts.remote_parallelism,
-          ))
-        };
-
-        match exec_strategy_opts.speculation_strategy.as_ref() {
-          "local_first" => Box::new(SpeculatingCommandRunner::new(
-            local_command_runner,
-            remote_execution_command_runner,
-            exec_strategy_opts.speculation_delay,
-          )),
-          "remote_first" => Box::new(SpeculatingCommandRunner::new(
-            remote_execution_command_runner,
-            local_command_runner,
-            exec_strategy_opts.speculation_delay,
-          )),
-          "none" => remote_execution_command_runner,
-          _ => unreachable!(),
-        }
+        Box::new(BoundedCommandRunner::new(
+          Core::make_remote_execution_runner(
+            store,
+            process_execution_metadata,
+            &remoting_opts,
+            root_ca_certs,
+            oauth_bearer_token,
+          )?,
+          exec_strategy_opts.remote_parallelism,
+        ))
       } else if remote_caching_used {
         let action_cache_address = remote_store_servers
           .first()
