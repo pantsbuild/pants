@@ -45,7 +45,10 @@ use rand::Rng;
 use tokio::task_local;
 
 mod metrics;
-pub use metrics::Metric;
+use bytes::buf::BufMutExt;
+use bytes::{Bytes, BytesMut};
+use hdrhistogram::serialization::Serializer;
+pub use metrics::{Metric, ObservationMetric};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct SpanId(u64);
@@ -190,6 +193,7 @@ pub struct WorkunitStore {
   streaming_workunit_data: StreamingWorkunitData,
   heavy_hitters_data: HeavyHittersData,
   metrics_data: MetricsData,
+  observation_data: ObservationsData,
 }
 
 #[derive(Clone)]
@@ -513,6 +517,7 @@ impl WorkunitStore {
       streaming_workunit_data: StreamingWorkunitData::new(),
       heavy_hitters_data: HeavyHittersData::new(),
       metrics_data: MetricsData::default(),
+      observation_data: ObservationsData::default(),
     }
   }
 
@@ -701,6 +706,53 @@ impl WorkunitStore {
         });
     }
   }
+
+  ///
+  /// Records an observation of a time-like metric into a histogram.
+  ///
+  pub fn record_observation(&self, metric: ObservationMetric, value: u64) {
+    let mut histograms_by_metric = self.observation_data.observations.lock();
+    histograms_by_metric
+      .entry(metric)
+      .and_modify(|h| {
+        let _ = h.record(value);
+      })
+      .or_insert_with(|| {
+        let mut h = hdrhistogram::Histogram::<u64>::new(3).expect("Failed to allocate histogram");
+        let _ = h.record(value);
+        h
+      });
+  }
+
+  ///
+  /// Return all observations in binary encoded format.
+  ///
+  pub fn encode_observations(&self) -> Result<HashMap<String, Bytes>, String> {
+    use hdrhistogram::serialization::V2DeflateSerializer;
+
+    let mut serializer = V2DeflateSerializer::new();
+
+    let mut result = HashMap::new();
+
+    let histograms_by_metric = self.observation_data.observations.lock();
+    for (metric, histogram) in histograms_by_metric.iter() {
+      let mut writer = BytesMut::new().writer();
+
+      serializer
+        .serialize(&histogram, &mut writer)
+        .map_err(|err| {
+          format!(
+            "Failed to encode histogram for key `{}`: {}",
+            metric.as_str(),
+            err
+          )
+        })?;
+
+      result.insert(metric.as_str().to_owned(), writer.into_inner().freeze());
+    }
+
+    Ok(result)
+  }
 }
 
 pub fn format_workunit_duration(duration: Duration) -> String {
@@ -812,6 +864,20 @@ impl Default for MetricsData {
   fn default() -> MetricsData {
     MetricsData {
       counters: Arc::new(Mutex::new(HashMap::new())),
+    }
+  }
+}
+
+#[derive(Clone)]
+struct ObservationsData {
+  /// Histograms for supported observation metrics.
+  observations: Arc<Mutex<HashMap<ObservationMetric, hdrhistogram::Histogram<u64>>>>,
+}
+
+impl Default for ObservationsData {
+  fn default() -> Self {
+    ObservationsData {
+      observations: Arc::new(Mutex::new(HashMap::new())),
     }
   }
 }

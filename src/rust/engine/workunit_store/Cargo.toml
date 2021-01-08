@@ -6,8 +6,10 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+bytes = "0.5"
 concrete_time = { path = "../concrete_time" }
 hashing = { path = "../hashing" }
+hdrhistogram = "7.2"
 parking_lot = "0.11"
 rand = "0.6"
 tokio = { version = "0.2.23", features = ["rt-util"] }

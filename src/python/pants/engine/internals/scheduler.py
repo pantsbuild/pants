@@ -313,6 +313,12 @@ class Scheduler:
         )
         return {"started": result[0], "completed": result[1]}
 
+    def get_observation_histograms(self, session):
+        return self._native.lib.session_get_observation_histograms(self._scheduler, session)
+
+    def record_test_observation(self, session, value: int) -> None:
+        self._native.lib.session_record_test_observation(self._scheduler, session, value)
+
     def _run_and_return_roots(self, session, execution_request):
         try:
             raw_roots = self._native.lib.scheduler_execute(
@@ -664,3 +670,9 @@ class SchedulerSession:
 
     def garbage_collect_store(self, target_size_bytes: int) -> None:
         self._scheduler.garbage_collect_store(target_size_bytes)
+
+    def get_observation_histograms(self):
+        return self._scheduler.get_observation_histograms(self._session)
+
+    def record_test_observation(self, value: int) -> None:
+        self._scheduler.record_test_observation(self._session, value)

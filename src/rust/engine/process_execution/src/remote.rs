@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
+use std::io::Cursor;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -11,6 +12,7 @@ use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::longrunning::Operation;
 use bazel_protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
+use bazel_protos::require_digest;
 use bytes::Bytes;
 use concrete_time::TimeSpan;
 use double_checked_cell_async::DoubleCheckedCell;
@@ -38,14 +40,14 @@ use tonic::transport::{Channel, Endpoint};
 use tonic::{Code, Interceptor, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
-use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
+use workunit_store::{
+  with_workunit, Metric, ObservationMetric, SpanId, WorkunitMetadata, WorkunitStore,
+};
 
 use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
   Process, ProcessCacheScope, ProcessMetadata,
 };
-use bazel_protos::require_digest;
-use std::io::Cursor;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -276,23 +278,39 @@ impl CommandRunner {
   // Outputs progress reported by the server and returns the next actionable operation
   // or gRPC status back to the main loop (plus the operation name so the main loop can
   // reconnect).
-  async fn wait_on_operation_stream<S>(&self, mut stream: S, build_id: &str) -> StreamOutcome
+  async fn wait_on_operation_stream<S>(&self, mut stream: S, context: &Context) -> StreamOutcome
   where
     S: Stream<Item = Result<Operation, Status>> + Unpin,
   {
     let mut operation_name_opt: Option<String> = None;
+    let mut start_time_opt = Some(Instant::now());
 
     trace!(
       "wait_on_operation_stream (build_id={}): monitoring stream",
-      build_id
+      &context.build_id
     );
 
     loop {
-      match stream.next().await {
+      let item = stream.next().await;
+
+      if let Some(start_time) = start_time_opt.take() {
+        let timing: Result<i64, _> = Instant::now()
+          .duration_since(start_time)
+          .as_millis()
+          .try_into();
+        if let Ok(obs) = timing {
+          context.workunit_store.record_observation(
+            ObservationMetric::RemoteExecutionRPCFirstResponseTime,
+            obs as u64,
+          );
+        }
+      }
+
+      match item {
         Some(Ok(operation)) => {
           trace!(
             "wait_on_operation_stream (build_id={}): got operation: {:?}",
-            build_id,
+            &context.build_id,
             &operation
           );
 
@@ -665,7 +683,7 @@ impl CommandRunner {
           // or status to interpret.
           let operation_stream = operation_stream_response.into_inner();
           let stream_outcome = self
-            .wait_on_operation_stream(operation_stream, &context.build_id)
+            .wait_on_operation_stream(operation_stream, &context)
             .await;
 
           match stream_outcome {

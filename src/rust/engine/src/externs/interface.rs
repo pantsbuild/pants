@@ -54,9 +54,9 @@ use std::time::Duration;
 
 use async_latch::AsyncLatch;
 use cpython::{
-  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyDict, PyErr, PyInt,
-  PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
-  ToPyObject,
+  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyBytes, PyClone, PyDict,
+  PyErr, PyInt, PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python,
+  PythonObject, ToPyObject,
 };
 use futures::future::FutureExt;
 use futures::future::{self, TryFutureExt};
@@ -69,7 +69,7 @@ use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
-use workunit_store::{UserMetadataItem, Workunit, WorkunitState};
+use workunit_store::{ObservationMetric, UserMetadataItem, Workunit, WorkunitState};
 
 use crate::{
   externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
@@ -299,6 +299,22 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(
       py,
       session_poll_workunits(a: PyScheduler, b: PySession, c: u64)
+    ),
+  )?;
+  m.add(
+    py,
+    "session_get_observation_histograms",
+    py_fn!(
+      py,
+      session_get_observation_histograms(a: PyScheduler, b: PySession)
+    ),
+  )?;
+  m.add(
+    py,
+    "session_record_test_observation",
+    py_fn!(
+      py,
+      session_record_test_observation(a: PyScheduler, b: PySession, c: u64)
     ),
   )?;
 
@@ -1327,6 +1343,64 @@ fn session_new_run_id(py: Python, session_ptr: PySession) -> PyUnitResult {
   with_session(py, session_ptr, |session| {
     session.new_run_id();
     Ok(None)
+  })
+}
+
+fn session_get_observation_histograms(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  session_ptr: PySession,
+) -> CPyResult<PyDict> {
+  // Encoding version to return to callers. This should be bumped when the encoded histograms
+  // are encoded in a backwards-incompatible manner.
+  const OBSERVATIONS_VERSION: u64 = 0;
+
+  with_scheduler(py, scheduler_ptr, |_scheduler| {
+    with_session(py, session_ptr, |session| {
+      let observations = session
+        .workunit_store()
+        .encode_observations()
+        .map_err(|err| PyErr::new::<exc::Exception, _>(py, (err,)))?;
+
+      let encoded_observations = PyDict::new(py);
+      for (metric, encoded_histogram) in &observations {
+        encoded_observations.set_item(
+          py,
+          PyString::new(py, metric.as_str()),
+          PyBytes::new(py, &encoded_histogram[..]),
+        )?;
+      }
+
+      let result = PyDict::new(py);
+      result.set_item(
+        py,
+        PyString::new(py, "version"),
+        OBSERVATIONS_VERSION.into_py_object(py).into_object(),
+      )?;
+      result.set_item(
+        py,
+        PyString::new(py, "histograms"),
+        encoded_observations.into_object(),
+      )?;
+
+      Ok(result)
+    })
+  })
+}
+
+fn session_record_test_observation(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  session_ptr: PySession,
+  value: u64,
+) -> CPyResult<PyObject> {
+  with_scheduler(py, scheduler_ptr, |_scheduler| {
+    with_session(py, session_ptr, |session| {
+      session
+        .workunit_store()
+        .record_observation(ObservationMetric::TestObservation, value);
+      Ok(py.None())
+    })
   })
 }
 
