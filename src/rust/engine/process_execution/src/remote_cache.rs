@@ -478,11 +478,6 @@ impl crate::CommandRunner for CommandRunner {
               action_digest,
               cached_response_opt
             );
-            if cached_response_opt.is_some() {
-              context
-                .workunit_store
-                .increment_counter(Metric::SpeculationRemoteCacheCompletedFirst, 1);
-            }
             cached_response_opt
           }
           Err(err) => {
@@ -498,9 +493,13 @@ impl crate::CommandRunner for CommandRunner {
       tokio::select! {
         cache_result = cache_read_future => {
           if let Some(cached_response) = cache_result {
+            context.workunit_store.increment_counter(Metric::SpeculationRemoteCacheCompletedFirst, 1);
             return Ok(cached_response);
           } else {
-           local_execution_future.await?
+            // Note that we don't increment a counter here, as there is nothing of note in this
+            // scenario: the remote cache did not save unnecessary local work, nor was the remote
+            // trip unusually slow such that local execution was faster.
+            local_execution_future.await?
           }
         }
         local_result = &mut local_execution_future => {
