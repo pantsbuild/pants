@@ -30,7 +30,7 @@ struct RoundtripResults {
   maybe_cached: Result<FallibleProcessResultWithPlatform, String>,
 }
 
-fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir, StubCAS) {
+fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store) {
   let runtime = task_executor::Executor::new();
   let base_dir = TempDir::new().unwrap();
   let named_cache_dir = base_dir.path().join("named_cache_dir");
@@ -58,15 +58,14 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir, StubCA
     NamedCaches::new(named_cache_dir),
     true,
   ));
-  (runner, store, base_dir, stub_cas)
+  (runner, store)
 }
 
 fn create_cached_runner(
   local: Box<dyn CommandRunnerTrait>,
   store: Store,
   eager_fetch: bool,
-) -> (Box<dyn CommandRunnerTrait>, TempDir, StubActionCache) {
-  let cache_dir = TempDir::new().unwrap();
+) -> (Box<dyn CommandRunnerTrait>, StubActionCache) {
   let action_cache = StubActionCache::new().unwrap();
   let runner = Box::new(
     crate::remote_cache::CommandRunner::new(
@@ -84,10 +83,10 @@ fn create_cached_runner(
     )
     .expect("caching command runner"),
   );
-  (runner, cache_dir, action_cache)
+  (runner, action_cache)
 }
 
-fn create_script(script_exit_code: i8) -> (Process, PathBuf, TempDir) {
+fn create_script(script_exit_code: i8) -> (Process, PathBuf) {
   let script_dir = TempDir::new().unwrap();
   let script_path = script_dir.path().join("script");
   std::fs::File::create(&script_path)
@@ -107,16 +106,16 @@ fn create_script(script_exit_code: i8) -> (Process, PathBuf, TempDir) {
   ])
   .output_files(relative_paths(&["roland"]).collect());
 
-  (process, script_path, script_dir)
+  (process, script_path)
 }
 
 async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
-  let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
-  let (process, script_path, _script_dir) = create_script(script_exit_code);
+  let (local, store) = create_local_runner();
+  let (process, script_path) = create_script(script_exit_code);
 
   let local_result = local.run(process.clone().into(), Context::default()).await;
 
-  let (caching, _cache_dir, _stub_action_cache) = create_cached_runner(local, store.clone(), false);
+  let (caching, _stub_action_cache) = create_cached_runner(local, store.clone(), false);
 
   let uncached_result = caching
     .run(process.clone().into(), Context::default())
@@ -156,9 +155,9 @@ async fn failures_not_cached() {
 async fn skip_cache_on_error() {
   WorkunitStore::setup_for_tests();
 
-  let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
-  let (caching, _cache_dir, stub_action_cache) = create_cached_runner(local, store.clone(), false);
-  let (process, _script_path, _script_dir) = create_script(0);
+  let (local, store) = create_local_runner();
+  let (caching, stub_action_cache) = create_cached_runner(local, store.clone(), false);
+  let (process, _script_path) = create_script(0);
 
   stub_action_cache
     .always_errors
@@ -181,13 +180,12 @@ async fn eager_fetch() {
   WorkunitStore::setup_for_tests();
 
   async fn run_process(eager_fetch: bool) -> FallibleProcessResultWithPlatform {
-    let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
-    let (caching, _cache_dir, stub_action_cache) =
-      create_cached_runner(local, store.clone(), eager_fetch);
+    let (local, store) = create_local_runner();
+    let (caching, stub_action_cache) = create_cached_runner(local, store.clone(), eager_fetch);
 
     // Get the `action_digest` for the Process that we're going to run. This will allow us to
     // insert a bogus value into the `stub_action_cache`.
-    let (process, _script_path, _script_dir) = create_script(1);
+    let (process, _script_path) = create_script(1);
     let (action, command, _exec_request) =
       make_execute_request(&process, ProcessMetadata::default()).unwrap();
     let (_command_digest, action_digest) = ensure_action_stored_locally(&store, &command, &action)
