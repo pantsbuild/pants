@@ -9,12 +9,11 @@ import time
 import uuid
 from collections import OrderedDict
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
 from pants.engine.internals.native import Native
-from pants.goal.aggregated_timings import AggregatedTimings, TimingData
 from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
@@ -95,11 +94,6 @@ class RunTracker:
         self.run_info_dir = os.path.join(info_dir, self.run_id)
         self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
 
-        # Time spent in a workunit, including its children.
-        self.cumulative_timings = AggregatedTimings(
-            os.path.join(self.run_info_dir, "cumulative_timings")
-        )
-
         # pantsd stats.
         self._pantsd_metrics: Dict[str, int] = dict()
 
@@ -108,6 +102,7 @@ class RunTracker:
 
         # Initialized in `start()`.
         self._run_start_time: Optional[float] = None
+        self._run_total_duration: Optional[float] = None
 
     @property
     def goals(self) -> List[str]:
@@ -185,8 +180,7 @@ class RunTracker:
             raise Exception("RunTracker.end_run() called without calling .start()")
 
         duration = time.time() - self._run_start_time
-
-        self.cumulative_timings.add_timing(label="main", secs=duration)
+        self._total_run_time = duration
 
         outcome_str = "SUCCESS" if exit_code == PANTS_SUCCEEDED_EXIT_CODE else "FAILURE"
 
@@ -200,8 +194,8 @@ class RunTracker:
 
         return
 
-    def get_cumulative_timings(self) -> TimingData:
-        return self.cumulative_timings.get_all()
+    def get_cumulative_timings(self) -> List[Dict[str, Any]]:
+        return [{"label": "main", "timing": self._total_run_time}]
 
     def get_options_to_record(self) -> dict:
         recorded_options = {}
