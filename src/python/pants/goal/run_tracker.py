@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import json
 import logging
 import os
 import sys
@@ -19,7 +18,7 @@ from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.subsystem import Subsystem
-from pants.util.dirutil import relative_symlink, safe_file_dump
+from pants.util.dirutil import relative_symlink
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +47,7 @@ class DeprecatedRunTracker(Subsystem):
             advanced=True,
             default=None,
             removal_version="2.3.0.dev0",
-            removal_hint=(
-                "This option is now a noop: instead, use global option " "`--stats-json-file`."
-            ),
+            removal_hint=("This option has been removed."),
             help="Write stats to this local json file on run completion.",
         )
         register(
@@ -131,37 +128,10 @@ class RunTracker:
     def pantsd_scheduler_metrics(self) -> Dict[str, int]:
         return dict(self._pantsd_metrics)  # defensive copy
 
-    @classmethod
-    def write_stats_to_json(cls, file_name: str, stats: dict) -> None:
-        """Write stats to a local json file."""
-        params = json.dumps(stats, cls=RunTrackerOptionEncoder)
-        try:
-            safe_file_dump(file_name, params, mode="w")
-        except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
-            print(
-                f"WARNING: Failed to write stats to {file_name} due to Error: {e!r}",
-                file=sys.stderr,
-            )
-
     def run_information(self):
         """Basic information about this run."""
         run_information = self.run_info.get_as_dict()
         return run_information
-
-    def store_stats(self) -> None:
-        """Store stats about this run in local and optionally remote stats dbs."""
-
-        stats = {
-            "run_info": self.run_information(),
-            "pantsd_stats": self.pantsd_scheduler_metrics,
-            "cumulative_timings": self.get_cumulative_timings(),
-            "recorded_options": self.get_options_to_record(),
-        }
-
-        # Write stats to user-defined json file.
-        stats_json_file_name = self._all_options.for_global_scope().stats_json_file
-        if stats_json_file_name:
-            self.write_stats_to_json(stats_json_file_name, stats)
 
     def has_ended(self) -> bool:
         return self._has_ended
@@ -187,8 +157,6 @@ class RunTracker:
         if self.run_info.get_info("outcome") is None:
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
             self.run_info.add_info("outcome", outcome_str, ignore_errors=True)
-
-        self.store_stats()
 
         self.native.set_per_run_log_path(None)
 

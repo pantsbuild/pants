@@ -415,12 +415,6 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--stats-json-file",
-            advanced=True,
-            default=None,
-            help="Write stats to this local json file on run completion.",
-        )
-        register(
             "--stats-record-option-scopes",
             advanced=True,
             type=list,
