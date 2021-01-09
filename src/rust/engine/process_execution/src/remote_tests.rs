@@ -546,8 +546,7 @@ async fn make_execute_request_with_timeout() {
 
 #[tokio::test]
 async fn successful_with_only_call_to_execute() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();
 
@@ -595,8 +594,7 @@ async fn successful_with_only_call_to_execute() {
 
 #[tokio::test]
 async fn successful_after_reconnect_with_wait_execution() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();
 
@@ -645,8 +643,7 @@ async fn successful_after_reconnect_with_wait_execution() {
 
 #[tokio::test]
 async fn successful_after_reconnect_from_retryable_error() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
   let op_name_1 = "gimme-foo".to_string();
   let op_name_2 = "gimme-bar".to_string();
@@ -705,8 +702,7 @@ async fn successful_after_reconnect_from_retryable_error() {
 
 #[tokio::test]
 async fn successful_served_from_action_cache() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -747,8 +743,7 @@ async fn successful_served_from_action_cache() {
 
 #[tokio::test]
 async fn server_rejecting_execute_request_gives_error() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let execute_request = echo_foo_request();
 
@@ -786,8 +781,7 @@ async fn server_rejecting_execute_request_gives_error() {
 
 #[tokio::test]
 async fn server_sending_triggering_timeout_with_deadline_exceeded() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let execute_request = echo_foo_request();
 
@@ -823,8 +817,7 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
 
 #[tokio::test]
 async fn sends_headers() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();
@@ -933,8 +926,7 @@ async fn sends_headers() {
 
 #[tokio::test]
 async fn extract_response_with_digest_stdout() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
@@ -1017,8 +1009,7 @@ async fn extract_response_with_digest_stdout_osx_remote() {
 
 #[tokio::test]
 async fn ensure_inline_stdio_is_stored() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let runtime = task_executor::Executor::new();
 
@@ -1128,9 +1119,7 @@ async fn ensure_inline_stdio_is_stored() {
 
 #[tokio::test]
 async fn bad_result_bytes() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1173,9 +1162,7 @@ async fn bad_result_bytes() {
 
 #[tokio::test]
 async fn initial_response_error() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1228,9 +1215,7 @@ async fn initial_response_error() {
 
 #[tokio::test]
 async fn initial_response_missing_response_and_error() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1274,9 +1259,7 @@ async fn initial_response_missing_response_and_error() {
 
 #[tokio::test]
 async fn fails_after_retry_limit_exceeded() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1335,9 +1318,7 @@ async fn fails_after_retry_limit_exceeded() {
 
 #[tokio::test]
 async fn fails_after_retry_limit_exceeded_with_stream_close() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1397,9 +1378,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
 
 #[tokio::test]
 async fn execute_missing_file_uploads_if_known() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let runtime = task_executor::Executor::new();
 
   let roland = TestData::roland();
@@ -1510,9 +1489,7 @@ async fn execute_missing_file_uploads_if_known() {
 
 #[tokio::test]
 async fn execute_missing_file_errors_if_unknown() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let missing_digest = TestDirectory::containing_roland().digest();
 
   let mock_server = {
@@ -1754,8 +1731,7 @@ async fn extract_execute_response_other_status() {
 
 #[tokio::test]
 async fn remote_workunits_are_stored() {
-  let mut workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  let mut workunit_store = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();

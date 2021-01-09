@@ -528,6 +528,12 @@ impl WorkunitStore {
     }))
   }
 
+  pub fn setup_for_tests() -> WorkunitStore {
+    let store = WorkunitStore::new(false);
+    store.init_thread_state(None);
+    store
+  }
+
   pub fn log_straggling_workunits(&self, threshold: Duration) {
     if let Some(stragglers_msg) = self
       .heavy_hitters_data
