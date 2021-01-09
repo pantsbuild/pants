@@ -123,6 +123,7 @@ release_notes = """
   '2.0.x': 'src/python/pants/notes/2.0.x.rst',
   '2.1.x': 'src/python/pants/notes/2.1.x.rst',
   '2.2.x': 'src/python/pants/notes/2.2.x.md',
+  '2.3.x': 'src/python/pants/notes/2.3.x.md',
 }
 """
 
