@@ -7,12 +7,7 @@ See https://www.pantsbuild.org/docs/python-linters-and-formatters and https://ww
 """
 
 from pants.backend.python.lint.pylint import rules as pylint_rules
-from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
 
 
 def rules():
     return pylint_rules.rules()
-
-
-def target_types():
-    return [PylintSourcePlugin]
