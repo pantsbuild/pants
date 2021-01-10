@@ -122,17 +122,6 @@ class Field:
         self._check_deprecated(raw_value, address)
         self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address=address)
 
-        if not address.is_file_target and not hasattr(self, "help"):
-            warn_or_error(
-                removal_version="2.3.0.dev0",
-                deprecated_entity_description="not setting `help` on a `Field`",
-                hint=(
-                    "Please set the class property `help: str` for the field "
-                    f"`{self.__class__}`. In Pants 2.3, Pants will no longer look at the docstring "
-                    "for help messages and it will error if `help` is not defined."
-                ),
-            )
-
     @classmethod
     def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
         """Convert the `raw_value` into `self.value`.
@@ -315,17 +304,6 @@ class Target:
                 hint=(
                     f"Using the `{self.alias}` target type for {address}. "
                     f"{self.deprecated_removal_hint}"
-                ),
-            )
-
-        if not address.is_file_target and not hasattr(self, "help"):
-            warn_or_error(
-                removal_version="2.3.0.dev0",
-                deprecated_entity_description="not setting `help` on a `Target`",
-                hint=(
-                    "Please set the class property `help: str` for the target type "
-                    f"`{self.__class__}`. In Pants 2.3, Pants will no longer look at the docstring "
-                    "for help messages and it will error if `help` is not defined."
                 ),
             )
 

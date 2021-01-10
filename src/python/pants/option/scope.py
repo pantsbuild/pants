@@ -4,9 +4,7 @@
 from dataclasses import dataclass
 from typing import Optional, Type, cast
 
-from pants.base.deprecated import warn_or_error
 from pants.option.option_value_container import OptionValueContainer
-from pants.util.memo import memoized_property
 
 GLOBAL_SCOPE = ""
 GLOBAL_SCOPE_CONFIG_SECTION = "GLOBAL"
@@ -36,22 +34,9 @@ class ScopeInfo:
     removal_version: Optional[str] = None
     removal_hint: Optional[str] = None
 
-    # TODO: We only memoize this to avoid repeating the deprecation warning. Revert back once the
-    #  deprecation is finished.
-    @memoized_property
+    @property
     def description(self) -> str:
-        if hasattr(self.optionable_cls, "help"):
-            return cast(str, getattr(self.optionable_cls, "help"))
-        warn_or_error(
-            removal_version="2.3.0.dev0",
-            deprecated_entity_description="not setting `help` on a `Subsystem`",
-            hint=(
-                "Please set the class property `help: str` for the subsystem "
-                f"`{self.optionable_cls}`. In Pants 2.3, Pants will no longer look at the "
-                f"docstring or help messages and it will error if `help` is not defined."
-            ),
-        )
-        return cast(str, self._optionable_cls_attr("get_description", lambda: "")())
+        return cast(str, getattr(self.optionable_cls, "help"))
 
     @property
     def deprecated_scope(self) -> Optional[str]:
