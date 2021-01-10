@@ -112,14 +112,12 @@ def test_inject_handler_dependency(rule_runner: RuleRunner) -> None:
         "project",
         dedent(
             """\
-            python_library(sources=['app.py'])
+            python_library()
             python_awslambda(name='first_party', handler='project.app:func', runtime='python3.7')
             python_awslambda(name='first_party_shorthand', handler='app.py:func', runtime='python3.7')
             python_awslambda(name='third_party', handler='colors:func', runtime='python3.7')
             python_awslambda(name='unrecognized', handler='who_knows.module:func', runtime='python3.7')
-            python_awslambda(
-                name='self', sources=['self.py'], handler='project.self:func', runtime='python3.7'
-            )
+            python_awslambda(name='self', handler='self.py:func', runtime='python3.7')
             """
         ),
     )
@@ -146,7 +144,8 @@ def test_inject_handler_dependency(rule_runner: RuleRunner) -> None:
     )
     assert_injected(Address("project", target_name="unrecognized"), expected=None)
     assert_injected(
-        Address("project", target_name="self", relative_file_path="self.py"), expected=None
+        Address("project", target_name="self"),
+        expected=Address("project", relative_file_path="self.py"),
     )
 
     # Test that we can turn off the injection.
