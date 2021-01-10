@@ -186,7 +186,7 @@ def test_archive() -> None:
     )
 
     rule_runner.create_file("project/app.py", "print('hello world!')")
-    rule_runner.add_to_build_file("project", "pex_binary(sources=['app.py'])")
+    rule_runner.add_to_build_file("project", "pex_binary(entry_point='app.py')")
 
     rule_runner.add_to_build_file(
         "",
