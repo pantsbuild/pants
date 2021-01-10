@@ -641,31 +641,6 @@ class TransitiveTargetsRequest:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TransitiveTargetsRequestLite:
-    """A request to get the transitive dependencies of the input roots, but without considering
-    dependency inference.
-
-    This solely exists due to graph ambiguity with codegen implementations. Use
-    `TransitiveTargetsRequest` everywhere other than codegen.
-    """
-
-    roots: Tuple[Address, ...]
-
-    def __init__(self, roots: Iterable[Address]) -> None:
-        warn_or_error(
-            removal_version="2.3.0.dev0",
-            deprecated_entity_description="`TransitiveTargetsRequestLite`",
-            hint=(
-                "Rather than `Get(TransitiveTargets, TransitiveTargetsRequestLite)`, use "
-                "`Get(TransitiveTargets, TransitiveTargetsRequest)`. There is no more need for "
-                "`TransitiveTargetsRequestLite` because the rule graph cycle has been resolved."
-            ),
-        )
-        self.roots = tuple(roots)
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
 class RegisteredTargetTypes:
     aliases_to_types: FrozenDict[str, Type[Target]]
 
@@ -1568,31 +1543,6 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
     include_special_cased_deps: bool = False
-
-    def debug_hint(self) -> str:
-        return self.field.address.spec
-
-
-@dataclass(frozen=True)
-class DependenciesRequestLite(EngineAwareParameter):
-    """Like DependenciesRequest, but does not use dependency inference.
-
-    This solely exists due to graph ambiguity with codegen. Use `DependenciesRequest` everywhere but
-    with codegen.
-    """
-
-    field: Dependencies
-
-    def __post_init__(self) -> None:
-        warn_or_error(
-            removal_version="2.3.0.dev0",
-            deprecated_entity_description="`DependenciesRequestLite`",
-            hint=(
-                "Rather than `Get(Targets, DependenciesRequestLite)`, use "
-                "`Get(Targets, DependenciesRequest)`. There is no more need for "
-                "`DependenciesRequestLite` because the rule graph cycle has been resolved."
-            ),
-        )
 
     def debug_hint(self) -> str:
         return self.field.address.spec
