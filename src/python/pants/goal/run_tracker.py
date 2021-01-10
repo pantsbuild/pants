@@ -17,7 +17,6 @@ from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.option.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink
 
 logger = logging.getLogger(__name__)
@@ -34,37 +33,6 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
         if isinstance(o, OrderedDict):
             return o
         return super().default(o)
-
-
-class DeprecatedRunTracker(Subsystem):
-    options_scope = "run-tracker"
-    help = "Tracks and times the execution of a pants run."
-
-    @classmethod
-    def register_options(cls, register):
-        register(
-            "--stats-local-json-file",
-            advanced=True,
-            default=None,
-            removal_version="2.3.0.dev0",
-            removal_hint=("This option has been removed."),
-            help="Write stats to this local json file on run completion.",
-        )
-        register(
-            "--stats-option-scopes-to-record",
-            advanced=True,
-            type=list,
-            default=["*"],
-            removal_version="2.3.0.dev0",
-            removal_hint=(
-                "This option is now a noop: instead, use global option "
-                "`--stats-record-option-scopes`."
-            ),
-            help="Option scopes to record in stats on run completion. "
-            "Options may be selected by joining the scope and the option with a ^ character, "
-            "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "
-            "Add a '*' to the list to capture all known scopes.",
-        )
 
 
 class RunTracker:
