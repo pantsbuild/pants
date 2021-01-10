@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.target_types import (
-    DeprecatedPexBinarySources,
     PexAlwaysWriteCacheField,
     PexBinaryDefaults,
     PexEmitWarningsField,
@@ -39,9 +38,8 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
-    required_fields = (PexEntryPointField, DeprecatedPexBinarySources)
+    required_fields = (PexEntryPointField,)
 
-    sources: DeprecatedPexBinarySources
     entry_point: PexEntryPointField
 
     output_path: OutputPathField
@@ -75,7 +73,7 @@ async def package_pex_binary(
     field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults
 ) -> BuiltPackage:
     resolved_entry_point = await Get(
-        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point, field_set.sources)
+        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)
     )
     output_filename = field_set.output_path.value_or_default(field_set.address, file_ending="pex")
     two_step_pex = await Get(

@@ -1,17 +1,18 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 from textwrap import dedent
 from typing import List, Optional
 
 import pytest
+from _pytest.logging import LogCaptureFixture
 from pkg_resources import Requirement
 
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
-    DeprecatedPexBinarySources,
     PexBinary,
     PexBinaryDependencies,
     PexEntryPointField,
@@ -85,14 +86,32 @@ def test_timeout_calculation() -> None:
         ("path.to.module:func", []),
         ("lambda.py", ["project/dir/lambda.py"]),
         ("lambda.py:func", ["project/dir/lambda.py"]),
-        # Soon to be deprecated.
-        (None, []),
-        (":func", []),
     ),
 )
 def test_entry_point_filespec(entry_point: Optional[str], expected: List[str]) -> None:
     field = PexEntryPointField(entry_point, address=Address("project/dir"))
     assert field.filespec == {"includes": expected}
+
+
+def test_entry_point_validation(caplog: LogCaptureFixture) -> None:
+    addr = Address("src/python/project")
+
+    with pytest.raises(InvalidFieldException):
+        PexEntryPointField(" ", address=addr)
+    with pytest.raises(InvalidFieldException):
+        PexEntryPointField("modue:func:who_knows_what_this_is", address=addr)
+    with pytest.raises(InvalidFieldException):
+        PexEntryPointField(":func", address=addr)
+
+    ep = "custom.entry_point:"
+    with caplog.at_level(logging.WARNING):
+        assert "custom.entry_point" == PexEntryPointField(ep, address=addr).value
+
+    assert len(caplog.record_tuples) == 1
+    _, levelno, message = caplog.record_tuples[0]
+    assert logging.WARNING == levelno
+    assert ep in message
+    assert str(addr) in message
 
 
 def test_resolve_pex_binary_entry_point() -> None:
@@ -103,47 +122,26 @@ def test_resolve_pex_binary_entry_point() -> None:
         ]
     )
 
-    def assert_resolved(
-        *, entry_point: Optional[str], source: Optional[str] = None, expected: Optional[str]
-    ) -> None:
+    def assert_resolved(*, entry_point: Optional[str], expected: Optional[str]) -> None:
         addr = Address("src/python/project")
         rule_runner.create_file("src/python/project/app.py")
         rule_runner.create_file("src/python/project/f2.py")
         ep_field = PexEntryPointField(entry_point, address=addr)
-        sources = DeprecatedPexBinarySources([source] if source else None, address=addr)
-        result = rule_runner.request(
-            ResolvedPexEntryPoint, [ResolvePexEntryPointRequest(ep_field, sources)]
-        )
+        result = rule_runner.request(ResolvedPexEntryPoint, [ResolvePexEntryPointRequest(ep_field)])
         assert result.val == expected
 
     # Full module provided.
     assert_resolved(entry_point="custom.entry_point", expected="custom.entry_point")
     assert_resolved(entry_point="custom.entry_point:func", expected="custom.entry_point:func")
-    assert_resolved(
-        entry_point="custom.entry_point", source="app.py", expected="custom.entry_point"
-    )
-    assert_resolved(
-        entry_point="custom.entry_point:func", source="app.py", expected="custom.entry_point:func"
-    )
 
     # File names are expanded into the full module path.
     assert_resolved(entry_point="app.py", expected="project.app")
     assert_resolved(entry_point="app.py:func", expected="project.app:func")
-    assert_resolved(entry_point="app.py", source="app.py", expected="project.app")
-    assert_resolved(entry_point="app.py:func", source="app.py", expected="project.app:func")
 
     # We special case the strings `<none>` and `<None>`.
     assert_resolved(entry_point="<none>", expected=None)
     assert_resolved(entry_point="<None>", expected=None)
-    assert_resolved(entry_point="<none>", source="app.py", expected=None)
-    assert_resolved(entry_point="<None>", source="app.py", expected=None)
 
-    # No entry point, but `sources` given (soon to be deprecated).
-    assert_resolved(entry_point=":func", source="app.py", expected="project.app:func")
-    assert_resolved(entry_point=None, source="app.py", expected="project.app")
-
-    with pytest.raises(ExecutionError):
-        assert_resolved(entry_point=":func", expected="doesnt matter")
     with pytest.raises(ExecutionError):
         assert_resolved(entry_point="doesnt_exist.py", expected="doesnt matter")
     # Resolving >1 file is an error.
@@ -186,7 +184,6 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
             pex_binary(name='third_party', entry_point='colors')
             pex_binary(name='third_party_func', entry_point='colors:func')
             pex_binary(name='unrecognized', entry_point='who_knows.module')
-            pex_binary(name='self', sources=['self.py'])
             """
         ),
     )
@@ -224,9 +221,6 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
         expected=Address("", target_name="ansicolors"),
     )
     assert_injected(Address("project", target_name="unrecognized"), expected=None)
-    assert_injected(
-        Address("project", target_name="self", relative_file_path="self.py"), expected=None
-    )
 
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
