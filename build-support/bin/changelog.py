@@ -68,7 +68,7 @@ def instructions(new_version: str) -> str:
         Copy the below headers into `src/python/pants/notes/{major}.{minor}.x.md`. Then, put each
         external-facing commit into the relevant category. Commits that are internal-only (i.e.,
         that are only of interest to Pants developers and have no user-facing implications) should
-        be pasted into the PR description, not the release notes.
+        be pasted into a PR comment for review, not the release notes.
 
         You can tweak descriptions to be more descriptive or to fix typos, and you can reorder
         based on relative importance to end users. Delete any unused headers.
@@ -95,7 +95,7 @@ def instructions(new_version: str) -> str:
         ### Documentation
 
 
-        ### Internal (put these in the PR description, not the release notes)
+        ### Internal (put these in a PR comment for review, not the release notes)
 
         --------------------------------------------------------------------
 
