@@ -227,6 +227,9 @@ class AsyncFieldMixin(Field):
         # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
         # subclasses from adding arbitrary fields.
         self._unfreeze_instance()  # type: ignore[attr-defined]
+        # N.B.: We store the address here and not in the Field base class, because the memory usage
+        # of storing this value in every field was shown to be excessive / lead to performance
+        # issues.
         self.address = address
         self._freeze_instance()  # type: ignore[attr-defined]
 
