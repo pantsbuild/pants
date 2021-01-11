@@ -73,7 +73,7 @@ class RunTracker:
     def goals(self) -> List[str]:
         return self._all_options.goals if self._all_options else []
 
-    def start(self, run_start_time: float) -> None:
+    def start(self, run_start_time: float, specs: List[str]) -> None:
         """Start tracking this pants run."""
         if self._has_started:
             raise AssertionError("RunTracker.start must not be called multiple times.")
@@ -84,6 +84,7 @@ class RunTracker:
         self.run_info.add_basic_info(self.run_id, run_start_time)
         cmd_line = " ".join(["pants"] + sys.argv[1:])
         self.run_info.add_info("cmd_line", cmd_line)
+        self.run_info.add_info("specs_from_command_line", specs, stringify=False)
 
         # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
         link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")

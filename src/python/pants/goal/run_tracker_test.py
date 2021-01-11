@@ -17,7 +17,7 @@ def test_run_tracker_timing_output(**kwargs) -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
             run_tracker = RunTracker(create_options_bootstrapper([]).bootstrap_options)
-            run_tracker.start(run_start_time=time.time())
+            run_tracker.start(run_start_time=time.time(), specs=["::"])
             frozen_time = kwargs["frozen_time"]
             frozen_time.tick(delta=datetime.timedelta(seconds=1))
             run_tracker.end_run(PANTS_SUCCEEDED_EXIT_CODE)

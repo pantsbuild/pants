@@ -69,7 +69,7 @@ class LocalPantsRunner:
         cls,
         options_bootstrapper: OptionsBootstrapper,
         build_config: BuildConfiguration,
-        run_tracker: RunTracker,
+        run_id: str,
         options: Options,
         scheduler: Optional[GraphScheduler] = None,
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
@@ -87,7 +87,7 @@ class LocalPantsRunner:
             raise
 
         return graph_scheduler_helper.new_session(
-            run_tracker.run_id,
+            run_id,
             dynamic_ui=global_scope.dynamic_ui,
             use_colors=global_scope.get("colors", True),
             session_values=SessionValues(
@@ -141,7 +141,12 @@ class LocalPantsRunner:
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
         graph_session = cls._init_graph_session(
-            options_bootstrapper, build_config, run_tracker, options, scheduler, cancellation_latch
+            options_bootstrapper,
+            build_config,
+            run_tracker.run_id,
+            options,
+            scheduler,
+            cancellation_latch,
         )
 
         # Option values are usually computed lazily on demand,
@@ -177,20 +182,10 @@ class LocalPantsRunner:
             profile_path=profile_path,
         )
 
-    def _start_run(self, start_time: float) -> None:
-        self.run_tracker.start(run_start_time=start_time)
-
-        spec_parser = SpecsParser(get_buildroot())
-        specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
-        # Note: This will not include values from `--changed-*` flags.
-        self.run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
-
-    def _run_v2(self, goals: Tuple[str, ...]) -> ExitCode:
-        if not goals:
-            return PANTS_SUCCEEDED_EXIT_CODE
+    def _perform_run(self, goals: Tuple[str, ...]) -> ExitCode:
         global_options = self.options.for_global_scope()
         if not global_options.get("loop", False):
-            return self._maybe_run_v2_body(goals, poll=False)
+            return self._perform_run_body(goals, poll=False)
 
         iterations = global_options.loop_max
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
@@ -199,14 +194,14 @@ class LocalPantsRunner:
             # observe fresh values for Goals. See notes in `scheduler.rs`.
             self.graph_session.scheduler_session.new_run_id()
             try:
-                exit_code = self._maybe_run_v2_body(goals, poll=True)
+                exit_code = self._perform_run_body(goals, poll=True)
             except ExecutionError as e:
                 logger.warning(e)
             iterations -= 1
 
         return exit_code
 
-    def _maybe_run_v2_body(self, goals, poll: bool) -> ExitCode:
+    def _perform_run_body(self, goals: Tuple[str, ...], poll: bool) -> ExitCode:
         return self.graph_session.run_goal_rules(
             union_membership=self.union_membership,
             goals=goals,
@@ -217,10 +212,6 @@ class LocalPantsRunner:
 
     def _finish_run(self, code: ExitCode) -> None:
         """Cleans up the run tracker."""
-
-        metrics = self.graph_session.scheduler_session.metrics()
-        self.run_tracker.set_pantsd_scheduler_metrics(metrics)
-        self.run_tracker.end_run(code)
 
     def _print_help(self, request: HelpRequest) -> ExitCode:
         global_options = self.options.for_global_scope()
@@ -248,7 +239,9 @@ class LocalPantsRunner:
         return tuple(wcf.callback_factory() for wcf in workunits_callback_factories)
 
     def run(self, start_time: float) -> ExitCode:
-        self._start_run(start_time)
+        spec_parser = SpecsParser(get_buildroot())
+        specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
+        self.run_tracker.start(run_start_time=start_time, specs=specs)
 
         with maybe_profiled(self.profile_path):
             global_options = self.options.for_global_scope()
@@ -265,11 +258,16 @@ class LocalPantsRunner:
 
             goals = tuple(self.options.goals)
             with streaming_reporter.session():
+                if not goals:
+                    return PANTS_SUCCEEDED_EXIT_CODE
                 engine_result = PANTS_FAILED_EXIT_CODE
                 try:
-                    engine_result = self._run_v2(goals)
+                    engine_result = self._perform_run(goals)
                 except Exception as e:
                     ExceptionSink.log_exception(e)
 
-                self._finish_run(engine_result)
+                metrics = self.graph_session.scheduler_session.metrics()
+                self.run_tracker.set_pantsd_scheduler_metrics(metrics)
+                self.run_tracker.end_run(engine_result)
+
             return engine_result
