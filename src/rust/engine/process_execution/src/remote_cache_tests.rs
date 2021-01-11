@@ -9,7 +9,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use fs::RelativePath;
-use hashing::Digest;
+use hashing::{Digest, EMPTY_DIGEST};
 use maplit::hashset;
 use mock::{StubActionCache, StubCAS};
 use remexec::ActionResult;
@@ -24,10 +24,66 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, NamedCaches, Platform, Process, ProcessMetadata,
 };
+use term::terminfo::parm::Param::Words;
 
 struct RoundtripResults {
   uncached: Result<FallibleProcessResultWithPlatform, String>,
   maybe_cached: Result<FallibleProcessResultWithPlatform, String>,
+}
+
+/// A mock of the local runner used for better hermeticity of the tests.
+struct MockLocalCommandRunner {
+  result: Result<FallibleProcessResultWithPlatform, String>,
+}
+
+impl MockLocalCommandRunner {
+  pub fn new(exit_code: i32) -> MockLocalCommandRunner {
+    MockLocalCommandRunner {
+      result: Ok(FallibleProcessResultWithPlatform {
+        stdout_digest: EMPTY_DIGEST,
+        stderr_digest: EMPTY_DIGEST,
+        exit_code,
+        output_directory: EMPTY_DIGEST,
+        execution_attempts: vec![],
+        platform: Platform::current().unwrap(),
+      }),
+    }
+  }
+}
+
+impl CommandRunnerTrait for MockLocalCommandRunner {
+  async fn run(
+    &self,
+    _req: MultiPlatformProcess,
+    _context: Context,
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    self.result.clone()
+  }
+
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
+    Some(req.0.get(&None).unwrap().clone())
+  }
+}
+
+fn create_store() -> Store {
+  let runtime = task_executor::Executor::new();
+  let stub_cas = StubCAS::builder().build();
+  let store_dir = base_dir.path().join("store_dir");
+  Store::with_remote(
+    runtime,
+    store_dir,
+    vec![stub_cas.address()],
+    None,
+    None,
+    None,
+    1,
+    10 * 1024 * 1024,
+    Duration::from_secs(1),
+    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+    1,
+    1,
+  )
+  .unwrap()
 }
 
 fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store) {
@@ -133,6 +189,58 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     uncached: uncached_result,
     maybe_cached: maybe_cached_result,
   }
+}
+
+#[tokio::test]
+async fn cache_read_success() {
+  WorkunitStore::setup_for_tests();
+  let store = create_store();
+  let local_runner = Box::new(MockLocalCommandRunner::new(1));
+  let (cache_runner, action_cache) = create_cached_runner(local_runner, store, false);
+
+  // Insert a successful ActionResult.
+  let result = cache_runner.run().await.unwrap();
+  assert_eq!(result.exit_code, 0);
+}
+
+/// If the cache has any issues during failures, we should gracefully fallback to the local runner.
+#[tokio::test]
+async fn cache_read_skipped_on_errors() {
+  WorkunitStore::setup_for_tests();
+  let store = create_store();
+  let local_runner = Box::new(MockLocalCommandRunner::new(1));
+  let (cache_runner, action_cache) = create_cached_runner(local, store, false);
+
+  let result = cache_runner.run().await.unwrap();
+
+  let results = run_roundtrip(0).await;
+  assert_eq!(results.uncached, results.maybe_cached);
+}
+
+#[tokio::test]
+async fn cache_write_success() {
+  WorkunitStore::setup_for_tests();
+  let store = create_store();
+  let local_runner = Box::new(MockLocalCommandRunner::new(1));
+  let (cache_runner, action_cache) = create_cached_runner(local, store, false);
+
+  let result = cache_runner.run().await.unwrap();
+
+  let results = run_roundtrip(0).await;
+  assert_eq!(results.uncached, results.maybe_cached);
+}
+
+#[tokio::test]
+async fn cache_write_not_for_failures() {
+  WorkunitStore::setup_for_tests();
+  let store = create_store();
+  let local_runner = Box::new(MockLocalCommandRunner::new(1));
+  let (cache_runner, action_cache) = create_cached_runner(local, store, false);
+
+  let result = cache_runner.run().await.unwrap();
+
+  let results = run_roundtrip(0).await;
+  assert_eq!(results.uncached, results.maybe_cached);
 }
 
 #[tokio::test]
