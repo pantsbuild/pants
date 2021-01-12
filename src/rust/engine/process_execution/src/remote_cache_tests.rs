@@ -138,18 +138,14 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
 
 #[tokio::test]
 async fn cache_success() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let results = run_roundtrip(0).await;
   assert_eq!(results.uncached, results.maybe_cached);
 }
 
 #[tokio::test]
 async fn failures_not_cached() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let results = run_roundtrip(1).await;
   assert_ne!(results.uncached, results.maybe_cached);
   assert_eq!(results.uncached.unwrap().exit_code, 1);
@@ -158,8 +154,7 @@ async fn failures_not_cached() {
 
 #[tokio::test]
 async fn skip_cache_on_error() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
   let (caching, _cache_dir, stub_action_cache) = create_cached_runner(local, store.clone(), false);
@@ -183,8 +178,7 @@ async fn skip_cache_on_error() {
 /// the cached result with its non-existent digests.
 #[tokio::test]
 async fn eager_fetch() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   async fn run_process(eager_fetch: bool) -> FallibleProcessResultWithPlatform {
     let (local, store, _local_runner_dir, _stub_cas) = create_local_runner();
@@ -345,8 +339,7 @@ async fn make_action_result_basic() {
     }
   }
 
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
