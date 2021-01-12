@@ -90,8 +90,8 @@ class RunSubsystem(GoalSubsystem):
         return tuple(self.options.args)
 
     @property
-    def env_vars(self) -> List[str]:
-        return cast(List[str], self.options.env_vars)
+    def extra_env_vars(self) -> List[str]:
+        return cast(List[str], self.options.extra_env_vars)
 
 
 class Run(Goal):
@@ -128,8 +128,8 @@ async def run(
         args = (arg.format(chroot=tmpdir) for arg in request.args)
         extra_env = {k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}
         user_env = (
-            pants_env.get_subset(run_subsystem.env_vars)
-            if run_subsystem.env_vars
+            pants_env.get_subset(run_subsystem.extra_env_vars)
+            if run_subsystem.extra_env_vars
             else FrozenDict({})
         )
         conflicting_env_keys = set(user_env.keys()) & set(extra_env.keys())
