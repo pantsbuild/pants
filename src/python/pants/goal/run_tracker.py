@@ -85,20 +85,22 @@ class RunTracker:
         # Initialize the run.
         self._run_start_time = run_start_time
 
-        self._run_info["id"] = self.run_id
-        self._run_info["timestamp"] = run_start_time
-
         datetime = time.strftime("%A %b %d, %Y %H:%M:%S", time.localtime(run_start_time))
-        self._run_info["datetime"] = datetime
-
-        self._run_info["user"] = getpass.getuser()
-        self._run_info["machine"] = socket.gethostname()
-        self._run_info["buildroot"] = get_buildroot()
-        self._run_info["version"] = VERSION
-
         cmd_line = " ".join(["pants"] + sys.argv[1:])
-        self._run_info["cmd_line"] = cmd_line
-        self._run_info["specs_from_command_line"] = specs
+
+        self._run_info.update(
+            {
+                "id": self.run_id,
+                "timestamp": run_start_time,
+                "datetime": datetime,
+                "user": getpass.getuser(),
+                "machine": socket.gethostname(),
+                "buildroot": get_buildroot(),
+                "version": VERSION,
+                "cmd_line": cmd_line,
+                "specs_from_command_line": specs,
+            }
+        )
 
     def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
         self._pantsd_metrics = metrics
