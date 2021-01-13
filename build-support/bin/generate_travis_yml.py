@@ -79,8 +79,9 @@ GLOBAL_ENV_VARS = [
     "BOOTSTRAPPED_PEX_KEY_PREFIX=daily/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex",
     "NATIVE_ENGINE_SO_KEY_PREFIX=monthly/native_engine_so",
     "MACOS_PYENV_PY27_VERSION=2.7.18",
-    "MACOS_PYENV_PY37_VERSION=3.7.7",
-    "MACOS_PYENV_PY38_VERSION=3.8.3",
+    "MACOS_PYENV_PY37_VERSION=3.7.9",
+    "MACOS_PYENV_PY38_VERSION=3.8.7",
+    "MACOS_PYENV_PY39_VERSION=3.9.1",
     # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
     # override the default value because Linux pre-installs Python via Pyenv and we must keep their
     # $PYENV_ROOT for this to still work.
@@ -114,22 +115,31 @@ GLOBAL_ENV_VARS = [
 class PythonVersion(Enum):
     py37 = "py37"
     py38 = "py38"
+    py39 = "py39"
 
     def __str__(self) -> str:
         return str(self.value)
 
     @property
     def number(self) -> int:
-        return {self.py37: 37, self.py38: 38}[self]  # type: ignore[index]
+        return {self.py37: 37, self.py38: 38, self.py39: 39}[self]  # type: ignore[index]
 
     @property
     def decimal(self) -> float:
-        return {self.py37: 3.7, self.py38: 3.8}[self]  # type: ignore[index]
+        return {self.py37: 3.7, self.py38: 3.8, self.py39: 3.9}[self]  # type: ignore[index]
 
     def default_stage(self, *, is_bootstrap: bool = False) -> Stage:
         if is_bootstrap:
-            return {self.py37: Stage.bootstrap, self.py38: Stage.bootstrap_cron}[self]  # type: ignore[index]
-        return {self.py37: Stage.test, self.py38: Stage.test_cron}[self]  # type: ignore[index]
+            return {
+                self.py37: Stage.bootstrap_cron,
+                self.py38: Stage.bootstrap_cron,
+                self.py39: Stage.bootstrap,
+            }[
+                self  # type: ignore[index]
+            ]
+        return {self.py37: Stage.test_cron, self.py38: Stage.test_cron, self.py39: Stage.test}[
+            self  # type: ignore[index]
+        ]
 
 
 # ----------------------------------------------------------------------
@@ -305,7 +315,7 @@ def linux_shard(
     setup = {
         "os": "linux",
         "dist": "bionic",
-        "python": ["2.7", "3.6", "3.7"],
+        "python": ["2.7", "3.6", "3.7", "3.8", "3.9"],
         "addons": {
             "apt": {
                 "packages": [
@@ -555,6 +565,7 @@ def _build_wheels_command(homedir: str = "${HOME}") -> List[str]:
         *_install_rust(homedir=homedir),
         "./build-support/bin/release.sh -n",
         "USE_PY38=true ./build-support/bin/release.sh -n",
+        "USE_PY39=true ./build-support/bin/release.sh -n",
         # NB: We also build `fs_util` in this shard to leverage having had compiled the engine.
         "./build-support/bin/release.sh -f",
     ]
@@ -779,7 +790,7 @@ class NoAliasDumper(yaml.SafeDumper):
 
 
 def main() -> None:
-    supported_python_versions = [PythonVersion.py37, PythonVersion.py38]
+    supported_python_versions = [PythonVersion.py37, PythonVersion.py38, PythonVersion.py39]
     generated_yaml = yaml.dump(
         {
             # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1
