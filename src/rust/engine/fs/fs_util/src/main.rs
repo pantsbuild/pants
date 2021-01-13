@@ -28,25 +28,23 @@
 #![allow(clippy::mutex_atomic)]
 #![type_length_limit = "1881109"]
 
-use std::convert::TryInto;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
-use boxfuture::{BoxFuture, Boxable};
+use bazel_protos::require_digest;
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
 use fs::{
   GlobExpansionConjunction, GlobMatching, PreparedPathGlobs, RelativePath, StrictGlobMatching,
 };
-use futures::compat::Future01CompatExt;
-use futures::future::TryFutureExt;
-use futures01::{future, Future};
+use futures::future::{self, BoxFuture};
+use futures::FutureExt;
+use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use protobuf::Message;
 use rand::seq::SliceRandom;
 use serde_derive::Serialize;
 use store::{
@@ -396,12 +394,10 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             fs::Stat::File(f) => {
               let digest = store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
                 .store_by_digest(f)
-                .compat()
                 .await
                 .unwrap();
 
               let report = ensure_uploaded_to_remote(&store, store_has_remote, digest)
-                .compat()
                 .await
                 .unwrap();
               print_upload_summary(args.value_of("output-mode"), &report);
@@ -432,7 +428,6 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let digest = Digest(fingerprint, size_bytes);
         store
           .materialize_directory(destination, digest)
-          .compat()
           .await
           .map(|metadata| {
             eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
@@ -476,9 +471,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         )
         .await?;
 
-        let report = ensure_uploaded_to_remote(&store, store_has_remote, snapshot.digest)
-          .compat()
-          .await?;
+        let report = ensure_uploaded_to_remote(&store, store_has_remote, snapshot.digest).await?;
         print_upload_summary(args.value_of("output-mode"), &report);
 
         Ok(())
@@ -521,14 +514,14 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
           "binary" => {
             let maybe_directory = store.load_directory(digest).await?;
-            maybe_directory.map(|(d, _metadata)| d.write_to_bytes().unwrap())
+            maybe_directory.map(|(d, _metadata)| d.to_bytes().to_vec())
           }
           "text" => {
             let maybe_p = store.load_directory(digest).await?;
             maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())
           }
           "recursive-file-list" => {
-            let maybe_v = expand_files(store, digest).compat().await?;
+            let maybe_v = expand_files(store, digest).await?;
             maybe_v
               .map(|v| {
                 v.into_iter()
@@ -539,7 +532,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .map(String::into_bytes)
           }
           "recursive-file-list-with-digests" => {
-            let maybe_v = expand_files(store, digest).compat().await?;
+            let maybe_v = expand_files(store, digest).await?;
             maybe_v
               .map(|v| {
                 v.into_iter()
@@ -575,18 +568,12 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .expect("size_bytes must be a non-negative number");
       let digest = Digest(fingerprint, size_bytes);
       let v = match store
-        .load_file_bytes_with(digest, |bytes| bytes.into())
+        .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
         .await?
       {
         None => {
           let maybe_dir = store.load_directory(digest).await?;
-          maybe_dir.map(|(dir, _metadata)| {
-            Bytes::from(
-              dir
-                .write_to_bytes()
-                .expect("Error serializing Directory proto"),
-            )
-          })
+          maybe_dir.map(|(dir, _metadata)| dir.to_bytes())
         }
         Some((bytes, _metadata)) => Some(bytes),
       };
@@ -624,18 +611,17 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
   }
 }
 
-fn expand_files(
+async fn expand_files(
   store: Store,
   digest: Digest,
-) -> impl Future<Item = Option<Vec<(String, Digest)>>, Error = String> {
+) -> Result<Option<Vec<(String, Digest)>>, String> {
   let files = Arc::new(Mutex::new(Vec::new()));
-  expand_files_helper(store, digest, String::new(), files.clone()).map(|maybe| {
-    maybe.map(|()| {
-      let mut v = Arc::try_unwrap(files).unwrap().into_inner();
-      v.sort_by(|(l, _), (r, _)| l.cmp(r));
-      v
-    })
-  })
+  let vec_opt = expand_files_helper(store, digest, String::new(), files.clone()).await?;
+  Ok(vec_opt.map(|_| {
+    let mut v = Arc::try_unwrap(files).unwrap().into_inner();
+    v.sort_by(|(l, _), (r, _)| l.cmp(r));
+    v
+  }))
 }
 
 fn expand_files_helper(
@@ -643,27 +629,27 @@ fn expand_files_helper(
   digest: Digest,
   prefix: String,
   files: Arc<Mutex<Vec<(String, Digest)>>>,
-) -> BoxFuture<Option<()>, String> {
-  Box::pin(async move {
+) -> BoxFuture<'static, Result<Option<()>, String>> {
+  async move {
     let maybe_dir = store.load_directory(digest).await?;
     match maybe_dir {
       Some((dir, _metadata)) => {
         {
           let mut files_unlocked = files.lock();
-          for file in dir.get_files() {
-            let file_digest: Result<Digest, String> = file.get_digest().try_into();
-            files_unlocked.push((format!("{}{}", prefix, file.name), file_digest?));
+          for file in &dir.files {
+            let file_digest = require_digest(file.digest.as_ref())?;
+            files_unlocked.push((format!("{}{}", prefix, file.name), file_digest));
           }
         }
         let subdirs_and_digests = dir
-          .get_directories()
+          .directories
           .iter()
           .map(move |subdir| {
-            let digest: Result<Digest, String> = subdir.get_digest().try_into();
+            let digest = require_digest(subdir.digest.as_ref());
             digest.map(|digest| (subdir, digest))
           })
           .collect::<Result<Vec<_>, _>>()?;
-        future::join_all(
+        future::try_join_all(
           subdirs_and_digests
             .into_iter()
             .map(move |(subdir, digest)| {
@@ -676,15 +662,13 @@ fn expand_files_helper(
             })
             .collect::<Vec<_>>(),
         )
-        .map(|_| Some(()))
-        .compat()
         .await
+        .map(|_| Some(()))
       }
       None => Ok(None),
     }
-  })
-  .compat()
-  .to_boxed()
+  }
+  .boxed()
 }
 
 fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> fs::PosixFS {
@@ -697,18 +681,18 @@ fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> 
   .unwrap()
 }
 
-fn ensure_uploaded_to_remote(
+async fn ensure_uploaded_to_remote(
   store: &Store,
   store_has_remote: bool,
   digest: Digest,
-) -> impl Future<Item = SummaryWithDigest, Error = String> {
+) -> Result<SummaryWithDigest, String> {
   let summary = if store_has_remote {
     store
       .ensure_remote_has_recursive(vec![digest])
+      .await
       .map(Some)
-      .to_boxed()
   } else {
-    future::ok(None).to_boxed()
+    Ok(None)
   };
   summary.map(move |summary| SummaryWithDigest { digest, summary })
 }

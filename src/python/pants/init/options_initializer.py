@@ -4,7 +4,7 @@
 import logging
 import os
 import sys
-from typing import Optional
+from typing import Optional, Tuple
 
 import pkg_resources
 
@@ -14,8 +14,9 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.init.extension_loader import load_backends_and_plugins
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.global_options import GlobalOptions
+from pants.option.option_value_container import OptionValueContainer
+from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.ordered_set import OrderedSet
 
@@ -33,7 +34,7 @@ class BuildConfigInitializer:
     _cached_build_config: Optional[BuildConfiguration] = None
 
     @classmethod
-    def get(cls, options_bootstrapper):
+    def get(cls, options_bootstrapper: OptionsBootstrapper) -> BuildConfiguration:
         if cls._cached_build_config is None:
             cls._cached_build_config = cls(options_bootstrapper).setup()
         return cls._cached_build_config
@@ -43,11 +44,12 @@ class BuildConfigInitializer:
         cls._cached_build_config = None
 
     def __init__(self, options_bootstrapper: OptionsBootstrapper) -> None:
-        self._options_bootstrapper = options_bootstrapper
         self._bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-        self._working_set = PluginResolver(self._options_bootstrapper).resolve()
+        self._working_set = PluginResolver(options_bootstrapper).resolve()
 
-    def _load_plugins(self) -> BuildConfiguration:
+    def setup(self) -> BuildConfiguration:
+        """Loads backends and plugins."""
+
         # Add any extra paths to python path (e.g., for loading extra source backends).
         for path in self._bootstrap_options.pythonpath:
             if path not in sys.path:
@@ -61,29 +63,26 @@ class BuildConfigInitializer:
             self._bootstrap_options.backend_packages,
         )
 
-    def setup(self) -> BuildConfiguration:
-        """Load backends and plugins.
-
-        :returns: A `BuildConfiguration` object constructed during backend/plugin loading.
-        """
-        return self._load_plugins()
-
 
 class OptionsInitializer:
     """Initializes options."""
 
     @staticmethod
-    def _construct_options(options_bootstrapper, build_configuration):
-        """Parse and register options.
+    def compute_executor_arguments(bootstrap_options: OptionValueContainer) -> Tuple[int, int]:
+        """Computes the arguments to construct a PyExecutor.
 
-        :returns: An Options object representing the full set of runtime options.
+        Does not directly construct a PyExecutor to avoid cycles.
         """
-        known_scope_infos = [
-            si
-            for optionable in build_configuration.all_optionables
-            for si in optionable.known_scope_infos()
-        ]
-        return options_bootstrapper.get_full_options(known_scope_infos)
+        if bootstrap_options.rule_threads_core < 2:
+            # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
+            # at a time, and a `@goal_rule` will only block one thread.
+            raise ValueError("--rule-threads-core values less than 2 are not supported.")
+        rule_threads_max = (
+            bootstrap_options.rule_threads_max
+            if bootstrap_options.rule_threads_max
+            else 4 * bootstrap_options.rule_threads_core
+        )
+        return bootstrap_options.rule_threads_core, rule_threads_max
 
     @staticmethod
     def compute_pants_ignore(buildroot, global_options):
@@ -110,13 +109,15 @@ class OptionsInitializer:
         return pants_ignore
 
     @staticmethod
-    def compute_pantsd_invalidation_globs(buildroot, bootstrap_options):
+    def compute_pantsd_invalidation_globs(
+        buildroot: str, bootstrap_options: OptionValueContainer
+    ) -> Tuple[str, ...]:
         """Computes the merged value of the `--pantsd-invalidation-globs` option.
 
         Combines --pythonpath and --pants-config-files files that are in {buildroot} dir with those
         invalidation_globs provided by users.
         """
-        invalidation_globs = OrderedSet()
+        invalidation_globs: OrderedSet[str] = OrderedSet()
 
         # Globs calculated from the sys.path and other file-like configuration need to be sanitized
         # to relative globs (where possible).
@@ -149,10 +150,14 @@ class OptionsInitializer:
             )
         )
 
-        return list(invalidation_globs)
+        return tuple(invalidation_globs)
 
     @classmethod
-    def create(cls, options_bootstrapper, build_configuration, init_subsystems=True):
+    def create(
+        cls,
+        options_bootstrapper: OptionsBootstrapper,
+        build_configuration: BuildConfiguration,
+    ) -> Options:
         global_bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
 
         if global_bootstrap_options.pants_version != pants_version():
@@ -162,11 +167,14 @@ class OptionsInitializer:
             )
 
         # Parse and register options.
-        options = cls._construct_options(options_bootstrapper, build_configuration)
+
+        known_scope_infos = [
+            si
+            for optionable in build_configuration.all_optionables
+            for si in optionable.known_scope_infos()
+        ]
+        options = options_bootstrapper.get_full_options(known_scope_infos)
 
         GlobalOptions.validate_instance(options.for_global_scope())
-
-        if init_subsystems:
-            Subsystem.set_options(options)
 
         return options

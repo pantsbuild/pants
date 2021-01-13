@@ -195,8 +195,10 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai
++ Thales Menato
 + Tianshuo Deng
 + Tien Nguyen
++ Tim Gates
 + Tim Treptow
 + Timur Abishev
 + Tina Huang

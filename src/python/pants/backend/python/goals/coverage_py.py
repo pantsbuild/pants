@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import configparser
 from dataclasses import dataclass
 from enum import Enum
@@ -77,8 +79,8 @@ class CoverageReportType(Enum):
 
     _report_name: str
 
-    def __new__(cls, value: str, report_name: Optional[str] = None) -> "CoverageReportType":
-        member: "CoverageReportType" = object.__new__(cls)
+    def __new__(cls, value: str, report_name: Optional[str] = None) -> CoverageReportType:
+        member: CoverageReportType = object.__new__(cls)
         member._value_ = value
         member._report_name = report_name if report_name is not None else value
         return member
@@ -93,9 +95,9 @@ class CoverageReportType(Enum):
 
 
 class CoverageSubsystem(PythonToolBase):
-    """Configuration for Python test coverage measurement."""
-
     options_scope = "coverage-py"
+    help = "Configuration for Python test coverage measurement."
+
     default_version = "coverage>=5.0.3,<5.1"
     default_entry_point = "coverage"
     register_interpreter_constraints = True
@@ -111,9 +113,9 @@ class CoverageSubsystem(PythonToolBase):
             default=None,
             help=(
                 "A list of Python modules to use in the coverage report, e.g. "
-                "`['helloworld_test', 'helloworld.util.dirutil']. The modules are recursive: any "
-                "submodules will be included. If you leave this off, the coverage report will "
-                "include every file in the transitive closure of the address/file arguments; "
+                "`['helloworld_test', 'helloworld.util.dirutil'].\n\nThe modules are recursive: "
+                "any submodules will be included.\n\nIf you leave this off, the coverage report "
+                "will include every file in the transitive closure of the address/file arguments; "
                 "for example, `test ::` will include every Python file in your project, whereas "
                 "`test project/app_test.py` will include `app_test.py` and any of its transitive "
                 "dependencies."
@@ -186,8 +188,8 @@ def _validate_and_update_config(
         )
     coverage_config.set("run", "relative_files", "True")
     omit_elements = [em for em in run_section.get("omit", "").split("\n")] or ["\n"]
-    if "test_runner.pex/*" not in omit_elements:
-        omit_elements.append("test_runner.pex/*")
+    if "pytest.pex/*" not in omit_elements:
+        omit_elements.append("pytest.pex/*")
     run_section["omit"] = "\n".join(omit_elements)
 
 
@@ -276,7 +278,12 @@ async def generate_coverage_reports(
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(all_used_addresses))
     sources = await Get(
         PythonSourceFiles,
-        PythonSourceFilesRequest(transitive_targets.closure, include_resources=False),
+        # Coverage sometimes includes non-Python files in its `.coverage` data. We need to
+        # ensure that they're present when generating the report. We include all the files included
+        # by `pytest_runner.py`.
+        PythonSourceFilesRequest(
+            transitive_targets.closure, include_files=True, include_resources=True
+        ),
     )
     input_digest = await Get(
         Digest,
@@ -314,9 +321,7 @@ async def generate_coverage_reports(
         pex_processes.append(
             PexProcess(
                 coverage_setup.pex,
-                # We pass `--ignore-errors` because Pants dynamically injects missing `__init__.py`
-                # files and this will cause Coverage to fail.
-                argv=(report_type.report_name, "--ignore-errors"),
+                argv=(report_type.report_name,),
                 input_digest=input_digest,
                 output_directories=("htmlcov",) if report_type == CoverageReportType.HTML else None,
                 output_files=(output_file,) if output_file else None,

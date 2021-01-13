@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.python.lint.bandit.rules import BanditFieldSet, BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonLibrary
 from pants.core.goals.lint import LintResult, LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
@@ -41,7 +41,11 @@ def make_target(
     for source_file in source_files:
         rule_runner.create_file(source_file.path, source_file.content.decode())
     return PythonLibrary(
-        {PythonInterpreterCompatibility.alias: interpreter_constraints},
+        {
+            InterpreterConstraintsField.alias: [interpreter_constraints]
+            if interpreter_constraints
+            else None
+        },
         address=Address("", target_name="target"),
     )
 
@@ -55,7 +59,10 @@ def run_bandit(
     skip: bool = False,
     additional_args: Optional[List[str]] = None,
 ) -> Sequence[LintResult]:
-    args = ["--backend-packages=pants.backend.python.lint.bandit"]
+    args = [
+        "--backend-packages=pants.backend.python.lint.bandit",
+        "--bandit-version=bandit==1.6.2",
+    ]
     if config:
         rule_runner.create_file(relpath=".bandit", contents=config)
         args.append("--bandit-config=.bandit")

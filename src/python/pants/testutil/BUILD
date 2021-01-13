@@ -6,8 +6,9 @@ python_distribution(
   dependencies=[
     ':testutil',
     ':int-test-for-export',
+    ':rule_runner',
   ],
-  setup_py_commands=["bdist_wheel", "--python-tag", "py36.py37.py38", "sdist"],
+  setup_py_commands=["bdist_wheel", "--python-tag", "py37.py38", "sdist"],
   provides=setup_py(
     name='pantsbuild.pants.testutil',
     description='Test support for writing Pants plugins.',
@@ -23,7 +24,6 @@ python_library(
     "!rule_runner.py",
     "!test_base.py",
     "!pants_integration_test.py",
-    "!pants_run_integration_test.py",
     "!_test.py",
   ],
 )
@@ -36,7 +36,7 @@ python_library(
 
 python_library(
   name = 'int-test-for-export',
-  sources = ['pants_integration_test.py', 'pants_run_integration_test.py'],
+  sources = ['pants_integration_test.py'],
   dependencies = [
     '//:build_root',
     'src/python/pants:entry_point'
@@ -47,7 +47,7 @@ target(
   name = 'int-test',
   dependencies=[
     ':int-test-for-export',
-    # NB: 'pants_run_integration_test.py' runs ./pants in a subprocess using the PYTHONPATH
+    # NB: 'pants_integration_test.py' runs ./pants in a subprocess using the PYTHONPATH
     # of the testrunner. We include the pants binary itself to fully populate the path.
     'src/python/pants/bin:pants_local_binary',
   ],
@@ -55,5 +55,5 @@ target(
 
 python_tests(
   name='tests',
-  sources=['*_test.py', '!pants_integration_test.py', '!pants_run_integration_test.py']
+  sources=['*_test.py', '!pants_integration_test.py']
 )

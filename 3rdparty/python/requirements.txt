@@ -1,32 +1,28 @@
 ansicolors==1.1.8
 beautifulsoup4>=4.6.0,<4.7
-dataclasses==0.6
 fasteners==0.15.0
+freezegun==1.0.0
 
 # The MyPy requirement should be maintained in lockstep with the requirement the Pants repo uses
 # for the mypy task since it configures custom MyPy plugins. That requirement can be found via:
-#
-#   ./pants \
-#       options \
-#         --output-format=json \
-#         --scope=mypy \
-#         --name=version \
-#     | jq -r '."mypy.version".value'
+#   ./pants help-all | \
+#   jq -r '
+#     .scope_to_help_info.mypy.advanced[] | select(.config_key == "version") |
+#     .value_history.ranked_values[-1].value
+#   '
 #
 mypy==0.782
 
-packaging==20.4
+packaging==20.8
 pathspec==0.8.0
-pex==2.1.20
+pex==2.1.24
 psutil==5.7.0
 pystache==0.5.4
 # This should be kept in sync with `pytest.py`.
-pytest>=6.0.1,<6.1
+pytest>=6.0.1,<6.3
 PyYAML>=5.3.1,<5.4
 requests[security]>=2.20.1
-setproctitle==1.1.10
+setproctitle==1.2
 setuptools>=50.3.0,<50.4
-toml==0.10.1
-typed-ast>=1.4.1,<1.5
+toml==0.10.2
 typing-extensions==3.7.4.2
-www-authenticate==0.9.2

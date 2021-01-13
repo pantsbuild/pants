@@ -37,10 +37,16 @@ class ResolveAllConstraintsOption(Enum):
     ALWAYS = "always"
 
 
-class PythonSetup(Subsystem):
-    """A Python environment."""
+class ResolverVersion(Enum):
+    """The resolver implementation to use when resolving Python requirements."""
 
+    PIP_LEGACY = "pip-legacy-resolver"
+    PIP_2020 = "pip-2020-resolver"
+
+
+class PythonSetup(Subsystem):
     options_scope = "python-setup"
+    help = "Options for Pants's Python support."
 
     @classmethod
     def register_options(cls, register):
@@ -51,11 +57,13 @@ class PythonSetup(Subsystem):
             type=list,
             default=["CPython>=3.6"],
             metavar="<requirement>",
-            help="Constrain the selected Python interpreter. Specify with requirement syntax, "
-            "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
-            "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
-            "be ORed together. These constraints are applied in addition to any "
-            "compatibilities required by the relevant targets.",
+            help=(
+                "The Python interpreters your codebase is compatible with.\n\nSpecify with "
+                "requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with version "
+                ">=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple "
+                "constraint strings will be ORed together.\n\nThese constraints are used as the "
+                "default value for the `interpreter_constraints` field of Python targets."
+            ),
         )
         register(
             "--requirement-constraints",
@@ -63,9 +71,9 @@ class PythonSetup(Subsystem):
             type=file_option,
             help=(
                 "When resolving third-party requirements, use this "
-                "constraints file to determine which versions to use. See "
+                "constraints file to determine which versions to use.\n\nSee "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
-                "on the format of constraint files and how constraints are applied in Pex and Pip."
+                "on the format of constraint files and how constraints are applied in Pex and pip."
             ),
         )
         register(
@@ -80,10 +88,11 @@ class PythonSetup(Subsystem):
                 "constraints file, each subset will be independently resolved as needed, which is "
                 "more correct - work is only invalidated if a requirement it actually depends on "
                 "changes - but also a lot slower, due to the extra resolving. "
-                "You may wish to leave this option set for normal work, such as running tests, "
-                "but selectively turn it off via command-line-flag when building deployable "
-                "binaries, so that you only deploy the requirements you actually need for a "
-                "given binary. Requires [python-setup].requirement_constraints to be set."
+                "\n\n* `never` will always use proper subsets, regardless of the goal being "
+                "run.\n* `nondeployables` will use proper subsets for `./pants package`, but "
+                "otherwise attempt to use a single resolve.\n* `always` will always attempt to use "
+                "a single resolve."
+                "\n\nRequires [python-setup].requirement_constraints to be set."
             ),
         )
         register(
@@ -105,13 +114,29 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--resolver-version",
+            advanced=True,
+            type=ResolverVersion,
+            default=ResolverVersion.PIP_LEGACY,
+            deprecation_start_version="2.3.0.dev1",
+            removal_version="2.5.0.dev1",
+            removal_hint="",
+            help=(
+                "The resolver implementation to use when resolving Python requirements.\n\nSupport "
+                f"for the {ResolverVersion.PIP_LEGACY.value!r} will be removed in Pants 2.5; so "
+                f"you're encouraged to start using the {ResolverVersion.PIP_2020.value!r} early. "
+                "For more information on this change see "
+                "https://pip.pypa.io/en/latest/user_guide/#changes-to-the-pip-dependency-resolver-in-20-2-2020"
+            ),
+        )
+        register(
             "--resolver-manylinux",
             advanced=True,
             type=str,
             default="manylinux2014",
             help="Whether to allow resolution of manylinux wheels when resolving requirements for "
             "foreign linux platforms. The value should be a manylinux platform upper bound, "
-            "e.g.: manylinux2010, or else [Ff]alse, [Nn]o or [Nn]one to disallow.",
+            "e.g.: 'manylinux2010', or else the string 'no' to disallow.",
         )
         register(
             "--resolver-jobs",
@@ -129,13 +154,11 @@ class PythonSetup(Subsystem):
         register(
             "--resolver-http-cache-ttl",
             type=int,
-            default=3_600,  # This matches PEX's default.
+            default=0,
             advanced=True,
-            help=(
-                "The maximum time (in seconds) for items in the HTTP cache. When the cache expires,"
-                "the PEX resolver will make network requests to see if new versions of your "
-                "requirements are available."
-            ),
+            removal_version="2.4.0.dev1",
+            removal_hint="Unused.",
+            help="Unused.",
         )
 
     @property
@@ -159,6 +182,10 @@ class PythonSetup(Subsystem):
         return self.expand_interpreter_search_paths(self.options.interpreter_search_paths)
 
     @property
+    def resolver_version(self) -> ResolverVersion:
+        return cast(ResolverVersion, self.options.resolver_version)
+
+    @property
     def manylinux(self) -> Optional[str]:
         manylinux = cast(Optional[str], self.options.resolver_manylinux)
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
@@ -168,10 +195,6 @@ class PythonSetup(Subsystem):
     @property
     def resolver_jobs(self) -> int:
         return cast(int, self.options.resolver_jobs)
-
-    @property
-    def resolver_http_cache_ttl(self) -> int:
-        return cast(int, self.options.resolver_http_cache_ttl)
 
     @property
     def scratch_dir(self):
@@ -295,5 +318,4 @@ def get_pyenv_root():
     try:
         return subprocess.check_output(["pyenv", "root"]).decode().strip()
     except (OSError, subprocess.CalledProcessError):
-        logger.info("No pyenv binary found. Will not use pyenv interpreters.")
-    return None
+        return None

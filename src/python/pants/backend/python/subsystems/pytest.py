@@ -8,9 +8,8 @@ from pants.option.subsystem import Subsystem
 
 
 class PyTest(Subsystem):
-    """The pytest Python test framework (https://docs.pytest.org/)."""
-
     options_scope = "pytest"
+    help = "The pytest Python test framework (https://docs.pytest.org/)."
 
     @classmethod
     def register_options(cls, register):
@@ -27,7 +26,7 @@ class PyTest(Subsystem):
             # This should be kept in sync with `requirements.txt`.
             # TODO: To fix this, we should allow using a `target_option` referring to a
             #  `python_requirement_library` to override the version.
-            default="pytest>=6.0.1,<6.1",
+            default="pytest>=6.0.1,<6.3",
             advanced=True,
             help="Requirement string for Pytest.",
         )
@@ -56,13 +55,16 @@ class PyTest(Subsystem):
             "--timeout-default",
             type=int,
             advanced=True,
-            help="The default timeout (in seconds) for a test target if the timeout field is not set on the target.",
+            help=(
+                "The default timeout (in seconds) for a test target if the `timeout` field is not "
+                "set on the target."
+            ),
         )
         register(
             "--timeout-maximum",
             type=int,
             advanced=True,
-            help="The maximum timeout (in seconds) that can be set on a test target.",
+            help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
         )
         register(
             "--junit-xml-dir",

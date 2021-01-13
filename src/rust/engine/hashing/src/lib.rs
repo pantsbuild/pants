@@ -37,8 +37,10 @@ use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde::{Deserialize, Deserializer};
 use sha2::{Digest as Sha256Digest, Sha256};
 
+use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Write};
+use std::str::FromStr;
 
 pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
@@ -151,6 +153,22 @@ impl<'de> Deserialize<'de> for Fingerprint {
     }
 
     deserializer.deserialize_string(FingerprintVisitor)
+  }
+}
+
+impl FromStr for Fingerprint {
+  type Err = String;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    Fingerprint::from_hex_string(s)
+  }
+}
+
+impl TryFrom<&str> for Fingerprint {
+  type Error = String;
+
+  fn try_from(s: &str) -> Result<Self, Self::Error> {
+    Fingerprint::from_hex_string(s)
   }
 }
 

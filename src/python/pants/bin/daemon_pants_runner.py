@@ -12,6 +12,7 @@ from typing import Dict, Tuple
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, ExitCode
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.engine.internals.native import Native, RawFdRunner
+from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.init.logging import (
     clear_logging_handlers,
     get_logging_handlers,
@@ -49,19 +50,27 @@ class DaemonPantsRunner(RawFdRunner):
             print(msg, file=stderr, flush=True)
 
     @contextmanager
-    def _one_run_at_a_time(self, stderr_fd: int, timeout: float):
+    def _one_run_at_a_time(
+        self, stderr_fd: int, cancellation_latch: PySessionCancellationLatch, timeout: float
+    ):
         """Acquires exclusive access within the daemon.
 
         Periodically prints a message on the given stderr_fd while exclusive access cannot be
         acquired.
+
+        TODO: This method will be removed as part of #7654, so it currently polls the lock and
+        cancellation latch rather than waiting for both of them asynchronously, which would be a bit
+        cleaner.
         """
 
+        render_timeout = 5
         should_poll_forever = timeout <= 0
         start = time.time()
+        render_deadline = start + render_timeout
         deadline = None if should_poll_forever else start + timeout
 
         def should_keep_polling(now):
-            return not deadline or deadline > now
+            return not cancellation_latch.is_cancelled() and (not deadline or deadline > now)
 
         acquired = self._run_lock.acquire(blocking=False)
         if not acquired:
@@ -82,11 +91,13 @@ class DaemonPantsRunner(RawFdRunner):
                 finally:
                     self._run_lock.release()
             elif should_keep_polling(now):
-                self._send_stderr(
-                    stderr_fd,
-                    f"Waiting for invocation to finish (waited for {int(now - start)}s so far)...\n",
-                )
-                acquired = self._run_lock.acquire(blocking=True, timeout=5)
+                if now > render_deadline:
+                    self._send_stderr(
+                        stderr_fd,
+                        f"Waiting for invocation to finish (waited for {int(now - start)}s so far)...\n",
+                    )
+                    render_deadline = now + render_timeout
+                acquired = self._run_lock.acquire(blocking=True, timeout=0.1)
             else:
                 raise ExclusiveRequestTimeout(
                     "Timed out while waiting for another pants invocation to finish."
@@ -113,7 +124,9 @@ class DaemonPantsRunner(RawFdRunner):
             Native().override_thread_logging_destination_to_just_pantsd()
             set_logging_handlers(handlers)
 
-    def single_daemonized_run(self, working_dir: str) -> ExitCode:
+    def single_daemonized_run(
+        self, working_dir: str, cancellation_latch: PySessionCancellationLatch
+    ) -> ExitCode:
         """Run a single daemonized run of Pants.
 
         All aspects of the `sys` global should already have been replaced in `__call__`, so this
@@ -131,7 +144,7 @@ class DaemonPantsRunner(RawFdRunner):
         # of a local run: once we allow for concurrent runs, this information should be
         # propagated down from the caller.
         #   see https://github.com/pantsbuild/pants/issues/7654
-        clean_global_runtime_state(reset_subsystem=True)
+        clean_global_runtime_state()
         options_bootstrapper = OptionsBootstrapper.create(
             env=os.environ, args=sys.argv, allow_pantsrc=True
         )
@@ -143,7 +156,10 @@ class DaemonPantsRunner(RawFdRunner):
             try:
                 scheduler = self._core.prepare_scheduler(options_bootstrapper)
                 runner = LocalPantsRunner.create(
-                    os.environ, options_bootstrapper, scheduler=scheduler
+                    os.environ,
+                    options_bootstrapper,
+                    scheduler=scheduler,
+                    cancellation_latch=cancellation_latch,
                 )
                 return runner.run(start_time)
             except Exception as e:
@@ -159,19 +175,28 @@ class DaemonPantsRunner(RawFdRunner):
         args: Tuple[str, ...],
         env: Dict[str, str],
         working_directory: bytes,
+        cancellation_latch: PySessionCancellationLatch,
         stdin_fd: int,
         stdout_fd: int,
         stderr_fd: int,
     ) -> ExitCode:
         request_timeout = float(env.get("PANTSD_REQUEST_TIMEOUT_LIMIT", -1))
         # NB: Order matters: we acquire a lock before mutating either `sys.std*`, `os.environ`, etc.
-        with self._one_run_at_a_time(stderr_fd, timeout=request_timeout), stdio_as(
+        with self._one_run_at_a_time(
+            stderr_fd,
+            cancellation_latch=cancellation_latch,
+            timeout=request_timeout,
+        ), stdio_as(
             stdin_fd=stdin_fd, stdout_fd=stdout_fd, stderr_fd=stderr_fd
-        ), hermetic_environment_as(**env), argv_as((command,) + args):
+        ), hermetic_environment_as(
+            **env
+        ), argv_as(
+            (command,) + args
+        ):
             # NB: Run implements exception handling, so only the most primitive errors will escape
             # this function, where they will be logged to the pantsd.log by the server.
             logger.info(f"handling request: `{' '.join(args)}`")
             try:
-                return self.single_daemonized_run(working_directory.decode())
+                return self.single_daemonized_run(working_directory.decode(), cancellation_latch)
             finally:
                 logger.info(f"request completed: `{' '.join(args)}`")

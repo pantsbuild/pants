@@ -1,15 +1,3 @@
-use async_trait::async_trait;
-use boxfuture::{try_future, BoxFuture, Boxable};
-use fs::{
-  self, GlobExpansionConjunction, GlobMatching, PathGlobs, RelativePath, StrictGlobMatching,
-};
-use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
-use futures::stream::{BoxStream, StreamExt, TryStreamExt};
-use log::{debug, info};
-use nails::execution::{ChildOutput, ExitCode};
-use shell_quote::bash;
-
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
@@ -23,19 +11,28 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
 use std::sync::Arc;
-use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
+use async_trait::async_trait;
+use bytes::{Bytes, BytesMut};
+use fs::{
+  self, GlobExpansionConjunction, GlobMatching, PathGlobs, RelativePath, StrictGlobMatching,
+};
+use futures::future::{BoxFuture, FutureExt, TryFutureExt};
+use futures::stream::{BoxStream, StreamExt, TryStreamExt};
+use log::{debug, info};
+use nails::execution::ExitCode;
+use shell_quote::bash;
+use store::{OneOffStoreFileByDigest, Snapshot, Store};
 use tokio::process::{Child, Command};
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
+use tryfuture::try_future;
+use workunit_store::Metric;
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform,
-  PlatformConstraint, Process,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
 };
-
-use bytes::{Bytes, BytesMut};
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
@@ -77,7 +74,7 @@ impl CommandRunner {
     posix_fs: Arc<fs::PosixFS>,
     output_file_paths: BTreeSet<RelativePath>,
     output_dir_paths: BTreeSet<RelativePath>,
-  ) -> BoxFuture<Snapshot, String> {
+  ) -> BoxFuture<'static, Result<Snapshot, String>> {
     let output_paths: Result<Vec<String>, String> = output_dir_paths
       .into_iter()
       .flat_map(|p| {
@@ -117,8 +114,7 @@ impl CommandRunner {
       )
       .await
     })
-    .compat()
-    .to_boxed()
+    .boxed()
   }
 }
 
@@ -182,6 +178,16 @@ impl HermeticCommand {
   }
 }
 
+// TODO: A Stream that ends with `Exit` is error prone: we should consider creating a Child struct
+// similar to nails::server::Child (which is itself shaped like `std::process::Child`).
+// See https://github.com/stuhood/nails/issues/1 for more info.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ChildOutput {
+  Stdout(Bytes),
+  Stderr(Bytes),
+  Exit(ExitCode),
+}
+
 ///
 /// The fully collected outputs of a completed child process.
 ///
@@ -193,13 +199,13 @@ pub struct ChildResults {
 
 impl ChildResults {
   pub fn collect_from(
-    mut stream: BoxStream<Result<ChildOutput, String>>,
-  ) -> futures::future::BoxFuture<Result<ChildResults, String>> {
+    mut stream: BoxStream<'static, Result<ChildOutput, String>>,
+  ) -> BoxFuture<'static, Result<ChildResults, String>> {
     let mut stdout = BytesMut::with_capacity(8192);
     let mut stderr = BytesMut::with_capacity(8192);
     let mut exit_code = 1;
 
-    Box::pin(async move {
+    async move {
       while let Some(child_output_res) = stream.next().await {
         match child_output_res? {
           ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
@@ -212,23 +218,15 @@ impl ChildResults {
         stderr: stderr.into(),
         exit_code,
       })
-    })
+    }
+    .boxed()
   }
 }
 
 #[async_trait]
 impl super::CommandRunner for CommandRunner {
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![
-      &(PlatformConstraint::None, PlatformConstraint::None),
-      &(self.platform.into(), PlatformConstraint::None),
-      &(
-        self.platform.into(),
-        PlatformConstraint::current_platform_constraint().unwrap(),
-      ),
-    ]
-    .iter()
-    {
+    for compatible_constraint in vec![None, self.platform.into()].iter() {
       if let Some(compatible_req) = req.0.get(compatible_constraint) {
         return Some(compatible_req.clone());
       }
@@ -246,6 +244,10 @@ impl super::CommandRunner for CommandRunner {
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    context
+      .workunit_store
+      .increment_counter(Metric::LocalExecutionRequests, 1);
+
     let req = self.extract_compatible_request(&req).unwrap();
     let req_debug_repr = format!("{:#?}", req);
     self
@@ -286,15 +288,19 @@ impl CapturedWorkdir for CommandRunner {
     _context: Context,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
-    let mut command = HermeticCommand::new(&req.argv[0]);
-    command
-      .args(&req.argv[1..])
-      .current_dir(if let Some(ref working_directory) = req.working_directory {
-        workdir_path.join(working_directory)
-      } else {
-        workdir_path.to_owned()
-      })
-      .envs(&req.env);
+    let cwd = if let Some(ref working_directory) = req.working_directory {
+      workdir_path.join(working_directory)
+    } else {
+      workdir_path.to_owned()
+    };
+    // TODO(#11406): Go back to using relative paths, rather than absolutifying them, once Rust
+    //  fixes https://github.com/rust-lang/rust/issues/80819 for macOS.
+    let argv0 = match RelativePath::new(&req.argv[0]) {
+      Ok(rel_path) => cwd.join(rel_path),
+      Err(_) => PathBuf::from(&req.argv[0]),
+    };
+    let mut command = HermeticCommand::new(argv0);
+    command.args(&req.argv[1..]).current_dir(cwd).envs(&req.env);
 
     // See the documentation of the `CapturedWorkdir::run_in_workdir` method, but `exclusive_spawn`
     // indicates the binary we're spawning was written out by the current thread, and, as such,
@@ -431,7 +437,6 @@ pub trait CapturedWorkdir {
     // non-determinism when paths overlap.
     let sandbox = store
       .materialize_directory(workdir_path.clone(), req.input_files)
-      .compat()
       .await?;
     let workdir_path2 = workdir_path.clone();
     let output_file_paths = req.output_files.clone();
@@ -546,7 +551,6 @@ pub trait CapturedWorkdir {
         req.output_files,
         req.output_directories,
       )
-      .compat()
       .await?
     };
 

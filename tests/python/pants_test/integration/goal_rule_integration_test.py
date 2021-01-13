@@ -14,8 +14,8 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 
 @ensure_daemon
-def test_goal_validation():
-    result = run_pants(["blah", "::"])
+def test_goal_validation(use_pantsd: bool) -> None:
+    result = run_pants(["blah", "::"], use_pantsd=use_pantsd)
     result.assert_failure()
     assert "Unknown goal: blah" in result.stdout
 
@@ -36,7 +36,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
         with self.pantsd_successful_run_context() as ctx:
 
             def run_list():
-                result = ctx.runner(["list", "examples/src/python/example/hello::"])
+                result = ctx.runner(["list", "testprojects/src/python/hello::"])
                 ctx.checker.assert_started()
                 return result
 

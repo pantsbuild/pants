@@ -1,18 +1,26 @@
 [GLOBAL]
 print_stacktrace = true
 
-pants_distdir_legacy_paths = false
-
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
+  "pants.backend.awslambda.python",
   "pants.backend.python",
+  "pants.backend.codegen.protobuf.python",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "pants.backend.python.typecheck.mypy",
+  "pants.backend.python.mixed_interpreter_constraints",
   "internal_plugins.releases",
+  "toolchain.pants.auth",
+  "toolchain.pants.buildsense",
+  "toolchain.pants.common",
+]
+
+plugins = [
+  "toolchain.pants.plugin==0.3.0",
 ]
 
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
@@ -31,8 +39,6 @@ pants_ignore.add = [
   # venv directories under build-support.
   "/build-support/virtualenvs/",
   "/build-support/*.venv/",
-  # An absolute symlink to the Pants Rust toolchain sources.
-  "/build-support/bin/native/src",
   # We shouldn't walk or watch the rust compiler artifacts because it is slow.
   "/src/rust/engine/target",
   # We want to .gitignore Java .class files, but pants should pay attention to them.
@@ -53,8 +59,10 @@ root_patterns = [
 ]
 
 [python-setup]
+resolver_version = "pip-2020-resolver"
 requirement_constraints = "3rdparty/python/constraints.txt"
 resolve_all_constraints = "nondeployables"
+interpreter_constraints = [">=3.7,<3.9"]
 
 [black]
 config = "pyproject.toml"
@@ -71,11 +79,11 @@ extra_requirements.add = [
 
 [isort]
 version = "isort[pyproject,colors]>=5.5.1,<5.6"
-config = ["pyproject.toml", "examples/.isort.cfg"]
+config = ["pyproject.toml"]
 
 [mypy]
 config = "build-support/mypy/mypy.ini"
-source_plugins = ["pants-plugins/mypy_plugins:total_ordering"]
+source_plugins = ["pants-plugins/mypy_plugins"]
 
 [pants-releases]
 release_notes = """
@@ -113,6 +121,9 @@ release_notes = """
   '1.29.x': 'src/python/pants/notes/1.29.x.rst',
   '1.30.x': 'src/python/pants/notes/1.30.x.rst',
   '2.0.x': 'src/python/pants/notes/2.0.x.rst',
+  '2.1.x': 'src/python/pants/notes/2.1.x.rst',
+  '2.2.x': 'src/python/pants/notes/2.2.x.md',
+  '2.3.x': 'src/python/pants/notes/2.3.x.md',
 }
 """
 
@@ -125,5 +136,11 @@ pytest_plugins.add = [
 ]
 timeout_default = 60
 
+[coverage-py]
+interpreter_constraints = [">=3.7,<3.9"]
+
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
+
+[toolchain-setup]
+repo = "pants"

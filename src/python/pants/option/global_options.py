@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import multiprocessing
 import os
 import sys
 import tempfile
@@ -13,13 +12,13 @@ from pants.base.build_environment import (
     get_buildroot,
     get_default_pants_config_file,
     get_pants_cachedir,
-    get_pants_configdir,
     pants_version,
 )
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import docs_url
 from pants.util.logging import LogLevel
 
 
@@ -74,11 +73,9 @@ class ExecutionOptions:
     remote_store_connection_limit: Any
     process_execution_local_parallelism: Any
     process_execution_remote_parallelism: Any
+    process_execution_cache_namespace: Any
     process_execution_cleanup_local_dirs: Any
-    process_execution_speculation_delay: Any
-    process_execution_speculation_strategy: Any
     process_execution_use_local_cache: Any
-    remote_execution_process_cache_namespace: Any
     remote_instance_name: Any
     remote_ca_certs_path: Any
     remote_oauth_bearer_token_path: Any
@@ -86,6 +83,12 @@ class ExecutionOptions:
     remote_execution_headers: Any
     remote_execution_overall_deadline_secs: int
     process_execution_local_enable_nailgun: bool
+    remote_cache_read: bool
+    remote_cache_write: bool
+    remote_store_initial_timeout: int
+    remote_store_timeout_multiplier: float
+    remote_store_maximum_timeout: int
+    remote_cache_eager_fetch: bool
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
@@ -101,10 +104,8 @@ class ExecutionOptions:
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
             process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
-            process_execution_speculation_delay=bootstrap_options.process_execution_speculation_delay,
-            process_execution_speculation_strategy=bootstrap_options.process_execution_speculation_strategy,
             process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
-            remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
+            process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             remote_instance_name=bootstrap_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
@@ -112,7 +113,16 @@ class ExecutionOptions:
             remote_execution_headers=bootstrap_options.remote_execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
+            remote_cache_read=bootstrap_options.remote_cache_read,
+            remote_cache_write=bootstrap_options.remote_cache_write,
+            remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
+            remote_store_initial_timeout=bootstrap_options.remote_store_initial_timeout,
+            remote_store_timeout_multiplier=bootstrap_options.remote_store_timeout_multiplier,
+            remote_store_maximum_timeout=bootstrap_options.remote_store_maximum_timeout,
         )
+
+
+_CPU_COUNT = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
@@ -124,13 +134,11 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
     remote_store_connection_limit=5,
-    process_execution_local_parallelism=multiprocessing.cpu_count(),
+    process_execution_local_parallelism=_CPU_COUNT,
     process_execution_remote_parallelism=128,
+    process_execution_cache_namespace=None,
     process_execution_cleanup_local_dirs=True,
-    process_execution_speculation_delay=1,
-    process_execution_speculation_strategy="none",
     process_execution_use_local_cache=True,
-    remote_execution_process_cache_namespace=None,
     remote_instance_name=None,
     remote_ca_certs_path=None,
     remote_oauth_bearer_token_path=None,
@@ -138,13 +146,18 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_headers={},
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
     process_execution_local_enable_nailgun=False,
+    remote_cache_read=False,
+    remote_cache_write=False,
+    remote_cache_eager_fetch=True,
+    remote_store_initial_timeout=10,
+    remote_store_timeout_multiplier=2.0,
+    remote_store_maximum_timeout=10,
 )
 
 
 class GlobalOptions(Subsystem):
-    """Options to control the overall behavior of Pants."""
-
     options_scope = GLOBAL_SCOPE
+    help = "Options to control the overall behavior of Pants."
 
     @classmethod
     def register_bootstrap_options(cls, register):
@@ -162,6 +175,42 @@ class GlobalOptions(Subsystem):
         buildroot = get_buildroot()
         default_distdir_name = "dist"
         default_rel_distdir = f"/{default_distdir_name}/"
+
+        register(
+            "--backend-packages",
+            advanced=True,
+            type=list,
+            default=[],
+            help=(
+                "Register functionality from these backends.\n\nThe backend packages must be "
+                "present on the PYTHONPATH, typically because they are in the Pants core dist, in a "
+                "plugin dist, or available as sources in the repo."
+            ),
+        )
+        register(
+            "--plugins",
+            advanced=True,
+            type=list,
+            help=(
+                "Allow backends to be loaded from these plugins (usually released through PyPI). "
+                "The default backends for each plugin will be loaded automatically. Other backends "
+                "in a plugin can be loaded by listing them in `backend_packages` in the "
+                "`[GLOBAL]` scope."
+            ),
+        )
+        register(
+            "--plugins-force-resolve",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="Re-resolve plugins, even if previously resolved.",
+        )
+        register(
+            "--plugin-cache-dir",
+            advanced=True,
+            default=os.path.join(get_pants_cachedir(), "plugins"),
+            help="Cache resolved plugin requirements here.",
+        )
 
         register(
             "-l", "--level", type=LogLevel, default=LogLevel.INFO, help="Set the logging level."
@@ -185,7 +234,7 @@ class GlobalOptions(Subsystem):
             "The logging levels are one of: "
             '"error", "warn", "info", "debug", "trace". '
             "All logging targets not specified here use the global log level set with --level. For example, "
-            'you can set `--log-levels-by-target=\'{"workunit_store": "info", "pants.engine.rules": "warn"}\'` ',
+            'you can set `--log-levels-by-target=\'{"workunit_store": "info", "pants.engine.rules": "warn"}\'`.',
         )
 
         register(
@@ -215,10 +264,8 @@ class GlobalOptions(Subsystem):
             default=[],
             advanced=True,
             help="Regexps matching warning strings to ignore, e.g. "
-            '["DEPRECATED: scope some_scope will be removed"]. The regexps will be matched '
-            "from the start of the warning string, and will always be case-insensitive. "
-            "See the `warnings` Python module documentation for more background "
-            "on how these are used.",
+            '["DEPRECATED: the option `--my-opt` will be removed"]. The regex patterns will be '
+            "matched from the start of the warning string, and are case-insensitive.",
         )
 
         register(
@@ -226,15 +273,12 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=pants_version(),
             daemon=True,
-            help="Use this pants version. Note Pants code only uses this to verify that you are "
+            help="Use this Pants version. Note that Pants only uses this to verify that you are "
             "using the requested version, as Pants cannot dynamically change the version it "
-            "is using once the program is already running. This option is useful to set in "
-            "your pants.toml, however, and then you can grep the value to select which "
-            "version to use for setup scripts (e.g. `./pants`), runner scripts, IDE plugins, "
-            "etc. For example, the setup script we distribute at "
-            "https://www.pantsbuild.org/docs/installation uses this value to determine which Python"
-            "version to run with. You may find the version of the Pants instance you are running "
-            "by using -v, -V, or --version.",
+            "is using once the program is already running.\n\nIf you use the `./pants` script from "
+            f"{docs_url('installation')}, however, changing the value in your "
+            "`pants.toml` will cause the new version to be installed and run automatically.\n\n"
+            "Run `./pants --version` to check what is being used.",
         )
         register(
             "--pants-bin-name",
@@ -243,52 +287,24 @@ class GlobalOptions(Subsystem):
             help="The name of the script or binary used to invoke Pants. "
             "Useful when printing help messages.",
         )
-        register(
-            "--plugins",
-            advanced=True,
-            type=list,
-            help="Allow backends to be loaded from these plugins. The default backends for "
-            "each plugin will be loaded automatically. Other backends in a plugin can be "
-            "loaded by listing them in `backend_packages` in the `[GLOBAL]` scope.",
-        )
-        register(
-            "--plugins-force-resolve",
-            advanced=True,
-            type=bool,
-            default=False,
-            help="Re-resolve plugins even if previously resolved.",
-        )
-        register(
-            "--plugin-cache-dir",
-            advanced=True,
-            default=os.path.join(get_pants_cachedir(), "plugins"),
-            help="Cache resolved plugin requirements here.",
-        )
-        register(
-            "--backend-packages",
-            advanced=True,
-            type=list,
-            default=[],
-            help=(
-                "Register rules from these backends. The backend packages must be present on "
-                "the PYTHONPATH, typically because they are in the Pants core dist, in a "
-                "plugin dist, or available as sources in the repo."
-            ),
-        )
 
         register(
             "--pants-bootstrapdir",
             advanced=True,
             metavar="<dir>",
-            default=get_pants_cachedir(),
-            help="Use this dir for global cache.",
+            default=None,
+            removal_version="2.3.0.dev1",
+            removal_hint="Unused.",
+            help="Unused.",
         )
         register(
             "--pants-configdir",
             advanced=True,
             metavar="<dir>",
-            default=get_pants_configdir(),
-            help="Use this dir for global config files.",
+            default=None,
+            removal_version="2.3.0.dev1",
+            removal_hint="Unused.",
+            help="Unused.",
         )
         register(
             "--pants-workdir",
@@ -296,7 +312,7 @@ class GlobalOptions(Subsystem):
             metavar="<dir>",
             default=os.path.join(buildroot, ".pants.d"),
             daemon=True,
-            help="Write intermediate output files to this dir.",
+            help="Write intermediate logs and output files to this dir.",
         )
         register(
             "--pants-physical-workdir-base",
@@ -313,33 +329,22 @@ class GlobalOptions(Subsystem):
             advanced=True,
             metavar="<dir>",
             default=os.path.join(buildroot, "build-support"),
-            help="Use support files from this dir.",
+            help="Unused. Will be deprecated in 2.2.0.",
         )
         register(
             "--pants-distdir",
             advanced=True,
             metavar="<dir>",
             default=os.path.join(buildroot, "dist"),
-            help="Write end-product artifacts to this dir.",
-        )
-        # TODO: Change the default to false in 2.1, deprecate the option in 2.2 and remove in 2.3.
-        register(
-            "--pants-distdir-legacy-paths",
-            type=bool,
-            advanced=True,
-            default=True,
-            help="Whether to write binaries to the pre-2.0 paths under distdir. These legacy "
-            "paths are not qualified by target address, so may be ambiguous.  This option "
-            "is a temporary mechanism for easing transition to 2.0.  We recommemd switching "
-            "to the new, unambiguous paths ASAP, by setting this option to true.",
+            help="Write end products, such as the results of `./pants package`, to this dir.",
         )
         register(
             "--pants-subprocessdir",
             advanced=True,
             default=os.path.join(buildroot, ".pids"),
             daemon=True,
-            help="The directory to use for tracking subprocess metadata, if any. This should "
-            "live outside of the dir used by `--pants-workdir` to allow for tracking "
+            help="The directory to use for tracking subprocess metadata. This should "
+            "live outside of the dir used by `pants_workdir` to allow for tracking "
             "subprocesses that outlive the workdir data.",
         )
         register(
@@ -350,7 +355,11 @@ class GlobalOptions(Subsystem):
             # files independently affects fingerprints.
             fingerprint=False,
             default=[get_default_pants_config_file()],
-            help="Paths to Pants config files.",
+            help=(
+                "Paths to Pants config files. This may only be set through the environment variable "
+                "`PANTS_CONFIG_FILES` and the command line argument `--pants-config-files`; it will "
+                "be ignored if in a config file like `pants.toml`."
+            ),
         )
         register(
             "--pantsrc",
@@ -359,7 +368,10 @@ class GlobalOptions(Subsystem):
             default=True,
             # NB: See `--pants-config-files`.
             fingerprint=False,
-            help="Use pantsrc files.",
+            help=(
+                "Use pantsrc files located at the paths specified in the global option "
+                "`pantsrc_files`."
+            ),
         )
         register(
             "--pantsrc-files",
@@ -378,24 +390,21 @@ class GlobalOptions(Subsystem):
             "--pythonpath",
             advanced=True,
             type=list,
-            help="Add these directories to PYTHONPATH to search for plugins.",
+            help=(
+                "Add these directories to PYTHONPATH to search for plugins. This does not impact "
+                "the PYTHONPATH used by Pants when running your Python code."
+            ),
         )
         register(
             "--spec-files",
             type=list,
-            # NB: See `--pants-config-files`.
+            # NB: We don't fingerprint spec files because the content of the files independently
+            # affects fingerprints.
             fingerprint=False,
-            help="Read additional specs (e.g., target addresses or file names), one per line,"
-            "from these files.",
-        )
-        register(
-            "--spec-file",
-            type=list,
-            removal_version="2.1.0.dev0",
-            removal_hint="Use --spec-files",
-            fingerprint=False,
-            help="Read additional specs from this file (e.g. target addresses or file names). "
-            "Each spec should be one per line.",
+            help=(
+                "Read additional specs (target addresses, files, and/or globs), one per line,"
+                "from these files."
+            ),
         )
         register(
             "--verify-config",
@@ -403,6 +412,19 @@ class GlobalOptions(Subsystem):
             default=True,
             advanced=True,
             help="Verify that all config file values correspond to known options.",
+        )
+
+        register(
+            "--stats-record-option-scopes",
+            advanced=True,
+            type=list,
+            default=["*"],
+            help=(
+                "Option scopes to record in stats on run completion. "
+                "Options may be selected by joining the scope and the option with a ^ character, "
+                "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "
+                "Add a '*' to the list to capture all known scopes."
+            ),
         )
 
         register(
@@ -414,9 +436,9 @@ class GlobalOptions(Subsystem):
             help="Paths to ignore for all filesystem operations performed by pants "
             "(e.g. BUILD file scanning, glob matching, etc). "
             "Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). "
-            "The `--pants-distdir` and `--pants-workdir` locations are inherently ignored. "
-            "--pants-ignore can be used in tandem with --pants-ignore-use-gitignore, and any rules "
-            "specified here apply after rules specified in a .gitignore file.",
+            "The `pants_distdir` and `pants_workdir` locations are automatically ignored. "
+            "`pants_ignore` can be used in tandem with `pants_ignore_use_gitignore`; any rules "
+            "specified here are applied after rules specified in a .gitignore file.",
         )
         register(
             "--pants-ignore-use-gitignore",
@@ -447,7 +469,7 @@ class GlobalOptions(Subsystem):
             daemon=True,
             help=(
                 "Enables use of the Pants daemon (pantsd). pantsd can significantly improve "
-                "runtime performance by lowering per-run startup cost, and by caching filesystem "
+                "runtime performance by lowering per-run startup cost, and by memoizing filesystem "
                 "operations and rule execution."
             ),
         )
@@ -492,14 +514,6 @@ class GlobalOptions(Subsystem):
 
         # These facilitate configuring the native engine.
         register(
-            "--native-engine-visualize-to",
-            advanced=True,
-            default=None,
-            type=dir_option,
-            help="A directory to write execution and rule graphs to as `dot` files. The contents "
-            "of the directory will be overwritten if any filenames collide.",
-        )
-        register(
             "--print-stacktrace",
             advanced=True,
             type=bool,
@@ -507,13 +521,12 @@ class GlobalOptions(Subsystem):
             help="Print the full exception stack trace for any errors.",
         )
         register(
-            "--print-exception-stacktrace",
+            "--native-engine-visualize-to",
             advanced=True,
-            type=bool,
-            default=False,
-            help="Print to console the full exception stack trace if encountered.",
-            removal_version="2.1.0.dev0",
-            removal_hint="Use `--print-stacktrace` instead of `--print-exception-stacktrace`.",
+            default=None,
+            type=dir_option,
+            help="A directory to write execution and rule graphs to as `dot` files. The contents "
+            "of the directory will be overwritten if any filenames collide.",
         )
 
         # Pants Daemon options.
@@ -525,22 +538,6 @@ class GlobalOptions(Subsystem):
             daemon=True,
             help="The port to bind the Pants nailgun server to. Defaults to a random port.",
         )
-        # TODO(#7514): Make this default to 1.0 seconds if stdin is a tty!
-        register(
-            "--pantsd-pailgun-quit-timeout",
-            advanced=True,
-            type=float,
-            default=5.0,
-            help="The length of time (in seconds) to wait for further output after sending a "
-            "signal to the remote pantsd process before killing it.",
-        )
-        register(
-            "--pantsd-log-dir",
-            advanced=True,
-            default=None,
-            daemon=True,
-            help="The directory to log pantsd output to.",
-        )
         register(
             "--pantsd-invalidation-globs",
             advanced=True,
@@ -549,6 +546,33 @@ class GlobalOptions(Subsystem):
             daemon=True,
             help="Filesystem events matching any of these globs will trigger a daemon restart. "
             "Pants's own code, plugins, and `--pants-config-files` are inherently invalidated.",
+        )
+
+        process_execution_local_parallelism = "--process-execution-local-parallelism"
+        rule_threads_core = "--rule-threads-core"
+        rule_threads_max = "--rule-threads-max"
+
+        register(
+            rule_threads_core,
+            type=int,
+            default=max(2, _CPU_COUNT // 2),
+            advanced=True,
+            help=(
+                "The number of threads to keep active and ready to execute `@rule` logic (see "
+                f"also: `{rule_threads_max}`). Values less than 2 are not currently supported. "
+                "This value is independent of the number of processes that may be spawned in "
+                f"parallel locally (controlled by `{process_execution_local_parallelism}`)."
+            ),
+        )
+        register(
+            rule_threads_max,
+            type=int,
+            default=None,
+            advanced=True,
+            help=(
+                "The maximum number of threads to use to execute `@rule` logic. Defaults to "
+                f"a small multiple of `{rule_threads_core}`."
+            ),
         )
 
         cache_instructions = (
@@ -568,12 +592,6 @@ class GlobalOptions(Subsystem):
             default=os.path.join(get_pants_cachedir(), "lmdb_store"),
         )
         register(
-            "--local-execution-root-dir",
-            advanced=True,
-            help=f"Directory to use for local process execution sandboxing. {cache_instructions}",
-            default=tempfile.gettempdir(),
-        )
-        register(
             "--named-caches-dir",
             advanced=True,
             help=(
@@ -582,6 +600,29 @@ class GlobalOptions(Subsystem):
             ),
             default=os.path.join(get_pants_cachedir(), "named_caches"),
         )
+
+        register(
+            "--local-execution-root-dir",
+            advanced=True,
+            help=f"Directory to use for local process execution sandboxing. {cache_instructions}",
+            default=tempfile.gettempdir(),
+        )
+        register(
+            "--process-execution-use-local-cache",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Whether to keep process executions in a local cache persisted to disk.",
+        )
+        register(
+            "--process-execution-cleanup-local-dirs",
+            type=bool,
+            default=True,
+            advanced=True,
+            help="Whether or not to cleanup directories used for local process execution "
+            "(primarily useful for e.g. debugging).",
+        )
+
         register(
             "--ca-certs-path",
             advanced=True,
@@ -590,13 +631,114 @@ class GlobalOptions(Subsystem):
             help="Path to a file containing PEM-format CA certificates used for verifying secure "
             "connections when downloading files required by a build.",
         )
+
+        register(
+            process_execution_local_parallelism,
+            type=int,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
+            advanced=True,
+            help="Number of concurrent processes that may be executed locally.",
+        )
+        register(
+            "--process-execution-remote-parallelism",
+            type=int,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_remote_parallelism,
+            advanced=True,
+            help="Number of concurrent processes that may be executed remotely.",
+        )
+        register(
+            "--process-execution-cache-namespace",
+            advanced=True,
+            type=str,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_cache_namespace,
+            help=(
+                "The cache namespace for process execution. "
+                "Change this value to invalidate every artifact's execution, or to prevent "
+                "process cache entries from being (re)used for different usecases or users."
+            ),
+        )
+        register(
+            "--process-execution-speculation-delay",
+            type=float,
+            default=1,
+            advanced=True,
+            help="Number of seconds to wait before speculating a second request for a slow process. "
+            " see `--process-execution-speculation-strategy`",
+            removal_version="2.4.0.dev0",
+            removal_hint=(
+                "This option now no-ops, as speculation has been removed. It will be "
+                "re-implemented in the future."
+            ),
+        )
+        register(
+            "--process-execution-speculation-strategy",
+            choices=["remote_first", "local_first", "none"],
+            default="none",
+            help="Speculate a second request for an underlying process if the first one does not complete within "
+            "`--process-execution-speculation-delay` seconds.\n"
+            "`local_first` (default): Try to run the process locally first, "
+            "and fall back to remote execution if available.\n"
+            "`remote_first`: Run the process on the remote execution backend if available, "
+            "and fall back to the local host if remote calls take longer than the speculation timeout.\n"
+            "`none`: Do not speculate about long running processes.",
+            advanced=True,
+            removal_version="2.4.0.dev0",
+            removal_hint=(
+                "This option now no-ops, as speculation has been removed. It will be "
+                "re-implemented in the future."
+            ),
+        )
+        register(
+            "--process-execution-local-enable-nailgun",
+            type=bool,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
+            help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
+            advanced=True,
+        )
+
         register(
             "--remote-execution",
             advanced=True,
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
-            help="Enables remote workers for increased parallelism. (Alpha)",
+            help=(
+                "Enables remote workers for increased parallelism. (Alpha)\n\nAlternatively, you "
+                "can use `--remote-cache-read` and `--remote-cache-write` to still run everything "
+                "locally, but to use a remote cache."
+            ),
         )
+        register(
+            "--remote-cache-read",
+            type=bool,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read,
+            advanced=True,
+            help=(
+                "Whether to enable reading from a remote cache.\n\nThis cannot be used at the same "
+                "time as `--remote-execution`."
+            ),
+        )
+        register(
+            "--remote-cache-write",
+            type=bool,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_write,
+            advanced=True,
+            help=(
+                "Whether to enable writing results to a remote cache.\n\nThis cannot be used at "
+                "the same time as `--remote-execution`."
+            ),
+        )
+        register(
+            "--remote-cache-eager-fetch",
+            type=bool,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_eager_fetch,
+            help=(
+                "Eagerly fetch relevant content from the remote store instead of lazily fetching."
+                "\n\nThis may result in worse performance, but reduce the frequency of errors "
+                "encountered by reducing the surface area of when remote caching is used."
+            ),
+        )
+
         register(
             "--remote-store-server",
             advanced=True,
@@ -646,12 +788,25 @@ class GlobalOptions(Subsystem):
             help="Number of remote stores to concurrently allow connections to.",
         )
         register(
-            "--remote-execution-process-cache-namespace",
+            "--remote-store-initial-timeout",
+            type=int,
             advanced=True,
-            help="The cache namespace for remote process execution. "
-            "Bump this to invalidate every artifact's remote execution. "
-            "This is the remote execution equivalent of the legacy cache-key-gen-version "
-            "flag.",
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_initial_timeout,
+            help="Initial timeout (in milliseconds) when there is a failure in accessing a remote store.",
+        )
+        register(
+            "--remote-store-timeout-multiplier",
+            type=float,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_timeout_multiplier,
+            help="Multiplier used to increase the timeout (starting with value of --remote-store-initial-timeout) between retry attempts in accessing a remote store.",
+        )
+        register(
+            "--remote-store-maximum-timeout",
+            type=int,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_maximum_timeout,
+            help="Maximum timeout (in millseconds) to allow between retry attempts in accessing a remote store.",
         )
         register(
             "--remote-instance-name",
@@ -697,63 +852,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help="Overall timeout in seconds for each remote execution request from time of submission",
         )
-        register(
-            "--process-execution-local-parallelism",
-            type=int,
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
-            advanced=True,
-            help="Number of concurrent processes that may be executed locally.",
-        )
-        register(
-            "--process-execution-remote-parallelism",
-            type=int,
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_remote_parallelism,
-            advanced=True,
-            help="Number of concurrent processes that may be executed remotely.",
-        )
-        register(
-            "--process-execution-cleanup-local-dirs",
-            type=bool,
-            default=True,
-            advanced=True,
-            help="Whether or not to cleanup directories used for local process execution "
-            "(primarily useful for e.g. debugging).",
-        )
-        register(
-            "--process-execution-speculation-delay",
-            type=float,
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_speculation_delay,
-            advanced=True,
-            help="Number of seconds to wait before speculating a second request for a slow process. "
-            " see `--process-execution-speculation-strategy`",
-        )
-        register(
-            "--process-execution-speculation-strategy",
-            choices=["remote_first", "local_first", "none"],
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_speculation_strategy,
-            help="Speculate a second request for an underlying process if the first one does not complete within "
-            "`--process-execution-speculation-delay` seconds.\n"
-            "`local_first` (default): Try to run the process locally first, "
-            "and fall back to remote execution if available.\n"
-            "`remote_first`: Run the process on the remote execution backend if available, "
-            "and fall back to the local host if remote calls take longer than the speculation timeout.\n"
-            "`none`: Do not speculate about long running processes.",
-            advanced=True,
-        )
-        register(
-            "--process-execution-use-local-cache",
-            type=bool,
-            default=True,
-            advanced=True,
-            help="Whether to keep process executions in a local cache persisted to disk.",
-        )
-        register(
-            "--process-execution-local-enable-nailgun",
-            type=bool,
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
-            help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
-            advanced=True,
-        )
 
     @classmethod
     def register_options(cls, register):
@@ -769,7 +867,7 @@ class GlobalOptions(Subsystem):
             default=(("CI" not in os.environ) and sys.stderr.isatty()),
             help="Display a dynamically-updating console UI as Pants runs. This is true by default "
             "if Pants detects a TTY and there is no 'CI' environment variable indicating that "
-            "Pants is running in a continuous integration environment; and false otherwise.",
+            "Pants is running in a continuous integration environment.",
         )
 
         register(
@@ -778,7 +876,7 @@ class GlobalOptions(Subsystem):
             metavar="[+-]tag1,tag2,...",
             help=(
                 "Include only targets with these tags (optional '+' prefix) or without these "
-                "tags ('-' prefix). See https://www.pantsbuild.org/docs/advanced-target-selection."
+                f"tags ('-' prefix). See {docs_url('advanced-target-selection')}."
             ),
         )
         register(
@@ -786,7 +884,27 @@ class GlobalOptions(Subsystem):
             type=list,
             default=[],
             metavar="<regexp>",
-            help="Exclude target roots that match these regexes.",
+            help="Exclude targets that match these regexes. This does not impact file arguments.",
+        )
+
+        register(
+            "--files-not-found-behavior",
+            advanced=True,
+            type=FilesNotFoundBehavior,
+            default=FilesNotFoundBehavior.warn,
+            help="What to do when files and globs specified in BUILD files, such as in the "
+            "`sources` field, cannot be found. This happens when the files do not exist on "
+            "your machine or when they are ignored by the `--pants-ignore` option.",
+        )
+        register(
+            "--owners-not-found-behavior",
+            advanced=True,
+            type=OwnersNotFoundBehavior,
+            default=OwnersNotFoundBehavior.error,
+            help=(
+                "What to do when file arguments do not have any owning target. This happens when "
+                "there are no targets whose `sources` fields include the file argument."
+            ),
         )
 
         register(
@@ -818,7 +936,7 @@ class GlobalOptions(Subsystem):
             default=[],
             help=(
                 "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
-                "See https://www.pantsbuild.org/docs/macros."
+                f"See {docs_url('macros')}."
             ),
         )
         register(
@@ -830,31 +948,11 @@ class GlobalOptions(Subsystem):
             "project depends on.",
         )
 
-        register(
-            "--files-not-found-behavior",
-            advanced=True,
-            type=FilesNotFoundBehavior,
-            default=FilesNotFoundBehavior.warn,
-            help="What to do when files and globs specified in BUILD files, such as in the "
-            "`sources` field, cannot be found. This happens when the files do not exist on "
-            "your machine or when they are ignored by the `--pants-ignore` option.",
-        )
-        register(
-            "--owners-not-found-behavior",
-            advanced=True,
-            type=OwnersNotFoundBehavior,
-            default=OwnersNotFoundBehavior.error,
-            help=(
-                "What to do when file arguments do not have any owning target. This happens when "
-                "there are no targets whose `sources` fields include the file argument."
-            ),
-        )
-
         loop_flag = "--loop"
         register(
             loop_flag,
             type=bool,
-            help="Run goals continuously as file changes are detected.",
+            help="Run goals continuously as file changes are detected. Alpha feature.",
         )
         register(
             "--loop-max",
@@ -865,30 +963,11 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--lock",
-            advanced=True,
-            type=bool,
-            default=True,
-            help="Use a global lock to exclude other versions of Pants from running during "
-            "critical operations.",
-        )
-
-        register(
             "--streaming-workunits-report-interval",
             type=float,
-            default=10,
+            default=1,
             advanced=True,
             help="Interval in seconds between when streaming workunit event receivers will be polled.",
-        )
-        register(
-            "--streaming-workunits-handlers",
-            type=list,
-            member_type=str,
-            default=[],
-            advanced=True,
-            help="Use this option to name Subsystems which will receive streaming workunit events. "
-            "For instance, `--streaming-workunits-handlers=\"['pants.reporting.workunit.Workunits']\"` will "
-            'register a Subsystem called Workunits defined in the module "pants.reporting.workunit".',
         )
 
     @classmethod
@@ -912,4 +991,38 @@ class GlobalOptions(Subsystem):
             raise OptionsError(
                 "The `--remote-execution-server` option requires also setting "
                 "`--remote-store-server`. Often these have the same value."
+            )
+        if opts.remote_cache_read and not opts.remote_store_server:
+            raise OptionsError(
+                "The `--remote-cache-read` option requires also setting "
+                "`--remote-store-server` to work properly."
+            )
+        if opts.remote_cache_write and not opts.remote_store_server:
+            raise OptionsError(
+                "The `--remote-cache-write` option requires also setting "
+                "`--remote-store-server` to work properly."
+            )
+
+        if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
+            raise OptionsError(
+                "`--remote-execution` cannot be set at the same time as either "
+                "`--remote-cache-read` or `--remote-cache-write`.\n\nIf remote execution is "
+                "enabled, it will already use remote caching."
+            )
+
+        # Ensure that timeout values are non-zero.
+        if opts.remote_store_initial_timeout <= 0:
+            raise OptionsError(
+                "The --remote-store-initial-timeout option requires a positive number of "
+                "milliseconds."
+            )
+        if opts.remote_store_timeout_multiplier <= 0.0:
+            raise OptionsError(
+                "The --remote-store-timeout-multiplier option requires a positive number for the "
+                "multiplier."
+            )
+        if opts.remote_store_maximum_timeout <= 0:
+            raise OptionsError(
+                "The --remote-store-initial-timeout option requires a positive number of "
+                "milliseconds."
             )

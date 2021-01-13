@@ -436,7 +436,7 @@ async fn garbage_collect_fail_because_too_many_leases() {
 async fn write_one_meg(store: &ByteStore, byte: u8) {
   let mut bytes = BytesMut::with_capacity(1024 * 1024);
   for _ in 0..1024 * 1024 {
-    bytes.put(byte);
+    bytes.put_u8(byte);
   }
   store
     .store_bytes(EntryType::File, bytes.freeze(), false)
@@ -532,7 +532,9 @@ async fn empty_file_is_known() {
   let empty_file = TestData::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::File, empty_file.digest(), |b| Bytes::from(b))
+      .load_bytes_with(EntryType::File, empty_file.digest(), |b| {
+        Bytes::copy_from_slice(b)
+      })
       .await,
     Ok(Some(empty_file.bytes())),
   )
@@ -545,7 +547,9 @@ async fn empty_directory_is_known() {
   let empty_dir = TestDirectory::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| Bytes::from(b))
+      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| {
+        Bytes::copy_from_slice(b)
+      })
       .await,
     Ok(Some(empty_dir.bytes())),
   )
@@ -584,7 +588,7 @@ pub async fn load_bytes(
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
   store
-    .load_bytes_with(entry_type, digest, |b| Bytes::from(b))
+    .load_bytes_with(entry_type, digest, |b| Bytes::copy_from_slice(b))
     .await
 }
 

@@ -1,10 +1,16 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+python_library(
+  name="binary_file",
+  sources=["test_binary.py"],
+  dependencies=[":test_library"],
+)
+
 pex_binary(
-  name='test',
-  sources=['test_binary.py'],
-  dependencies=[':test_library']
+  name="test_binary",
+  entry_point="test_binary.py",
+  dependencies=[':binary_file']
 )
 
 python_library(

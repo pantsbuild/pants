@@ -23,7 +23,7 @@ impl DisplayForGraph for Rule {
   fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String {
     match self {
       Rule::Task(ref task) => {
-        let task_name = task.func.name();
+        let task_name = task.func.full_name();
         let product = format!("{}", task.product);
 
         let clause_portion = Self::formatted_select_clause(&task.clause, display_args);

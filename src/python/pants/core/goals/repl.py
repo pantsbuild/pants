@@ -38,9 +38,9 @@ class ReplImplementation(ABC):
 
 
 class ReplSubsystem(GoalSubsystem):
-    """Opens a REPL."""
-
     name = "repl"
+    help = "Open a REPL with the specified code loadable."
+
     required_union_implementations = (ReplImplementation,)
 
     @classmethod

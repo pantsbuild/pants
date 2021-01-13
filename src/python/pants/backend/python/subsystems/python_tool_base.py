@@ -42,9 +42,10 @@ class PythonToolBase(Subsystem):
             type=str,
             advanced=True,
             default=cls.default_entry_point,
-            help="The main module for the tool. If unspecified, the code using this tool "
-            "must provide it explicitly on invocation, or it can use the tool as a "
-            "library, invoked by a wrapper script.",
+            help=(
+                "The main module for the tool. Usually, you will not want to change this from the "
+                "default."
+            ),
         )
 
         if cls.default_interpreter_constraints and not cls.register_interpreter_constraints:
@@ -54,31 +55,13 @@ class PythonToolBase(Subsystem):
                 "`--interpreter-constraints` option will not be registered. Did you mean to set "
                 "this?"
             )
-        interpreter_constraints_help = (
-            "Python interpreter constraints for this tool. An empty list uses the default "
-            "interpreter constraints for the repo."
-        )
         if cls.register_interpreter_constraints:
             register(
                 "--interpreter-constraints",
                 type=list,
                 advanced=True,
                 default=cls.default_interpreter_constraints,
-                help=interpreter_constraints_help,
-            )
-        else:
-            register(
-                "--interpreter-constraints",
-                type=list,
-                advanced=True,
-                default=[],
-                help=interpreter_constraints_help,
-                removal_version="2.1.0.dev0",
-                removal_hint=(
-                    "This option no longer does anything, as Pants auto-configures the interpreter "
-                    f"constraints for {cls.options_scope} based on your code's interpreter "
-                    "constraints."
-                ),
+                help="Python interpreter constraints for this tool.",
             )
 
     @property

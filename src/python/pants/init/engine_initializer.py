@@ -1,6 +1,8 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,27 +10,27 @@ from typing import Any, ClassVar, Iterable, List, Optional, Set, Tuple, Type, ca
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine import desktop, fs, process
+from pants.engine import desktop, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals import build_files, graph, options_parsing, uuid
+from pants.engine.internals import build_files, graph, options_parsing
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.platform import create_platform_rules
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule, collect_rules, rule
+from pants.engine.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
-from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
@@ -50,11 +52,14 @@ class GraphScheduler:
         build_id,
         dynamic_ui: bool = False,
         use_colors=True,
-        should_report_workunits=False,
         session_values: Optional[SessionValues] = None,
-    ) -> "GraphSession":
+        cancellation_latch: Optional[PySessionCancellationLatch] = None,
+    ) -> GraphSession:
         session = self.scheduler.new_session(
-            build_id, dynamic_ui, should_report_workunits, session_values=session_values
+            build_id,
+            dynamic_ui,
+            session_values=session_values,
+            cancellation_latch=cancellation_latch,
         )
         console = Console(use_colors=use_colors, session=session if dynamic_ui else None)
         return GraphSession(session, console, self.goal_map)
@@ -161,22 +166,20 @@ class EngineInitializer:
     def setup_graph(
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
+        executor: Optional[PyExecutor] = None,
     ) -> GraphScheduler:
         native = Native()
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        print_stacktrace = resolve_conflicting_options(
-            old_option="print_exception_stacktrace",
-            new_option="print_stacktrace",
-            old_scope="",
-            new_scope="",
-            old_container=bootstrap_options,
-            new_container=bootstrap_options,
+        executor = executor or PyExecutor(
+            *OptionsInitializer.compute_executor_arguments(bootstrap_options)
         )
         return EngineInitializer.setup_graph_extended(
             options_bootstrapper,
             build_configuration,
             ExecutionOptions.from_bootstrap_options(bootstrap_options),
+            native=native,
+            executor=executor,
             pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
                 build_root, bootstrap_options
             ),
@@ -186,8 +189,7 @@ class EngineInitializer:
             named_caches_dir=bootstrap_options.named_caches_dir,
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
-            native=native,
-            include_trace_on_error=print_stacktrace,
+            include_trace_on_error=bootstrap_options.print_stacktrace,
         )
 
     @staticmethod
@@ -197,6 +199,7 @@ class EngineInitializer:
         execution_options: ExecutionOptions,
         native: Native,
         *,
+        executor: PyExecutor,
         pants_ignore_patterns: List[str],
         use_gitignore: bool,
         local_store_dir: str,
@@ -208,9 +211,6 @@ class EngineInitializer:
     ) -> GraphScheduler:
         build_root = build_root or get_buildroot()
 
-        build_configuration = build_configuration or BuildConfigInitializer.get(
-            options_bootstrapper
-        )
         rules = build_configuration.rules
         union_membership = UnionMembership.from_rules(build_configuration.union_rules)
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
@@ -249,11 +249,11 @@ class EngineInitializer:
                 *fs.rules(),
                 *desktop.rules(),
                 *graph.rules(),
-                *uuid.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
-                *create_platform_rules(),
+                *platform.rules(),
                 *changed_rules(),
+                *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
                 *rules,
             )
@@ -290,6 +290,7 @@ class EngineInitializer:
             ca_certs_path=ensure_optional_absolute_path(ca_certs_path),
             rules=rules,
             union_membership=union_membership,
+            executor=executor,
             execution_options=execution_options,
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=bootstrap_options.native_engine_visualize_to,

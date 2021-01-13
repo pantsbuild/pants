@@ -7,17 +7,11 @@ from typing import cast
 import pytest
 
 from pants.base.build_root import BuildRoot
-from pants.base.specs import AddressLiteralSpec
 from pants.core.goals.run import Run, RunFieldSet, RunRequest, RunSubsystem, run
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveRunner
-from pants.engine.target import (
-    Target,
-    TargetRootsToFieldSets,
-    TargetRootsToFieldSetsRequest,
-    TargetWithOrigin,
-)
+from pants.engine.target import Target, TargetRootsToFieldSets, TargetRootsToFieldSetsRequest
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.rule_runner import MockConsole, MockGet, RuleRunner, run_rule_with_mocks
@@ -54,9 +48,6 @@ def single_target_run(
         core_fields = ()
 
     target = TestBinaryTarget({}, address=address)
-    target_with_origin = TargetWithOrigin(
-        target, AddressLiteralSpec(address.spec_path, address.target_name)
-    )
     field_set = TestRunFieldSet.create(target)
 
     res = run_rule_with_mocks(
@@ -73,7 +64,7 @@ def single_target_run(
             MockGet(
                 output_type=TargetRootsToFieldSets,
                 input_type=TargetRootsToFieldSetsRequest,
-                mock=lambda _: TargetRootsToFieldSets({target_with_origin: [field_set]}),
+                mock=lambda _: TargetRootsToFieldSets({target: [field_set]}),
             ),
             MockGet(
                 output_type=RunRequest,

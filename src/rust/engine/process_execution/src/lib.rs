@@ -40,10 +40,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
-use workunit_store::{with_workunit, WorkunitMetadata, WorkunitStore};
+use workunit_store::{with_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
-use hashing::Digest;
+use hashing::{Digest, EMPTY_FINGERPRINT};
 
 pub mod cache;
 #[cfg(test)]
@@ -57,9 +57,9 @@ pub mod remote;
 #[cfg(test)]
 pub mod remote_tests;
 
-pub mod speculate;
+pub mod remote_cache;
 #[cfg(test)]
-mod speculate_tests;
+mod remote_cache_tests;
 
 pub mod nailgun;
 
@@ -80,52 +80,10 @@ impl Platform {
   pub fn current() -> Result<Platform, String> {
     let platform_info =
       uname::uname().map_err(|_| "Failed to get local platform info!".to_string())?;
-
     match platform_info {
       uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => Ok(Platform::Darwin),
       uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => Ok(Platform::Linux),
       uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
-    }
-  }
-}
-
-#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum PlatformConstraint {
-  Darwin,
-  Linux,
-  None,
-}
-
-impl PlatformConstraint {
-  pub fn current_platform_constraint() -> Result<PlatformConstraint, String> {
-    Platform::current().map(|p: Platform| p.into())
-  }
-}
-
-impl From<Platform> for PlatformConstraint {
-  fn from(platform: Platform) -> PlatformConstraint {
-    match platform {
-      Platform::Linux => PlatformConstraint::Linux,
-      Platform::Darwin => PlatformConstraint::Darwin,
-    }
-  }
-}
-
-impl TryFrom<&String> for PlatformConstraint {
-  type Error = String;
-  ///
-  /// This is a helper method to convert values from the python/engine/platform.py::PlatformConstraint enum,
-  /// which have been serialized, into the rust PlatformConstraint enum.
-  ///
-  fn try_from(variant_candidate: &String) -> Result<Self, Self::Error> {
-    match variant_candidate.as_ref() {
-      "darwin" => Ok(PlatformConstraint::Darwin),
-      "linux" => Ok(PlatformConstraint::Linux),
-      "none" => Ok(PlatformConstraint::None),
-      other => Err(format!(
-        "Unknown, platform {:?} encountered in parsing",
-        other
-      )),
     }
   }
 }
@@ -139,12 +97,41 @@ impl From<Platform> for String {
   }
 }
 
-impl From<PlatformConstraint> for String {
-  fn from(platform: PlatformConstraint) -> String {
-    match platform {
-      PlatformConstraint::Linux => "linux".to_string(),
-      PlatformConstraint::Darwin => "darwin".to_string(),
-      PlatformConstraint::None => "none".to_string(),
+impl TryFrom<String> for Platform {
+  type Error = String;
+  fn try_from(variant_candidate: String) -> Result<Self, Self::Error> {
+    match variant_candidate.as_ref() {
+      "darwin" => Ok(Platform::Darwin),
+      "linux" => Ok(Platform::Linux),
+      other => Err(format!(
+        "Unknown platform {:?} encountered in parsing",
+        other
+      )),
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum ProcessCacheScope {
+  // Cached in all locations, regardless of success or failure.
+  Always,
+  // Cached in all locations, but only if the process exits successfully.
+  Successful,
+  // Cached only in memory (i.e. memoized in pantsd), but never persistently.
+  PerRestart,
+  // Never cached anywhere: will run once per Session (i.e. once per run of Pants).
+  Never,
+}
+
+impl TryFrom<String> for ProcessCacheScope {
+  type Error = String;
+  fn try_from(variant_candidate: String) -> Result<Self, Self::Error> {
+    match variant_candidate.to_lowercase().as_ref() {
+      "always" => Ok(ProcessCacheScope::Always),
+      "successful" => Ok(ProcessCacheScope::Successful),
+      "per_restart" => Ok(ProcessCacheScope::PerRestart),
+      "never" => Ok(ProcessCacheScope::Never),
+      other => Err(format!("Unknown Process cache scope: {:?}", other)),
     }
   }
 }
@@ -218,11 +205,12 @@ pub struct Process {
   /// see https://github.com/pantsbuild/pants/issues/6416.
   ///
   pub jdk_home: Option<PathBuf>,
-  pub target_platform: PlatformConstraint,
+
+  pub platform_constraint: Option<Platform>,
 
   pub is_nailgunnable: bool,
 
-  pub cache_failures: bool,
+  pub cache_scope: ProcessCacheScope,
 }
 
 impl Process {
@@ -249,10 +237,10 @@ impl Process {
       level: log::Level::Info,
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
-      target_platform: PlatformConstraint::None,
+      platform_constraint: None,
       is_nailgunnable: false,
       execution_slot_variable: None,
-      cache_failures: false,
+      cache_scope: ProcessCacheScope::Successful,
     }
   }
 
@@ -296,10 +284,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
   type Error = String;
 
   fn try_from(req: MultiPlatformProcess) -> Result<Self, Self::Error> {
-    match req
-      .0
-      .get(&(PlatformConstraint::None, PlatformConstraint::None))
-    {
+    match req.0.get(&None) {
       Some(crossplatform_req) => Ok(crossplatform_req.clone()),
       None => Err(String::from(
         "Cannot coerce to a simple Process, no cross platform request exists.",
@@ -312,7 +297,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
 /// A container of platform constrained processes.
 ///
 #[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MultiPlatformProcess(pub BTreeMap<(PlatformConstraint, PlatformConstraint), Process>);
+pub struct MultiPlatformProcess(pub BTreeMap<Option<Platform>, Process>);
 
 impl MultiPlatformProcess {
   pub fn user_facing_name(&self) -> String {
@@ -339,12 +324,8 @@ impl MultiPlatformProcess {
 }
 
 impl From<Process> for MultiPlatformProcess {
-  fn from(req: Process) -> Self {
-    MultiPlatformProcess(
-      vec![((PlatformConstraint::None, PlatformConstraint::None), req)]
-        .into_iter()
-        .collect(),
-    )
+  fn from(proc: Process) -> Self {
+    MultiPlatformProcess(vec![(None, proc)].into_iter().collect())
   }
 }
 
@@ -353,7 +334,7 @@ impl From<Process> for MultiPlatformProcess {
 /// externally from the engine graph (e.g. when using remote execution or an external process
 /// cache).
 ///
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ProcessMetadata {
   pub instance_name: Option<String>,
   pub cache_key_gen_version: Option<String>,
@@ -448,7 +429,11 @@ pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
     .0
     .values()
     .map(|ref process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
-    .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
+    .map(|(_a, _b, er)| {
+      er.action_digest
+        .map(|d| d.hash)
+        .unwrap_or_else(|| EMPTY_FINGERPRINT.to_hex())
+    })
     .collect();
   hashes.sort();
   Digest::of_bytes(
@@ -515,10 +500,15 @@ impl CommandRunner for BoundedCommandRunner {
           Ok(FallibleProcessResultWithPlatform {
             stdout_digest,
             stderr_digest,
+            exit_code,
             ..
           }) => WorkunitMetadata {
             stdout: Some(*stdout_digest),
             stderr: Some(*stderr_digest),
+            user_metadata: vec![(
+              "exit_code".to_string(),
+              UserMetadataItem::ImmediateId(*exit_code as i64),
+            )],
             ..old_metadata
           },
         };

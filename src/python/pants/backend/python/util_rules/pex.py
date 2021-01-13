@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import functools
 import itertools
@@ -24,11 +26,9 @@ from typing import (
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
+from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonRequirementsField,
-)
+from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_environment import (
@@ -48,15 +48,10 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.process import (
-    MultiPlatformProcess,
-    Process,
-    ProcessResult,
-    ProcessScope,
-    UncacheableProcess,
-)
+from pants.engine.platform import Platform
+from pants.engine.process import MultiPlatformProcess, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import Target
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
@@ -75,24 +70,24 @@ class PexRequirements(DeduplicatedCollection[str]):
         fields: Iterable[PythonRequirementsField],
         *,
         additional_requirements: Iterable[str] = (),
-    ) -> "PexRequirements":
+    ) -> PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
         return PexRequirements({*field_requirements, *additional_requirements})
 
 
 # This protocol allows us to work with any arbitrary FieldSet. See
 # https://mypy.readthedocs.io/en/stable/protocols.html.
-class FieldSetWithCompatibility(Protocol):
+class FieldSetWithInterpreterConstraints(Protocol):
     @property
     def address(self) -> Address:
         ...
 
     @property
-    def compatibility(self) -> PythonInterpreterCompatibility:
+    def interpreter_constraints(self) -> InterpreterConstraintsField:
         ...
 
 
-_FS = TypeVar("_FS", bound=FieldSetWithCompatibility)
+_FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
@@ -182,9 +177,22 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
         )
 
     @classmethod
+    def create_from_targets(
+        cls, targets: Iterable[Target], python_setup: PythonSetup
+    ) -> PexInterpreterConstraints:
+        return cls.create_from_compatibility_fields(
+            (
+                tgt[InterpreterConstraintsField]
+                for tgt in targets
+                if tgt.has_field(InterpreterConstraintsField)
+            ),
+            python_setup,
+        )
+
+    @classmethod
     def create_from_compatibility_fields(
-        cls, fields: Iterable[PythonInterpreterCompatibility], python_setup: PythonSetup
-    ) -> "PexInterpreterConstraints":
+        cls, fields: Iterable[InterpreterConstraintsField], python_setup: PythonSetup
+    ) -> PexInterpreterConstraints:
         constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
         # This will OR within each field and AND across fields.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
@@ -194,13 +202,12 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
     def group_field_sets_by_constraints(
         cls, field_sets: Iterable[_FS], python_setup: PythonSetup
     ) -> FrozenDict["PexInterpreterConstraints", Tuple[_FS, ...]]:
-
         results = defaultdict(set)
-
         for fs in field_sets:
-            constraints = cls.create_from_compatibility_fields([fs.compatibility], python_setup)
+            constraints = cls.create_from_compatibility_fields(
+                [fs.interpreter_constraints], python_setup
+            )
             results[constraints].add(fs)
-
         return FrozenDict(
             {
                 constraints: tuple(sorted(field_sets, key=lambda fs: fs.address))
@@ -281,15 +288,18 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
             allowed_versions=["3.8", "3.9"], prior_version="3.7"
         )
 
-    def debug_hint(self) -> str:
+    def __str__(self) -> str:
         return " OR ".join(str(constraint) for constraint in self)
+
+    def debug_hint(self) -> str:
+        return str(self)
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
     sort_input = True
 
     @classmethod
-    def create_from_platforms_field(cls, field: PythonPlatformsField) -> "PexPlatforms":
+    def create_from_platforms_field(cls, field: PythonPlatformsField) -> PexPlatforms:
         return cls(field.value or ())
 
     def generate_pex_arg_list(self) -> List[str]:
@@ -412,10 +422,12 @@ logger = logging.getLogger(__name__)
 
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
-async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -> PythonExecutable:
+async def find_interpreter(
+    interpreter_constraints: PexInterpreterConstraints, pex_runtime_env: PexRuntimeEnvironment
+) -> PythonExecutable:
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         PexCliProcess(
             description=f"Find interpreter for constraints: {formatted_constraints}",
             # Here, we run the Pex CLI with no requirements, which just selects an interpreter.
@@ -449,12 +461,19 @@ async def find_interpreter(interpreter_constraints: PexInterpreterConstraints) -
                 ),
             ),
             level=LogLevel.DEBUG,
+            # NB: We want interpreter discovery to re-run fairly frequently (PER_RESTART), but
+            # not on every run of Pants (NEVER, which is effectively per-Session). See #10769 for
+            # a solution that is less of a tradeoff.
+            cache_scope=ProcessCacheScope.PER_RESTART,
         ),
     )
-    result = await Get(
-        ProcessResult, UncacheableProcess(process=process, scope=ProcessScope.PER_SESSION)
-    )
     path, fingerprint = result.stdout.decode().strip().splitlines()
+
+    if pex_runtime_env.verbosity > 0:
+        log_output = result.stderr.decode()
+        if log_output:
+            logger.info("%s", log_output)
+
     return PythonExecutable(path=path, fingerprint=fingerprint)
 
 
@@ -464,7 +483,7 @@ async def create_pex(
     python_setup: PythonSetup,
     python_repos: PythonRepos,
     platform: Platform,
-    pex_runtime_environment: PexRuntimeEnvironment,
+    pex_runtime_env: PexRuntimeEnvironment,
 ) -> Pex:
     """Returns a PEX with the given settings."""
 
@@ -478,8 +497,8 @@ async def create_pex(
         "--no-pypi",
         *(f"--index={index}" for index in python_repos.indexes),
         *(f"--repo={repo}" for repo in python_repos.repos),
-        "--cache-ttl",
-        str(python_setup.resolver_http_cache_ttl),
+        "--resolver-version",
+        python_setup.resolver_version.value,
         *request.additional_args,
     ]
 
@@ -505,9 +524,6 @@ async def create_pex(
             argv.extend(request.interpreter_constraints.generate_pex_arg_list())
 
     argv.append("--no-emit-warnings")
-    verbosity = pex_runtime_environment.verbosity
-    if verbosity > 0:
-        argv.append(f"-{'v' * verbosity}")
 
     if python_setup.resolver_jobs:
         argv.extend(["--jobs", str(python_setup.resolver_jobs)])
@@ -581,14 +597,9 @@ async def create_pex(
     # NB: Building a Pex is platform dependent, so in order to get a PEX that we can use locally
     # without cross-building, we specify that our PEX command should be run on the current local
     # platform.
-    result = await Get(
-        ProcessResult,
-        MultiPlatformProcess(
-            {(PlatformConstraint(platform.value), PlatformConstraint(platform.value)): process}
-        ),
-    )
+    result = await Get(ProcessResult, MultiPlatformProcess({platform: process}))
 
-    if verbosity > 0:
+    if pex_runtime_env.verbosity > 0:
         log_output = result.stderr.decode()
         if log_output:
             logger.info("%s", log_output)
@@ -652,7 +663,7 @@ class PexProcess:
     output_directories: Optional[Tuple[str, ...]]
     timeout_seconds: Optional[int]
     execution_slot_variable: Optional[str]
-    uncacheable: bool
+    cache_scope: Optional[ProcessCacheScope]
 
     def __init__(
         self,
@@ -667,7 +678,7 @@ class PexProcess:
         output_directories: Optional[Iterable[str]] = None,
         timeout_seconds: Optional[int] = None,
         execution_slot_variable: Optional[str] = None,
-        uncacheable: bool = False,
+        cache_scope: Optional[ProcessCacheScope] = None,
     ) -> None:
         self.pex = pex
         self.argv = tuple(argv)
@@ -679,11 +690,11 @@ class PexProcess:
         self.output_directories = tuple(output_directories) if output_directories else None
         self.timeout_seconds = timeout_seconds
         self.execution_slot_variable = execution_slot_variable
-        self.uncacheable = uncacheable
+        self.cache_scope = cache_scope
 
 
 @rule
-async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
+def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
     argv = pex_environment.create_argv(
         f"./{request.pex.name}",
         *request.argv,
@@ -693,7 +704,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         **pex_environment.environment_dict(python_configured=request.pex.python is not None),
         **(request.extra_env or {}),
     }
-    process = Process(
+    return Process(
         argv,
         description=request.description,
         level=request.level,
@@ -703,8 +714,8 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         output_directories=request.output_directories,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
+        cache_scope=request.cache_scope,
     )
-    return await Get(Process, UncacheableProcess(process)) if request.uncacheable else process
 
 
 def rules():

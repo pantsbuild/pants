@@ -56,7 +56,7 @@ def test_default_no_config() -> None:
             [run]
             relative_files = True
             omit = 
-            \ttest_runner.pex/*
+            \tpytest.pex/*
 
         """  # noqa: W291
     )
@@ -79,7 +79,7 @@ def test_simple_config() -> None:
             relative_files = True
             jerry = HELLO
             omit = 
-            \ttest_runner.pex/*
+            \tpytest.pex/*
 
             """  # noqa: W291
     )
@@ -101,7 +101,7 @@ def test_config_no_run_section() -> None:
             [run]
             relative_files = True
             omit = 
-            \ttest_runner.pex/*
+            \tpytest.pex/*
 
             """  # noqa: W291
     )
@@ -124,7 +124,7 @@ def test_append_omits() -> None:
             omit = 
             \tjerry/seinfeld/*.py
             \tfestivus/tinsel/*.py
-            \ttest_runner.pex/*
+            \tpytest.pex/*
             relative_files = True
 
             """  # noqa: W291

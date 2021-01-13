@@ -28,7 +28,6 @@ We use [Travis CI](https://travis-ci.org) to verify the build
 To run Pants, you need:
 
 * Linux or macOS.
-* Python 3.6+ discoverable on your `PATH`.
-* A C compiler, system headers, Python headers (to compile native Python modules) and the `libffi`
- library and headers (to compile and link modules that use CFFI to access native code).
+* Python 3.7+ discoverable on your `PATH`.
+* A C compiler, system headers and Python headers (to compile native Python modules).
 * Internet access (so that Pants can fully bootstrap itself).

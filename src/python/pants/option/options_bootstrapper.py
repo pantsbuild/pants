@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import os
 import warnings
@@ -99,7 +101,7 @@ class OptionsBootstrapper:
     @classmethod
     def create(
         cls, env: Mapping[str, str], args: Sequence[str], *, allow_pantsrc: bool
-    ) -> "OptionsBootstrapper":
+    ) -> OptionsBootstrapper:
         """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
         :param env: An environment dictionary, or None to use `os.environ`.

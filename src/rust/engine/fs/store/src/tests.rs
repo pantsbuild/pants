@@ -1,18 +1,3 @@
-use crate::{
-  DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Store, UploadSummary,
-  MEGABYTES,
-};
-
-use bazel_protos;
-use bytes::Bytes;
-use fs::RelativePath;
-use futures::compat::Future01CompatExt;
-use hashing::{Digest, Fingerprint};
-use maplit::btreemap;
-use mock::StubCAS;
-use protobuf::Message;
-use serverset::BackoffConfig;
-use std;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -21,6 +6,20 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
+
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bytes::{Bytes, BytesMut};
+use fs::RelativePath;
+use grpc_util::prost::MessageExt;
+use hashing::{Digest, Fingerprint};
+use maplit::btreemap;
+use mock::StubCAS;
+use serverset::BackoffConfig;
+
+use crate::{
+  DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Store, UploadSummary,
+  MEGABYTES,
+};
 
 impl LoadMetadata {
   fn is_remote(&self) -> bool {
@@ -63,14 +62,16 @@ pub fn extra_big_file_digest() -> Digest {
 }
 
 pub fn extra_big_file_bytes() -> Bytes {
-  let mut bytes = big_file_bytes();
-  bytes.extend(&big_file_bytes());
-  bytes
+  let bfb = big_file_bytes();
+  let mut bytes = BytesMut::with_capacity(2 * bfb.len());
+  bytes.extend_from_slice(&bfb);
+  bytes.extend_from_slice(&bfb);
+  bytes.freeze()
 }
 
 pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
   let option = store
-    .load_file_bytes_with(digest, |bytes| Bytes::from(bytes))
+    .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
     .await?;
   Ok(option.map(|(bytes, _metadata)| bytes))
 }
@@ -231,7 +232,6 @@ async fn load_recursive_directory() {
 
   new_store(dir.path(), cas.address())
     .ensure_local_has_recursive_directory(recursive_testdir_digest)
-    .compat()
     .await
     .expect("Downloading recursive directory should have succeeded.");
 
@@ -360,17 +360,15 @@ async fn malformed_remote_directory_is_error() {
 #[tokio::test]
 async fn non_canonical_remote_directory_is_error() {
   let mut non_canonical_directory = TestDirectory::containing_roland().directory();
-  non_canonical_directory.mut_files().push({
-    let mut file = bazel_protos::remote_execution::FileNode::new();
-    file.set_name("roland".to_string());
-    file.set_digest((&TestData::roland().digest()).into());
+  non_canonical_directory.files.push({
+    let file = remexec::FileNode {
+      name: "roland".to_string(),
+      digest: Some((&TestData::roland().digest()).into()),
+      ..Default::default()
+    };
     file
   });
-  let non_canonical_directory_bytes = Bytes::from(
-    non_canonical_directory
-      .write_to_bytes()
-      .expect("Error serializing proto"),
-  );
+  let non_canonical_directory_bytes = non_canonical_directory.to_bytes();
   let directory_digest = Digest::of_bytes(&non_canonical_directory_bytes);
   let non_canonical_directory_fingerprint = directory_digest.0;
 
@@ -457,7 +455,6 @@ async fn expand_empty_directory() {
 
   let expanded = new_local_store(dir.path())
     .expand_directory(empty_dir.digest())
-    .compat()
     .await
     .expect("Error expanding directory");
   let want: HashMap<Digest, EntryType> = vec![(empty_dir.digest(), EntryType::Directory)]
@@ -480,7 +477,6 @@ async fn expand_flat_directory() {
 
   let expanded = new_local_store(dir.path())
     .expand_directory(testdir.digest())
-    .compat()
     .await
     .expect("Error expanding directory");
   let want: HashMap<Digest, EntryType> = vec![
@@ -512,7 +508,6 @@ async fn expand_recursive_directory() {
 
   let expanded = new_local_store(dir.path())
     .expand_directory(recursive_testdir.digest())
-    .compat()
     .await
     .expect("Error expanding directory");
   let want: HashMap<Digest, EntryType> = vec![
@@ -532,7 +527,6 @@ async fn expand_missing_directory() {
   let digest = TestDirectory::containing_roland().digest();
   let error = new_local_store(dir.path())
     .expand_directory(digest)
-    .compat()
     .await
     .expect_err("Want error");
   assert!(
@@ -555,7 +549,6 @@ async fn expand_directory_missing_subdir() {
 
   let error = new_local_store(dir.path())
     .expand_directory(recursive_testdir.digest())
-    .compat()
     .await
     .expect_err("Want error");
   assert!(
@@ -584,7 +577,6 @@ async fn uploads_files() {
 
   new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![testdata.digest()])
-    .compat()
     .await
     .expect("Error uploading file");
 
@@ -616,7 +608,6 @@ async fn uploads_directories_recursively() {
 
   new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest()])
-    .compat()
     .await
     .expect("Error uploading directory");
 
@@ -649,7 +640,6 @@ async fn uploads_files_recursively_when_under_three_digests_ignoring_items_alrea
 
   new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![testdata.digest()])
-    .compat()
     .await
     .expect("Error uploading file");
 
@@ -662,7 +652,6 @@ async fn uploads_files_recursively_when_under_three_digests_ignoring_items_alrea
 
   new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest()])
-    .compat()
     .await
     .expect("Error uploading directory");
 
@@ -697,7 +686,6 @@ async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_d
 
   new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![roland.digest()])
-    .compat()
     .await
     .expect("Error uploading big file");
 
@@ -711,7 +699,6 @@ async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_d
 
   new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest(), catnip.digest()])
-    .compat()
     .await
     .expect("Error uploading directory");
 
@@ -738,7 +725,6 @@ async fn does_not_reupload_big_file_already_in_cas() {
 
   new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![extra_big_file_digest()])
-    .compat()
     .await
     .expect("Error uploading directory");
 
@@ -750,7 +736,6 @@ async fn does_not_reupload_big_file_already_in_cas() {
 
   new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![extra_big_file_digest()])
-    .compat()
     .await
     .expect("Error uploading directory");
 
@@ -772,7 +757,6 @@ async fn upload_missing_files() {
 
   let error = new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![testdata.digest()])
-    .compat()
     .await
     .expect_err("Want error");
   assert_eq!(
@@ -798,7 +782,6 @@ async fn upload_missing_file_in_directory() {
 
   let error = new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest()])
-    .compat()
     .await
     .expect_err("Want error");
   assert_eq!(
@@ -829,7 +812,6 @@ async fn uploading_digest_with_wrong_size_is_error() {
 
   new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![wrong_digest])
-    .compat()
     .await
     .expect_err("Expect error uploading file");
 
@@ -877,7 +859,6 @@ async fn instance_name_upload() {
 
   store_with_remote
     .ensure_remote_has_recursive(vec![testdir.digest()])
-    .compat()
     .await
     .expect("Error uploading");
 }
@@ -908,7 +889,7 @@ async fn instance_name_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::from(b))
+      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
       .unwrap()
       .unwrap()
@@ -958,7 +939,6 @@ async fn auth_upload() {
 
   store_with_remote
     .ensure_remote_has_recursive(vec![testdir.digest()])
-    .compat()
     .await
     .expect("Error uploading");
 }
@@ -989,7 +969,7 @@ async fn auth_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::from(b))
+      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
       .unwrap()
       .unwrap()
@@ -1007,7 +987,6 @@ async fn materialize_missing_file() {
   let store = new_local_store(store_dir.path());
   store
     .materialize_file(file.clone(), TestData::roland().digest(), false)
-    .compat()
     .await
     .expect_err("Want unknown digest error");
 }
@@ -1027,7 +1006,6 @@ async fn materialize_file() {
     .expect("Error saving bytes");
   store
     .materialize_file(file.clone(), testdata.digest(), false)
-    .compat()
     .await
     .expect("Error materializing file");
   assert_eq!(file_contents(&file), testdata.bytes());
@@ -1049,7 +1027,6 @@ async fn materialize_file_executable() {
     .expect("Error saving bytes");
   store
     .materialize_file(file.clone(), testdata.digest(), true)
-    .compat()
     .await
     .expect("Error materializing file");
   assert_eq!(file_contents(&file), testdata.bytes());
@@ -1067,7 +1044,6 @@ async fn materialize_missing_directory() {
       materialize_dir.path().to_owned(),
       TestDirectory::recursive().digest(),
     )
-    .compat()
     .await
     .expect_err("Want unknown digest error");
 }
@@ -1105,7 +1081,6 @@ async fn materialize_directory() {
       materialize_dir.path().to_owned(),
       recursive_testdir.digest(),
     )
-    .compat()
     .await
     .expect("Error materializing");
 
@@ -1144,7 +1119,6 @@ async fn materialize_directory_executable() {
 
   store
     .materialize_directory(materialize_dir.path().to_owned(), testdir.digest())
-    .compat()
     .await
     .expect("Error materializing");
 
@@ -1168,7 +1142,6 @@ async fn contents_for_directory_empty() {
 
   let file_contents = store
     .contents_for_directory(TestDirectory::empty().digest())
-    .compat()
     .await
     .expect("Getting FileContents");
 
@@ -1203,7 +1176,6 @@ async fn contents_for_directory() {
 
   let file_contents = store
     .contents_for_directory(recursive_testdir.digest())
-    .compat()
     .await
     .expect("Getting FileContents");
 
@@ -1320,7 +1292,6 @@ async fn returns_upload_summary_on_empty_cas() {
     .expect("Error storing file locally");
   let mut summary = new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest()])
-    .compat()
     .await
     .expect("Error uploading file");
 
@@ -1371,7 +1342,6 @@ async fn summary_does_not_count_things_in_cas() {
   // Store testroland first, which should return a summary of one file
   let mut data_summary = new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![testroland.digest()])
-    .compat()
     .await
     .expect("Error uploading file");
   data_summary.upload_wall_time = Duration::default();
@@ -1392,7 +1362,6 @@ async fn summary_does_not_count_things_in_cas() {
   // and not report it in uploads.
   let mut dir_summary = new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest()])
-    .compat()
     .await
     .expect("Error uploading directory");
 
@@ -1439,7 +1408,6 @@ async fn materialize_directory_metadata_all_local() {
   let mat_dir = tempfile::tempdir().unwrap();
   let metadata = store
     .materialize_directory(mat_dir.path().to_owned(), outer_dir.digest())
-    .compat()
     .await
     .unwrap();
 
@@ -1495,7 +1463,6 @@ async fn materialize_directory_metadata_mixed() {
   let mat_dir = tempfile::tempdir().unwrap();
   let metadata = store
     .materialize_directory(mat_dir.path().to_owned(), outer_dir.digest())
-    .compat()
     .await
     .unwrap();
 
@@ -1523,16 +1490,16 @@ async fn materialize_directory_metadata_mixed() {
 #[tokio::test]
 async fn explicitly_overwrites_already_existing_file() {
   fn test_file_with_arbitrary_content(filename: &str, content: &TestData) -> TestDirectory {
-    use bazel_protos;
     let digest = content.digest();
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name(filename.to_owned());
-      file.set_digest((&digest).into());
-      file.set_is_executable(false);
-      file
-    });
+    let directory = remexec::Directory {
+      files: vec![remexec::FileNode {
+        name: filename.to_owned(),
+        digest: Some((&digest).into()),
+        is_executable: false,
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
     TestDirectory { directory }
   }
 
@@ -1556,7 +1523,6 @@ async fn explicitly_overwrites_already_existing_file() {
 
   let _ = store
     .materialize_directory(dir_to_write_to.path().to_owned(), contents_dir.digest())
-    .compat()
     .await
     .unwrap();
 

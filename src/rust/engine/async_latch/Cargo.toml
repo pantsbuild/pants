@@ -1,0 +1,13 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "async_latch"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+parking_lot = "0.11"
+tokio = { version = "0.2.23", features = ["sync"] }
+
+[dev-dependencies]
+tokio = { version = "0.2.23", features = ["macros"] }

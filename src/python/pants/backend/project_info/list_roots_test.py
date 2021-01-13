@@ -44,6 +44,7 @@ def test_multiple_source_roots(rule_runner: RuleRunner) -> None:
 
 
 def test_buildroot_is_source_root(rule_runner: RuleRunner) -> None:
+    rule_runner.create_dir("code")
     assert_roots(rule_runner, ["/"], expected=["."])
 
 

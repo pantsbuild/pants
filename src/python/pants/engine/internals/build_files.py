@@ -6,15 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Dict
 
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AddressSpec, AddressSpecs
-from pants.engine.addresses import (
-    Address,
-    Addresses,
-    AddressesWithOrigins,
-    AddressInput,
-    AddressWithOrigin,
-    BuildFileAddress,
-)
+from pants.base.specs import AddressSpecs
+from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
@@ -122,7 +115,7 @@ async def parse_address_family(
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
-    owning_address = address.maybe_convert_to_base_target()
+    owning_address = address.maybe_convert_to_build_target()
     if address_family.get_target_adaptor(owning_address) is None:
         raise ResolveError.did_you_mean(
             bad_name=owning_address.target_name,
@@ -135,14 +128,14 @@ async def find_build_file(address: Address) -> BuildFileAddress:
         if build_file_address.address == owning_address
     )
     return (
-        bfa if address.is_base_target else BuildFileAddress(rel_path=bfa.rel_path, address=address)
+        BuildFileAddress(rel_path=bfa.rel_path, address=address) if address.is_file_target else bfa
     )
 
 
 @rule
 async def find_target_adaptor(address: Address) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
-    if not address.is_base_target:
+    if address.is_file_target:
         raise ValueError(
             f"Subtargets are not resident in BUILD files, and so do not have TargetAdaptors: {address}"
         )
@@ -164,16 +157,10 @@ def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFil
 
 
 @rule
-async def addresses_with_origins_from_address_specs(
+async def addresses_from_address_specs(
     address_specs: AddressSpecs, global_options: GlobalOptions, specs_filter: AddressSpecsFilter
-) -> AddressesWithOrigins:
-    """Given an AddressMapper and list of AddressSpecs, return matching AddressesWithOrigins.
-
-    :raises: :class:`ResolveError` if the provided specs fail to match targets, and those spec
-        types expect to have matched something.
-    """
+) -> Addresses:
     matched_addresses: OrderedSet[Address] = OrderedSet()
-    addr_to_origin: Dict[Address, AddressSpec] = {}
     filtering_disabled = address_specs.filter_by_global_options is False
 
     # First convert all `AddressLiteralSpec`s. Some of the resulting addresses may be file
@@ -183,18 +170,17 @@ async def addresses_with_origins_from_address_specs(
         for spec in address_specs.literals
     )
     literal_target_adaptors = await MultiGet(
-        Get(TargetAdaptor, Address, addr.maybe_convert_to_base_target())
+        Get(TargetAdaptor, Address, addr.maybe_convert_to_build_target())
         for addr in literal_addresses
     )
     # We convert to targets for the side effect of validating that any file addresses actually
-    # belong to the specified base targets.
+    # belong to the specified BUILD targets.
     await Get(
-        UnexpandedTargets, Addresses(addr for addr in literal_addresses if not addr.is_base_target)
+        UnexpandedTargets, Addresses(addr for addr in literal_addresses if addr.is_file_target)
     )
     for literal_spec, addr, target_adaptor in zip(
         address_specs.literals, literal_addresses, literal_target_adaptors
     ):
-        addr_to_origin[addr] = literal_spec
         if filtering_disabled or specs_filter.matches(addr, target_adaptor):
             matched_addresses.add(addr)
 
@@ -216,25 +202,13 @@ async def addresses_with_origins_from_address_specs(
         # These may raise ResolveError, depending on the type of spec.
         addr_families_for_spec = glob_spec.matching_address_families(address_family_by_directory)
         addr_target_pairs_for_spec = glob_spec.matching_addresses(addr_families_for_spec)
-
-        for addr, _ in addr_target_pairs_for_spec:
-            # A target might be covered by multiple specs, so we take the most specific one.
-            addr_to_origin[addr] = AddressSpecs.more_specific(addr_to_origin.get(addr), glob_spec)
-
         matched_addresses.update(
             addr
             for (addr, tgt) in addr_target_pairs_for_spec
             if filtering_disabled or specs_filter.matches(addr, tgt)
         )
 
-    return AddressesWithOrigins(
-        AddressWithOrigin(address=addr, origin=addr_to_origin[addr]) for addr in matched_addresses
-    )
-
-
-@rule
-def strip_address_origins(addresses_with_origins: AddressesWithOrigins) -> Addresses:
-    return Addresses(address_with_origin.address for address_with_origin in addresses_with_origins)
+    return Addresses(sorted(matched_addresses))
 
 
 def rules():

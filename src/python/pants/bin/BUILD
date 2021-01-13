@@ -55,3 +55,8 @@ pex_binary(
   # To allow for loading `native_engine.so` when built as a pex, we set zip_safe=False.
   zip_safe=False,
 )
+
+python_integration_tests(
+  name='integration',
+  uses_pants_run=True,
+)

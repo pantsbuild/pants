@@ -7,7 +7,7 @@ from typing import Iterable, List, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
+    InterpreterConstraintsField,
     PythonRequirementsField,
     PythonSources,
 )
@@ -243,9 +243,9 @@ async def pylint_lint(
     plugin_targets, linted_targets = await MultiGet(plugin_targets_request, linted_targets_request)
 
     plugin_targets_compatibility_fields = tuple(
-        plugin_tgt[PythonInterpreterCompatibility]
+        plugin_tgt[InterpreterConstraintsField]
         for plugin_tgt in plugin_targets.closure
-        if plugin_tgt.has_field(PythonInterpreterCompatibility)
+        if plugin_tgt.has_field(InterpreterConstraintsField)
     )
 
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
@@ -267,9 +267,9 @@ async def pylint_lint(
         interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
             (
                 *(
-                    tgt[PythonInterpreterCompatibility]
+                    tgt[InterpreterConstraintsField]
                     for tgt in [tgt, *dependencies]
-                    if tgt.has_field(PythonInterpreterCompatibility)
+                    if tgt.has_field(InterpreterConstraintsField)
                 ),
                 *plugin_targets_compatibility_fields,
             ),

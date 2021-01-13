@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import copy
 from dataclasses import dataclass
 from typing import Dict, Iterator, List, Optional
@@ -39,7 +41,7 @@ class OptionValueContainerBuilder:
             return super().__setattr__(key, value)
         self._set(key, value)
 
-    def build(self) -> "OptionValueContainer":
+    def build(self) -> OptionValueContainer:
         return OptionValueContainer(copy.copy(self._value_map))
 
 

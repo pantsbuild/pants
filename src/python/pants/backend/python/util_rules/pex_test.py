@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
 import os.path
 import textwrap
@@ -11,7 +13,7 @@ from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, cas
 import pytest
 from pkg_resources import Requirement
 
-from pants.backend.python.target_types import PythonInterpreterCompatibility
+from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -214,12 +216,15 @@ def test_interpreter_constraints_do_not_require_python38(constraints):
 
 @dataclass(frozen=True)
 class MockFieldSet(FieldSet):
-    compatibility: PythonInterpreterCompatibility
+    interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
-    def create_for_test(cls, address: Address, compat: Optional[str]) -> "MockFieldSet":
+    def create_for_test(cls, address: Address, compat: Optional[str]) -> MockFieldSet:
         return cls(
-            address=address, compatibility=PythonInterpreterCompatibility(compat, address=address)
+            address=address,
+            interpreter_constraints=InterpreterConstraintsField(
+                [compat] if compat else None, address=address
+            ),
         )
 
 
@@ -280,7 +285,7 @@ class ExactRequirement:
     version: str
 
     @classmethod
-    def parse(cls, requirement: str) -> "ExactRequirement":
+    def parse(cls, requirement: str) -> ExactRequirement:
         req = Requirement.parse(requirement)
         assert len(req.specs) == 1, (
             f"Expected an exact requirement with only 1 specifier, given {requirement} with "
@@ -401,12 +406,11 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
     assert "main.py" in pex_files
     assert "subdir/sub.py" in pex_files
 
-    # We reasonably expect there to be a python interpreter on the test-running process's path.
-    env = {"PATH": os.getenv("PATH", "")}
-
+    # This should run the Pex using the same interpreter used to create it. We must set the `PATH` so that the shebang
+    # works.
     process = Process(
-        argv=("python", "test.pex"),
-        env=env,
+        argv=("./test.pex",),
+        env={"PATH": os.getenv("PATH", "")},
         input_digest=pex_output["pex"].digest,
         description="Run the pex and make sure it works",
     )

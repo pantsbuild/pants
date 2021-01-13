@@ -91,7 +91,7 @@ class Outputting:
         register(
             "--output-file",
             metavar="<path>",
-            help="Output to this file.  If unspecified, outputs to stdout.",
+            help="Output the goal's stdout to this file. If unspecified, outputs to stdout.",
         )
 
     @final

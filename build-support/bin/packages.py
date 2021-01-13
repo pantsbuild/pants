@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import argparse
 import os
 import re
@@ -246,14 +248,7 @@ def build_fs_util() -> None:
     # it in our releases because it can be a useful standalone tool.
     with travis_section("fs_util", "Building fs_util"):
         subprocess.run(
-            [
-                "build-support/bin/native/cargo",
-                "build",
-                "--release",
-                "--manifest-path=src/rust/engine/Cargo.toml",
-                "-p",
-                "fs_util",
-            ],
+            ["./cargo", "build", "--release", "-p", "fs_util"],
             check=True,
             env={**os.environ, "RUST_BACKTRACE": "1"},
         )
@@ -380,7 +375,7 @@ class PrebuiltWheel(NamedTuple):
     url: str
 
     @classmethod
-    def create(cls, path: str) -> "PrebuiltWheel":
+    def create(cls, path: str) -> PrebuiltWheel:
         return cls(path, quote_plus(path))
 
 
@@ -438,10 +433,10 @@ def check_prebuilt_wheels(check_dir: str) -> None:
         if not local_files:
             missing_packages.append(package.name)
             continue
-        if is_cross_platform(local_files) and len(local_files) != 6:
+        if is_cross_platform(local_files) and len(local_files) != 4:
             formatted_local_files = ", ".join(f.name for f in local_files)
             missing_packages.append(
-                f"{package.name} (expected 6 wheels, {{macosx, linux}} x {{cp36m, cp37m, cp38}}, "
+                f"{package.name} (expected 4 wheels, {{macosx, linux}} x {{cp37m, cp38}}, "
                 f"but found {formatted_local_files})"
             )
     if missing_packages:

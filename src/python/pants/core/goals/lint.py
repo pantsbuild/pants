@@ -1,12 +1,13 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Iterable, Optional, Tuple, cast
+from typing import Any, Dict, Iterable, Optional, Tuple, cast
 
-from pants.base.deprecated import resolve_conflicting_options
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
@@ -17,7 +18,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
@@ -39,7 +40,7 @@ class InvalidLinterReportsError(Exception):
 
 
 @dataclass(frozen=True)
-class LintResult:
+class LintResult(EngineAwareReturnType):
     exit_code: int
     stdout: str
     stderr: str
@@ -54,7 +55,7 @@ class LintResult:
         partition_description: Optional[str] = None,
         strip_chroot_path: bool = False,
         report: Optional[LintReport] = None,
-    ) -> "LintResult":
+    ) -> LintResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
@@ -66,10 +67,13 @@ class LintResult:
             report=report,
         )
 
+    def metadata(self) -> Dict[str, Any]:
+        return {"partition": self.partition_description}
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class LintResults(EngineAwareReturnType):
+class LintResults:
     """Zero or more LintResult objects for a single linter.
 
     Typically, linters will return one result. If they no-oped, they will return zero results.
@@ -96,6 +100,14 @@ class LintResults(EngineAwareReturnType):
     def reports(self) -> Tuple[LintReport, ...]:
         return tuple(result.report for result in self.results if result.report)
 
+
+class EnrichedLintResults(LintResults, EngineAwareReturnType):
+    """`LintResults` that are enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `LintResults`, and a rule will upcast those into
+    `EnrichedLintResults`.
+    """
+
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
@@ -103,8 +115,11 @@ class LintResults(EngineAwareReturnType):
 
     def message(self) -> Optional[str]:
         if self.skipped:
-            return "skipped."
-        message = "succeeded." if self.exit_code == 0 else f"failed (exit code {self.exit_code})."
+            return f"{self.linter_name} skipped."
+        message = self.linter_name
+        message += (
+            " succeeded." if self.exit_code == 0 else f" failed (exit code {self.exit_code})."
+        )
 
         def msg_for_result(result: LintResult) -> str:
             msg = ""
@@ -140,9 +155,8 @@ class LintRequest(StyleRequest):
 
 
 class LintSubsystem(GoalSubsystem):
-    """Lint source code."""
-
     name = "lint"
+    help = "Run all linters and/or formatters in check mode."
 
     required_union_implementations = (LintRequest,)
 
@@ -156,24 +170,12 @@ class LintSubsystem(GoalSubsystem):
             default=False,
             help=(
                 "Rather than linting all files in a single batch, lint each file as a "
-                "separate process. Why do this? You'll get many more cache hits. Why not do this? "
-                "Linters both have substantial startup overhead and are cheap to add one "
+                "separate process.\n\nWhy do this? You'll get many more cache hits. Why not do "
+                "this? Linters both have substantial startup overhead and are cheap to add one "
                 "additional file to the run. On a cold cache, it is much faster to use "
-                "`--no-per-file-caching`. We only recommend using `--per-file-caching` if you "
+                "`--no-per-file-caching`.\n\nWe only recommend using `--per-file-caching` if you "
                 "are using a remote cache or if you have benchmarked that this option will be "
                 "faster than `--no-per-file-caching` for your use case."
-            ),
-        )
-        register(
-            "--per-target-caching",
-            advanced=True,
-            type=bool,
-            default=False,
-            help="See `--per-file-caching`.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "Use the renamed `--per-file-caching` option instead. If this option is set, Pants "
-                "will now run per every file, rather than per target."
             ),
         )
         register(
@@ -190,15 +192,7 @@ class LintSubsystem(GoalSubsystem):
 
     @property
     def per_file_caching(self) -> bool:
-        val = resolve_conflicting_options(
-            old_option="per_target_caching",
-            new_option="per_file_caching",
-            old_container=self.options,
-            new_container=self.options,
-            old_scope=self.name,
-            new_scope=self.name,
-        )
-        return cast(bool, val)
+        return cast(bool, self.options.per_file_caching)
 
     @property
     def reports_dir(self) -> Optional[str]:
@@ -238,19 +232,19 @@ async def lint(
 
     if lint_subsystem.per_file_caching:
         all_per_file_results = await MultiGet(
-            Get(LintResults, LintRequest, request.__class__([field_set]))
+            Get(EnrichedLintResults, LintRequest, request.__class__([field_set]))
             for request in valid_requests
             for field_set in request.field_sets
         )
 
-        def key_fn(results: LintResults):
+        def key_fn(results: EnrichedLintResults):
             return results.linter_name
 
         # NB: We must pre-sort the data for itertools.groupby() to work properly.
         sorted_all_per_files_results = sorted(all_per_file_results, key=key_fn)
         # We consolidate all results for each linter into a single `LintResults`.
         all_results = tuple(
-            LintResults(
+            EnrichedLintResults(
                 itertools.chain.from_iterable(
                     per_file_results.results for per_file_results in all_linter_results
                 ),
@@ -262,7 +256,7 @@ async def lint(
         )
     else:
         all_results = await MultiGet(
-            Get(LintResults, LintRequest, lint_request) for lint_request in valid_requests
+            Get(EnrichedLintResults, LintRequest, lint_request) for lint_request in valid_requests
         )
 
     all_results = tuple(sorted(all_results, key=lambda results: results.linter_name))
@@ -308,6 +302,13 @@ async def lint(
         console.print_stderr(f"{sigil} {results.linter_name} {status}.")
 
     return Lint(exit_code)
+
+
+# NB: We mark this uncachable to ensure that the results are always streamed, even if the
+# underlying LintResults is memoized. This rule is very cheap, so there's little performance hit.
+@_uncacheable_rule(desc="lint")
+def enrich_lint_results(results: LintResults) -> EnrichedLintResults:
+    return EnrichedLintResults(results=results.results, linter_name=results.linter_name)
 
 
 def rules():

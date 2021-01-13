@@ -43,12 +43,52 @@ impl EngineAwareInformation for Message {
   }
 }
 
+pub struct Metadata;
+
+impl EngineAwareInformation for Metadata {
+  type MaybeOutput = Vec<(String, Value)>;
+
+  fn retrieve(_types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
+    let metadata_val = match externs::call_method(&value, "metadata", &[]) {
+      Ok(value) => value,
+      Err(py_err) => {
+        let failure = Failure::from_py_err(py_err);
+        log::error!("Error calling `metadata` method: {}", failure);
+        return None;
+      }
+    };
+
+    let metadata_val = externs::check_for_python_none(metadata_val)?;
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+
+    let mut output = Vec::new();
+    let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).ok()?;
+
+    for (key, value) in metadata_dict.items(py).into_iter() {
+      let key_name: String = match key.extract(py) {
+        Ok(s) => s,
+        Err(e) => {
+          log::error!(
+            "Error in EngineAware.metadata() implementation - non-string key: {:?}",
+            e
+          );
+          return None;
+        }
+      };
+
+      output.push((key_name, Value::from(value)));
+    }
+    Some(output)
+  }
+}
+
 pub struct Artifacts {}
 
 impl EngineAwareInformation for Artifacts {
   type MaybeOutput = Vec<(String, Digest)>;
 
-  fn retrieve(types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
+  fn retrieve(_types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
     let artifacts_val = match externs::call_method(&value, "artifacts", &[]) {
       Ok(value) => value,
       Err(py_err) => {
@@ -79,7 +119,7 @@ impl EngineAwareInformation for Artifacts {
           log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
         })
         .ok()?;
-      let digest = match lift_directory_digest(types, &Value::new(digest_value)) {
+      let digest = match lift_directory_digest(&Value::new(digest_value)) {
         Ok(digest) => digest,
         Err(e) => {
           log::error!("Error in EngineAware.artifacts() implementation: {}", e);

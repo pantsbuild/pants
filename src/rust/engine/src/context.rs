@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::core::Failure;
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
-use crate::scheduler::Session;
+use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
@@ -22,8 +22,7 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
-  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, CommandRunner, NamedCaches,
-  Platform, ProcessMetadata,
+  self, BoundedCommandRunner, CommandRunner, NamedCaches, Platform, ProcessMetadata,
 };
 use rand::seq::SliceRandom;
 use regex::Regex;
@@ -66,6 +65,7 @@ pub struct Core {
   pub watcher: Arc<InvalidationWatcher>,
   pub build_root: PathBuf,
   pub local_parallelism: usize,
+  pub sessions: Sessions,
 }
 
 #[derive(Clone, Debug)]
@@ -82,6 +82,10 @@ pub struct RemotingOptions {
   pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
   pub store_connection_limit: usize,
+  pub store_initial_timeout: Duration,
+  pub store_timeout_multiplier: f64,
+  pub store_maximum_timeout: Duration,
+  pub cache_eager_fetch: bool,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
@@ -92,10 +96,10 @@ pub struct ExecutionStrategyOptions {
   pub local_parallelism: usize,
   pub remote_parallelism: usize,
   pub cleanup_local_dirs: bool,
-  pub speculation_delay: Duration,
-  pub speculation_strategy: String,
   pub use_local_cache: bool,
   pub local_enable_nailgun: bool,
+  pub remote_cache_read: bool,
+  pub remote_cache_write: bool,
 }
 
 impl Core {
@@ -109,6 +113,12 @@ impl Core {
     oauth_bearer_token: &Option<String>,
   ) -> Result<Store, String> {
     if enable_remote {
+      let backoff_config = store::BackoffConfig::new(
+        remoting_opts.store_initial_timeout,
+        remoting_opts.store_timeout_multiplier,
+        remoting_opts.store_maximum_timeout,
+      )?;
+
       Store::with_remote(
         executor.clone(),
         local_store_dir,
@@ -119,9 +129,7 @@ impl Core {
         remoting_opts.store_thread_count,
         remoting_opts.store_chunk_bytes,
         remoting_opts.store_chunk_upload_timeout,
-        // TODO: Take a parameter
-        store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
-          .unwrap(),
+        backoff_config,
         remoting_opts.store_rpc_retries,
         remoting_opts.store_connection_limit,
       )
@@ -192,6 +200,7 @@ impl Core {
 
   fn make_command_runner(
     store: &Store,
+    remote_store_servers: &[String],
     executor: &Executor,
     local_execution_root_dir: &Path,
     named_caches_dir: &Path,
@@ -202,8 +211,20 @@ impl Core {
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
   ) -> Result<Box<dyn CommandRunner>, String> {
+    let remote_caching_used =
+      exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write;
+
+    // If remote caching is used with eager_fetch, we do not want to use the remote store
+    // with the local command runner. This reduces the surface area of where the remote store is
+    // used to only be the remote cache command runner.
+    let store_for_local_runner = if remote_caching_used && remoting_opts.cache_eager_fetch {
+      store.clone().into_local_only()
+    } else {
+      store.clone()
+    };
+
     let local_command_runner = Core::make_local_execution_runner(
-      store,
+      &store_for_local_runner,
       executor,
       local_execution_root_dir,
       named_caches_dir,
@@ -211,8 +232,10 @@ impl Core {
       &exec_strategy_opts,
     );
 
-    let command_runner: Box<dyn CommandRunner> = if remoting_opts.execution_enable {
-      let remote_command_runner: Box<dyn process_execution::CommandRunner> = {
+    // Possibly either add the remote execution runner or the remote cache runner.
+    // `global_options.py` already validates that both are not set at the same time.
+    let maybe_remote_enabled_command_runner: Box<dyn CommandRunner> =
+      if remoting_opts.execution_enable {
         Box::new(BoundedCommandRunner::new(
           Core::make_remote_execution_runner(
             store,
@@ -223,27 +246,29 @@ impl Core {
           )?,
           exec_strategy_opts.remote_parallelism,
         ))
+      } else if remote_caching_used {
+        let action_cache_address = remote_store_servers
+          .first()
+          .ok_or_else(|| "At least one remote store must be specified".to_owned())?;
+        Box::new(process_execution::remote_cache::CommandRunner::new(
+          local_command_runner.into(),
+          process_execution_metadata.clone(),
+          store.clone(),
+          action_cache_address.as_str(),
+          root_ca_certs.clone(),
+          oauth_bearer_token.clone(),
+          remoting_opts.execution_headers.clone(),
+          Platform::current()?,
+          exec_strategy_opts.remote_cache_read,
+          exec_strategy_opts.remote_cache_write,
+          remoting_opts.cache_eager_fetch,
+        )?)
+      } else {
+        local_command_runner
       };
 
-      match exec_strategy_opts.speculation_strategy.as_ref() {
-        "local_first" => Box::new(SpeculatingCommandRunner::new(
-          local_command_runner,
-          remote_command_runner,
-          exec_strategy_opts.speculation_delay,
-        )),
-        "remote_first" => Box::new(SpeculatingCommandRunner::new(
-          remote_command_runner,
-          local_command_runner,
-          exec_strategy_opts.speculation_delay,
-        )),
-        "none" => remote_command_runner,
-        _ => unreachable!(),
-      }
-    } else {
-      local_command_runner
-    };
-
-    let maybe_cached_command_runner = if exec_strategy_opts.use_local_cache {
+    // Possibly use the local cache runner, regardless of remote execution/caching.
+    let maybe_local_cached_command_runner = if exec_strategy_opts.use_local_cache {
       let process_execution_store = ShardedLmdb::new(
         local_store_dir.join("processes"),
         5 * GIGABYTES,
@@ -252,16 +277,16 @@ impl Core {
       )
       .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       Box::new(process_execution::cache::CommandRunner::new(
-        command_runner.into(),
+        maybe_remote_enabled_command_runner.into(),
         process_execution_store,
         store.clone(),
         process_execution_metadata.clone(),
       ))
     } else {
-      command_runner
+      maybe_remote_enabled_command_runner
     };
 
-    Ok(maybe_cached_command_runner)
+    Ok(maybe_local_cached_command_runner)
   }
 
   fn load_certificates(
@@ -344,20 +369,25 @@ impl Core {
       None
     };
 
-    let store = safe_create_dir_all_ioerror(&local_store_dir)
-      .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
-      .and_then(|_| {
-        Core::make_store(
-          &executor,
-          &local_store_dir,
-          remoting_opts.execution_enable && !remote_store_servers.is_empty(),
-          &remoting_opts,
-          &remote_store_servers,
-          &root_ca_certs,
-          &oauth_bearer_token,
-        )
-      })
-      .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
+    let need_remote_store = remoting_opts.execution_enable
+      || exec_strategy_opts.remote_cache_read
+      || exec_strategy_opts.remote_cache_write;
+    if need_remote_store && remote_store_servers.is_empty() {
+      return Err("Remote store required but none provided".into());
+    }
+
+    safe_create_dir_all_ioerror(&local_store_dir)
+      .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))?;
+    let store = Core::make_store(
+      &executor,
+      &local_store_dir,
+      need_remote_store,
+      &remoting_opts,
+      &remote_store_servers,
+      &root_ca_certs,
+      &oauth_bearer_token,
+    )
+    .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
     let process_execution_metadata = ProcessMetadata {
       instance_name: remoting_opts.instance_name.clone(),
@@ -367,6 +397,7 @@ impl Core {
 
     let command_runner = Core::make_command_runner(
       &store,
+      &remote_store_servers,
       &executor,
       &local_execution_root_dir,
       &named_caches_dir,
@@ -410,6 +441,8 @@ impl Core {
     let watcher = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
     watcher.start(&graph);
 
+    let sessions = Sessions::new(&executor)?;
+
     Ok(Core {
       graph,
       tasks,
@@ -427,6 +460,7 @@ impl Core {
       build_root,
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
+      sessions,
     })
   }
 

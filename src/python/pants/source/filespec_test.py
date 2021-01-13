@@ -55,7 +55,7 @@ def assert_rule_match(
         (".*", (".dots", ".dips")),
         ("./*.py", ("f.py", "g.py")),
         # Dirs.
-        ("dist/", ("dist",)),
+        ("my_dir/", ("my_dir",)),
         ("build-support/*.venv/", ("build-support/blah.venv", "build-support/rbt.venv")),
         # Literals.
         ("a", ("a",)),

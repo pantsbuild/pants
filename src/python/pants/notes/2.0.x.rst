@@ -6,6 +6,154 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release, and
 https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
 
+2.0.1 (12/18/2020)
+------------------
+
+The second stable release in the 2.0.x series, with no changes since `rc4`.
+
+Thank you for everyone's feedback!
+
+2.0.1rc4 (12/16/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix filtering of log messages generated in native code. (cherrypick of #11313) (#11318)
+  `PR #11318 <https://github.com/pantsbuild/pants/pull/11318>`_
+
+* Upgrade to Pex 2.1.24 to fix macOS Big Sur. (cherrypick of #11312) (#11314)
+  `PR #11314 <https://github.com/pantsbuild/pants/pull/11314>`_
+
+* Clean the graph speculatively, and cancel nodes when interest is lost (cherrypick of #11308) (#11310)
+  `PR #11310 <https://github.com/pantsbuild/pants/pull/11310>`_
+
+* Implement native Process cache scoping to fix --test-force (cherrypick of #11291) (#11299)
+  `PR #11299 <https://github.com/pantsbuild/pants/pull/11299>`_
+
+* Revert "Move graph cycle detection to rust. (#11202)" (cherrypick of #11272) (#11277)
+  `PR #11202 <https://github.com/pantsbuild/pants/pull/11202>`_
+  `PR #11277 <https://github.com/pantsbuild/pants/pull/11277>`_
+
+* Increase Pants' python recursion limit by default, and allow it to be overridden. (cherrypick of #11271) (#11276)
+  `PR #11276 <https://github.com/pantsbuild/pants/pull/11276>`_
+
+Internal
+~~~~~~~~
+
+* [tests] Use a bandit version that works with older python versions. (cherrypick of #11268) (#11279)
+  `PR #11279 <https://github.com/pantsbuild/pants/pull/11279>`_
+
+
+2.0.1rc3 (11/24/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix off-by-one error for `python_awslambda` `sources` field validation (#11234)
+  `PR #11234 <https://github.com/pantsbuild/pants/pull/11234>`_
+
+2.0.1rc2 (11/20/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Revert premature deprecation of `sources` field for `python_awslambda` (#11216)
+  `PR #11216 <https://github.com/pantsbuild/pants/pull/11216>`_
+
+Bugfixes
+~~~~~~~~
+
+* Move graph cycle detection to rust to fix recursion limit. (cherrypick of #11202) (#11203)
+  `PR #11203 <https://github.com/pantsbuild/pants/pull/11203>`_
+
+* Set the soft ulimit value more conservatively to fix macOS Big Sur issue (cherrypick of #11194) (#11196)
+  `PR #11196 <https://github.com/pantsbuild/pants/pull/11196>`_
+
+2.0.1rc1 (11/16/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Deprecate the `sources` field for `python_awslambda` (Cherry-pick of #11176) (#11177)
+  `PR #11177 <https://github.com/pantsbuild/pants/pull/11177>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix relative imports in dependency inference (Cherry-pick of #11181) (#11190)
+  `PR #11190 <https://github.com/pantsbuild/pants/pull/11190>`_
+
+2.0.1rc0 (11/11/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Add a specific error for target names containing slashes (cherrypick of #11115) (#11122)
+  `PR #11122 <https://github.com/pantsbuild/pants/pull/11122>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix logs for `test`, `lint`, `fmt`, and `typecheck` to always print, even if cached (Cherry-pick of #11111) (#11116)
+  `PR #11116 <https://github.com/pantsbuild/pants/pull/11116>`_
+
+* Fix `pytest.pex` leaking into coverage data (Cherry-pick of  #11110) (#11112)
+  `PR #11112 <https://github.com/pantsbuild/pants/pull/11112>`_
+
+* Fix Coverage not finding resource files when generating a report (Cherry-pick of #11129) #11139
+  `PR #11139 <https://github.com/pantsbuild/pants/pull/11139>`_
+
+* Fix `!!` transitive excludes when used multiple times in a repo (Cherry-pick of #11103) (#11104)
+  `PR #11104 <https://github.com/pantsbuild/pants/pull/11104>`_
+
+* Fix `setup_py().with_binaries()` to properly inject dependencies (#11098)
+  `PR #11098 <https://github.com/pantsbuild/pants/pull/11098>`_
+
+* Upgrade to Pex 2.1.21 to fix interpreter selection and race condition (Cherry-pick of #11131) (#11133)
+  `PR #11133 <https://github.com/pantsbuild/pants/pull/11133>`_
+
+* Fix `--pex-verbosity` to work with the interpreter selection PEX (Cherry-pick of #11108) (#11120)
+  `PR #11120 <https://github.com/pantsbuild/pants/pull/11120>`_
+
+2.0.0 (10/27/2020)
+------------------
+
+The first stable release in the 2.0.x series, with no changes since `rc3`.
+
+Thank you for everyone's feedback!
+
+2.0.0rc3 (10/25/2020)
+---------------------
+
+User API Changes
+~~~~~~~~~~~~~~~~
+
+* Deprecate several unused options (Cherry-pick of #11041) #11043
+  `PR #11043 <https://github.com/pantsbuild/pants/pull/11043>`_
+
+* Deprecate unused `run-tracker` options (Cherry-pick of #11038) (#11039)
+  `PR #11039 <https://github.com/pantsbuild/pants/pull/11039>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix PEX to always write to `named_caches_dir`, rather than `~/.pex` (Cherry-pick of #11040) (#11042)
+  `PR #11042 <https://github.com/pantsbuild/pants/pull/11042>`_
+
+* Eagerly validate entry points for `setup_py().with_binaries()` (Cherry-pick of #11034) (#11036)
+  `PR #11036 <https://github.com/pantsbuild/pants/pull/11036>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Improve several help messages (Cherry-pick of #11029) (#11035)
+  `PR #11035 <https://github.com/pantsbuild/pants/pull/11035>`_
+
 2.0.0rc2 (10/22/2020)
 ---------------------
 

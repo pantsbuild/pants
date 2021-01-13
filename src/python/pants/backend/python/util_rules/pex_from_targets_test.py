@@ -44,7 +44,9 @@ def test_constraints_validation(rule_runner: RuleRunner) -> None:
         "constraints1.txt",
         dedent(
             """
-            Foo._-BAR==1.0.0
+            # Comment.
+            --find-links=https://duckduckgo.com
+            Foo._-BAR==1.0.0  # Inline comment.
             bar==5.5.5
             baz==2.2.2
             qux==3.4.5

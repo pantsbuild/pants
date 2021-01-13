@@ -19,8 +19,9 @@ codegen-units = 1
 # (e.g. fs_util) won't be included when we build/test things.
 members = [
   ".",
+  "async_latch",
   "async_semaphore",
-  "boxfuture",
+  "async_value",
   "concrete_time",
   "fs",
   "fs/brfs",
@@ -40,6 +41,7 @@ members = [
   "testutil/mock",
   "testutil/local_cas",
   "testutil/local_execution_server",
+  "tryfuture",
   "ui",
   "watch",
   "workunit_store"
@@ -55,8 +57,9 @@ members = [
 # On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
 default-members = [
   ".",
+  "async_latch",
   "async_semaphore",
-  "boxfuture",
+  "async_value",
   "concrete_time",
   "fs",
   "fs/fs_util",
@@ -75,6 +78,7 @@ default-members = [
   "testutil/mock",
   "testutil/local_cas",
   "testutil/local_execution_server",
+  "tryfuture",
   "ui",
   "watch",
   "workunit_store"
@@ -93,17 +97,16 @@ extension-module = ["cpython/extension-module"]
 default = []
 
 [dependencies]
+async_latch = { path = "async_latch" }
 async_semaphore = { path = "async_semaphore" }
 async-trait = "0.1"
-boxfuture = { path = "boxfuture" }
-bytes = "0.4.5"
+bytes = "0.5"
 concrete_time = { path = "concrete_time" }
 cpython = "0.5"
 crossbeam-channel = "0.4"
 fnv = "1.0.5"
 fs = { path = "fs" }
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.4"
@@ -125,7 +128,8 @@ store = { path = "fs/store" }
 task_executor = { path = "task_executor" }
 tempfile = "3"
 time = "0.1.40"
-tokio = { version = "0.2.22", features = ["rt-threaded"] }
+tokio = { version = "0.2.23", features = ["macros", "rt-threaded"] }
+tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
 url = "2.1"
 uuid = { version = "0.7", features = ["v4"] }
@@ -138,6 +142,8 @@ fs = { path = "./fs" }
 env_logger = "0.5.4"
 
 [patch.crates-io]
-# TODO: Remove patch when we can upgrade to an official released version of protobuf with a fix.
-# See: https://github.com/pantsbuild/pants/issues/7760 for context.
-protobuf = { git="https://github.com/pantsbuild/rust-protobuf", rev="171611c33ec92f07e1b7107327f6d0139a7afebf", version="2.0.6", features = ["with-bytes"] }
+# Patch all transitive uses of Prost to refer to the version with `Bytes` support.
+# Specifically, this Prost commit: https://github.com/danburkert/prost/commit/a1cccbcee343e2c444e1cd2738c7fba2599fc391
+prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
+prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
+prost-types = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }

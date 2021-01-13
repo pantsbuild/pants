@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashMap};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::fmt::Display;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -22,21 +22,22 @@ use crate::externs::engine_aware::{self, EngineAwareInformation};
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
-use boxfuture::{BoxFuture, Boxable};
-use bytes::{self, BufMut};
+use bytes::buf::BufMutExt;
 use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
 };
 use process_execution::{
-  self, CacheDest, CacheName, MultiPlatformProcess, PlatformConstraint, Process,
+  self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process, ProcessCacheScope,
 };
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
 use store::{self, StoreFileByDigest};
-use workunit_store::{with_workunit, Level, WorkunitMetadata};
+use workunit_store::{
+  with_workunit, Level, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
+};
 
 pub type NodeResult<T> = Result<T, Failure>;
 
@@ -60,12 +61,12 @@ impl VFS<Failure> for Context {
 }
 
 impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
+  fn store_by_digest(
+    &self,
+    file: File,
+  ) -> future::BoxFuture<'static, Result<hashing::Digest, Failure>> {
     let context = self.clone();
-    async move { context.get(DigestFile(file)).await }
-      .boxed()
-      .compat()
-      .to_boxed()
+    async move { context.get(DigestFile(file)).await }.boxed()
   }
 }
 
@@ -206,19 +207,8 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_directory_digest(types: &Types, digest: &Value) -> Result<hashing::Digest, String> {
-  if types.directory_digest != externs::get_type_for(digest) {
-    return Err(format!(
-      "{} is not of type {}.",
-      digest, types.directory_digest
-    ));
-  }
-  let fingerprint = externs::getattr_as_string(&digest, "fingerprint");
-  let digest_length: usize = externs::getattr(&digest, "serialized_bytes_length").unwrap();
-  Ok(hashing::Digest(
-    hashing::Fingerprint::from_hex_string(&fingerprint)?,
-    digest_length,
-  ))
+pub fn lift_directory_digest(digest: &Value) -> Result<hashing::Digest, String> {
+  externs::fs::from_py_digest(digest).map_err(|e| format!("{:?}", e))
 }
 
 pub fn lift_file_digest(types: &Types, digest: &Value) -> Result<hashing::Digest, String> {
@@ -237,16 +227,12 @@ pub fn lift_file_digest(types: &Types, digest: &Value) -> Result<hashing::Digest
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct MultiPlatformExecuteProcess {
-  cache_failures: bool,
+  cache_scope: ProcessCacheScope,
   process: MultiPlatformProcess,
 }
 
 impl MultiPlatformExecuteProcess {
-  fn lift_execute_process(
-    types: &Types,
-    value: &Value,
-    target_platform: PlatformConstraint,
-  ) -> Result<Process, String> {
+  fn lift_process(value: &Value, platform_constraint: Option<Platform>) -> Result<Process, String> {
     let env = externs::getattr_from_frozendict(&value, "env");
 
     let working_directory = {
@@ -259,8 +245,8 @@ impl MultiPlatformExecuteProcess {
     };
 
     let py_digest: Value = externs::getattr(&value, "input_digest").unwrap();
-    let digest = lift_directory_digest(types, &py_digest)
-      .map_err(|err| format!("Error parsing digest {}", err))?;
+    let digest =
+      lift_directory_digest(&py_digest).map_err(|err| format!("Error parsing digest {}", err))?;
 
     let output_files = externs::getattr::<Vec<String>>(&value, "output_files")
       .unwrap()
@@ -311,7 +297,9 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let cache_failures: bool = externs::getattr(&value, "cache_failures").unwrap();
+    let cache_scope =
+      externs::getattr_as_string(&externs::getattr(&value, "cache_scope").unwrap(), "name")
+        .try_into()?;
 
     Ok(process_execution::Process {
       argv: externs::getattr(&value, "argv").unwrap(),
@@ -325,53 +313,44 @@ impl MultiPlatformExecuteProcess {
       level,
       append_only_caches,
       jdk_home,
-      target_platform,
+      platform_constraint,
       is_nailgunnable,
       execution_slot_variable,
-      cache_failures,
+      cache_scope,
     })
   }
 
-  pub fn lift(types: &Types, value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
-    let constraint_parts: Vec<String> = externs::getattr(&value, "platform_constraints").unwrap();
-    if constraint_parts.len() % 2 != 0 {
-      return Err("Error parsing platform_constraints: odd number of parts".to_owned());
-    }
-    let constraint_key_pairs: Vec<_> = constraint_parts
-      .chunks_exact(2)
-      .map(|constraint_key_pair| {
-        (
-          PlatformConstraint::try_from(&constraint_key_pair[0]).unwrap(),
-          PlatformConstraint::try_from(&constraint_key_pair[1]).unwrap(),
-        )
+  pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+    let raw_constraints = externs::getattr::<Vec<Option<String>>>(&value, "platform_constraints")?;
+    let constraints = raw_constraints
+      .into_iter()
+      .map(|maybe_plat| match maybe_plat {
+        Some(plat) => Platform::try_from(plat).map(Some),
+        None => Ok(None),
       })
-      .collect();
-    let processes: Vec<Value> = externs::getattr(&value, "processes").unwrap();
-    if constraint_parts.len() / 2 != processes.len() {
+      .collect::<Result<Vec<_>, _>>()?;
+    let processes = externs::getattr::<Vec<Value>>(&value, "processes")?;
+    if constraints.len() != processes.len() {
       return Err(format!(
         "Sizes of constraint keys and processes do not match: {} vs. {}",
-        constraint_parts.len() / 2,
+        constraints.len(),
         processes.len()
       ));
     }
 
-    let mut cache_failures = true;
-
-    let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
-      BTreeMap::new();
-    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
-      let underlying_req = MultiPlatformExecuteProcess::lift_execute_process(
-        types,
-        execute_process,
-        constraint_key.1,
-      )?;
-      if !underlying_req.cache_failures {
-        cache_failures = false;
-      }
-      request_by_constraint.insert(*constraint_key, underlying_req.clone());
+    let mut request_by_constraint: BTreeMap<Option<Platform>, Process> = BTreeMap::new();
+    for (constraint, execute_process) in constraints.iter().zip(processes.iter()) {
+      let underlying_req = MultiPlatformExecuteProcess::lift_process(execute_process, *constraint)?;
+      request_by_constraint.insert(*constraint, underlying_req.clone());
     }
+
+    let cache_scope = request_by_constraint
+      .values()
+      .next()
+      .map(|p| p.cache_scope)
+      .unwrap();
     Ok(MultiPlatformExecuteProcess {
-      cache_failures,
+      cache_scope,
       process: MultiPlatformProcess(request_by_constraint),
     })
   }
@@ -389,19 +368,21 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<ProcessResult> {
     let request = self.process;
-    let execution_context = process_execution::Context::new(
-      context.session.workunit_store(),
-      context.session.build_id().to_string(),
-    );
+
     if context
       .core
       .command_runner
       .extract_compatible_request(&request)
       .is_some()
     {
-      let res = context
-        .core
-        .command_runner
+      let command_runner = &context.core.command_runner;
+
+      let execution_context = process_execution::Context::new(
+        context.session.workunit_store(),
+        context.session.build_id().to_string(),
+      );
+
+      let res = command_runner
         .run(request, execution_context)
         .await
         .map_err(|e| throw(&e))?;
@@ -642,7 +623,7 @@ impl Snapshot {
   }
 
   pub fn store_directory_digest(item: &hashing::Digest) -> Result<Value, String> {
-    externs::fs::new_py_digest(*item)
+    externs::fs::to_py_digest(*item)
       .map(|d| d.into_object().into())
       .map_err(|e| format!("{:?}", e))
   }
@@ -657,27 +638,10 @@ impl Snapshot {
     )
   }
 
-  pub fn store_snapshot(core: &Arc<Core>, item: &store::Snapshot) -> Result<Value, String> {
-    let mut files = Vec::new();
-    let mut dirs = Vec::new();
-    for ps in &item.path_stats {
-      match ps {
-        &PathStat::File { ref path, .. } => {
-          files.push(Self::store_path(path)?);
-        }
-        &PathStat::Dir { ref path, .. } => {
-          dirs.push(Self::store_path(path)?);
-        }
-      }
-    }
-    Ok(externs::unsafe_call(
-      core.types.snapshot,
-      &[
-        Self::store_directory_digest(&item.digest)?,
-        externs::store_tuple(files),
-        externs::store_tuple(dirs),
-      ],
-    ))
+  pub fn store_snapshot(item: store::Snapshot) -> Result<Value, String> {
+    externs::fs::to_py_snapshot(item)
+      .map(|d| d.into_object().into())
+      .map_err(|e| format!("{:?}", e))
   }
 
   fn store_path(item: &Path) -> Result<Value, String> {
@@ -902,34 +866,31 @@ impl Task {
           .core
           .rule_graph
           .edges_for_inner(&entry)
-          .ok_or_else(|| throw(&format!("no edges for task {:?} exist!", entry)))
+          .ok_or_else(|| throw(&format!("No edges for task {:?} exist!", entry)))
           .and_then(|edges| {
-            edges
-              .entry_for(&dependency_key)
-              .cloned()
-              .ok_or_else(|| match get.input_type {
-                Some(ty) if externs::is_union(ty) => {
-                  let value = externs::type_for_type_id(ty).into_object();
-                  match externs::call_method(
-                    &value,
-                    "non_member_error_message",
-                    &[externs::val_for(&get.input)],
-                  ) {
-                    Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
-                    // If the non_member_error_message() call failed for any reason,
-                    // fall back to a generic message.
-                    Err(_e) => throw(&format!(
-                      "Type {} is not a member of the {} @union",
-                      get.input.type_id(),
-                      ty
-                    )),
-                  }
-                }
-                _ => throw(&format!(
-                  "{:?} did not declare a dependency on {:?}",
-                  entry, dependency_key
-                )),
-              })
+            edges.entry_for(&dependency_key).cloned().ok_or_else(|| {
+              if externs::is_union(get.input_type) {
+                throw(&format!(
+                  "Invalid Get. Because the second argument to `Get({}, {}, {:?})` is annotated \
+                    with `@union`, the third argument should be a member of that union. Did you \
+                    intend to register `UnionRule({}, {})`? If not, you may be using the wrong \
+                    type ({}) for the third argument.",
+                  get.output,
+                  get.input_type,
+                  get.input,
+                  get.input_type,
+                  get.input.type_id(),
+                  get.input.type_id(),
+                ))
+              } else {
+                // NB: The Python constructor for `Get()` will have already errored if
+                // `type(input) != input_type`.
+                throw(&format!(
+                  "Could not find a rule to satisfy Get({}, {}, {}).",
+                  get.output, get.input_type, get.input
+                ))
+              }
+            })
           });
         // The subject of the get is a new parameter that replaces an existing param of the same
         // type.
@@ -992,6 +953,7 @@ pub struct PythonRuleOutput {
   new_level: Option<log::Level>,
   message: Option<String>,
   new_artifacts: Vec<(String, hashing::Digest)>,
+  new_metadata: Vec<(String, Value)>,
 }
 
 #[async_trait]
@@ -1034,21 +996,24 @@ impl WrappedNode for Task {
     }
 
     if result_type == product {
-      let (new_level, message, new_artifacts) = if can_modify_workunit {
+      let (new_level, message, new_artifacts, new_metadata) = if can_modify_workunit {
         (
           engine_aware::EngineAwareLevel::retrieve(&context.core.types, &result_val),
           engine_aware::Message::retrieve(&context.core.types, &result_val),
           engine_aware::Artifacts::retrieve(&context.core.types, &result_val)
             .unwrap_or_else(Vec::new),
+          engine_aware::Metadata::retrieve(&context.core.types, &result_val)
+            .unwrap_or_else(Vec::new),
         )
       } else {
-        (None, None, Vec::new())
+        (None, None, Vec::new(), Vec::new())
       };
       Ok(PythonRuleOutput {
         value: result_val,
         new_level,
         message,
         new_artifacts,
+        new_metadata,
       })
     } else {
       Err(throw(&format!(
@@ -1258,6 +1223,7 @@ impl Node for NodeKey {
       stdout: None,
       stderr: None,
       artifacts: Vec::new(),
+      user_metadata: Vec::new(),
     };
     let metadata2 = metadata.clone();
 
@@ -1282,6 +1248,9 @@ impl Node for NodeKey {
       let mut level = metadata.level;
       let mut message = None;
       let mut artifacts = Vec::new();
+      let mut user_metadata = Vec::new();
+
+      let context2 = context.clone();
       let mut result = match self {
         NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::DownloadedFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
@@ -1312,6 +1281,7 @@ impl Node for NodeKey {
               }
               message = python_rule_output.message;
               artifacts = python_rule_output.new_artifacts;
+              user_metadata = python_rule_output.new_metadata;
               NodeOutput::Value(python_rule_output.value)
             })
             .await
@@ -1329,10 +1299,23 @@ impl Node for NodeKey {
         }
       }
 
+      let session = context2.session;
       let final_metadata = WorkunitMetadata {
         level,
         message,
         artifacts,
+        user_metadata: user_metadata
+          .into_iter()
+          .map(|(key, val)| {
+            let py_value_handle = UserMetadataPyValue::new();
+            let umi = UserMetadataItem::PyValue(py_value_handle.clone());
+            session.with_metadata_map(|map| {
+              let val = val.clone();
+              map.insert(py_value_handle.clone(), val);
+            });
+            (key, umi)
+          })
+          .collect(),
         ..metadata
       };
       (result, final_metadata)
@@ -1360,14 +1343,11 @@ impl Node for NodeKey {
   fn cacheable_item(&self, output: &NodeOutput) -> bool {
     match self {
       NodeKey::MultiPlatformExecuteProcess(ref mp) => match output {
-        NodeOutput::ProcessResult(ref process_result) => {
-          let process_succeeded = process_result.0.exit_code == 0;
-          if mp.cache_failures {
-            true
-          } else {
-            process_succeeded
-          }
-        }
+        NodeOutput::ProcessResult(ref process_result) => match mp.cache_scope {
+          ProcessCacheScope::Always | ProcessCacheScope::PerRestart => true,
+          ProcessCacheScope::Successful => process_result.0.exit_code == 0,
+          ProcessCacheScope::Never => false,
+        },
         _ => true,
       },
       _ => true,
@@ -1424,6 +1404,9 @@ pub enum NodeOutput {
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(Box<ProcessResult>),
+  // Allow clippy::rc_buffer due to non-trivial issues that would arise in using the
+  // suggested Arc<[PathStat]> type. See https://github.com/rust-lang/rust-clippy/issues/6170
+  #[allow(clippy::rc_buffer)]
   Paths(Arc<Vec<PathStat>>),
   Value(Value),
 }
@@ -1453,6 +1436,7 @@ impl TryFrom<NodeOutput> for PythonRuleOutput {
         new_level: None,
         message: None,
         new_artifacts: Vec::new(),
+        new_metadata: Vec::new(),
       }),
       _ => Err(()),
     }

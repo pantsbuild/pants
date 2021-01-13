@@ -2,12 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple, cast
+from typing import Tuple
 
 from pants.backend.python.target_types import (
     PexAlwaysWriteCacheField,
     PexBinaryDefaults,
-    PexBinarySources,
     PexEmitWarningsField,
     PexEntryPointField,
     PexIgnoreErrorsField,
@@ -25,7 +24,6 @@ from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
-from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -35,15 +33,13 @@ from pants.core.goals.package import (
 from pants.core.goals.run import RunFieldSet
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
-class PexBinaryFieldSet(PackageFieldSet, BinaryFieldSet, RunFieldSet):
-    required_fields = (PexEntryPointField, PexBinarySources)
+class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
+    required_fields = (PexEntryPointField,)
 
-    sources: PexBinarySources
     entry_point: PexEntryPointField
 
     output_path: OutputPathField
@@ -74,18 +70,12 @@ class PexBinaryFieldSet(PackageFieldSet, BinaryFieldSet, RunFieldSet):
 
 @rule(level=LogLevel.DEBUG)
 async def package_pex_binary(
-    field_set: PexBinaryFieldSet,
-    pex_binary_defaults: PexBinaryDefaults,
-    global_options: GlobalOptions,
+    field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults
 ) -> BuiltPackage:
     resolved_entry_point = await Get(
-        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point, field_set.sources)
+        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)
     )
-    output_filename = field_set.output_path.value_or_default(
-        field_set.address,
-        file_ending="pex",
-        use_legacy_format=global_options.options.pants_distdir_legacy_paths,
-    )
+    output_filename = field_set.output_path.value_or_default(field_set.address, file_ending="pex")
     two_step_pex = await Get(
         TwoStepPex,
         TwoStepPexFromTargetsRequest(
@@ -102,15 +92,5 @@ async def package_pex_binary(
     return BuiltPackage(two_step_pex.pex.digest, (BuiltPackageArtifact(output_filename),))
 
 
-@rule(level=LogLevel.DEBUG)
-async def create_pex_binary(field_set: PexBinaryFieldSet) -> CreatedBinary:
-    pex = await Get(BuiltPackage, PackageFieldSet, field_set)
-    return CreatedBinary(pex.digest, cast(str, pex.artifacts[0].relpath))
-
-
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(PackageFieldSet, PexBinaryFieldSet),
-        UnionRule(BinaryFieldSet, PexBinaryFieldSet),
-    ]
+    return [*collect_rules(), UnionRule(PackageFieldSet, PexBinaryFieldSet)]

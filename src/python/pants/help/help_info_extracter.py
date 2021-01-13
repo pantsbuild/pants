@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import inspect
 import json
@@ -11,19 +13,17 @@ from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, Type, ca
 from pants.base import deprecated
 from pants.engine.goal import GoalSubsystem
 from pants.engine.target import (
-    AsyncField,
+    AsyncFieldMixin,
     BoolField,
     DictStringToStringField,
     DictStringToStringSequenceField,
     Field,
     FloatField,
     IntField,
-    PrimitiveField,
     RegisteredTargetTypes,
     ScalarField,
     SequenceField,
     StringField,
-    StringOrStringSequenceField,
     StringSequenceField,
     Target,
 )
@@ -32,6 +32,7 @@ from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
 from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
+from pants.util.strutil import first_paragraph
 
 
 class HelpJSONEncoder(json.JSONEncoder):
@@ -94,6 +95,7 @@ class OptionHelpInfo:
     typ: Type
     default: Any
     help: str
+    deprecation_active: bool
     deprecated_message: Optional[str]
     removal_version: Optional[str]
     removal_hint: Optional[str]
@@ -153,44 +155,41 @@ class TargetFieldHelpInfo:
     default: Optional[str]
 
     @classmethod
-    def create(cls, field: Type[Field]) -> "TargetFieldHelpInfo":
-        # NB: It is very common (and encouraged) to subclass Fields to give custom behavior, e.g.
-        # `PythonSources` subclassing `Sources`. Here, we set `fallback_to_ancestors=True` so that
-        # we can still generate meaningful documentation for all these custom fields without
-        # requiring the Field author to rewrite the docstring.
-        #
-        # However, if the original `Field` author did not define docstring, then this means we
-        # would typically fall back to the docstring for `AsyncField`, `PrimitiveField`, or a
-        # helper class like `StringField`. This is a quirk of this heuristic and it's not
-        # intentional since these core `Field` types have documentation oriented to the custom
-        # `Field` author and not the end user filling in fields in a BUILD file target.
-        description = get_docstring(
-            field,
-            flatten=True,
-            fallback_to_ancestors=True,
-            ignored_ancestors={
-                *Field.mro(),
-                AsyncField,
-                PrimitiveField,
-                BoolField,
-                DictStringToStringField,
-                DictStringToStringSequenceField,
-                FloatField,
-                Generic,  # type: ignore[arg-type]
-                IntField,
-                ScalarField,
-                SequenceField,
-                StringField,
-                StringOrStringSequenceField,
-                StringSequenceField,
-            },
-        )
-        if issubclass(field, PrimitiveField):
-            raw_value_type = get_type_hints(field.compute_value)["raw_value"]
-        elif issubclass(field, AsyncField):
-            raw_value_type = get_type_hints(field.sanitize_raw_value)["raw_value"]
+    def create(cls, field: Type[Field]) -> TargetFieldHelpInfo:
+        description: Optional[str]
+        if hasattr(field, "help"):
+            description = field.help
         else:
-            raw_value_type = get_type_hints(field.__init__)["raw_value"]
+            # NB: It is very common (and encouraged) to subclass Fields to give custom behavior, e.g.
+            # `PythonSources` subclassing `Sources`. Here, we set `fallback_to_ancestors=True` so that
+            # we can still generate meaningful documentation for all these custom fields without
+            # requiring the Field author to rewrite the docstring.
+            #
+            # However, if the original plugin author did not define docstring, then this means we
+            # would typically fall back to the docstring for `Field` or a template like `StringField`.
+            # This is a an awkward edge of our heuristic and it's not intentional since these core
+            # `Field` types have documentation oriented to the plugin author and not the end user
+            # filling in fields in a BUILD file.
+            description = get_docstring(
+                field,
+                flatten=True,
+                fallback_to_ancestors=True,
+                ignored_ancestors={
+                    *Field.mro(),
+                    AsyncFieldMixin,
+                    BoolField,
+                    DictStringToStringField,
+                    DictStringToStringSequenceField,
+                    FloatField,
+                    Generic,  # type: ignore[arg-type]
+                    IntField,
+                    ScalarField,
+                    SequenceField,
+                    StringField,
+                    StringSequenceField,
+                },
+            )
+        raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
 
         # Check if the field only allows for certain choices.
@@ -232,11 +231,19 @@ class TargetTypeHelpInfo:
     @classmethod
     def create(
         cls, target_type: Type[Target], *, union_membership: UnionMembership
-    ) -> "TargetTypeHelpInfo":
+    ) -> TargetTypeHelpInfo:
+        description: Optional[str]
+        summary: Optional[str]
+        if hasattr(target_type, "help"):
+            description = target_type.help
+            summary = first_paragraph(description)
+        else:
+            description = get_docstring(target_type)
+            summary = get_docstring_summary(target_type)
         return cls(
             alias=target_type.alias,
-            summary=get_docstring_summary(target_type),
-            description=get_docstring(target_type),
+            summary=summary,
+            description=description,
             fields=tuple(
                 TargetFieldHelpInfo.create(field)
                 for field in target_type.class_field_types(union_membership=union_membership)
@@ -281,12 +288,10 @@ class HelpInfoExtracter:
                 )
                 raise ValueError(
                     f"Subsystem {cls_name} with scope `{scope_info.scope}` has no description. "
-                    f"Add a docstring or implement get_description()."
+                    f"Add a class property `help`."
                 )
             is_goal = optionable_cls is not None and issubclass(optionable_cls, GoalSubsystem)
-            oshi: OptionScopeHelpInfo = HelpInfoExtracter(
-                scope_info.scope
-            ).get_option_scope_help_info(
+            oshi = HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                 scope_info.description, options.get_parser(scope_info.scope), is_goal
             )
             scope_to_help_info[oshi.scope] = oshi
@@ -392,7 +397,7 @@ class HelpInfoExtracter:
             history = parser.history(kwargs["dest"])
             ohi = self.get_option_help_info(args, kwargs)
             ohi = dataclasses.replace(ohi, value_history=history)
-            if kwargs.get("removal_version"):
+            if ohi.deprecation_active:
                 deprecated_options.append(ohi)
             elif kwargs.get("advanced") or (
                 kwargs.get("recursive") and not kwargs.get("recursive_root")
@@ -446,12 +451,21 @@ class HelpInfoExtracter:
         typ = kwargs.get("type", str)
         default = self.compute_default(**kwargs)
         help_msg = kwargs.get("help", "No help available.")
+        deprecation_start_version = kwargs.get("deprecation_start_version")
         removal_version = kwargs.get("removal_version")
+        deprecation_active = removal_version is not None and deprecated.is_deprecation_active(
+            deprecation_start_version
+        )
         deprecated_message = None
         if removal_version:
             deprecated_tense = deprecated.get_deprecated_tense(removal_version)
+            message_start = (
+                "Deprecated"
+                if deprecation_active
+                else f"Upcoming deprecation in version: {deprecation_start_version}"
+            )
             deprecated_message = (
-                f"Deprecated, {deprecated_tense} removed in version: {removal_version}."
+                f"{message_start}, {deprecated_tense} removed in version: {removal_version}."
             )
         removal_hint = kwargs.get("removal_hint")
         choices = self.compute_choices(kwargs)
@@ -470,6 +484,7 @@ class HelpInfoExtracter:
             typ=typ,
             default=default,
             help=help_msg,
+            deprecation_active=deprecation_active,
             deprecated_message=deprecated_message,
             removal_version=removal_version,
             removal_hint=removal_hint,

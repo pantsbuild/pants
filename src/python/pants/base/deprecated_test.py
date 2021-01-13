@@ -18,6 +18,7 @@ from pants.base.deprecated import (
     deprecated,
     deprecated_conditional,
     deprecated_module,
+    is_deprecation_active,
     resolve_conflicting_options,
     warn_or_error,
 )
@@ -295,3 +296,9 @@ def test_resolve_conflicting_options() -> None:
         option_resolved(old_configured=True, new_configured=True)
     assert "--old-scope-my-opt" in str(e.value)
     assert "--new-scope-my-opt" in str(e.value)
+
+
+def test_is_deprecation_active() -> None:
+    assert is_deprecation_active(deprecation_start_version=None)
+    assert is_deprecation_active(deprecation_start_version="1.0.0")
+    assert not is_deprecation_active(deprecation_start_version=FUTURE_VERSION)

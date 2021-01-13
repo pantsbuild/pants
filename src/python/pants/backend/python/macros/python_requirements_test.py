@@ -138,12 +138,12 @@ def test_relpath_override(rule_runner: RuleRunner) -> None:
         requirements_txt_relpath="subdir/requirements.txt",
         expected_file_dep=PythonRequirementsFile(
             {"sources": ["subdir/requirements.txt"]},
-            address=Address("", target_name="subdir/requirements.txt"),
+            address=Address("", target_name="subdir_requirements.txt"),
         ),
         expected_targets=[
             PythonRequirementLibrary(
                 {
-                    "dependencies": [":subdir/requirements.txt"],
+                    "dependencies": [":subdir_requirements.txt"],
                     "requirements": [Requirement.parse("ansicolors>=1.18.0")],
                 },
                 address=Address("", target_name="ansicolors"),

@@ -10,7 +10,7 @@ from typing import List, Mapping
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
 from pants.bin.remote_pants_runner import RemotePantsRunner
-from pants.init.logging import setup_logging, setup_warning_filtering
+from pants.init.logging import setup_logging
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -67,11 +67,6 @@ class PantsRunner:
             bootstrap_options = options_bootstrapper.bootstrap_options
             global_bootstrap_options = bootstrap_options.for_global_scope()
 
-        # Initialize the workdir early enough to ensure that logging has a destination.
-        workdir_src = init_workdir(global_bootstrap_options)
-        ExceptionSink.reset_log_location(workdir_src)
-
-        setup_warning_filtering(global_bootstrap_options.ignore_pants_warnings or [])
         # We enable logging here, and everything before it will be routed through regular
         # Python logging.
         setup_logging(global_bootstrap_options, stderr_logging=True)
@@ -86,5 +81,9 @@ class PantsRunner:
         # N.B. Inlining this import speeds up the python thin client run by about 100ms.
         from pants.bin.local_pants_runner import LocalPantsRunner
 
+        # We only install signal handling via ExceptionSink if the run will execute in this process.
+        ExceptionSink.install(
+            log_location=init_workdir(global_bootstrap_options), pantsd_instance=False
+        )
         runner = LocalPantsRunner.create(env=self.env, options_bootstrapper=options_bootstrapper)
         return runner.run(start_time)

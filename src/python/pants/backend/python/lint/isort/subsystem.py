@@ -8,9 +8,9 @@ from pants.option.custom_types import file_option, shell_str
 
 
 class Isort(PythonToolBase):
-    """The Python import sorter tool (https://timothycrosley.github.io/isort/)."""
-
     options_scope = "isort"
+    help = "The Python import sorter tool (https://timothycrosley.github.io/isort/)."
+
     default_version = "isort[pyproject]>=5.5.1,<5.6"
     default_extra_requirements = ["setuptools"]
     register_interpreter_constraints = True
@@ -26,7 +26,7 @@ class Isort(PythonToolBase):
             default=False,
             help=(
                 f"Don't use isort when running `{register.bootstrap.pants_bin_name} fmt` and "
-                f"`{register.bootstrap.pants_bin_name} lint`"
+                f"`{register.bootstrap.pants_bin_name} lint`."
             ),
         )
         register(
@@ -35,7 +35,7 @@ class Isort(PythonToolBase):
             member_type=shell_str,
             help=(
                 "Arguments to pass directly to isort, e.g. "
-                f'`--{cls.options_scope}-args="--case-sensitive --trailing-comma"`'
+                f'`--{cls.options_scope}-args="--case-sensitive --trailing-comma"`.'
             ),
         )
         register(
@@ -43,7 +43,7 @@ class Isort(PythonToolBase):
             type=list,
             member_type=file_option,
             advanced=True,
-            help="Path to `isort.cfg` or alternative isort config file(s)",
+            help="Path to `isort.cfg` or alternative isort config file(s).",
         )
 
     @property

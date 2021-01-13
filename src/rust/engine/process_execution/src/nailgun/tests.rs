@@ -1,12 +1,13 @@
-use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
-use crate::{NamedCaches, PlatformConstraint, Process, ProcessMetadata};
-use futures::compat::Future01CompatExt;
-use hashing::EMPTY_DIGEST;
 use std::fs::read_link;
 use std::os::unix::fs::symlink;
 use std::path::PathBuf;
+
+use hashing::EMPTY_DIGEST;
 use store::Store;
 use tempfile::TempDir;
+
+use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
+use crate::{NamedCaches, Platform, Process, ProcessMetadata};
 
 fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
   let store_dir = TempDir::new().unwrap();
@@ -20,14 +21,14 @@ fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
     NamedCaches::new(named_cache_dir.path().to_owned()),
     true,
   );
-  let metadata = ProcessMetadata {
-    instance_name: None,
-    cache_key_gen_version: None,
-    platform_properties: vec![],
-  };
   let workdir_base = workdir_base.unwrap_or(std::env::temp_dir());
 
-  CommandRunner::new(local_runner, metadata, workdir_base, executor.clone())
+  CommandRunner::new(
+    local_runner,
+    ProcessMetadata::default(),
+    workdir_base,
+    executor.clone(),
+  )
 }
 
 fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {
@@ -41,7 +42,7 @@ fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> Process {
   let mut process = Process::new(vec![]);
   process.jdk_home = jdk_home;
   process.is_nailgunnable = true;
-  process.target_platform = PlatformConstraint::Darwin;
+  process.platform_constraint = Some(Platform::Darwin);
   process
 }
 
@@ -85,7 +86,7 @@ async fn creating_nailgun_server_request_updates_the_cli() {
     &NAILGUN_MAIN_CLASS.to_string(),
     Vec::new(),
     PathBuf::from(""),
-    PlatformConstraint::None,
+    None,
   );
   assert_eq!(req.argv[0], NAILGUN_MAIN_CLASS);
   assert_eq!(req.argv[1..], ARGS_TO_START_NAILGUN);
@@ -116,7 +117,7 @@ async fn materialize_with_jdk(
     jdk_path,
     EMPTY_DIGEST,
   );
-  materializer.compat().await
+  materializer.await
 }
 
 #[tokio::test]
