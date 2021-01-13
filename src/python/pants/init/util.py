@@ -5,7 +5,6 @@ import os
 from typing import cast
 
 from pants.fs.fs import safe_filename_from_path
-from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import absolute_symlink, safe_mkdir, safe_rmtree
 
@@ -49,10 +48,3 @@ def init_workdir(global_options: OptionValueContainer) -> str:
         # Create both symlink workdir (.pants.d dir) and its destination/physical workdir
         create_symlink_to_clean_workdir()
     return workdir_src
-
-
-def clean_global_runtime_state() -> None:
-    """Resets the global runtime state of a pants runtime."""
-
-    # Reset global plugin state.
-    BuildConfigInitializer.reset()
