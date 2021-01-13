@@ -41,7 +41,7 @@ def single_target_run(
     console: MockConsole,
     *,
     program_text: bytes,
-    env_var_option: Optional[List[str]] = None,
+    extra_env_vars: Optional[List[str]] = None,
     pants_env: Optional[Mapping[str, str]] = None,
 ) -> Run:
     workspace = Workspace(rule_runner.scheduler)
@@ -61,7 +61,7 @@ def single_target_run(
     res = run_rule_with_mocks(
         run,
         rule_args=[
-            create_goal_subsystem(RunSubsystem, args=[], env_vars=env_var_option or []),
+            create_goal_subsystem(RunSubsystem, args=[], extra_env_vars=extra_env_vars or []),
             create_subsystem(GlobalOptions, pants_workdir=rule_runner.pants_workdir),
             console,
             interactive_runner,
@@ -116,14 +116,13 @@ def test_env_vars(rule_runner: RuleRunner) -> None:
         Address("some/addr"),
         console,
         program_text=program_text,
-        env_var_option=["FOO=bar", "BAZ"],
+        extra_env_vars=["FOO=bar"],
         pants_env={"BAZ": "from_pants_environment"},
     )
     assert res.exit_code == 0
     with open(env_vars_output_path) as fp:
         env_vars = list(fp)
     assert "FOO=bar\n" in env_vars
-    assert "BAZ=from_pants_environment\n" in env_vars
 
     # Test that we correctly validate that user-set env vars don't collide with ones that
     # Pants sets.
@@ -133,7 +132,7 @@ def test_env_vars(rule_runner: RuleRunner) -> None:
             Address("some/addr"),
             console,
             program_text=program_text,
-            env_var_option=["COLLIDING_ENV_VAR=dummy"],
+            extra_env_vars=["COLLIDING_ENV_VAR=dummy"],
         )
     assert "The following environment variables cannot be set" in str(excinfo.value)
     assert "COLLIDING_ENV_VAR" in str(excinfo.value)
