@@ -3,6 +3,7 @@
 
 import datetime
 import getpass
+import re
 import time
 
 import pytest
@@ -48,17 +49,16 @@ def test_run_information(exit_code, expected, **kwargs) -> None:
             assert run_information["buildroot"] == get_buildroot()
             assert run_information["path"] == get_buildroot()
             # freezegun doesn't seem to accurately mock the time zone,
-            # so we can only safely assert that the month and year appear
-            # in the human-readable string contained in the "datetime" key
+            # (i.e. the time zone used depends on that of the machine that
+            # executes the test), so we can only safely assert that the
+            # month and year appear in the human-readable string contained
+            # in the "datetime" key
             assert "Jan" in run_information["datetime"]
             assert "2020" in run_information["datetime"]
             assert run_information["timestamp"] == 1578657601.0
             assert run_information["user"] == getpass.getuser()
             assert run_information["version"] == VERSION
-            assert (
-                run_information["cmd_line"]
-                == "pants --no-header src/python/pants/goal/run_tracker_test.py"
-            )
+            assert re.match("pants.*run_tracker_test.py", run_information["cmd_line"])
             assert run_information["specs_from_command_line"] == [
                 "src/python/pants/goal/run_tracker_test.py"
             ]
