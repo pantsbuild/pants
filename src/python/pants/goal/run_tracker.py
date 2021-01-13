@@ -1,8 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import getpass
 import logging
 import os
+import socket
 import sys
 import time
 import uuid
@@ -10,6 +12,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
 from pants.engine.internals.native import Native
@@ -17,6 +20,7 @@ from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
+from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +84,18 @@ class RunTracker:
 
         # Initialize the run.
         self._run_start_time = run_start_time
-        self._run_info.add_basic_info(self.run_id, run_start_time)
+
+        self._run_info.add_info("id", self.run_id)
+        self._run_info.add_info("timestamp", run_start_time)
+
+        datetime = time.strftime("%A %b %d, %Y %H:%M:%S", time.localtime(run_start_time))
+        self._run_info.add_info("datetime", datetime)
+
+        self._run_info.add_info("user", getpass.getuser())
+        self._run_info.add_info("machine", socket.gethostname())
+        self._run_info.add_info("buildroot", get_buildroot())
+        self._run_info.add_info("version", VERSION)
+
         cmd_line = " ".join(["pants"] + sys.argv[1:])
         self._run_info.add_info("cmd_line", cmd_line)
         self._run_info.add_info("specs_from_command_line", specs, stringify=False)

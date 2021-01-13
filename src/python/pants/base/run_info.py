@@ -1,16 +1,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import getpass
 import os
 import re
-import socket
-import time
 from collections import OrderedDict
 
-from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_mkdir_for
-from pants.version import VERSION
 
 
 class RunInfo:
@@ -74,21 +69,3 @@ class RunInfo:
         except IOError:
             if not kwargs.get("ignore_errors", False):
                 raise
-
-    def add_basic_info(self, run_id: str, timestamp: float) -> None:
-        """Adds basic build info."""
-        datetime = time.strftime("%A %b %d, %Y %H:%M:%S", time.localtime(timestamp))
-        user = getpass.getuser()
-        machine = socket.gethostname()
-        buildroot = get_buildroot()
-        # TODO: Get rid of the redundant 'path' key once everyone is off it.
-        self.add_infos(
-            ("id", run_id),
-            ("timestamp", timestamp),
-            ("datetime", datetime),
-            ("user", user),
-            ("machine", machine),
-            ("path", buildroot),
-            ("buildroot", buildroot),
-            ("version", VERSION),
-        )
