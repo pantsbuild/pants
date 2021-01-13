@@ -8,7 +8,7 @@ import unittest
 from multiprocessing import Manager, Process
 from threading import Thread
 
-from pants.process.lock import OwnerPrintingInterProcessFileLock
+from pants.pantsd.lock import OwnerPrintingInterProcessFileLock
 
 
 def hold_lock_until_terminate(path, lock_held, terminate):
