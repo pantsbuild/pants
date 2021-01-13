@@ -35,7 +35,7 @@ def test_run_tracker_timing_output(**kwargs) -> None:
     "exit_code,expected",
     [(PANTS_SUCCEEDED_EXIT_CODE, "SUCCESS"), (PANTS_FAILED_EXIT_CODE, "FAILURE")],
 )
-@freeze_time(datetime.datetime(2020, 1, 1, 12, 0, 0), tz_offset=3, as_kwarg="frozen_time")
+@freeze_time(datetime.datetime(2020, 1, 10, 12, 0, 1), as_kwarg="frozen_time")
 def test_run_information(exit_code, expected, **kwargs) -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
@@ -47,8 +47,12 @@ def test_run_information(exit_code, expected, **kwargs) -> None:
             run_information = run_tracker.run_information()
             assert run_information["buildroot"] == get_buildroot()
             assert run_information["path"] == get_buildroot()
-            assert run_information["datetime"] == "Wednesday Jan 01, 2020 04:00:00"
-            assert run_information["timestamp"] == 1577880000.0
+            # freezegun doesn't seem to accurately mock the time zone,
+            # so we can only safely assert that the month and year appear
+            # in the human-readable string contained in the "datetime" key
+            assert "Jan" in run_information["datetime"]
+            assert "2020" in run_information["datetime"]
+            assert run_information["timestamp"] == 1578657601.0
             assert run_information["user"] == getpass.getuser()
             assert run_information["version"] == VERSION
             assert (
