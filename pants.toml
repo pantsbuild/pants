@@ -62,7 +62,7 @@ root_patterns = [
 resolver_version = "pip-2020-resolver"
 requirement_constraints = "3rdparty/python/constraints.txt"
 resolve_all_constraints = "nondeployables"
-interpreter_constraints = [">=3.7,<3.9"]
+interpreter_constraints = [">=3.7,<3.10"]
 
 [black]
 config = "pyproject.toml"
@@ -137,7 +137,7 @@ pytest_plugins.add = [
 timeout_default = 60
 
 [coverage-py]
-interpreter_constraints = [">=3.7,<3.9"]
+interpreter_constraints = [">=3.7,<3.10"]
 
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"

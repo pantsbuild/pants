@@ -74,7 +74,7 @@ function determine_python() {
     echo "${PY}"
     return 0
   fi
-  for version in '3.7' '3.8'; do
+  for version in '3.7' '3.8' '3.9'; do
     local interpreter_path
     interpreter_path="$(command -v "python${version}")"
     if [[ -z "${interpreter_path}" ]]; then
