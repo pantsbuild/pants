@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.option.options import Options
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
-from pants.process.lock import OwnerPrintingInterProcessFileLock
+from pants.pantsd.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 from pants.util.memo import memoized_classproperty, memoized_property
 
