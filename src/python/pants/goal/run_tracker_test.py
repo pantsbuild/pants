@@ -46,6 +46,7 @@ def test_run_information(exit_code, expected, **kwargs) -> None:
 
             run_information = run_tracker.run_information()
             assert run_information["buildroot"] == get_buildroot()
+            assert run_information["path"] == get_buildroot()
             assert run_information["datetime"] == "Wednesday Jan 01, 2020 04:00:00"
             assert run_information["timestamp"] == 1577880000.0
             assert run_information["user"] == getpass.getuser()

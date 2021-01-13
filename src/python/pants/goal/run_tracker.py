@@ -96,6 +96,7 @@ class RunTracker:
                 "user": getpass.getuser(),
                 "machine": socket.gethostname(),
                 "buildroot": get_buildroot(),
+                "path": get_buildroot(),
                 "version": VERSION,
                 "cmd_line": cmd_line,
                 "specs_from_command_line": specs,
