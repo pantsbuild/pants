@@ -153,5 +153,6 @@ def test_get_docstring_fallback_to_parents() -> None:
     object_docstring = object.__doc__
     assert object_docstring is not None
     assert (
-        get_docstring(FallbackToObject, fallback_to_ancestors=True, ignored_ancestors=[]) == object_docstring.rstrip()
+        get_docstring(FallbackToObject, fallback_to_ancestors=True, ignored_ancestors=[])
+        == object_docstring.rstrip()
     )
