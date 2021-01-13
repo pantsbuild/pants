@@ -17,7 +17,6 @@ from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.util.dirutil import relative_symlink
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +55,13 @@ class RunTracker:
 
         self._all_options = options
         info_dir = os.path.join(self._all_options.for_global_scope().pants_workdir, "run-tracker")
-        self.run_info_dir = os.path.join(info_dir, self.run_id)
-        self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
+        self._run_info_dir = os.path.join(info_dir, self.run_id)
+        self._run_info = RunInfo(os.path.join(self._run_info_dir, "info"))
 
         # pantsd stats.
         self._pantsd_metrics: Dict[str, int] = dict()
 
-        self.run_logs_file = Path(self.run_info_dir, "logs")
+        self.run_logs_file = Path(self._run_info_dir, "logs")
         self.native.set_per_run_log_path(str(self.run_logs_file))
 
         # Initialized in `start()`.
@@ -81,14 +80,10 @@ class RunTracker:
 
         # Initialize the run.
         self._run_start_time = run_start_time
-        self.run_info.add_basic_info(self.run_id, run_start_time)
+        self._run_info.add_basic_info(self.run_id, run_start_time)
         cmd_line = " ".join(["pants"] + sys.argv[1:])
-        self.run_info.add_info("cmd_line", cmd_line)
-        self.run_info.add_info("specs_from_command_line", specs, stringify=False)
-
-        # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
-        link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")
-        relative_symlink(self.run_info_dir, link_to_latest)
+        self._run_info.add_info("cmd_line", cmd_line)
+        self._run_info.add_info("specs_from_command_line", specs, stringify=False)
 
     def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
         self._pantsd_metrics = metrics
@@ -99,8 +94,7 @@ class RunTracker:
 
     def run_information(self):
         """Basic information about this run."""
-        run_information = self.run_info.get_as_dict()
-        return run_information
+        return self._run_info.get_as_dict()
 
     def has_ended(self) -> bool:
         return self._has_ended
@@ -123,13 +117,11 @@ class RunTracker:
 
         outcome_str = "SUCCESS" if exit_code == PANTS_SUCCEEDED_EXIT_CODE else "FAILURE"
 
-        if self.run_info.get_info("outcome") is None:
+        if self._run_info.get_info("outcome") is None:
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
-            self.run_info.add_info("outcome", outcome_str, ignore_errors=True)
+            self._run_info.add_info("outcome", outcome_str, ignore_errors=True)
 
         self.native.set_per_run_log_path(None)
-
-        return
 
     def get_cumulative_timings(self) -> List[Dict[str, Any]]:
         return [{"label": "main", "timing": self._total_run_time}]
