@@ -42,10 +42,13 @@ impl TryFrom<crate::gen::build::bazel::remote::execution::v2::Digest> for hashin
   }
 }
 
-pub fn require_digest(
-  digest_opt: Option<&crate::gen::build::bazel::remote::execution::v2::Digest>,
+pub fn require_digest<
+  'a,
+  D: Into<Option<&'a crate::gen::build::bazel::remote::execution::v2::Digest>>,
+>(
+  digest_opt: D,
 ) -> Result<hashing::Digest, String> {
-  match digest_opt {
+  match digest_opt.into() {
     Some(digest) => hashing::Digest::try_from(digest),
     None => Err("Protocol violation: Digest missing from a Remote Execution API protobuf.".into()),
   }

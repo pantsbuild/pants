@@ -47,6 +47,11 @@ pub mod gen {
       }
     }
   }
+  pub mod buildbarn {
+    pub mod cas {
+      tonic::include_proto!("buildbarn.cas");
+    }
+  }
 }
 
 mod verification;

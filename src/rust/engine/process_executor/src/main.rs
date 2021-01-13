@@ -34,34 +34,33 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 
+use bazel_protos::gen::build::bazel::remote::execution::v2::{Action, Command};
+use bazel_protos::gen::buildbarn::cas::UncachedActionResult;
+use bazel_protos::require_digest;
 use fs::RelativePath;
 use hashing::{Digest, Fingerprint};
 use process_execution::{Context, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata};
-use store::{BackoffConfig, Store};
+use prost::Message;
+use store::{BackoffConfig, Store, StoreWrapper};
 use structopt::StructOpt;
 use workunit_store::WorkunitStore;
 
 #[derive(StructOpt)]
-#[structopt(
-  name = "process_executor",
-  raw(setting = "structopt::clap::AppSettings::TrailingVarArg")
-)]
-struct Opt {
+struct CommandSpec {
+  #[structopt(last = true)]
+  argv: Vec<String>,
+
   /// Fingerprint (hex string) of the digest to use as the input file tree.
   #[structopt(long)]
-  input_digest: Fingerprint,
+  input_digest: Option<Fingerprint>,
 
   /// Length of the proto-bytes whose digest to use as the input file tree.
   #[structopt(long)]
-  input_digest_length: usize,
+  input_digest_length: Option<usize>,
 
   /// Extra platform properties to set on the execution request.
   #[structopt(long)]
   extra_platform_property: Vec<String>,
-
-  /// Extra header to pass on remote execution request.
-  #[structopt(long)]
-  header: Vec<String>,
 
   /// Environment variables with which the process should be run.
   #[structopt(long)]
@@ -82,6 +81,40 @@ struct Opt {
   #[structopt(long)]
   output_directory_path: Vec<PathBuf>,
 
+  /// Path to execute the binary at relative to its input digest root.
+  #[structopt(long)]
+  working_directory: Option<PathBuf>,
+
+  #[structopt(long)]
+  cache_key_gen_version: Option<String>,
+}
+
+#[derive(StructOpt)]
+struct ActionDigestSpec {
+  /// Fingerprint (hex string) of the digest of the action to run.
+  #[structopt(long)]
+  action_digest: Option<Fingerprint>,
+
+  /// Length of the proto-bytes whose digest is the action to run.
+  #[structopt(long)]
+  action_digest_length: Option<usize>,
+}
+
+#[derive(StructOpt)]
+#[structopt(name = "process_executor", setting = structopt::clap::AppSettings::TrailingVarArg)]
+struct Opt {
+  #[structopt(flatten)]
+  command: CommandSpec,
+
+  #[structopt(flatten)]
+  action_digest: ActionDigestSpec,
+
+  #[structopt(long)]
+  buildbarn_url: Option<String>,
+
+  #[structopt(long)]
+  run_under: Option<String>,
+
   /// The name of a directory (which may or may not exist), where the output tree will be materialized.
   #[structopt(long)]
   materialize_output_to: Option<PathBuf>,
@@ -98,14 +131,8 @@ struct Opt {
   #[structopt(long)]
   named_cache_path: Option<PathBuf>,
 
-  /// Path to execute the binary at relative to its input digest root.
-  #[structopt(long)]
-  working_directory: Option<PathBuf>,
-
   #[structopt(long)]
   remote_instance_name: Option<String>,
-  #[structopt(long)]
-  cache_key_gen_version: Option<String>,
 
   /// The host:port of the gRPC server to connect to. Forces remote execution.
   /// If unspecified, local execution will be performed.
@@ -154,8 +181,9 @@ struct Opt {
   #[structopt(long, default_value = "600")]
   overall_deadline_secs: u64,
 
-  #[structopt(last = true)]
-  argv: Vec<String>,
+  /// Extra header to pass on remote execution request.
+  #[structopt(long)]
+  header: Vec<String>,
 }
 
 /// A binary which takes args of format:
@@ -173,33 +201,24 @@ async fn main() {
 
   let args = Opt::from_args();
 
-  let output_files = args
-    .output_file_path
-    .iter()
-    .map(RelativePath::new)
-    .collect::<Result<BTreeSet<_>, _>>()
-    .unwrap();
-  let output_directories = args
-    .output_directory_path
-    .iter()
-    .map(RelativePath::new)
-    .collect::<Result<BTreeSet<_>, _>>()
-    .unwrap();
   let headers: BTreeMap<String, String> = collection_from_keyvalues(args.header.iter());
 
   let executor = task_executor::Executor::new();
 
-  let local_store_path = args.local_store_path.unwrap_or_else(Store::default_path);
+  let local_store_path = args
+    .local_store_path
+    .clone()
+    .unwrap_or_else(Store::default_path);
 
-  let store = match (args.server.as_ref(), args.cas_server) {
-    (Some(_server), Some(cas_server)) => {
-      let root_ca_certs = if let Some(path) = args.cas_root_ca_cert_file {
+  let store = match (&args.server, &args.cas_server) {
+    (_, Some(cas_server)) => {
+      let root_ca_certs = if let Some(ref path) = args.cas_root_ca_cert_file {
         Some(std::fs::read(path).expect("Error reading root CA certs file"))
       } else {
         None
       };
 
-      let oauth_bearer_token = if let Some(path) = args.cas_oauth_bearer_token_path {
+      let oauth_bearer_token = if let Some(ref path) = args.cas_oauth_bearer_token_path {
         Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
       } else {
         None
@@ -208,7 +227,7 @@ async fn main() {
       Store::with_remote(
         executor.clone(),
         local_store_path,
-        vec![cas_server],
+        vec![cas_server.clone()],
         args.remote_instance_name.clone(),
         root_ca_certs,
         oauth_bearer_token,
@@ -222,33 +241,21 @@ async fn main() {
       )
     }
     (None, None) => Store::local_only(executor.clone(), local_store_path),
-    _ => panic!("Must specify either both --server and --cas-server or neither."),
+    _ => panic!("Can't specify --server without --cas-server"),
   }
   .expect("Error making store");
 
-  let input_files = Digest(args.input_digest, args.input_digest_length);
+  let (mut request, process_metadata) = make_request(&store, &args)
+    .await
+    .expect("Failed to construct request");
 
-  let working_directory = args
-    .working_directory
-    .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
-
-  let request = process_execution::Process {
-    argv: args.argv,
-    env: collection_from_keyvalues(args.env.iter()),
-    working_directory,
-    input_files,
-    output_files,
-    output_directories,
-    timeout: Some(Duration::new(15 * 60, 0)),
-    description: "process_executor".to_string(),
-    level: log::Level::Info,
-    append_only_caches: BTreeMap::new(),
-    jdk_home: args.jdk,
-    platform_constraint: None,
-    is_nailgunnable: args.use_nailgun,
-    execution_slot_variable: None,
-    cache_scope: ProcessCacheScope::Always,
-  };
+  if let Some(run_under) = args.run_under {
+    let run_under = shlex::split(&run_under).expect("Could not shlex --run-under arg");
+    request.argv = run_under
+      .into_iter()
+      .chain(request.argv.into_iter())
+      .collect();
+  }
 
   let runner: Box<dyn process_execution::CommandRunner> = match args.server {
     Some(address) => {
@@ -269,11 +276,7 @@ async fn main() {
           process_execution::remote::CommandRunner::new(
             &address,
             vec![address.to_owned()],
-            ProcessMetadata {
-              instance_name: args.remote_instance_name,
-              cache_key_gen_version: args.cache_key_gen_version,
-              platform_properties: collection_from_keyvalues(args.extra_platform_property.iter()),
-            },
+            process_metadata,
             root_ca_certs,
             oauth_bearer_token,
             headers,
@@ -330,6 +333,238 @@ async fn main() {
   print!("{}", String::from_utf8(stdout).unwrap());
   eprint!("{}", String::from_utf8(stderr).unwrap());
   exit(result.exit_code);
+}
+
+async fn make_request(
+  store: &Store,
+  args: &Opt,
+) -> Result<(process_execution::Process, ProcessMetadata), String> {
+  match (
+    args.command.input_digest,
+    args.command.input_digest_length,
+    args.action_digest.action_digest,
+    args.action_digest.action_digest_length,
+    args.buildbarn_url.as_ref(),
+  ) {
+    (Some(input_digest), Some(input_digest_length), None, None, None) => {
+      make_request_from_flat_args(args, Digest(input_digest, input_digest_length))
+
+    }
+    (None, None, Some(action_fingerprint), Some(action_digest_length), None) => {
+      extract_request_from_action_digest(store, Digest(action_fingerprint, action_digest_length), args.remote_instance_name.clone()).await
+    }
+    (None, None, None, None, Some(buildbarn_url)) => {
+      extract_request_from_buildbarn_url(store, buildbarn_url).await
+    }
+    (None, None, None, None, None) => {
+      Err("Must specify either action input digest or action digest or buildbarn URL".to_owned())
+    }
+    _ => {
+      Err("Unsupported combination of arguments - can only set one of action digest or all other action-specifying flags".to_owned())
+    }
+  }
+}
+
+fn make_request_from_flat_args(
+  args: &Opt,
+  input_root_digest: Digest,
+) -> Result<(process_execution::Process, ProcessMetadata), String> {
+  let output_files = args
+    .command
+    .output_file_path
+    .iter()
+    .map(RelativePath::new)
+    .collect::<Result<BTreeSet<_>, _>>()?;
+  let output_directories = args
+    .command
+    .output_directory_path
+    .iter()
+    .map(RelativePath::new)
+    .collect::<Result<BTreeSet<_>, _>>()?;
+
+  let working_directory = args
+    .command
+    .working_directory
+    .clone()
+    .map(|path| {
+      RelativePath::new(path)
+        .map_err(|err| format!("working-directory must be a relative path: {:?}", err))
+    })
+    .transpose()?;
+
+  let process = process_execution::Process {
+    argv: args.command.argv.clone(),
+    env: collection_from_keyvalues(args.command.env.iter()),
+    working_directory,
+    input_files: input_root_digest,
+    output_files,
+    output_directories,
+    timeout: Some(Duration::new(15 * 60, 0)),
+    description: "process_executor".to_string(),
+    level: log::Level::Info,
+    append_only_caches: BTreeMap::new(),
+    jdk_home: args.command.jdk.clone(),
+    platform_constraint: None,
+    is_nailgunnable: args.use_nailgun,
+    execution_slot_variable: None,
+    cache_scope: ProcessCacheScope::Always,
+  };
+
+  let metadata = ProcessMetadata {
+    instance_name: args.remote_instance_name.clone(),
+    cache_key_gen_version: args.command.cache_key_gen_version.clone(),
+    platform_properties: collection_from_keyvalues(args.command.extra_platform_property.iter()),
+  };
+  Ok((process, metadata))
+}
+
+#[allow(clippy::redundant_closure)] // False positives for prost::Message::decode: https://github.com/rust-lang/rust-clippy/issues/5939
+async fn extract_request_from_action_digest(
+  store: &Store,
+  action_digest: Digest,
+  instance_name: Option<String>,
+) -> Result<(process_execution::Process, ProcessMetadata), String> {
+  let action = store
+    .load_file_bytes_with(action_digest, |bytes| Action::decode(bytes))
+    .await?
+    .ok_or_else(|| format!("Could not find action proto in CAS: {:?}", action_digest))?
+    .0
+    .map_err(|err| {
+      format!(
+        "Error deserializing action proto {:?}: {:?}",
+        action_digest, err
+      )
+    })?;
+
+  let command_digest = require_digest(&action.command_digest)
+    .map_err(|err| format!("Bad Command digest: {:?}", err))?;
+  let command = store
+    .load_file_bytes_with(command_digest, |bytes| Command::decode(bytes))
+    .await?
+    .ok_or_else(|| format!("Could not find command proto in CAS: {:?}", command_digest))?
+    .0
+    .map_err(|err| {
+      format!(
+        "Error deserializing command proto {:?}: {:?}",
+        command_digest, err
+      )
+    })?;
+  let working_directory = if command.working_directory.is_empty() {
+    None
+  } else {
+    Some(
+      RelativePath::new(command.working_directory)
+        .map_err(|err| format!("working-directory must be a relative path: {:?}", err))?,
+    )
+  };
+
+  let input_files = require_digest(&action.input_root_digest)
+    .map_err(|err| format!("Bad input root digest: {:?}", err))?;
+
+  // In case the local Store doesn't have the input root Directory,
+  // have it fetch it and identify it as a Directory, so that it doesn't get confused about the unknown metadata.
+  store.load_directory_or_err(input_files).await?;
+
+  let process = process_execution::Process {
+    argv: command.arguments,
+    env: command
+      .environment_variables
+      .iter()
+      .map(|env| (env.name.clone(), env.value.clone()))
+      .collect(),
+    working_directory,
+    input_files,
+    output_files: command
+      .output_files
+      .iter()
+      .map(RelativePath::new)
+      .collect::<Result<_, _>>()?,
+    output_directories: command
+      .output_directories
+      .iter()
+      .map(RelativePath::new)
+      .collect::<Result<_, _>>()?,
+    timeout: action.timeout.map(|timeout| {
+      std::time::Duration::from_nanos(timeout.nanos as u64 + timeout.seconds as u64 * 1000000000)
+    }),
+    execution_slot_variable: None,
+    description: "".to_string(),
+    level: log::Level::Error,
+    append_only_caches: BTreeMap::new(),
+    jdk_home: None,
+    platform_constraint: None,
+    is_nailgunnable: false,
+    cache_scope: ProcessCacheScope::Always,
+  };
+
+  let metadata = ProcessMetadata {
+    instance_name,
+    cache_key_gen_version: None,
+    platform_properties: command
+      .platform
+      .iter()
+      .flat_map(|platform| {
+        platform
+          .properties
+          .iter()
+          .map(|property| (property.name.clone(), property.value.clone()))
+      })
+      .collect(),
+  };
+
+  Ok((process, metadata))
+}
+
+async fn extract_request_from_buildbarn_url(
+  store: &Store,
+  buildbarn_url: &str,
+) -> Result<(process_execution::Process, ProcessMetadata), String> {
+  let url_parts: Vec<&str> = buildbarn_url.trim_end_matches('/').split('/').collect();
+  if url_parts.len() < 4 {
+    return Err("Buildbarn URL didn't have enough parts".to_owned());
+  }
+  let interesting_parts = &url_parts[url_parts.len() - 4..url_parts.len()];
+  let kind = interesting_parts[0];
+  let instance = interesting_parts[1];
+
+  let action_digest = match kind {
+    "action" => {
+      let action_fingerprint = Fingerprint::from_hex_string(interesting_parts[2])?;
+      let action_digest_length: usize = interesting_parts[3]
+        .parse()
+        .map_err(|err| format!("Couldn't parse action digest length as a number: {:?}", err))?;
+      Digest(action_fingerprint, action_digest_length)
+    }
+    "uncached_action_result" => {
+      let action_result_fingerprint = Fingerprint::from_hex_string(interesting_parts[2])?;
+      let action_result_digest_length: usize = interesting_parts[3].parse().map_err(|err| {
+        format!(
+          "Couldn't parse uncached action digest result length as a number: {:?}",
+          err
+        )
+      })?;
+      let action_result_digest = Digest(action_result_fingerprint, action_result_digest_length);
+
+      let action_result = store
+        .load_file_bytes_with(action_result_digest, |bytes| {
+          UncachedActionResult::decode(bytes)
+        })
+        .await?
+        .ok_or_else(|| "Couldn't fetch action result proto".to_owned())?
+        .0
+        .map_err(|err| format!("Error deserializing action result proto: {:?}", err))?;
+
+      require_digest(&action_result.action_digest)?
+    }
+    _ => {
+      return Err(format!(
+        "Wrong kind in buildbarn URL; wanted action or uncached_action_result, got {}",
+        kind
+      ));
+    }
+  };
+
+  extract_request_from_action_digest(store, action_digest, Some(instance.to_owned())).await
 }
 
 fn collection_from_keyvalues<Str, It, Col>(keyvalues: It) -> Col
