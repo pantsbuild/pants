@@ -47,7 +47,6 @@ from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
@@ -97,7 +96,7 @@ class Scheduler:
         local_execution_root_dir: str,
         named_caches_dir: str,
         ca_certs_path: Optional[str],
-        rules: FrozenOrderedSet[Rule],
+        rules: Iterable[Rule],
         union_membership: UnionMembership,
         execution_options: ExecutionOptions,
         executor: PyExecutor,
