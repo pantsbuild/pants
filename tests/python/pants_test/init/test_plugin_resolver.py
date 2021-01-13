@@ -81,10 +81,10 @@ def _run_setup_py(
     )
     merged_digest = rule_runner.request(Digest, [MergeDigests([pex_obj.digest, source_digest])])
 
+    # This should run the Pex using the same interpreter used to create it. We must set the `PATH` so that the shebang
+    # works.
     process = Process(
-        argv=("python", "setup-py-runner.pex", "setup.py") + tuple(setup_py_args),
-        # We reasonably expect there to be a python interpreter on the test-running
-        # process's path.
+        argv=("./setup-py-runner.pex", "setup.py", *setup_py_args),
         env={"PATH": os.getenv("PATH", "")},
         input_digest=merged_digest,
         description="Run setup.py",

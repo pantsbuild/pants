@@ -122,17 +122,6 @@ class Field:
         self._check_deprecated(raw_value, address)
         self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address=address)
 
-        if not address.is_file_target and not hasattr(self, "help"):
-            warn_or_error(
-                removal_version="2.3.0.dev0",
-                deprecated_entity_description="not setting `help` on a `Field`",
-                hint=(
-                    "Please set the class property `help: str` for the field "
-                    f"`{self.__class__}`. In Pants 2.3, Pants will no longer look at the docstring "
-                    "for help messages and it will error if `help` is not defined."
-                ),
-            )
-
     @classmethod
     def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
         """Convert the `raw_value` into `self.value`.
@@ -238,6 +227,9 @@ class AsyncFieldMixin(Field):
         # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
         # subclasses from adding arbitrary fields.
         self._unfreeze_instance()  # type: ignore[attr-defined]
+        # N.B.: We store the address here and not in the Field base class, because the memory usage
+        # of storing this value in every field was shown to be excessive / lead to performance
+        # issues.
         self.address = address
         self._freeze_instance()  # type: ignore[attr-defined]
 
@@ -315,17 +307,6 @@ class Target:
                 hint=(
                     f"Using the `{self.alias}` target type for {address}. "
                     f"{self.deprecated_removal_hint}"
-                ),
-            )
-
-        if not address.is_file_target and not hasattr(self, "help"):
-            warn_or_error(
-                removal_version="2.3.0.dev0",
-                deprecated_entity_description="not setting `help` on a `Target`",
-                hint=(
-                    "Please set the class property `help: str` for the target type "
-                    f"`{self.__class__}`. In Pants 2.3, Pants will no longer look at the docstring "
-                    "for help messages and it will error if `help` is not defined."
                 ),
             )
 
@@ -659,31 +640,6 @@ class TransitiveTargetsRequest:
     ) -> None:
         self.roots = tuple(roots)
         self.include_special_cased_deps = include_special_cased_deps
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class TransitiveTargetsRequestLite:
-    """A request to get the transitive dependencies of the input roots, but without considering
-    dependency inference.
-
-    This solely exists due to graph ambiguity with codegen implementations. Use
-    `TransitiveTargetsRequest` everywhere other than codegen.
-    """
-
-    roots: Tuple[Address, ...]
-
-    def __init__(self, roots: Iterable[Address]) -> None:
-        warn_or_error(
-            removal_version="2.3.0.dev0",
-            deprecated_entity_description="`TransitiveTargetsRequestLite`",
-            hint=(
-                "Rather than `Get(TransitiveTargets, TransitiveTargetsRequestLite)`, use "
-                "`Get(TransitiveTargets, TransitiveTargetsRequest)`. There is no more need for "
-                "`TransitiveTargetsRequestLite` because the rule graph cycle has been resolved."
-            ),
-        )
-        self.roots = tuple(roots)
 
 
 @frozen_after_init
@@ -1590,31 +1546,6 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
     include_special_cased_deps: bool = False
-
-    def debug_hint(self) -> str:
-        return self.field.address.spec
-
-
-@dataclass(frozen=True)
-class DependenciesRequestLite(EngineAwareParameter):
-    """Like DependenciesRequest, but does not use dependency inference.
-
-    This solely exists due to graph ambiguity with codegen. Use `DependenciesRequest` everywhere but
-    with codegen.
-    """
-
-    field: Dependencies
-
-    def __post_init__(self) -> None:
-        warn_or_error(
-            removal_version="2.3.0.dev0",
-            deprecated_entity_description="`DependenciesRequestLite`",
-            hint=(
-                "Rather than `Get(Targets, DependenciesRequestLite)`, use "
-                "`Get(Targets, DependenciesRequest)`. There is no more need for "
-                "`DependenciesRequestLite` because the rule graph cycle has been resolved."
-            ),
-        )
 
     def debug_hint(self) -> str:
         return self.field.address.spec

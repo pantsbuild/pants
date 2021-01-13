@@ -198,6 +198,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Thales Menato
 + Tianshuo Deng
 + Tien Nguyen
++ Tim Gates
 + Tim Treptow
 + Timur Abishev
 + Tina Huang

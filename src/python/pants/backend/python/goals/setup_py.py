@@ -15,7 +15,6 @@ from typing import Any, Dict, List, Mapping, Set, Tuple, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
-    DeprecatedPexBinarySources,
     PexEntryPointField,
     PythonProvidesField,
     PythonRequirementsField,
@@ -522,7 +521,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     )
     entry_point_requests = []
     for binary in binaries:
-        if not binary.has_fields([PexEntryPointField, DeprecatedPexBinarySources]):
+        if not binary.has_field(PexEntryPointField):
             raise InvalidEntryPoint(
                 "Expected addresses to `pex_binary` targets in `.with_binaries()` for the "
                 f"`provides` field for {exported_addr}, but found {binary.address} with target "
@@ -544,18 +543,14 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
                 f"but {binary.address} set it to {repr(entry_point)}. For example, set "
                 f"`entry_point='{entry_point}:main'. See {url}."
             )
-        entry_point_requests.append(
-            ResolvePexEntryPointRequest(
-                binary[PexEntryPointField], binary[DeprecatedPexBinarySources]
-            )
-        )
+        entry_point_requests.append(ResolvePexEntryPointRequest(binary[PexEntryPointField]))
     binary_entry_points = await MultiGet(
         Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest, request)
         for request in entry_point_requests
     )
     for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
-        entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
-        console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
+        entry_points = setup_kwargs.setdefault("entry_points", {})
+        console_scripts = entry_points.setdefault("console_scripts", [])
         console_scripts.append(f"{key}={binary_entry_point.val}")
 
     # Generate the setup script.

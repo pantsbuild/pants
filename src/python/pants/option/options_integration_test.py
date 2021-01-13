@@ -49,7 +49,7 @@ def test_deprecation_and_ignore_pants_warnings(use_pantsd: bool) -> None:
         from pants.engine.rules import SubsystemRule
 
         class Options(Subsystem):
-            '''Options just for a test.'''
+            help = "Options just for a test."
             options_scope = "mock-options"
 
             @classmethod

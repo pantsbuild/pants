@@ -753,6 +753,12 @@ impl WorkunitStore {
 
     Ok(result)
   }
+
+  pub fn setup_for_tests() -> WorkunitStore {
+    let store = WorkunitStore::new(false);
+    store.init_thread_state(None);
+    store
+  }
 }
 
 pub fn format_workunit_duration(duration: Duration) -> String {

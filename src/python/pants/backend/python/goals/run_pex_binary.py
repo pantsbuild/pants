@@ -33,7 +33,7 @@ async def create_pex_binary_run_request(
     entry_point, transitive_targets = await MultiGet(
         Get(
             ResolvedPexEntryPoint,
-            ResolvePexEntryPointRequest(field_set.entry_point, field_set.sources),
+            ResolvePexEntryPointRequest(field_set.entry_point),
         ),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )

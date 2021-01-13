@@ -406,12 +406,11 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
     assert "main.py" in pex_files
     assert "subdir/sub.py" in pex_files
 
-    # We reasonably expect there to be a python interpreter on the test-running process's path.
-    env = {"PATH": os.getenv("PATH", "")}
-
+    # This should run the Pex using the same interpreter used to create it. We must set the `PATH` so that the shebang
+    # works.
     process = Process(
-        argv=("python", "test.pex"),
-        env=env,
+        argv=("./test.pex",),
+        env={"PATH": os.getenv("PATH", "")},
         input_digest=pex_output["pex"].digest,
         description="Run the pex and make sure it works",
     )
