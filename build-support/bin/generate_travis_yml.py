@@ -128,8 +128,8 @@ class PythonVersion(Enum):
 
     def default_stage(self, *, is_bootstrap: bool = False) -> Stage:
         if is_bootstrap:
-            return {self.py37: Stage.bootstrap_cron, self.py38: Stage.bootstrap}[self]  # type: ignore[index]
-        return {self.py37: Stage.test_cron, self.py38: Stage.test}[self]  # type: ignore[index]
+            return {self.py37: Stage.bootstrap, self.py38: Stage.bootstrap_cron}[self]  # type: ignore[index]
+        return {self.py37: Stage.test, self.py38: Stage.test_cron}[self]  # type: ignore[index]
 
 
 # ----------------------------------------------------------------------
