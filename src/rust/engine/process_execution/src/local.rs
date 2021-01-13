@@ -288,27 +288,19 @@ impl CapturedWorkdir for CommandRunner {
     _context: Context,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
+    let cwd = if let Some(ref working_directory) = req.working_directory {
+      workdir_path.join(working_directory)
+    } else {
+      workdir_path.to_owned()
+    };
     // TODO(#11406): Go back to using relative paths, rather than absolutifying them, once Rust
     //  fixes https://github.com/rust-lang/rust/issues/80819 for macOS.
     let argv0 = match RelativePath::new(&req.argv[0]) {
-      Ok(rel_path) => {
-        if let Some(ref working_directory) = req.working_directory {
-          workdir_path.join(working_directory).join(rel_path)
-        } else {
-          workdir_path.join(rel_path)
-        }
-      }
+      Ok(rel_path) => cwd.join(rel_path),
       Err(_) => PathBuf::from(&req.argv[0]),
     };
     let mut command = HermeticCommand::new(argv0);
-    command
-      .args(&req.argv[1..])
-      .current_dir(if let Some(ref working_directory) = req.working_directory {
-        workdir_path.join(working_directory)
-      } else {
-        workdir_path.to_owned()
-      })
-      .envs(&req.env);
+    command.args(&req.argv[1..]).current_dir(cwd).envs(&req.env);
 
     // See the documentation of the `CapturedWorkdir::run_in_workdir` method, but `exclusive_spawn`
     // indicates the binary we're spawning was written out by the current thread, and, as such,
