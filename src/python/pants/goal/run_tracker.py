@@ -98,7 +98,7 @@ class RunTracker:
 
         cmd_line = " ".join(["pants"] + sys.argv[1:])
         self._run_info["cmd_line"] = cmd_line
-        self._run_info["specs_from_command_line"] = str(specs).strip()
+        self._run_info["specs_from_command_line"] = specs
 
     def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
         self._pantsd_metrics = metrics
