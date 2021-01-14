@@ -16,9 +16,6 @@ fi
 set -e
 
 MERGE_BASE="$(git_merge_base)"
-echo "HERE"
-echo "$(git rev-parse --symbolic-full-name --abbrev-ref HEAD@\{upstream\})"
-echo "DONE"
 
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
