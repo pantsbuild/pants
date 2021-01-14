@@ -234,6 +234,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     language: generic
@@ -278,6 +279,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py38
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
     language: generic
@@ -322,6 +324,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py39
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py39.osx
     language: generic
@@ -791,6 +794,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - CACHE_NAME=rust_tests.osx
     if: commit_message !~ /\[ci skip-rust\]/
     name: Rust tests - OSX
@@ -888,6 +892,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.osx
@@ -922,6 +927,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_platform_tests.py37
     language: generic
@@ -946,6 +952,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
     - CACHE_NAME=osx_platform_tests.py38
     language: generic
@@ -970,6 +977,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py39.osx
     - CACHE_NAME=osx_platform_tests.py39
     language: generic
@@ -994,6 +1002,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_smoke_tests.10_12.py37
     language: generic
@@ -1019,6 +1028,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
     - CACHE_NAME=osx_smoke_tests.10_12.py38
     language: generic
@@ -1044,6 +1054,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py39.osx
     - CACHE_NAME=osx_smoke_tests.10_12.py39
     language: generic
@@ -1069,6 +1080,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_smoke_tests.10_13.py37
     language: generic
@@ -1094,6 +1106,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
     - CACHE_NAME=osx_smoke_tests.10_13.py38
     language: generic
@@ -1119,6 +1132,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py39.osx
     - CACHE_NAME=osx_smoke_tests.10_13.py39
     language: generic
