@@ -395,6 +395,7 @@ def _osx_env_with_pyenv() -> List[str]:
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"',
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"',
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"',
+        'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"',
     ]
 
 
