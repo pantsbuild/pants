@@ -82,6 +82,7 @@ impl Metric {
 pub enum ObservationMetric {
   TestObservation,
   RemoteExecutionRPCFirstResponseTime,
+  RemoteStoreTimeToFirstByte,
 }
 
 impl ObservationMetric {
@@ -91,6 +92,7 @@ impl ObservationMetric {
     match *self {
       TestObservation => "test_observation",
       RemoteExecutionRPCFirstResponseTime => "remote_execution_rpc_first_response_time",
+      RemoteStoreTimeToFirstByte => "remote_store_time_to_first_byte",
     }
   }
 }

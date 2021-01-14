@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::fmt;
 use std::str::FromStr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
@@ -18,7 +18,7 @@ use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
 use tonic::transport::{Channel, Endpoint};
 use tonic::{Code, Interceptor, Request};
-use workunit_store::with_workunit;
+use workunit_store::{with_workunit, ObservationMetric};
 
 use super::BackoffConfig;
 use std::sync::Arc;
@@ -251,6 +251,8 @@ impl ByteStore {
     let mut client = self.byte_stream_client.as_ref().clone();
 
     let result_future = async move {
+      let start_time = Instant::now();
+
       let stream_result = client
         .read({
           bazel_protos::gen::google::bytestream::ReadRequest {
@@ -276,8 +278,26 @@ impl ByteStore {
       };
 
       let read_result_closure = async {
+        let mut got_first_response = false;
         let mut buf = BytesMut::with_capacity(digest.1);
         while let Some(response) = stream.next().await {
+          // Record the observed time to receive the first response for this read.
+          if !got_first_response {
+            got_first_response = true;
+
+            if let Some(workunit_state) = workunit_store::get_workunit_state() {
+              let timing: Result<u64, _> = Instant::now()
+                .duration_since(start_time)
+                .as_micros()
+                .try_into();
+              if let Ok(obs) = timing {
+                workunit_state
+                  .store
+                  .record_observation(ObservationMetric::RemoteStoreTimeToFirstByte, obs);
+              }
+            }
+          }
+
           buf.extend_from_slice(&(response?).data);
         }
         Ok(buf.freeze())
