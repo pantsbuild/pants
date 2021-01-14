@@ -294,15 +294,14 @@ impl CommandRunner {
       let item = stream.next().await;
 
       if let Some(start_time) = start_time_opt.take() {
-        let timing: Result<i64, _> = Instant::now()
+        let timing: Result<u64, _> = Instant::now()
           .duration_since(start_time)
-          .as_millis()
+          .as_micros()
           .try_into();
         if let Ok(obs) = timing {
-          context.workunit_store.record_observation(
-            ObservationMetric::RemoteExecutionRPCFirstResponseTime,
-            obs as u64,
-          );
+          context
+            .workunit_store
+            .record_observation(ObservationMetric::RemoteExecutionRPCFirstResponseTime, obs);
         }
       }
 
