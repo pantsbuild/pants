@@ -277,6 +277,7 @@ def _linux_before_install(
     include_test_config: bool = True, install_travis_wait: bool = False, *, xenial: bool = False
 ) -> List[str]:
     commands = [
+        "pyenv versions",
         "./build-support/bin/install_aws_cli_for_ci.sh",
         # These are pre-installed through Travis, but we must still activate them.
         # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
@@ -315,7 +316,7 @@ def linux_shard(
     setup = {
         "os": "linux",
         "dist": "bionic",
-        "python": ["2.7", "3.6", "3.7", "3.8", "3.9"],
+        "python": "3.9",
         "addons": {
             "apt": {
                 "packages": [
