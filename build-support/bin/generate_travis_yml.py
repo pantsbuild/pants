@@ -582,6 +582,7 @@ def build_wheels_linux() -> Dict:
         **CACHE_NATIVE_ENGINE,
         **linux_shard(use_docker=True),
         "name": "Build Linux wheels and fs_util",
+        "stage": Stage.test.value,
         "script": [docker_build_travis_ci_image(), docker_run_travis_ci_image(command)],
         "if": SKIP_WHEELS_CONDITION,
     }
@@ -594,6 +595,7 @@ def build_wheels_osx() -> Dict:
         **CACHE_NATIVE_ENGINE,
         **osx_shard(osx_image="xcode8"),
         "name": "Build macOS wheels and fs_util",
+        "stage": Stage.test.value,
         "script": _build_wheels_command(),
         "before_install": _osx_before_install(
             python_versions=[PythonVersion.py37, PythonVersion.py38],
