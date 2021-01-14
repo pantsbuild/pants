@@ -53,9 +53,8 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -106,9 +105,8 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -159,9 +157,8 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -349,9 +346,8 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -399,9 +395,8 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -449,9 +444,8 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -483,7 +477,6 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
@@ -520,7 +513,6 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
@@ -572,9 +564,8 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -621,9 +612,8 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -670,9 +660,8 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -701,7 +690,6 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
@@ -792,9 +780,8 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -1127,9 +1114,8 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -1182,9 +1168,8 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:

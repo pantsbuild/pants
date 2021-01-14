@@ -277,13 +277,12 @@ def _linux_before_install(
     include_test_config: bool = True, install_travis_wait: bool = False, *, xenial: bool = False
 ) -> List[str]:
     commands = [
-        "pyenv versions",
         "./build-support/bin/install_aws_cli_for_ci.sh",
         # These are pre-installed through Travis, but we must still activate them.
         # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
         #   https://github.com/pantsbuild/pants/issues/7601
         (
-            "pyenv global 2.7.17 3.6.10 3.7.6 3.8.1"
+            "pyenv global 2.7.17 3.6.10 3.7.6 3.8.1 3.9.1"
             if not xenial
             else "pyenv global 2.7.15 3.6.7 3.7.1"
         ),
