@@ -53,6 +53,7 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     cache:
@@ -71,12 +72,7 @@ jobs:
     language: python
     name: Build Linux native engine and pants.pex (Python 3.7)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
@@ -110,6 +106,7 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     cache:
@@ -128,12 +125,7 @@ jobs:
     language: python
     name: Build Linux native engine and pants.pex (Python 3.8)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
@@ -167,6 +159,7 @@ jobs:
     - find build-support -name "*.py[co]" -delete
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     cache:
@@ -185,12 +178,7 @@ jobs:
     language: python
     name: Build Linux native engine and pants.pex (Python 3.9)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
@@ -361,6 +349,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
@@ -380,12 +369,7 @@ jobs:
     language: python
     name: Self-checks and lint (Python 3.7)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
@@ -415,6 +399,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
@@ -434,12 +419,7 @@ jobs:
     language: python
     name: Self-checks and lint (Python 3.8)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
@@ -469,6 +449,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
@@ -488,12 +469,7 @@ jobs:
     language: python
     name: Self-checks and lint (Python 3.9)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain
       none
@@ -507,6 +483,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
@@ -543,6 +520,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
@@ -594,6 +572,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
@@ -613,12 +592,7 @@ jobs:
     language: python
     name: Python tests (Python 3.7)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --integration-tests --python-version 3.7
@@ -647,6 +621,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
@@ -666,12 +641,7 @@ jobs:
     language: python
     name: Python tests (Python 3.8)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --integration-tests --python-version 3.8
@@ -700,6 +670,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
@@ -719,12 +690,7 @@ jobs:
     language: python
     name: Python tests (Python 3.9)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --integration-tests --python-version 3.9
@@ -735,6 +701,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
@@ -825,6 +792,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     before_script:
@@ -844,12 +812,7 @@ jobs:
     language: python
     name: Build Linux wheels and fs_util
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
@@ -1164,6 +1127,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     before_script:
@@ -1192,12 +1156,7 @@ jobs:
     language: python
     name: Deploy stable pants.pex
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - ./build-support/bin/release.sh -p
     stage: Deploy Pants Pex
@@ -1223,6 +1182,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pyenv versions
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
     before_script:
@@ -1241,12 +1201,7 @@ jobs:
     language: python
     name: Deploy unstable pants.pex
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    - '3.8'
-    - '3.9'
+    python: '3.9'
     script:
     - ./build-support/bin/release.sh -p
     - mkdir -p dist/deploy/pex/
