@@ -17,10 +17,10 @@ junit_xml_dir = "dist/test-results/"
 [coverage-py]
 report = ["raw", "xml"]
 
-#[auth]
-#from_env_var = "TOOLCHAIN_AUTH_TOKEN"
-#org = "pantsbuild"
-#ci_env_variables = ["TRAVIS", "TRAVIS_JOB_ID", "TRAVIS_BUILD_ID", "TRAVIS_PULL_REQUEST", "TRAVIS_BUILD_WEB_URL"]
-#
-#[buildsense]
-#enable = true
+[auth]
+from_env_var = "TOOLCHAIN_AUTH_TOKEN"
+org = "pantsbuild"
+ci_env_variables = ["TRAVIS", "TRAVIS_JOB_ID", "TRAVIS_BUILD_ID", "TRAVIS_PULL_REQUEST", "TRAVIS_BUILD_WEB_URL"]
+
+[buildsense]
+enable = true
