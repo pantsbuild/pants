@@ -127,6 +127,7 @@ smallvec = "0.6"
 store = { path = "fs/store" }
 task_executor = { path = "task_executor" }
 tempfile = "3"
+testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.1.40"
 tokio = { version = "0.2.23", features = ["macros", "rt-threaded"] }
 tryfuture = { path = "tryfuture" }

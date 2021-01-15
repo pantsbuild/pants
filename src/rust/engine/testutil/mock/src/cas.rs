@@ -44,7 +44,9 @@ pub struct StubCAS {
 
 impl Drop for StubCAS {
   fn drop(&mut self) {
-    self.shutdown_sender.take().unwrap().send(()).unwrap();
+    if let Some(s) = self.shutdown_sender.take() {
+      let _ = s.send(());
+    }
   }
 }
 
