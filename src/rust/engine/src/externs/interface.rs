@@ -76,6 +76,8 @@ use crate::{
   Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
 };
 
+mod testutil;
+
 py_exception!(native_engine, PollTimeout);
 py_exception!(native_engine, NailgunConnectionException);
 py_exception!(native_engine, NailgunClientException);
@@ -419,6 +421,9 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::fs::PyDigest>(py)?;
   m.add_class::<externs::fs::PySnapshot>(py)?;
 
+  m.add_class::<self::testutil::PyStubCAS>(py)?;
+  m.add_class::<self::testutil::PyStubCASBuilder>(py)?;
+
   Ok(())
 });
 
@@ -482,7 +487,7 @@ py_class!(class PyTypes |py| {
   }
 });
 
-py_class!(class PyExecutor |py| {
+py_class!(pub class PyExecutor |py| {
     data executor: Executor;
     def __new__(_cls, core_threads: usize, max_threads: usize) -> CPyResult<Self> {
       let executor = Executor::new_owned(core_threads, max_threads).map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;

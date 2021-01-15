@@ -199,7 +199,7 @@ impl Core {
   }
 
   fn make_command_runner(
-    store: &Store,
+    full_store: &Store,
     remote_store_servers: &[String],
     executor: &Executor,
     local_execution_root_dir: &Path,
@@ -218,9 +218,9 @@ impl Core {
     // with the local command runner. This reduces the surface area of where the remote store is
     // used to only be the remote cache command runner.
     let store_for_local_runner = if remote_caching_used && remoting_opts.cache_eager_fetch {
-      store.clone().into_local_only()
+      full_store.clone().into_local_only()
     } else {
-      store.clone()
+      full_store.clone()
     };
 
     let local_command_runner = Core::make_local_execution_runner(
@@ -238,7 +238,7 @@ impl Core {
       if remoting_opts.execution_enable {
         Box::new(BoundedCommandRunner::new(
           Core::make_remote_execution_runner(
-            store,
+            full_store,
             process_execution_metadata,
             &remoting_opts,
             root_ca_certs,
@@ -253,7 +253,7 @@ impl Core {
         Box::new(process_execution::remote_cache::CommandRunner::new(
           local_command_runner.into(),
           process_execution_metadata.clone(),
-          store.clone(),
+          full_store.clone(),
           action_cache_address.as_str(),
           root_ca_certs.clone(),
           oauth_bearer_token.clone(),
@@ -279,7 +279,7 @@ impl Core {
       Box::new(process_execution::cache::CommandRunner::new(
         maybe_remote_enabled_command_runner.into(),
         process_execution_store,
-        store.clone(),
+        full_store.clone(),
         process_execution_metadata.clone(),
       ))
     } else {
@@ -378,7 +378,7 @@ impl Core {
 
     safe_create_dir_all_ioerror(&local_store_dir)
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))?;
-    let store = Core::make_store(
+    let full_store = Self::make_store(
       &executor,
       &local_store_dir,
       need_remote_store,
@@ -389,14 +389,26 @@ impl Core {
     )
     .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
+    let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
+      && remoting_opts.cache_eager_fetch
+    {
+      // In remote cache mode with eager fetching, the only interaction with the remote CAS
+      // should be through the remote cache code paths. Thus, the store seen by the rest of the
+      // code base should be the local-only store.
+      full_store.clone().into_local_only()
+    } else {
+      // Otherwise, the remote CAS should be visible everywhere.
+      full_store.clone()
+    };
+
     let process_execution_metadata = ProcessMetadata {
       instance_name: remoting_opts.instance_name.clone(),
       cache_key_gen_version: remoting_opts.execution_process_cache_namespace.clone(),
       platform_properties: remoting_opts.execution_extra_platform_properties.clone(),
     };
 
-    let command_runner = Core::make_command_runner(
-      &store,
+    let command_runner = Self::make_command_runner(
+      &full_store,
       &remote_store_servers,
       &executor,
       &local_execution_root_dir,
@@ -412,7 +424,7 @@ impl Core {
     let graph = Arc::new(InvalidatableGraph(Graph::new()));
 
     // These certs are for downloads, not to be confused with the ones used for remoting.
-    let ca_certs = Core::load_certificates(ca_certs_path)?;
+    let ca_certs = Self::load_certificates(ca_certs_path)?;
 
     let http_client_builder = ca_certs
       .iter()
