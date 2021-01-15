@@ -13,7 +13,9 @@ class OptionableTest(unittest.TestCase):
 
         with self.assertRaises(TypeError) as cm:
             NoScope()  # type: ignore[abstract]
-        assert ("with abstract methods options_scope") in str(cm.exception)
+        assert "with abstract methods options_scope" in str(
+            cm.exception
+        ) or "with abstract method options_scope" in str(cm.exception)
 
         class StringScope(Optionable):
             options_scope = "good"
