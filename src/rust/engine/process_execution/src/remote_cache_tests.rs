@@ -24,7 +24,6 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, NamedCaches, Platform, Process, ProcessMetadata,
 };
-use term::terminfo::parm::Param::Words;
 
 struct RoundtripResults {
   uncached: Result<FallibleProcessResultWithPlatform, String>,
@@ -51,6 +50,7 @@ impl MockLocalCommandRunner {
   }
 }
 
+#[async_trait]
 impl CommandRunnerTrait for MockLocalCommandRunner {
   async fn run(
     &self,
@@ -65,10 +65,10 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
   }
 }
 
-fn create_store() -> Store {
+fn create_remote_store() -> Store {
   let runtime = task_executor::Executor::new();
   let stub_cas = StubCAS::builder().build();
-  let store_dir = base_dir.path().join("store_dir");
+  let store_dir = TempDir::new().unwrap().path().join("store_dir");
   Store::with_remote(
     runtime,
     store_dir,
@@ -142,6 +142,13 @@ fn create_cached_runner(
   (runner, action_cache)
 }
 
+fn create_process() -> Process {
+  Process::new(vec![
+    testutil::path::find_bash(),
+    "echo -n hello world".to_string(),
+  ])
+}
+
 fn create_script(script_exit_code: i8) -> (Process, PathBuf) {
   let script_dir = TempDir::new().unwrap();
   let script_path = script_dir.path().join("script");
@@ -194,54 +201,64 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
 #[tokio::test]
 async fn cache_read_success() {
   WorkunitStore::setup_for_tests();
-  let store = create_store();
+  let store = create_remote_store();
   let local_runner = Box::new(MockLocalCommandRunner::new(1));
-  let (cache_runner, action_cache) = create_cached_runner(local_runner, store, false);
+  let (cache_runner, action_cache) = create_cached_runner(local_runner, store.clone(), false);
 
-  // Insert a successful ActionResult.
-  let result = cache_runner.run().await.unwrap();
+  let process = create_process();
+  action_cache.insert(&process, &store, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+
+  let result = cache_runner
+    .run(process.clone().into(), Context::default())
+    .await
+    .unwrap();
   assert_eq!(result.exit_code, 0);
 }
 
-/// If the cache has any issues during failures, we should gracefully fallback to the local runner.
+/// If the cache has any issues during reads, we should gracefully fallback to the local runner.
 #[tokio::test]
 async fn cache_read_skipped_on_errors() {
   WorkunitStore::setup_for_tests();
-  let store = create_store();
+  let store = create_remote_store();
   let local_runner = Box::new(MockLocalCommandRunner::new(1));
-  let (cache_runner, action_cache) = create_cached_runner(local, store, false);
+  let (cache_runner, action_cache) = create_cached_runner(local_runner, store.clone(), false);
 
-  let result = cache_runner.run().await.unwrap();
+  let process = create_process();
+  action_cache.insert(&process, &store, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+  action_cache.always_errors.store(true, Ordering::SeqCst);
 
-  let results = run_roundtrip(0).await;
-  assert_eq!(results.uncached, results.maybe_cached);
+  let result = cache_runner
+    .run(process.clone().into(), Context::default())
+    .await
+    .unwrap();
+  assert_eq!(result.exit_code, 1);
 }
 
-#[tokio::test]
-async fn cache_write_success() {
-  WorkunitStore::setup_for_tests();
-  let store = create_store();
-  let local_runner = Box::new(MockLocalCommandRunner::new(1));
-  let (cache_runner, action_cache) = create_cached_runner(local, store, false);
-
-  let result = cache_runner.run().await.unwrap();
-
-  let results = run_roundtrip(0).await;
-  assert_eq!(results.uncached, results.maybe_cached);
-}
-
-#[tokio::test]
-async fn cache_write_not_for_failures() {
-  WorkunitStore::setup_for_tests();
-  let store = create_store();
-  let local_runner = Box::new(MockLocalCommandRunner::new(1));
-  let (cache_runner, action_cache) = create_cached_runner(local, store, false);
-
-  let result = cache_runner.run().await.unwrap();
-
-  let results = run_roundtrip(0).await;
-  assert_eq!(results.uncached, results.maybe_cached);
-}
+// #[tokio::test]
+// async fn cache_write_success() {
+//   WorkunitStore::setup_for_tests();
+//   let store = create_remote_store();
+//   let local_runner = Box::new(MockLocalCommandRunner::new(1));
+//   let (cache_runner, action_cache) = create_cached_runner(local, store, false);
+//
+//   let result = cache_runner.run().await.unwrap();
+//
+//   let results = run_roundtrip(0).await;
+//   assert_eq!(results.uncached, results.maybe_cached);
+// }
+//
+// #[tokio::test]
+// async fn cache_write_not_for_failures() {
+//   WorkunitStore::setup_for_tests();
+//   let store = create_remote_store();
+//   let local_runner = Box::new(MockLocalCommandRunner::new(1));
+//   let (cache_runner, action_cache) = create_cached_runner(local, store, false);
+//
+//   let result = cache_runner.run().await.unwrap();
+//
+//   let results = run_roundtrip(0).await;
+//   assert_eq!(results.uncached, results.maybe_cached);
+// }
 
 #[tokio::test]
 async fn cache_success() {

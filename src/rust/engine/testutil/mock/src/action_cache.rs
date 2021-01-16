@@ -39,10 +39,13 @@ use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use remexec::action_cache_server::{ActionCache, ActionCacheServer};
 use remexec::{ActionResult, GetActionResultRequest, UpdateActionResultRequest};
+use store::Store;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 
 use crate::tonic_util::AddrIncomingWithStream;
+use process_execution::remote::{ensure_action_stored_locally, make_execute_request};
+use process_execution::{Process, ProcessMetadata};
 
 pub struct StubActionCache {
   pub action_map: Arc<Mutex<HashMap<Fingerprint, ActionResult>>>,
@@ -171,5 +174,36 @@ impl StubActionCache {
   ///
   pub fn address(&self) -> String {
     format!("{}", self.local_addr)
+  }
+
+  ///
+  /// Insert an ActionResult for a particular Process.
+  ///
+  /// This will calculate the action_digest for the input Process, using the same logic as `
+  /// CommandRunner::run()`.
+  ///
+  pub async fn insert(
+    &self,
+    process: &Process,
+    store: &Store,
+    exit_code: i32,
+    stdout_digest: Digest,
+    stderr_digest: Digest,
+  ) {
+    let (action, command, _exec_request) =
+      make_execute_request(process, ProcessMetadata::default()).unwrap();
+    let (_command_digest, action_digest) = ensure_action_stored_locally(store, &command, &action)
+      .await
+      .unwrap();
+    let action_result = ActionResult {
+      exit_code,
+      stdout_digest: Some(stdout_digest.into()),
+      stderr_digest: Some(stderr_digest.into()),
+      ..ActionResult::default()
+    };
+    self
+      .action_map
+      .lock()
+      .insert(action_digest.0, action_result);
   }
 }
