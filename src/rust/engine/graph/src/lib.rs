@@ -50,7 +50,7 @@ use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer, Stats};
 
@@ -561,7 +561,7 @@ impl<N: Node> Graph<N> {
               "Filesystem changed during run: retrying `{}` in {:?}...",
               node, self.invalidation_delay
             );
-            delay_for(self.invalidation_delay).await;
+            sleep(self.invalidation_delay).await;
             continue;
           }
           Err(other_err) => break Err(other_err),
@@ -620,7 +620,7 @@ impl<N: Node> Graph<N> {
       };
       entry.poll(context, generation).await;
       if let Some(delay) = delay {
-        delay_for(delay).await;
+        sleep(delay).await;
       }
     };
 

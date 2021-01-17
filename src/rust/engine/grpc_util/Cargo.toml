@@ -6,13 +6,12 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-bytes = "0.5"
+bytes = "1.0"
 futures = "0.3"
-prost = "0.6"
-prost-types = "0.6"
-rustls-native-certs = "0.4"
-tokio = { version = "0.2.23", features = ["process", "rt-threaded", "sync", "tcp", "time"] }
-tokio-rustls = "0.14"
-tokio-util = { version = "0.2", features = ["codec"] }
-tonic = { version = "0.3", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+rustls-native-certs = "0.5"
+prost = "0.7"
+tokio = { version = "^1.4", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-rustls = "0.22"
+tokio-util = { version = "0.6", features = ["codec"] }
+tonic = { version = "0.4", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 

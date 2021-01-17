@@ -8,7 +8,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use hashing::{Digest, Fingerprint};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 use walkdir::WalkDir;
 
 #[tokio::test]
@@ -195,7 +195,7 @@ async fn garbage_collect_expired() {
   );
 
   // Wait for it to expire.
-  delay_for(lease_time * 2).await;
+  sleep(lease_time * 2).await;
   assert_eq!(
     0,
     store

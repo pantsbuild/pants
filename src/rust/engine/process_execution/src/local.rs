@@ -35,6 +35,9 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
   ProcessResultMetadata,
 };
+use futures::task::Poll;
+use futures::Stream;
+use tonic::codegen::Pin;
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
@@ -277,6 +280,27 @@ impl super::CommandRunner for CommandRunner {
   }
 }
 
+use ouroboros::self_referencing;
+
+#[self_referencing]
+struct OwnedChild {
+  child: Box<Child>,
+  #[borrows(mut child)]
+  #[not_covariant]
+  exit_stream: BoxStream<'this, Result<ChildOutput, std::io::Error>>,
+}
+
+impl Stream for OwnedChild {
+  type Item = Result<ChildOutput, std::io::Error>;
+
+  fn poll_next(
+    mut self: Pin<&mut Self>,
+    cx: &mut std::task::Context<'_>,
+  ) -> Poll<Option<Self::Item>> {
+    self.with_exit_stream_mut(|es| Pin::new(es).poll_next(cx))
+  }
+}
+
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
   fn named_caches(&self) -> &NamedCaches {
@@ -330,7 +354,7 @@ impl CapturedWorkdir for CommandRunner {
         // process but outside of our control (in libraries). As such, we back-stop by sleeping and
         // trying again for a while if we do hit one of these fork races we do not control.
         const MAX_ETXTBSY_WAIT: Duration = Duration::from_millis(100);
-        let mut retries = 0;
+        let mut retries: u32 = 0;
         let mut sleep_millis = 1;
 
         let start_time = std::time::Instant::now();
@@ -339,7 +363,7 @@ impl CapturedWorkdir for CommandRunner {
             Err(e) => {
               if e.raw_os_error() == Some(libc::ETXTBSY) && start_time.elapsed() < MAX_ETXTBSY_WAIT
               {
-                tokio::time::delay_for(std::time::Duration::from_millis(sleep_millis)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(sleep_millis)).await;
                 retries += 1;
                 sleep_millis *= 2;
                 continue;
@@ -363,27 +387,39 @@ impl CapturedWorkdir for CommandRunner {
       }
     }?;
 
-    debug!("spawned local process as {} for {:?}", child.id(), req);
+    debug!("spawned local process as {:?} for {:?}", child.id(), req);
     let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())
       .map_ok(|bytes| ChildOutput::Stdout(bytes.into()))
+      .fuse()
       .boxed();
     let stderr_stream = FramedRead::new(child.stderr.take().unwrap(), BytesCodec::new())
       .map_ok(|bytes| ChildOutput::Stderr(bytes.into()))
+      .fuse()
       .boxed();
-    let exit_stream = child
-      .into_stream()
-      .map_ok(|exit_status| {
-        ChildOutput::Exit(ExitCode(
-          exit_status
-            .code()
-            .or_else(|| exit_status.signal().map(Neg::neg))
-            .expect("Child process should exit via returned code or signal."),
-        ))
-      })
-      .boxed();
+    let owned_child = OwnedChildBuilder {
+      child: Box::new(child),
+      exit_stream_builder: |child: &mut Child| {
+        child
+          .wait()
+          .into_stream()
+          .map_ok(|exit_status| {
+            ChildOutput::Exit(ExitCode(
+              exit_status
+                .code()
+                .or_else(|| exit_status.signal().map(Neg::neg))
+                .expect("Child process should exit via returned code or signal."),
+            ))
+          })
+          .boxed()
+      },
+    }
+    .build();
+
+    let result_stream =
+      futures::stream::select_all(vec![stdout_stream, stderr_stream, owned_child.boxed()]);
 
     Ok(
-      futures::stream::select_all(vec![stdout_stream, stderr_stream, exit_stream])
+      result_stream
         .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
         .boxed(),
     )

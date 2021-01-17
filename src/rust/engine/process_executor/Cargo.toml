@@ -15,10 +15,10 @@ futures = "0.3"
 hashing = { path = "../hashing" }
 log = "0.4"
 process_execution = { path = "../process_execution" }
-prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
+prost = "0.7"
 shlex = "0.1.1"
 store = { path = "../fs/store" }
 structopt = "0.3.20"
 task_executor = { path = "../task_executor" }
-tokio = { version = "0.2.23", features = ["rt-threaded", "macros"] }
+tokio = { version = "^1.4", features = ["rt-multi-thread", "macros"] }
 workunit_store = { path = "../workunit_store"}

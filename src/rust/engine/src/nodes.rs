@@ -22,7 +22,7 @@ use crate::externs::engine_aware::{self, EngineAwareInformation};
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
-use bytes::buf::BufMutExt;
+use bytes::BufMut;
 use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
@@ -758,7 +758,7 @@ impl StreamingDownload for NetDownload {
 }
 
 struct FileDownload {
-  stream: tokio::io::ReaderStream<tokio::fs::File>,
+  stream: tokio_util::io::ReaderStream<tokio::fs::File>,
 }
 
 impl FileDownload {
@@ -769,7 +769,7 @@ impl FileDownload {
         e, path, file_name
       )
     })?;
-    let stream = tokio::io::reader_stream(file);
+    let stream = tokio_util::io::ReaderStream::new(file);
     Ok(FileDownload { stream })
   }
 }

@@ -15,7 +15,7 @@ use remexec::ActionResult;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 use workunit_store::WorkunitStore;
 
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
@@ -60,7 +60,7 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
     _req: MultiPlatformProcess,
     _context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    delay_for(self.delay).await;
+    sleep(self.delay).await;
     self.call_counter.fetch_add(1, Ordering::SeqCst);
     self.result.clone()
   }
@@ -317,7 +317,7 @@ async fn cache_write_success() {
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 
   // Wait for the cache write block to finish.
-  delay_for(Duration::from_secs(1)).await;
+  sleep(Duration::from_secs(1)).await;
   assert_eq!(action_cache.action_map.lock().len(), 1);
   let action_map_mutex_guard = action_cache.action_map.lock();
   assert_eq!(
@@ -348,7 +348,7 @@ async fn cache_write_not_for_failures() {
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 
   // Wait for the cache write block to finish.
-  delay_for(Duration::from_millis(100)).await;
+  sleep(Duration::from_millis(100)).await;
   assert!(action_cache.action_map.lock().is_empty());
 }
 
@@ -376,7 +376,7 @@ async fn cache_write_does_not_block() {
   // CommandRunner::run().
   assert!(action_cache.action_map.lock().is_empty());
 
-  delay_for(Duration::from_secs(1)).await;
+  sleep(Duration::from_secs(1)).await;
   assert_eq!(action_cache.action_map.lock().len(), 1);
   let action_map_mutex_guard = action_cache.action_map.lock();
   assert_eq!(

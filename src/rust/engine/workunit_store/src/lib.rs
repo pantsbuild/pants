@@ -35,9 +35,12 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use bytes::{BufMut, Bytes, BytesMut};
 use concrete_time::TimeSpan;
+use hdrhistogram::serialization::Serializer;
 use log::log;
 pub use log::Level;
+pub use metrics::{Metric, ObservationMetric};
 use parking_lot::Mutex;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rand::thread_rng;
@@ -45,10 +48,6 @@ use rand::Rng;
 use tokio::task_local;
 
 mod metrics;
-use bytes::buf::BufMutExt;
-use bytes::{Bytes, BytesMut};
-use hdrhistogram::serialization::Serializer;
-pub use metrics::{Metric, ObservationMetric};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct SpanId(u64);

@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 parking_lot = "0.11"
-tokio = { version = "0.2.23", features = ["sync"] }
+tokio = { version = "^1.4", features = ["sync"] }
 
 [dev-dependencies]
-tokio = { version = "0.2.23", features = ["macros"] }
+tokio = { version = "^1.4", features = ["rt", "macros", "time"] }

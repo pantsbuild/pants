@@ -14,7 +14,7 @@ use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{Select, Visualizer};
 use crate::session::{ObservedValueResult, Root, Session};
 
-use futures::{future, FutureExt};
+use futures::{future, FutureExt, TryFutureExt};
 use graph::LastObserved;
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{debug, warn};
@@ -254,10 +254,10 @@ impl Scheduler {
           _ = session.cancelled() => {
             // The Session was cancelled: kill the process, and then wait for it to exit (to avoid
             // zombies).
-            subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e))?;
-            subprocess.await.map_err(|e| e.to_string())
+            subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e)).await?;
+            subprocess.wait().await.map_err(|e| e.to_string())
           }
-          exit_status = &mut subprocess => {
+          exit_status = subprocess.wait() => {
             // The process exited.
             exit_status.map_err(|e| e.to_string())
           }
@@ -366,7 +366,7 @@ impl Scheduler {
     let mut execution_task = self.execute_helper(request, session).boxed();
 
     self.core.executor.block_on(async move {
-      let mut refresh_delay = time::delay_for(Self::refresh_delay(interval, deadline));
+      let mut refresh_delay = time::sleep(Self::refresh_delay(interval, deadline)).boxed();
       let result = loop {
         tokio::select! {
           _ = session.cancelled() => {
@@ -383,7 +383,7 @@ impl Scheduler {
               // Just a receive timeout. render and continue.
               session.maybe_display_render();
             }
-            refresh_delay = time::delay_for(Self::refresh_delay(interval, deadline));
+            refresh_delay = time::sleep(Self::refresh_delay(interval, deadline)).boxed();
           }
           res = &mut execution_task => {
             // Completed successfully.

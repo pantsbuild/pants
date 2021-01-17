@@ -1,9 +1,8 @@
-use crate::AsyncLatch;
-
 use std::time::Duration;
 
-use tokio;
-use tokio::time::delay_for;
+use tokio::time::sleep;
+
+use crate::AsyncLatch;
 
 #[tokio::test]
 async fn basic() {
@@ -16,7 +15,7 @@ async fn basic() {
 
   // Ensure that `triggered` doesn't return until `trigger` has been called.
   tokio::select! {
-    _ = delay_for(Duration::from_secs(1)) => {},
+    _ = sleep(Duration::from_secs(1)) => {},
     _ = &mut join => { panic!("Background task should have continued to wait.") }
   }
   latch.trigger();

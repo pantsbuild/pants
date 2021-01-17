@@ -3,7 +3,7 @@ use crate::AsyncValue;
 use std::time::Duration;
 
 use tokio;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 #[tokio::test]
 async fn send() {
@@ -21,7 +21,7 @@ async fn cancel_explicit() {
 
   // Ensure that a value is not received.
   tokio::select! {
-    _ = delay_for(Duration::from_secs(1)) => {},
+    _ = sleep(Duration::from_secs(1)) => {},
     _ = receiver.recv() => { panic!("Should have continued to wait.") }
   }
 
@@ -39,7 +39,7 @@ async fn cancel_implicit() {
 
   // Ensure that a value is not received.
   tokio::select! {
-    _ = delay_for(Duration::from_secs(1)) => {},
+    _ = sleep(Duration::from_secs(1)) => {},
     _ = receiver.recv() => { panic!("Should have continued to wait.") }
   }
 
