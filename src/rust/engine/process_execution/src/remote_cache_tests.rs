@@ -12,6 +12,7 @@ use fs::RelativePath;
 use hashing::{Digest, EMPTY_DIGEST};
 use maplit::hashset;
 use mock::{StubActionCache, StubCAS};
+use parking_lot::Mutex;
 use remexec::ActionResult;
 use store::{BackoffConfig, Store};
 use tempfile::TempDir;
@@ -31,12 +32,14 @@ struct RoundtripResults {
 }
 
 /// A mock of the local runner used for better hermeticity of the tests.
+#[derive(Clone)]
 struct MockLocalCommandRunner {
   result: Result<FallibleProcessResultWithPlatform, String>,
+  call_counter: Arc<Mutex<u32>>,
 }
 
 impl MockLocalCommandRunner {
-  pub fn new(exit_code: i32) -> MockLocalCommandRunner {
+  pub fn new(exit_code: i32, call_counter: Arc<Mutex<u32>>) -> MockLocalCommandRunner {
     MockLocalCommandRunner {
       result: Ok(FallibleProcessResultWithPlatform {
         stdout_digest: EMPTY_DIGEST,
@@ -46,6 +49,7 @@ impl MockLocalCommandRunner {
         execution_attempts: vec![],
         platform: Platform::current().unwrap(),
       }),
+      call_counter,
     }
   }
 }
@@ -57,6 +61,8 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
     _req: MultiPlatformProcess,
     _context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let mut calls = self.call_counter.lock();
+    *calls += 1;
     self.result.clone()
   }
 
@@ -86,7 +92,7 @@ fn create_remote_store() -> Store {
   .unwrap()
 }
 
-fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store) {
+fn create_local_runner_old() -> (Box<dyn CommandRunnerTrait>, Store) {
   let runtime = task_executor::Executor::new();
   let base_dir = TempDir::new().unwrap();
   let named_cache_dir = base_dir.path().join("named_cache_dir");
@@ -115,6 +121,12 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store) {
     true,
   ));
   (runner, store)
+}
+
+fn create_local_runner(exit_code: i32) -> (Box<MockLocalCommandRunner>, Arc<Mutex<u32>>) {
+  let call_counter = Arc::new(Mutex::new(0));
+  let local_runner = Box::new(MockLocalCommandRunner::new(exit_code, call_counter.clone()));
+  (local_runner, call_counter)
 }
 
 fn create_cached_runner(
@@ -149,6 +161,31 @@ fn create_process() -> Process {
   ])
 }
 
+async fn insert_into_action_cache(
+  action_cache: &StubActionCache,
+  process: &Process,
+  store: &Store,
+  exit_code: i32,
+  stdout_digest: Digest,
+  stderr_digest: Digest,
+) {
+  let (action, command, _exec_request) =
+    make_execute_request(process, ProcessMetadata::default()).unwrap();
+  let (_command_digest, action_digest) = ensure_action_stored_locally(store, &command, &action)
+    .await
+    .unwrap();
+  let action_result = ActionResult {
+    exit_code,
+    stdout_digest: Some(stdout_digest.into()),
+    stderr_digest: Some(stderr_digest.into()),
+    ..ActionResult::default()
+  };
+  action_cache
+    .action_map
+    .lock()
+    .insert(action_digest.0, action_result);
+}
+
 fn create_script(script_exit_code: i8) -> (Process, PathBuf) {
   let script_dir = TempDir::new().unwrap();
   let script_path = script_dir.path().join("script");
@@ -173,7 +210,7 @@ fn create_script(script_exit_code: i8) -> (Process, PathBuf) {
 }
 
 async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
-  let (local, store) = create_local_runner();
+  let (local, store) = create_local_runner_old();
   let (process, script_path) = create_script(script_exit_code);
 
   let local_result = local.run(process.clone().into(), Context::default()).await;
@@ -202,17 +239,35 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
 async fn cache_read_success() {
   WorkunitStore::setup_for_tests();
   let store = create_remote_store();
-  let local_runner = Box::new(MockLocalCommandRunner::new(1));
-  let (cache_runner, action_cache) = create_cached_runner(local_runner, store.clone(), false);
+  let (local_runner, local_runner_call_counter) = create_local_runner(1);
+  let (cache_runner, action_cache) =
+    create_cached_runner(local_runner.clone(), store.clone(), false);
 
   let process = create_process();
-  action_cache.insert(&process, &store, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+  insert_into_action_cache(
+    &action_cache,
+    &process,
+    &store,
+    0,
+    EMPTY_DIGEST,
+    EMPTY_DIGEST,
+  )
+  .await;
 
-  let result = cache_runner
+  assert_eq!(*local_runner_call_counter.lock(), 0);
+  let local_result = local_runner
     .run(process.clone().into(), Context::default())
     .await
     .unwrap();
-  assert_eq!(result.exit_code, 0);
+  assert_eq!(local_result.exit_code, 1);
+  assert_eq!(*local_runner_call_counter.lock(), 1);
+
+  let remote_result = cache_runner
+    .run(process.clone().into(), Context::default())
+    .await
+    .unwrap();
+  assert_eq!(remote_result.exit_code, 0);
+  assert_eq!(*local_runner_call_counter.lock(), 1);
 }
 
 /// If the cache has any issues during reads, we should gracefully fallback to the local runner.
@@ -220,18 +275,36 @@ async fn cache_read_success() {
 async fn cache_read_skipped_on_errors() {
   WorkunitStore::setup_for_tests();
   let store = create_remote_store();
-  let local_runner = Box::new(MockLocalCommandRunner::new(1));
-  let (cache_runner, action_cache) = create_cached_runner(local_runner, store.clone(), false);
+  let (local_runner, local_runner_call_counter) = create_local_runner(1);
+  let (cache_runner, action_cache) =
+    create_cached_runner(local_runner.clone(), store.clone(), false);
 
   let process = create_process();
-  action_cache.insert(&process, &store, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+  insert_into_action_cache(
+    &action_cache,
+    &process,
+    &store,
+    0,
+    EMPTY_DIGEST,
+    EMPTY_DIGEST,
+  )
+  .await;
   action_cache.always_errors.store(true, Ordering::SeqCst);
 
-  let result = cache_runner
+  assert_eq!(*local_runner_call_counter.lock(), 0);
+  let local_result = local_runner
     .run(process.clone().into(), Context::default())
     .await
     .unwrap();
-  assert_eq!(result.exit_code, 1);
+  assert_eq!(local_result.exit_code, 1);
+  assert_eq!(*local_runner_call_counter.lock(), 1);
+
+  let remote_result = cache_runner
+    .run(process.clone().into(), Context::default())
+    .await
+    .unwrap();
+  assert_eq!(remote_result.exit_code, 1);
+  assert_eq!(*local_runner_call_counter.lock(), 2);
 }
 
 // #[tokio::test]
@@ -276,27 +349,6 @@ async fn failures_not_cached() {
   assert_eq!(results.maybe_cached.unwrap().exit_code, 127); // aka the return code for file not found
 }
 
-#[tokio::test]
-async fn skip_cache_on_error() {
-  WorkunitStore::setup_for_tests();
-
-  let (local, store) = create_local_runner();
-  let (caching, stub_action_cache) = create_cached_runner(local, store.clone(), false);
-  let (process, _script_path) = create_script(0);
-
-  stub_action_cache
-    .always_errors
-    .store(true, Ordering::SeqCst);
-
-  // Run once to ensure the cache is skipped on errors.
-  let result = caching
-    .run(process.clone().into(), Context::default())
-    .await
-    .unwrap();
-
-  assert_eq!(result.exit_code, 0);
-}
-
 /// With eager_fetch enabled, we should skip the remote cache if any of the process result's
 /// digests are invalid. This will force rerunning the process locally. Otherwise, we should use
 /// the cached result with its non-existent digests.
@@ -305,7 +357,7 @@ async fn eager_fetch() {
   WorkunitStore::setup_for_tests();
 
   async fn run_process(eager_fetch: bool) -> FallibleProcessResultWithPlatform {
-    let (local, store) = create_local_runner();
+    let (local, store) = create_local_runner_old();
     let (caching, stub_action_cache) = create_cached_runner(local, store.clone(), eager_fetch);
 
     // Get the `action_digest` for the Process that we're going to run. This will allow us to
