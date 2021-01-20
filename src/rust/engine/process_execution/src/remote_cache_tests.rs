@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
@@ -63,25 +64,39 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
   }
 }
 
-fn create_remote_store() -> Store {
-  let runtime = task_executor::Executor::new();
-  let stub_cas = StubCAS::builder().build();
-  let store_dir = TempDir::new().unwrap().path().join("store_dir");
-  Store::with_remote(
-    runtime,
-    store_dir,
-    vec![stub_cas.address()],
-    None,
-    None,
-    None,
-    1,
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
-    1,
-  )
-  .unwrap()
+// NB: We bundle these into a struct to ensure they share the same lifetime.
+struct StoreSetup {
+  pub store: Store,
+  pub store_dir: PathBuf,
+  pub cas: StubCAS,
+}
+
+impl StoreSetup {
+  pub fn new() -> StoreSetup {
+    let runtime = task_executor::Executor::new();
+    let cas = StubCAS::builder().build();
+    let store_dir = TempDir::new().unwrap().path().join("store_dir");
+    let store = Store::with_remote(
+      runtime,
+      store_dir.clone(),
+      vec![cas.address()],
+      None,
+      None,
+      None,
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+      BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
+      1,
+    )
+    .unwrap();
+    StoreSetup {
+      store,
+      store_dir,
+      cas,
+    }
+  }
 }
 
 fn create_local_runner(exit_code: i32) -> (Box<MockLocalCommandRunner>, Arc<Mutex<u32>>) {
@@ -150,12 +165,12 @@ fn insert_into_action_cache(
 #[tokio::test]
 async fn cache_read_success() {
   WorkunitStore::setup_for_tests();
-  let store = create_remote_store();
+  let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1);
   let (cache_runner, action_cache) =
-    create_cached_runner(local_runner.clone(), store.clone(), false);
+    create_cached_runner(local_runner.clone(), store_setup.store.clone(), false);
 
-  let (process, action_digest) = create_process(&store).await;
+  let (process, action_digest) = create_process(&store_setup.store).await;
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
 
   assert_eq!(*local_runner_call_counter.lock(), 0);
@@ -178,12 +193,12 @@ async fn cache_read_success() {
 #[tokio::test]
 async fn cache_read_skipped_on_errors() {
   WorkunitStore::setup_for_tests();
-  let store = create_remote_store();
+  let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1);
   let (cache_runner, action_cache) =
-    create_cached_runner(local_runner.clone(), store.clone(), false);
+    create_cached_runner(local_runner.clone(), store_setup.store.clone(), false);
 
-  let (process, action_digest) = create_process(&store).await;
+  let (process, action_digest) = create_process(&store_setup.store).await;
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
   action_cache.always_errors.store(true, Ordering::SeqCst);
 
@@ -211,12 +226,12 @@ async fn cache_read_eager_fetch() {
   WorkunitStore::setup_for_tests();
 
   async fn run_process(eager_fetch: bool) -> (i32, u32) {
-    let store = create_remote_store();
+    let store_setup = StoreSetup::new();
     let (local_runner, local_runner_call_counter) = create_local_runner(1);
     let (cache_runner, action_cache) =
-      create_cached_runner(local_runner.clone(), store.clone(), eager_fetch);
+      create_cached_runner(local_runner.clone(), store_setup.store.clone(), eager_fetch);
 
-    let (process, action_digest) = create_process(&store).await;
+    let (process, action_digest) = create_process(&store_setup.store).await;
     insert_into_action_cache(
       &action_cache,
       &action_digest,
@@ -254,12 +269,13 @@ async fn cache_read_eager_fetch() {
 
 // #[tokio::test]
 // async fn cache_write_success() {
+//   let _logger = env_logger::try_init();
 //   WorkunitStore::setup_for_tests();
-//   let store = create_remote_store();
+//   let store_setup = StoreSetup::new();
 //   let (local_runner, local_runner_call_counter) = create_local_runner(0);
 //   let (cache_runner, action_cache) =
-//     create_cached_runner(local_runner, store.clone(), false);
-//   let process = create_process();
+//     create_cached_runner(local_runner, store_setup.store.clone(), false);
+//   let (process, _action_digest) = create_process(&store_setup.store).await;
 //
 //   assert_eq!(*local_runner_call_counter.lock(), 0);
 //   assert!(action_cache.action_map.lock().is_empty());
@@ -271,8 +287,9 @@ async fn cache_read_eager_fetch() {
 //   assert_eq!(local_result.exit_code, 0);
 //   assert_eq!(*local_runner_call_counter.lock(), 1);
 //
-//   assert!()
-//
+//   assert_eq!(action_cache.action_map.lock().len(), 1);
+//   // let cache_entry = action_cache.action_map.lock().get(&action_digest.0);
+//   // assert_eq!(cache_entry.unwrap().exit_code, 0);
 // }
 
 // #[tokio::test]
