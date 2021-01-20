@@ -450,47 +450,69 @@ impl crate::CommandRunner for CommandRunner {
     )
     .await?;
 
-    // Check the remote Action Cache to see if this request was already computed.
-    // If so, return immediately with the result.
-    if self.cache_read {
-      let response = with_workunit(
-        context.workunit_store.clone(),
-        "check_action_cache".to_owned(),
-        WorkunitMetadata::with_level(Level::Debug),
-        crate::remote::check_action_cache(
-          action_digest,
-          &self.metadata,
-          self.platform,
-          &context,
-          self.action_cache_client.clone(),
-          self.store.clone(),
-          self.eager_fetch,
-        ),
-        |_, md| md,
-      )
-      .await;
-      match response {
-        Ok(cached_response_opt) => {
-          log::debug!(
-            "remote cache response: digest={:?}: {:?}",
-            action_digest,
-            cached_response_opt
-          );
+    let mut local_execution_future = self.underlying.run(req, context.clone());
 
-          if let Some(cached_response) = cached_response_opt {
-            return Ok(cached_response);
+    let result = if self.cache_read {
+      // A future to read from the cache and log the results accordingly.
+      let cache_read_future = async {
+        let response = with_workunit(
+          context.workunit_store.clone(),
+          "check_action_cache".to_owned(),
+          WorkunitMetadata::with_level(Level::Debug),
+          crate::remote::check_action_cache(
+            action_digest,
+            &self.metadata,
+            self.platform,
+            &context,
+            self.action_cache_client.clone(),
+            self.store.clone(),
+            self.eager_fetch,
+          ),
+          |_, md| md,
+        )
+        .await;
+        match response {
+          Ok(cached_response_opt) => {
+            log::debug!(
+              "remote cache response: digest={:?}: {:?}",
+              action_digest,
+              cached_response_opt
+            );
+            cached_response_opt
+          }
+          Err(err) => {
+            log::warn!("Failed to read from remote cache: {}", err);
+            None
           }
         }
-        Err(err) => {
-          log::warn!("Failed to read from remote cache: {}", err);
-        }
       };
-    }
 
-    let result = self.underlying.run(req, context.clone()).await?;
+      // We speculate between reading from the remote cache vs. running locally. If there was a
+      // cache hit, we return early because there will be no need to write to the cache. Otherwise,
+      // we run the process locally and will possibly write it to the cache later.
+      tokio::select! {
+        cache_result = cache_read_future => {
+          if let Some(cached_response) = cache_result {
+            context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+            return Ok(cached_response);
+          } else {
+            // Note that we don't increment a counter here, as there is nothing of note in this
+            // scenario: the remote cache did not save unnecessary local work, nor was the remote
+            // trip unusually slow such that local execution was faster.
+            local_execution_future.await?
+          }
+        }
+        local_result = &mut local_execution_future => {
+          context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
+          local_result?
+        }
+      }
+    } else {
+      local_execution_future.await?
+    };
+
     if result.exit_code == 0 && self.cache_write {
-      // Store the result in the remote cache if not the product of a remote execution.
-      if let Err(err) = self
+      let write_result = self
         .update_action_cache(
           &context,
           &request,
@@ -500,13 +522,13 @@ impl crate::CommandRunner for CommandRunner {
           action_digest,
           command_digest,
         )
-        .await
-      {
+        .await;
+      if let Err(err) = write_result {
         log::warn!("Failed to write to remote cache: {}", err);
         context
           .workunit_store
           .increment_counter(Metric::RemoteCacheWriteErrors, 1);
-      }
+      };
     }
 
     Ok(result)
