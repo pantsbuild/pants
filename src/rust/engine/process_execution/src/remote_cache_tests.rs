@@ -174,19 +174,12 @@ async fn cache_read_success() {
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
 
   assert_eq!(*local_runner_call_counter.lock(), 0);
-  let local_result = local_runner
-    .run(process.clone().into(), Context::default())
-    .await
-    .unwrap();
-  assert_eq!(local_result.exit_code, 1);
-  assert_eq!(*local_runner_call_counter.lock(), 1);
-
   let remote_result = cache_runner
     .run(process.clone().into(), Context::default())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 0);
-  assert_eq!(*local_runner_call_counter.lock(), 1);
+  assert_eq!(*local_runner_call_counter.lock(), 0);
 }
 
 /// If the cache has any issues during reads, we should gracefully fallback to the local runner.
@@ -203,19 +196,12 @@ async fn cache_read_skipped_on_errors() {
   action_cache.always_errors.store(true, Ordering::SeqCst);
 
   assert_eq!(*local_runner_call_counter.lock(), 0);
-  let local_result = local_runner
-    .run(process.clone().into(), Context::default())
-    .await
-    .unwrap();
-  assert_eq!(local_result.exit_code, 1);
-  assert_eq!(*local_runner_call_counter.lock(), 1);
-
   let remote_result = cache_runner
     .run(process.clone().into(), Context::default())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
-  assert_eq!(*local_runner_call_counter.lock(), 2);
+  assert_eq!(*local_runner_call_counter.lock(), 1);
 }
 
 /// With eager_fetch enabled, we should skip the remote cache if any of the process result's
@@ -241,14 +227,6 @@ async fn cache_read_eager_fetch() {
     );
 
     assert_eq!(*local_runner_call_counter.lock(), 0);
-    let local_result = local_runner
-      .run(process.clone().into(), Context::default())
-      .await
-      .unwrap();
-    assert_eq!(local_result.exit_code, 1);
-    assert_eq!(*local_runner_call_counter.lock(), 1);
-
-    // Run the process, possibly by pulling from the `ActionCache`.
     let remote_result = cache_runner
       .run(process.clone().into(), Context::default())
       .await
@@ -260,11 +238,11 @@ async fn cache_read_eager_fetch() {
 
   let (lazy_exit_code, lazy_local_call_count) = run_process(false).await;
   assert_eq!(lazy_exit_code, 0);
-  assert_eq!(lazy_local_call_count, 1);
+  assert_eq!(lazy_local_call_count, 0);
 
   let (eager_exit_code, eager_local_call_count) = run_process(true).await;
   assert_eq!(eager_exit_code, 1);
-  assert_eq!(eager_local_call_count, 2);
+  assert_eq!(eager_local_call_count, 1);
 }
 
 #[tokio::test]
