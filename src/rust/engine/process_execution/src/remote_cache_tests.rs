@@ -182,7 +182,7 @@ async fn cache_read_success() {
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 20);
   let (cache_runner, action_cache) =
-    create_cached_runner(local_runner.clone(), store_setup.store.clone(), 0, false);
+    create_cached_runner(local_runner, store_setup.store.clone(), 0, false);
 
   let (process, action_digest) = create_process(&store_setup.store).await;
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
@@ -203,7 +203,7 @@ async fn cache_read_skipped_on_errors() {
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 20);
   let (cache_runner, action_cache) =
-    create_cached_runner(local_runner.clone(), store_setup.store.clone(), 0, false);
+    create_cached_runner(local_runner, store_setup.store.clone(), 0, false);
 
   let (process, action_digest) = create_process(&store_setup.store).await;
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
@@ -228,12 +228,8 @@ async fn cache_read_eager_fetch() {
   async fn run_process(eager_fetch: bool) -> (i32, usize) {
     let store_setup = StoreSetup::new();
     let (local_runner, local_runner_call_counter) = create_local_runner(1, 20);
-    let (cache_runner, action_cache) = create_cached_runner(
-      local_runner.clone(),
-      store_setup.store.clone(),
-      0,
-      eager_fetch,
-    );
+    let (cache_runner, action_cache) =
+      create_cached_runner(local_runner, store_setup.store.clone(), 0, eager_fetch);
 
     let (process, action_digest) = create_process(&store_setup.store).await;
     insert_into_action_cache(
@@ -261,6 +257,51 @@ async fn cache_read_eager_fetch() {
   let (eager_exit_code, eager_local_call_count) = run_process(true).await;
   assert_eq!(eager_exit_code, 1);
   assert_eq!(eager_local_call_count, 1);
+}
+
+#[tokio::test]
+async fn cache_read_speculation() {
+  WorkunitStore::setup_for_tests();
+
+  async fn run_process(local_delay_ms: u64, remote_delay_ms: u64, cache_hit: bool) -> (i32, usize) {
+    let store_setup = StoreSetup::new();
+    let (local_runner, local_runner_call_counter) = create_local_runner(1, local_delay_ms);
+    let (cache_runner, action_cache) = create_cached_runner(
+      local_runner,
+      store_setup.store.clone(),
+      remote_delay_ms,
+      false,
+    );
+
+    let (process, action_digest) = create_process(&store_setup.store).await;
+    if cache_hit {
+      insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+    }
+
+    assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
+    let remote_result = cache_runner
+      .run(process.clone().into(), Context::default())
+      .await
+      .unwrap();
+
+    let final_local_count = local_runner_call_counter.load(Ordering::SeqCst);
+    (remote_result.exit_code, final_local_count)
+  }
+
+  // Case 1: remote is faster than local.
+  let (exit_code, local_call_count) = run_process(20, 0, true).await;
+  assert_eq!(exit_code, 0);
+  assert_eq!(local_call_count, 0);
+
+  // Case 2: local is faster than remote.
+  let (exit_code, local_call_count) = run_process(0, 20, true).await;
+  assert_eq!(exit_code, 1);
+  assert_eq!(local_call_count, 1);
+
+  // Case 3: the remote lookup wins, but there is no cache entry so we fallback to local execution.
+  let (exit_code, local_call_count) = run_process(20, 0, false).await;
+  assert_eq!(exit_code, 1);
+  assert_eq!(local_call_count, 1);
 }
 
 #[tokio::test]
