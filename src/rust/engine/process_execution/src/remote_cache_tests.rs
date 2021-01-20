@@ -115,26 +115,26 @@ fn create_cached_runner(
   (runner, action_cache)
 }
 
-fn create_process() -> Process {
-  Process::new(vec![
+async fn create_process(store: &Store) -> (Process, Digest) {
+  let process = Process::new(vec![
     testutil::path::find_bash(),
     "echo -n hello world".to_string(),
-  ])
+  ]);
+  let (action, command, _exec_request) =
+    make_execute_request(&process, ProcessMetadata::default()).unwrap();
+  let (_command_digest, action_digest) = ensure_action_stored_locally(store, &command, &action)
+    .await
+    .unwrap();
+  (process, action_digest)
 }
 
-async fn insert_into_action_cache(
+fn insert_into_action_cache(
   action_cache: &StubActionCache,
-  process: &Process,
-  store: &Store,
+  action_digest: &Digest,
   exit_code: i32,
   stdout_digest: Digest,
   stderr_digest: Digest,
 ) {
-  let (action, command, _exec_request) =
-    make_execute_request(process, ProcessMetadata::default()).unwrap();
-  let (_command_digest, action_digest) = ensure_action_stored_locally(store, &command, &action)
-    .await
-    .unwrap();
   let action_result = ActionResult {
     exit_code,
     stdout_digest: Some(stdout_digest.into()),
@@ -155,16 +155,8 @@ async fn cache_read_success() {
   let (cache_runner, action_cache) =
     create_cached_runner(local_runner.clone(), store.clone(), false);
 
-  let process = create_process();
-  insert_into_action_cache(
-    &action_cache,
-    &process,
-    &store,
-    0,
-    EMPTY_DIGEST,
-    EMPTY_DIGEST,
-  )
-  .await;
+  let (process, action_digest) = create_process(&store).await;
+  insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
 
   assert_eq!(*local_runner_call_counter.lock(), 0);
   let local_result = local_runner
@@ -191,16 +183,8 @@ async fn cache_read_skipped_on_errors() {
   let (cache_runner, action_cache) =
     create_cached_runner(local_runner.clone(), store.clone(), false);
 
-  let process = create_process();
-  insert_into_action_cache(
-    &action_cache,
-    &process,
-    &store,
-    0,
-    EMPTY_DIGEST,
-    EMPTY_DIGEST,
-  )
-  .await;
+  let (process, action_digest) = create_process(&store).await;
+  insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
   action_cache.always_errors.store(true, Ordering::SeqCst);
 
   assert_eq!(*local_runner_call_counter.lock(), 0);
@@ -232,16 +216,14 @@ async fn cache_read_eager_fetch() {
     let (cache_runner, action_cache) =
       create_cached_runner(local_runner.clone(), store.clone(), eager_fetch);
 
-    let process = create_process();
+    let (process, action_digest) = create_process(&store).await;
     insert_into_action_cache(
       &action_cache,
-      &process,
-      &store,
+      &action_digest,
       0,
       TestData::roland().digest(),
       TestData::roland().digest(),
-    )
-    .await;
+    );
 
     assert_eq!(*local_runner_call_counter.lock(), 0);
     let local_result = local_runner
@@ -274,15 +256,25 @@ async fn cache_read_eager_fetch() {
 // async fn cache_write_success() {
 //   WorkunitStore::setup_for_tests();
 //   let store = create_remote_store();
-//   let local_runner = Box::new(MockLocalCommandRunner::new(1));
-//   let (cache_runner, action_cache) = create_cached_runner(local, store, false);
+//   let (local_runner, local_runner_call_counter) = create_local_runner(0);
+//   let (cache_runner, action_cache) =
+//     create_cached_runner(local_runner, store.clone(), false);
+//   let process = create_process();
 //
-//   let result = cache_runner.run().await.unwrap();
+//   assert_eq!(*local_runner_call_counter.lock(), 0);
+//   assert!(action_cache.action_map.lock().is_empty());
 //
-//   let results = run_roundtrip(0).await;
-//   assert_eq!(results.uncached, results.maybe_cached);
+//   let local_result = cache_runner
+//     .run(process.clone().into(), Context::default())
+//     .await
+//     .unwrap();
+//   assert_eq!(local_result.exit_code, 0);
+//   assert_eq!(*local_runner_call_counter.lock(), 1);
+//
+//   assert!()
+//
 // }
-//
+
 // #[tokio::test]
 // async fn cache_write_not_for_failures() {
 //   WorkunitStore::setup_for_tests();
