@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,7 +11,6 @@ use fs::RelativePath;
 use hashing::{Digest, EMPTY_DIGEST};
 use maplit::hashset;
 use mock::{StubActionCache, StubCAS};
-use parking_lot::Mutex;
 use remexec::ActionResult;
 use store::{BackoffConfig, Store};
 use tempfile::TempDir;
@@ -28,11 +27,11 @@ use crate::{
 #[derive(Clone)]
 struct MockLocalCommandRunner {
   result: Result<FallibleProcessResultWithPlatform, String>,
-  call_counter: Arc<Mutex<u32>>,
+  call_counter: Arc<AtomicUsize>,
 }
 
 impl MockLocalCommandRunner {
-  pub fn new(exit_code: i32, call_counter: Arc<Mutex<u32>>) -> MockLocalCommandRunner {
+  pub fn new(exit_code: i32, call_counter: Arc<AtomicUsize>) -> MockLocalCommandRunner {
     MockLocalCommandRunner {
       result: Ok(FallibleProcessResultWithPlatform {
         stdout_digest: EMPTY_DIGEST,
@@ -54,8 +53,7 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
     _req: MultiPlatformProcess,
     _context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let mut calls = self.call_counter.lock();
-    *calls += 1;
+    self.call_counter.fetch_add(1, Ordering::SeqCst);
     self.result.clone()
   }
 
@@ -99,8 +97,8 @@ impl StoreSetup {
   }
 }
 
-fn create_local_runner(exit_code: i32) -> (Box<MockLocalCommandRunner>, Arc<Mutex<u32>>) {
-  let call_counter = Arc::new(Mutex::new(0));
+fn create_local_runner(exit_code: i32) -> (Box<MockLocalCommandRunner>, Arc<AtomicUsize>) {
+  let call_counter = Arc::new(AtomicUsize::new(0));
   let local_runner = Box::new(MockLocalCommandRunner::new(exit_code, call_counter.clone()));
   (local_runner, call_counter)
 }
@@ -173,13 +171,13 @@ async fn cache_read_success() {
   let (process, action_digest) = create_process(&store_setup.store).await;
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
 
-  assert_eq!(*local_runner_call_counter.lock(), 0);
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
     .run(process.clone().into(), Context::default())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 0);
-  assert_eq!(*local_runner_call_counter.lock(), 0);
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
 }
 
 /// If the cache has any issues during reads, we should gracefully fallback to the local runner.
@@ -195,13 +193,13 @@ async fn cache_read_skipped_on_errors() {
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
   action_cache.always_errors.store(true, Ordering::SeqCst);
 
-  assert_eq!(*local_runner_call_counter.lock(), 0);
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
     .run(process.clone().into(), Context::default())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
-  assert_eq!(*local_runner_call_counter.lock(), 1);
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 }
 
 /// With eager_fetch enabled, we should skip the remote cache if any of the process result's
@@ -211,7 +209,7 @@ async fn cache_read_skipped_on_errors() {
 async fn cache_read_eager_fetch() {
   WorkunitStore::setup_for_tests();
 
-  async fn run_process(eager_fetch: bool) -> (i32, u32) {
+  async fn run_process(eager_fetch: bool) -> (i32, usize) {
     let store_setup = StoreSetup::new();
     let (local_runner, local_runner_call_counter) = create_local_runner(1);
     let (cache_runner, action_cache) =
@@ -226,13 +224,13 @@ async fn cache_read_eager_fetch() {
       TestData::roland().digest(),
     );
 
-    assert_eq!(*local_runner_call_counter.lock(), 0);
+    assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
     let remote_result = cache_runner
       .run(process.clone().into(), Context::default())
       .await
       .unwrap();
 
-    let final_local_count = *local_runner_call_counter.lock();
+    let final_local_count = local_runner_call_counter.load(Ordering::SeqCst);
     (remote_result.exit_code, final_local_count)
   }
 
@@ -254,7 +252,7 @@ async fn cache_write_success() {
     create_cached_runner(local_runner, store_setup.store.clone(), false);
   let (process, action_digest) = create_process(&store_setup.store).await;
 
-  assert_eq!(*local_runner_call_counter.lock(), 0);
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   assert!(action_cache.action_map.lock().is_empty());
 
   let local_result = cache_runner
@@ -262,7 +260,7 @@ async fn cache_write_success() {
     .await
     .unwrap();
   assert_eq!(local_result.exit_code, 0);
-  assert_eq!(*local_runner_call_counter.lock(), 1);
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 
   assert_eq!(action_cache.action_map.lock().len(), 1);
   let action_map_mutex_guard = action_cache.action_map.lock();
@@ -284,7 +282,7 @@ async fn cache_write_not_for_failures() {
     create_cached_runner(local_runner, store_setup.store.clone(), false);
   let (process, _action_digest) = create_process(&store_setup.store).await;
 
-  assert_eq!(*local_runner_call_counter.lock(), 0);
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   assert!(action_cache.action_map.lock().is_empty());
 
   let local_result = cache_runner
@@ -292,7 +290,7 @@ async fn cache_write_not_for_failures() {
     .await
     .unwrap();
   assert_eq!(local_result.exit_code, 1);
-  assert_eq!(*local_runner_call_counter.lock(), 1);
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 
   assert!(action_cache.action_map.lock().is_empty());
 }
