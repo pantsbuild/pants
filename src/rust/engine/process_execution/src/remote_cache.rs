@@ -512,23 +512,27 @@ impl crate::CommandRunner for CommandRunner {
     };
 
     if result.exit_code == 0 && self.cache_write {
-      let write_result = self
-        .update_action_cache(
-          &context,
-          &request,
-          &result,
-          &self.metadata,
-          &command,
-          action_digest,
-          command_digest,
-        )
-        .await;
-      if let Err(err) = write_result {
-        log::warn!("Failed to write to remote cache: {}", err);
-        context
-          .workunit_store
-          .increment_counter(Metric::RemoteCacheWriteErrors, 1);
-      };
+      let command_runner = self.clone();
+      let result = result.clone();
+      tokio::spawn(async move {
+        let write_result = command_runner
+          .update_action_cache(
+            &context,
+            &request,
+            &result,
+            &command_runner.metadata,
+            &command,
+            action_digest,
+            command_digest,
+          )
+          .await;
+        if let Err(err) = write_result {
+          log::warn!("Failed to write to remote cache: {}", err);
+          context
+            .workunit_store
+            .increment_counter(Metric::RemoteCacheWriteErrors, 1);
+        };
+      });
     }
 
     Ok(result)
