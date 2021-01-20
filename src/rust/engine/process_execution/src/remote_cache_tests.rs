@@ -267,59 +267,57 @@ async fn cache_read_eager_fetch() {
   assert_eq!(eager_local_call_count, 2);
 }
 
-// #[tokio::test]
-// async fn cache_write_success() {
-//   let _logger = env_logger::try_init();
-//   WorkunitStore::setup_for_tests();
-//   let store_setup = StoreSetup::new();
-//   let (local_runner, local_runner_call_counter) = create_local_runner(0);
-//   let (cache_runner, action_cache) =
-//     create_cached_runner(local_runner, store_setup.store.clone(), false);
-//   let (process, _action_digest) = create_process(&store_setup.store).await;
-//
-//   assert_eq!(*local_runner_call_counter.lock(), 0);
-//   assert!(action_cache.action_map.lock().is_empty());
-//
-//   let local_result = cache_runner
-//     .run(process.clone().into(), Context::default())
-//     .await
-//     .unwrap();
-//   assert_eq!(local_result.exit_code, 0);
-//   assert_eq!(*local_runner_call_counter.lock(), 1);
-//
-//   assert_eq!(action_cache.action_map.lock().len(), 1);
-//   // let cache_entry = action_cache.action_map.lock().get(&action_digest.0);
-//   // assert_eq!(cache_entry.unwrap().exit_code, 0);
-// }
+#[tokio::test]
+async fn cache_write_success() {
+  WorkunitStore::setup_for_tests();
+  let store_setup = StoreSetup::new();
+  let (local_runner, local_runner_call_counter) = create_local_runner(0);
+  let (cache_runner, action_cache) =
+    create_cached_runner(local_runner, store_setup.store.clone(), false);
+  let (process, action_digest) = create_process(&store_setup.store).await;
 
-// #[tokio::test]
-// async fn cache_write_not_for_failures() {
-//   WorkunitStore::setup_for_tests();
-//   let store = create_remote_store();
-//   let local_runner = Box::new(MockLocalCommandRunner::new(1));
-//   let (cache_runner, action_cache) = create_cached_runner(local, store, false);
-//
-//   let result = cache_runner.run().await.unwrap();
-//
-//   let results = run_roundtrip(0).await;
-//   assert_eq!(results.uncached, results.maybe_cached);
-// }
+  assert_eq!(*local_runner_call_counter.lock(), 0);
+  assert!(action_cache.action_map.lock().is_empty());
 
-// #[tokio::test]
-// async fn cache_success() {
-//   WorkunitStore::setup_for_tests();
-//   let results = run_roundtrip(0).await;
-//   assert_eq!(results.uncached, results.maybe_cached);
-// }
-//
-// #[tokio::test]
-// async fn failures_not_cached() {
-//   WorkunitStore::setup_for_tests();
-//   let results = run_roundtrip(1).await;
-//   assert_ne!(results.uncached, results.maybe_cached);
-//   assert_eq!(results.uncached.unwrap().exit_code, 1);
-//   assert_eq!(results.maybe_cached.unwrap().exit_code, 127); // aka the return code for file not found
-// }
+  let local_result = cache_runner
+    .run(process.clone().into(), Context::default())
+    .await
+    .unwrap();
+  assert_eq!(local_result.exit_code, 0);
+  assert_eq!(*local_runner_call_counter.lock(), 1);
+
+  assert_eq!(action_cache.action_map.lock().len(), 1);
+  let action_map_mutex_guard = action_cache.action_map.lock();
+  assert_eq!(
+    action_map_mutex_guard
+      .get(&action_digest.0)
+      .unwrap()
+      .exit_code,
+    0
+  );
+}
+
+#[tokio::test]
+async fn cache_write_not_for_failures() {
+  WorkunitStore::setup_for_tests();
+  let store_setup = StoreSetup::new();
+  let (local_runner, local_runner_call_counter) = create_local_runner(1);
+  let (cache_runner, action_cache) =
+    create_cached_runner(local_runner, store_setup.store.clone(), false);
+  let (process, _action_digest) = create_process(&store_setup.store).await;
+
+  assert_eq!(*local_runner_call_counter.lock(), 0);
+  assert!(action_cache.action_map.lock().is_empty());
+
+  let local_result = cache_runner
+    .run(process.clone().into(), Context::default())
+    .await
+    .unwrap();
+  assert_eq!(local_result.exit_code, 1);
+  assert_eq!(*local_runner_call_counter.lock(), 1);
+
+  assert!(action_cache.action_map.lock().is_empty());
+}
 
 #[tokio::test]
 async fn make_tree_from_directory() {
