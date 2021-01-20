@@ -40,6 +40,8 @@ pub enum Metric {
   RemoteCacheRequestsUncached,
   RemoteCacheReadErrors,
   RemoteCacheWriteErrors,
+  RemoteCacheSpeculationLocalCompletedFirst,
+  RemoteCacheSpeculationRemoteCompletedFirst,
   RemoteExecutionErrors,
   RemoteExecutionRequests,
   RemoteExecutionRPCErrors,
@@ -48,8 +50,6 @@ pub enum Metric {
   RemoteExecutionRPCWaitExecution,
   RemoteExecutionSuccess,
   RemoteExecutionTimeouts,
-  SpeculationLocalExecutionCompletedFirst,
-  SpeculationRemoteCacheCompletedFirst,
 }
 
 impl Metric {
@@ -68,6 +68,10 @@ impl Metric {
       RemoteCacheRequestsUncached => "remote_cache_requests_uncached",
       RemoteCacheReadErrors => "remote_cache_read_errors",
       RemoteCacheWriteErrors => "remote_cache_write_errors",
+      RemoteCacheSpeculationLocalCompletedFirst => "remote_cache_speculation_local_completed_first",
+      RemoteCacheSpeculationRemoteCompletedFirst => {
+        "remote_cache_speculation_remote_completed_first"
+      }
       RemoteExecutionErrors => "remote_execution_errors",
       RemoteExecutionRequests => "remote_execution_requests",
       RemoteExecutionRPCRetries => "remote_execution_rpc_retries",
@@ -76,8 +80,6 @@ impl Metric {
       RemoteExecutionRPCWaitExecution => "remote_execution_rpc_wait_execution",
       RemoteExecutionSuccess => "remote_execution_success",
       RemoteExecutionTimeouts => "remote_execution_timeouts",
-      SpeculationLocalExecutionCompletedFirst => "speculation_local_execution_completed_first",
-      SpeculationRemoteCacheCompletedFirst => "speculation_remote_cache_completed_first",
     }
   }
 }

@@ -493,7 +493,7 @@ impl crate::CommandRunner for CommandRunner {
       tokio::select! {
         cache_result = cache_read_future => {
           if let Some(cached_response) = cache_result {
-            context.workunit_store.increment_counter(Metric::SpeculationRemoteCacheCompletedFirst, 1);
+            context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
             return Ok(cached_response);
           } else {
             // Note that we don't increment a counter here, as there is nothing of note in this
@@ -503,7 +503,7 @@ impl crate::CommandRunner for CommandRunner {
           }
         }
         local_result = &mut local_execution_future => {
-          context.workunit_store.increment_counter(Metric::SpeculationLocalExecutionCompletedFirst, 1);
+          context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
           local_result?
         }
       }
