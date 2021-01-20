@@ -219,6 +219,57 @@ async fn cache_read_skipped_on_errors() {
   assert_eq!(*local_runner_call_counter.lock(), 2);
 }
 
+/// With eager_fetch enabled, we should skip the remote cache if any of the process result's
+/// digests are invalid. This will force rerunning the process locally. Otherwise, we should use
+/// the cached result with its non-existent digests.
+#[tokio::test]
+async fn cache_read_eager_fetch() {
+  WorkunitStore::setup_for_tests();
+
+  async fn run_process(eager_fetch: bool) -> (i32, u32) {
+    let store = create_remote_store();
+    let (local_runner, local_runner_call_counter) = create_local_runner(1);
+    let (cache_runner, action_cache) =
+      create_cached_runner(local_runner.clone(), store.clone(), eager_fetch);
+
+    let process = create_process();
+    insert_into_action_cache(
+      &action_cache,
+      &process,
+      &store,
+      0,
+      TestData::roland().digest(),
+      TestData::roland().digest(),
+    )
+    .await;
+
+    assert_eq!(*local_runner_call_counter.lock(), 0);
+    let local_result = local_runner
+      .run(process.clone().into(), Context::default())
+      .await
+      .unwrap();
+    assert_eq!(local_result.exit_code, 1);
+    assert_eq!(*local_runner_call_counter.lock(), 1);
+
+    // Run the process, possibly by pulling from the `ActionCache`.
+    let remote_result = cache_runner
+      .run(process.clone().into(), Context::default())
+      .await
+      .unwrap();
+
+    let final_local_count = *local_runner_call_counter.lock();
+    (remote_result.exit_code, final_local_count)
+  }
+
+  let (lazy_exit_code, lazy_local_call_count) = run_process(false).await;
+  assert_eq!(lazy_exit_code, 0);
+  assert_eq!(lazy_local_call_count, 1);
+
+  let (eager_exit_code, eager_local_call_count) = run_process(true).await;
+  assert_eq!(eager_exit_code, 1);
+  assert_eq!(eager_local_call_count, 2);
+}
+
 // #[tokio::test]
 // async fn cache_write_success() {
 //   WorkunitStore::setup_for_tests();
@@ -259,56 +310,6 @@ async fn cache_read_skipped_on_errors() {
 //   assert_ne!(results.uncached, results.maybe_cached);
 //   assert_eq!(results.uncached.unwrap().exit_code, 1);
 //   assert_eq!(results.maybe_cached.unwrap().exit_code, 127); // aka the return code for file not found
-// }
-
-/// With eager_fetch enabled, we should skip the remote cache if any of the process result's
-/// digests are invalid. This will force rerunning the process locally. Otherwise, we should use
-/// the cached result with its non-existent digests.
-// #[tokio::test]
-// async fn eager_fetch() {
-//   WorkunitStore::setup_for_tests();
-//
-//   async fn run_process(eager_fetch: bool) -> FallibleProcessResultWithPlatform {
-//     let (local, store) = create_local_runner_old();
-//     let (caching, stub_action_cache) = create_cached_runner(local, store.clone(), eager_fetch);
-//
-//     // Get the `action_digest` for the Process that we're going to run. This will allow us to
-//     // insert a bogus value into the `stub_action_cache`.
-//     let (process, _script_path) = create_script(1);
-//     let (action, command, _exec_request) =
-//       make_execute_request(&process, ProcessMetadata::default()).unwrap();
-//     let (_command_digest, action_digest) = ensure_action_stored_locally(&store, &command, &action)
-//       .await
-//       .unwrap();
-//
-//     // Insert an ActionResult with missing digests and a return code of 0 (instead of 1).
-//     let bogus_action_result = ActionResult {
-//       exit_code: 0,
-//       stdout_digest: Some(TestData::roland().digest().into()),
-//       stderr_digest: Some(TestData::roland().digest().into()),
-//       ..ActionResult::default()
-//     };
-//     stub_action_cache
-//       .action_map
-//       .lock()
-//       .insert(action_digest.0, bogus_action_result);
-//
-//     // Run the process, possibly by pulling from the `ActionCache`.
-//     caching
-//       .run(process.clone().into(), Context::default())
-//       .await
-//       .unwrap()
-//   }
-//
-//   let lazy_result = run_process(false).await;
-//   assert_eq!(lazy_result.exit_code, 0);
-//   assert_eq!(lazy_result.stdout_digest, TestData::roland().digest());
-//   assert_eq!(lazy_result.stderr_digest, TestData::roland().digest());
-//
-//   let eager_result = run_process(true).await;
-//   assert_eq!(eager_result.exit_code, 1);
-//   assert_ne!(eager_result.stdout_digest, TestData::roland().digest());
-//   assert_ne!(eager_result.stderr_digest, TestData::roland().digest());
 // }
 
 #[tokio::test]
