@@ -112,18 +112,14 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
 
 #[tokio::test]
 async fn cache_success() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let results = run_roundtrip(0).await;
   assert_eq!(results.uncached, results.maybe_cached);
 }
 
 #[tokio::test]
 async fn failures_not_cached() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
+  WorkunitStore::setup_for_tests();
   let results = run_roundtrip(1).await;
   assert_ne!(results.uncached, results.maybe_cached);
   assert_eq!(results.uncached.unwrap().exit_code, 1);
@@ -132,8 +128,7 @@ async fn failures_not_cached() {
 
 #[tokio::test]
 async fn recover_from_missing_store_contents() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let (local, store, _local_runner_dir) = create_local_runner();
   let (caching, _cache_dir) = create_cached_runner(local, store.clone());

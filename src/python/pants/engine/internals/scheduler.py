@@ -47,7 +47,6 @@ from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
@@ -97,7 +96,7 @@ class Scheduler:
         local_execution_root_dir: str,
         named_caches_dir: str,
         ca_certs_path: Optional[str],
-        rules: FrozenOrderedSet[Rule],
+        rules: Iterable[Rule],
         union_membership: UnionMembership,
         execution_options: ExecutionOptions,
         executor: PyExecutor,
@@ -312,6 +311,12 @@ class Scheduler:
             self._scheduler, session, max_log_verbosity.level
         )
         return {"started": result[0], "completed": result[1]}
+
+    def get_observation_histograms(self, session):
+        return self._native.lib.session_get_observation_histograms(self._scheduler, session)
+
+    def record_test_observation(self, session, value: int) -> None:
+        self._native.lib.session_record_test_observation(self._scheduler, session, value)
 
     def _run_and_return_roots(self, session, execution_request):
         try:
@@ -664,3 +669,9 @@ class SchedulerSession:
 
     def garbage_collect_store(self, target_size_bytes: int) -> None:
         self._scheduler.garbage_collect_store(target_size_bytes)
+
+    def get_observation_histograms(self):
+        return self._scheduler.get_observation_histograms(self._session)
+
+    def record_test_observation(self, value: int) -> None:
+        self._scheduler.record_test_observation(self._session, value)

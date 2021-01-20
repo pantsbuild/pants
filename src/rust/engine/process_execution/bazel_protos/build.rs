@@ -15,6 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       &[
         "protos/bazelbuild_remote-apis/build/bazel/remote/execution/v2/remote_execution.proto",
         "protos/bazelbuild_remote-apis/build/bazel/semver/semver.proto",
+        "protos/buildbarn/cas.proto",
         "protos/googleapis/google/bytestream/bytestream.proto",
         "protos/googleapis/google/rpc/code.proto",
         "protos/googleapis/google/rpc/error_details.proto",
@@ -24,6 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       ],
       &[
         "protos/bazelbuild_remote-apis",
+        "protos/buildbarn",
         "protos/googleapis",
         "protos/standard",
       ],

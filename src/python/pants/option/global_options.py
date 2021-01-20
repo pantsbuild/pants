@@ -415,12 +415,6 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--stats-json-file",
-            advanced=True,
-            default=None,
-            help="Write stats to this local json file on run completion.",
-        )
-        register(
             "--stats-record-option-scopes",
             advanced=True,
             type=list,
@@ -543,17 +537,6 @@ class GlobalOptions(Subsystem):
             default=0,
             daemon=True,
             help="The port to bind the Pants nailgun server to. Defaults to a random port.",
-        )
-        # TODO(#7514): Make this default to 1.0 seconds if stdin is a tty!
-        register(
-            "--pantsd-pailgun-quit-timeout",
-            advanced=True,
-            type=float,
-            default=5.0,
-            removal_version="2.3.0.dev0",
-            removal_hint="The pailgun client has been rewritten to no longer use this",
-            help="The length of time (in seconds) to wait for further output after sending a "
-            "signal to the remote pantsd process before killing it.",
         )
         register(
             "--pantsd-invalidation-globs",

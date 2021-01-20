@@ -232,8 +232,8 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
         textwrap.dedent(
             """
             python_library(name='not_a_binary', sources=[])
-            pex_binary(name='no_explicit_entrypoint', sources=["app1.py"])
-            pex_binary(name='malformed_entrypoint', entry_point='invalid_binary.app2')
+            pex_binary(name='invalid_entrypoint_unowned1', entry_point='app1.py')
+            pex_binary(name='invalid_entrypoint_unowned2', entry_point='invalid_binary.app2')
             python_distribution(
                 name='invalid_bin1',
                 provides=setup_py(
@@ -244,13 +244,13 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
                 name='invalid_bin2',
                 provides=setup_py(
                     name='invalid_bin2', version='1.1.1'
-                ).with_binaries(foo=':no_explicit_entrypoint')
+                ).with_binaries(foo=':invalid_entrypoint_unowned1')
             )
             python_distribution(
                 name='invalid_bin3',
                 provides=setup_py(
                     name='invalid_bin3', version='1.1.1'
-                ).with_binaries(foo=':malformed_entrypoint')
+                ).with_binaries(foo=':invalid_entrypoint_unowned2')
             )
             """
         ),
@@ -279,7 +279,8 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
         "src/python/project",
         textwrap.dedent(
             """
-            pex_binary(name='bin', sources=["app.py"], entry_point=':func')
+            python_library()
+            pex_binary(name='bin', entry_point='app.py:func')
             python_distribution(
                 name='dist',
                 provides=setup_py(

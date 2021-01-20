@@ -779,7 +779,7 @@ class NoAliasDumper(yaml.SafeDumper):
 
 
 def main() -> None:
-    supported_python_versions = [PythonVersion.py37]
+    supported_python_versions = [PythonVersion.py37, PythonVersion.py38]
     generated_yaml = yaml.dump(
         {
             # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1

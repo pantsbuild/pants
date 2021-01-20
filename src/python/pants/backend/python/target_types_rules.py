@@ -12,7 +12,6 @@ import os.path
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
 from pants.backend.python.target_types import (
-    DeprecatedPexBinarySources,
     PexBinaryDependencies,
     PexEntryPointField,
     PythonDistributionDependencies,
@@ -30,7 +29,6 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import docs_url
 
@@ -54,43 +52,16 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     #  3) `path.to.module:func` => preserve exactly.
     #  4) `app.py` => convert into `path.to.app`.
     #  5) `app.py:func` => convert into `path.to.app:func`.
-    #  6) `:func` => if there's a sources field, convert to `path.to.sources:func` (deprecated).
-    #  7) no entry point field, but `sources` field => convert to `path.to.sources` (deprecated).
 
-    # Handle deprecated cases #6 and #7, which are the only cases where the `sources` field matters
-    # for calculating the entry point.
-    if not ep_val or ep_val.startswith(":"):
-        binary_source_paths = await Get(
-            Paths, PathGlobs, request.sources.path_globs(FilesNotFoundBehavior.error)
+    if ep_val is None:
+        instructions_url = docs_url(
+            "python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
         )
-        if len(binary_source_paths.files) != 1:
-            instructions_url = docs_url(
-                "python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
-            )
-            if not ep_val:
-                raise InvalidFieldException(
-                    f"The `{ep_alias}` field is not set for the target {address}. Run "
-                    f"`./pants help pex_binary` for more information on how to set the field or "
-                    f"see {instructions_url}."
-                )
-            raise InvalidFieldException(
-                f"The `{ep_alias}` field for the target {address} is set to the short-hand value "
-                f"{repr(ep_val)}, but the `sources` field is not set. Pants requires the "
-                "`sources` field to expand the entry point to the normalized form "
-                f"`path.to.module:{ep_val}`. Please either set the `sources` field to exactly one "
-                f"file (deprecated) or set `{ep_alias}='my_file.py:{ep_val}'`. See "
-                f"{instructions_url}."
-            )
-        entry_point_path = binary_source_paths.files[0]
-        source_root = await Get(
-            SourceRoot,
-            SourceRootRequest,
-            SourceRootRequest.for_file(entry_point_path),
+        raise InvalidFieldException(
+            f"The `{ep_alias}` field is not set for the target {address}. Run "
+            f"`./pants help pex_binary` for more information on how to set the field or "
+            f"see {instructions_url}."
         )
-        stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
-        module_base, _ = os.path.splitext(stripped_source_path)
-        normalized_path = module_base.replace(os.path.sep, ".")
-        return ResolvedPexEntryPoint(f"{normalized_path}{ep_val}" if ep_val else normalized_path)
 
     # Case #1.
     if ep_val in ("<none>", "<None>"):
@@ -146,18 +117,13 @@ async def inject_pex_binary_entry_point_dependency(
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
     entry_point = await Get(
         ResolvedPexEntryPoint,
-        ResolvePexEntryPointRequest(
-            original_tgt.target[PexEntryPointField], original_tgt.target[DeprecatedPexBinarySources]
-        ),
+        ResolvePexEntryPointRequest(original_tgt.target[PexEntryPointField]),
     )
     if entry_point.val is None:
         return InjectedDependencies()
     module, _, _func = entry_point.val.partition(":")
     owners = await Get(PythonModuleOwners, PythonModule(module))
-    # TODO: remove the check for == self once the `sources` field is removed.
-    return InjectedDependencies(
-        owner for owner in owners if owner != request.dependencies_field.address
-    )
+    return InjectedDependencies(owners)
 
 
 # -----------------------------------------------------------------------------------------------

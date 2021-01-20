@@ -59,6 +59,7 @@ def main() -> None:
 
 class PythonVersion(Enum):
     py37 = "3.7"
+    py38 = "3.8"
 
     def __str__(self) -> str:
         return str(self.value)

@@ -11,7 +11,6 @@ from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 @pytest.mark.parametrize(
     "tgt_content",
     [
-        "pex_binary(sources=['app.py'])",
         "python_library(name='lib')\npex_binary(entry_point='app.py')",
         "python_library(name='lib')\npex_binary(entry_point='app.py:main')",
     ],

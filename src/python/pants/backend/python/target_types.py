@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections.abc
+import logging
 import os.path
 from dataclasses import dataclass
 from textwrap import dedent
@@ -36,6 +37,8 @@ from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
 from pants.util.docutil import docs_url
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
@@ -95,18 +98,6 @@ class PexBinaryDefaults(Subsystem):
         return cast(bool, self.options.emit_warnings)
 
 
-class DeprecatedPexBinarySources(PythonSources):
-    expected_num_files = range(0, 2)
-    deprecated_removal_version = "2.3.0.dev0"
-    deprecated_removal_hint = (
-        "Remove the `sources` field and set the `entry_point` field to the file name, "
-        "e.g. `entry_point='app.py'` or `entry_point='app.py:func'`. Create a `python_library` "
-        "target with the entry point's file included (if it does not yet exist). Pants will infer "
-        "a dependency, which you can check with `./pants dependencies path/to:app`. See "
-        f"{docs_url('python-package-goal')} for more instructions."
-    )
-
-
 # See `target_types_rules.py` for a dependency injection rule.
 class PexBinaryDependencies(Dependencies):
     supports_transitive_excludes = True
@@ -122,6 +113,35 @@ class PexEntryPointField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
         "will convert into `path.to.app:func`.\n\nYou must use the file name shorthand for file "
         "arguments to work with this target.\n\nTo leave off an entry point, set to '<none>'."
     )
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
+        ep = super().compute_value(raw_value, address=address)
+        entry_point = ep.strip() if ep is not None else None
+        if not entry_point:
+            raise InvalidFieldException(
+                f"The entry point for {address} cannot be blank. It must indicate a Python module "
+                "by name or path and an optional nullary function in that module separated by a "
+                "colon, i.e.: module_name_or_path(':'function_name)?"
+            )
+        module_or_path, sep, func = entry_point.partition(":")
+        if not module_or_path:
+            raise InvalidFieldException(
+                f"The entry point for {address} must specify a module; given: {ep!r}"
+            )
+        if ":" in module_or_path or ":" in func:
+            raise InvalidFieldException(
+                f"The entry point for {address} can only contain one colon separating the entry "
+                f"point's module from the entry point function in that module; given: {ep!r}"
+            )
+        if sep and not func:
+            logger.warning(
+                f"Assuming no entry point function and stripping trailing ':' from the entry point "
+                f"{ep!r} declared in {address}. Consider deleting it to make it clear no entry "
+                f"point function is intended."
+            )
+            return module_or_path
+        return entry_point
 
     @property
     def filespec(self) -> Filespec:
@@ -145,7 +165,6 @@ class ResolvePexEntryPointRequest:
     """Determine the `entry_point` for a `pex_binary` after applying all syntactic sugar."""
 
     entry_point_field: PexEntryPointField
-    sources: DeprecatedPexBinarySources
 
 
 class PexPlatformsField(StringSequenceField):
@@ -235,23 +254,11 @@ class PexEmitWarningsField(BoolField):
         return self.value
 
 
-class DeprecatedPexBinaryInterpreterConstraints(InterpreterConstraintsField):
-    deprecated_removal_version = "2.3.0.dev0"
-    deprecated_removal_hint = (
-        "Because the `sources` field will be removed from `pex_binary` targets, it no longer makes "
-        "sense to also have an `interpreter_constraints` field. Instead, set the "
-        "`interpreter_constraints` field on the `python_library` target containing the binary's "
-        "entry point."
-    )
-
-
 class PexBinary(Target):
     alias = "pex_binary"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        DeprecatedPexBinaryInterpreterConstraints,
-        DeprecatedPexBinarySources,
         PexBinaryDependencies,
         PexEntryPointField,
         PexPlatformsField,

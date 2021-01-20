@@ -19,7 +19,7 @@ from pants.init.logging import (
     set_logging_handlers,
     setup_logging,
 )
-from pants.init.util import clean_global_runtime_state
+from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.util.contextutil import argv_as, hermetic_environment_as, stdio_as
@@ -144,7 +144,7 @@ class DaemonPantsRunner(RawFdRunner):
         # of a local run: once we allow for concurrent runs, this information should be
         # propagated down from the caller.
         #   see https://github.com/pantsbuild/pants/issues/7654
-        clean_global_runtime_state()
+        BuildConfigInitializer.reset()
         options_bootstrapper = OptionsBootstrapper.create(
             env=os.environ, args=sys.argv, allow_pantsrc=True
         )

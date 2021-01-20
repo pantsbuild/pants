@@ -615,13 +615,23 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
 
         with handler.session():
+            scheduler.record_test_observation(128)
             scheduler.product_request(TrueResult, subjects=[0])
+            histograms_info = scheduler.get_observation_histograms()
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunits_with_counters = [item for item in finished if "counters" in item]
         assert workunits_with_counters[0]["counters"]["local_execution_requests"] == 1
         assert workunits_with_counters[1]["counters"]["local_cache_requests"] == 1
         assert workunits_with_counters[1]["counters"]["local_cache_requests_uncached"] == 1
+
+        assert histograms_info["version"] == 0
+        assert "histograms" in histograms_info
+        assert "test_observation" in histograms_info["histograms"]
+        assert (
+            histograms_info["histograms"]["test_observation"]
+            == b"\x1c\x84\x93\x14\x00\x00\x00\x1fx\x9c\x93i\x99,\xcc\xc0\xc0\xc0\xcc\x00\x010\x9a\x11J3\xd9\x7f\x800\xfe32\x01\x00E\x0c\x03\x81"
+        )
 
 
 @dataclass(frozen=True)

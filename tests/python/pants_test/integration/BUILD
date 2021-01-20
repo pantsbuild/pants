@@ -57,4 +57,15 @@ python_integration_tests(
   timeout = 180,
 )
 
+python_integration_tests(
+  name = 'remote_cache_integration',
+  sources = ['remote_cache_integration_test.py'],
+  dependencies = [
+    'testprojects/src/python:hello_directory',
+  ],
+  uses_pants_run=True,
+  timeout = 180,
+)
+
+
 python_library()

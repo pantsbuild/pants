@@ -20,9 +20,10 @@ RUN yum install -y \
         zlib-devel
 
 ARG PYTHON_27_VERSION=2.7.18
-ARG PYTHON_36_VERSION=3.6.10
-ARG PYTHON_37_VERSION=3.7.7
-ARG PYTHON_38_VERSION=3.8.2
+ARG PYTHON_36_VERSION=3.6.12
+ARG PYTHON_37_VERSION=3.7.9
+ARG PYTHON_38_VERSION=3.8.7
+ARG PYTHON_39_VERSION=3.9.1
 
 ENV PYENV_ROOT /pyenv-docker-build
 ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
@@ -36,11 +37,13 @@ RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_36_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_37_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_38_VERSION}
+RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_39_VERSION}
 
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_36_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_37_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_38_VERSION}/bin:${PATH}"
+ENV PATH "${PYENV_ROOT}/versions/${PYTHON_39_VERSION}/bin:${PATH}"
 
 # We install the AWS CLI for use in CI to cache assets like pants.pex.
 ENV AWS_CLI_ROOT /aws-docker-build

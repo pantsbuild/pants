@@ -8,7 +8,6 @@ from typing import Match, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
-from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
@@ -29,21 +28,6 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import docs_url
-
-
-class PythonAwsLambdaSources(PythonSources):
-    expected_num_files = range(0, 2)
-    deprecated_removal_version = "2.3.0.dev0"
-    deprecated_removal_hint = (
-        "Remove the `sources` field and create a `python_library` target with the handler "
-        "file included (if it does not yet exist). Pants will infer a dependency, which you can "
-        "check with `./pants dependencies path/to:lambda`. See "
-        f"{docs_url('awslambda-python')} for an example.\n\nYou can also "
-        "update the `handler` field to use the file name, "
-        "e.g. `handler='lambda.py:handler_func'`. This will allow file arguments to still work "
-        "with this target, meaning you can still use `./pants package path/to/lambda.py` instead "
-        "of needing to use `./pants package path/to:lambda`."
-    )
 
 
 class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
@@ -151,10 +135,7 @@ async def inject_lambda_handler_dependency(
     )
     module, _, _func = handler.val.partition(":")
     owners = await Get(PythonModuleOwners, PythonModule(module))
-    # TODO: remove the check for == self once the `sources` field is removed.
-    return InjectedDependencies(
-        owner for owner in owners if owner != request.dependencies_field.address
-    )
+    return InjectedDependencies(owners)
 
 
 class PythonAwsLambdaRuntime(StringField):
@@ -184,22 +165,10 @@ class PythonAwsLambdaRuntime(StringField):
         return int(mo.group("major")), int(mo.group("minor"))
 
 
-class DeprecatedAwsLambdaInterpreterConstraints(InterpreterConstraintsField):
-    deprecated_removal_version = "2.3.0.dev0"
-    deprecated_removal_hint = (
-        "Because the `sources` field will be removed from `python_awslambda` targets, it no longer "
-        "makes sense to also have an `interpreter_constraints` field. Instead, set the "
-        "`interpreter_constraints` field on the `python_library` target containing the lambda's "
-        "handler code."
-    )
-
-
 class PythonAWSLambda(Target):
     alias = "python_awslambda"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        PythonAwsLambdaSources,
-        DeprecatedAwsLambdaInterpreterConstraints,
         OutputPathField,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,

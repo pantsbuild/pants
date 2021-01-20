@@ -1,26 +1,26 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import json
+import getpass
 import logging
 import os
+import socket
 import sys
 import time
 import uuid
 from collections import OrderedDict
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
-from pants.base.run_info import RunInfo
 from pants.engine.internals.native import Native
-from pants.goal.aggregated_timings import AggregatedTimings, TimingData
 from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.option.subsystem import Subsystem
-from pants.util.dirutil import relative_symlink, safe_file_dump
+from pants.util.dirutil import safe_mkdir_for
+from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -36,39 +36,6 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
         if isinstance(o, OrderedDict):
             return o
         return super().default(o)
-
-
-class DeprecatedRunTracker(Subsystem):
-    options_scope = "run-tracker"
-    help = "Tracks and times the execution of a pants run."
-
-    @classmethod
-    def register_options(cls, register):
-        register(
-            "--stats-local-json-file",
-            advanced=True,
-            default=None,
-            removal_version="2.3.0.dev0",
-            removal_hint=(
-                "This option is now a noop: instead, use global option " "`--stats-json-file`."
-            ),
-            help="Write stats to this local json file on run completion.",
-        )
-        register(
-            "--stats-option-scopes-to-record",
-            advanced=True,
-            type=list,
-            default=["*"],
-            removal_version="2.3.0.dev0",
-            removal_hint=(
-                "This option is now a noop: instead, use global option "
-                "`--stats-record-option-scopes`."
-            ),
-            help="Option scopes to record in stats on run completion. "
-            "Options may be selected by joining the scope and the option with a ^ character, "
-            "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "
-            "Add a '*' to the list to capture all known scopes.",
-        )
 
 
 class RunTracker:
@@ -92,28 +59,24 @@ class RunTracker:
 
         self._all_options = options
         info_dir = os.path.join(self._all_options.for_global_scope().pants_workdir, "run-tracker")
-        self.run_info_dir = os.path.join(info_dir, self.run_id)
-        self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
-
-        # Time spent in a workunit, including its children.
-        self.cumulative_timings = AggregatedTimings(
-            os.path.join(self.run_info_dir, "cumulative_timings")
-        )
+        self._run_info: Dict[str, Any] = {}
 
         # pantsd stats.
         self._pantsd_metrics: Dict[str, int] = dict()
 
-        self.run_logs_file = Path(self.run_info_dir, "logs")
+        self.run_logs_file = Path(info_dir, self.run_id, "logs")
+        safe_mkdir_for(str(self.run_logs_file))
         self.native.set_per_run_log_path(str(self.run_logs_file))
 
         # Initialized in `start()`.
         self._run_start_time: Optional[float] = None
+        self._run_total_duration: Optional[float] = None
 
     @property
     def goals(self) -> List[str]:
         return self._all_options.goals if self._all_options else []
 
-    def start(self, run_start_time: float) -> None:
+    def start(self, run_start_time: float, specs: List[str]) -> None:
         """Start tracking this pants run."""
         if self._has_started:
             raise AssertionError("RunTracker.start must not be called multiple times.")
@@ -121,13 +84,24 @@ class RunTracker:
 
         # Initialize the run.
         self._run_start_time = run_start_time
-        self.run_info.add_basic_info(self.run_id, run_start_time)
-        cmd_line = " ".join(["pants"] + sys.argv[1:])
-        self.run_info.add_info("cmd_line", cmd_line)
 
-        # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
-        link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")
-        relative_symlink(self.run_info_dir, link_to_latest)
+        datetime = time.strftime("%A %b %d, %Y %H:%M:%S", time.localtime(run_start_time))
+        cmd_line = " ".join(["pants"] + sys.argv[1:])
+
+        self._run_info.update(
+            {
+                "id": self.run_id,
+                "timestamp": run_start_time,
+                "datetime": datetime,
+                "user": getpass.getuser(),
+                "machine": socket.gethostname(),
+                "buildroot": get_buildroot(),
+                "path": get_buildroot(),
+                "version": VERSION,
+                "cmd_line": cmd_line,
+                "specs_from_command_line": specs,
+            }
+        )
 
     def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:
         self._pantsd_metrics = metrics
@@ -136,37 +110,9 @@ class RunTracker:
     def pantsd_scheduler_metrics(self) -> Dict[str, int]:
         return dict(self._pantsd_metrics)  # defensive copy
 
-    @classmethod
-    def write_stats_to_json(cls, file_name: str, stats: dict) -> None:
-        """Write stats to a local json file."""
-        params = json.dumps(stats, cls=RunTrackerOptionEncoder)
-        try:
-            safe_file_dump(file_name, params, mode="w")
-        except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
-            print(
-                f"WARNING: Failed to write stats to {file_name} due to Error: {e!r}",
-                file=sys.stderr,
-            )
-
-    def run_information(self):
+    def run_information(self) -> Dict[str, Any]:
         """Basic information about this run."""
-        run_information = self.run_info.get_as_dict()
-        return run_information
-
-    def store_stats(self) -> None:
-        """Store stats about this run in local and optionally remote stats dbs."""
-
-        stats = {
-            "run_info": self.run_information(),
-            "pantsd_stats": self.pantsd_scheduler_metrics,
-            "cumulative_timings": self.get_cumulative_timings(),
-            "recorded_options": self.get_options_to_record(),
-        }
-
-        # Write stats to user-defined json file.
-        stats_json_file_name = self._all_options.for_global_scope().stats_json_file
-        if stats_json_file_name:
-            self.write_stats_to_json(stats_json_file_name, stats)
+        return self._run_info
 
     def has_ended(self) -> bool:
         return self._has_ended
@@ -185,23 +131,15 @@ class RunTracker:
             raise Exception("RunTracker.end_run() called without calling .start()")
 
         duration = time.time() - self._run_start_time
-
-        self.cumulative_timings.add_timing(label="main", secs=duration)
+        self._total_run_time = duration
 
         outcome_str = "SUCCESS" if exit_code == PANTS_SUCCEEDED_EXIT_CODE else "FAILURE"
-
-        if self.run_info.get_info("outcome") is None:
-            # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
-            self.run_info.add_info("outcome", outcome_str, ignore_errors=True)
-
-        self.store_stats()
+        self._run_info["outcome"] = outcome_str
 
         self.native.set_per_run_log_path(None)
 
-        return
-
-    def get_cumulative_timings(self) -> TimingData:
-        return self.cumulative_timings.get_all()
+    def get_cumulative_timings(self) -> List[Dict[str, Any]]:
+        return [{"label": "main", "timing": self._total_run_time}]
 
     def get_options_to_record(self) -> dict:
         recorded_options = {}

@@ -31,8 +31,7 @@ struct LocalTestResult {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
     .await
@@ -48,8 +47,7 @@ async fn stdout() {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(Process::new(owned_string_vec(&[
     "/bin/bash",
@@ -69,8 +67,7 @@ async fn stdout_and_stderr_and_exit_code() {
 #[tokio::test]
 #[cfg(unix)]
 async fn capture_exit_code_signal() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   // Launch a process that kills itself with a signal.
   let result = run_command_locally(Process::new(owned_string_vec(&[
@@ -91,8 +88,7 @@ async fn capture_exit_code_signal() {
 #[tokio::test]
 #[cfg(unix)]
 async fn env() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let mut env: BTreeMap<String, String> = BTreeMap::new();
   env.insert("FOO".to_string(), "foo".to_string());
@@ -123,8 +119,7 @@ async fn env() {
 #[tokio::test]
 #[cfg(unix)]
 async fn env_is_deterministic() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   fn make_request() -> Process {
     let mut env = BTreeMap::new();
@@ -141,8 +136,7 @@ async fn env_is_deterministic() {
 
 #[tokio::test]
 async fn binary_not_found() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let err_string = run_command_locally(Process::new(owned_string_vec(&["echo", "-n", "foo"])))
     .await
@@ -153,8 +147,7 @@ async fn binary_not_found() {
 
 #[tokio::test]
 async fn output_files_none() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(Process::new(owned_string_vec(&[
     &find_bash(),
@@ -173,8 +166,7 @@ async fn output_files_none() {
 
 #[tokio::test]
 async fn output_files_one() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(
     Process::new(vec![
@@ -199,8 +191,7 @@ async fn output_files_one() {
 
 #[tokio::test]
 async fn output_dirs() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(
     Process::new(vec![
@@ -231,8 +222,7 @@ async fn output_dirs() {
 
 #[tokio::test]
 async fn output_files_many() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(
     Process::new(vec![
@@ -261,8 +251,7 @@ async fn output_files_many() {
 
 #[tokio::test]
 async fn output_files_execution_failure() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(
     Process::new(vec![
@@ -291,8 +280,7 @@ async fn output_files_execution_failure() {
 
 #[tokio::test]
 async fn output_files_partial_output() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(
     Process::new(vec![
@@ -321,8 +309,7 @@ async fn output_files_partial_output() {
 
 #[tokio::test]
 async fn output_overlapping_file_and_dir() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(
     Process::new(vec![
@@ -348,8 +335,7 @@ async fn output_overlapping_file_and_dir() {
 
 #[tokio::test]
 async fn append_only_cache_created() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let name = "geo";
   let dest = format!(".cache/{}", name);
@@ -371,8 +357,7 @@ async fn append_only_cache_created() {
 
 #[tokio::test]
 async fn jdk_symlink() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let roland = TestData::roland().bytes();
@@ -395,8 +380,7 @@ async fn jdk_symlink() {
 
 #[tokio::test]
 async fn test_directory_preservation() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
@@ -443,8 +427,7 @@ async fn test_directory_preservation() {
 
 #[tokio::test]
 async fn test_directory_preservation_error() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
@@ -469,8 +452,7 @@ async fn test_directory_preservation_error() {
 
 #[tokio::test]
 async fn all_containing_directories_for_outputs_are_created() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(
     Process::new(vec![
@@ -502,8 +484,7 @@ async fn all_containing_directories_for_outputs_are_created() {
 
 #[tokio::test]
 async fn output_empty_dir() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let result = run_command_locally(
     Process::new(vec![
@@ -528,8 +509,7 @@ async fn output_empty_dir() {
 
 #[tokio::test]
 async fn timeout() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let argv = vec![
     find_bash(),
@@ -551,8 +531,7 @@ async fn timeout() {
 
 #[tokio::test]
 async fn working_directory() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
