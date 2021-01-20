@@ -15,6 +15,7 @@ use remexec::ActionResult;
 use store::{BackoffConfig, Store};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
+use tokio::time::delay_for;
 use workunit_store::WorkunitStore;
 
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
@@ -28,10 +29,15 @@ use crate::{
 struct MockLocalCommandRunner {
   result: Result<FallibleProcessResultWithPlatform, String>,
   call_counter: Arc<AtomicUsize>,
+  delay: Duration,
 }
 
 impl MockLocalCommandRunner {
-  pub fn new(exit_code: i32, call_counter: Arc<AtomicUsize>) -> MockLocalCommandRunner {
+  pub fn new(
+    exit_code: i32,
+    call_counter: Arc<AtomicUsize>,
+    delay_ms: u64,
+  ) -> MockLocalCommandRunner {
     MockLocalCommandRunner {
       result: Ok(FallibleProcessResultWithPlatform {
         stdout_digest: EMPTY_DIGEST,
@@ -42,6 +48,7 @@ impl MockLocalCommandRunner {
         platform: Platform::current().unwrap(),
       }),
       call_counter,
+      delay: Duration::from_millis(delay_ms),
     }
   }
 }
@@ -53,6 +60,7 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
     _req: MultiPlatformProcess,
     _context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    delay_for(self.delay).await;
     self.call_counter.fetch_add(1, Ordering::SeqCst);
     self.result.clone()
   }
@@ -97,9 +105,16 @@ impl StoreSetup {
   }
 }
 
-fn create_local_runner(exit_code: i32) -> (Box<MockLocalCommandRunner>, Arc<AtomicUsize>) {
+fn create_local_runner(
+  exit_code: i32,
+  delay_ms: u64,
+) -> (Box<MockLocalCommandRunner>, Arc<AtomicUsize>) {
   let call_counter = Arc::new(AtomicUsize::new(0));
-  let local_runner = Box::new(MockLocalCommandRunner::new(exit_code, call_counter.clone()));
+  let local_runner = Box::new(MockLocalCommandRunner::new(
+    exit_code,
+    call_counter.clone(),
+    delay_ms,
+  ));
   (local_runner, call_counter)
 }
 
@@ -164,7 +179,7 @@ fn insert_into_action_cache(
 async fn cache_read_success() {
   WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
-  let (local_runner, local_runner_call_counter) = create_local_runner(1);
+  let (local_runner, local_runner_call_counter) = create_local_runner(1, 50);
   let (cache_runner, action_cache) =
     create_cached_runner(local_runner.clone(), store_setup.store.clone(), false);
 
@@ -185,7 +200,7 @@ async fn cache_read_success() {
 async fn cache_read_skipped_on_errors() {
   WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
-  let (local_runner, local_runner_call_counter) = create_local_runner(1);
+  let (local_runner, local_runner_call_counter) = create_local_runner(1, 50);
   let (cache_runner, action_cache) =
     create_cached_runner(local_runner.clone(), store_setup.store.clone(), false);
 
@@ -211,7 +226,7 @@ async fn cache_read_eager_fetch() {
 
   async fn run_process(eager_fetch: bool) -> (i32, usize) {
     let store_setup = StoreSetup::new();
-    let (local_runner, local_runner_call_counter) = create_local_runner(1);
+    let (local_runner, local_runner_call_counter) = create_local_runner(1, 50);
     let (cache_runner, action_cache) =
       create_cached_runner(local_runner.clone(), store_setup.store.clone(), eager_fetch);
 
@@ -247,7 +262,7 @@ async fn cache_read_eager_fetch() {
 async fn cache_write_success() {
   WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
-  let (local_runner, local_runner_call_counter) = create_local_runner(0);
+  let (local_runner, local_runner_call_counter) = create_local_runner(0, 50);
   let (cache_runner, action_cache) =
     create_cached_runner(local_runner, store_setup.store.clone(), false);
   let (process, action_digest) = create_process(&store_setup.store).await;
@@ -277,7 +292,7 @@ async fn cache_write_success() {
 async fn cache_write_not_for_failures() {
   WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
-  let (local_runner, local_runner_call_counter) = create_local_runner(1);
+  let (local_runner, local_runner_call_counter) = create_local_runner(1, 50);
   let (cache_runner, action_cache) =
     create_cached_runner(local_runner, store_setup.store.clone(), false);
   let (process, _action_digest) = create_process(&store_setup.store).await;
