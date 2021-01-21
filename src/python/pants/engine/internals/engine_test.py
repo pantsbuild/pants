@@ -10,7 +10,10 @@ from typing import List, Optional, Tuple
 
 import pytest
 
-from pants.base.specs import empty_specs
+from pants.backend.python.target_types import PythonLibrary
+from pants.base.build_environment import get_buildroot
+from pants.base.specs import Specs
+from pants.base.specs_parser import SpecsParser
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import (
     EMPTY_FILE_DIGEST,
@@ -303,7 +306,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
             max_workunit_verbosity=max_workunit_verbosity,
-            specs=empty_specs(),
+            specs=Specs.empty(),
             options_bootstrapper=create_options_bootstrapper([]),
         )
         return (scheduler, tracker, handler)
@@ -677,7 +680,7 @@ def test_more_complicated_engine_aware(rule_runner: RuleRunner, run_tracker: Run
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.TRACE,
-        specs=empty_specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
     )
     with handler.session():
@@ -738,7 +741,7 @@ def test_process_digests_on_streaming_workunits(
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
-        specs=empty_specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
     )
 
@@ -770,7 +773,7 @@ def test_process_digests_on_streaming_workunits(
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
-        specs=empty_specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
     )
 
@@ -818,8 +821,6 @@ def test_context_object_on_streaming_workunits(
         context = kwargs["context"]
         assert isinstance(context, StreamingWorkunitContext)
 
-        assert {} == context.get_expanded_specs()
-
         completed_workunits = kwargs["completed_workunits"]
         for workunit in completed_workunits:
             if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
@@ -833,8 +834,65 @@ def test_context_object_on_streaming_workunits(
         callbacks=[callback],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
-        specs=empty_specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
+    )
+
+    stdout_process = Process(
+        argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
+    )
+
+    with handler.session():
+        rule_runner.request(ProcessResult, [stdout_process])
+
+
+def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
+
+    rule_runner = RuleRunner(
+        target_types=[PythonLibrary],
+        rules=[
+            QueryRule(ProcessResult, (Process,)),
+        ],
+    )
+
+    rule_runner.set_options(["--backend-packages=pants.backend.python"])
+
+    rule_runner.create_file("src/python/somefiles/BUILD", "python_library()")
+    rule_runner.create_file("src/python/somefiles/a.py", "print('')")
+    rule_runner.create_file("src/python/somefiles/b.py", "print('')")
+
+    rule_runner.create_file("src/python/others/BUILD", "python_library()")
+    rule_runner.create_file("src/python/others/a.py", "print('')")
+    rule_runner.create_file("src/python/others/b.py", "print('')")
+
+    specs = SpecsParser(get_buildroot()).parse_specs(
+        ["src/python/somefiles::", "src/python/others/b.py"]
+    )
+
+    def callback(**kwargs) -> None:
+        context = kwargs["context"]
+        assert isinstance(context, StreamingWorkunitContext)
+
+        expanded = context.get_expanded_specs()
+        files = expanded.files
+
+        assert len(files.keys()) == 2
+        assert files["src/python/others/b.py"] == ["src/python/others/b.py"]
+        assert set(files["src/python/somefiles"]) == {
+            "src/python/somefiles/a.py",
+            "src/python/somefiles/b.py",
+        }
+
+    handler = StreamingWorkunitHandler(
+        scheduler=rule_runner.scheduler,
+        run_tracker=run_tracker,
+        callbacks=[callback],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.INFO,
+        specs=specs,
+        options_bootstrapper=create_options_bootstrapper(
+            ["--backend-packages=pants.backend.python"]
+        ),
     )
 
     stdout_process = Process(

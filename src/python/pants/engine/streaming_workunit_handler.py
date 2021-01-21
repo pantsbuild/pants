@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class ExpandedSpecs:
+    files: Dict[str, List[str]]
+
+
+@dataclass(frozen=True)
 class StreamingWorkunitContext:
     _scheduler: SchedulerSession
     _run_tracker: RunTracker
@@ -61,22 +66,24 @@ class StreamingWorkunitContext:
         """
         return self._scheduler.get_observation_histograms()
 
-    def get_expanded_specs(self) -> Dict[str, List[str]]:
+    def get_expanded_specs(self) -> ExpandedSpecs:
         """Return a dict containing the canonicalized addresses of the specs for this run, and what
         files they expand to."""
 
-        (addresses,) = self._scheduler.product_request(
+        (unexpanded_addresses,) = self._scheduler.product_request(
             Addresses, [Params(self._specs, self._options_bootstrapper)]
         )
 
-        ret = {}
-        for addr in addresses:
-            (targets,) = self._scheduler.product_request(Targets, [Params(Addresses([addr]))])
-            ret[addr.spec] = [
+        expanded_targets = self._scheduler.product_request(
+            Targets, [Params(Addresses([addr])) for addr in unexpanded_addresses]
+        )
+        files = {}
+        for addr, targets in zip(unexpanded_addresses, expanded_targets):
+            files[addr.spec] = [
                 tgt.address.filename if tgt.address.is_file_target else str(tgt.address)
                 for tgt in targets
             ]
-        return ret
+        return ExpandedSpecs(files=files)
 
 
 class WorkunitsCallback(Protocol):
@@ -227,12 +234,6 @@ def rules():
     return [
         QueryRule(WorkunitsCallbackFactories, (UnionMembership,)),
         QueryRule(Targets, (Addresses,)),
-        QueryRule(
-            Addresses,
-            (
-                Specs,
-                OptionsBootstrapper,
-            ),
-        ),
+        QueryRule(Addresses, (Specs, OptionsBootstrapper)),
         *collect_rules(),
     ]
