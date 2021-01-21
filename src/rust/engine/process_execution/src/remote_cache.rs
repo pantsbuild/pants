@@ -512,6 +512,9 @@ impl crate::CommandRunner for CommandRunner {
     };
 
     if result.exit_code == 0 && self.cache_write {
+      context
+        .workunit_store
+        .increment_counter(Metric::RemoteCacheWriteStarted, 1);
       let command_runner = self.clone();
       let result = result.clone();
       tokio::spawn(async move {
@@ -526,6 +529,9 @@ impl crate::CommandRunner for CommandRunner {
             command_digest,
           )
           .await;
+        context
+          .workunit_store
+          .increment_counter(Metric::RemoteCacheWriteFinished, 1);
         if let Err(err) = write_result {
           log::warn!("Failed to write to remote cache: {}", err);
           context
