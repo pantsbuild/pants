@@ -75,15 +75,16 @@ struct StoreSetup {
   pub store: Store,
   pub store_dir: PathBuf,
   pub cas: StubCAS,
+  pub executor: task_executor::Executor,
 }
 
 impl StoreSetup {
   pub fn new() -> StoreSetup {
-    let runtime = task_executor::Executor::new();
+    let executor = task_executor::Executor::new();
     let cas = StubCAS::builder().build();
     let store_dir = TempDir::new().unwrap().path().join("store_dir");
     let store = Store::with_remote(
-      runtime,
+      executor.clone(),
       store_dir.clone(),
       vec![cas.address()],
       None,
@@ -101,6 +102,7 @@ impl StoreSetup {
       store,
       store_dir,
       cas,
+      executor,
     }
   }
 }
@@ -120,7 +122,7 @@ fn create_local_runner(
 
 fn create_cached_runner(
   local: Box<dyn CommandRunnerTrait>,
-  store: Store,
+  store_setup: &StoreSetup,
   read_delay_ms: u64,
   write_delay_ms: u64,
   eager_fetch: bool,
@@ -130,7 +132,8 @@ fn create_cached_runner(
     crate::remote_cache::CommandRunner::new(
       local.into(),
       ProcessMetadata::default(),
-      store,
+      store_setup.executor.clone(),
+      store_setup.store.clone(),
       &action_cache.address(),
       None,
       None,
@@ -182,8 +185,7 @@ async fn cache_read_success() {
   WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
-  let (cache_runner, action_cache) =
-    create_cached_runner(local_runner, store_setup.store.clone(), 0, 0, false);
+  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
 
   let (process, action_digest) = create_process(&store_setup.store).await;
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
@@ -203,8 +205,7 @@ async fn cache_read_skipped_on_errors() {
   WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
-  let (cache_runner, action_cache) =
-    create_cached_runner(local_runner, store_setup.store.clone(), 0, 0, false);
+  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
 
   let (process, action_digest) = create_process(&store_setup.store).await;
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
@@ -230,7 +231,7 @@ async fn cache_read_eager_fetch() {
     let store_setup = StoreSetup::new();
     let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
     let (cache_runner, action_cache) =
-      create_cached_runner(local_runner, store_setup.store.clone(), 0, 0, eager_fetch);
+      create_cached_runner(local_runner, &store_setup, 0, 0, eager_fetch);
 
     let (process, action_digest) = create_process(&store_setup.store).await;
     insert_into_action_cache(
@@ -267,13 +268,8 @@ async fn cache_read_speculation() {
   async fn run_process(local_delay_ms: u64, remote_delay_ms: u64, cache_hit: bool) -> (i32, usize) {
     let store_setup = StoreSetup::new();
     let (local_runner, local_runner_call_counter) = create_local_runner(1, local_delay_ms);
-    let (cache_runner, action_cache) = create_cached_runner(
-      local_runner,
-      store_setup.store.clone(),
-      remote_delay_ms,
-      0,
-      false,
-    );
+    let (cache_runner, action_cache) =
+      create_cached_runner(local_runner, &store_setup, remote_delay_ms, 0, false);
 
     let (process, action_digest) = create_process(&store_setup.store).await;
     if cache_hit {
@@ -311,8 +307,7 @@ async fn cache_write_success() {
   WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
-  let (cache_runner, action_cache) =
-    create_cached_runner(local_runner, store_setup.store.clone(), 0, 0, false);
+  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
   let (process, action_digest) = create_process(&store_setup.store).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -343,8 +338,7 @@ async fn cache_write_not_for_failures() {
   WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
-  let (cache_runner, action_cache) =
-    create_cached_runner(local_runner, store_setup.store.clone(), 0, 0, false);
+  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
   let (process, _action_digest) = create_process(&store_setup.store).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -369,7 +363,7 @@ async fn cache_write_does_not_block() {
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
   let (cache_runner, action_cache) =
-    create_cached_runner(local_runner, store_setup.store.clone(), 0, 100, false);
+    create_cached_runner(local_runner, &store_setup, 0, 100, false);
   let (process, action_digest) = create_process(&store_setup.store).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -549,6 +543,7 @@ async fn make_action_result_basic() {
   let runner = crate::remote_cache::CommandRunner::new(
     mock_command_runner.clone(),
     ProcessMetadata::default(),
+    executor.clone(),
     store.clone(),
     &action_cache.address(),
     None,

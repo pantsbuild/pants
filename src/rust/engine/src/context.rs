@@ -253,6 +253,7 @@ impl Core {
         Box::new(process_execution::remote_cache::CommandRunner::new(
           local_command_runner.into(),
           process_execution_metadata.clone(),
+          executor.clone(),
           full_store.clone(),
           action_cache_address.as_str(),
           root_ca_certs.clone(),

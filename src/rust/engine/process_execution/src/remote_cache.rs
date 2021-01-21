@@ -35,6 +35,7 @@ use crate::{
 pub struct CommandRunner {
   underlying: Arc<dyn crate::CommandRunner>,
   metadata: ProcessMetadata,
+  executor: task_executor::Executor,
   store: Store,
   action_cache_client: Arc<ActionCacheClient<Channel>>,
   headers: BTreeMap<String, String>,
@@ -48,6 +49,7 @@ impl CommandRunner {
   pub fn new(
     underlying: Arc<dyn crate::CommandRunner>,
     metadata: ProcessMetadata,
+    executor: task_executor::Executor,
     store: Store,
     action_cache_address: &str,
     root_ca_certs: Option<Vec<u8>>,
@@ -119,6 +121,7 @@ impl CommandRunner {
     Ok(CommandRunner {
       underlying,
       metadata,
+      executor,
       store,
       action_cache_client,
       headers,
@@ -517,28 +520,31 @@ impl crate::CommandRunner for CommandRunner {
         .increment_counter(Metric::RemoteCacheWriteStarted, 1);
       let command_runner = self.clone();
       let result = result.clone();
-      tokio::spawn(async move {
-        let write_result = command_runner
-          .update_action_cache(
-            &context,
-            &request,
-            &result,
-            &command_runner.metadata,
-            &command,
-            action_digest,
-            command_digest,
-          )
-          .await;
-        context
-          .workunit_store
-          .increment_counter(Metric::RemoteCacheWriteFinished, 1);
-        if let Err(err) = write_result {
-          log::warn!("Failed to write to remote cache: {}", err);
+      // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
+      let _write_join = self
+        .executor
+        .spawn(async move {
+          let write_result = command_runner
+            .update_action_cache(
+              &context,
+              &request,
+              &result,
+              &command_runner.metadata,
+              &command,
+              action_digest,
+              command_digest,
+            )
+            .await;
           context
             .workunit_store
-            .increment_counter(Metric::RemoteCacheWriteErrors, 1);
-        };
-      });
+            .increment_counter(Metric::RemoteCacheWriteFinished, 1);
+          if let Err(err) = write_result {
+            log::warn!("Failed to write to remote cache: {}", err);
+            context
+              .workunit_store
+              .increment_counter(Metric::RemoteCacheWriteErrors, 1);
+          };
+        });
     }
 
     Ok(result)
