@@ -37,7 +37,7 @@ class PantsRunner:
         terminate_pantsd = self.will_terminate_pantsd()
 
         if terminate_pantsd:
-            logger.debug("Pantsd terminating goal detected: {}".format(self.args))
+            logger.debug(f"Pantsd terminating goal detected: {self.args}")
 
         # If we want concurrent pants runs, we can't have pantsd enabled.
         return (
@@ -55,7 +55,7 @@ class PantsRunner:
         # this warning.
         pythonpath = os.environ.pop("PYTHONPATH", None)
         if pythonpath and not os.environ.pop("RUNNING_PANTS_FROM_SOURCES", None):
-            logger.warning(f"Scrubbed PYTHONPATH={pythonpath} from the environment.")
+            logger.debug(f"Scrubbed PYTHONPATH={pythonpath} from the environment.")
 
     def run(self, start_time: float) -> ExitCode:
         self.scrub_pythonpath()
@@ -76,7 +76,7 @@ class PantsRunner:
                 remote_runner = RemotePantsRunner(self.args, self.env, options_bootstrapper)
                 return remote_runner.run()
             except RemotePantsRunner.Fallback as e:
-                logger.warning("Client exception: {!r}, falling back to non-daemon mode".format(e))
+                logger.warning(f"Client exception: {e!r}, falling back to non-daemon mode")
 
         # N.B. Inlining this import speeds up the python thin client run by about 100ms.
         from pants.bin.local_pants_runner import LocalPantsRunner
