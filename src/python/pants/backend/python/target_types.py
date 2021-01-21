@@ -254,6 +254,27 @@ class PexEmitWarningsField(BoolField):
         return self.value
 
 
+class PexUnzipField(BoolField):
+    alias = "unzip"
+    default = False
+    value: bool
+    help = (
+        "Whether to have the PEX unzip itself into the PEX_ROOT before running.\n\nEnabling unzip "
+        "mode can provide lower startup latencies for most PEX files; even on first run."
+    )
+
+
+class PexIncludeToolsField(BoolField):
+    alias = "include_tools"
+    default = False
+    value: bool
+    help = (
+        "Whether to include Pex tools in the PEX bootstrap code.\n\nWith tools included, the "
+        "generated PEX file can be executed with `PEX_TOOLS=1 <pex file> --help` to gain access "
+        "to all the available tools."
+    )
+
+
 class PexBinary(Target):
     alias = "pex_binary"
     core_fields = (
@@ -268,6 +289,8 @@ class PexBinary(Target):
         PexIgnoreErrorsField,
         PexShebangField,
         PexEmitWarningsField,
+        PexUnzipField,
+        PexIncludeToolsField,
     )
     help = (
         "A Python target that can be converted into an executable PEX file.\n\nPEX files are "
