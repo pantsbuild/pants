@@ -64,6 +64,7 @@ struct ActionCacheResponder {
   action_map: Arc<Mutex<HashMap<Fingerprint, ActionResult>>>,
   always_errors: Arc<AtomicBool>,
   read_delay: Duration,
+  write_delay: Duration,
 }
 
 #[tonic::async_trait]
@@ -107,6 +108,8 @@ impl ActionCache for ActionCacheResponder {
     &self,
     request: Request<UpdateActionResultRequest>,
   ) -> Result<Response<ActionResult>, Status> {
+    delay_for(self.write_delay).await;
+
     let request = request.into_inner();
 
     let action_digest: Digest = match require_digest(request.action_digest.as_ref()) {
@@ -135,13 +138,18 @@ impl ActionCache for ActionCacheResponder {
 }
 
 impl StubActionCache {
-  pub fn new(read_delay_ms: u64) -> Result<Self, String> {
+  pub fn new() -> Result<Self, String> {
+    Self::new_with_delays(0, 0)
+  }
+
+  pub fn new_with_delays(read_delay_ms: u64, write_delay_ms: u64) -> Result<Self, String> {
     let action_map = Arc::new(Mutex::new(HashMap::new()));
     let always_errors = Arc::new(AtomicBool::new(false));
     let responder = ActionCacheResponder {
       action_map: action_map.clone(),
       always_errors: always_errors.clone(),
       read_delay: Duration::from_millis(read_delay_ms),
+      write_delay: Duration::from_millis(write_delay_ms),
     };
 
     let addr = "127.0.0.1:0"
