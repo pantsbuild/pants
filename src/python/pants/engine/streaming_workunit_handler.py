@@ -1,25 +1,35 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Iterator, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 from typing_extensions import Protocol
 
+from pants.base.specs import Specs
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents, Snapshot
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
+from pants.engine.internals.selectors import Params
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.goal.run_tracker import RunTracker
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class StreamingWorkunitContext:
     _scheduler: SchedulerSession
     _run_tracker: RunTracker
+    _specs: Specs
+    _options_bootstrapper: OptionsBootstrapper
 
     @property
     def run_tracker(self) -> RunTracker:
@@ -50,6 +60,23 @@ class StreamingWorkunitContext:
         These metrics are useful for debugging Pants internals.
         """
         return self._scheduler.get_observation_histograms()
+
+    def get_expanded_specs(self) -> Dict[str, List[str]]:
+        """Return a dict containing the canonicalized addresses of the specs for this run, and what
+        files they expand to."""
+
+        (addresses,) = self._scheduler.product_request(
+            Addresses, [Params(self._specs, self._options_bootstrapper)]
+        )
+
+        ret = {}
+        for addr in addresses:
+            (targets,) = self._scheduler.product_request(Targets, [Params(Addresses([addr]))])
+            ret[addr.spec] = [
+                tgt.address.filename if tgt.address.is_file_target else str(tgt.address)
+                for tgt in targets
+            ]
+        return ret
 
 
 class WorkunitsCallback(Protocol):
@@ -98,6 +125,8 @@ class StreamingWorkunitHandler:
         scheduler: SchedulerSession,
         run_tracker: RunTracker,
         callbacks: Iterable[WorkunitsCallback],
+        options_bootstrapper: OptionsBootstrapper,
+        specs: Specs,
         report_interval_seconds: float,
         max_workunit_verbosity: LogLevel = LogLevel.TRACE,
     ):
@@ -106,7 +135,10 @@ class StreamingWorkunitHandler:
         self.callbacks = callbacks
         self._thread_runner: Optional[_InnerHandler] = None
         self._context = StreamingWorkunitContext(
-            _scheduler=self.scheduler, _run_tracker=run_tracker
+            _scheduler=self.scheduler,
+            _run_tracker=run_tracker,
+            _specs=specs,
+            _options_bootstrapper=options_bootstrapper,
         )
         # TODO(10092) The max verbosity should be a per-client setting, rather than a global setting.
         self.max_workunit_verbosity = max_workunit_verbosity
@@ -192,4 +224,15 @@ async def construct_workunits_callback_factories(
 
 
 def rules():
-    return [QueryRule(WorkunitsCallbackFactories, (UnionMembership,)), *collect_rules()]
+    return [
+        QueryRule(WorkunitsCallbackFactories, (UnionMembership,)),
+        QueryRule(Targets, (Addresses,)),
+        QueryRule(
+            Addresses,
+            (
+                Specs,
+                OptionsBootstrapper,
+            ),
+        ),
+        *collect_rules(),
+    ]

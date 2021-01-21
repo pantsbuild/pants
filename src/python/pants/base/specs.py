@@ -306,3 +306,7 @@ class Specs:
     def provided(self) -> bool:
         """Did the user provide specs?"""
         return bool(self.address_specs) or bool(self.filesystem_specs)
+
+
+def empty_specs() -> Specs:
+    return Specs(AddressSpecs([], filter_by_global_options=True), FilesystemSpecs([]))

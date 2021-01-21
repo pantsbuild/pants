@@ -10,6 +10,7 @@ from typing import List, Optional, Tuple
 
 import pytest
 
+from pants.base.specs import empty_specs
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import (
     EMPTY_FILE_DIGEST,
@@ -302,6 +303,8 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
             max_workunit_verbosity=max_workunit_verbosity,
+            specs=empty_specs(),
+            options_bootstrapper=create_options_bootstrapper([]),
         )
         return (scheduler, tracker, handler)
 
@@ -674,6 +677,8 @@ def test_more_complicated_engine_aware(rule_runner: RuleRunner, run_tracker: Run
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.TRACE,
+        specs=empty_specs(),
+        options_bootstrapper=create_options_bootstrapper([]),
     )
     with handler.session():
         input_1 = CreateDigest(
@@ -733,6 +738,8 @@ def test_process_digests_on_streaming_workunits(
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
+        specs=empty_specs(),
+        options_bootstrapper=create_options_bootstrapper([]),
     )
 
     stdout_process = Process(
@@ -763,6 +770,8 @@ def test_process_digests_on_streaming_workunits(
         callbacks=[tracker.add],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
+        specs=empty_specs(),
+        options_bootstrapper=create_options_bootstrapper([]),
     )
 
     stderr_process = Process(
@@ -809,6 +818,8 @@ def test_context_object_on_streaming_workunits(
         context = kwargs["context"]
         assert isinstance(context, StreamingWorkunitContext)
 
+        assert {} == context.get_expanded_specs()
+
         completed_workunits = kwargs["completed_workunits"]
         for workunit in completed_workunits:
             if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
@@ -822,6 +833,8 @@ def test_context_object_on_streaming_workunits(
         callbacks=[callback],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
+        specs=empty_specs(),
+        options_bootstrapper=create_options_bootstrapper([]),
     )
 
     stdout_process = Process(

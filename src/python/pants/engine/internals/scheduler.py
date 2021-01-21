@@ -541,7 +541,7 @@ class SchedulerSession:
     def run_goal_rule(
         self,
         product: Type,
-        subject: Union[Any, Params],
+        subject: Params,
         poll: bool = False,
         poll_delay: Optional[float] = None,
     ) -> int:
