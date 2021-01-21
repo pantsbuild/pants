@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
@@ -306,3 +308,7 @@ class Specs:
     def provided(self) -> bool:
         """Did the user provide specs?"""
         return bool(self.address_specs) or bool(self.filesystem_specs)
+
+    @classmethod
+    def empty(cls) -> Specs:
+        return Specs(AddressSpecs([], filter_by_global_options=True), FilesystemSpecs([]))
