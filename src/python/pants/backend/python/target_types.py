@@ -269,7 +269,7 @@ class PexIncludeToolsField(BoolField):
     default = False
     value: bool
     help = (
-        "Whether to include Pex tools in the PEX bootstrap code.\n\nWith tools included the "
+        "Whether to include Pex tools in the PEX bootstrap code.\n\nWith tools included, the "
         "generated PEX file can be executed with `PEX_TOOLS=1 <pex file> --help` to gain access "
         "to all the available tools."
     )
