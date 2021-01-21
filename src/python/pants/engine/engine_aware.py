@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
-from pants.engine.fs import Snapshot
+from pants.engine.fs import FileDigest, Snapshot
 from pants.util.logging import LogLevel
 
 
@@ -49,11 +49,11 @@ class EngineAwareReturnType(ABC):
         """
         return None
 
-    def artifacts(self) -> Optional[Dict[str, Snapshot]]:
+    def artifacts(self) -> Optional[Dict[str, Union[FileDigest, Snapshot]]]:
         """If implemented, this sets the `artifacts` entry for the workunit of any `@rule`'s that
         return the annotated type.
 
-        `artifacts` is a mapping of arbitrary string keys to `Snapshot`s.
+        `artifacts` is a mapping of arbitrary string keys to `Snapshot`s or `FileDigest`s.
         """
         return None
 

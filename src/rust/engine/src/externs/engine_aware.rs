@@ -3,13 +3,12 @@
 
 use crate::core::Value;
 use crate::externs;
-use crate::nodes::lift_directory_digest;
+use crate::nodes::{lift_file_digest, lift_directory_digest};
 use crate::Failure;
 use crate::Types;
 
-use cpython::{PyDict, PyObject, PyString, Python};
-use hashing::Digest;
-use workunit_store::Level;
+use cpython::{PyDict, PyString, Python};
+use workunit_store::{ArtifactOutput, Level};
 
 // TODO all `retrieve` implementations should add a check that the `Value` actually subclasses
 // `EngineAware`
@@ -86,9 +85,9 @@ impl EngineAwareInformation for Metadata {
 pub struct Artifacts {}
 
 impl EngineAwareInformation for Artifacts {
-  type MaybeOutput = Vec<(String, Digest)>;
+  type MaybeOutput = Vec<(String, ArtifactOutput)>;
 
-  fn retrieve(_types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
+  fn retrieve(types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
     let artifacts_val = match externs::call_method(&value, "artifacts", &[]) {
       Ok(value) => value,
       Err(py_err) => {
@@ -114,20 +113,31 @@ impl EngineAwareInformation for Artifacts {
           return None;
         }
       };
-      let digest_value: PyObject = externs::getattr(&value, "digest")
-        .map_err(|e| {
-          log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
-        })
-        .ok()?;
-      let digest = match lift_directory_digest(&Value::new(digest_value)) {
-        Ok(digest) => digest,
-        Err(e) => {
-          log::error!("Error in EngineAware.artifacts() implementation: {}", e);
-          return None;
-        }
-      };
 
-      output.push((key_name, digest));
+      let artifact_output = if externs::get_type_for(&value) == types.file_digest {
+        match lift_file_digest(&types, &value) {
+          Ok(digest) => ArtifactOutput::FileDigest(digest),
+          Err(e) => {
+            log::error!("Error in EngineAware.artifacts() implementation: {}", e);
+            return None;
+          }
+        }
+      } else {
+        let digest_value = externs::getattr(&value, "digest")
+          .map_err(|e| {
+            log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
+          })
+        .ok()?;
+
+          match lift_directory_digest(&Value::new(digest_value)) {
+            Ok(digest) => ArtifactOutput::Snapshot(digest),
+            Err(e) => {
+              log::error!("Error in EngineAware.artifacts() implementation: {}", e);
+              return None;
+            }
+          }
+      };
+      output.push((key_name, artifact_output));
     }
     Some(output)
   }

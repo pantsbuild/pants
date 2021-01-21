@@ -69,7 +69,7 @@ use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
-use workunit_store::{ObservationMetric, UserMetadataItem, Workunit, WorkunitState};
+use workunit_store::{ObservationMetric, UserMetadataItem, Workunit, WorkunitState, ArtifactOutput};
 
 use crate::{
   externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
@@ -984,20 +984,29 @@ async fn workunit_to_py_value(
 
   for (artifact_name, digest) in workunit.metadata.artifacts.iter() {
     let store = core.store();
-    let snapshot = store::Snapshot::from_digest(store, *digest)
-      .await
-      .map_err(|err_str| {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        PyErr::new::<exc::Exception, _>(py, (err_str,))
-      })?;
+    let py_val = match digest {
+      ArtifactOutput::FileDigest(digest) => {
+        crate::nodes::Snapshot::store_file_digest(&core, digest)
+      },
+      ArtifactOutput::Snapshot(digest) => {
+        let snapshot = store::Snapshot::from_digest(store, *digest)
+          .await
+          .map_err(|err_str| {
+            let gil = Python::acquire_gil();
+            let py = gil.python();
+            PyErr::new::<exc::Exception, _>(py, (err_str,))
+          })?;
+        crate::nodes::Snapshot::store_snapshot(snapshot).map_err(|err_str| {
+          let gil = Python::acquire_gil();
+          let py = gil.python();
+          PyErr::new::<exc::Exception, _>(py, (err_str,))
+        })?
+      }
+    };
+
     artifact_entries.push((
       externs::store_utf8(artifact_name.as_str()),
-      crate::nodes::Snapshot::store_snapshot(snapshot).map_err(|err_str| {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        PyErr::new::<exc::Exception, _>(py, (err_str,))
-      })?,
+      py_val
     ))
   }
 

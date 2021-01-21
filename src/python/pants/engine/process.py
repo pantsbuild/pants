@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Unio
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
@@ -173,7 +173,9 @@ class ProcessResult:
     """
 
     stdout: bytes
+    stdout_digest: FileDigest
     stderr: bytes
+    stderr_digest: FileDigest
     output_digest: Digest
 
 
@@ -185,7 +187,9 @@ class FallibleProcessResult:
     """
 
     stdout: bytes
+    stdout_digest: FileDigest
     stderr: bytes
+    stderr_digest: FileDigest
     exit_code: int
     output_digest: Digest
 
@@ -195,7 +199,9 @@ class FallibleProcessResultWithPlatform:
     """Result of executing a process which might fail, along with the platform it ran on."""
 
     stdout: bytes
+    stdout_digest: FileDigest
     stderr: bytes
+    stderr_digest: FileDigest
     exit_code: int
     output_digest: Digest
     platform: Platform
@@ -248,9 +254,11 @@ def fallible_to_exec_result_or_raise(
 
     if fallible_result.exit_code == 0:
         return ProcessResult(
-            fallible_result.stdout,
-            fallible_result.stderr,
-            fallible_result.output_digest,
+            stdout=fallible_result.stdout,
+            stdout_digest=fallible_result.stdout_digest,
+            stderr=fallible_result.stderr,
+            stderr_digest=fallible_result.stderr_digest,
+            output_digest=fallible_result.output_digest,
         )
     raise ProcessExecutionFailure(
         fallible_result.exit_code,
@@ -265,7 +273,9 @@ def remove_platform_information(res: FallibleProcessResultWithPlatform) -> Falli
     return FallibleProcessResult(
         exit_code=res.exit_code,
         stdout=res.stdout,
+        stdout_digest=res.stdout_digest,
         stderr=res.stderr,
+        stderr_digest=res.stderr_digest,
         output_digest=res.output_digest,
     )
 

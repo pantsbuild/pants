@@ -185,7 +185,9 @@ fn multi_platform_process_request_to_process_result(
       context.core.types.process_result,
       &[
         externs::store_bytes(&stdout_bytes),
+        Snapshot::store_file_digest(&context.core, &result.stdout_digest),
         externs::store_bytes(&stderr_bytes),
+        Snapshot::store_file_digest(&context.core, &result.stderr_digest),
         externs::store_i64(result.exit_code.into()),
         Snapshot::store_directory_digest(&result.output_directory).map_err(|s| throw(&s))?,
         externs::unsafe_call(

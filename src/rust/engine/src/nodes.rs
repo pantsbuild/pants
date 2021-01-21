@@ -39,7 +39,7 @@ use reqwest::Error;
 use std::pin::Pin;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  with_workunit, Level, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
+  with_workunit, Level, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata, ArtifactOutput
 };
 
 pub type NodeResult<T> = Result<T, Failure>;
@@ -210,7 +210,7 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_directory_digest(digest: &Value) -> Result<hashing::Digest, String> {
+pub fn lift_directory_digest(digest: &PyObject) -> Result<hashing::Digest, String> {
   externs::fs::from_py_digest(digest).map_err(|e| format!("{:?}", e))
 }
 
@@ -1023,7 +1023,7 @@ pub struct PythonRuleOutput {
   value: Value,
   new_level: Option<log::Level>,
   message: Option<String>,
-  new_artifacts: Vec<(String, hashing::Digest)>,
+  new_artifacts: Vec<(String, ArtifactOutput)>,
   new_metadata: Vec<(String, Value)>,
 }
 
