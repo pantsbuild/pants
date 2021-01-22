@@ -77,8 +77,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--remote-cache-enabled",
-        type=bool,
-        default=False,
+        action="store_true",
         help=(
             "Enable remote caching via Toolchain. This requires setting the options "
             "`remote_oauth_bearer_token_path` and `remote_ca_certs_path` in your environment."
