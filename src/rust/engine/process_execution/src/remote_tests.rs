@@ -1745,7 +1745,7 @@ async fn remote_workunits_are_stored() {
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let action_cache = mock::StubActionCache::new(0).unwrap();
+  let action_cache = mock::StubActionCache::new().unwrap();
   let (command_runner, _store) =
     create_command_runner(action_cache.address(), &cas, Platform::Linux);
 
@@ -2301,7 +2301,7 @@ async fn extract_execute_response(
   operation: Operation,
   remote_platform: Platform,
 ) -> Result<RemoteTestResult, ExecutionError> {
-  let action_cache = mock::StubActionCache::new(0).expect("failed to create action cache");
+  let action_cache = mock::StubActionCache::new().expect("failed to create action cache");
 
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())

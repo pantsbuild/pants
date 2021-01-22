@@ -40,6 +40,8 @@ pub enum Metric {
   RemoteCacheRequestsUncached,
   RemoteCacheReadErrors,
   RemoteCacheWriteErrors,
+  RemoteCacheWriteStarted,
+  RemoteCacheWriteFinished,
   RemoteCacheSpeculationLocalCompletedFirst,
   RemoteCacheSpeculationRemoteCompletedFirst,
   RemoteExecutionErrors,
@@ -68,6 +70,8 @@ impl Metric {
       RemoteCacheRequestsUncached => "remote_cache_requests_uncached",
       RemoteCacheReadErrors => "remote_cache_read_errors",
       RemoteCacheWriteErrors => "remote_cache_write_errors",
+      RemoteCacheWriteStarted => "remote_cache_write_started",
+      RemoteCacheWriteFinished => "remote_cache_write_finished",
       RemoteCacheSpeculationLocalCompletedFirst => "remote_cache_speculation_local_completed_first",
       RemoteCacheSpeculationRemoteCompletedFirst => {
         "remote_cache_speculation_remote_completed_first"
