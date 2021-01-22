@@ -276,6 +276,11 @@ def _linux_before_install(
             if not xenial
             else "pyenv global 2.7.15 3.6.7 3.7.1"
         ),
+        (
+            "openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv "
+            "-in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted "
+            "-out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d"
+        ),
     ]
     if install_travis_wait:
         commands.extend(
@@ -328,7 +333,10 @@ def linux_shard(
         ),
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage().value,
-        "env": ["PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt"],
+        "env": [
+            "PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt",
+            "PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted",
+        ],
     }
     if load_test_config:
         setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]
