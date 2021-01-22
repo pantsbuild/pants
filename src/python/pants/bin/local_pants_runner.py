@@ -46,7 +46,6 @@ logger = logging.getLogger(__name__)
 class LocalPantsRunner:
     """Handles a single pants invocation running in the process-local context.
 
-    build_root: The build root for this run.
     options: The parsed options for this run.
     build_config: The parsed build configuration for this run.
     run_tracker: A tracker for metrics for the run.
@@ -55,8 +54,8 @@ class LocalPantsRunner:
     profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
     """
 
-    build_root: str
     options: Options
+    options_bootstrapper: OptionsBootstrapper
     build_config: BuildConfiguration
     run_tracker: RunTracker
     specs: Specs
@@ -125,7 +124,6 @@ class LocalPantsRunner:
         :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
         :param scheduler: If being called from the daemon, a warmed scheduler to use.
         """
-        build_root = get_buildroot()
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
 
         build_config = BuildConfigInitializer.get(options_bootstrapper)
@@ -165,15 +163,15 @@ class LocalPantsRunner:
         specs = calculate_specs(
             options_bootstrapper=options_bootstrapper,
             options=options,
-            build_root=build_root,
+            build_root=get_buildroot(),
             session=graph_session.scheduler_session,
         )
 
         profile_path = env.get("PANTS_PROFILE")
 
         return cls(
-            build_root=build_root,
             options=options,
+            options_bootstrapper=options_bootstrapper,
             build_config=build_config,
             run_tracker=run_tracker,
             specs=specs,
@@ -252,6 +250,8 @@ class LocalPantsRunner:
             streaming_reporter = StreamingWorkunitHandler(
                 self.graph_session.scheduler_session,
                 run_tracker=self.run_tracker,
+                specs=self.specs,
+                options_bootstrapper=self.options_bootstrapper,
                 callbacks=self._get_workunits_callbacks(),
                 report_interval_seconds=global_options.streaming_workunits_report_interval,
             )
