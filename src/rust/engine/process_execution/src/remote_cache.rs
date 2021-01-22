@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bazel_protos::require_digest;
 use fs::RelativePath;
+use futures::FutureExt;
 use hashing::Digest;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
@@ -488,7 +489,8 @@ impl crate::CommandRunner for CommandRunner {
             None
           }
         }
-      };
+      }
+      .boxed();
 
       // We speculate between reading from the remote cache vs. running locally. If there was a
       // cache hit, we return early because there will be no need to write to the cache. Otherwise,
@@ -521,9 +523,8 @@ impl crate::CommandRunner for CommandRunner {
       let command_runner = self.clone();
       let result = result.clone();
       // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
-      let _write_join = self
-        .executor
-        .spawn(async move {
+      let _write_join = self.executor.spawn(
+        async move {
           let write_result = command_runner
             .update_action_cache(
               &context,
@@ -544,7 +545,9 @@ impl crate::CommandRunner for CommandRunner {
               .workunit_store
               .increment_counter(Metric::RemoteCacheWriteErrors, 1);
           };
-        });
+        }
+        .boxed(),
+      );
     }
 
     Ok(result)
