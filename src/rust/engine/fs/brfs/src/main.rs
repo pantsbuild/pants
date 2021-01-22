@@ -85,7 +85,7 @@ pub fn digest_from_filepath(str: &str) -> Result<Digest, String> {
     .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?
     .parse::<usize>()
     .map_err(|err| format!("Invalid digest; size {} not a number: {}", str, err))?;
-  Ok(Digest(fingerprint, size_bytes))
+  Ok(Digest::new(fingerprint, size_bytes))
 }
 
 type Inode = u64;
@@ -263,7 +263,7 @@ impl BuildResultFS {
     self.inode_digest_cache.get(&inode).map(|f| {
       attr_for(
         inode,
-        f.digest.1 as u64,
+        f.digest.size as u64,
         fuse::FileType::RegularFile,
         if f.is_executable { 0o555 } else { 0o444 },
       )

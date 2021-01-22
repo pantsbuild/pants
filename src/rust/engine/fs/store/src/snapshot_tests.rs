@@ -54,7 +54,7 @@ async fn snapshot_one_file() {
   assert_eq!(
     snapshot,
     Snapshot {
-      digest: Digest(
+      digest: Digest::new(
         Fingerprint::from_hex_string(
           "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
         )
@@ -82,7 +82,7 @@ async fn snapshot_recursive_directories() {
   assert_eq!(
     snapshot,
     Snapshot {
-      digest: Digest(
+      digest: Digest::new(
         Fingerprint::from_hex_string(
           "8b1a7ea04eaa2527b35683edac088bc826117b53b7ec6601740b55e20bce3deb",
         )
@@ -136,7 +136,7 @@ async fn snapshot_recursive_directories_including_empty() {
       .await
       .unwrap(),
     Snapshot {
-      digest: Digest(
+      digest: Digest::new(
         Fingerprint::from_hex_string(
           "fbff703bdaac62accf2ea5083bcfed89292073bf710ef9ad14d9298c637e777b",
         )

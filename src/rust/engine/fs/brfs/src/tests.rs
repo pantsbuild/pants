@@ -222,7 +222,7 @@ async fn files_are_correctly_executable() {
 }
 
 pub fn digest_to_filepath(digest: &hashing::Digest) -> String {
-  format!("{}-{}", digest.0, digest.1)
+  format!("{}-{}", digest.fingerprint, digest.size)
 }
 
 pub fn make_dirs() -> (tempfile::TempDir, tempfile::TempDir) {

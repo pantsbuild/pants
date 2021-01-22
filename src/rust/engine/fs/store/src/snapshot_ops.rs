@@ -195,7 +195,10 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
     .iter()
     .map(|file_node| async move {
       let digest: Digest = require_digest(file_node.digest.as_ref())?;
-      let header = format!("file digest={} size={}:\n\n", digest.0, digest.1);
+      let header = format!(
+        "file digest={} size={}:\n\n",
+        digest.fingerprint, digest.size
+      );
 
       let contents = store_wrapper
         .load_file_bytes_with(digest, |bytes| {
@@ -227,7 +230,10 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
     .map(|dir_node| async move {
       // TODO(tonic): Avoid using .unwrap here!
       let digest = require_digest(dir_node.digest.as_ref())?;
-      let detail = format!("dir digest={} size={}:\n\n", digest.0, digest.1);
+      let detail = format!(
+        "dir digest={} size={}:\n\n",
+        digest.fingerprint, digest.size
+      );
       let res: Result<_, String> = Ok((dir_node.name.clone(), detail));
       res
     })
@@ -808,8 +814,8 @@ impl From<PathGlob> for RestrictedPathGlob {
 // TODO(tonic): Replace uses of this method with `.into` or equivalent.
 fn to_bazel_digest(digest: Digest) -> remexec::Digest {
   remexec::Digest {
-    hash: digest.0.to_hex(),
-    size_bytes: digest.1 as i64,
+    hash: digest.fingerprint.to_hex(),
+    size_bytes: digest.size as i64,
   }
 }
 

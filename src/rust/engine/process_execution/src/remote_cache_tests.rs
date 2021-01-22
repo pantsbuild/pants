@@ -176,7 +176,7 @@ fn insert_into_action_cache(
   action_cache
     .action_map
     .lock()
-    .insert(action_digest.0, action_result);
+    .insert(action_digest.fingerprint, action_result);
 }
 
 #[tokio::test]
@@ -325,7 +325,7 @@ async fn cache_write_success() {
   let action_map_mutex_guard = action_cache.action_map.lock();
   assert_eq!(
     action_map_mutex_guard
-      .get(&action_digest.0)
+      .get(&action_digest.fingerprint)
       .unwrap()
       .exit_code,
     0
@@ -384,7 +384,7 @@ async fn cache_write_does_not_block() {
   let action_map_mutex_guard = action_cache.action_map.lock();
   assert_eq!(
     action_map_mutex_guard
-      .get(&action_digest.0)
+      .get(&action_digest.fingerprint)
       .unwrap()
       .exit_code,
     0

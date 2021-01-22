@@ -353,11 +353,11 @@ async fn make_request(
     args.buildbarn_url.as_ref(),
   ) {
     (Some(input_digest), Some(input_digest_length), None, None, None) => {
-      make_request_from_flat_args(args, Digest(input_digest, input_digest_length))
+      make_request_from_flat_args(args, Digest::new(input_digest, input_digest_length))
 
     }
     (None, None, Some(action_fingerprint), Some(action_digest_length), None) => {
-      extract_request_from_action_digest(store, Digest(action_fingerprint, action_digest_length), args.remote_instance_name.clone()).await
+      extract_request_from_action_digest(store, Digest::new(action_fingerprint, action_digest_length), args.remote_instance_name.clone()).await
     }
     (None, None, None, None, Some(buildbarn_url)) => {
       extract_request_from_buildbarn_url(store, buildbarn_url).await
@@ -539,7 +539,7 @@ async fn extract_request_from_buildbarn_url(
       let action_digest_length: usize = interesting_parts[3]
         .parse()
         .map_err(|err| format!("Couldn't parse action digest length as a number: {:?}", err))?;
-      Digest(action_fingerprint, action_digest_length)
+      Digest::new(action_fingerprint, action_digest_length)
     }
     "uncached_action_result" => {
       let action_result_fingerprint = Fingerprint::from_hex_string(interesting_parts[2])?;
@@ -549,7 +549,8 @@ async fn extract_request_from_buildbarn_url(
           err
         )
       })?;
-      let action_result_digest = Digest(action_result_fingerprint, action_result_digest_length);
+      let action_result_digest =
+        Digest::new(action_result_fingerprint, action_result_digest_length);
 
       let action_result = store
         .load_file_bytes_with(action_result_digest, |bytes| {

@@ -46,7 +46,10 @@ pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
   0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
 ]);
-pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
+pub const EMPTY_DIGEST: Digest = Digest {
+  fingerprint: EMPTY_FINGERPRINT,
+  size: 0,
+};
 
 pub const FINGERPRINT_SIZE: usize = 32;
 
@@ -180,7 +183,10 @@ impl TryFrom<&str> for Fingerprint {
 /// of needing to create an entire protobuf to pass around the two fields.
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Digest(pub Fingerprint, pub usize);
+pub struct Digest {
+  pub fingerprint: Fingerprint,
+  pub size: usize,
+}
 
 impl Serialize for Digest {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -188,8 +194,8 @@ impl Serialize for Digest {
     S: Serializer,
   {
     let mut obj = serializer.serialize_struct("digest", 2)?;
-    obj.serialize_field("fingerprint", &self.0)?;
-    obj.serialize_field("size_bytes", &self.1)?;
+    obj.serialize_field("fingerprint", &self.fingerprint)?;
+    obj.serialize_field("size_bytes", &self.size)?;
     obj.end()
   }
 }
@@ -241,7 +247,7 @@ impl<'de> Deserialize<'de> for Digest {
         }
         let fingerprint = fingerprint.ok_or_else(|| de::Error::missing_field("fingerprint"))?;
         let size_bytes = size_bytes.ok_or_else(|| de::Error::missing_field("size_bytes"))?;
-        Ok(Digest(fingerprint, size_bytes))
+        Ok(Digest::new(fingerprint, size_bytes))
       }
     }
 
@@ -251,11 +257,15 @@ impl<'de> Deserialize<'de> for Digest {
 }
 
 impl Digest {
+  pub fn new(fingerprint: Fingerprint, size: usize) -> Digest {
+    Digest { fingerprint, size }
+  }
+
   pub fn of_bytes(bytes: &[u8]) -> Self {
     let mut hasher = Sha256::default();
     hasher.update(bytes);
 
-    Digest(Fingerprint::from_bytes(hasher.finalize()), bytes.len())
+    Digest::new(Fingerprint::from_bytes(hasher.finalize()), bytes.len())
   }
 }
 
@@ -282,7 +292,7 @@ impl<W: Write> WriterHasher<W> {
   ///
   pub fn finish(self) -> (Digest, W) {
     (
-      Digest(
+      Digest::new(
         Fingerprint::from_bytes(self.hasher.finalize()),
         self.byte_count,
       ),

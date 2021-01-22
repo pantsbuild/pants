@@ -3,8 +3,8 @@ use std::convert::TryFrom;
 impl<'a> From<&'a hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
   fn from(d: &'a hashing::Digest) -> Self {
     Self {
-      hash: d.0.to_hex(),
-      size_bytes: d.1 as i64,
+      hash: d.fingerprint.to_hex(),
+      size_bytes: d.size as i64,
     }
   }
 }
@@ -12,8 +12,8 @@ impl<'a> From<&'a hashing::Digest> for crate::gen::build::bazel::remote::executi
 impl From<hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
   fn from(d: hashing::Digest) -> Self {
     Self {
-      hash: d.0.to_hex(),
-      size_bytes: d.1 as i64,
+      hash: d.fingerprint.to_hex(),
+      size_bytes: d.size as i64,
     }
   }
 }
@@ -26,7 +26,7 @@ impl<'a> TryFrom<&'a crate::gen::build::bazel::remote::execution::v2::Digest> fo
   ) -> Result<Self, Self::Error> {
     hashing::Fingerprint::from_hex_string(&d.hash)
       .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", &d.hash, err))
-      .map(|fingerprint| hashing::Digest(fingerprint, d.size_bytes as usize))
+      .map(|fingerprint| hashing::Digest::new(fingerprint, d.size_bytes as usize))
   }
 }
 
@@ -38,7 +38,7 @@ impl TryFrom<crate::gen::build::bazel::remote::execution::v2::Digest> for hashin
   ) -> Result<Self, Self::Error> {
     hashing::Fingerprint::from_hex_string(&d.hash)
       .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", &d.hash, err))
-      .map(|fingerprint| hashing::Digest(fingerprint, d.size_bytes as usize))
+      .map(|fingerprint| hashing::Digest::new(fingerprint, d.size_bytes as usize))
   }
 }
 

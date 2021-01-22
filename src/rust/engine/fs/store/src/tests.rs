@@ -36,7 +36,7 @@ pub fn big_file_fingerprint() -> Fingerprint {
 }
 
 pub fn big_file_digest() -> Digest {
-  Digest(big_file_fingerprint(), big_file_bytes().len())
+  Digest::new(big_file_fingerprint(), big_file_bytes().len())
 }
 
 pub fn big_file_bytes() -> Bytes {
@@ -58,7 +58,7 @@ pub fn extra_big_file_fingerprint() -> Fingerprint {
 }
 
 pub fn extra_big_file_digest() -> Digest {
-  Digest(extra_big_file_fingerprint(), extra_big_file_bytes().len())
+  Digest::new(extra_big_file_fingerprint(), extra_big_file_bytes().len())
 }
 
 pub fn extra_big_file_bytes() -> Bytes {
@@ -370,7 +370,7 @@ async fn non_canonical_remote_directory_is_error() {
   });
   let non_canonical_directory_bytes = non_canonical_directory.to_bytes();
   let directory_digest = Digest::of_bytes(&non_canonical_directory_bytes);
-  let non_canonical_directory_fingerprint = directory_digest.0;
+  let non_canonical_directory_fingerprint = directory_digest.fingerprint;
 
   let dir = TempDir::new().unwrap();
 
@@ -808,7 +808,7 @@ async fn uploading_digest_with_wrong_size_is_error() {
 
   assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
-  let wrong_digest = Digest(testdata.fingerprint(), testdata.len() + 1);
+  let wrong_digest = Digest::new(testdata.fingerprint(), testdata.len() + 1);
 
   new_store(dir.path(), cas.address())
     .ensure_remote_has_recursive(vec![wrong_digest])
@@ -1301,9 +1301,9 @@ async fn returns_upload_summary_on_empty_cas() {
 
   // We store all 3 files, and so we must sum their digests
   let test_data = vec![
-    testdir.digest().1,
-    testroland.digest().1,
-    testcatnip.digest().1,
+    testdir.digest().size,
+    testroland.digest().size,
+    testcatnip.digest().size,
   ];
   let test_bytes = test_data.iter().sum();
   summary.upload_wall_time = Duration::default();
@@ -1354,9 +1354,9 @@ async fn summary_does_not_count_things_in_cas() {
     data_summary,
     UploadSummary {
       ingested_file_count: 1,
-      ingested_file_bytes: testroland.digest().1,
+      ingested_file_bytes: testroland.digest().size,
       uploaded_file_count: 1,
-      uploaded_file_bytes: testroland.digest().1,
+      uploaded_file_bytes: testroland.digest().size,
       upload_wall_time: Duration::default(),
     }
   );
@@ -1375,9 +1375,11 @@ async fn summary_does_not_count_things_in_cas() {
     dir_summary,
     UploadSummary {
       ingested_file_count: 3,
-      ingested_file_bytes: testdir.digest().1 + testroland.digest().1 + testcatnip.digest().1,
+      ingested_file_bytes: testdir.digest().size
+        + testroland.digest().size
+        + testcatnip.digest().size,
       uploaded_file_count: 2,
-      uploaded_file_bytes: testdir.digest().1 + testcatnip.digest().1,
+      uploaded_file_bytes: testdir.digest().size + testcatnip.digest().size,
       upload_wall_time: Duration::default(),
     }
   );
