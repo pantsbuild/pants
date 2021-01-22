@@ -32,7 +32,7 @@ def main() -> None:
     if args.smoke_tests:
         run_smoke_tests()
     if args.lint:
-        run_lint()
+        run_lint(remote_cache_enabled=args.remote_cache_enabled)
     if args.clippy:
         run_clippy()
     if args.cargo_audit:
@@ -41,6 +41,7 @@ def main() -> None:
         run_python_tests(
             include_unit=args.unit_tests,
             include_integration=args.integration_tests,
+            remote_cache_enabled=args.remote_cache_enabled,
         )
     if args.rust_tests:
         run_rust_tests()
@@ -75,6 +76,16 @@ def create_parser() -> argparse.ArgumentParser:
         help="Run Pants with this version.",
     )
     parser.add_argument(
+        "--remote-cache-enabled",
+        type=bool,
+        default=False,
+        help=(
+            "Enable remote caching via Toolchain. This requires setting the options "
+            "`remote_oauth_bearer_token_path` and `remote_ca_certs_path` in your environment."
+        ),
+    )
+
+    parser.add_argument(
         "--bootstrap", action="store_true", help="Bootstrap a pants.pex from local sources."
     )
     parser.add_argument(
@@ -91,6 +102,7 @@ def create_parser() -> argparse.ArgumentParser:
             "native_engine.so; this option should generally be avoided."
         ),
     )
+
     parser.add_argument("--githooks", action="store_true", help="Run pre-commit githook.")
     parser.add_argument(
         "--smoke-tests",
@@ -253,9 +265,11 @@ def run_smoke_tests() -> None:
             run_check(check)
 
 
-def run_lint() -> None:
+def run_lint(*, remote_cache_enabled: bool) -> None:
     targets = ["build-support::", "src::", "tests::"]
     command = ["./pants.pex", "--tag=-nolint", "lint", "typecheck", *targets]
+    if remote_cache_enabled:
+        command.append("--pants-config-files=pants.remote-cache.toml")
     _run_command(
         command,
         slug="Lint",
@@ -306,17 +320,18 @@ def run_rust_tests() -> None:
             die("Rust test failure.")
 
 
-def run_python_tests(*, include_unit: bool, include_integration: bool) -> None:
-    if include_unit and include_integration:
-        extra_args = []
-    elif include_unit and not include_integration:
-        extra_args = ["--tag=-integration"]
-    elif not include_unit and include_integration:
-        extra_args = ["--tag=+integration"]
-    else:
+def run_python_tests(*, include_unit: bool, include_integration: bool, remote_cache_enabled: bool) -> None:
+    extra_args = []
+    if remote_cache_enabled:
+        extra_args.append("--pants-config-files=pants.remote-cache.toml")
+    if not include_unit and not include_integration:
         raise ValueError(
             "Must specify True for at least one of `include_unit` and `include_integration`."
         )
+    elif include_unit and not include_integration:
+        extra_args.append("--tag=-integration")
+    elif not include_unit and include_integration:
+        extra_args.append("--tag=+integration")
     _run_command(
         command=_test_command(extra_args=extra_args),
         slug="PythonTests",

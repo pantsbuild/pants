@@ -4,6 +4,9 @@ colors = true
 # TODO: See #9924.
 dynamic_ui = false
 
+remote_oauth_bearer_token_path = "./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted"
+remote_ca_certs_path = "/etc/ssl/certs/ca-certificates.crt"
+
 [test]
 use_coverage = true
 

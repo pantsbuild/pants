@@ -482,13 +482,13 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
 
 def lint(python_version: PythonVersion) -> Dict:
     shard = {
-        **linux_shard(python_version=python_version, install_travis_wait=True),
+        **linux_shard(python_version=python_version),
         "name": f"Self-checks and lint (Python {python_version.decimal})",
         "script": [
             *_install_rust(),
             (
-                "travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py "
-                f"--githooks --smoke-tests --lint --python-version {python_version.decimal}"
+                "./build-support/bin/ci.py --githooks --smoke-tests --lint "
+                f"--remote-cache-enabled --python-version {python_version.decimal}"
             ),
         ],
     }
@@ -536,8 +536,8 @@ def python_tests(python_version: PythonVersion) -> Dict:
         "name": f"Python tests (Python {python_version.decimal})",
         "script": [
             "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-            "--unit-tests --integration-tests --python-version "
-            f"{python_version.decimal}"
+            "--unit-tests --integration-tests --remote-cache-enabled "
+            f"--python-version {python_version.decimal}"
         ],
         "after_success": ["./build-support/bin/upload_coverage.sh"],
     }
