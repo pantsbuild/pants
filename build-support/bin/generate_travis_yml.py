@@ -328,11 +328,11 @@ def linux_shard(
         ),
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage().value,
-        "env": [],
+        "env": ["PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt"],
     }
     if load_test_config:
         setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]
-        setup["env"] = [f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux"]
+        setup["env"].append(f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux")
         setup = {**setup, **CACHE_PANTS_RUN}
     if use_docker:
         setup["services"] = ["docker"]

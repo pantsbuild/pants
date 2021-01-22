@@ -65,6 +65,7 @@ jobs:
       timeout: 500
     dist: bionic
     env:
+    - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
     - CACHE_NAME=bootstrap.linux.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     language: python
@@ -120,6 +121,7 @@ jobs:
       timeout: 500
     dist: bionic
     env:
+    - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
     - CACHE_NAME=bootstrap.linux.py38
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.linux
     language: python
@@ -263,6 +265,7 @@ jobs:
       timeout: 500
     dist: bionic
     env:
+    - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - CACHE_NAME=lint.py37
     language: python
@@ -312,6 +315,7 @@ jobs:
       timeout: 500
     dist: bionic
     env:
+    - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.linux
     - CACHE_NAME=lint.py38
     language: python
@@ -435,6 +439,7 @@ jobs:
       timeout: 500
     dist: bionic
     env:
+    - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - CACHE_NAME=python_tests.py37
     language: python
@@ -486,6 +491,7 @@ jobs:
       timeout: 500
     dist: bionic
     env:
+    - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.linux
     - CACHE_NAME=python_tests.py38
     language: python
@@ -605,6 +611,7 @@ jobs:
       timeout: 500
     dist: bionic
     env:
+    - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.linux
@@ -866,6 +873,7 @@ jobs:
       skip_cleanup: true
     dist: bionic
     env:
+    - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - RUN_PANTS_FROM_PEX=1
     - PANTS_PEX_RELEASE=stable
@@ -913,6 +921,7 @@ jobs:
       timeout: 500
     dist: bionic
     env:
+    - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - RUN_PANTS_FROM_PEX=1
     - PREPARE_DEPLOY=1
