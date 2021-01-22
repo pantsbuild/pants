@@ -4,10 +4,6 @@ colors = true
 # TODO: See #9924.
 dynamic_ui = false
 
-# TODO: Eventually we would like pantsd enabled in CI as well, but we blanket disable it for
-# now in order to smooth off rough edges locally.
-pantsd = false
-
 [test]
 use_coverage = true
 

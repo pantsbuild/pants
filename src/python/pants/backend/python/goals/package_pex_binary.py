@@ -10,11 +10,13 @@ from pants.backend.python.target_types import (
     PexEmitWarningsField,
     PexEntryPointField,
     PexIgnoreErrorsField,
+    PexIncludeToolsField,
     PexInheritPathField,
 )
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import (
     PexShebangField,
+    PexUnzipField,
     PexZipSafeField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
@@ -50,6 +52,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     shebang: PexShebangField
     zip_safe: PexZipSafeField
     platforms: PythonPlatformsField
+    unzip: PexUnzipField
+    include_tools: PexIncludeToolsField
 
     def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> Tuple[str, ...]:
         args = []
@@ -65,6 +69,10 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--python-shebang={self.shebang.value}")
         if self.zip_safe.value is False:
             args.append("--not-zip-safe")
+        if self.unzip.value is True:
+            args.append("--unzip")
+        if self.include_tools.value is True:
+            args.append("--include-tools")
         return tuple(args)
 
 

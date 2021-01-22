@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from typing import Optional, cast
+from typing import cast
 
-from pants.base.build_environment import get_buildroot, get_git
+from pants.base.build_environment import get_git
 from pants.base.specs import AddressLiteralSpec, AddressSpecs, FilesystemSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import AddressInput
@@ -27,10 +27,9 @@ def calculate_specs(
     options: Options,
     session: SchedulerSession,
     *,
-    build_root: Optional[str] = None,
+    build_root: str,
 ) -> Specs:
     """Determine the specs for a given Pants run."""
-    build_root = build_root or get_buildroot()
     specs = SpecsParser(build_root).parse_specs(options.specs)
     changed_options = ChangedOptions.from_options(options.for_scope("changed"))
 

@@ -289,24 +289,6 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--pants-bootstrapdir",
-            advanced=True,
-            metavar="<dir>",
-            default=None,
-            removal_version="2.3.0.dev1",
-            removal_hint="Unused.",
-            help="Unused.",
-        )
-        register(
-            "--pants-configdir",
-            advanced=True,
-            metavar="<dir>",
-            default=None,
-            removal_version="2.3.0.dev1",
-            removal_hint="Unused.",
-            help="Unused.",
-        )
-        register(
             "--pants-workdir",
             advanced=True,
             metavar="<dir>",
