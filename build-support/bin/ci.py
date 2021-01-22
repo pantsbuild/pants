@@ -319,7 +319,9 @@ def run_rust_tests() -> None:
             die("Rust test failure.")
 
 
-def run_python_tests(*, include_unit: bool, include_integration: bool, remote_cache_enabled: bool) -> None:
+def run_python_tests(
+    *, include_unit: bool, include_integration: bool, remote_cache_enabled: bool
+) -> None:
     extra_args = []
     if remote_cache_enabled:
         extra_args.append("--pants-config-files=pants.remote-cache.toml")
