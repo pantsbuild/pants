@@ -333,7 +333,7 @@ def linux_shard(
                 "build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out "
                 "build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export "
                 "PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted; fi"
-            )
+            ),
         ],
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage().value,
