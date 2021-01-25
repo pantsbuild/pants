@@ -37,6 +37,7 @@ from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
+    TargetInfo,
 )
 from pants.goal.run_tracker import RunTracker
 from pants.testutil.option_util import create_options_bootstrapper
@@ -874,13 +875,13 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
         assert isinstance(context, StreamingWorkunitContext)
 
         expanded = context.get_expanded_specs()
-        files = expanded.files
+        targets = expanded.targets
 
-        assert len(files.keys()) == 2
-        assert files["src/python/others/b.py"] == ["src/python/others/b.py"]
-        assert set(files["src/python/somefiles"]) == {
-            "src/python/somefiles/a.py",
-            "src/python/somefiles/b.py",
+        assert len(targets.keys()) == 2
+        assert targets["src/python/others/b.py"] == [TargetInfo(filename="src/python/others/b.py")]
+        assert set(targets["src/python/somefiles"]) == {
+            TargetInfo(filename="src/python/somefiles/a.py"),
+            TargetInfo(filename="src/python/somefiles/b.py"),
         }
 
     handler = StreamingWorkunitHandler(
