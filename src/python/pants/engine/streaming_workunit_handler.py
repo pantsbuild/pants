@@ -25,8 +25,13 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class TargetInfo:
+    filename: str
+
+
+@dataclass(frozen=True)
 class ExpandedSpecs:
-    files: Dict[str, List[str]]
+    targets: Dict[str, List[TargetInfo]]
 
 
 @dataclass(frozen=True)
@@ -77,13 +82,17 @@ class StreamingWorkunitContext:
         expanded_targets = self._scheduler.product_request(
             Targets, [Params(Addresses([addr])) for addr in unexpanded_addresses]
         )
-        files = {}
+        targets_dict: Dict[str, List[TargetInfo]] = {}
         for addr, targets in zip(unexpanded_addresses, expanded_targets):
-            files[addr.spec] = [
-                tgt.address.filename if tgt.address.is_file_target else str(tgt.address)
+            targets_dict[addr.spec] = [
+                TargetInfo(
+                    filename=(
+                        tgt.address.filename if tgt.address.is_file_target else str(tgt.address)
+                    )
+                )
                 for tgt in targets
             ]
-        return ExpandedSpecs(files=files)
+        return ExpandedSpecs(targets=targets_dict)
 
 
 class WorkunitsCallback(Protocol):
