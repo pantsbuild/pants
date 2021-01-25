@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class TargetInfo:
-    filename: str
+    spec_or_filename: str
 
 
 @dataclass(frozen=True)
@@ -86,7 +86,7 @@ class StreamingWorkunitContext:
         for addr, targets in zip(unexpanded_addresses, expanded_targets):
             targets_dict[addr.spec] = [
                 TargetInfo(
-                    filename=(
+                    spec_or_filename=(
                         tgt.address.filename if tgt.address.is_file_target else str(tgt.address)
                     )
                 )

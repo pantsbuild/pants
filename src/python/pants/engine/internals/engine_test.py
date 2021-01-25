@@ -877,11 +877,13 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
         expanded = context.get_expanded_specs()
         targets = expanded.targets
 
-        assert len(targets.keys()) == 2
-        assert targets["src/python/others/b.py"] == [TargetInfo(filename="src/python/others/b.py")]
+        assert set(targets.keys()) == {"src/python/others/b.py", "src/python/somefiles"}
+        assert targets["src/python/others/b.py"] == [
+            TargetInfo(spec_or_filename="src/python/others/b.py")
+        ]
         assert set(targets["src/python/somefiles"]) == {
-            TargetInfo(filename="src/python/somefiles/a.py"),
-            TargetInfo(filename="src/python/somefiles/b.py"),
+            TargetInfo(spec_or_filename="src/python/somefiles/a.py"),
+            TargetInfo(spec_or_filename="src/python/somefiles/b.py"),
         }
 
     handler = StreamingWorkunitHandler(
