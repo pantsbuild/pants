@@ -323,16 +323,25 @@ def linux_shard(
             }
         },
         "language": "python",
-        "before_install": _linux_before_install(
-            include_test_config=load_test_config, install_travis_wait=install_travis_wait
-        ),
+        "before_install": [
+            *_linux_before_install(
+                include_test_config=load_test_config, install_travis_wait=install_travis_wait
+            ),
+            (
+                "if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K "
+                "$encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv -in "
+                "build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out "
+                "build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export "
+                "PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted; fi"
+            ),
+        ],
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage().value,
-        "env": [],
+        "env": ["PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt"],
     }
     if load_test_config:
         setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]
-        setup["env"] = [f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux"]
+        setup["env"].append(f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux")
         setup = {**setup, **CACHE_PANTS_RUN}
     if use_docker:
         setup["services"] = ["docker"]
@@ -482,13 +491,13 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
 
 def lint(python_version: PythonVersion) -> Dict:
     shard = {
-        **linux_shard(python_version=python_version, install_travis_wait=True),
+        **linux_shard(python_version=python_version),
         "name": f"Self-checks and lint (Python {python_version.decimal})",
         "script": [
             *_install_rust(),
             (
-                "travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py "
-                f"--githooks --smoke-tests --lint --python-version {python_version.decimal}"
+                "./build-support/bin/ci.py --githooks --smoke-tests --lint "
+                f"--remote-cache-enabled --python-version {python_version.decimal}"
             ),
         ],
     }
@@ -536,8 +545,8 @@ def python_tests(python_version: PythonVersion) -> Dict:
         "name": f"Python tests (Python {python_version.decimal})",
         "script": [
             "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-            "--unit-tests --integration-tests --python-version "
-            f"{python_version.decimal}"
+            "--unit-tests --integration-tests --remote-cache-enabled "
+            f"--python-version {python_version.decimal}"
         ],
         "after_success": ["./build-support/bin/upload_coverage.sh"],
     }
