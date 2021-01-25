@@ -54,9 +54,11 @@ jobs:
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
+    - if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K $encrypted_f6717c01a353_key
+      -iv $encrypted_f6717c01a353_iv -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted
+      -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export
+      PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted;
+      fi
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -69,7 +71,6 @@ jobs:
     dist: bionic
     env:
     - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
-    - PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
     - CACHE_NAME=bootstrap.linux.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     language: python
@@ -114,9 +115,11 @@ jobs:
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
+    - if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K $encrypted_f6717c01a353_key
+      -iv $encrypted_f6717c01a353_iv -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted
+      -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export
+      PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted;
+      fi
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -129,7 +132,6 @@ jobs:
     dist: bionic
     env:
     - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
-    - PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
     - CACHE_NAME=bootstrap.linux.py38
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.linux
     language: python
@@ -264,9 +266,11 @@ jobs:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
+    - if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K $encrypted_f6717c01a353_key
+      -iv $encrypted_f6717c01a353_iv -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted
+      -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export
+      PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted;
+      fi
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -277,7 +281,6 @@ jobs:
     dist: bionic
     env:
     - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
-    - PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - CACHE_NAME=lint.py37
     language: python
@@ -318,9 +321,11 @@ jobs:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
+    - if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K $encrypted_f6717c01a353_key
+      -iv $encrypted_f6717c01a353_iv -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted
+      -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export
+      PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted;
+      fi
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -331,7 +336,6 @@ jobs:
     dist: bionic
     env:
     - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
-    - PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.linux
     - CACHE_NAME=lint.py38
     language: python
@@ -356,9 +360,6 @@ jobs:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -395,9 +396,6 @@ jobs:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -449,12 +447,14 @@ jobs:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
+    - if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K $encrypted_f6717c01a353_key
+      -iv $encrypted_f6717c01a353_iv -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted
+      -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export
+      PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted;
+      fi
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -465,7 +465,6 @@ jobs:
     dist: bionic
     env:
     - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
-    - PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - CACHE_NAME=python_tests.py37
     language: python
@@ -505,12 +504,14 @@ jobs:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
+    - if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K $encrypted_f6717c01a353_key
+      -iv $encrypted_f6717c01a353_iv -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted
+      -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export
+      PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted;
+      fi
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -521,7 +522,6 @@ jobs:
     dist: bionic
     env:
     - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
-    - PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.linux
     - CACHE_NAME=python_tests.py38
     language: python
@@ -543,9 +543,6 @@ jobs:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -635,9 +632,11 @@ jobs:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
+    - if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K $encrypted_f6717c01a353_key
+      -iv $encrypted_f6717c01a353_iv -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted
+      -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export
+      PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted;
+      fi
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -648,7 +647,6 @@ jobs:
     dist: bionic
     env:
     - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
-    - PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.linux
@@ -891,9 +889,11 @@ jobs:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
+    - if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K $encrypted_f6717c01a353_key
+      -iv $encrypted_f6717c01a353_iv -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted
+      -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export
+      PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted;
+      fi
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -914,7 +914,6 @@ jobs:
     dist: bionic
     env:
     - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
-    - PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - RUN_PANTS_FROM_PEX=1
     - PANTS_PEX_RELEASE=stable
@@ -953,9 +952,11 @@ jobs:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
-    - openssl aes-256-cbc -K $encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv
-      -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
-      -d
+    - if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K $encrypted_f6717c01a353_key
+      -iv $encrypted_f6717c01a353_iv -in build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted
+      -out build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export
+      PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted;
+      fi
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -966,7 +967,6 @@ jobs:
     dist: bionic
     env:
     - PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt
-    - PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - RUN_PANTS_FROM_PEX=1
     - PREPARE_DEPLOY=1
