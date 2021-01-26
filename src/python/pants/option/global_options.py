@@ -1,12 +1,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 import sys
 import tempfile
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -16,6 +18,7 @@ from pants.base.build_environment import (
 )
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import docs_url
@@ -63,95 +66,114 @@ class ExecutionOptions:
     allowing Subsystems to be consumed before the Scheduler has been created).
     """
 
-    remote_execution: Any
-    remote_store_server: Any
-    remote_store_thread_count: Any
-    remote_execution_server: Any
-    remote_store_chunk_bytes: Any
-    remote_store_chunk_upload_timeout_seconds: Any
-    remote_store_rpc_retries: Any
-    remote_store_connection_limit: Any
-    process_execution_local_parallelism: Any
-    process_execution_remote_parallelism: Any
-    process_execution_cache_namespace: Any
-    process_execution_cleanup_local_dirs: Any
-    process_execution_use_local_cache: Any
-    remote_instance_name: Any
-    remote_ca_certs_path: Any
-    remote_oauth_bearer_token_path: Any
-    remote_execution_extra_platform_properties: Any
-    remote_execution_headers: Any
-    remote_execution_overall_deadline_secs: int
-    process_execution_local_enable_nailgun: bool
+    remote_execution: bool
     remote_cache_read: bool
     remote_cache_write: bool
+
+    remote_instance_name: Optional[str]
+    remote_ca_certs_path: Optional[str]
+    remote_oauth_bearer_token_path: Optional[str]
+
+    process_execution_local_parallelism: int
+    process_execution_remote_parallelism: int
+    process_execution_cache_namespace: Optional[str]
+    process_execution_cleanup_local_dirs: bool
+    process_execution_use_local_cache: bool
+    process_execution_local_enable_nailgun: bool
+
+    remote_store_server: List[str]
+    remote_store_thread_count: int
+    remote_store_chunk_bytes: Any
+    remote_store_chunk_upload_timeout_seconds: int
+    remote_store_rpc_retries: int
+    remote_store_connection_limit: int
     remote_store_initial_timeout: int
     remote_store_timeout_multiplier: float
     remote_store_maximum_timeout: int
+
     remote_cache_eager_fetch: bool
 
+    remote_execution_server: Optional[str]
+    remote_execution_extra_platform_properties: List[str]
+    remote_execution_headers: Dict[str, str]
+    remote_execution_overall_deadline_secs: int
+
     @classmethod
-    def from_bootstrap_options(cls, bootstrap_options):
+    def from_bootstrap_options(cls, bootstrap_options: OptionValueContainer) -> ExecutionOptions:
         return cls(
+            # Remote execution strategy.
             remote_execution=bootstrap_options.remote_execution,
-            remote_store_server=bootstrap_options.remote_store_server,
-            remote_execution_server=bootstrap_options.remote_execution_server,
-            remote_store_thread_count=bootstrap_options.remote_store_thread_count,
-            remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
-            remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
-            remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
-            remote_store_connection_limit=bootstrap_options.remote_store_connection_limit,
+            remote_cache_read=bootstrap_options.remote_cache_read,
+            remote_cache_write=bootstrap_options.remote_cache_write,
+            # General remote setup.
+            remote_instance_name=bootstrap_options.remote_instance_name,
+            remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
+            remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
+            # Process execution setup.
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
             process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
             process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
-            remote_instance_name=bootstrap_options.remote_instance_name,
-            remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
-            remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
-            remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
-            remote_execution_headers=bootstrap_options.remote_execution_headers,
-            remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
-            remote_cache_read=bootstrap_options.remote_cache_read,
-            remote_cache_write=bootstrap_options.remote_cache_write,
-            remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
+            # Remote store setup.
+            remote_store_server=bootstrap_options.remote_store_server,
+            remote_store_thread_count=bootstrap_options.remote_store_thread_count,
+            remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
+            remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
+            remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
+            remote_store_connection_limit=bootstrap_options.remote_store_connection_limit,
             remote_store_initial_timeout=bootstrap_options.remote_store_initial_timeout,
             remote_store_timeout_multiplier=bootstrap_options.remote_store_timeout_multiplier,
             remote_store_maximum_timeout=bootstrap_options.remote_store_maximum_timeout,
+            # Remote cache setup.
+            remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
+            # Remote execution setup.
+            remote_execution_server=bootstrap_options.remote_execution_server,
+            remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
+            remote_execution_headers=bootstrap_options.remote_execution_headers,
+            remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
         )
 
 
-_CPU_COUNT = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+_CPU_COUNT = (
+    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+) or 2
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
+    # Remote execution strategy.
     remote_execution=False,
-    remote_store_server=[],
-    remote_store_thread_count=1,
-    remote_execution_server=None,
-    remote_store_chunk_bytes=1024 * 1024,
-    remote_store_chunk_upload_timeout_seconds=60,
-    remote_store_rpc_retries=2,
-    remote_store_connection_limit=5,
+    remote_cache_read=False,
+    remote_cache_write=False,
+    # General remote setup.
+    remote_instance_name=None,
+    remote_ca_certs_path=None,
+    remote_oauth_bearer_token_path=None,
+    # Process execution setup.
     process_execution_local_parallelism=_CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
     process_execution_cleanup_local_dirs=True,
     process_execution_use_local_cache=True,
-    remote_instance_name=None,
-    remote_ca_certs_path=None,
-    remote_oauth_bearer_token_path=None,
-    remote_execution_extra_platform_properties=[],
-    remote_execution_headers={},
-    remote_execution_overall_deadline_secs=60 * 60,  # one hour
     process_execution_local_enable_nailgun=False,
-    remote_cache_read=False,
-    remote_cache_write=False,
-    remote_cache_eager_fetch=True,
+    # Remote store setup.
+    remote_store_server=[],
+    remote_store_thread_count=1,
+    remote_store_chunk_bytes=1024 * 1024,
+    remote_store_chunk_upload_timeout_seconds=60,
+    remote_store_rpc_retries=2,
+    remote_store_connection_limit=5,
     remote_store_initial_timeout=10,
     remote_store_timeout_multiplier=2.0,
     remote_store_maximum_timeout=10,
+    # Remote cache setup.
+    remote_cache_eager_fetch=True,
+    # Remote execution setup.
+    remote_execution_server=None,
+    remote_execution_extra_platform_properties=[],
+    remote_execution_headers={},
+    remote_execution_overall_deadline_secs=60 * 60,  # one hour
 )
 
 
@@ -709,16 +731,26 @@ class GlobalOptions(Subsystem):
                 "the same time as `--remote-execution`."
             ),
         )
+
         register(
-            "--remote-cache-eager-fetch",
-            type=bool,
+            "--remote-instance-name",
             advanced=True,
-            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_eager_fetch,
-            help=(
-                "Eagerly fetch relevant content from the remote store instead of lazily fetching."
-                "\n\nThis may result in worse performance, but reduce the frequency of errors "
-                "encountered by reducing the surface area of when remote caching is used."
-            ),
+            help="Name of the remote execution instance to use. Used for routing within "
+            "--remote-execution-server and --remote-store-server.",
+        )
+        register(
+            "--remote-ca-certs-path",
+            advanced=True,
+            help="Path to a PEM file containing CA certificates used for verifying secure "
+            "connections to --remote-execution-server and --remote-store-server. "
+            "If not specified, TLS will not be used.",
+        )
+        register(
+            "--remote-oauth-bearer-token-path",
+            advanced=True,
+            help="Path to a file containing an oauth token to use for grpc connections to "
+            "--remote-execution-server and --remote-store-server. If not specified, no "
+            "authorization will be performed.",
         )
 
         register(
@@ -735,11 +767,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_thread_count,
             help="Thread count to use for the pool that interacts with the remote file store.",
-        )
-        register(
-            "--remote-execution-server",
-            advanced=True,
-            help="host:port of grpc server to use as remote execution scheduler.",
         )
         register(
             "--remote-store-chunk-bytes",
@@ -790,25 +817,23 @@ class GlobalOptions(Subsystem):
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_maximum_timeout,
             help="Maximum timeout (in millseconds) to allow between retry attempts in accessing a remote store.",
         )
+
         register(
-            "--remote-instance-name",
+            "--remote-cache-eager-fetch",
+            type=bool,
             advanced=True,
-            help="Name of the remote execution instance to use. Used for routing within "
-            "--remote-execution-server and --remote-store-server.",
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_eager_fetch,
+            help=(
+                "Eagerly fetch relevant content from the remote store instead of lazily fetching."
+                "\n\nThis may result in worse performance, but reduce the frequency of errors "
+                "encountered by reducing the surface area of when remote caching is used."
+            ),
         )
+
         register(
-            "--remote-ca-certs-path",
+            "--remote-execution-server",
             advanced=True,
-            help="Path to a PEM file containing CA certificates used for verifying secure "
-            "connections to --remote-execution-server and --remote-store-server. "
-            "If not specified, TLS will not be used.",
-        )
-        register(
-            "--remote-oauth-bearer-token-path",
-            advanced=True,
-            help="Path to a file containing an oauth token to use for grpc connections to "
-            "--remote-execution-server and --remote-store-server. If not specified, no "
-            "authorization will be performed.",
+            help="host:port of grpc server to use as remote execution scheduler.",
         )
         register(
             "--remote-execution-extra-platform-properties",
