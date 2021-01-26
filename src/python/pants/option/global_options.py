@@ -988,17 +988,24 @@ class GlobalOptions(Subsystem):
 
         Raises pants.option.errors.OptionsError on validation failure.
         """
+        if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
+            raise OptionsError(
+                "`--remote-execution` cannot be set at the same time as either "
+                "`--remote-cache-read` or `--remote-cache-write`.\n\nIf remote execution is "
+                "enabled, it will already use remote caching."
+            )
+
         if opts.remote_execution and not opts.remote_execution_server:
             raise OptionsError(
                 "The `--remote-execution` option requires also setting "
                 "`--remote-execution-server` to work properly."
             )
-
         if opts.remote_execution_server and not opts.remote_store_server:
             raise OptionsError(
                 "The `--remote-execution-server` option requires also setting "
                 "`--remote-store-server`. Often these have the same value."
             )
+
         if opts.remote_cache_read and not opts.remote_store_server:
             raise OptionsError(
                 "The `--remote-cache-read` option requires also setting "
@@ -1008,13 +1015,6 @@ class GlobalOptions(Subsystem):
             raise OptionsError(
                 "The `--remote-cache-write` option requires also setting "
                 "`--remote-store-server` to work properly."
-            )
-
-        if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
-            raise OptionsError(
-                "`--remote-execution` cannot be set at the same time as either "
-                "`--remote-cache-read` or `--remote-cache-write`.\n\nIf remote execution is "
-                "enabled, it will already use remote caching."
             )
 
         # Ensure that timeout values are non-zero.
@@ -1033,3 +1033,16 @@ class GlobalOptions(Subsystem):
                 "The --remote-store-initial-timeout option requires a positive number of "
                 "milliseconds."
             )
+
+        # Ensure that remote headers are ASCII (gRCP requirement).
+        for k, v in opts.remote_execution_headers.items():
+            if not k.isascii():
+                raise OptionsError(
+                    f"All values in `--remote-execution-headers` must be ASCII "
+                    f"(as required by gRPC), but the key in `{k}: {v}` has non-ASCII characters."
+                )
+            if not v.isascii():
+                raise OptionsError(
+                    f"All values in `--remote-execution-headers` must be ASCII "
+                    f"(as required by gRPC), but the value in `{k}: {v}` has non-ASCII characters."
+                )
