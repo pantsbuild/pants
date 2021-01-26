@@ -12,7 +12,7 @@ use crate::nodes::{NodeKey, Select};
 use crate::scheduler::Scheduler;
 
 use async_latch::AsyncLatch;
-use futures::future::{AbortHandle, Abortable};
+use futures::future::{AbortHandle, Abortable, BoxFuture};
 use futures::FutureExt;
 use graph::LastObserved;
 use log::warn;
@@ -84,6 +84,8 @@ struct InnerSession {
   // Session/build_id would be stable.
   run_id: Mutex<Uuid>,
   workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
+  // Tasks to await at tail of the session.
+  tail_tasks: Arc<Mutex<Vec<BoxFuture<'static, ()>>>>,
 }
 
 impl InnerSession {
@@ -132,6 +134,7 @@ impl Session {
       session_values: Mutex::new(session_values),
       run_id: Mutex::new(Uuid::new_v4()),
       workunit_metadata_map: RwLock::new(HashMap::new()),
+      tail_tasks: Arc::new(Mutex::new(Vec::new())),
     });
     scheduler.core.sessions.add(&inner_session);
     Session(inner_session)
@@ -298,6 +301,13 @@ impl Session {
         }
       }
     }
+  }
+
+  /// Returns a Vec of futures representing an asynchrous "tail" task that should not block
+  /// individual nodes in the build graph but should block (up to a configurable timeout)
+  /// ending this `Session`.
+  pub fn tail_tasks(&self) -> Arc<Mutex<Vec<BoxFuture<'static, ()>>>> {
+    self.0.tail_tasks.clone()
   }
 }
 

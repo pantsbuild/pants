@@ -523,11 +523,12 @@ impl crate::CommandRunner for CommandRunner {
       let command_runner = self.clone();
       let result = result.clone();
       // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
-      let _write_join = self.executor.spawn(
+      let context2 = context.clone();
+      let write_fut = self.executor.spawn(
         async move {
           let write_result = command_runner
             .update_action_cache(
-              &context,
+              &context2,
               &request,
               &result,
               &command_runner.metadata,
@@ -536,18 +537,20 @@ impl crate::CommandRunner for CommandRunner {
               command_digest,
             )
             .await;
-          context
+          context2
             .workunit_store
             .increment_counter(Metric::RemoteCacheWriteFinished, 1);
           if let Err(err) = write_result {
             log::warn!("Failed to write to remote cache: {}", err);
-            context
+            context2
               .workunit_store
               .increment_counter(Metric::RemoteCacheWriteErrors, 1);
           };
         }
         .boxed(),
       );
+      let mut tail_tasks = context.tail_tasks.lock();
+      tail_tasks.push(write_fut.boxed());
     }
 
     Ok(result)

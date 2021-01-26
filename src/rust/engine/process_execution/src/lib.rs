@@ -69,6 +69,8 @@ extern crate uname;
 
 pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
 use fs::RelativePath;
+use futures::future::BoxFuture;
+use parking_lot::Mutex;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Platform {
@@ -382,6 +384,7 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 pub struct Context {
   workunit_store: WorkunitStore,
   build_id: String,
+  tail_tasks: Arc<Mutex<Vec<BoxFuture<'static, ()>>>>,
 }
 
 impl Default for Context {
@@ -389,6 +392,7 @@ impl Default for Context {
     Context {
       workunit_store: WorkunitStore::new(false),
       build_id: String::default(),
+      tail_tasks: Arc::new(Mutex::new(Vec::new())),
     }
   }
 }
@@ -398,6 +402,7 @@ impl Context {
     Context {
       workunit_store,
       build_id,
+      tail_tasks: Arc::new(Mutex::new(Vec::new())),
     }
   }
 }

@@ -13,6 +13,7 @@ use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{Select, Visualizer};
 use crate::session::{ObservedValueResult, Root, Session, Stderr};
 
+use futures::future::BoxFuture;
 use futures::{future, FutureExt};
 use graph::{InvalidationResult, LastObserved};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -384,6 +385,9 @@ impl Scheduler {
           }
           res = &mut execution_task => {
             // Completed successfully.
+            // Wait for tail tasks to complete.
+            let tail_tasks = session.tail_tasks().lock().drain(..).collect();
+            Self::wait_for_tail_tasks(tail_tasks).await;
             break Ok(Self::execute_record_results(&request.roots, &session, res));
           }
           stderr = receiver.recv() => match stderr {
@@ -401,6 +405,22 @@ impl Scheduler {
       session.maybe_display_teardown().await;
       result
     })
+  }
+
+  async fn wait_for_tail_tasks(tasks: Vec<BoxFuture<'static, ()>>) {
+    log::info!("tail tasks count={}", tasks.len());
+    if !tasks.is_empty() {
+      let joined_tail_tasks_fut = futures::future::join_all(tasks);
+      let timeout_fut = time::timeout(Duration::from_secs(5), joined_tail_tasks_fut);
+      match timeout_fut.await {
+        Ok(_) => {
+          log::info!("tasks tasks successfully ran");
+        }
+        Err(_) => {
+          log::warn!("tasks tasks exceeded tail wait ");
+        }
+      }
+    }
   }
 
   fn refresh_delay(refresh_interval: Duration, deadline: Option<Instant>) -> Duration {
