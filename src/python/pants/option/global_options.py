@@ -1067,21 +1067,19 @@ class GlobalOptions(Subsystem):
                 "milliseconds."
             )
 
-        # Ensure that remote headers are ASCII (gRCP requirement).
+        # Ensure that remote headers are ASCII.
         def validate_headers(opt_name: str) -> None:
             command_line_opt_name = f"--{opt_name.replace('_', '-')}"
             for k, v in getattr(opts, opt_name).items():
                 if not k.isascii():
                     raise OptionsError(
-                        f"All values in `{command_line_opt_name}` must be ASCII "
-                        f"(as required by gRPC), but the key in `{k}: {v}` has non-ASCII "
-                        f"characters."
+                        f"All values in `{command_line_opt_name}` must be ASCII, but the key "
+                        f"in `{k}: {v}` has non-ASCII characters."
                     )
                 if not v.isascii():
                     raise OptionsError(
-                        f"All values in `{command_line_opt_name}` must be ASCII "
-                        f"(as required by gRPC), but the value in `{k}: {v}` has non-ASCII "
-                        f"characters."
+                        f"All values in `{command_line_opt_name}` must be ASCII, but the value in "
+                        f"`{k}: {v}` has non-ASCII characters."
                     )
 
         validate_headers("remote_execution_headers")
