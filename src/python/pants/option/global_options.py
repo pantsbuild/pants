@@ -8,7 +8,8 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, cast
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -72,7 +73,6 @@ class ExecutionOptions:
 
     remote_instance_name: Optional[str]
     remote_ca_certs_path: Optional[str]
-    remote_oauth_bearer_token_path: Optional[str]
 
     process_execution_local_parallelism: int
     process_execution_remote_parallelism: int
@@ -101,6 +101,22 @@ class ExecutionOptions:
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options: OptionValueContainer) -> ExecutionOptions:
+        # Possibly insert some headers.
+        remote_execution_headers = cast(Dict[str, str], bootstrap_options.remote_execution_headers)
+        remote_store_headers = cast(Dict[str, str], bootstrap_options.remote_store_headers)
+        if bootstrap_options.remote_oauth_bearer_token_path:
+            oauth_token = (
+                Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
+            )
+            if set(oauth_token).intersection({"\n", "\r"}):
+                raise OptionsError(
+                    f"OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path} "
+                    "must not contain multiple lines."
+                )
+            token_header = {"authorization": f"Bearer {oauth_token}"}
+            remote_execution_headers.update(token_header)
+            remote_store_headers.update(token_header)
+
         return cls(
             # Remote execution strategy.
             remote_execution=bootstrap_options.remote_execution,
@@ -109,7 +125,6 @@ class ExecutionOptions:
             # General remote setup.
             remote_instance_name=bootstrap_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
-            remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
             # Process execution setup.
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
@@ -119,7 +134,7 @@ class ExecutionOptions:
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             # Remote store setup.
             remote_store_server=bootstrap_options.remote_store_server,
-            remote_store_headers=bootstrap_options.remote_store_headers,
+            remote_store_headers=remote_store_headers,
             remote_store_thread_count=bootstrap_options.remote_store_thread_count,
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
             remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
@@ -133,7 +148,7 @@ class ExecutionOptions:
             # Remote execution setup.
             remote_execution_server=bootstrap_options.remote_execution_server,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
-            remote_execution_headers=bootstrap_options.remote_execution_headers,
+            remote_execution_headers=remote_execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
         )
 
@@ -151,7 +166,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # General remote setup.
     remote_instance_name=None,
     remote_ca_certs_path=None,
-    remote_oauth_bearer_token_path=None,
     # Process execution setup.
     process_execution_local_parallelism=_CPU_COUNT,
     process_execution_remote_parallelism=128,
@@ -753,8 +767,10 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=(
                 "Path to a file containing an oauth token to use for gGRPC connections to "
-                "--remote-execution-server and --remote-store-server. Pants will add a header with "
-                "this token. If not specified, no authorization will be performed."
+                "--remote-execution-server and --remote-store-server.\n\nIf specified, Pants will "
+                "add a header in the format `authorization: Bearer <token>`. You can also manually "
+                "add this header via `--remote-execution-headers` and `--remote-store-headers`. "
+                "Otherwise, no authorization will be performed."
             ),
         )
 

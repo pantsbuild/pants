@@ -76,7 +76,6 @@ pub struct RemotingOptions {
   pub execution_process_cache_namespace: Option<String>,
   pub instance_name: Option<String>,
   pub root_ca_certs_path: Option<PathBuf>,
-  pub oauth_bearer_token_path: Option<PathBuf>,
   pub store_headers: BTreeMap<String, String>,
   pub store_thread_count: usize,
   pub store_chunk_bytes: usize,
@@ -111,7 +110,6 @@ impl Core {
     remoting_opts: &RemotingOptions,
     remote_store_servers: &[String],
     root_ca_certs: &Option<Vec<u8>>,
-    oauth_bearer_token: &Option<String>,
   ) -> Result<Store, String> {
     if enable_remote {
       let backoff_config = store::BackoffConfig::new(
@@ -119,20 +117,13 @@ impl Core {
         remoting_opts.store_timeout_multiplier,
         remoting_opts.store_maximum_timeout,
       )?;
-      let mut store_headers = remoting_opts.store_headers.clone();
-      if let Some(oauth_bearer_token) = oauth_bearer_token {
-        store_headers.insert(
-          "authorization".to_owned(),
-          format!("Bearer {}", oauth_bearer_token.trim()),
-        );
-      }
       Store::with_remote(
         executor.clone(),
         local_store_dir,
         remote_store_servers.to_vec(),
         remoting_opts.instance_name.clone(),
         root_ca_certs.clone(),
-        store_headers,
+        remoting_opts.store_headers.clone(),
         remoting_opts.store_thread_count,
         remoting_opts.store_chunk_bytes,
         remoting_opts.store_chunk_upload_timeout,
@@ -184,15 +175,7 @@ impl Core {
     process_execution_metadata: &ProcessMetadata,
     remoting_opts: &RemotingOptions,
     root_ca_certs: &Option<Vec<u8>>,
-    oauth_bearer_token: &Option<String>,
   ) -> Result<Box<dyn CommandRunner>, String> {
-    let mut execution_headers = remoting_opts.execution_headers.clone();
-    if let Some(oauth_bearer_token) = oauth_bearer_token {
-      execution_headers.insert(
-        "authorization".to_owned(),
-        format!("Bearer {}", oauth_bearer_token.trim()),
-      );
-    }
     Ok(Box::new(process_execution::remote::CommandRunner::new(
       // No problem unwrapping here because the global options validation
       // requires the remoting_opts.execution_server be present when
@@ -201,7 +184,7 @@ impl Core {
       remoting_opts.store_servers.clone(),
       process_execution_metadata.clone(),
       root_ca_certs.clone(),
-      execution_headers,
+      remoting_opts.execution_headers.clone(),
       store.clone(),
       // TODO if we ever want to configure the remote platform to be something else we
       // need to take an option all the way down here and into the remote::CommandRunner struct.
@@ -220,7 +203,6 @@ impl Core {
     local_store_dir: &Path,
     process_execution_metadata: &ProcessMetadata,
     root_ca_certs: &Option<Vec<u8>>,
-    oauth_bearer_token: &Option<String>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
   ) -> Result<Box<dyn CommandRunner>, String> {
@@ -255,7 +237,6 @@ impl Core {
             process_execution_metadata,
             &remoting_opts,
             root_ca_certs,
-            oauth_bearer_token,
           )?,
           exec_strategy_opts.remote_parallelism,
         ))
@@ -263,13 +244,6 @@ impl Core {
         let action_cache_address = remote_store_servers
           .first()
           .ok_or_else(|| "At least one remote store must be specified".to_owned())?;
-        let mut store_headers = remoting_opts.store_headers.clone();
-        if let Some(oauth_bearer_token) = oauth_bearer_token {
-          store_headers.insert(
-            "authorization".to_owned(),
-            format!("Bearer {}", oauth_bearer_token.trim()),
-          );
-        }
         Box::new(process_execution::remote_cache::CommandRunner::new(
           local_command_runner.into(),
           process_execution_metadata.clone(),
@@ -277,7 +251,7 @@ impl Core {
           full_store.clone(),
           action_cache_address.as_str(),
           root_ca_certs.clone(),
-          store_headers,
+          remoting_opts.store_headers.clone(),
           Platform::current()?,
           exec_strategy_opts.remote_cache_read,
           exec_strategy_opts.remote_cache_write,
@@ -371,24 +345,6 @@ impl Core {
       None
     };
 
-    // We re-use this token for both the execution and store service; they're generally tied together.
-    let oauth_bearer_token = if let Some(ref path) = remoting_opts.oauth_bearer_token_path {
-      Some(
-        std::fs::read_to_string(path)
-          .map_err(|err| format!("Error reading OAuth bearer token file {:?}: {}", path, err))
-          .map(|v| v.trim_matches(|c| c == '\r' || c == '\n').to_owned())
-          .and_then(|v| {
-            if v.find(|c| c == '\r' || c == '\n').is_some() {
-              Err("OAuth bearer token file must not contain multiple lines".to_string())
-            } else {
-              Ok(v)
-            }
-          })?,
-      )
-    } else {
-      None
-    };
-
     let need_remote_store = remoting_opts.execution_enable
       || exec_strategy_opts.remote_cache_read
       || exec_strategy_opts.remote_cache_write;
@@ -405,7 +361,6 @@ impl Core {
       &remoting_opts,
       &remote_store_servers,
       &root_ca_certs,
-      &oauth_bearer_token,
     )
     .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
@@ -436,7 +391,6 @@ impl Core {
       &local_store_dir,
       &process_execution_metadata,
       &root_ca_certs,
-      &oauth_bearer_token,
       &exec_strategy_opts,
       &remoting_opts,
     )?;
