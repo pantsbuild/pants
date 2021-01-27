@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::fmt;
-use std::str::FromStr;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -12,6 +12,7 @@ use bytes::{Bytes, BytesMut};
 use futures::future::TryFutureExt;
 use futures::Future;
 use futures::StreamExt;
+use grpc_util::headers_to_interceptor_fn;
 use hashing::Digest;
 use itertools::{Either, Itertools};
 use log::Level;
@@ -21,8 +22,6 @@ use tonic::{Code, Interceptor, Request};
 use workunit_store::{with_workunit, ObservationMetric};
 
 use super::BackoffConfig;
-use std::sync::Arc;
-use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -90,48 +89,13 @@ impl ByteStore {
 
     let headers = oauth_bearer_token
       .iter()
-      .map(|t| {
-        (
-          String::from("authorization"),
-          format!("Bearer {}", t.trim()),
-        )
-      })
+      .map(|t| ("authorization".to_owned(), format!("Bearer {}", t.trim())))
       .collect::<BTreeMap<_, _>>();
-
-    let mut metadata = MetadataMap::with_capacity(headers.len());
-    for (key, value) in &headers {
-      let key_ascii = AsciiMetadataKey::from_str(key.as_str()).map_err(|_| {
-        format!(
-          "Header key `{}` must be an ASCII value (as required by gRPC).",
-          key
-        )
-      })?;
-      let value_ascii = AsciiMetadataValue::from_str(value.as_str()).map_err(|_| {
-        format!(
-          "Header value `{}` for key `{}` must be an ASCII value (as required by gRPC).",
-          value, key
-        )
-      })?;
-      metadata.insert(key_ascii, value_ascii);
-    }
 
     let interceptor = if headers.is_empty() {
       None
     } else {
-      Some(Interceptor::new(move |mut req: Request<()>| {
-        let req_metadata = req.metadata_mut();
-        for kv_ref in metadata.iter() {
-          match kv_ref {
-            KeyAndValueRef::Ascii(key, value) => {
-              req_metadata.insert(key, value.clone());
-            }
-            KeyAndValueRef::Binary(key, value) => {
-              req_metadata.insert_bin(key, value.clone());
-            }
-          }
-        }
-        Ok(req)
-      }))
+      Some(Interceptor::new(headers_to_interceptor_fn(&headers)?))
     };
 
     let byte_stream_client = Arc::new(match interceptor.as_ref() {

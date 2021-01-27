@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
 use std::io::Cursor;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::SystemTime;
 use std::time::{Duration, Instant};
@@ -33,9 +32,7 @@ use remexec::{
   ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
 };
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
-use tonic::metadata::{
-  AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataValue, KeyAndValueRef, MetadataMap,
-};
+use tonic::metadata::BinaryMetadataValue;
 use tonic::transport::{Channel, Endpoint};
 use tonic::{Code, Interceptor, Request, Status};
 use tryfuture::try_future;
@@ -48,6 +45,7 @@ use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
   Process, ProcessCacheScope, ProcessMetadata,
 };
+use grpc_util::headers_to_interceptor_fn;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -124,7 +122,6 @@ impl CommandRunner {
     store_servers: Vec<String>,
     metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
-    oauth_bearer_token: Option<String>,
     headers: BTreeMap<String, String>,
     store: Store,
     platform: Platform,
@@ -141,52 +138,13 @@ impl CommandRunner {
     } else {
       "http"
     };
-
-    let mut headers = headers;
-    if let Some(oauth_bearer_token) = oauth_bearer_token {
-      headers.insert(
-        String::from("authorization"),
-        format!("Bearer {}", oauth_bearer_token.trim()),
-      );
-    }
-
-    let mut grpc_metadata = MetadataMap::with_capacity(headers.len());
-    for (key, value) in &headers {
-      let key_ascii = AsciiMetadataKey::from_str(key.as_str()).map_err(|_| {
-        format!(
-          "Header key `{}` must be an ASCII value (as required by gRPC).",
-          key
-        )
-      })?;
-      let value_ascii = AsciiMetadataValue::from_str(value.as_str()).map_err(|_| {
-        format!(
-          "Header value `{}` for key `{}` must be an ASCII value (as required by gRPC).",
-          value, key
-        )
-      })?;
-      grpc_metadata.insert(key_ascii, value_ascii);
-    }
+    let address_with_scheme = format!("{}://{}", scheme, address);
 
     let interceptor = if headers.is_empty() {
       None
     } else {
-      Some(Interceptor::new(move |mut req: Request<()>| {
-        let req_metadata = req.metadata_mut();
-        for kv_ref in grpc_metadata.iter() {
-          match kv_ref {
-            KeyAndValueRef::Ascii(key, value) => {
-              req_metadata.insert(key, value.clone());
-            }
-            KeyAndValueRef::Binary(key, value) => {
-              req_metadata.insert_bin(key, value.clone());
-            }
-          }
-        }
-        Ok(req)
-      }))
+      Some(Interceptor::new(headers_to_interceptor_fn(&headers)?))
     };
-
-    let address_with_scheme = format!("{}://{}", scheme, address);
 
     let endpoint = grpc_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
