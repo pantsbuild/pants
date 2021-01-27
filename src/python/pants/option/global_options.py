@@ -82,6 +82,7 @@ class ExecutionOptions:
     process_execution_local_enable_nailgun: bool
 
     remote_store_server: List[str]
+    remote_store_headers: Dict[str, str]
     remote_store_thread_count: int
     remote_store_chunk_bytes: Any
     remote_store_chunk_upload_timeout_seconds: int
@@ -118,6 +119,7 @@ class ExecutionOptions:
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             # Remote store setup.
             remote_store_server=bootstrap_options.remote_store_server,
+            remote_store_headers=bootstrap_options.remote_store_headers,
             remote_store_thread_count=bootstrap_options.remote_store_thread_count,
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
             remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
@@ -159,6 +161,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_enable_nailgun=False,
     # Remote store setup.
     remote_store_server=[],
+    remote_store_headers={},
     remote_store_thread_count=1,
     remote_store_chunk_bytes=1024 * 1024,
     remote_store_chunk_upload_timeout_seconds=60,
@@ -748,17 +751,29 @@ class GlobalOptions(Subsystem):
         register(
             "--remote-oauth-bearer-token-path",
             advanced=True,
-            help="Path to a file containing an oauth token to use for grpc connections to "
-            "--remote-execution-server and --remote-store-server. If not specified, no "
-            "authorization will be performed.",
+            help=(
+                "Path to a file containing an oauth token to use for gGRPC connections to "
+                "--remote-execution-server and --remote-store-server. Pants will add a header with "
+                "this token. If not specified, no authorization will be performed."
+            ),
         )
 
         register(
             "--remote-store-server",
             advanced=True,
             type=list,
-            default=[],
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_server,
             help="host:port of grpc server to use as remote execution file store.",
+        )
+        register(
+            "--remote-store-headers",
+            advanced=True,
+            type=dict,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_headers,
+            help=(
+                "Headers to set on remote store requests. Format: header=value. Pants "
+                "may add additional headers.\n\nSee `--remote-execution-headers` as well."
+            ),
         )
         # TODO: Infer this from remote-store-connection-limit.
         register(
@@ -842,15 +857,17 @@ class GlobalOptions(Subsystem):
             "Format: property=value. Multiple values should be specified as multiple "
             "occurrences of this flag. Pants itself may add additional platform properties.",
             type=list,
-            default=[],
+            default=DEFAULT_EXECUTION_OPTIONS.remote_execution_extra_platform_properties,
         )
         register(
             "--remote-execution-headers",
             advanced=True,
-            help="Headers to set on remote execution requests. "
-            "Format: header=value. Pants itself may add additional headers.",
             type=dict,
-            default={},
+            default=DEFAULT_EXECUTION_OPTIONS.remote_execution_headers,
+            help=(
+                "Headers to set on remote execution requests. Format: header=value. Pants "
+                "may add additional headers.\n\nSee `--remote-store-headers` as well."
+            ),
         )
         register(
             "--remote-execution-overall-deadline-secs",
@@ -1035,14 +1052,21 @@ class GlobalOptions(Subsystem):
             )
 
         # Ensure that remote headers are ASCII (gRCP requirement).
-        for k, v in opts.remote_execution_headers.items():
-            if not k.isascii():
-                raise OptionsError(
-                    f"All values in `--remote-execution-headers` must be ASCII "
-                    f"(as required by gRPC), but the key in `{k}: {v}` has non-ASCII characters."
-                )
-            if not v.isascii():
-                raise OptionsError(
-                    f"All values in `--remote-execution-headers` must be ASCII "
-                    f"(as required by gRPC), but the value in `{k}: {v}` has non-ASCII characters."
-                )
+        def validate_headers(opt_name: str) -> None:
+            command_line_opt_name = f"--{opt_name.replace('_', '-')}"
+            for k, v in getattr(opts, opt_name).items():
+                if not k.isascii():
+                    raise OptionsError(
+                        f"All values in `{command_line_opt_name}` must be ASCII "
+                        f"(as required by gRPC), but the key in `{k}: {v}` has non-ASCII "
+                        f"characters."
+                    )
+                if not v.isascii():
+                    raise OptionsError(
+                        f"All values in `{command_line_opt_name}` must be ASCII "
+                        f"(as required by gRPC), but the value in `{k}: {v}` has non-ASCII "
+                        f"characters."
+                    )
+
+        validate_headers("remote_execution_headers")
+        validate_headers("remote_store_headers")

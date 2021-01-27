@@ -77,6 +77,7 @@ pub struct RemotingOptions {
   pub instance_name: Option<String>,
   pub root_ca_certs_path: Option<PathBuf>,
   pub oauth_bearer_token_path: Option<PathBuf>,
+  pub store_headers: BTreeMap<String, String>,
   pub store_thread_count: usize,
   pub store_chunk_bytes: usize,
   pub store_chunk_upload_timeout: Duration,
@@ -118,14 +119,20 @@ impl Core {
         remoting_opts.store_timeout_multiplier,
         remoting_opts.store_maximum_timeout,
       )?;
-
+      let mut store_headers = remoting_opts.store_headers.clone();
+      if let Some(oauth_bearer_token) = oauth_bearer_token {
+        store_headers.insert(
+          "authorization".to_owned(),
+          format!("Bearer {}", oauth_bearer_token.trim()),
+        );
+      }
       Store::with_remote(
         executor.clone(),
         local_store_dir,
         remote_store_servers.to_vec(),
         remoting_opts.instance_name.clone(),
         root_ca_certs.clone(),
-        oauth_bearer_token.clone(),
+        store_headers,
         remoting_opts.store_thread_count,
         remoting_opts.store_chunk_bytes,
         remoting_opts.store_chunk_upload_timeout,
@@ -256,9 +263,9 @@ impl Core {
         let action_cache_address = remote_store_servers
           .first()
           .ok_or_else(|| "At least one remote store must be specified".to_owned())?;
-        let mut execution_headers = remoting_opts.execution_headers.clone();
+        let mut store_headers = remoting_opts.store_headers.clone();
         if let Some(oauth_bearer_token) = oauth_bearer_token {
-          execution_headers.insert(
+          store_headers.insert(
             "authorization".to_owned(),
             format!("Bearer {}", oauth_bearer_token.trim()),
           );
@@ -270,7 +277,7 @@ impl Core {
           full_store.clone(),
           action_cache_address.as_str(),
           root_ca_certs.clone(),
-          execution_headers,
+          store_headers,
           Platform::current()?,
           exec_strategy_opts.remote_cache_read,
           exec_strategy_opts.remote_cache_write,
