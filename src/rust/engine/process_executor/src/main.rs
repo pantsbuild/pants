@@ -201,7 +201,7 @@ async fn main() {
 
   let args = Opt::from_args();
 
-  let headers: BTreeMap<String, String> = collection_from_keyvalues(args.header.iter());
+  let mut headers: BTreeMap<String, String> = collection_from_keyvalues(args.header.iter());
 
   let executor = task_executor::Executor::new();
 
@@ -265,11 +265,14 @@ async fn main() {
         None
       };
 
-      let oauth_bearer_token = if let Some(path) = args.execution_oauth_bearer_token_path {
-        Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
-      } else {
-        None
-      };
+      if let Some(oauth_path) = args.execution_oauth_bearer_token_path {
+        let token =
+          std::fs::read_to_string(oauth_path).expect("Error reading oauth bearer token file");
+        headers.insert(
+          "authorization".to_owned(),
+          format!("Bearer {}", token.trim()),
+        );
+      }
 
       let command_runner_box: Box<dyn process_execution::CommandRunner> = {
         Box::new(
@@ -278,7 +281,6 @@ async fn main() {
             vec![address.to_owned()],
             process_metadata,
             root_ca_certs,
-            oauth_bearer_token,
             headers,
             store.clone(),
             Platform::Linux,

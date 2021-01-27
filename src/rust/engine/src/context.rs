@@ -179,6 +179,13 @@ impl Core {
     root_ca_certs: &Option<Vec<u8>>,
     oauth_bearer_token: &Option<String>,
   ) -> Result<Box<dyn CommandRunner>, String> {
+    let mut execution_headers = remoting_opts.execution_headers.clone();
+    if let Some(oauth_bearer_token) = oauth_bearer_token {
+      execution_headers.insert(
+        "authorization".to_owned(),
+        format!("Bearer {}", oauth_bearer_token.trim()),
+      );
+    }
     Ok(Box::new(process_execution::remote::CommandRunner::new(
       // No problem unwrapping here because the global options validation
       // requires the remoting_opts.execution_server be present when
@@ -187,8 +194,7 @@ impl Core {
       remoting_opts.store_servers.clone(),
       process_execution_metadata.clone(),
       root_ca_certs.clone(),
-      oauth_bearer_token.clone(),
-      remoting_opts.execution_headers.clone(),
+      execution_headers,
       store.clone(),
       // TODO if we ever want to configure the remote platform to be something else we
       // need to take an option all the way down here and into the remote::CommandRunner struct.
@@ -250,6 +256,13 @@ impl Core {
         let action_cache_address = remote_store_servers
           .first()
           .ok_or_else(|| "At least one remote store must be specified".to_owned())?;
+        let mut execution_headers = remoting_opts.execution_headers.clone();
+        if let Some(oauth_bearer_token) = oauth_bearer_token {
+          execution_headers.insert(
+            "authorization".to_owned(),
+            format!("Bearer {}", oauth_bearer_token.trim()),
+          );
+        }
         Box::new(process_execution::remote_cache::CommandRunner::new(
           local_command_runner.into(),
           process_execution_metadata.clone(),
@@ -257,8 +270,7 @@ impl Core {
           full_store.clone(),
           action_cache_address.as_str(),
           root_ca_certs.clone(),
-          oauth_bearer_token.clone(),
-          remoting_opts.execution_headers.clone(),
+          execution_headers,
           Platform::current()?,
           exec_strategy_opts.remote_cache_read,
           exec_strategy_opts.remote_cache_write,

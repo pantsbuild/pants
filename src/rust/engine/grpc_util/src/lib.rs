@@ -27,9 +27,12 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
+use std::str::FromStr;
 
 use tokio_rustls::rustls::ClientConfig;
+use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 
 pub mod prost;
@@ -68,4 +71,47 @@ pub fn create_tls_config(pem_bytes: Vec<u8>) -> Result<ClientConfig, String> {
     .map_err(|_| "unexpected state in PEM file add".to_owned())?;
 
   Ok(tls_config)
+}
+
+pub fn headers_to_metadata_map(headers: &BTreeMap<String, String>) -> Result<MetadataMap, String> {
+  let mut metadata_map = MetadataMap::with_capacity(headers.len());
+  for (key, value) in headers {
+    let key_ascii = AsciiMetadataKey::from_str(key.as_str()).map_err(|_| {
+      format!(
+        "Header key `{}` must be an ASCII value (as required by gRPC).",
+        key
+      )
+    })?;
+    let value_ascii = AsciiMetadataValue::from_str(value.as_str()).map_err(|_| {
+      format!(
+        "Header value `{}` for key `{}` must be an ASCII value (as required by gRPC).",
+        value, key
+      )
+    })?;
+    metadata_map.insert(key_ascii, value_ascii);
+  }
+  Ok(metadata_map)
+}
+
+pub fn headers_to_interceptor_fn(
+  headers: &BTreeMap<String, String>,
+) -> Result<
+  impl Fn(tonic::Request<()>) -> Result<tonic::Request<()>, tonic::Status> + Send + Sync + 'static,
+  String,
+> {
+  let metadata_map = headers_to_metadata_map(headers)?;
+  Ok(move |mut req: tonic::Request<()>| {
+    let req_metadata = req.metadata_mut();
+    for kv_ref in metadata_map.iter() {
+      match kv_ref {
+        KeyAndValueRef::Ascii(key, value) => {
+          req_metadata.insert(key, value.clone());
+        }
+        KeyAndValueRef::Binary(key, value) => {
+          req_metadata.insert_bin(key, value.clone());
+        }
+      }
+    }
+    Ok(req)
+  })
 }
