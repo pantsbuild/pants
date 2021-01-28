@@ -89,7 +89,7 @@ impl StoreSetup {
       vec![cas.address()],
       None,
       None,
-      None,
+      BTreeMap::new(),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
