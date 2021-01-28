@@ -8,7 +8,6 @@ import os
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
@@ -67,8 +66,6 @@ class AuthPluginResult:
 
     store_headers: Dict[str, str]
     execution_headers: Dict[str, str]
-    auth_host_name: Optional[str] = None
-    expiration: Optional[datetime] = None
 
 
 @dataclass(frozen=True)
@@ -801,7 +798,25 @@ class GlobalOptions(Subsystem):
                 "Otherwise, no authorization will be performed."
             ),
         )
-        register("--remote-auth-plugin", advanced=True, type=str, default=None, help=("foo"))
+        register(
+            "--remote-auth-plugin",
+            advanced=True,
+            type=str,
+            default=None,
+            help=(
+                "Path to a plugin to dynamically set headers used during gRCP calls for remote "
+                "caching and remote execution.\n\nFormat: `path.to.module:my_func`. Pants will "
+                "import your module and run your function. Update the `--pythonpath` option to "
+                "ensure your file is loadable.\n\nThe function should take the kwargs "
+                "`initial_store_headers: Dict[str, str]` and "
+                "`initial_execution_headers: Dict[str, str]`. It should return an instance of "
+                "`AuthPluginResult` from `pants.option.global_options.`\n\nPants will "
+                "replace the headers it would normally use with whatever your plugin returns; "
+                "usually, you should include the `initial_store_headers` and "
+                "`initial_execution_headers` in your result so that options like "
+                "`--remote-store-headers` still work."
+            ),
+        )
 
         register(
             "--remote-store-server",

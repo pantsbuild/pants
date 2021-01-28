@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import dataclasses
+import sys
 from pathlib import Path
+from textwrap import dedent
 
-from pants.option.global_options import ExecutionOptions, DEFAULT_EXECUTION_OPTIONS
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.testutil.option_util import create_option_value_container
 from pants.util.contextutil import temporary_dir
 
@@ -28,22 +30,41 @@ def test_execution_options_remote_oauth_bearer_token_path() -> None:
         )
     assert exec_options.remote_store_headers == {"authorization": "Bearer my-token", "foo": "bar"}
     assert exec_options.remote_execution_headers == {
-        "authorization": "Bearer my-token", "foo": "bar"
+        "authorization": "Bearer my-token",
+        "foo": "bar",
     }
 
 
 def test_execution_options_auth_plugin() -> None:
     with temporary_dir() as tempdir:
-        plugin_path = Path(tempdir, "plugin.py")
+        sys.path.append(tempdir)
+        plugin_path = Path(tempdir, "auth_plugin.py")
         plugin_path.touch()
-        # TODO: write the plugin and figure out how to load it
-        plugin_path.write_text("...")
+        plugin_path.write_text(
+            dedent(
+                """\
+                from pants.option.global_options import AuthPluginResult
+                
+                def auth_func(initial_execution_headers, initial_store_headers):
+                    return AuthPluginResult(
+                        execution_headers={
+                            **{k: "baz" for k in initial_execution_headers},
+                            "exec": "xyz",
+                        },
+                        store_headers={
+                            **{k: "baz" for k in initial_store_headers},
+                            "store": "abc",
+                        },
+                    )
+                """
+            )
+        )
         bootstrap_options = {
             **dataclasses.asdict(DEFAULT_EXECUTION_OPTIONS),
             "remote_execution_headers": {"foo": "bar"},
             "remote_store_headers": {"foo": "bar"},
             "remote_oauth_bearer_token_path": None,
-            "remote_auth_plugin": "plugin:auth_func",
+            "remote_auth_plugin": "auth_plugin:auth_func",
         }
         exec_options = ExecutionOptions.from_bootstrap_options(
             create_option_value_container(**bootstrap_options)
