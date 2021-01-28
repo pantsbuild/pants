@@ -29,7 +29,7 @@
 #![type_length_limit = "44109434"]
 
 use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -713,11 +713,23 @@ async fn main() {
     None
   };
 
-  let oauth_bearer_token = if let Some(path) = args.value_of("oauth-bearer-token-file") {
-    Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
-  } else {
-    None
-  };
+  let mut headers = BTreeMap::new();
+  if let Some(oauth_path) = args.value_of("oauth-bearer-token-file") {
+    let token = match std::fs::read_to_string(oauth_path) {
+      Ok(token) => token,
+      Err(err) => {
+        error!(
+          "Error reading oauth bearer token from {:?}: {}",
+          oauth_path, err
+        );
+        std::process::exit(1);
+      }
+    };
+    headers.insert(
+      "authorization".to_owned(),
+      format!("Bearer {}", token.trim()),
+    );
+  }
 
   let runtime = task_executor::Executor::new();
 
@@ -728,7 +740,7 @@ async fn main() {
       vec![address.to_owned()],
       args.value_of("remote-instance-name").map(str::to_owned),
       root_ca_certs,
-      oauth_bearer_token,
+      headers,
       1,
       4 * 1024 * 1024,
       std::time::Duration::from_secs(5 * 60),

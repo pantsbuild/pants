@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -155,7 +155,7 @@ async fn write_file_multiple_chunks() {
     vec![cas.address()],
     None,
     None,
-    None,
+    BTreeMap::new(),
     1,
     10 * 1024,
     Duration::from_secs(5),
@@ -234,7 +234,7 @@ async fn write_connection_error() {
     vec![String::from("doesnotexist.example")],
     None,
     None,
-    None,
+    BTreeMap::new(),
     1,
     10 * 1024 * 1024,
     Duration::from_secs(1),
@@ -321,7 +321,7 @@ async fn reads_from_multiple_cas_servers() {
     vec![cas1.address(), cas2.address()],
     None,
     None,
-    None,
+    BTreeMap::new(),
     1,
     10 * 1024 * 1024,
     Duration::from_secs(1),
@@ -350,7 +350,7 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
     vec![cas.address()],
     None,
     None,
-    None,
+    BTreeMap::new(),
     1,
     10 * MEGABYTES,
     Duration::from_secs(1),

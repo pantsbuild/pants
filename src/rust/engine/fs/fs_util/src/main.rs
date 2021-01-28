@@ -45,9 +45,9 @@ use futures::FutureExt;
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use prost::alloc::collections::BTreeMap;
 use rand::seq::SliceRandom;
 use serde_derive::Serialize;
+use std::collections::BTreeMap;
 use store::{
   Snapshot, SnapshotOps, SnapshotOpsError, Store, StoreFileByDigest, SubsetParams, UploadSummary,
 };
