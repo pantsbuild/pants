@@ -218,11 +218,15 @@ async fn main() {
         None
       };
 
-      let oauth_bearer_token = if let Some(ref path) = args.cas_oauth_bearer_token_path {
-        Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
-      } else {
-        None
-      };
+      let mut headers = BTreeMap::new();
+      if let Some(ref oauth_path) = args.cas_oauth_bearer_token_path {
+        let token =
+          std::fs::read_to_string(oauth_path).expect("Error reading oauth bearer token file");
+        headers.insert(
+          "authorization".to_owned(),
+          format!("Bearer {}", token.trim()),
+        );
+      }
 
       Store::with_remote(
         executor.clone(),
@@ -230,7 +234,7 @@ async fn main() {
         vec![cas_server.clone()],
         args.remote_instance_name.clone(),
         root_ca_certs,
-        oauth_bearer_token,
+        headers,
         1,
         args.upload_chunk_bytes,
         Duration::from_secs(30),

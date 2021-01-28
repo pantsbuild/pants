@@ -45,6 +45,7 @@ use futures::FutureExt;
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
+use prost::alloc::collections::BTreeMap;
 use rand::seq::SliceRandom;
 use serde_derive::Serialize;
 use store::{
@@ -294,14 +295,19 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           None
         };
 
-        let oauth_bearer_token =
-          if let Some(path) = top_match.value_of("oauth-bearer-token-file") {
-            Some(std::fs::read_to_string(path).map_err(|err| {
-              format!("Error reading oauth bearer token from {:?}: {}", path, err)
-            })?)
-          } else {
-            None
-          };
+        let mut headers = BTreeMap::new();
+        if let Some(oauth_path) = top_match.value_of("oauth-bearer-token-file") {
+          let token = std::fs::read_to_string(oauth_path).map_err(|err| {
+            format!(
+              "Error reading oauth bearer token from {:?}: {}",
+              oauth_path, err
+            )
+          })?;
+          headers.insert(
+            "authorization".to_owned(),
+            format!("Bearer {}", token.trim()),
+          );
+        }
 
         // Randomize CAS address order to avoid thundering herds from common config.
         let mut cas_addresses = cas_address.map(str::to_owned).collect::<Vec<_>>();
@@ -316,7 +322,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .value_of("remote-instance-name")
               .map(str::to_owned),
             root_ca_certs,
-            oauth_bearer_token,
+            headers,
             value_t!(top_match.value_of("thread-count"), usize).expect("Invalid thread count"),
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures

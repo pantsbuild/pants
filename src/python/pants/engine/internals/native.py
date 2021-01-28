@@ -256,7 +256,7 @@ class Native(metaclass=SingletonMetaclass):
             execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,
             root_ca_certs_path=execution_options.remote_ca_certs_path,
-            oauth_bearer_token_path=execution_options.remote_oauth_bearer_token_path,
+            store_headers=tuple(execution_options.remote_store_headers.items()),
             store_thread_count=execution_options.remote_store_thread_count,
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
@@ -270,9 +270,7 @@ class Native(metaclass=SingletonMetaclass):
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties
             ),
-            execution_headers=tuple(
-                (k, v) for (k, v) in execution_options.remote_execution_headers.items()
-            ),
+            execution_headers=tuple(execution_options.remote_execution_headers.items()),
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
         )
 

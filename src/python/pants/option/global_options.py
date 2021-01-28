@@ -8,7 +8,8 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, cast
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -72,7 +73,6 @@ class ExecutionOptions:
 
     remote_instance_name: Optional[str]
     remote_ca_certs_path: Optional[str]
-    remote_oauth_bearer_token_path: Optional[str]
 
     process_execution_local_parallelism: int
     process_execution_remote_parallelism: int
@@ -82,6 +82,7 @@ class ExecutionOptions:
     process_execution_local_enable_nailgun: bool
 
     remote_store_server: List[str]
+    remote_store_headers: Dict[str, str]
     remote_store_thread_count: int
     remote_store_chunk_bytes: Any
     remote_store_chunk_upload_timeout_seconds: int
@@ -100,6 +101,22 @@ class ExecutionOptions:
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options: OptionValueContainer) -> ExecutionOptions:
+        # Possibly insert some headers.
+        remote_execution_headers = cast(Dict[str, str], bootstrap_options.remote_execution_headers)
+        remote_store_headers = cast(Dict[str, str], bootstrap_options.remote_store_headers)
+        if bootstrap_options.remote_oauth_bearer_token_path:
+            oauth_token = (
+                Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
+            )
+            if set(oauth_token).intersection({"\n", "\r"}):
+                raise OptionsError(
+                    f"OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path} "
+                    "must not contain multiple lines."
+                )
+            token_header = {"authorization": f"Bearer {oauth_token}"}
+            remote_execution_headers.update(token_header)
+            remote_store_headers.update(token_header)
+
         return cls(
             # Remote execution strategy.
             remote_execution=bootstrap_options.remote_execution,
@@ -108,7 +125,6 @@ class ExecutionOptions:
             # General remote setup.
             remote_instance_name=bootstrap_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
-            remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
             # Process execution setup.
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
@@ -118,6 +134,7 @@ class ExecutionOptions:
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             # Remote store setup.
             remote_store_server=bootstrap_options.remote_store_server,
+            remote_store_headers=remote_store_headers,
             remote_store_thread_count=bootstrap_options.remote_store_thread_count,
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
             remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
@@ -131,7 +148,7 @@ class ExecutionOptions:
             # Remote execution setup.
             remote_execution_server=bootstrap_options.remote_execution_server,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
-            remote_execution_headers=bootstrap_options.remote_execution_headers,
+            remote_execution_headers=remote_execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
         )
 
@@ -149,7 +166,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # General remote setup.
     remote_instance_name=None,
     remote_ca_certs_path=None,
-    remote_oauth_bearer_token_path=None,
     # Process execution setup.
     process_execution_local_parallelism=_CPU_COUNT,
     process_execution_remote_parallelism=128,
@@ -159,6 +175,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_enable_nailgun=False,
     # Remote store setup.
     remote_store_server=[],
+    remote_store_headers={},
     remote_store_thread_count=1,
     remote_store_chunk_bytes=1024 * 1024,
     remote_store_chunk_upload_timeout_seconds=60,
@@ -748,17 +765,31 @@ class GlobalOptions(Subsystem):
         register(
             "--remote-oauth-bearer-token-path",
             advanced=True,
-            help="Path to a file containing an oauth token to use for grpc connections to "
-            "--remote-execution-server and --remote-store-server. If not specified, no "
-            "authorization will be performed.",
+            help=(
+                "Path to a file containing an oauth token to use for gGRPC connections to "
+                "--remote-execution-server and --remote-store-server.\n\nIf specified, Pants will "
+                "add a header in the format `authorization: Bearer <token>`. You can also manually "
+                "add this header via `--remote-execution-headers` and `--remote-store-headers`. "
+                "Otherwise, no authorization will be performed."
+            ),
         )
 
         register(
             "--remote-store-server",
             advanced=True,
             type=list,
-            default=[],
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_server,
             help="host:port of grpc server to use as remote execution file store.",
+        )
+        register(
+            "--remote-store-headers",
+            advanced=True,
+            type=dict,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_headers,
+            help=(
+                "Headers to set on remote store requests. Format: header=value. Pants "
+                "may add additional headers.\n\nSee `--remote-execution-headers` as well."
+            ),
         )
         # TODO: Infer this from remote-store-connection-limit.
         register(
@@ -842,15 +873,17 @@ class GlobalOptions(Subsystem):
             "Format: property=value. Multiple values should be specified as multiple "
             "occurrences of this flag. Pants itself may add additional platform properties.",
             type=list,
-            default=[],
+            default=DEFAULT_EXECUTION_OPTIONS.remote_execution_extra_platform_properties,
         )
         register(
             "--remote-execution-headers",
             advanced=True,
-            help="Headers to set on remote execution requests. "
-            "Format: header=value. Pants itself may add additional headers.",
             type=dict,
-            default={},
+            default=DEFAULT_EXECUTION_OPTIONS.remote_execution_headers,
+            help=(
+                "Headers to set on remote execution requests. Format: header=value. Pants "
+                "may add additional headers.\n\nSee `--remote-store-headers` as well."
+            ),
         )
         register(
             "--remote-execution-overall-deadline-secs",
@@ -1034,15 +1067,20 @@ class GlobalOptions(Subsystem):
                 "milliseconds."
             )
 
-        # Ensure that remote headers are ASCII (gRCP requirement).
-        for k, v in opts.remote_execution_headers.items():
-            if not k.isascii():
-                raise OptionsError(
-                    f"All values in `--remote-execution-headers` must be ASCII "
-                    f"(as required by gRPC), but the key in `{k}: {v}` has non-ASCII characters."
-                )
-            if not v.isascii():
-                raise OptionsError(
-                    f"All values in `--remote-execution-headers` must be ASCII "
-                    f"(as required by gRPC), but the value in `{k}: {v}` has non-ASCII characters."
-                )
+        # Ensure that remote headers are ASCII.
+        def validate_headers(opt_name: str) -> None:
+            command_line_opt_name = f"--{opt_name.replace('_', '-')}"
+            for k, v in getattr(opts, opt_name).items():
+                if not k.isascii():
+                    raise OptionsError(
+                        f"All values in `{command_line_opt_name}` must be ASCII, but the key "
+                        f"in `{k}: {v}` has non-ASCII characters."
+                    )
+                if not v.isascii():
+                    raise OptionsError(
+                        f"All values in `{command_line_opt_name}` must be ASCII, but the value in "
+                        f"`{k}: {v}` has non-ASCII characters."
+                    )
+
+        validate_headers("remote_execution_headers")
+        validate_headers("remote_store_headers")

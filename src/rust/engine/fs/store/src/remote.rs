@@ -46,7 +46,7 @@ impl ByteStore {
     cas_addresses: Vec<String>,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
-    oauth_bearer_token: Option<String>,
+    headers: BTreeMap<String, String>,
     _thread_count: usize,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
@@ -64,7 +64,6 @@ impl ByteStore {
     } else {
       "http"
     };
-
     let cas_addresses_with_scheme: Vec<_> = cas_addresses
       .iter()
       .map(|addr| format!("{}://{}", scheme, addr))
@@ -86,12 +85,6 @@ impl ByteStore {
     }
 
     let channel = tonic::transport::Channel::balance_list(endpoints.iter().cloned());
-
-    let headers = oauth_bearer_token
-      .iter()
-      .map(|t| ("authorization".to_owned(), format!("Bearer {}", t.trim())))
-      .collect::<BTreeMap<_, _>>();
-
     let interceptor = if headers.is_empty() {
       None
     } else {
