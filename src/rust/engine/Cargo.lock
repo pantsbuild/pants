@@ -644,6 +644,7 @@ dependencies = [
  "fnv",
  "fs",
  "futures",
+ "futures-core",
  "graph",
  "hashing",
  "indexmap",

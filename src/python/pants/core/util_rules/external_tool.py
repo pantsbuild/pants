@@ -204,9 +204,10 @@ class TemplatedExternalTool(ExternalTool):
             help=(
                 "URL to download the tool, either as a single binary file or a compressed file "
                 "(e.g. zip file). You can change this to point to your own hosted file, e.g. to "
-                "work with proxies.\n\nUse `{version}` to have the value from --version "
-                "substituted, and `{platform}` to have a value from --url-platform-mapping "
-                "substituted in, depending on the current platform. For example, "
+                "work with proxies or for access via the filesystem through a file:// URL.\n\nUse "
+                "`{version}` to have the value from --version substituted, and `{platform}` to "
+                "have a value from --url-platform-mapping substituted in, depending on the "
+                "current platform. For example, "
                 "https://github.com/.../protoc-{version}-{platform}.zip."
             ),
         )
