@@ -22,8 +22,8 @@ def create_options_bootstrapper(
     )
 
 
-def _create_scoped_options(
-    default_rank: Rank, **options: Union[RankedValue, Value]
+def create_option_value_container(
+    default_rank: Rank = Rank.NONE, **options: Union[RankedValue, Value]
 ) -> OptionValueContainer:
     scoped_options = OptionValueContainerBuilder()
     for key, value in options.items():
@@ -49,7 +49,7 @@ def create_goal_subsystem(
     """
     return goal_subsystem_type(
         scope=goal_subsystem_type.name,
-        options=_create_scoped_options(default_rank, **options),
+        options=create_option_value_container(default_rank, **options),
     )
 
 
@@ -68,5 +68,5 @@ def create_subsystem(
     options_scope = cast(str, subsystem_type.options_scope)
     return subsystem_type(
         scope=options_scope,
-        options=_create_scoped_options(default_rank, **options),
+        options=create_option_value_container(default_rank, **options),
     )

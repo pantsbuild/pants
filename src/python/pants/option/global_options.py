@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 import sys
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
@@ -57,6 +59,16 @@ class OwnersNotFoundBehavior(Enum):
 
     def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
         return GlobMatchErrorBehavior(self.value)
+
+
+@dataclass(frozen=True)
+class AuthPluginResult:
+    """The return type for a function specified via `--remote-auth-plugin`."""
+
+    store_headers: Dict[str, str]
+    execution_headers: Dict[str, str]
+    auth_host_name: Optional[str] = None
+    expiration: Optional[datetime] = None
 
 
 @dataclass(frozen=True)
@@ -116,6 +128,21 @@ class ExecutionOptions:
             token_header = {"authorization": f"Bearer {oauth_token}"}
             remote_execution_headers.update(token_header)
             remote_store_headers.update(token_header)
+        if bootstrap_options.remote_auth_plugin:
+            auth_plugin_path, auth_plugin_func = bootstrap_options.remote_auth_plugin.split(":")
+            auth_plugin_module = importlib.import_module(auth_plugin_path)
+            auth_plugin_func = getattr(auth_plugin_module, auth_plugin_func)
+            auth_plugin_result = cast(
+                AuthPluginResult,
+                auth_plugin_func(
+                    initial_execution_headers=remote_execution_headers,
+                    initial_store_headers=remote_store_headers,
+                ),
+            )
+            # NB: We replace the headers variables so that the plugin author has total control
+            # over how the headers are set. We expect most plugins to preserve the original headers.
+            remote_execution_headers = auth_plugin_result.execution_headers
+            remote_store_headers = auth_plugin_result.store_headers
 
         return cls(
             # Remote execution strategy.
@@ -769,10 +796,12 @@ class GlobalOptions(Subsystem):
                 "Path to a file containing an oauth token to use for gGRPC connections to "
                 "--remote-execution-server and --remote-store-server.\n\nIf specified, Pants will "
                 "add a header in the format `authorization: Bearer <token>`. You can also manually "
-                "add this header via `--remote-execution-headers` and `--remote-store-headers`. "
+                "add this header via `--remote-execution-headers` and `--remote-store-headers`, or "
+                "use `--remote-auth-plugin` to dynamically set the relevant headers. "
                 "Otherwise, no authorization will be performed."
             ),
         )
+        register("--remote-auth-plugin", advanced=True, type=str, default=None, help=("foo"))
 
         register(
             "--remote-store-server",
