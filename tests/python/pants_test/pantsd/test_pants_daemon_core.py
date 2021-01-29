@@ -14,6 +14,7 @@ def test_prepare_scheduler():
 
     core = PantsDaemonCore(PyExecutor(2, 4), create_services)
 
+    # TODO
     first_scheduler = core.prepare_scheduler(create_options_bootstrapper(["-ldebug"]))
     second_scheduler = core.prepare_scheduler(create_options_bootstrapper(["-lwarn"]))
     assert first_scheduler is not second_scheduler

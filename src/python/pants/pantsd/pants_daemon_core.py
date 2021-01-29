@@ -7,10 +7,11 @@ from typing import Optional
 
 from typing_extensions import Protocol
 
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
-from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
@@ -62,7 +63,7 @@ class PantsDaemonCore:
             return self._services.are_all_alive()
 
     def _init_scheduler(
-        self, options_fingerprint: str, options_bootstrapper: OptionsBootstrapper
+        self, options_fingerprint: str, options: Options, build_config: BuildConfiguration
     ) -> None:
         """(Re-)Initialize the scheduler.
 
@@ -75,11 +76,10 @@ class PantsDaemonCore:
                 logger.info("initializing pantsd...")
             if self._services:
                 self._services.shutdown()
-            build_config = BuildConfigInitializer.get(options_bootstrapper)
             self._scheduler = EngineInitializer.setup_graph(
-                options_bootstrapper, build_config, executor=self._executor
+                options, build_config, executor=self._executor
             )
-            bootstrap_options_values = options_bootstrapper.bootstrap_options.for_global_scope()
+            bootstrap_options_values = options.bootstrap_option_values()
 
             self._services = self._services_constructor(bootstrap_options_values, self._scheduler)
             self._fingerprint = options_fingerprint
@@ -89,7 +89,12 @@ class PantsDaemonCore:
             self._scheduler = None
             raise e
 
-    def prepare_scheduler(self, options_bootstrapper: OptionsBootstrapper) -> GraphScheduler:
+    def prepare_scheduler(
+        self,
+        options_bootstrapper: OptionsBootstrapper,
+        options: Options,
+        build_config: BuildConfiguration,
+    ) -> GraphScheduler:
         """Get a scheduler for the given options_bootstrapper.
 
         Runs in a client context (generally in DaemonPantsRunner) so logging is sent to the client.
@@ -108,7 +113,8 @@ class PantsDaemonCore:
         with self._lifecycle_lock:
             if self._scheduler is None or options_fingerprint != self._fingerprint:
                 # The fingerprint mismatches, either because this is the first run (and there is no
-                # fingerprint) or because relevant options have changed. Create a new scheduler and services.
-                self._init_scheduler(options_fingerprint, options_bootstrapper)
+                # fingerprint) or because relevant options have changed. Create a new scheduler
+                # and services.
+                self._init_scheduler(options_fingerprint, options, build_config)
                 assert self._scheduler is not None
             return self._scheduler

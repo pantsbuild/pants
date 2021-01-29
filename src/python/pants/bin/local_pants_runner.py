@@ -38,6 +38,7 @@ from pants.option.errors import UnknownFlagsError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
+from pants.util.memo import memoized_classmethod
 
 logger = logging.getLogger(__name__)
 
@@ -75,20 +76,17 @@ class LocalPantsRunner:
     ) -> GraphSession:
         native = Native()
         native.set_panic_handler()
-        graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(
-            options_bootstrapper, build_config
-        )
-
+        graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(options, build_config)
         try:
-            global_scope = options.for_global_scope()
+            global_options = options.for_global_scope()
         except UnknownFlagsError as err:
             cls._handle_unknown_flags(err, options_bootstrapper)
             raise
 
         return graph_scheduler_helper.new_session(
             run_id,
-            dynamic_ui=global_scope.dynamic_ui,
-            use_colors=global_scope.get("colors", True),
+            dynamic_ui=global_options.dynamic_ui,
+            use_colors=global_options.get("colors", True),
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
@@ -106,6 +104,17 @@ class LocalPantsRunner:
         no_arg_bootstrapper = replace(options_bootstrapper, args=("dummy_first_arg",))
         options = OptionsInitializer.create(no_arg_bootstrapper, build_config)
         FlagErrorHelpPrinter(options).handle_unknown_flags(err)
+
+    @memoized_classmethod
+    def create_options(
+        cls, options_bootstrapper: OptionsBootstrapper
+    ) -> Tuple[BuildConfiguration, Options]:
+        build_config = BuildConfigInitializer.get(options_bootstrapper)
+        try:
+            return build_config, OptionsInitializer.create(options_bootstrapper, build_config)
+        except UnknownFlagsError as err:
+            cls._handle_unknown_flags(err, options_bootstrapper)
+            raise
 
     @classmethod
     def create(
@@ -125,13 +134,7 @@ class LocalPantsRunner:
         :param scheduler: If being called from the daemon, a warmed scheduler to use.
         """
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-
-        build_config = BuildConfigInitializer.get(options_bootstrapper)
-        try:
-            options = OptionsInitializer.create(options_bootstrapper, build_config)
-        except UnknownFlagsError as err:
-            cls._handle_unknown_flags(err, options_bootstrapper)
-            raise
+        build_config, options = cls.create_options(options_bootstrapper)
 
         run_tracker = RunTracker(options)
         union_membership = UnionMembership.from_rules(build_config.union_rules)

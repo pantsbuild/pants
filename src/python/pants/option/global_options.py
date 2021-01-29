@@ -22,7 +22,7 @@ from pants.base.build_environment import (
 )
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
-from pants.option.option_value_container import OptionValueContainer
+from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import docs_url
@@ -124,7 +124,8 @@ class ExecutionOptions:
     remote_execution_overall_deadline_secs: int
 
     @classmethod
-    def from_bootstrap_options(cls, bootstrap_options: OptionValueContainer) -> ExecutionOptions:
+    def from_options(cls, options: Options) -> ExecutionOptions:
+        bootstrap_options = options.bootstrap_option_values()
         # Possibly insert some headers and disable remote execution/caching.
         remote_execution_headers = cast(Dict[str, str], bootstrap_options.remote_execution_headers)
         remote_store_headers = cast(Dict[str, str], bootstrap_options.remote_store_headers)
@@ -154,6 +155,7 @@ class ExecutionOptions:
                 auth_plugin_func(
                     initial_execution_headers=remote_execution_headers,
                     initial_store_headers=remote_store_headers,
+                    options=options,
                 ),
             )
             # NB: We replace the headers variables so that the plugin author has total control
@@ -837,8 +839,9 @@ class GlobalOptions(Subsystem):
                 "caching and remote execution.\n\nFormat: `path.to.module:my_func`. Pants will "
                 "import your module and run your function. Update the `--pythonpath` option to "
                 "ensure your file is loadable.\n\nThe function should take the kwargs "
-                "`initial_store_headers: Dict[str, str]` and "
-                "`initial_execution_headers: Dict[str, str]`. It should return an instance of "
+                "`initial_store_headers: Dict[str, str]`, "
+                "`initial_execution_headers: Dict[str, str]`, and `options: Options` (from "
+                "pants.option.options). It should return an instance of "
                 "`AuthPluginResult` from `pants.option.global_options`. If the state is "
                 "unavailable, Pants will disable remote caching and execution.\n\nPants will "
                 "replace the headers it would normally use with whatever your plugin returns; "

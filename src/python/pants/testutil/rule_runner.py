@@ -145,12 +145,12 @@ class RuleRunner:
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
             native=Native(),
-            options_bootstrapper=options_bootstrapper,
             build_root=self.build_root,
             build_configuration=self.build_config,
             executor=_EXECUTOR,
-            execution_options=ExecutionOptions.from_bootstrap_options(global_options),
+            execution_options=ExecutionOptions.from_options(global_options),
             ca_certs_path=ca_certs_path,
+            native_engine_visualize_to=None,
         ).new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(

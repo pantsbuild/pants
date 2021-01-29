@@ -25,7 +25,7 @@ def test_execution_options_remote_oauth_bearer_token_path() -> None:
             "remote_oauth_bearer_token_path": str(token_path),
             "remote_auth_plugin": None,
         }
-        exec_options = ExecutionOptions.from_bootstrap_options(
+        exec_options = ExecutionOptions.from_options(
             create_option_value_container(**bootstrap_options)  # type: ignore[arg-type]
         )
     assert exec_options.remote_store_headers == {"authorization": "Bearer my-token", "foo": "bar"}
@@ -71,7 +71,7 @@ def test_execution_options_auth_plugin() -> None:
                 "remote_execution": True,
             }
             sys.path.append(tempdir)
-            result = ExecutionOptions.from_bootstrap_options(
+            result = ExecutionOptions.from_options(
                 create_option_value_container(**bootstrap_options)  # type: ignore[arg-type]
             )
             sys.path.pop()

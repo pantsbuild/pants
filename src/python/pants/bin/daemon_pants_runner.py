@@ -148,13 +148,15 @@ class DaemonPantsRunner(RawFdRunner):
         options_bootstrapper = OptionsBootstrapper.create(
             env=os.environ, args=sys.argv, allow_pantsrc=True
         )
-        bootstrap_options = options_bootstrapper.bootstrap_options
-        global_bootstrap_options = bootstrap_options.for_global_scope()
+        global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
 
         # Run using the pre-warmed Session.
         with self._stderr_logging(global_bootstrap_options):
             try:
-                scheduler = self._core.prepare_scheduler(options_bootstrapper)
+                build_config, options = LocalPantsRunner.create_options(options_bootstrapper)
+                scheduler = self._core.prepare_scheduler(
+                    options_bootstrapper, options, build_config
+                )
                 runner = LocalPantsRunner.create(
                     os.environ,
                     options_bootstrapper,
