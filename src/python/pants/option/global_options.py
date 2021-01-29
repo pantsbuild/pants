@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import enum
 import importlib
+import logging
 import os
 import sys
 import tempfile
@@ -25,6 +27,8 @@ from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import docs_url
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 class GlobMatchErrorBehavior(Enum):
@@ -60,10 +64,17 @@ class OwnersNotFoundBehavior(Enum):
         return GlobMatchErrorBehavior(self.value)
 
 
+@enum.unique
+class AuthPluginState(Enum):
+    OK = "ok"
+    UNAVAILABLE = "unavailable"
+
+
 @dataclass(frozen=True)
 class AuthPluginResult:
     """The return type for a function specified via `--remote-auth-plugin`."""
 
+    state: AuthPluginState
     store_headers: Dict[str, str]
     execution_headers: Dict[str, str]
 
@@ -110,9 +121,12 @@ class ExecutionOptions:
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options: OptionValueContainer) -> ExecutionOptions:
-        # Possibly insert some headers.
+        # Possibly insert some headers and disable remote execution/caching.
         remote_execution_headers = cast(Dict[str, str], bootstrap_options.remote_execution_headers)
         remote_store_headers = cast(Dict[str, str], bootstrap_options.remote_store_headers)
+        remote_execution = cast(bool, bootstrap_options.remote_execution)
+        remote_cache_read = cast(bool, bootstrap_options.remote_cache_read)
+        remote_cache_write = cast(bool, bootstrap_options.remote_cache_write)
         if bootstrap_options.remote_oauth_bearer_token_path:
             oauth_token = (
                 Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
@@ -125,7 +139,9 @@ class ExecutionOptions:
             token_header = {"authorization": f"Bearer {oauth_token}"}
             remote_execution_headers.update(token_header)
             remote_store_headers.update(token_header)
-        if bootstrap_options.remote_auth_plugin:
+        if bootstrap_options.remote_auth_plugin and (
+            remote_execution or remote_cache_read or remote_cache_write
+        ):
             auth_plugin_path, auth_plugin_func = bootstrap_options.remote_auth_plugin.split(":")
             auth_plugin_module = importlib.import_module(auth_plugin_path)
             auth_plugin_func = getattr(auth_plugin_module, auth_plugin_func)
@@ -140,12 +156,21 @@ class ExecutionOptions:
             # over how the headers are set. We expect most plugins to preserve the original headers.
             remote_execution_headers = auth_plugin_result.execution_headers
             remote_store_headers = auth_plugin_result.store_headers
+            # If authentication was not possible, we disable remote caching and execution.
+            if auth_plugin_result.state == AuthPluginState.UNAVAILABLE:
+                logger.warning(
+                    "Disabling remote caching and remote execution because authentication was not "
+                    "available via the plugin from `--remote-auth-plugin`."
+                )
+                remote_execution = False
+                remote_cache_read = False
+                remote_cache_write = False
 
         return cls(
             # Remote execution strategy.
-            remote_execution=bootstrap_options.remote_execution,
-            remote_cache_read=bootstrap_options.remote_cache_read,
-            remote_cache_write=bootstrap_options.remote_cache_write,
+            remote_execution=remote_execution,
+            remote_cache_read=remote_cache_read,
+            remote_cache_write=remote_cache_write,
             # General remote setup.
             remote_instance_name=bootstrap_options.remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
@@ -810,7 +835,8 @@ class GlobalOptions(Subsystem):
                 "ensure your file is loadable.\n\nThe function should take the kwargs "
                 "`initial_store_headers: Dict[str, str]` and "
                 "`initial_execution_headers: Dict[str, str]`. It should return an instance of "
-                "`AuthPluginResult` from `pants.option.global_options.`\n\nPants will "
+                "`AuthPluginResult` from `pants.option.global_options`. If the state is "
+                "unavailable, Pants will disable remote caching and execution.\n\nPants will "
                 "replace the headers it would normally use with whatever your plugin returns; "
                 "usually, you should include the `initial_store_headers` and "
                 "`initial_execution_headers` in your result so that options like "
