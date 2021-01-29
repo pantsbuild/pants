@@ -11,6 +11,7 @@ use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint, DEFAULT_LEASE_TIME};
+use workunit_store::ObservationMetric;
 
 #[derive(Debug, Clone)]
 pub struct ByteStore {
@@ -287,6 +288,12 @@ impl ByteStore {
       // To maintain the guarantee that the given function is called in a blocking context, we
       // spawn it as a task.
       return Ok(Some(self.executor().spawn_blocking(move || f(&[])).await));
+    }
+
+    if let Some(workunit_state) = workunit_store::get_workunit_state() {
+      workunit_state
+        .store
+        .record_observation(ObservationMetric::LocalStoreReadBlobSize, digest.1 as u64);
     }
 
     let dbs = match entry_type {
