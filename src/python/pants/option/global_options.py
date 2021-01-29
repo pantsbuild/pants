@@ -78,6 +78,10 @@ class AuthPluginResult:
     store_headers: Dict[str, str]
     execution_headers: Dict[str, str]
 
+    @property
+    def is_available(self) -> bool:
+        return self.state == AuthPluginState.OK
+
 
 @dataclass(frozen=True)
 class ExecutionOptions:
@@ -156,9 +160,9 @@ class ExecutionOptions:
             # over how the headers are set. We expect most plugins to preserve the original headers.
             remote_execution_headers = auth_plugin_result.execution_headers
             remote_store_headers = auth_plugin_result.store_headers
-            # If authentication was not possible, we disable remote caching and execution.
-            if auth_plugin_result.state == AuthPluginState.UNAVAILABLE:
-                logger.warning(
+            if not auth_plugin_result.is_available:
+                # NB: This is debug because we expect plugins to log more informative messages.
+                logger.debug(
                     "Disabling remote caching and remote execution because authentication was not "
                     "available via the plugin from `--remote-auth-plugin`."
                 )
