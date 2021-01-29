@@ -126,6 +126,7 @@ class ExecutionOptions:
     @classmethod
     def from_options(cls, options: Options) -> ExecutionOptions:
         bootstrap_options = options.bootstrap_option_values()
+        assert bootstrap_options is not None
         # Possibly insert some headers and disable remote execution/caching.
         remote_execution_headers = cast(Dict[str, str], bootstrap_options.remote_execution_headers)
         remote_store_headers = cast(Dict[str, str], bootstrap_options.remote_store_headers)

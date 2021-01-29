@@ -127,6 +127,7 @@ class RuleRunner:
         self.build_config = build_config_builder.create()
 
         options_bootstrapper = create_options_bootstrapper()
+        options = OptionsInitializer.create(options_bootstrapper, self.build_config)
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         local_store_dir = (
             os.path.realpath(safe_mkdtemp())
@@ -148,7 +149,7 @@ class RuleRunner:
             build_root=self.build_root,
             build_configuration=self.build_config,
             executor=_EXECUTOR,
-            execution_options=ExecutionOptions.from_options(global_options),
+            execution_options=ExecutionOptions.from_options(options),
             ca_certs_path=ca_certs_path,
             native_engine_visualize_to=None,
         ).new_session(

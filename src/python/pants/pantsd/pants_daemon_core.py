@@ -80,6 +80,7 @@ class PantsDaemonCore:
                 options, build_config, executor=self._executor
             )
             bootstrap_options_values = options.bootstrap_option_values()
+            assert bootstrap_options_values is not None
 
             self._services = self._services_constructor(bootstrap_options_values, self._scheduler)
             self._fingerprint = options_fingerprint

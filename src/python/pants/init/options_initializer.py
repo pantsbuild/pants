@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 from contextlib import contextmanager
-from typing import Optional, Tuple
+from typing import Iterator, Optional, Tuple
 
 import pkg_resources
 
@@ -192,7 +192,7 @@ class OptionsInitializer:
     @contextmanager
     def handle_unknown_flags(
         cls, options_bootstrapper: OptionsBootstrapper, *, raise_: bool
-    ) -> None:
+    ) -> Iterator[None]:
         """If there are any unknown flags, print "Did you mean?" and possibly error."""
         try:
             yield

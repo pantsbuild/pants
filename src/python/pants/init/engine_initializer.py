@@ -171,6 +171,7 @@ class EngineInitializer:
         native = Native()
         build_root = get_buildroot()
         bootstrap_options = options.bootstrap_option_values()
+        assert bootstrap_options is not None
         executor = executor or PyExecutor(
             *OptionsInitializer.compute_executor_arguments(bootstrap_options)
         )
