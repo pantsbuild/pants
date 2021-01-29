@@ -842,12 +842,12 @@ class GlobalOptions(Subsystem):
                 "`initial_store_headers: Dict[str, str]`, "
                 "`initial_execution_headers: Dict[str, str]`, and `options: Options` (from "
                 "pants.option.options). It should return an instance of "
-                "`AuthPluginResult` from `pants.option.global_options`. If the state is "
-                "unavailable, Pants will disable remote caching and execution.\n\nPants will "
+                "`AuthPluginResult` from `pants.option.global_options`.\n\nPants will "
                 "replace the headers it would normally use with whatever your plugin returns; "
                 "usually, you should include the `initial_store_headers` and "
                 "`initial_execution_headers` in your result so that options like "
-                "`--remote-store-headers` still work."
+                "`--remote-store-headers` still work. If the returned auth state is "
+                "unavailable, Pants will disable remote caching and execution."
             ),
         )
 
