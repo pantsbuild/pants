@@ -269,30 +269,6 @@ function get_pgp_program() {
   git config --get gpg.program || echo "gpg"
 }
 
-function reversion_whls() {
-  # Reversions all whls from an input directory to an output directory.
-  # Adds one pants-specific glob to match the `VERSION` file in `pantsbuild.pants`.
-  local src_dir=$1
-  local dest_dir=$2
-  local output_version=$3
-
-  for whl in "${src_dir}"/*.whl; do
-    run_local_pants run build-support/bin/reversion.py -- --glob='pants/VERSION' "${whl}" \
-      "${dest_dir}" "${output_version}" || die "Could not reversion whl ${whl} to ${output_version}"
-  done
-}
-
-function adjust_wheel_platform() {
-  # Renames wheels to adjust their tag from a src platform to a dst platform.
-  local src_plat="$1"
-  local dst_plat="$2"
-  local dir="$3"
-  find "$dir" -type f -name "*${src_plat}.whl" | while read -r src_whl; do
-    local dst_whl=${src_whl/$src_plat/$dst_plat}
-    mv -f "${src_whl}" "${dst_whl}"
-  done
-}
-
 function activate_twine() {
   local -r venv_dir="${ROOT}/build-support/twine-deps.venv"
 
@@ -385,21 +361,10 @@ function publish_packages() {
   mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"
 
   start_travis_section "Publishing" "Publishing packages for ${PANTS_STABLE_VERSION}"
-
-  # Fetch unstable wheels, rename any linux whls to manylinux, and reversion them
-  # from PANTS_UNSTABLE_VERSION to PANTS_STABLE_VERSION
-  run_packages_script fetch-and-check-prebuilt-wheels --wheels-dest "${DEPLOY_DIR}"
-  # See https://www.python.org/dev/peps/pep-0599/. We build on Centos7 so use manylinux2014.
-  adjust_wheel_platform "linux_x86_64" "manylinux2014_x86_64" \
-    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}"
-  reversion_whls \
-    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}" \
-    "${PANTS_STABLE_VERSION}"
+  run_packages_script fetch-and-check-prebuilt-wheels --wheels-dest "${DEPLOY_DIR}" --reversion
 
   activate_twine
   trap deactivate RETURN
-
   twine upload --sign "--sign-with=$(get_pgp_program)" "--identity=$(get_pgp_keyid)" \
     "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
 
