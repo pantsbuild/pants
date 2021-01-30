@@ -72,7 +72,13 @@ class AuthPluginState(Enum):
 
 @dataclass(frozen=True)
 class AuthPluginResult:
-    """The return type for a function specified via `--remote-auth-plugin`."""
+    """The return type for a function specified via `--remote-auth-plugin`.
+
+    The returned `store_headers` and `execution_headers` will replace whatever headers Pants would
+    have used normally, e.g. what is set with `--remote-store-headers`. This allows you to control
+    the merge strategy if your plugin sets conflicting headers. Usually, you will want to preserve
+    the `initial_store_headers` and `initial_execution_headers` passed to the plugin.
+    """
 
     state: AuthPluginState
     store_headers: Dict[str, str]
@@ -148,7 +154,14 @@ class ExecutionOptions:
         if bootstrap_options.remote_auth_plugin and (
             remote_execution or remote_cache_read or remote_cache_write
         ):
-            auth_plugin_path, auth_plugin_func = bootstrap_options.remote_auth_plugin.split(":")
+            try:
+                auth_plugin_path, auth_plugin_func = bootstrap_options.remote_auth_plugin.split(":")
+            except ValueError:
+                raise OptionsError(
+                    "Invalid value for `--remote-auth-plugin`: "
+                    f"{bootstrap_options.remote_auth_plugin}. Please use the format "
+                    f"`path.to.module:my_func`."
+                )
             auth_plugin_module = importlib.import_module(auth_plugin_path)
             auth_plugin_func = getattr(auth_plugin_module, auth_plugin_func)
             auth_plugin_result = cast(
@@ -159,10 +172,6 @@ class ExecutionOptions:
                     options=options,
                 ),
             )
-            # NB: We replace the headers variables so that the plugin author has total control
-            # over how the headers are set. We expect most plugins to preserve the original headers.
-            remote_execution_headers = auth_plugin_result.execution_headers
-            remote_store_headers = auth_plugin_result.store_headers
             if not auth_plugin_result.is_available:
                 # NB: This is debug because we expect plugins to log more informative messages.
                 logger.debug(
@@ -172,6 +181,9 @@ class ExecutionOptions:
                 remote_execution = False
                 remote_cache_read = False
                 remote_cache_write = False
+            else:
+                remote_execution_headers = auth_plugin_result.execution_headers
+                remote_store_headers = auth_plugin_result.store_headers
 
         return cls(
             # Remote execution strategy.
@@ -826,8 +838,8 @@ class GlobalOptions(Subsystem):
                 "--remote-execution-server and --remote-store-server.\n\nIf specified, Pants will "
                 "add a header in the format `authorization: Bearer <token>`. You can also manually "
                 "add this header via `--remote-execution-headers` and `--remote-store-headers`, or "
-                "use `--remote-auth-plugin` to dynamically set the relevant headers. "
-                "Otherwise, no authorization will be performed."
+                "use `--remote-auth-plugin` to provide a plugin to dynamically set the relevant "
+                "headers. Otherwise, no authorization will be performed."
             ),
         )
         register(
@@ -836,7 +848,7 @@ class GlobalOptions(Subsystem):
             type=str,
             default=None,
             help=(
-                "Path to a plugin to dynamically set headers used during gRCP calls for remote "
+                "Path to a plugin to dynamically set headers used during gRPC calls for remote "
                 "caching and remote execution.\n\nFormat: `path.to.module:my_func`. Pants will "
                 "import your module and run your function. Update the `--pythonpath` option to "
                 "ensure your file is loadable.\n\nThe function should take the kwargs "
@@ -848,7 +860,7 @@ class GlobalOptions(Subsystem):
                 "usually, you should include the `initial_store_headers` and "
                 "`initial_execution_headers` in your result so that options like "
                 "`--remote-store-headers` still work. If the returned auth state is "
-                "unavailable, Pants will disable remote caching and execution."
+                "AuthPluginState.UNAVAILABLE, Pants will disable remote caching and execution."
             ),
         )
 
