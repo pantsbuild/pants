@@ -11,7 +11,7 @@ from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.pex import PexInterpreterConstraints
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.engine.addresses import Addresses
+from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
@@ -87,7 +87,7 @@ async def py_constraints(
                 for t in (*all_expanded_targets, *all_explicit_targets)
                 if t.has_field(InterpreterConstraintsField)
             },
-            key=lambda tgt: tgt.address,
+            key=lambda tgt: cast(Address, tgt.address),
         )
 
         constraints_per_tgt = [

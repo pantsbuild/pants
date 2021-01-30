@@ -341,7 +341,9 @@ def linux_shard(
     }
     if load_test_config:
         setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]
-        setup["env"].append(f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux")
+        setup["env"].append(  # type: ignore[attr-defined]
+            f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux"
+        )
         setup = {**setup, **CACHE_PANTS_RUN}
     if use_docker:
         setup["services"] = ["docker"]
@@ -414,8 +416,10 @@ def osx_shard(
     if osx_image is not None:
         setup["osx_image"] = osx_image
     if load_test_config:
-        setup["before_script"].append(AWS_GET_PANTS_PEX_COMMAND)
-        setup["env"].append(f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.osx")
+        setup["before_script"].append(AWS_GET_PANTS_PEX_COMMAND)  # type: ignore[attr-defined]
+        setup["env"].append(  # type: ignore[attr-defined]
+            f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.osx"
+        )
     return setup
 
 
@@ -449,7 +453,7 @@ def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List
 
 def bootstrap_linux(python_version: PythonVersion) -> Dict:
     shard = {
-        **CACHE_NATIVE_ENGINE,
+        **CACHE_NATIVE_ENGINE,  # type: ignore[arg-type]
         **linux_shard(load_test_config=False, python_version=python_version, use_docker=True),
         "name": f"Build Linux native engine and pants.pex (Python {python_version.decimal})",
         "stage": python_version.default_stage(is_bootstrap=True).value,
@@ -470,7 +474,7 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
 
 def bootstrap_osx(python_version: PythonVersion) -> Dict:
     shard = {
-        **CACHE_NATIVE_ENGINE,
+        **CACHE_NATIVE_ENGINE,  # type: ignore[arg-type]
         # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
         # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
         # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version

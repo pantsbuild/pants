@@ -199,6 +199,6 @@ def frozen_after_init(cls: C) -> C:
     cls._freeze_instance = freeze_instance
     cls._unfreeze_instance = unfreeze_instance
     cls.__init__ = new_init
-    cls.__setattr__ = new_setattr
+    cls.__setattr__ = new_setattr  # type: ignore[assignment]
 
     return cls

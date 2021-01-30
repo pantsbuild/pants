@@ -17,7 +17,7 @@ from pants.util.contextutil import environment_as, temporary_dir
 from pants.version import VERSION
 
 
-@freeze_time(datetime.datetime(2020, 1, 1, 12, 0, 0), as_kwarg="frozen_time")
+@freeze_time(datetime.datetime(2020, 1, 1, 12, 0, 0), as_kwarg="frozen_time")  # type: ignore[call-arg]
 def test_run_tracker_timing_output(**kwargs) -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
@@ -36,7 +36,7 @@ def test_run_tracker_timing_output(**kwargs) -> None:
     "exit_code,expected",
     [(PANTS_SUCCEEDED_EXIT_CODE, "SUCCESS"), (PANTS_FAILED_EXIT_CODE, "FAILURE")],
 )
-@freeze_time(datetime.datetime(2020, 1, 10, 12, 0, 1), as_kwarg="frozen_time")
+@freeze_time(datetime.datetime(2020, 1, 10, 12, 0, 1), as_kwarg="frozen_time")  # type: ignore[call-arg]
 def test_run_information(exit_code, expected, **kwargs) -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
