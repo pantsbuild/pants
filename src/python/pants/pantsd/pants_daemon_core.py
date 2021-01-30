@@ -7,11 +7,10 @@ from typing import Optional
 
 from typing_extensions import Protocol
 
-from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
+from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
@@ -63,7 +62,7 @@ class PantsDaemonCore:
             return self._services.are_all_alive()
 
     def _init_scheduler(
-        self, options_fingerprint: str, options: Options, build_config: BuildConfiguration
+        self, options_fingerprint: str, options_bootstrapper: OptionsBootstrapper
     ) -> None:
         """(Re-)Initialize the scheduler.
 
@@ -76,6 +75,8 @@ class PantsDaemonCore:
                 logger.info("initializing pantsd...")
             if self._services:
                 self._services.shutdown()
+            build_config = BuildConfigInitializer.get(options_bootstrapper)
+            options = OptionsInitializer.create(options_bootstrapper, build_config)
             self._scheduler = EngineInitializer.setup_graph(
                 options, build_config, executor=self._executor
             )
@@ -90,12 +91,7 @@ class PantsDaemonCore:
             self._scheduler = None
             raise e
 
-    def prepare_scheduler(
-        self,
-        options_bootstrapper: OptionsBootstrapper,
-        options: Options,
-        build_config: BuildConfiguration,
-    ) -> GraphScheduler:
+    def prepare_scheduler(self, options_bootstrapper: OptionsBootstrapper) -> GraphScheduler:
         """Get a scheduler for the given options_bootstrapper.
 
         Runs in a client context (generally in DaemonPantsRunner) so logging is sent to the client.
@@ -116,6 +112,6 @@ class PantsDaemonCore:
                 # The fingerprint mismatches, either because this is the first run (and there is no
                 # fingerprint) or because relevant options have changed. Create a new scheduler
                 # and services.
-                self._init_scheduler(options_fingerprint, options, build_config)
+                self._init_scheduler(options_fingerprint, options_bootstrapper)
                 assert self._scheduler is not None
             return self._scheduler

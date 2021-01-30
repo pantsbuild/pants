@@ -19,7 +19,7 @@ from pants.init.logging import (
     set_logging_handlers,
     setup_logging,
 )
-from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.util.contextutil import argv_as, hermetic_environment_as, stdio_as
@@ -153,12 +153,7 @@ class DaemonPantsRunner(RawFdRunner):
         # Run using the pre-warmed Session.
         with self._stderr_logging(global_bootstrap_options):
             try:
-                build_config, options = OptionsInitializer.create_with_build_config(
-                    options_bootstrapper, raise_=True
-                )
-                scheduler = self._core.prepare_scheduler(
-                    options_bootstrapper, options, build_config
-                )
+                scheduler = self._core.prepare_scheduler(options_bootstrapper)
                 runner = LocalPantsRunner.create(
                     os.environ,
                     options_bootstrapper,
