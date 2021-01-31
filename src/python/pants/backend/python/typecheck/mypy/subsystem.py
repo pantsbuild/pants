@@ -12,7 +12,7 @@ class MyPy(PythonToolBase):
     options_scope = "mypy"
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
-    default_version = "mypy==0.782"
+    default_version = "mypy==0.800"
     default_entry_point = "mypy"
     # See `mypy/rules.py`. We only use these default constraints in some situations. Technically,
     # MyPy only requires 3.5+, but some popular plugins like `django-stubs` require 3.6+. Because

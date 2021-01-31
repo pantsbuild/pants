@@ -479,7 +479,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
 
     result = run_mypy(rule_runner, [py2_target, py3_target])
     assert len(result) == 2
-    py2_result, py3_result = sorted(result, key=lambda res: res.partition_description)
+    py2_result, py3_result = sorted(result, key=lambda res: res.partition_description or "")
 
     assert py2_result.exit_code == 0
     assert py2_result.partition_description == "['CPython==2.7.*', 'CPython==2.7.*,>=3.6']"
@@ -600,7 +600,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             """\
             python_requirement_library(
                 name='mypy',
-                requirements=['mypy==0.782'],
+                requirements=['mypy==0.800'],
             )
 
             python_requirement_library(
