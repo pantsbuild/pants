@@ -75,8 +75,9 @@ class PantsDaemonCore:
                 logger.info("initializing pantsd...")
             if self._services:
                 self._services.shutdown()
-            build_config = BuildConfigInitializer.get(options_bootstrapper)
-            options = OptionsInitializer.create(options_bootstrapper, build_config)
+            with OptionsInitializer.handle_unknown_flags(options_bootstrapper, raise_=True):
+                build_config = BuildConfigInitializer.get(options_bootstrapper)
+                options = OptionsInitializer.create(options_bootstrapper, build_config)
             self._scheduler = EngineInitializer.setup_graph(
                 options, build_config, executor=self._executor
             )
