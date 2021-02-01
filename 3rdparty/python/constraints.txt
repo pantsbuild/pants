@@ -15,7 +15,7 @@ mypy==0.800
 mypy-extensions==0.4.3
 packaging==20.9
 pex==2.1.28
-pip==20.2.1
+pip==20.2.3
 pluggy==0.13.1
 psutil==5.7.0
 py==1.10.0
