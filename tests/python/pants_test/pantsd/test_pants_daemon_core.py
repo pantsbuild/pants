@@ -8,7 +8,6 @@ from pants.testutil.option_util import create_options_bootstrapper
 
 
 def test_prepare_scheduler():
-
     # A core with no services.
     def create_services(bootstrap_options, legacy_graph_scheduler):
         return PantsServices()

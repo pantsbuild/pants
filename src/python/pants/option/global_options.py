@@ -154,14 +154,13 @@ class ExecutionOptions:
         if bootstrap_options.remote_auth_plugin and (
             remote_execution or remote_cache_read or remote_cache_write
         ):
-            try:
-                auth_plugin_path, auth_plugin_func = bootstrap_options.remote_auth_plugin.split(":")
-            except ValueError:
+            if ":" not in bootstrap_options.remote_auth_plugin:
                 raise OptionsError(
                     "Invalid value for `--remote-auth-plugin`: "
                     f"{bootstrap_options.remote_auth_plugin}. Please use the format "
                     f"`path.to.module:my_func`."
                 )
+            auth_plugin_path, auth_plugin_func = bootstrap_options.remote_auth_plugin.split(":")
             auth_plugin_module = importlib.import_module(auth_plugin_path)
             auth_plugin_func = getattr(auth_plugin_module, auth_plugin_func)
             auth_plugin_result = cast(
