@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
@@ -104,7 +104,7 @@ fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
     vec![cas_address],
     None,
     None,
-    None,
+    BTreeMap::new(),
     1,
     10 * MEGABYTES,
     Duration::from_secs(1),
@@ -847,7 +847,7 @@ async fn instance_name_upload() {
     vec![cas.address()],
     Some("dark-tower".to_owned()),
     None,
-    None,
+    BTreeMap::new(),
     1,
     10 * MEGABYTES,
     Duration::from_secs(1),
@@ -877,7 +877,7 @@ async fn instance_name_download() {
     vec![cas.address()],
     Some("dark-tower".to_owned()),
     None,
-    None,
+    BTreeMap::new(),
     1,
     10 * MEGABYTES,
     Duration::from_secs(1),
@@ -921,13 +921,15 @@ async fn auth_upload() {
     .await
     .expect("Error storing catnip locally");
 
+  let mut headers = BTreeMap::new();
+  headers.insert("authorization".to_owned(), "Bearer Armory.Key".to_owned());
   let store_with_remote = Store::with_remote(
     task_executor::Executor::new(),
     dir.path(),
     vec![cas.address()],
     None,
     None,
-    Some("Armory.Key".to_owned()),
+    headers,
     1,
     10 * MEGABYTES,
     Duration::from_secs(1),
@@ -951,13 +953,15 @@ async fn auth_download() {
     .file(&TestData::roland())
     .build();
 
+  let mut headers = BTreeMap::new();
+  headers.insert("authorization".to_owned(), "Bearer Armory.Key".to_owned());
   let store_with_remote = Store::with_remote(
     task_executor::Executor::new(),
     dir.path(),
     vec![cas.address()],
     None,
     None,
-    Some("Armory.Key".to_owned()),
+    headers,
     1,
     10 * MEGABYTES,
     Duration::from_secs(1),

@@ -11,7 +11,7 @@ freezegun==1.0.0
 #     .value_history.ranked_values[-1].value
 #   '
 #
-mypy==0.782
+mypy==0.800
 
 packaging==20.8
 pathspec==0.8.0

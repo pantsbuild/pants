@@ -243,7 +243,7 @@ class AddPrefix:
 
 @dataclass(frozen=True)
 class DownloadFile:
-    """Download an asset via a GET request.
+    """Retrieve the contents of a file via an HTTP GET request or directly for local file:// URLs.
 
     To compute the `expected_digest`, manually download the file, then run `shasum -a 256` to
     compute the fingerprint and `wc -c` to compute the expected length of the downloaded file in

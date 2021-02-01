@@ -194,7 +194,7 @@ class ReferenceGenerator:
                 field["default_or_required"] = (
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
-            target["fields"] = sorted(target["fields"], key=lambda fld: fld["alias"])
+            target["fields"] = sorted(target["fields"], key=lambda fld: cast(str, fld["alias"]))
 
         return cast(Dict[str, Dict[str, Any]], target_info)
 

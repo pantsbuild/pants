@@ -32,8 +32,11 @@ use process_execution::{
   self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process, ProcessCacheScope,
 };
 
+use bytes::Bytes;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
+use reqwest::Error;
+use std::pin::Pin;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
   with_workunit, Level, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
@@ -692,8 +695,89 @@ impl From<Snapshot> for NodeKey {
   }
 }
 
+#[async_trait]
+trait StreamingDownload: Send {
+  async fn next(&mut self) -> Option<Result<Bytes, String>>;
+}
+
+struct NetDownload {
+  stream: futures_core::stream::BoxStream<'static, Result<Bytes, Error>>,
+}
+
+impl NetDownload {
+  async fn start(core: &Arc<Core>, url: Url, file_name: String) -> Result<NetDownload, String> {
+    // TODO: Retry failures
+    let response = core
+      .http_client
+      .get(url.clone())
+      .send()
+      .await
+      .map_err(|err| format!("Error downloading file: {}", err))?;
+
+    // Handle common HTTP errors.
+    if response.status().is_server_error() {
+      return Err(format!(
+        "Server error ({}) downloading file {} from {}",
+        response.status().as_str(),
+        file_name,
+        url,
+      ));
+    } else if response.status().is_client_error() {
+      return Err(format!(
+        "Client error ({}) downloading file {} from {}",
+        response.status().as_str(),
+        file_name,
+        url,
+      ));
+    }
+    let byte_stream = Pin::new(Box::new(response.bytes_stream()));
+    Ok(NetDownload {
+      stream: byte_stream,
+    })
+  }
+}
+
+#[async_trait]
+impl StreamingDownload for NetDownload {
+  async fn next(&mut self) -> Option<Result<Bytes, String>> {
+    self
+      .stream
+      .next()
+      .await
+      .map(|result| result.map_err(|err| err.to_string()))
+  }
+}
+
+struct FileDownload {
+  stream: tokio::io::ReaderStream<tokio::fs::File>,
+}
+
+impl FileDownload {
+  async fn start(path: &str, file_name: String) -> Result<FileDownload, String> {
+    let file = tokio::fs::File::open(path).await.map_err(|e| {
+      format!(
+        "Error ({}) opening file at {} for download to {}",
+        e, path, file_name
+      )
+    })?;
+    let stream = tokio::io::reader_stream(file);
+    Ok(FileDownload { stream })
+  }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct DownloadedFile(pub Key);
+
+#[async_trait]
+impl StreamingDownload for FileDownload {
+  async fn next(&mut self) -> Option<Result<Bytes, String>> {
+    self
+      .stream
+      .next()
+      .await
+      .map(|result| result.map_err(|err| err.to_string()))
+  }
+}
 
 impl DownloadedFile {
   async fn load_or_download(
@@ -720,36 +804,24 @@ impl DownloadedFile {
     core.store().snapshot_of_one_file(path, digest, true).await
   }
 
+  async fn start_download(
+    core: &Arc<Core>,
+    url: Url,
+    file_name: String,
+  ) -> Result<Box<dyn StreamingDownload>, String> {
+    if url.scheme() == "file" {
+      return Ok(Box::new(FileDownload::start(url.path(), file_name).await?));
+    }
+    Ok(Box::new(NetDownload::start(&core, url, file_name).await?))
+  }
+
   async fn download(
     core: Arc<Core>,
     url: Url,
     file_name: String,
     expected_digest: hashing::Digest,
   ) -> Result<(), String> {
-    // TODO: Retry failures
-    let response = core
-      .http_client
-      .get(url.clone())
-      .send()
-      .await
-      .map_err(|err| format!("Error downloading file: {}", err))?;
-
-    // Handle common HTTP errors.
-    if response.status().is_server_error() {
-      return Err(format!(
-        "Server error ({}) downloading file {} from {}",
-        response.status().as_str(),
-        file_name,
-        url,
-      ));
-    } else if response.status().is_client_error() {
-      return Err(format!(
-        "Client error ({}) downloading file {} from {}",
-        response.status().as_str(),
-        file_name,
-        url,
-      ));
-    }
+    let mut response_stream = DownloadedFile::start_download(&core, url, file_name).await?;
 
     let (actual_digest, bytes) = {
       struct SizeLimiter<W: std::io::Write> {
@@ -784,7 +856,6 @@ impl DownloadedFile {
         size_limit: expected_digest.1,
       });
 
-      let mut response_stream = response.bytes_stream();
       while let Some(next_chunk) = response_stream.next().await {
         let chunk =
           next_chunk.map_err(|err| format!("Error reading URL fetch response: {}", err))?;
