@@ -1,18 +1,22 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import logging
 import os
 import sys
-from typing import Optional, Tuple
+from contextlib import contextmanager
+from typing import Iterator, Optional, Tuple
 
 import pkg_resources
 
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.help.flag_error_help_printer import FlagErrorHelpPrinter
 from pants.init.extension_loader import load_backends_and_plugins
 from pants.init.plugin_resolver import PluginResolver
+from pants.option.errors import UnknownFlagsError
 from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
@@ -159,7 +163,6 @@ class OptionsInitializer:
         build_configuration: BuildConfiguration,
     ) -> Options:
         global_bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-
         if global_bootstrap_options.pants_version != pants_version():
             raise BuildConfigurationError(
                 f"Version mismatch: Requested version was {global_bootstrap_options.pants_version}, "
@@ -167,14 +170,40 @@ class OptionsInitializer:
             )
 
         # Parse and register options.
-
         known_scope_infos = [
             si
             for optionable in build_configuration.all_optionables
             for si in optionable.known_scope_infos()
         ]
         options = options_bootstrapper.get_full_options(known_scope_infos)
-
         GlobalOptions.validate_instance(options.for_global_scope())
-
         return options
+
+    @classmethod
+    def create_with_build_config(
+        cls, options_bootstrapper: OptionsBootstrapper, *, raise_: bool
+    ) -> Tuple[BuildConfiguration, Options]:
+        build_config = BuildConfigInitializer.get(options_bootstrapper)
+        with OptionsInitializer.handle_unknown_flags(options_bootstrapper, raise_=raise_):
+            options = OptionsInitializer.create(options_bootstrapper, build_config)
+        return build_config, options
+
+    @classmethod
+    @contextmanager
+    def handle_unknown_flags(
+        cls, options_bootstrapper: OptionsBootstrapper, *, raise_: bool
+    ) -> Iterator[None]:
+        """If there are any unknown flags, print "Did you mean?" and possibly error."""
+        try:
+            yield
+        except UnknownFlagsError as err:
+            build_config = BuildConfigInitializer.get(options_bootstrapper)
+            # We need an options instance in order to get "did you mean" suggestions, but we know
+            # there are bad flags in the args, so we generate options with no flags.
+            no_arg_bootstrapper = dataclasses.replace(
+                options_bootstrapper, args=("dummy_first_arg",)
+            )
+            options = cls.create(no_arg_bootstrapper, build_config)
+            FlagErrorHelpPrinter(options).handle_unknown_flags(err)
+            if raise_:
+                raise err

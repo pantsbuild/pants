@@ -32,7 +32,7 @@ from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
-from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.options import Options
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
@@ -164,20 +164,20 @@ class EngineInitializer:
 
     @staticmethod
     def setup_graph(
-        options_bootstrapper: OptionsBootstrapper,
+        options: Options,
         build_configuration: BuildConfiguration,
         executor: Optional[PyExecutor] = None,
     ) -> GraphScheduler:
         native = Native()
         build_root = get_buildroot()
-        bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        bootstrap_options = options.bootstrap_option_values()
+        assert bootstrap_options is not None
         executor = executor or PyExecutor(
             *OptionsInitializer.compute_executor_arguments(bootstrap_options)
         )
         return EngineInitializer.setup_graph_extended(
-            options_bootstrapper,
             build_configuration,
-            ExecutionOptions.from_bootstrap_options(bootstrap_options),
+            ExecutionOptions.from_options(options),
             native=native,
             executor=executor,
             pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
@@ -190,11 +190,11 @@ class EngineInitializer:
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
             include_trace_on_error=bootstrap_options.print_stacktrace,
+            native_engine_visualize_to=bootstrap_options.native_engine_visualize_to,
         )
 
     @staticmethod
     def setup_graph_extended(
-        options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
         execution_options: ExecutionOptions,
         native: Native,
@@ -208,6 +208,7 @@ class EngineInitializer:
         ca_certs_path: Optional[str] = None,
         build_root: Optional[str] = None,
         include_trace_on_error: bool = True,
+        native_engine_visualize_to: Optional[str] = None,
     ) -> GraphScheduler:
         build_root = build_root or get_buildroot()
 
@@ -215,7 +216,6 @@ class EngineInitializer:
         union_membership = UnionMembership.from_rules(build_configuration.union_rules)
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
 
-        bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         @rule
@@ -293,7 +293,7 @@ class EngineInitializer:
             executor=executor,
             execution_options=execution_options,
             include_trace_on_error=include_trace_on_error,
-            visualize_to_dir=bootstrap_options.native_engine_visualize_to,
+            visualize_to_dir=native_engine_visualize_to,
         )
 
         return GraphScheduler(scheduler, goal_map)

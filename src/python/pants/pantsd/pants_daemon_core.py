@@ -9,7 +9,7 @@ from typing_extensions import Protocol
 
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
-from pants.init.options_initializer import BuildConfigInitializer
+from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -75,11 +75,14 @@ class PantsDaemonCore:
                 logger.info("initializing pantsd...")
             if self._services:
                 self._services.shutdown()
-            build_config = BuildConfigInitializer.get(options_bootstrapper)
+            with OptionsInitializer.handle_unknown_flags(options_bootstrapper, raise_=True):
+                build_config = BuildConfigInitializer.get(options_bootstrapper)
+                options = OptionsInitializer.create(options_bootstrapper, build_config)
             self._scheduler = EngineInitializer.setup_graph(
-                options_bootstrapper, build_config, executor=self._executor
+                options, build_config, executor=self._executor
             )
-            bootstrap_options_values = options_bootstrapper.bootstrap_options.for_global_scope()
+            bootstrap_options_values = options.bootstrap_option_values()
+            assert bootstrap_options_values is not None
 
             self._services = self._services_constructor(bootstrap_options_values, self._scheduler)
             self._fingerprint = options_fingerprint
@@ -108,7 +111,8 @@ class PantsDaemonCore:
         with self._lifecycle_lock:
             if self._scheduler is None or options_fingerprint != self._fingerprint:
                 # The fingerprint mismatches, either because this is the first run (and there is no
-                # fingerprint) or because relevant options have changed. Create a new scheduler and services.
+                # fingerprint) or because relevant options have changed. Create a new scheduler
+                # and services.
                 self._init_scheduler(options_fingerprint, options_bootstrapper)
                 assert self._scheduler is not None
             return self._scheduler
