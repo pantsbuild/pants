@@ -34,13 +34,10 @@ class PyTest(Subsystem):
             "--pytest-plugins",
             type=list,
             advanced=True,
-            default=[
-                "pytest-cov>=2.10.1,<2.11",
-                # NB: zipp has frequently destabilized builds due to floating transitive versions
-                # under pytest.
-                "zipp==2.1.0",
-            ],
-            help="Requirement strings for any plugins or additional requirements you'd like to use.",
+            default=["pytest-cov>=2.10.1,<2.11"],
+            help=(
+                "Requirement strings for any plugins or additional requirements you'd like to use."
+            ),
         )
         register(
             "--timeouts",
