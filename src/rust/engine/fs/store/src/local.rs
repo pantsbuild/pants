@@ -46,6 +46,9 @@ impl ByteStore {
     let directories_root = root.join("directories");
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
+        // The size value bounds the total size of all shards, but it also bounds the per item
+        // size to `max_size / ShardedLmdb::NUM_SHARDS`.
+        //
         // We want these stores to be allowed to grow to a large multiple of the `StoreGCService`
         // size target (see DEFAULT_LOCAL_STORE_GC_TARGET_BYTES), in case it is a very long time
         // between GC runs. It doesn't reflect space allocated on disk, or RAM allocated (it may
@@ -59,7 +62,9 @@ impl ByteStore {
         //
         file_dbs: ShardedLmdb::new(
           files_root,
-          4 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+          // We set this larger than we do other stores in order to avoid applying too low a bound
+          // on the size of stored files.
+          16 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
           executor.clone(),
           lease_time,
         )

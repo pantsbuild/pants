@@ -66,8 +66,13 @@ use remexec::Tree;
 const MEGABYTES: usize = 1024 * 1024;
 const GIGABYTES: usize = 1024 * MEGABYTES;
 
-// This is the target number of bytes which should be present in all combined LMDB store files
-// after garbage collection. We almost certainly want to make this configurable.
+///
+/// This is the target number of bytes which should be present in all combined LMDB store files
+/// after garbage collection. We almost certainly want to make this configurable.
+///
+/// Because LMDB is sharded (by ShardedLmdb::NUM_SHARDS), this value also bounds the maximum size
+/// of individual items in the store: see the relevant calls to `ShardedLmdb::new` for more info.
+///
 pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * GIGABYTES;
 
 mod local;
