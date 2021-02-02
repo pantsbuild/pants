@@ -28,12 +28,10 @@ use rand::seq::SliceRandom;
 use regex::Regex;
 use rule_graph::RuleGraph;
 use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
-use store::Store;
+use store::{Store, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
 use task_executor::Executor;
 use uuid::Uuid;
 use watch::{Invalidatable, InvalidationWatcher};
-
-const GIGABYTES: usize = 1024 * 1024 * 1024;
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
 // and requires single PEM blocks. There is a crate (https://crates.io/crates/pem) that can decode
@@ -265,7 +263,7 @@ impl Core {
     let maybe_local_cached_command_runner = if exec_strategy_opts.use_local_cache {
       let process_execution_store = ShardedLmdb::new(
         local_store_dir.join("processes"),
-        5 * GIGABYTES,
+        2 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
         executor.clone(),
         DEFAULT_LEASE_TIME,
       )

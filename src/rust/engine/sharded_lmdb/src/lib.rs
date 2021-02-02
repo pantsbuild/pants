@@ -108,7 +108,8 @@ pub struct ShardedLmdb {
   // First Database is content, second is leases.
   lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
   root_path: PathBuf,
-  max_size: usize,
+  num_shards: u8,
+  max_size_per_shard: usize,
   executor: task_executor::Executor,
   lease_time: Duration,
 }
@@ -138,7 +139,12 @@ impl ShardedLmdb {
     trace!("Initializing ShardedLmdb at root {:?}", root_path);
     let mut lmdbs = HashMap::new();
 
-    for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path, max_size)? {
+    let num_shards = 0x10_u8;
+    let max_size_per_shard = max_size / (num_shards as usize);
+
+    for (env, dir, fingerprint_prefix) in
+      ShardedLmdb::envs(&root_path, num_shards, max_size_per_shard)?
+    {
       let content_database = env
         .create_db(Some("content-versioned"), DatabaseFlags::empty())
         .map_err(|e| {
@@ -166,15 +172,20 @@ impl ShardedLmdb {
     Ok(ShardedLmdb {
       lmdbs,
       root_path,
-      max_size,
+      num_shards,
+      max_size_per_shard,
       executor,
       lease_time,
     })
   }
 
-  fn envs(root_path: &Path, max_size: usize) -> Result<Vec<(Environment, PathBuf, u8)>, String> {
-    let mut envs = Vec::with_capacity(0x10);
-    for b in 0x00..0x10 {
+  fn envs(
+    root_path: &Path,
+    num_shards: u8,
+    max_size_per_shard: usize,
+  ) -> Result<Vec<(Environment, PathBuf, u8)>, String> {
+    let mut envs = Vec::with_capacity(num_shards as usize);
+    for b in 0x00..num_shards {
       let fingerprint_prefix = b << 4;
       let mut dirname = String::new();
       fmt::Write::write_fmt(&mut dirname, format_args!("{:x}", fingerprint_prefix)).unwrap();
@@ -183,7 +194,7 @@ impl ShardedLmdb {
       fs::safe_create_dir_all(&dir)
         .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
       envs.push((
-        ShardedLmdb::make_env(&dir, max_size)?,
+        ShardedLmdb::make_env(&dir, max_size_per_shard)?,
         dir,
         fingerprint_prefix,
       ));
@@ -191,7 +202,7 @@ impl ShardedLmdb {
     Ok(envs)
   }
 
-  fn make_env(dir: &Path, max_size: usize) -> Result<Environment, String> {
+  fn make_env(dir: &Path, max_size_per_shard: usize) -> Result<Environment, String> {
     Environment::new()
       // NO_SYNC
       // =======
@@ -226,7 +237,7 @@ impl ShardedLmdb {
       .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
       // 2 DBs; one for file contents, one for leases.
       .set_max_dbs(2)
-      .set_map_size(max_size)
+      .set_map_size(max_size_per_shard)
       .open(dir)
       .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))
   }
@@ -400,7 +411,9 @@ impl ShardedLmdb {
 
   #[allow(clippy::useless_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
   pub fn compact(&self) -> Result<(), String> {
-    for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path, self.max_size)? {
+    for (env, old_dir, _) in
+      ShardedLmdb::envs(&self.root_path, self.num_shards, self.max_size_per_shard)?
+    {
       let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");
       env
         .copy(new_dir.path(), EnvironmentCopyFlags::COMPACT)
