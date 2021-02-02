@@ -723,9 +723,9 @@ pub trait SnapshotOps: StoreWrapper + 'static {
           (false, false) => {
             // Prefer "No subdirectory found" error to "had extra files" error.
             return Err(format!(
-              "Cannot strip prefix {} from root directory {:?} - {}directory{} didn't contain a directory named {}{}",
+              "Cannot strip prefix {} from root directory (Digest with hash {:?}) - {}directory{} didn't contain a directory named {}{}",
               already_stripped.join(&prefix).display(),
-              root_digest,
+              root_digest.hash,
               if has_already_stripped_any { "sub" } else { "root " },
               if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
               component_to_strip_str,
@@ -734,9 +734,9 @@ pub trait SnapshotOps: StoreWrapper + 'static {
           },
           (true, false) => {
             return Err(format!(
-              "Cannot strip prefix {} from root directory {:?} - {}directory{} contained non-matching {}",
+              "Cannot strip prefix {} from root directory (Digest with hash {:?}) - {}directory{} contained non-matching {}",
               already_stripped.join(&prefix).display(),
-              root_digest,
+              root_digest.hash,
               if has_already_stripped_any { "sub" } else { "root " },
               if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
               Snapshot::directories_and_files(&extra_directories, &files),

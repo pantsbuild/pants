@@ -725,9 +725,9 @@ def test_remove_prefix(rule_runner: RuleRunner) -> None:
                 [RemovePrefix(snapshot_with_extra_files.digest, "characters/dark_tower")],
             )
         assert (
-            "Cannot strip prefix characters/dark_tower from root directory Digest(Fingerprint<"
-            "28c47f77867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root "
-            "directory contained non-matching directory named: books and file named: index"
+            "Cannot strip prefix characters/dark_tower from root directory (Digest "
+            "with hash Fingerprint<28c47f77867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>)"
+            " - root directory contained non-matching directory named: books and file named: index"
         ) in str(exc.value)
 
 

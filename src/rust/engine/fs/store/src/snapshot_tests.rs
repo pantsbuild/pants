@@ -456,7 +456,7 @@ async fn strip_prefix_non_matching_file() {
   let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
   let result = store.strip_prefix(dir.digest(), prefix).await;
 
-  assert_eq!(result, Err(format!("Cannot strip prefix cats from root directory {:?} - root directory contained non-matching file named: treats", dir.digest()).into()));
+  assert_eq!(result, Err(format!("Cannot strip prefix cats from root directory (Digest with hash {:?}) - root directory contained non-matching file named: treats", dir.digest().hash).into()));
 }
 
 #[tokio::test]
@@ -475,7 +475,7 @@ async fn strip_prefix_non_matching_dir() {
   let prefix = RelativePath::new(PathBuf::from("animals/cats")).unwrap();
   let result = store.strip_prefix(dir.digest(), prefix).await;
 
-  assert_eq!(result, Err(format!("Cannot strip prefix animals/cats from root directory {:?} - subdirectory animals contained non-matching directory named: birds", dir.digest()).into()));
+  assert_eq!(result, Err(format!("Cannot strip prefix animals/cats from root directory (Digest with hash {:?}) - subdirectory animals contained non-matching directory named: birds", dir.digest().hash).into()));
 }
 
 #[tokio::test]
@@ -492,7 +492,7 @@ async fn strip_subdir_not_in_dir() {
     .expect("Error storing directory");
   let prefix = RelativePath::new(PathBuf::from("cats/ugly")).unwrap();
   let result = store.strip_prefix(dir.digest(), prefix).await;
-  assert_eq!(result, Err(format!("Cannot strip prefix cats/ugly from root directory {:?} - subdirectory cats didn't contain a directory named ugly but did contain file named: roland", dir.digest()).into()));
+  assert_eq!(result, Err(format!("Cannot strip prefix cats/ugly from root directory (Digest with hash {:?}) - subdirectory cats didn't contain a directory named ugly but did contain file named: roland", dir.digest().hash).into()));
 }
 
 fn make_dir_stat(root: &Path, relpath: &Path) -> PathStat {
