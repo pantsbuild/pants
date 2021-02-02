@@ -163,10 +163,8 @@ impl ByteStore {
         env
           .begin_rw_txn()
           .and_then(|mut txn| {
-            let key = VersionedFingerprint::new(
-              aged_fingerprint.fingerprint,
-              ShardedLmdb::schema_version(),
-            );
+            let key =
+              VersionedFingerprint::new(aged_fingerprint.fingerprint, ShardedLmdb::SCHEMA_VERSION);
             txn.del(database, &key, None)?;
 
             txn
