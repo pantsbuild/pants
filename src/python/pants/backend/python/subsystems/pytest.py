@@ -34,7 +34,7 @@ class PyTest(Subsystem):
             "--pytest-plugins",
             type=list,
             advanced=True,
-            default=["pytest-cov>=2.10.1,<2.11"],
+            default=["pytest-cov>=2.10.1,<2.12"],
             help=(
                 "Requirement strings for any plugins or additional requirements you'd like to use."
             ),
