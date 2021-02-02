@@ -3,8 +3,8 @@ use std::convert::TryFrom;
 impl<'a> From<&'a hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
   fn from(d: &'a hashing::Digest) -> Self {
     Self {
-      hash: d.fingerprint.to_hex(),
-      size_bytes: d.size as i64,
+      hash: d.hash.to_hex(),
+      size_bytes: d.size_bytes as i64,
     }
   }
 }
@@ -12,8 +12,8 @@ impl<'a> From<&'a hashing::Digest> for crate::gen::build::bazel::remote::executi
 impl From<hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
   fn from(d: hashing::Digest) -> Self {
     Self {
-      hash: d.fingerprint.to_hex(),
-      size_bytes: d.size as i64,
+      hash: d.hash.to_hex(),
+      size_bytes: d.size_bytes as i64,
     }
   }
 }

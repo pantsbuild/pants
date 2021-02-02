@@ -91,7 +91,7 @@ impl ActionCache for ActionCacheResponder {
     };
 
     let action_map = self.action_map.lock();
-    let action_result = match action_map.get(&action_digest.fingerprint) {
+    let action_result = match action_map.get(&action_digest.hash) {
       Some(ar) => ar.clone(),
       None => {
         return Err(Status::not_found(format!(
@@ -131,7 +131,7 @@ impl ActionCache for ActionCacheResponder {
     };
 
     let mut action_map = self.action_map.lock();
-    action_map.insert(action_digest.fingerprint, action_result.clone());
+    action_map.insert(action_digest.hash, action_result.clone());
 
     Ok(Response::new(action_result))
   }

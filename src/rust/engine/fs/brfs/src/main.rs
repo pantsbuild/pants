@@ -263,7 +263,7 @@ impl BuildResultFS {
     self.inode_digest_cache.get(&inode).map(|f| {
       attr_for(
         inode,
-        f.digest.size as u64,
+        f.digest.size_bytes as u64,
         fuse::FileType::RegularFile,
         if f.is_executable { 0o555 } else { 0o444 },
       )

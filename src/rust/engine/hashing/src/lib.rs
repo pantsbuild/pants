@@ -47,8 +47,8 @@ pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
 ]);
 pub const EMPTY_DIGEST: Digest = Digest {
-  fingerprint: EMPTY_FINGERPRINT,
-  size: 0,
+  hash: EMPTY_FINGERPRINT,
+  size_bytes: 0,
 };
 
 pub const FINGERPRINT_SIZE: usize = 32;
@@ -184,8 +184,8 @@ impl TryFrom<&str> for Fingerprint {
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Digest {
-  pub fingerprint: Fingerprint,
-  pub size: usize,
+  pub hash: Fingerprint,
+  pub size_bytes: usize,
 }
 
 impl Serialize for Digest {
@@ -194,8 +194,8 @@ impl Serialize for Digest {
     S: Serializer,
   {
     let mut obj = serializer.serialize_struct("digest", 2)?;
-    obj.serialize_field("fingerprint", &self.fingerprint)?;
-    obj.serialize_field("size_bytes", &self.size)?;
+    obj.serialize_field("fingerprint", &self.hash)?;
+    obj.serialize_field("size_bytes", &self.size_bytes)?;
     obj.end()
   }
 }
@@ -257,8 +257,8 @@ impl<'de> Deserialize<'de> for Digest {
 }
 
 impl Digest {
-  pub fn new(fingerprint: Fingerprint, size: usize) -> Digest {
-    Digest { fingerprint, size }
+  pub fn new(hash: Fingerprint, size_bytes: usize) -> Digest {
+    Digest { hash, size_bytes }
   }
 
   pub fn of_bytes(bytes: &[u8]) -> Self {

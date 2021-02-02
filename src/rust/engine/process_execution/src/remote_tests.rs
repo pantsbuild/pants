@@ -1545,7 +1545,7 @@ async fn execute_missing_file_errors_if_unknown() {
     .run(cat_roland_request(), Context::default())
     .await
     .expect_err("Want error");
-  assert_contains(&error, &format!("{}", missing_digest.fingerprint));
+  assert_contains(&error, &format!("{}", missing_digest.hash));
 }
 
 #[tokio::test]
@@ -1846,10 +1846,10 @@ async fn digest_command() {
   let digest = crate::remote::digest(&command).unwrap();
 
   assert_eq!(
-    &digest.fingerprint.to_hex(),
+    &digest.hash.to_hex(),
     "a32cd427e5df6a998199266681692989f56c19cabd1cc637bdd56ae2e62619b4"
   );
-  assert_eq!(digest.size, 32)
+  assert_eq!(digest.size_bytes, 32)
 }
 
 #[tokio::test]
@@ -2369,7 +2369,7 @@ pub(crate) fn missing_preconditionfailure_violation(
   {
     bazel_protos::gen::google::rpc::precondition_failure::Violation {
       r#type: "MISSING".to_owned(),
-      subject: format!("blobs/{}/{}", digest.fingerprint, digest.size),
+      subject: format!("blobs/{}/{}", digest.hash, digest.size_bytes),
       ..Default::default()
     }
   }

@@ -75,11 +75,11 @@ py_class!(pub class PyDigest |py| {
     }
 
     @property def fingerprint(&self) -> PyResult<String> {
-      Ok(self.digest(py).fingerprint.to_hex())
+      Ok(self.digest(py).hash.to_hex())
     }
 
     @property def serialized_bytes_length(&self) -> PyResult<usize> {
-      Ok(self.digest(py).size)
+      Ok(self.digest(py).size_bytes)
     }
 
     def __richcmp__(&self, other: PyDigest, op: CompareOp) -> PyResult<PyObject> {
@@ -97,7 +97,7 @@ py_class!(pub class PyDigest |py| {
     }
 
     def __hash__(&self) -> PyResult<u64> {
-      Ok(self.digest(py).fingerprint.prefix_hash())
+      Ok(self.digest(py).hash.prefix_hash())
     }
 });
 
@@ -147,6 +147,6 @@ py_class!(pub class PySnapshot |py| {
     }
 
     def __hash__(&self) -> PyResult<u64> {
-      Ok(self.snapshot(py).digest.fingerprint.prefix_hash())
+      Ok(self.snapshot(py).digest.hash.prefix_hash())
     }
 });

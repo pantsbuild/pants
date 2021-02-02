@@ -542,9 +542,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             maybe_v
               .map(|v| {
                 v.into_iter()
-                  .map(|(name, digest)| {
-                    format!("{} {} {}\n", name, digest.fingerprint, digest.size)
-                  })
+                  .map(|(name, digest)| format!("{} {} {}\n", name, digest.hash, digest.size_bytes))
                   .collect::<Vec<String>>()
                   .join("")
               })
@@ -602,7 +600,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .all_local_digests(::store::EntryType::Directory)
           .expect("Error opening store")
         {
-          println!("{} {}", digest.fingerprint, digest.size);
+          println!("{} {}", digest.hash, digest.size_bytes);
         }
         Ok(())
       }
@@ -708,7 +706,7 @@ async fn ensure_uploaded_to_remote(
 fn print_upload_summary(mode: Option<&str>, report: &SummaryWithDigest) {
   match mode {
     Some("json") => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
-    Some("simple") => println!("{} {}", report.digest.fingerprint, report.digest.size),
+    Some("simple") => println!("{} {}", report.digest.hash, report.digest.size_bytes),
     // This should never be reached, as clap should error with unknown formats.
     _ => eprintln!("Unknown summary format."),
   };

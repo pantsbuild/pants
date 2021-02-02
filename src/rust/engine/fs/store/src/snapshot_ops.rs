@@ -197,7 +197,7 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
       let digest: Digest = require_digest(file_node.digest.as_ref())?;
       let header = format!(
         "file digest={} size={}:\n\n",
-        digest.fingerprint, digest.size
+        digest.hash, digest.size_bytes
       );
 
       let contents = store_wrapper
@@ -230,10 +230,7 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
     .map(|dir_node| async move {
       // TODO(tonic): Avoid using .unwrap here!
       let digest = require_digest(dir_node.digest.as_ref())?;
-      let detail = format!(
-        "dir digest={} size={}:\n\n",
-        digest.fingerprint, digest.size
-      );
+      let detail = format!("dir digest={} size={}:\n\n", digest.hash, digest.size_bytes);
       let res: Result<_, String> = Ok((dir_node.name.clone(), detail));
       res
     })
@@ -814,8 +811,8 @@ impl From<PathGlob> for RestrictedPathGlob {
 // TODO(tonic): Replace uses of this method with `.into` or equivalent.
 fn to_bazel_digest(digest: Digest) -> remexec::Digest {
   remexec::Digest {
-    hash: digest.fingerprint.to_hex(),
-    size_bytes: digest.size as i64,
+    hash: digest.hash.to_hex(),
+    size_bytes: digest.size_bytes as i64,
   }
 }
 

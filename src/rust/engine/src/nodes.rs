@@ -635,8 +635,8 @@ impl Snapshot {
     externs::unsafe_call(
       core.types.file_digest,
       &[
-        externs::store_utf8(&item.fingerprint.to_hex()),
-        externs::store_i64(item.size as i64),
+        externs::store_utf8(&item.hash.to_hex()),
+        externs::store_i64(item.size_bytes as i64),
       ],
     )
   }
@@ -851,9 +851,9 @@ impl DownloadedFile {
       }
 
       let mut hasher = hashing::WriterHasher::new(SizeLimiter {
-        writer: bytes::BytesMut::with_capacity(expected_digest.size).writer(),
+        writer: bytes::BytesMut::with_capacity(expected_digest.size_bytes).writer(),
         written: 0,
-        size_limit: expected_digest.size,
+        size_limit: expected_digest.size_bytes,
       });
 
       while let Some(next_chunk) = response_stream.next().await {

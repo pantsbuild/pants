@@ -65,7 +65,7 @@ impl crate::CommandRunner for CommandRunner {
       .increment_counter(Metric::LocalCacheRequests, 1);
 
     let digest = crate::digest(req.clone(), &self.metadata);
-    let key = digest.fingerprint;
+    let key = digest.hash;
 
     let cache_failures = req
       .0

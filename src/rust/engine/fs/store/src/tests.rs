@@ -370,7 +370,7 @@ async fn non_canonical_remote_directory_is_error() {
   });
   let non_canonical_directory_bytes = non_canonical_directory.to_bytes();
   let directory_digest = Digest::of_bytes(&non_canonical_directory_bytes);
-  let non_canonical_directory_fingerprint = directory_digest.fingerprint;
+  let non_canonical_directory_fingerprint = directory_digest.hash;
 
   let dir = TempDir::new().unwrap();
 
@@ -1301,9 +1301,9 @@ async fn returns_upload_summary_on_empty_cas() {
 
   // We store all 3 files, and so we must sum their digests
   let test_data = vec![
-    testdir.digest().size,
-    testroland.digest().size,
-    testcatnip.digest().size,
+    testdir.digest().size_bytes,
+    testroland.digest().size_bytes,
+    testcatnip.digest().size_bytes,
   ];
   let test_bytes = test_data.iter().sum();
   summary.upload_wall_time = Duration::default();
@@ -1354,9 +1354,9 @@ async fn summary_does_not_count_things_in_cas() {
     data_summary,
     UploadSummary {
       ingested_file_count: 1,
-      ingested_file_bytes: testroland.digest().size,
+      ingested_file_bytes: testroland.digest().size_bytes,
       uploaded_file_count: 1,
-      uploaded_file_bytes: testroland.digest().size,
+      uploaded_file_bytes: testroland.digest().size_bytes,
       upload_wall_time: Duration::default(),
     }
   );
@@ -1375,11 +1375,11 @@ async fn summary_does_not_count_things_in_cas() {
     dir_summary,
     UploadSummary {
       ingested_file_count: 3,
-      ingested_file_bytes: testdir.digest().size
-        + testroland.digest().size
-        + testcatnip.digest().size,
+      ingested_file_bytes: testdir.digest().size_bytes
+        + testroland.digest().size_bytes
+        + testcatnip.digest().size_bytes,
       uploaded_file_count: 2,
-      uploaded_file_bytes: testdir.digest().size + testcatnip.digest().size,
+      uploaded_file_bytes: testdir.digest().size_bytes + testcatnip.digest().size_bytes,
       upload_wall_time: Duration::default(),
     }
   );
