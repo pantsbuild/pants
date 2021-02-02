@@ -9,6 +9,8 @@ from pants.backend.python.target_types import (
     PexBinaryDefaults,
     PexEmitWarningsField,
     PexEntryPointField,
+    PexExecutionMode,
+    PexExecutionModeField,
     PexIgnoreErrorsField,
     PexIncludeToolsField,
     PexInheritPathField,
@@ -36,6 +38,7 @@ from pants.core.goals.run import RunFieldSet
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
 
 
 @dataclass(frozen=True)
@@ -53,7 +56,25 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     zip_safe: PexZipSafeField
     platforms: PythonPlatformsField
     unzip: PexUnzipField
+    execution_mode: PexExecutionModeField
     include_tools: PexIncludeToolsField
+
+    @memoized_property
+    def _execution_mode(self) -> PexExecutionMode:
+        if self.unzip.value is True:
+            if self.execution_mode.value not in (None, PexExecutionMode.UNZIP.value):
+                raise Exception(
+                    f"The deprecated {PexUnzipField.alias} field is set to `True` but the "
+                    f"{PexExecutionModeField.alias} field contradicts this by requesting"
+                    f"`{self.execution_mode.value!r}`. Correct this by only specifying a value for "
+                    f"one field or the other, preferring the {PexExecutionModeField.alias} field."
+                )
+            return PexExecutionMode.UNZIP
+        return (
+            PexExecutionMode.ZIPAPP
+            if self.execution_mode.value is None
+            else PexExecutionMode(self.execution_mode.value)
+        )
 
     def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> Tuple[str, ...]:
         args = []
@@ -69,8 +90,10 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--python-shebang={self.shebang.value}")
         if self.zip_safe.value is False:
             args.append("--not-zip-safe")
-        if self.unzip.value is True:
+        if self._execution_mode is PexExecutionMode.UNZIP:
             args.append("--unzip")
+        if self._execution_mode is PexExecutionMode.VENV:
+            args.append("--venv")
         if self.include_tools.value is True:
             args.append("--include-tools")
         return tuple(args)

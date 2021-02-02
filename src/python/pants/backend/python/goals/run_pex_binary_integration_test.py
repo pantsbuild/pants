@@ -2,20 +2,26 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
 from textwrap import dedent
+from typing import Optional
 
 import pytest
 
+from pants.backend.python.target_types import PexExecutionMode
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
 
 @pytest.mark.parametrize(
-    ("entry_point", "unzip", "include_tools"),
+    ("entry_point", "execution_mode", "include_tools"),
     [
-        ("app.py", True, True),
-        ("app.py:main", False, False),
+        ("app.py", PexExecutionMode.UNZIP, True),
+        ("app.py", PexExecutionMode.VENV, True),
+        ("app.py:main", PexExecutionMode.ZIPAPP, False),
+        ("app.py:main", None, False),
     ],
 )
-def test_run_sample_script(entry_point: str, unzip: bool, include_tools: bool) -> None:
+def test_run_sample_script(
+    entry_point: str, execution_mode: Optional[PexExecutionMode], include_tools: bool
+) -> None:
     """Test that we properly run a `pex_binary` target.
 
     This checks a few things:
@@ -44,7 +50,7 @@ def test_run_sample_script(entry_point: str, unzip: bool, include_tools: bool) -
             python_library(name='lib')
             pex_binary(
               entry_point={entry_point!r},
-              unzip={unzip!r},
+              execution_mode={execution_mode.value if execution_mode is not None else None!r},
               include_tools={include_tools!r},
             )
             """
@@ -80,4 +86,5 @@ def test_run_sample_script(entry_point: str, unzip: bool, include_tools: bool) -
         result = run("--", "info", PEX_TOOLS="1")
         assert result.exit_code == 0
         pex_info = json.loads(result.stdout)
-        assert unzip == pex_info["unzip"]
+        assert (execution_mode is PexExecutionMode.UNZIP) == pex_info["unzip"]
+        assert (execution_mode is PexExecutionMode.VENV) == pex_info["venv"]
