@@ -10,7 +10,7 @@ class Setuptools(PythonToolBase):
 
     # NB: setuptools doesn't have an entrypoint, unlike most python tools.
     # We call it via a generated setup.py script.
-    default_version = "setuptools>=50.3.0,<50.4"
-    default_extra_requirements = ["wheel==0.35.1"]
+    default_version = "setuptools>=50.3.0,<54.0"
+    default_extra_requirements = ["wheel>=0.35.1,<0.37"]
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.5"]
