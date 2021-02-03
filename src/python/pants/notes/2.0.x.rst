@@ -6,6 +6,11 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release, and
 https://www.pantsbuild.org/docs/plugin-upgrade-guide for a plugin upgrade guide.
 
+2.0.2 (2/3/2020)
+----------------
+
+The third stable release in the 2.0.x series, with no changes since ``2.0.2rc0``.
+
 2.0.2rc0 (1/14/2021)
 --------------------
 
