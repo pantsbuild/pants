@@ -545,8 +545,8 @@ impl Store {
       )
       .await?;
 
-      let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.1);
-      let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.1);
+      let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.size_bytes);
+      let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.size_bytes);
 
       Ok(UploadSummary {
         ingested_file_count: ingested_file_sizes.len(),
@@ -727,7 +727,7 @@ impl Store {
     if digests.len() < 3 {
       let mut num_bytes = 0;
       for digest in digests.keys() {
-        num_bytes += digest.1;
+        num_bytes += digest.size_bytes;
       }
       num_bytes < 1024 * 1024
     } else {
@@ -756,7 +756,7 @@ impl Store {
         .map(|digest| {
           let store = self.clone();
           async move {
-            match store.local.entry_type(digest.0).await {
+            match store.local.entry_type(digest.hash).await {
               Ok(Some(EntryType::File)) => Ok(Either::Left(*digest)),
               Ok(Some(EntryType::Directory)) => {
                 let store_for_expanding = match missing_behavior {

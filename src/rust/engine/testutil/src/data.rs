@@ -41,7 +41,7 @@ impl TestData {
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
-    self.digest().0
+    self.digest().hash
   }
 
   pub fn digest(&self) -> hashing::Digest {
@@ -305,7 +305,7 @@ impl TestDirectory {
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
-    self.digest().0
+    self.digest().hash
   }
 
   pub fn digest(&self) -> hashing::Digest {
@@ -333,7 +333,7 @@ impl TestTree {
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
-    self.digest().0
+    self.digest().hash
   }
 
   pub fn digest(&self) -> hashing::Digest {

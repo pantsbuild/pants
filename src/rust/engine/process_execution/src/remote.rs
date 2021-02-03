@@ -434,7 +434,7 @@ impl CommandRunner {
         }
       };
 
-      missing_digests.push(Digest(fingerprint, size));
+      missing_digests.push(Digest::new(fingerprint, size));
     }
 
     if missing_digests.is_empty() {

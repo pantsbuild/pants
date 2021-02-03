@@ -122,8 +122,8 @@ impl ByteStore {
       "{}/uploads/{}/blobs/{}/{}",
       self.instance_name.clone().unwrap_or_default(),
       uuid::Uuid::new_v4(),
-      digest.0,
-      digest.1,
+      digest.hash,
+      digest.size_bytes,
     );
     let workunit_name = format!("store_bytes({})", resource_name.clone());
     let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
@@ -197,8 +197,8 @@ impl ByteStore {
     let resource_name = format!(
       "{}/blobs/{}/{}",
       store.instance_name.clone().unwrap_or_default(),
-      digest.0,
-      digest.1
+      digest.hash,
+      digest.size_bytes
     );
     let workunit_name = format!("load_bytes_with({})", resource_name.clone());
     let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
@@ -236,7 +236,7 @@ impl ByteStore {
 
       let read_result_closure = async {
         let mut got_first_response = false;
-        let mut buf = BytesMut::with_capacity(digest.1);
+        let mut buf = BytesMut::with_capacity(digest.size_bytes);
         while let Some(response) = stream.next().await {
           // Record the observed time to receive the first response for this read.
           if !got_first_response {

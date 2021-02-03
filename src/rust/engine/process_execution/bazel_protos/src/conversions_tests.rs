@@ -6,7 +6,7 @@ use crate::gen::build::bazel::remote::execution::v2 as remexec;
 
 #[test]
 fn from_our_digest() {
-  let our_digest = &hashing::Digest(
+  let our_digest = &hashing::Digest::new(
     hashing::Fingerprint::from_hex_string(
       "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
     )
@@ -28,7 +28,7 @@ fn from_bazel_digest() {
     size_bytes: 10,
   };
   let converted: Result<hashing::Digest, String> = (&bazel_digest).try_into();
-  let want = hashing::Digest(
+  let want = hashing::Digest::new(
     hashing::Fingerprint::from_hex_string(
       "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
     )

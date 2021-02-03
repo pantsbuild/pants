@@ -491,7 +491,7 @@ impl ContentAddressableStorage for StubCASResponder {
     for digest in request.blob_digests {
       let hashing_digest_result: Result<Digest, String> = digest.try_into();
       let hashing_digest = hashing_digest_result.expect("Bad digest");
-      if !blobs.contains_key(&hashing_digest.0) {
+      if !blobs.contains_key(&hashing_digest.hash) {
         response.missing_blob_digests.push(hashing_digest.into())
       }
     }

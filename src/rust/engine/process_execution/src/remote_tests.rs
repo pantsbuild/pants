@@ -106,7 +106,7 @@ async fn make_execute_request() {
 
   let want_action = remexec::Action {
     command_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "369820f9643feb39980c51fb6d35d59567256946ff3234a371cba8f4de95339c",
         )
@@ -121,7 +121,7 @@ async fn make_execute_request() {
 
   let want_execute_request = remexec::ExecuteRequest {
     action_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "51cda3b6c18ddd47005162010e898b20faf842b3ba1a840d1a619bd962d53192",
         )
@@ -188,7 +188,7 @@ async fn make_execute_request_with_instance_name() {
 
   let want_action = remexec::Action {
     command_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "ce536af7c6334e325a99507409535d50acf05338d4cbdd031425bdaa55a87d6d",
         )
@@ -204,7 +204,7 @@ async fn make_execute_request_with_instance_name() {
   let want_execute_request = remexec::ExecuteRequest {
     instance_name: "dark-tower".to_owned(),
     action_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "11cc69e6e2376c57a54a42db3d3dd22b2996a1527f976589d2d200623097b5c8",
         )
@@ -280,7 +280,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
 
   let want_action = remexec::Action {
     command_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "09e54a4817a36e164a0e395fac36091fd5b4aac185b8bafa90842ac4aff92a34",
         )
@@ -295,7 +295,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
 
   let want_execute_request = remexec::ExecuteRequest {
     action_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "dc554a1ed77588e1bac90896dcfeba255f8178ebc01893231415841109216944",
         )
@@ -345,7 +345,7 @@ async fn make_execute_request_with_jdk() {
 
   let want_action = remexec::Action {
     command_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "9e969561212af080f0b6c346cdf954265a489f9c9fae63d11d61869174b13e29",
         )
@@ -360,7 +360,7 @@ async fn make_execute_request_with_jdk() {
 
   let want_execute_request = remexec::ExecuteRequest {
     action_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "f90182cd453f36577868fc05a605ac84c19882c18bd907ff241923d98a7bca1e",
         )
@@ -421,7 +421,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
 
   let want_action = remexec::Action {
     command_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "8d59966fac1f1a7c209ca33f8ca003ed3985b9835043fc114c45aaafa119a77b",
         )
@@ -436,7 +436,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
 
   let want_execute_request = remexec::ExecuteRequest {
     action_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "190e7b28a9e32be6cb0beaad97d175c6882857991598de3585c91aec183b14b3",
         )
@@ -510,7 +510,7 @@ async fn make_execute_request_with_timeout() {
 
   let want_action = remexec::Action {
     command_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "369820f9643feb39980c51fb6d35d59567256946ff3234a371cba8f4de95339c",
         )
@@ -526,7 +526,7 @@ async fn make_execute_request_with_timeout() {
 
   let want_execute_request = remexec::ExecuteRequest {
     action_digest: Some(
-      (&Digest(
+      (&Digest::new(
         Fingerprint::from_hex_string(
           "151e4bfce1244eb7ae74ed09d8759088557d9c63fbaaa5fcca662998266f4b09",
         )
@@ -750,7 +750,7 @@ async fn server_rejecting_execute_request_gives_error() {
   let mock_server = mock::execution_server::TestServer::new(
     mock::execution_server::MockExecution::new(vec![
       ExpectedAPICall::GetActionResult {
-        action_digest: hashing::Digest(
+        action_digest: hashing::Digest::new(
           hashing::Fingerprint::from_hex_string(
             "bf10cd168ad711602f7a241cbcbc9a3d32497fdd1465d8a01d4549ee7d8ebc08",
           )
@@ -1493,7 +1493,7 @@ async fn execute_missing_file_errors_if_unknown() {
   let mock_server = {
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::GetActionResult {
-        action_digest: hashing::Digest(
+        action_digest: hashing::Digest::new(
           hashing::Fingerprint::from_hex_string(
             "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
           )
@@ -1545,7 +1545,7 @@ async fn execute_missing_file_errors_if_unknown() {
     .run(cat_roland_request(), Context::default())
     .await
     .expect_err("Want error");
-  assert_contains(&error, &format!("{}", missing_digest.0));
+  assert_contains(&error, &format!("{}", missing_digest.hash));
 }
 
 #[tokio::test]
@@ -1846,10 +1846,10 @@ async fn digest_command() {
   let digest = crate::remote::digest(&command).unwrap();
 
   assert_eq!(
-    &digest.0.to_hex(),
+    &digest.hash.to_hex(),
     "a32cd427e5df6a998199266681692989f56c19cabd1cc637bdd56ae2e62619b4"
   );
-  assert_eq!(digest.1, 32)
+  assert_eq!(digest.size_bytes, 32)
 }
 
 #[tokio::test]
@@ -1987,7 +1987,7 @@ async fn extract_output_files_from_response_directories_and_files() {
 
   assert_eq!(
     extract_output_files_from_response(&execute_response).await,
-    Ok(Digest(
+    Ok(Digest::new(
       Fingerprint::from_hex_string(
         "639b4b84bb58a9353d49df8122e7987baf038efe54ed035e67910846c865b1e2"
       )
@@ -2369,7 +2369,7 @@ pub(crate) fn missing_preconditionfailure_violation(
   {
     bazel_protos::gen::google::rpc::precondition_failure::Violation {
       r#type: "MISSING".to_owned(),
-      subject: format!("blobs/{}/{}", digest.0, digest.1),
+      subject: format!("blobs/{}/{}", digest.hash, digest.size_bytes),
       ..Default::default()
     }
   }

@@ -195,7 +195,10 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
     .iter()
     .map(|file_node| async move {
       let digest: Digest = require_digest(file_node.digest.as_ref())?;
-      let header = format!("file digest={} size={}:\n\n", digest.0, digest.1);
+      let header = format!(
+        "file digest={} size={}:\n\n",
+        digest.hash, digest.size_bytes
+      );
 
       let contents = store_wrapper
         .load_file_bytes_with(digest, |bytes| {
@@ -227,7 +230,7 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
     .map(|dir_node| async move {
       // TODO(tonic): Avoid using .unwrap here!
       let digest = require_digest(dir_node.digest.as_ref())?;
-      let detail = format!("dir digest={} size={}:\n\n", digest.0, digest.1);
+      let detail = format!("dir digest={} size={}:\n\n", digest.hash, digest.size_bytes);
       let res: Result<_, String> = Ok((dir_node.name.clone(), detail));
       res
     })
@@ -720,9 +723,9 @@ pub trait SnapshotOps: StoreWrapper + 'static {
           (false, false) => {
             // Prefer "No subdirectory found" error to "had extra files" error.
             return Err(format!(
-              "Cannot strip prefix {} from root directory {:?} - {}directory{} didn't contain a directory named {}{}",
+              "Cannot strip prefix {} from root directory (Digest with hash {:?}) - {}directory{} didn't contain a directory named {}{}",
               already_stripped.join(&prefix).display(),
-              root_digest,
+              root_digest.hash,
               if has_already_stripped_any { "sub" } else { "root " },
               if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
               component_to_strip_str,
@@ -731,9 +734,9 @@ pub trait SnapshotOps: StoreWrapper + 'static {
           },
           (true, false) => {
             return Err(format!(
-              "Cannot strip prefix {} from root directory {:?} - {}directory{} contained non-matching {}",
+              "Cannot strip prefix {} from root directory (Digest with hash {:?}) - {}directory{} contained non-matching {}",
               already_stripped.join(&prefix).display(),
-              root_digest,
+              root_digest.hash,
               if has_already_stripped_any { "sub" } else { "root " },
               if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
               Snapshot::directories_and_files(&extra_directories, &files),
@@ -808,8 +811,8 @@ impl From<PathGlob> for RestrictedPathGlob {
 // TODO(tonic): Replace uses of this method with `.into` or equivalent.
 fn to_bazel_digest(digest: Digest) -> remexec::Digest {
   remexec::Digest {
-    hash: digest.0.to_hex(),
-    size_bytes: digest.1 as i64,
+    hash: digest.hash.to_hex(),
+    size_bytes: digest.size_bytes as i64,
   }
 }
 

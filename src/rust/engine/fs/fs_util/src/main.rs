@@ -368,7 +368,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .unwrap()
             .parse::<usize>()
             .expect("size_bytes must be a non-negative number");
-          let digest = Digest(fingerprint, size_bytes);
+          let digest = Digest::new(fingerprint, size_bytes);
           let write_result = store
             .load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap())
             .await?;
@@ -431,7 +431,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .unwrap()
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
-        let digest = Digest(fingerprint, size_bytes);
+        let digest = Digest::new(fingerprint, size_bytes);
         store
           .materialize_directory(destination, digest)
           .await
@@ -489,7 +489,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .unwrap()
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
-        let mut digest = Digest(fingerprint, size_bytes);
+        let mut digest = Digest::new(fingerprint, size_bytes);
 
         if let Some(prefix_to_strip) = args.value_of("child-dir") {
           let mut result = store
@@ -542,7 +542,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             maybe_v
               .map(|v| {
                 v.into_iter()
-                  .map(|(name, digest)| format!("{} {} {}\n", name, digest.0, digest.1))
+                  .map(|(name, digest)| format!("{} {} {}\n", name, digest.hash, digest.size_bytes))
                   .collect::<Vec<String>>()
                   .join("")
               })
@@ -572,7 +572,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .unwrap()
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
-      let digest = Digest(fingerprint, size_bytes);
+      let digest = Digest::new(fingerprint, size_bytes);
       let v = match store
         .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
         .await?
@@ -600,7 +600,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .all_local_digests(::store::EntryType::Directory)
           .expect("Error opening store")
         {
-          println!("{} {}", digest.0, digest.1);
+          println!("{} {}", digest.hash, digest.size_bytes);
         }
         Ok(())
       }
@@ -706,7 +706,7 @@ async fn ensure_uploaded_to_remote(
 fn print_upload_summary(mode: Option<&str>, report: &SummaryWithDigest) {
   match mode {
     Some("json") => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
-    Some("simple") => println!("{} {}", report.digest.0, report.digest.1),
+    Some("simple") => println!("{} {}", report.digest.hash, report.digest.size_bytes),
     // This should never be reached, as clap should error with unknown formats.
     _ => eprintln!("Unknown summary format."),
   };

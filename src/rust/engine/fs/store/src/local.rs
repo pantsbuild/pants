@@ -86,7 +86,7 @@ impl ByteStore {
   }
 
   pub async fn entry_type(&self, fingerprint: Fingerprint) -> Result<Option<EntryType>, String> {
-    if fingerprint == EMPTY_DIGEST.0 {
+    if fingerprint == EMPTY_DIGEST.hash {
       // Technically this is valid as both; choose Directory in case a caller is checking whether
       // it _can_ be a Directory.
       return Ok(Some(EntryType::Directory));
@@ -118,7 +118,7 @@ impl ByteStore {
         EntryType::Directory => self.inner.directory_dbs.clone(),
       };
       dbs?
-        .lease(digest.0)
+        .lease(digest.hash)
         .await
         .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
     }
@@ -255,7 +255,7 @@ impl ByteStore {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     };
-    dbs?.remove(digest.0).await
+    dbs?.remove(digest.hash).await
   }
 
   pub async fn store_bytes(
@@ -274,7 +274,7 @@ impl ByteStore {
       .executor
       .spawn_blocking(move || Digest::of_bytes(&bytes))
       .await;
-    dbs?.store_bytes(digest.0, bytes2, initial_lease).await?;
+    dbs?.store_bytes(digest.hash, bytes2, initial_lease).await?;
     Ok(digest)
   }
 
@@ -301,9 +301,10 @@ impl ByteStore {
     }
 
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
-      workunit_state
-        .store
-        .record_observation(ObservationMetric::LocalStoreReadBlobSize, digest.1 as u64);
+      workunit_state.store.record_observation(
+        ObservationMetric::LocalStoreReadBlobSize,
+        digest.size_bytes as u64,
+      );
     }
 
     let dbs = match entry_type {
@@ -311,8 +312,8 @@ impl ByteStore {
       EntryType::File => self.inner.file_dbs.clone(),
     };
 
-    dbs?.load_bytes_with(digest.0, move |bytes| {
-        if bytes.len() == digest.1 {
+    dbs?.load_bytes_with(digest.hash, move |bytes| {
+        if bytes.len() == digest.size_bytes {
             Ok(f(bytes))
         } else {
             Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
@@ -336,7 +337,7 @@ impl ByteStore {
       for (key, bytes) in cursor.iter() {
         let v = VersionedFingerprint::from_bytes_unsafe(key);
         let fingerprint = v.get_fingerprint();
-        digests.push(Digest(fingerprint, bytes.len()));
+        digests.push(Digest::new(fingerprint, bytes.len()));
       }
     }
     Ok(digests)
