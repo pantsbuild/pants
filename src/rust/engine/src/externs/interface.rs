@@ -1692,7 +1692,7 @@ fn single_file_digests_to_bytes(
 
     let digests: Vec<Digest> = py_file_digests
       .iter(py)
-      .map(|item| crate::nodes::lift_file_digest(&core.types, &item.into()))
+      .map(|item| crate::nodes::lift_file_digest(&core.types, &item))
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 

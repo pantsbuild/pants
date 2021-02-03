@@ -37,7 +37,7 @@ pub fn none() -> PyObject {
   gil.python().None()
 }
 
-pub fn get_type_for(val: &Value) -> TypeId {
+pub fn get_type_for(val: &PyObject) -> TypeId {
   let gil = Python::acquire_gil();
   let py = gil.python();
   (&val.get_type(py)).into()
