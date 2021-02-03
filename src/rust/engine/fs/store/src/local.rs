@@ -1,4 +1,4 @@
-use super::{EntryType, ShrinkBehavior, GIGABYTES};
+use super::{EntryType, ShrinkBehavior, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
 
 use std::collections::BinaryHeap;
 use std::path::Path;
@@ -45,20 +45,32 @@ impl ByteStore {
     let directories_root = root.join("directories");
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
-        // We want these stores to be allowed to grow very large, in case we are on a system with
-        // large disks which doesn't want to GC a lot.
-        // It doesn't reflect space allocated on disk, or RAM allocated (it may be reflected in
-        // VIRT but not RSS). There is no practical upper bound on this number, so we set them
-        // ridiculously high.
-        // However! We set them lower than we'd otherwise choose because sometimes we see tests on
-        // travis fail because they can't allocate virtual memory, if there are multiple Stores
-        // in memory at the same time. We don't know why they're not efficiently garbage collected
-        // by python, but they're not, so...
-        file_dbs: ShardedLmdb::new(files_root, 100 * GIGABYTES, executor.clone(), lease_time)
-          .map(Arc::new),
+        // The size value bounds the total size of all shards, but it also bounds the per item
+        // size to `max_size / ShardedLmdb::NUM_SHARDS`.
+        //
+        // We want these stores to be allowed to grow to a large multiple of the `StoreGCService`
+        // size target (see DEFAULT_LOCAL_STORE_GC_TARGET_BYTES), in case it is a very long time
+        // between GC runs. It doesn't reflect space allocated on disk, or RAM allocated (it may
+        // be reflected in VIRT but not RSS).
+        //
+        // However! We set them lower than we'd otherwise choose for a few reasons:
+        // 1. we see tests on travis fail because they can't allocate virtual memory if there
+        //    are too many open Stores at the same time.
+        // 2. macOS creates core dumps that apparently include MMAP'd pages, and setting this too
+        //    high will use up an unnecessary amount of disk if core dumps are enabled.
+        //
+        file_dbs: ShardedLmdb::new(
+          files_root,
+          // We set this larger than we do other stores in order to avoid applying too low a bound
+          // on the size of stored files.
+          16 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+          executor.clone(),
+          lease_time,
+        )
+        .map(Arc::new),
         directory_dbs: ShardedLmdb::new(
           directories_root,
-          5 * GIGABYTES,
+          2 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
           executor.clone(),
           lease_time,
         )
@@ -155,10 +167,8 @@ impl ByteStore {
         env
           .begin_rw_txn()
           .and_then(|mut txn| {
-            let key = VersionedFingerprint::new(
-              aged_fingerprint.fingerprint,
-              ShardedLmdb::schema_version(),
-            );
+            let key =
+              VersionedFingerprint::new(aged_fingerprint.fingerprint, ShardedLmdb::SCHEMA_VERSION);
             txn.del(database, &key, None)?;
 
             txn
