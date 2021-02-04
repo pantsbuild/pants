@@ -4,7 +4,16 @@
 This document describes releases leading up to the ``2.1.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.1/docs/release-notes-2-1 for an overview of the changes in this release.
- 
+
+2.1.2rc0 (2/4/2021)
+-------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix older versions of `tar` not working when creating an `archive` (Cherry-pick of #11413) (#11418)
+  `PR #11418 <https://github.com/pantsbuild/pants/pull/11418>`_
+
 2.1.1 (12/18/2020)
 ------------------
 
