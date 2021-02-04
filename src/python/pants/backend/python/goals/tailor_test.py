@@ -3,14 +3,14 @@
 
 import pytest
 
-from pants.backend.python.goals import init
-from pants.backend.python.goals.init import (
+from pants.backend.python.goals import tailor
+from pants.backend.python.goals.tailor import (
     PutativePythonTargetsRequest,
     classify_source_files,
     group_by_dir,
 )
 from pants.backend.python.target_types import PythonLibrary, PythonTests
-from pants.core.goals.init import PutativeTarget, PutativeTargets
+from pants.core.goals.tailor import PutativeTarget, PutativeTargets
 from pants.core.util_rules import source_files
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -20,7 +20,7 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *init.rules(),
+            *tailor.rules(),
             *source_files.rules(),
             QueryRule(PutativeTargets, (PutativePythonTargetsRequest,)),
         ],
@@ -40,7 +40,7 @@ def test_classify_source_files() -> None:
     }
     lib_files = {"foo/bar/baz.py", "foo/bar_baz.py", "foo.pyi"}
 
-    assert {PythonTests.alias: test_files, PythonLibrary.alias: lib_files} == classify_source_files(
+    assert {PythonTests: test_files, PythonLibrary: lib_files} == classify_source_files(
         test_files | lib_files
     )
 
@@ -84,14 +84,16 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     assert (
         PutativeTargets(
             [
-                PutativeTarget("src/python/foo", "foo", "python_library", ["__init__.py"]),
-                PutativeTarget(
-                    "src/python/foo/bar", "bar", "python_library", ["baz2.py", "baz3.py"]
+                PutativeTarget.for_target_type(
+                    PythonLibrary, "src/python/foo", "foo", ["__init__.py"]
                 ),
-                PutativeTarget(
+                PutativeTarget.for_target_type(
+                    PythonLibrary, "src/python/foo/bar", "bar", ["baz2.py", "baz3.py"]
+                ),
+                PutativeTarget.for_target_type(
+                    PythonTests,
                     "src/python/foo/bar",
                     "tests",
-                    "python_tests",
                     ["baz1_test.py", "baz2_test.py"],
                     kwargs={"name": "tests"},
                 ),
