@@ -266,11 +266,11 @@ class PexExecutionModeField(StringField):
     valid_choices = PexExecutionMode
     expected_type = str
     help = (
-        "The mode the generated PEX file will run in. The traditional PEX file runs in "
+        "The mode the generated PEX file will run in.\n\nThe traditional PEX file runs in "
         f"{PexExecutionMode.ZIPAPP.value!r} mode (See: https://www.python.org/dev/peps/pep-0441/). "
         f"In general, faster cold start times can be attained using the "
         f"{PexExecutionMode.UNZIP.value!r} mode which also has the benefit of allowing standard "
-        "use of `__file__` and filesystem APIs to access code and resources in the PEX. The "
+        "use of `__file__` and filesystem APIs to access code and resources in the PEX.\n\nThe "
         f"fastest execution mode in the steady state is {PexExecutionMode.VENV.value!r}, which "
         "generates a virtual environment from the PEX file on first run, but then achieves near "
         "native virtual environment start times. This mode also benefits from a traditional "
