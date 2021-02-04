@@ -155,12 +155,12 @@ impl Executor {
     &self,
     f: F,
   ) -> impl Future<Output = R> {
-    let logging_destination = logging::get_destination();
+    let stdio_destination = stdio::get_destination();
     let workunit_store_handle = workunit_store::get_workunit_store_handle();
     // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
     // panic, in which case we want to propagate that.
     tokio::task::spawn_blocking(move || {
-      logging::set_thread_destination(logging_destination);
+      stdio::set_thread_destination(stdio_destination);
       workunit_store::set_thread_workunit_store_handle(workunit_store_handle);
       f()
     })
@@ -168,20 +168,20 @@ impl Executor {
   }
 
   ///
-  /// Copy our (thread-local or task-local) logging destination and current workunit parent into
-  /// the task. The former ensures that when a pantsd thread kicks off a future, any logging done
+  /// Copy our (thread-local or task-local) stdio destination and current workunit parent into
+  /// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
   /// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
   /// is created it has an accurate handle to its parent.
   ///
   fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::Output> {
-    let logging_destination = logging::get_destination();
+    let stdio_destination = stdio::get_destination();
     let workunit_store_handle = workunit_store::get_workunit_store_handle();
 
     // NB: It is important that the first portion of this method is synchronous (meaning that this
     // method cannot be `async`), because that means that it will run on the thread that calls it.
     // The second, async portion of the method will run in the spawned Task.
 
-    logging::scope_task_destination(logging_destination, async move {
+    stdio::scope_task_destination(stdio_destination, async move {
       workunit_store::scope_task_workunit_store_handle(workunit_store_handle, future).await
     })
   }

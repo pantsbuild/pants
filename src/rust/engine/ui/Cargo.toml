@@ -9,9 +9,10 @@ path = "src/console_ui.rs"
 
 [dependencies]
 futures = "0.3"
-indicatif = "0.14.0"
 indexmap = "1.4"
-uuid = { version = "0.7", features = ["v4"] }
-logging = { path = "../logging" }
+console = "0.14"
+indicatif = "0.15"
+stdio = { path = "../stdio" }
 task_executor = { path = "../task_executor" }
+uuid = { version = "0.7", features = ["v4"] }
 workunit_store = { path = "../workunit_store" }

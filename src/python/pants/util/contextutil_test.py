@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import sys
 import unittest.mock
-import uuid
 import zipfile
 from contextlib import contextmanager
 from typing import Iterator
@@ -19,7 +18,6 @@ from pants.util.contextutil import (
     maybe_profiled,
     open_zip,
     pushd,
-    stdio_as,
     temporary_dir,
     temporary_file,
 )
@@ -203,83 +201,6 @@ class ContextutilTest(unittest.TestCase):
                     file_symlink
                 ):
                     pass
-
-    @contextmanager
-    def _stdio_as_tempfiles(self) -> Iterator[None]:
-        """Harness to replace `sys.std*` with tempfiles.
-
-        Validates that all files are read/written/flushed correctly, and acts as a contextmanager to
-        allow for recursive tests.
-        """
-
-        # Prefix contents written within this instance with a unique string to differentiate
-        # them from other instances.
-        uuid_str = str(uuid.uuid4())
-
-        def u(string: str) -> str:
-            return f"{uuid_str}#{string}"
-
-        stdin_data = u("stdio")
-        stdout_data = u("stdout")
-        stderr_data = u("stderr")
-
-        with temporary_file(binary_mode=False) as tmp_stdin, temporary_file(
-            binary_mode=False
-        ) as tmp_stdout, temporary_file(binary_mode=False) as tmp_stderr:
-            print(stdin_data, file=tmp_stdin)
-            tmp_stdin.seek(0)
-            # Read prepared content from stdin, and write content to stdout/stderr.
-            with stdio_as(
-                stdout_fd=tmp_stdout.fileno(),
-                stderr_fd=tmp_stderr.fileno(),
-                stdin_fd=tmp_stdin.fileno(),
-            ):
-                self.assertEqual(sys.stdin.fileno(), 0)
-                self.assertEqual(sys.stdout.fileno(), 1)
-                self.assertEqual(sys.stderr.fileno(), 2)
-
-                self.assertEqual(stdin_data, sys.stdin.read().strip())
-                print(stdout_data, file=sys.stdout)
-                yield
-                print(stderr_data, file=sys.stderr)
-
-            tmp_stdout.seek(0)
-            tmp_stderr.seek(0)
-            self.assertEqual(stdout_data, tmp_stdout.read().strip())
-            self.assertEqual(stderr_data, tmp_stderr.read().strip())
-
-    def test_stdio_as(self) -> None:
-        self.assertTrue(
-            sys.stderr.fileno() > 2, f"Expected a pseudofile as stderr, got: {sys.stderr}"
-        )
-        old_stdout, old_stderr, old_stdin = sys.stdout, sys.stderr, sys.stdin
-
-        # The first level tests that when `sys.std*` are file-likes (in particular, the ones set up in
-        # pytest's harness) rather than actual files, we stash and restore them properly.
-        with self._stdio_as_tempfiles():
-            # The second level stashes the first level's actual file objects and then re-opens them.
-            with self._stdio_as_tempfiles():
-                pass
-
-            # Validate that after the second level completes, the first level still sees valid
-            # fds on `sys.std*`.
-            self.assertEqual(sys.stdin.fileno(), 0)
-            self.assertEqual(sys.stdout.fileno(), 1)
-            self.assertEqual(sys.stderr.fileno(), 2)
-
-        self.assertEqual(sys.stdout, old_stdout)
-        self.assertEqual(sys.stderr, old_stderr)
-        self.assertEqual(sys.stdin, old_stdin)
-
-    def test_stdio_as_dev_null(self) -> None:
-        # Capture output to tempfiles.
-        with self._stdio_as_tempfiles():
-            # Read/write from/to `/dev/null`, which will be validated by the harness as not
-            # affecting the tempfiles.
-            with stdio_as(stdout_fd=-1, stderr_fd=-1, stdin_fd=-1):
-                self.assertEqual("", sys.stdin.read())
-                print("garbage", file=sys.stdout)
-                print("garbage", file=sys.stderr)
 
     def test_permissions(self) -> None:
         with temporary_file(permissions=0o700) as f:

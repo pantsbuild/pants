@@ -355,9 +355,8 @@ dependencies = [
 
 [[package]]
 name = "console"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a50aab2529019abfabfa93f1e6c41ef392f91fbf179b347a7e96abb524884a08"
+version = "0.14.0"
+source = "git+https://github.com/stuhood/console?branch=stuhood/term-target-for-arbitrary-handles#a29180f638c1aa2b44efcd725b126bc89305fff7"
 dependencies = [
  "encode_unicode",
  "lazy_static",
@@ -366,7 +365,6 @@ dependencies = [
  "terminal_size",
  "unicode-width",
  "winapi 0.3.9",
- "winapi-util",
 ]
 
 [[package]]
@@ -655,6 +653,7 @@ dependencies = [
  "indexmap",
  "itertools 0.8.2",
  "lazy_static",
+ "libc",
  "log 0.4.11",
  "logging",
  "mock",
@@ -668,6 +667,7 @@ dependencies = [
  "rule_graph",
  "sharded_lmdb",
  "smallvec 0.6.14",
+ "stdio",
  "store",
  "task_executor",
  "tempfile",
@@ -1250,9 +1250,9 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49a68371cf417889c9d7f98235b7102ea7c54fc59bcbd22f3dea785be9d27e40"
+checksum = "7baab56125e25686df467fe470785512329883aab42696d661247aca2a2896e4"
 dependencies = [
  "console",
  "lazy_static",
@@ -1465,6 +1465,7 @@ dependencies = [
  "num_enum",
  "parking_lot",
  "regex",
+ "stdio",
  "tokio",
  "uuid",
 ]
@@ -2860,6 +2861,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "stdio"
+version = "0.0.1"
+dependencies = [
+ "log 0.4.11",
+ "parking_lot",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "store"
 version = "0.1.0"
 dependencies = [
@@ -3004,7 +3015,7 @@ dependencies = [
  "arc-swap",
  "futures",
  "lazy_static",
- "logging",
+ "stdio",
  "tokio",
  "workunit_store",
 ]
@@ -3487,10 +3498,11 @@ checksum = "373c8a200f9e67a0c95e62a4f52fbf80c23b4381c05a17845531982fa99e6b33"
 name = "ui"
 version = "0.0.1"
 dependencies = [
+ "console",
  "futures",
  "indexmap",
  "indicatif",
- "logging",
+ "stdio",
  "task_executor",
  "uuid",
  "workunit_store",
@@ -3730,7 +3742,6 @@ dependencies = [
  "futures",
  "hashing",
  "log 0.4.11",
- "logging",
  "notify",
  "parking_lot",
  "task_executor",

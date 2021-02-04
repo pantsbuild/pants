@@ -1,21 +1,12 @@
 [package]
 version = "0.0.1"
 edition = "2018"
-name = "logging"
+name = "stdio"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-colored = "1.9.0"
-chrono = "0.4.10"
-lazy_static = "1"
 log = "0.4"
-num_enum = "0.4"
 parking_lot = "0.11"
-regex = "1"
-stdio = { path = "../stdio" }
 tokio = { version = "0.2.23", features = ["rt-util"] }
 uuid = { version = "0.7", features = ["v4"] }
-
-[build-dependencies]
-cargo_metadata = "0.10"

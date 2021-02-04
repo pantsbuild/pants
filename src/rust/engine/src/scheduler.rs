@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -17,6 +18,7 @@ use futures::{future, FutureExt};
 use graph::{InvalidationResult, LastObserved};
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{debug, info, warn};
+use stdio::TryCloneAsFile;
 use tempfile::TempDir;
 use tokio::process;
 use tokio::sync::mpsc;
@@ -243,6 +245,28 @@ impl Scheduler {
 
     let exit_status = session
       .with_console_ui_disabled(async move {
+        // Once any UI is torn down, grab exclusive access to the console.
+        let (term_stdin, term_stdout, term_stderr) =
+          stdio::get_destination().exclusive_start(Box::new(|_| {
+            // A stdio handler that will immediately trigger logging.
+            Err(())
+          }))?;
+        command
+          .stdin(Stdio::from(
+            term_stdin
+              .try_clone_as_file()
+              .map_err(|e| format!("Couldn't clone stdin: {}", e))?,
+          ))
+          .stdout(Stdio::from(
+            term_stdout
+              .try_clone_as_file()
+              .map_err(|e| format!("Couldn't clone stdout: {}", e))?,
+          ))
+          .stderr(Stdio::from(
+            term_stderr
+              .try_clone_as_file()
+              .map_err(|e| format!("Couldn't clone stderr: {}", e))?,
+          ));
         let mut subprocess = command
           .spawn()
           .map_err(|e| format!("Error executing interactive process: {}", e))?;

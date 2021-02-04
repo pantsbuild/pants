@@ -30,6 +30,7 @@ class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
             )
             ctx.checker.assert_started()
             assert "[DEBUG] Connecting to pantsd on port" in daemon_run.stderr
+            assert "[DEBUG] Connected to pantsd" in daemon_run.stderr
 
             pantsd_log = "\n".join(read_pantsd_log(ctx.workdir))
-            assert "[DEBUG] Logging reinitialized in pantsd context" in pantsd_log
+            assert "[INFO] handling request" in pantsd_log

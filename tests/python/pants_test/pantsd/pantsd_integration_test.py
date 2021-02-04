@@ -612,11 +612,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         config = {"GLOBAL": {"concurrent": True, "pantsd": True}}
         with temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(
-                ["help", "goals"], workdir=workdir, config=config
+                ["-ldebug", "help", "goals"], workdir=workdir, config=config
             )
             pants_run.assert_success()
-            pantsd_log_location = os.path.join(workdir, "pantsd", "pantsd.log")
-            self.assertFalse(os.path.exists(pantsd_log_location))
+            self.assertNotIn("Connecting to pantsd", pants_run.stderr)
 
     def test_unhandled_exceptions_only_log_exceptions_once(self):
         """Tests that the unhandled exceptions triggered by LocalPantsRunner instances don't

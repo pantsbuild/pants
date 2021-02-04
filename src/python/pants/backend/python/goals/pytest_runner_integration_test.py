@@ -27,7 +27,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 
 
 @pytest.fixture
@@ -170,8 +170,9 @@ def run_pytest(
     test_result = rule_runner.request(TestResult, inputs)
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:
-        debug_result = InteractiveRunner(rule_runner.scheduler).run(debug_request.process)
-        assert test_result.exit_code == debug_result.exit_code
+        with mock_console(rule_runner.options_bootstrapper) as (_, _):
+            debug_result = InteractiveRunner(rule_runner.scheduler).run(debug_request.process)
+            assert test_result.exit_code == debug_result.exit_code
     return test_result
 
 

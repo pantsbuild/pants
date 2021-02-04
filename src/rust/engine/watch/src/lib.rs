@@ -149,7 +149,6 @@ impl InvalidationWatcher {
     watch_receiver: Receiver<notify::Result<notify::Event>>,
   ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-      logging::set_thread_destination(logging::Destination::Pantsd);
       let exit_msg = loop {
         let event_res = watch_receiver.recv_timeout(Duration::from_millis(10));
         let invalidatable = if let Some(g) = invalidatable.upgrade() {

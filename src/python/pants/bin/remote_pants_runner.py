@@ -106,7 +106,7 @@ class RemotePantsRunner:
         executor = PyExecutor(*GlobalOptions.compute_executor_arguments(global_options))
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
-        ng_env = NailgunProtocol.ttynames_to_env(sys.stdin, sys.stdout.buffer, sys.stderr.buffer)
+        ng_env = NailgunProtocol.ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
         modified_env = {
             **self._env,
             **ng_env,

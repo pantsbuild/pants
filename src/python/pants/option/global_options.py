@@ -351,12 +351,18 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "-l", "--level", type=LogLevel, default=LogLevel.INFO, help="Set the logging level."
+            "-l",
+            "--level",
+            type=LogLevel,
+            default=LogLevel.INFO,
+            daemon=True,
+            help="Set the logging level.",
         )
         register(
             "--show-log-target",
             type=bool,
             default=False,
+            daemon=True,
             advanced=True,
             help="Display the target where a log message originates in that log message's output. "
             "This can be helpful when paired with --log-levels-by-target.",
@@ -366,6 +372,7 @@ class GlobalOptions(Subsystem):
             "--log-levels-by-target",
             type=dict,
             default={},
+            daemon=True,
             advanced=True,
             help="Set a more specific logging level for one or more logging targets. The names of "
             "logging targets are specified in log strings when the --show-log-target option is set. "
@@ -379,6 +386,7 @@ class GlobalOptions(Subsystem):
             "--log-show-rust-3rdparty",
             type=bool,
             default=False,
+            daemon=True,
             advanced=True,
             help="Whether to show/hide logging done by 3rdparty Rust crates used by the Pants "
             "engine.",
@@ -400,6 +408,7 @@ class GlobalOptions(Subsystem):
             type=list,
             member_type=str,
             default=[],
+            daemon=True,
             advanced=True,
             help="Regexps matching warning strings to ignore, e.g. "
             '["DEPRECATED: the option `--my-opt` will be removed"]. The regex patterns will be '
