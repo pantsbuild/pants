@@ -128,6 +128,12 @@ pub enum WorkunitState {
 }
 
 #[derive(Clone, Debug)]
+pub enum ArtifactOutput {
+  FileDigest(hashing::Digest),
+  Snapshot(hashing::Digest),
+}
+
+#[derive(Clone, Debug)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub message: Option<String>,
@@ -135,7 +141,7 @@ pub struct WorkunitMetadata {
   pub blocked: bool,
   pub stdout: Option<hashing::Digest>,
   pub stderr: Option<hashing::Digest>,
-  pub artifacts: Vec<(String, hashing::Digest)>,
+  pub artifacts: Vec<(String, ArtifactOutput)>,
   pub user_metadata: Vec<(String, UserMetadataItem)>,
 }
 

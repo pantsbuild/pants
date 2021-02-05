@@ -28,7 +28,15 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.addresses import Address
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    EMPTY_FILE_DIGEST,
+    CreateDigest,
+    Digest,
+    FileContent,
+    MergeDigests,
+    Workspace,
+)
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Sources,
@@ -69,7 +77,9 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
         return EnrichedTestResult(
             exit_code=self.exit_code(self.address),
             stdout="",
+            stdout_digest=EMPTY_FILE_DIGEST,
             stderr="",
+            stderr_digest=EMPTY_FILE_DIGEST,
             address=self.address,
             coverage_data=MockCoverageData(self.address),
             output_setting=ShowOutput.ALL,
@@ -266,7 +276,12 @@ def test_coverage(rule_runner: RuleRunner) -> None:
 
 def sort_results() -> None:
     create_test_result = partial(
-        EnrichedTestResult, stdout="", stderr="", output_setting=ShowOutput.ALL
+        EnrichedTestResult,
+        stdout="",
+        stdout_digest=EMPTY_FILE_DIGEST,
+        stderr="",
+        stderr_digest=EMPTY_FILE_DIGEST,
+        output_setting=ShowOutput.ALL,
     )
     skip1 = create_test_result(exit_code=None, address=Address("t1"))
     skip2 = create_test_result(exit_code=None, address=Address("t2"))
@@ -296,7 +311,9 @@ def assert_streaming_output(
     result = EnrichedTestResult(
         exit_code=exit_code,
         stdout=stdout,
+        stdout_digest=EMPTY_FILE_DIGEST,
         stderr=stderr,
+        stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
         address=Address("demo_test"),
     )

@@ -21,7 +21,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
+from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
@@ -43,9 +43,11 @@ logger = logging.getLogger(__name__)
 class TestResult:
     exit_code: Optional[int]
     stdout: str
+    stdout_digest: FileDigest
     stderr: str
+    stderr_digest: FileDigest
     address: Address
-    coverage_data: Optional["CoverageData"] = None
+    coverage_data: Optional[CoverageData] = None
     xml_results: Optional[Snapshot] = None
 
     # Prevent this class from being detected by pytest as a test class.
@@ -53,7 +55,14 @@ class TestResult:
 
     @classmethod
     def skip(cls, address: Address) -> TestResult:
-        return cls(exit_code=None, stdout="", stderr="", address=address)
+        return cls(
+            exit_code=None,
+            stdout="",
+            stderr="",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            address=address,
+        )
 
     @classmethod
     def from_fallible_process_result(
@@ -61,13 +70,15 @@ class TestResult:
         process_result: FallibleProcessResult,
         address: Address,
         *,
-        coverage_data: Optional["CoverageData"] = None,
+        coverage_data: Optional[CoverageData] = None,
         xml_results: Optional[Snapshot] = None,
     ) -> TestResult:
         return cls(
             exit_code=process_result.exit_code,
             stdout=process_result.stdout.decode(),
+            stdout_digest=process_result.stdout_digest,
             stderr=process_result.stderr.decode(),
+            stderr_digest=process_result.stderr_digest,
             address=address,
             coverage_data=coverage_data,
             xml_results=xml_results,
@@ -83,7 +94,7 @@ class TestResult:
             and not self.xml_results
         )
 
-    def __lt__(self, other: Union[Any, "EnrichedTestResult"]) -> bool:
+    def __lt__(self, other: Union[Any, EnrichedTestResult]) -> bool:
         """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
         each group."""
         if not isinstance(other, EnrichedTestResult):
@@ -115,10 +126,14 @@ class EnrichedTestResult(TestResult, EngineAwareReturnType):
 
     output_setting: ShowOutput = ShowOutput.ALL
 
-    def artifacts(self) -> Optional[Dict[str, Snapshot]]:
-        if not self.xml_results:
-            return None
-        return {"xml_results": self.xml_results}
+    def artifacts(self) -> Optional[Dict[str, Union[FileDigest, Snapshot]]]:
+        output: Dict[str, Union[FileDigest, Snapshot]] = {
+            "stdout": self.stdout_digest,
+            "stderr": self.stderr_digest,
+        }
+        if self.xml_results:
+            output["xml_results"] = self.xml_results
+        return output
 
     def level(self) -> LogLevel:
         if self.skipped:
@@ -242,8 +257,8 @@ class CoverageReports(EngineAwareReturnType):
                 report_paths.append(report_path)
         return tuple(report_paths)
 
-    def artifacts(self) -> Optional[Dict[str, Snapshot]]:
-        artifacts = {}
+    def artifacts(self) -> Optional[Dict[str, Union[Snapshot, FileDigest]]]:
+        artifacts: Dict[str, Union[Snapshot, FileDigest]] = {}
         for report in self.reports:
             artifact = report.get_artifact()
             if not artifact:
@@ -476,7 +491,9 @@ def enrich_test_result(
     return EnrichedTestResult(
         exit_code=test_result.exit_code,
         stdout=test_result.stdout,
+        stdout_digest=test_result.stdout_digest,
         stderr=test_result.stderr,
+        stderr_digest=test_result.stderr_digest,
         address=test_result.address,
         coverage_data=test_result.coverage_data,
         xml_results=test_result.xml_results,
