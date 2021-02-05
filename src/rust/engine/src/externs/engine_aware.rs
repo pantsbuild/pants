@@ -3,7 +3,7 @@
 
 use crate::core::Value;
 use crate::externs;
-use crate::nodes::{lift_file_digest, lift_directory_digest};
+use crate::nodes::{lift_directory_digest, lift_file_digest};
 use crate::Failure;
 use crate::Types;
 
@@ -127,15 +127,15 @@ impl EngineAwareInformation for Artifacts {
           .map_err(|e| {
             log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
           })
-        .ok()?;
+          .ok()?;
 
-          match lift_directory_digest(&Value::new(digest_value)) {
-            Ok(digest) => ArtifactOutput::Snapshot(digest),
-            Err(e) => {
-              log::error!("Error in EngineAware.artifacts() implementation: {}", e);
-              return None;
-            }
+        match lift_directory_digest(&Value::new(digest_value)) {
+          Ok(digest) => ArtifactOutput::Snapshot(digest),
+          Err(e) => {
+            log::error!("Error in EngineAware.artifacts() implementation: {}", e);
+            return None;
           }
+        }
       };
       output.push((key_name, artifact_output));
     }

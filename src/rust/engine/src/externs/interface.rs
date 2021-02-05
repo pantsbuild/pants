@@ -69,7 +69,9 @@ use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
-use workunit_store::{ObservationMetric, UserMetadataItem, Workunit, WorkunitState, ArtifactOutput};
+use workunit_store::{
+  ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
+};
 
 use crate::{
   externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
@@ -987,7 +989,7 @@ async fn workunit_to_py_value(
     let py_val = match digest {
       ArtifactOutput::FileDigest(digest) => {
         crate::nodes::Snapshot::store_file_digest(&core, digest)
-      },
+      }
       ArtifactOutput::Snapshot(digest) => {
         let snapshot = store::Snapshot::from_digest(store, *digest)
           .await
@@ -1004,10 +1006,7 @@ async fn workunit_to_py_value(
       }
     };
 
-    artifact_entries.push((
-      externs::store_utf8(artifact_name.as_str()),
-      py_val
-    ))
+    artifact_entries.push((externs::store_utf8(artifact_name.as_str()), py_val))
   }
 
   let mut user_metadata_entries = Vec::new();
@@ -1670,8 +1669,7 @@ fn ensure_remote_has_recursive(
     // NB: Supports either a FileDigest or Digest as input.
     let digests: Vec<Digest> = py_digests
       .iter(py)
-      .map(|item| {
-        let value = item.into();
+      .map(|value| {
         crate::nodes::lift_directory_digest(&value)
           .or_else(|_| crate::nodes::lift_file_digest(&core.types, &value))
       })
@@ -1794,7 +1792,7 @@ fn write_digest(
       // TODO: A parent_id should be an explicit argument.
       session.workunit_store().init_thread_state(None);
 
-      let lifted_digest = nodes::lift_directory_digest(&digest.into())
+      let lifted_digest = nodes::lift_directory_digest(&digest)
         .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
 
       // Python will have already validated that path_prefix is a relative path.
