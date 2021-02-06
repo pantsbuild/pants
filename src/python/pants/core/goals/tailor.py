@@ -152,15 +152,17 @@ class PutativeTarget:
         # explicit "name=" kwarg, even if the rename happens to be to the default name.
         return dataclasses.replace(self, name=new_name, kwargs={**self.kwargs, "name": new_name})
 
-    def restrict_sources(self, comments: Iterable[str] = tuple()) -> PutativeTarget:
+    def restrict_sources(self) -> PutativeTarget:
         """A copy of this object with the sources explicitly set to just the triggering sources."""
         owned_sources = self.triggering_sources
         return dataclasses.replace(
             self,
             owned_sources=owned_sources,
-            comments=self.comments + tuple(comments),
             kwargs={**self.kwargs, "sources": owned_sources},
         )
+
+    def add_comments(self, comments: Iterable[str]) -> PutativeTarget:
+        return dataclasses.replace(self, comments=self.comments + tuple(comments))
 
     def generate_build_file_stanza(self, indent: str) -> str:
         def fmt_val(v) -> str:
@@ -241,12 +243,12 @@ async def rename_conflicting_targets(ptgts: PutativeTargets) -> UniquelyNamedPut
     uniquely_named_putative_targets: List[PutativeTarget] = []
     for ptgt in ptgts:
         idx = 0
-        orig_name = ptgt.name
-        while ptgt.address.spec in existing_addrs:
-            ptgt = ptgt.rename(f"{orig_name}{idx}")
+        possibly_renamed_ptgt = ptgt
+        while possibly_renamed_ptgt.address.spec in existing_addrs:
+            possibly_renamed_ptgt = ptgt.rename(f"{ptgt.name}{idx}")
             idx += 1
-        uniquely_named_putative_targets.append(ptgt)
-        existing_addrs.add(ptgt.address.spec)
+        uniquely_named_putative_targets.append(possibly_renamed_ptgt)
+        existing_addrs.add(possibly_renamed_ptgt.address.spec)
 
     return UniquelyNamedPutativeTargets(PutativeTargets(uniquely_named_putative_targets))
 
@@ -281,8 +283,8 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
         orig_sources_str = (
             f"[{explicit_srcs_str}]" if explicit_srcs_str else f"the default for {ptgt.type_alias}"
         )
-        ptgt = ptgt.restrict_sources(
-            comments=[f"# Sources restricted from {orig_sources_str} due to conflict with"]
+        ptgt = ptgt.restrict_sources().add_comments(
+            [f"# NOTE: Sources restricted from {orig_sources_str} due to conflict with"]
             + [f"#   - {caddr}" for caddr in conflicting_addrs]
         )
     return DisjointSourcePutativeTarget(ptgt)
@@ -365,9 +367,6 @@ async def tailor(
         updated_build_files = set(edited_build_files.updated_paths)
         workspace.write_digest(edited_build_files.digest)
         ptgts_by_build_file = group_by_build_file(ptgts)
-        console.print_stdout("")
-        console.print_stdout(console.magenta("Automatic BUILD file edits"))
-        console.print_stdout(console.magenta("--------------------------"))
         for build_file_path, ptgts in ptgts_by_build_file.items():
             verb = "Updated" if build_file_path in updated_build_files else "Created"
             console.print_stdout(f"{verb} {console.blue(build_file_path)}:")
