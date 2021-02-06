@@ -5,6 +5,7 @@ import collections.abc
 import logging
 import os.path
 from dataclasses import dataclass
+from enum import Enum
 from textwrap import dedent
 from typing import Iterable, Iterator, Optional, Tuple, Union, cast
 
@@ -254,10 +255,39 @@ class PexEmitWarningsField(BoolField):
         return self.value
 
 
+class PexExecutionMode(Enum):
+    ZIPAPP = "zipapp"
+    UNZIP = "unzip"
+    VENV = "venv"
+
+
+class PexExecutionModeField(StringField):
+    alias = "execution_mode"
+    valid_choices = PexExecutionMode
+    expected_type = str
+    help = (
+        "The mode the generated PEX file will run in.\n\nThe traditional PEX file runs in "
+        f"{PexExecutionMode.ZIPAPP.value!r} mode (See: https://www.python.org/dev/peps/pep-0441/). "
+        f"In general, faster cold start times can be attained using the "
+        f"{PexExecutionMode.UNZIP.value!r} mode which also has the benefit of allowing standard "
+        "use of `__file__` and filesystem APIs to access code and resources in the PEX.\n\nThe "
+        f"fastest execution mode in the steady state is {PexExecutionMode.VENV.value!r}, which "
+        "generates a virtual environment from the PEX file on first run, but then achieves near "
+        "native virtual environment start times. This mode also benefits from a traditional "
+        "virtual environment `sys.path`, giving maximum compatibility with stdlib and third party "
+        "APIs."
+    )
+
+
 class PexUnzipField(BoolField):
     alias = "unzip"
     default = False
     value: bool
+    deprecated_removal_version = "2.5.0.dev1"
+    deprecated_removal_hint = (
+        f"Use {PexExecutionModeField.alias}={PexExecutionMode.UNZIP.value!r} to enable "
+        f"{PexExecutionMode.UNZIP.value!r} mode instead."
+    )
     help = (
         "Whether to have the PEX unzip itself into the PEX_ROOT before running.\n\nEnabling unzip "
         "mode can provide lower startup latencies for most PEX files; even on first run."
@@ -290,6 +320,7 @@ class PexBinary(Target):
         PexShebangField,
         PexEmitWarningsField,
         PexUnzipField,
+        PexExecutionModeField,
         PexIncludeToolsField,
     )
     help = (
