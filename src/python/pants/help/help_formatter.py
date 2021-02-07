@@ -9,6 +9,7 @@ from typing import List, Optional
 from pants.help.help_info_extracter import OptionHelpInfo, OptionScopeHelpInfo, to_help_str
 from pants.help.maybe_color import MaybeColor
 from pants.option.ranked_value import Rank, RankedValue
+from pants.util.strutil import hard_wrap
 
 
 class HelpFormatter(MaybeColor):
@@ -32,9 +33,8 @@ class HelpFormatter(MaybeColor):
                 # The basic options section gets the description and options scope info.
                 # No need to repeat those in the advanced section.
                 title = f"{display_scope} options"
-                lines.append(self.maybe_green(f"{title}\n{'-' * len(title)}"))
-                if oshi.description:
-                    lines.append(f"\n{oshi.description}")
+                lines.append(self.maybe_green(f"{title}\n{'-' * len(title)}\n"))
+                lines.extend(hard_wrap(oshi.description))
                 lines.append(" ")
                 config_section = f"[{oshi.scope or 'GLOBAL'}]"
                 lines.append(f"Config section: {self.maybe_magenta(config_section)}")
@@ -108,11 +108,7 @@ class HelpFormatter(MaybeColor):
             for rv in interesting_ranked_values
             for line in format_value(rv, "overrode: ", f"{indent}    ")
         ]
-        description_lines = ohi.help.splitlines()
-        # wrap() returns [] for an empty line, but we want to emit those, hence the "or [line]".
-        description_lines = [
-            f"{indent}{s}" for line in description_lines for s in wrap(line, 96) or [line]
-        ]
+        description_lines = hard_wrap(ohi.help, indent=len(indent))
         lines = [
             *arg_lines,
             *choices_lines,
@@ -122,7 +118,8 @@ class HelpFormatter(MaybeColor):
             *description_lines,
         ]
         if ohi.deprecated_message:
-            lines.append(self.maybe_red(f"{indent}{ohi.deprecated_message}."))
+            maybe_colorize = self.maybe_red if ohi.deprecation_active else self.maybe_yellow
+            lines.append(maybe_colorize(f"{indent}{ohi.deprecated_message}"))
             if ohi.removal_hint:
-                lines.append(self.maybe_red(f"{indent}{ohi.removal_hint}"))
+                lines.append(maybe_colorize(f"{indent}{ohi.removal_hint}"))
         return lines

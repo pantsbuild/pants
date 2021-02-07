@@ -20,6 +20,7 @@ target(
     'src/python/pants/backend/python/lint/flake8',
     'src/python/pants/backend/python/lint/isort',
     'src/python/pants/backend/python/lint/pylint',
+    'src/python/pants/backend/python/mixed_interpreter_constraints',
     'src/python/pants/backend/python/typecheck/mypy',
     'src/python/pants/core',
   ],
@@ -28,6 +29,5 @@ target(
 python_integration_tests(
   name="integration",
   uses_pants_run=True,
-  # TODO(#10504): Lower this to ~120 once fixed.
-  timeout=600,
+  timeout=200,
 )

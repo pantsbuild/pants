@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
+import re
 import textwrap
 
 from pants.testutil.pants_integration_test import run_pants
@@ -25,7 +26,7 @@ def test_help_advanced_global() -> None:
     pants_run.assert_success()
     assert "Global advanced options" in pants_run.stdout
     # Spot check to see that a global advanced option is printed
-    assert "--pants-bootstrapdir" in pants_run.stdout
+    assert "--loop-max" in pants_run.stdout
 
 
 def test_help_targets() -> None:
@@ -35,6 +36,16 @@ def test_help_targets() -> None:
     assert "to get help for a specific target" in pants_run.stdout
 
 
+def test_help_subsystems() -> None:
+    pants_run = run_pants(["--backend-packages=pants.backend.python", "help", "subsystems"])
+    pants_run.assert_success()
+    assert (
+        "pex                     How Pants uses Pex to run Python subprocesses" in pants_run.stdout
+    )
+    assert "to get help for a specific subsystem" in pants_run.stdout
+    assert not re.search(r"^test\s+", pants_run.stdout)
+
+
 def test_help_specific_target() -> None:
     pants_run = run_pants(["help", "archive"])
     pants_run.assert_success()
@@ -42,13 +53,14 @@ def test_help_specific_target() -> None:
     assert (
         textwrap.dedent(
             """
-    archive
-    -------
+            archive
+            -------
 
-    A ZIP or TAR file containing loose files and code packages.
+            A ZIP or TAR file containing loose files and code packages.
 
-    Valid fields:
-    """
+
+            Valid fields:
+            """
         )
         in pants_run.stdout
     )
@@ -56,11 +68,11 @@ def test_help_specific_target() -> None:
     assert (
         textwrap.dedent(
             """
-    format
-        type: 'tar' | 'tar.bz2' | 'tar.gz' | 'tar.xz' | 'zip'
-        required
-        The type of archive file to be generated.
-    """
+            format
+                type: 'tar' | 'tar.bz2' | 'tar.gz' | 'tar.xz' | 'zip'
+                required
+                The type of archive file to be generated.
+            """
         )
         in pants_run.stdout
     )

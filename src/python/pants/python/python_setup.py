@@ -12,6 +12,7 @@ from typing import Callable, Iterable, List, Optional, Tuple, cast
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import warn_or_error
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -37,10 +38,16 @@ class ResolveAllConstraintsOption(Enum):
     ALWAYS = "always"
 
 
-class PythonSetup(Subsystem):
-    """A Python environment."""
+class ResolverVersion(Enum):
+    """The resolver implementation to use when resolving Python requirements."""
 
+    PIP_LEGACY = "pip-legacy-resolver"
+    PIP_2020 = "pip-2020-resolver"
+
+
+class PythonSetup(Subsystem):
     options_scope = "python-setup"
+    help = "Options for Pants's Python support."
 
     @classmethod
     def register_options(cls, register):
@@ -51,11 +58,13 @@ class PythonSetup(Subsystem):
             type=list,
             default=["CPython>=3.6"],
             metavar="<requirement>",
-            help="Constrain the selected Python interpreter. Specify with requirement syntax, "
-            "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
-            "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
-            "be ORed together. These constraints are used as the default value for the "
-            "`compatibility` field of Python targets.",
+            help=(
+                "The Python interpreters your codebase is compatible with.\n\nSpecify with "
+                "requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with version "
+                ">=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple "
+                "constraint strings will be ORed together.\n\nThese constraints are used as the "
+                "default value for the `interpreter_constraints` field of Python targets."
+            ),
         )
         register(
             "--requirement-constraints",
@@ -63,7 +72,7 @@ class PythonSetup(Subsystem):
             type=file_option,
             help=(
                 "When resolving third-party requirements, use this "
-                "constraints file to determine which versions to use. See "
+                "constraints file to determine which versions to use.\n\nSee "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
                 "on the format of constraint files and how constraints are applied in Pex and pip."
             ),
@@ -106,6 +115,19 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--resolver-version",
+            advanced=True,
+            type=ResolverVersion,
+            default=ResolverVersion.PIP_LEGACY,
+            help=(
+                "The resolver implementation to use when resolving Python requirements.\n\nSupport "
+                f"for the {ResolverVersion.PIP_LEGACY.value!r} will be removed in Pants 2.5; so "
+                f"you're encouraged to start using the {ResolverVersion.PIP_2020.value!r} early. "
+                "For more information on this change see "
+                "https://pip.pypa.io/en/latest/user_guide/#changes-to-the-pip-dependency-resolver-in-20-2-2020"
+            ),
+        )
+        register(
             "--resolver-manylinux",
             advanced=True,
             type=str,
@@ -130,13 +152,11 @@ class PythonSetup(Subsystem):
         register(
             "--resolver-http-cache-ttl",
             type=int,
-            default=3_600,  # This matches PEX's default.
+            default=0,
             advanced=True,
-            help=(
-                "The maximum time (in seconds) for items in the HTTP cache. When the cache expires,"
-                "the PEX resolver will make network requests to see if new versions of your "
-                "requirements are available."
-            ),
+            removal_version="2.4.0.dev1",
+            removal_hint="Unused.",
+            help="Unused.",
         )
 
     @property
@@ -159,6 +179,25 @@ class PythonSetup(Subsystem):
     def interpreter_search_paths(self):
         return self.expand_interpreter_search_paths(self.options.interpreter_search_paths)
 
+    # Note: only memoized to avoid the deprecation happening multiple times. Change back once the default
+    # changes
+    @memoized_property
+    def resolver_version(self) -> ResolverVersion:
+        if self.options.is_default("resolver_version"):
+            warn_or_error(
+                removal_version="2.4.0.dev0",
+                deprecated_entity_description="defaulting to the legacy pip resolver",
+                hint=(
+                    "In Pants 2.4.0, Pants will default to using pip's new resolver. The legacy "
+                    "resolver will be removed in Pants 2.5.\n\nSet "
+                    "`[python-setup].resolver_version = 'pip-2020-resolver` to prepare for the "
+                    "default changing. Refer to "
+                    "https://pip.pypa.io/en/latest/user_guide/#changes-to-the-pip-dependency-resolver-in-20-2-2020"
+                    " for more information on the new resolver."
+                ),
+            )
+        return cast(ResolverVersion, self.options.resolver_version)
+
     @property
     def manylinux(self) -> Optional[str]:
         manylinux = cast(Optional[str], self.options.resolver_manylinux)
@@ -169,10 +208,6 @@ class PythonSetup(Subsystem):
     @property
     def resolver_jobs(self) -> int:
         return cast(int, self.options.resolver_jobs)
-
-    @property
-    def resolver_http_cache_ttl(self) -> int:
-        return cast(int, self.options.resolver_http_cache_ttl)
 
     @property
     def scratch_dir(self):
@@ -296,5 +331,4 @@ def get_pyenv_root():
     try:
         return subprocess.check_output(["pyenv", "root"]).decode().strip()
     except (OSError, subprocess.CalledProcessError):
-        logger.info("No pyenv binary found. Will not use pyenv interpreters.")
-    return None
+        return None

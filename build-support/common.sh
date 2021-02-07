@@ -65,6 +65,28 @@ function fingerprint_data() {
 }
 
 function git_merge_base() {
-  # This prints the tracking branch if set and otherwise falls back to local "master".
-  git rev-parse --symbolic-full-name --abbrev-ref HEAD@\{upstream\} 2>/dev/null || echo 'master'
+  # This prints the tracking branch if set and otherwise falls back to the commit before HEAD.
+  # We fall back to the commit before HEAD to attempt to account for situations without a tracking
+  # branch, which might include `master` builds, but can also include branch-PR builds, where
+  # Travis checks out a specially crafted Github `+refs/pull/11516/merge` branch.
+  git rev-parse --symbolic-full-name --abbrev-ref HEAD@\{upstream\} 2>/dev/null || git rev-parse HEAD^
+}
+
+function determine_python() {
+  if [[ -n "${PY:-}" ]]; then
+    echo "${PY}"
+    return 0
+  fi
+  for version in '3.7' '3.8'; do
+    local interpreter_path
+    interpreter_path="$(command -v "python${version}")"
+    if [[ -z "${interpreter_path}" ]]; then
+      continue
+    fi
+    # Check if the Python version is installed via Pyenv but not activated.
+    if [[ "$("${interpreter_path}" --version 2>&1 > /dev/null)" == "pyenv: python${version}"* ]]; then
+      continue
+    fi
+    echo "${interpreter_path}" && return 0
+  done
 }

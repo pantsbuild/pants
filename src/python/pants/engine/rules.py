@@ -1,6 +1,8 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import ast
 import inspect
 import itertools
@@ -80,7 +82,7 @@ class _RuleVisitor(ast.NodeVisitor):
 # We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
 # decorator.
 @memoized
-def SubsystemRule(optionable_factory: Type[OptionableFactory]) -> "TaskRule":
+def SubsystemRule(optionable_factory: Type[OptionableFactory]) -> TaskRule:
     """Returns a TaskRule that constructs an instance of the subsystem."""
     return TaskRule(**optionable_factory.signature())
 
@@ -466,7 +468,7 @@ class RuleIndex:
     union_rules: FrozenOrderedSet[UnionRule]
 
     @classmethod
-    def create(cls, rule_entries) -> "RuleIndex":
+    def create(cls, rule_entries: Iterable[Rule]) -> RuleIndex:
         """Creates a RuleIndex with tasks indexed by their output type."""
         rules: OrderedSet[TaskRule] = OrderedSet()
         queries: OrderedSet[QueryRule] = OrderedSet()

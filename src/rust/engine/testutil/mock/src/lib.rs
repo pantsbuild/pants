@@ -30,7 +30,8 @@
 mod action_cache;
 mod cas;
 pub mod execution_server;
+mod tonic_util;
 
 pub use crate::action_cache::StubActionCache;
-pub use crate::cas::StubCAS;
+pub use crate::cas::{StubCAS, StubCASBuilder};
 pub use crate::execution_server::MockExecution;

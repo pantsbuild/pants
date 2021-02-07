@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import typing
 from collections import defaultdict
@@ -14,11 +16,9 @@ from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.goal.run_tracker import RunTracker
 from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
 from pants.option.scope import normalize_scope
-from pants.reporting.reporting import Reporting
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.vcs.changed import Changed
 
@@ -31,9 +31,7 @@ _RESERVED_NAMES = {"global", "targets", "goals"}
 
 
 # Subsystems used outside of any rule.
-_GLOBAL_SUBSYSTEMS: FrozenOrderedSet[Type[Optionable]] = FrozenOrderedSet(
-    {GlobalOptions, Reporting, RunTracker, Changed}
-)
+_GLOBAL_SUBSYSTEMS: FrozenOrderedSet[Type[Optionable]] = FrozenOrderedSet({GlobalOptions, Changed})
 
 
 @dataclass(frozen=True)
@@ -221,7 +219,7 @@ class BuildConfiguration:
                 )
             self._target_types.update(target_types)
 
-        def create(self) -> "BuildConfiguration":
+        def create(self) -> BuildConfiguration:
             registered_aliases = BuildFileAliases(
                 objects=self._exposed_object_by_alias.copy(),
                 context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy(),

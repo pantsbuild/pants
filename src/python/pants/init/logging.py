@@ -4,12 +4,10 @@
 import http.client
 import logging
 import os
-import warnings
 from logging import Formatter, Handler, LogRecord, StreamHandler
 from typing import Dict, Iterable, Optional, Tuple
 
 import pants.util.logging as pants_logging
-from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.internals.native import Native
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir
@@ -28,18 +26,16 @@ def init_rust_logger(
     use_color: bool,
     show_target: bool,
     log_levels_by_target: Dict[str, LogLevel] = {},
+    message_regex_filters: Iterable[str] = (),
 ) -> None:
     Native().init_rust_logging(
-        log_level.level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
+        log_level.level,
+        log_show_rust_3rdparty,
+        use_color,
+        show_target,
+        log_levels_by_target,
+        message_regex_filters,
     )
-
-
-def setup_warning_filtering(warnings_filter_regexes: Iterable[str]) -> None:
-    """Sets up regex-based ignores for messages using the Python warnings system."""
-
-    warnings.resetwarnings()
-    for message_regexp in warnings_filter_regexes or ():
-        warnings.filterwarnings(action="ignore", message=message_regexp)
 
 
 class NativeHandler(StreamHandler):
@@ -131,21 +127,19 @@ def setup_logging(global_bootstrap_options: OptionValueContainer, stderr_logging
     use_color = global_bootstrap_options.colors
     show_target = global_bootstrap_options.show_log_target
     log_levels_by_target = get_log_levels_by_target(global_bootstrap_options)
+    message_regex_filters = global_bootstrap_options.ignore_pants_warnings
 
     init_rust_logger(
-        global_level, log_show_rust_3rdparty, use_color, show_target, log_levels_by_target
+        global_level,
+        log_show_rust_3rdparty,
+        use_color,
+        show_target,
+        log_levels_by_target,
+        message_regex_filters,
     )
 
-    print_stacktrace = resolve_conflicting_options(
-        old_option="print_exception_stacktrace",
-        new_option="print_stacktrace",
-        old_scope="",
-        new_scope="",
-        old_container=global_bootstrap_options,
-        new_container=global_bootstrap_options,
-    )
     if stderr_logging:
-        setup_logging_to_stderr(global_level, print_stacktrace)
+        setup_logging_to_stderr(global_level, global_bootstrap_options.print_stacktrace)
 
     if log_dir:
         setup_logging_to_file(global_level, log_dir=log_dir)

@@ -6,15 +6,19 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+bazel_protos = { path = "../process_execution/bazel_protos" }
 clap = "2"
-dirs = "1"
+dirs-next = "2"
 env_logger = "0.5.4"
 fs = { path = "../fs" }
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
 hashing = { path = "../hashing" }
 log = "0.4"
 process_execution = { path = "../process_execution" }
+prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
+shlex = "0.1.1"
 store = { path = "../fs/store" }
+structopt = "0.3.20"
 task_executor = { path = "../task_executor" }
-tokio = { version = "0.2.22", features = ["rt-threaded", "macros"] }
+tokio = { version = "0.2.23", features = ["rt-threaded", "macros"] }
 workunit_store = { path = "../workunit_store"}

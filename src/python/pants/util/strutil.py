@@ -3,7 +3,8 @@
 
 import re
 import shlex
-from typing import Dict, Iterable, List, Optional, Union
+import textwrap
+from typing import Dict, Iterable, List, Optional, Sequence, Union
 
 
 def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
@@ -133,3 +134,28 @@ def strip_v2_chroot_path(v: Union[bytes, str]) -> str:
     if isinstance(v, bytes):
         v = v.decode()
     return re.sub(r"/.*/process-execution[a-zA-Z0-9]+/", "", v)
+
+
+def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> Sequence[str]:
+    """Hard wrap a string while still preserving any prior hard wrapping (new lines).
+
+    This works well when the input uses soft wrapping, e.g. via Python's implicit string
+    concatenation.
+
+    Usually, you will want to join the lines together with "\n".join().
+    """
+    # wrap() returns [] for an empty line, but we want to emit those, hence the `or [line]`.
+    return [
+        f"{' ' * indent}{wrapped_line}"
+        for line in s.splitlines()
+        for wrapped_line in textwrap.wrap(line, width=width - indent) or [line]
+    ]
+
+
+def first_paragraph(s: str) -> str:
+    """Get the first paragraph, where paragraphs are separated by blank lines."""
+    lines = s.splitlines()
+    first_blank_line_index = next(
+        (i for i, line in enumerate(lines) if line.strip() == ""), len(lines)
+    )
+    return " ".join(lines[:first_blank_line_index])

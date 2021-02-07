@@ -25,13 +25,13 @@ def ensure_shellcheck_installed() -> None:
 
 def run_shellcheck() -> None:
     targets = set(glob("./**/*.sh", recursive=True)) | {
+        "./cargo",
         "./pants",
         "./build-support/pants_venv",
         "./build-support/virtualenv",
         "./build-support/githooks/pre-commit",
         "./build-support/githooks/prepare-commit-msg",
     }
-    targets -= set(glob("./build-support/bin/native/src/**/*.sh", recursive=True))
     targets -= set(glob("./build-support/virtualenv.dist/**/*.sh", recursive=True))
     targets -= set(glob("./build-support/virtualenvs/**/*.sh", recursive=True))
     targets -= set(glob("./build-support/twine-deps.venv/**/*.sh", recursive=True))

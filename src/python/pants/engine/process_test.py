@@ -2,19 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from dataclasses import dataclass
 
 import pytest
 
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, DigestContents, FileContent
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
     BinaryPathRequest,
@@ -22,267 +13,194 @@ from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
     Process,
+    ProcessCacheScope,
     ProcessResult,
 )
-from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.testutil.test_base import TestBase
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir, touch
 
 
-@pytest.fixture
-def rule_runner() -> RuleRunner:
+def new_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(BinaryPaths, [BinaryPathRequest]),
+            QueryRule(ProcessResult, [Process]),
+            QueryRule(FallibleProcessResult, [Process]),
         ],
     )
 
 
-@dataclass(frozen=True)
-class Concatted:
-    value: str
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return new_rule_runner()
 
 
-@dataclass(frozen=True)
-class BinaryLocation:
-    bin_path: str
+def test_argv_executable(rule_runner: RuleRunner) -> None:
+    def run_process(*, is_executable: bool) -> ProcessResult:
+        digest = rule_runner.request(
+            Digest,
+            [
+                CreateDigest(
+                    [
+                        FileContent(
+                            "echo.sh",
+                            b'#!/bin/bash -eu\necho "Hello"\n',
+                            is_executable=is_executable,
+                        )
+                    ]
+                )
+            ],
+        )
+        process = Process(
+            argv=("./echo.sh",),
+            input_digest=digest,
+            description="cat the contents of this file",
+        )
+        return rule_runner.request(ProcessResult, [process])
 
-    def __post_init__(self):
-        if not os.path.isfile(self.bin_path) or not os.access(self.bin_path, os.X_OK):
-            raise ValueError(f"path {self.bin_path} does not name an existing executable file.")
+    assert run_process(is_executable=True).stdout == b"Hello\n"
 
-
-@dataclass(frozen=True)
-class ShellCat:
-    """Wrapper class to show an example of using an auxiliary class (which wraps an executable) to
-    generate an argv instead of doing it all in CatExecutionRequest.
-
-    This can be used to encapsulate operations such as sanitizing command-line arguments which are
-    specific to the executable, which can reduce boilerplate for generating Process instances if the
-    executable is used in different ways across multiple different types of process execution
-    requests.
-    """
-
-    binary_location: BinaryLocation
-
-    @property
-    def bin_path(self):
-        return self.binary_location.bin_path
-
-    def argv_from_snapshot(self, snapshot):
-        cat_file_paths = snapshot.files
-
-        option_like_files = [p for p in cat_file_paths if p.startswith("-")]
-        if option_like_files:
-            raise ValueError(
-                f"invalid file names: '{option_like_files}' look like command-line options"
-            )
-
-        # Add /dev/null to the list of files, so that cat doesn't hang forever if no files are in the
-        # Snapshot.
-        return (self.bin_path, "/dev/null") + tuple(cat_file_paths)
+    with pytest.raises(ExecutionError) as exc:
+        run_process(is_executable=False)
+    assert "Permission" in str(exc.value)
 
 
-@dataclass(frozen=True)
-class CatExecutionRequest:
-    shell_cat: ShellCat
-    path_globs: PathGlobs
+def test_env(rule_runner: RuleRunner) -> None:
+    with environment_as(VAR1="VAL"):
+        process = Process(argv=("/usr/bin/env",), description="", env={"VAR2": "VAL"})
+        result = rule_runner.request(ProcessResult, [process])
+    assert b"VAR1=VAL" not in result.stdout
+    assert b"VAR2=VAL" in result.stdout
 
 
-@rule
-async def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -> Concatted:
-    cat_bin = cat_exe_req.shell_cat
-    cat_files_snapshot = await Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
+def test_output_digest(rule_runner: RuleRunner) -> None:
     process = Process(
-        argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
-        input_digest=cat_files_snapshot.digest,
-        description="cat some files",
+        argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
+        description="echo roland",
+        output_files=("roland",),
     )
-    cat_process_result = await Get(ProcessResult, Process, process)
-    return Concatted(cat_process_result.stdout.decode())
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.output_digest == Digest(
+        fingerprint="63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
+        serialized_bytes_length=80,
+    )
+
+    digest_contents = rule_runner.request(DigestContents, [result.output_digest])
+    assert digest_contents == DigestContents([FileContent("roland", b"European Burmese", False)])
 
 
-def cat_stdout_rules():
-    return [cat_files_process_result_concatted, QueryRule(Concatted, (CatExecutionRequest,))]
+def test_timeout(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/bash", "-c", "/bin/sleep 0.2; /bin/echo -n 'European Burmese'"),
+        timeout_seconds=0.1,
+        description="sleepy-cat",
+    )
+    result = rule_runner.request(FallibleProcessResult, [process])
+    assert result.exit_code != 0
+    assert b"Exceeded timeout" in result.stdout
+    assert b"sleepy-cat" in result.stdout
 
 
-class TestInputFileCreation(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            QueryRule(ProcessResult, (Process,)),
-            QueryRule(FallibleProcessResult, (Process,)),
-        )
+def test_failing_process(rule_runner: RuleRunner) -> None:
+    process = Process(argv=("/bin/bash", "-c", "exit 1"), description="failure")
+    result = rule_runner.request(FallibleProcessResult, [process])
+    assert result.exit_code == 1
 
-    def test_input_file_creation(self):
-        file_name = "some.filename"
-        file_contents = b"some file contents"
-
-        digest = self.request(
-            Digest, [CreateDigest([FileContent(path=file_name, content=file_contents)])]
-        )
-        req = Process(
-            argv=("/bin/cat", file_name),
-            input_digest=digest,
-            description="cat the contents of this file",
-        )
-
-        result = self.request(ProcessResult, [req])
-        self.assertEqual(result.stdout, file_contents)
-
-    def test_multiple_file_creation(self):
-        digest = self.request(
-            Digest,
-            [
-                CreateDigest(
-                    (
-                        FileContent(path="a.txt", content=b"hello"),
-                        FileContent(path="b.txt", content=b"goodbye"),
-                    )
-                )
-            ],
-        )
-
-        req = Process(
-            argv=("/bin/cat", "a.txt", "b.txt"),
-            input_digest=digest,
-            description="cat the contents of this file",
-        )
-
-        result = self.request(ProcessResult, [req])
-        self.assertEqual(result.stdout, b"hellogoodbye")
-
-    def test_file_in_directory_creation(self):
-        path = "somedir/filename"
-        content = b"file contents"
-
-        digest = self.request(Digest, [CreateDigest([FileContent(path=path, content=content)])])
-        req = Process(
-            argv=("/bin/cat", "somedir/filename"),
-            input_digest=digest,
-            description="Cat a file in a directory to make sure that doesn't break",
-        )
-
-        result = self.request(ProcessResult, [req])
-        self.assertEqual(result.stdout, content)
-
-    def test_not_executable(self):
-        file_name = "echo.sh"
-        file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
-
-        digest = self.request(
-            Digest, [CreateDigest([FileContent(path=file_name, content=file_contents)])]
-        )
-        req = Process(
-            argv=("./echo.sh",),
-            input_digest=digest,
-            description="cat the contents of this file",
-        )
-
-        with pytest.raises(ExecutionError) as exc:
-            self.request(ProcessResult, [req])
-        assert "Permission" in str(exc.value)
-
-    def test_executable(self):
-        file_name = "echo.sh"
-        file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
-
-        digest = self.request(
-            Digest,
-            [
-                CreateDigest(
-                    [FileContent(path=file_name, content=file_contents, is_executable=True)]
-                )
-            ],
-        )
-        req = Process(
-            argv=("./echo.sh",),
-            input_digest=digest,
-            description="cat the contents of this file",
-        )
-
-        result = self.request(ProcessResult, [req])
-        self.assertEqual(result.stdout, b"Hello\n")
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(ProcessResult, [process])
+    assert "Process 'failure' failed with exit code 1." in str(exc.value)
 
 
-class ProcessTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            *cat_stdout_rules(),
-            QueryRule(ProcessResult, (Process,)),
-            QueryRule(FallibleProcessResult, (Process,)),
-        )
-
-    def test_env(self):
-        req = Process(argv=("foo",), description="Some process", env={"VAR": "VAL"})
-        assert dict(req.env) == {"VAR": "VAL"}
-
-    def test_integration_concat_with_snapshots_stdout(self):
-        self.create_file("f1", "one\n")
-        self.create_file("f2", "two\n")
-
-        cat_exe_req = CatExecutionRequest(
-            ShellCat(BinaryLocation("/bin/cat")),
-            PathGlobs(["f*"]),
-        )
-
-        concatted = self.request(Concatted, [cat_exe_req])
-        self.assertEqual(Concatted("one\ntwo\n"), concatted)
-
-    def test_write_file(self):
-        request = Process(
-            argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
-            description="echo roland",
-            output_files=("roland",),
-        )
-
-        process_result = self.request(ProcessResult, [request])
-
-        self.assertEqual(
-            process_result.output_digest,
-            Digest(
-                fingerprint="63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
-                serialized_bytes_length=80,
-            ),
-        )
-
-        digest_contents = self.request(DigestContents, [process_result.output_digest])
-        assert digest_contents == DigestContents(
-            [FileContent("roland", b"European Burmese", False)]
-        )
-
-    def test_timeout(self):
-        request = Process(
-            argv=("/bin/bash", "-c", "/bin/sleep 0.2; /bin/echo -n 'European Burmese'"),
-            timeout_seconds=0.1,
-            description="sleepy-cat",
-        )
-        result = self.request(FallibleProcessResult, [request])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn(b"Exceeded timeout", result.stdout)
-        self.assertIn(b"sleepy-cat", result.stdout)
-
-    def test_fallible_failing_command_returns_exited_result(self):
-        request = Process(argv=("/bin/bash", "-c", "exit 1"), description="one-cat")
-
-        result = self.request(FallibleProcessResult, [request])
-
-        self.assertEqual(result.exit_code, 1)
-
-    def test_non_fallible_failing_command_raises(self):
-        request = Process(argv=("/bin/bash", "-c", "exit 1"), description="one-cat")
-
-        with self.assertRaises(ExecutionError) as cm:
-            self.request(ProcessResult, [request])
-        assert "Process 'one-cat' failed with exit code 1." in str(cm.exception)
+def test_cache_scope_always(rule_runner: RuleRunner) -> None:
+    # Should not re-run on failure, even in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM && exit 1"),
+        cache_scope=ProcessCacheScope.ALWAYS,
+        description="failure",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("session two")
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    assert result_one is result_two
 
 
-def test_running_interactive_process_in_workspace_cannot_have_input_files() -> None:
+def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
+    # Should not re-run on success, even in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.SUCCESSFUL,
+        description="success",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("session one")
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    assert result_one is result_two
+
+    # Should re-run on failure, but only in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM && exit 1"),
+        cache_scope=ProcessCacheScope.SUCCESSFUL,
+        description="failure",
+    )
+    result_three = rule_runner.request(FallibleProcessResult, [process])
+    result_four = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("session two")
+    result_five = rule_runner.request(FallibleProcessResult, [process])
+    assert result_three is result_four
+    assert result_four != result_five
+
+
+def test_cache_scope_per_restart() -> None:
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.PER_RESTART,
+        description="random",
+    )
+    runner_one = new_rule_runner()
+    result_one = runner_one.request(FallibleProcessResult, [process])
+    runner_one.new_session("session one")
+    result_two = runner_one.request(FallibleProcessResult, [process])
+    # Should not re-run within the same Scheduler, even with a new Session.
+    assert result_one is result_two
+
+    # Should re-run in a new Scheduler.
+    runner_two = new_rule_runner()
+    result_three = runner_two.request(FallibleProcessResult, [process])
+    assert result_one.stdout != result_three.stdout
+
+
+def test_cache_scope_never(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.NEVER,
+        description="random",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("next attempt")
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    # Should re-run in a new Session.
+    assert result_one.stdout != result_two.stdout
+
+
+# TODO: Move to fs_test.py.
+def test_create_files(rule_runner: RuleRunner) -> None:
+    files = [FileContent("a.txt", b"hello"), FileContent("somedir/b.txt", b"goodbye")]
+    digest = rule_runner.request(
+        Digest,
+        [CreateDigest(files)],
+    )
+
+    process = Process(
+        argv=("/bin/cat", "a.txt", "somedir/b.txt"),
+        input_digest=digest,
+        description="",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout == b"hellogoodbye"
+
+
+def test_interactive_process_cannot_have_input_files_and_workspace() -> None:
     mock_digest = Digest(EMPTY_DIGEST.fingerprint, 1)
     with pytest.raises(ValueError):
         InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)

@@ -62,7 +62,6 @@ lazy_static! {
 const TARGET_NOFILE_LIMIT: u64 = 10000;
 
 const XDG_CACHE_HOME: &str = "XDG_CACHE_HOME";
-const XDG_CONFIG_HOME: &str = "XDG_CONFIG_HOME";
 
 /// Follows the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
 pub fn default_cache_path() -> PathBuf {
@@ -71,20 +70,9 @@ pub fn default_cache_path() -> PathBuf {
   let cache_path = std::env::var(XDG_CACHE_HOME)
     .ok()
     .map(PathBuf::from)
-    .or_else(|| dirs::home_dir().map(|home| home.join(".cache")))
+    .or_else(|| dirs_next::home_dir().map(|home| home.join(".cache")))
     .unwrap_or_else(|| panic!("Could not find home dir or {}.", XDG_CACHE_HOME));
   cache_path.join("pants")
-}
-
-/// Follows the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
-pub fn default_config_path() -> PathBuf {
-  // TODO: Keep in alignment with `pants.base.build_environment.get_pants_configdir`.
-  let config_path = std::env::var(XDG_CONFIG_HOME)
-    .ok()
-    .map(PathBuf::from)
-    .or_else(|| dirs::home_dir().map(|home| home.join(".config")))
-    .unwrap_or_else(|| panic!("Could not find home dir or {}.", XDG_CONFIG_HOME));
-  config_path.join("pants")
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
@@ -782,14 +770,17 @@ pub fn increase_limits() -> Result<String, String> {
         for more information.",
         TARGET_NOFILE_LIMIT
       );
-      // If we might be able to increase the limit, try to.
+      // If we might be able to increase the soft limit, try to.
       if cur < max {
-        rlimit::Resource::NOFILE.set(max, max).map_err(|e| {
-          format!(
-            "Could not raise file handle limit above {}: `{}`. {}",
-            cur, e, err_suffix
-          )
-        })?;
+        let target_soft_limit = std::cmp::min(max, TARGET_NOFILE_LIMIT);
+        rlimit::Resource::NOFILE
+          .set(target_soft_limit, max)
+          .map_err(|e| {
+            format!(
+              "Could not raise soft file handle limit above {}: `{}`. {}",
+              cur, e, err_suffix
+            )
+          })?;
       } else {
         return Err(format!(
           "File handle limit is capped to: {}. {}",

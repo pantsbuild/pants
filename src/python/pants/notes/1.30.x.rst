@@ -5,6 +5,33 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.2 (12/21/2020)
+-------------------
+
+The third stable release in the 1.30.x series, with no changes since `rc3`.
+
+Thank you to everyone who helped test the rcs!
+
+1.30.2rc3 (12/16/2020)
+----------------------
+
+This release backports an upgrade to Pex 2.1.24 to bring support for macOS BigSur.
+
+Bugfixes
+~~~~~~~~
+
+* Upgrade to Pex 2.1.24. (#11312) (#11317)
+  `PR #11317 <https://github.com/pantsbuild/pants/pull/11317>`_
+
+1.30.2rc2 (11/24/2020)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Add a specific error for target names containing slashes (cherry pick of #11115) (#11121)
+  `PR #11121 <https://github.com/pantsbuild/pants/pull/11121>`_
+
 1.30.2rc1 (9/30/2020)
 ---------------------
 

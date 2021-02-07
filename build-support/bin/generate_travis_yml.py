@@ -65,6 +65,8 @@ class Stage(Enum):
 # Env vars
 # ----------------------------------------------------------------------
 
+# NB: These are not applied to the Linux Docker image - all of those env vars must be explicitly
+# exported in the image.
 GLOBAL_ENV_VARS = [
     'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"',
     "PANTS_DYNAMIC_UI=false",
@@ -77,7 +79,6 @@ GLOBAL_ENV_VARS = [
     "BOOTSTRAPPED_PEX_KEY_PREFIX=daily/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex",
     "NATIVE_ENGINE_SO_KEY_PREFIX=monthly/native_engine_so",
     "MACOS_PYENV_PY27_VERSION=2.7.18",
-    "MACOS_PYENV_PY36_VERSION=3.6.10",
     "MACOS_PYENV_PY37_VERSION=3.7.7",
     "MACOS_PYENV_PY38_VERSION=3.8.3",
     # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
@@ -111,7 +112,6 @@ GLOBAL_ENV_VARS = [
 
 
 class PythonVersion(Enum):
-    py36 = "py36"
     py37 = "py37"
     py38 = "py38"
 
@@ -120,24 +120,16 @@ class PythonVersion(Enum):
 
     @property
     def number(self) -> int:
-        return {self.py36: 36, self.py37: 37, self.py38: 38}[self]  # type: ignore[index]
+        return {self.py37: 37, self.py38: 38}[self]  # type: ignore[index]
 
     @property
     def decimal(self) -> float:
-        return {self.py36: 3.6, self.py37: 3.7, self.py38: 3.8}[self]  # type: ignore[index]
+        return {self.py37: 3.7, self.py38: 3.8}[self]  # type: ignore[index]
 
     def default_stage(self, *, is_bootstrap: bool = False) -> Stage:
         if is_bootstrap:
-            return {
-                self.py36: Stage.bootstrap,
-                self.py37: Stage.bootstrap_cron,
-                self.py38: Stage.bootstrap_cron,
-            }[
-                self  # type: ignore[index]
-            ]
-        return {self.py36: Stage.test, self.py37: Stage.test_cron, self.py38: Stage.test_cron,}[
-            self  # type: ignore[index]
-        ]
+            return {self.py37: Stage.bootstrap, self.py38: Stage.bootstrap_cron}[self]  # type: ignore[index]
+        return {self.py37: Stage.test, self.py38: Stage.test_cron}[self]  # type: ignore[index]
 
 
 # ----------------------------------------------------------------------
@@ -225,7 +217,8 @@ CACHE_NATIVE_ENGINE = {
         "timeout": _cache_timeout,
         "directories": [
             *_cache_common_directories,
-            "${HOME}/.cache/pants/rust/cargo",
+            "${HOME}/.rustup",
+            "${HOME}/.cargo",
             "build-support/virtualenvs",
             "src/rust/engine/target",
         ],
@@ -235,6 +228,8 @@ CACHE_NATIVE_ENGINE = {
 CACHE_PANTS_RUN = {
     "before_cache": [
         _cache_set_required_permissions,
+        # Travis recommends purging this folder for Rust projects.
+        'rm -rf "${HOME}/.cargo/registry/src"',
         # Render a summary to assist with further tuning the cache.
         "du -m -d2 ${HOME}/.cache/pants | sort -r -n",
         "./build-support/bin/prune_travis_cache.sh",
@@ -256,6 +251,16 @@ class Platform(Enum):
 
     def __str__(self) -> str:
         return str(self.value)
+
+
+def _install_rust(homedir: str = "${HOME}") -> List[str]:
+    rustup = (
+        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y "
+        "--default-toolchain none"
+    )
+    # This will mutate the PATH to add `rustup` and `cargo`.
+    activate_rustup = f"source {homedir}/.cargo/env"
+    return [rustup, activate_rustup]
 
 
 def _linux_before_install(
@@ -291,7 +296,7 @@ def _linux_before_install(
 def linux_shard(
     *,
     load_test_config: bool = True,
-    python_version: PythonVersion = PythonVersion.py36,
+    python_version: PythonVersion = PythonVersion.py37,
     use_docker: bool = False,
     install_travis_wait: bool = False,
 ) -> Dict:
@@ -318,16 +323,27 @@ def linux_shard(
             }
         },
         "language": "python",
-        "before_install": _linux_before_install(
-            include_test_config=load_test_config, install_travis_wait=install_travis_wait
-        ),
+        "before_install": [
+            *_linux_before_install(
+                include_test_config=load_test_config, install_travis_wait=install_travis_wait
+            ),
+            (
+                "if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K "
+                "$encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv -in "
+                "build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out "
+                "build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export "
+                "PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted; fi"
+            ),
+        ],
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage().value,
-        "env": [],
+        "env": ["PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt"],
     }
     if load_test_config:
         setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]
-        setup["env"] = [f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux"]
+        setup["env"].append(  # type: ignore[attr-defined]
+            f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux"
+        )
         setup = {**setup, **CACHE_PANTS_RUN}
     if use_docker:
         setup["services"] = ["docker"]
@@ -345,6 +361,7 @@ def linux_fuse_shard() -> Dict:
             "sudo modprobe fuse",
             "sudo chmod 666 /dev/fuse",
             "sudo chown root:$USER /etc/fuse.conf",
+            *_install_rust(),
         ],
     }
 
@@ -377,7 +394,6 @@ def _osx_env_with_pyenv() -> List[str]:
     return [
         *_osx_env(),
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"',
-        'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY36_VERSION}/bin:${PATH}"',
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"',
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"',
     ]
@@ -386,7 +402,7 @@ def _osx_env_with_pyenv() -> List[str]:
 def osx_shard(
     *,
     load_test_config: bool = True,
-    python_version: PythonVersion = PythonVersion.py36,
+    python_version: PythonVersion = PythonVersion.py37,
     osx_image: Optional[str] = None,
 ) -> Dict:
     setup = {
@@ -400,8 +416,10 @@ def osx_shard(
     if osx_image is not None:
         setup["osx_image"] = osx_image
     if load_test_config:
-        setup["before_script"].append(AWS_GET_PANTS_PEX_COMMAND)
-        setup["env"].append(f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.osx")
+        setup["before_script"].append(AWS_GET_PANTS_PEX_COMMAND)  # type: ignore[attr-defined]
+        setup["env"].append(  # type: ignore[attr-defined]
+            f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.osx"
+        )
     return setup
 
 
@@ -416,13 +434,14 @@ SKIP_WHEELS_CONDITION = (
 # ----------------------------------------------------------------------
 
 
-def _bootstrap_command(*, python_version: PythonVersion) -> str:
-    return (
+def _bootstrap_commands(*, python_version: PythonVersion, homedir: str = "${HOME}") -> List[str]:
+    bootstrap_script = (
         "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version "
         f"{python_version.decimal} --aws-bucket ${{AWS_BUCKET}} --native-engine-so-key-prefix "
         "${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key "
         "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     )
+    return [*_install_rust(homedir), bootstrap_script]
 
 
 def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List[str]:
@@ -434,13 +453,17 @@ def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List
 
 def bootstrap_linux(python_version: PythonVersion) -> Dict:
     shard = {
-        **CACHE_NATIVE_ENGINE,
+        **CACHE_NATIVE_ENGINE,  # type: ignore[arg-type]
         **linux_shard(load_test_config=False, python_version=python_version, use_docker=True),
         "name": f"Build Linux native engine and pants.pex (Python {python_version.decimal})",
         "stage": python_version.default_stage(is_bootstrap=True).value,
         "script": [
             docker_build_travis_ci_image(),
-            docker_run_travis_ci_image(_bootstrap_command(python_version=python_version)),
+            docker_run_travis_ci_image(
+                " && ".join(
+                    _bootstrap_commands(python_version=python_version, homedir="/travis/home")
+                )
+            ),
         ],
     }
     safe_extend(
@@ -451,7 +474,7 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
 
 def bootstrap_osx(python_version: PythonVersion) -> Dict:
     shard = {
-        **CACHE_NATIVE_ENGINE,
+        **CACHE_NATIVE_ENGINE,  # type: ignore[arg-type]
         # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
         # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
         # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
@@ -459,7 +482,7 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
         "name": f"Build macOS native engine and pants.pex (Python {python_version.decimal})",
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage(is_bootstrap=True).value,
-        "script": [_bootstrap_command(python_version=python_version)],
+        "script": _bootstrap_commands(python_version=python_version),
     }
     safe_extend(shard, "env", _bootstrap_env(python_version=python_version, platform=Platform.osx))
     return shard
@@ -472,19 +495,13 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
 
 def lint(python_version: PythonVersion) -> Dict:
     shard = {
-        **linux_shard(python_version=python_version, install_travis_wait=True),
+        **linux_shard(python_version=python_version),
         "name": f"Self-checks and lint (Python {python_version.decimal})",
         "script": [
+            *_install_rust(),
             (
-                "travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py "
-                f"--githooks --smoke-tests --python-version {python_version.decimal}"
-            ),
-            # NB: We split up `--lint` into its own shard because it uses remote execution. The
-            # RBE token expires after 60 minutes, so we don't want to generate the token until all
-            # local execution has finished.
-            (
-                "travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py "
-                f"--lint --python-version {python_version.decimal}"
+                "./build-support/bin/ci.py --githooks --smoke-tests --lint "
+                f"--remote-cache-enabled --python-version {python_version.decimal}"
             ),
         ],
     }
@@ -512,6 +529,7 @@ def clippy() -> Dict:
 
 def cargo_audit() -> Dict:
     return {
+        **CACHE_NATIVE_ENGINE,
         **linux_fuse_shard(),
         "name": "Cargo audit",
         "stage": Stage.test_cron.value,
@@ -531,8 +549,8 @@ def python_tests(python_version: PythonVersion) -> Dict:
         "name": f"Python tests (Python {python_version.decimal})",
         "script": [
             "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-            "--unit-tests --integration-tests --python-version "
-            f"{python_version.decimal}"
+            "--unit-tests --integration-tests --remote-cache-enabled "
+            f"--python-version {python_version.decimal}"
         ],
         "after_success": ["./build-support/bin/upload_coverage.sh"],
     }
@@ -545,10 +563,10 @@ def python_tests(python_version: PythonVersion) -> Dict:
 # ----------------------------------------------------------------------
 
 
-def _build_wheels_command() -> List[str]:
+def _build_wheels_command(homedir: str = "${HOME}") -> List[str]:
     return [
+        *_install_rust(homedir=homedir),
         "./build-support/bin/release.sh -n",
-        "USE_PY37=true ./build-support/bin/release.sh -n",
         "USE_PY38=true ./build-support/bin/release.sh -n",
         # NB: We also build `fs_util` in this shard to leverage having had compiled the engine.
         "./build-support/bin/release.sh -f",
@@ -560,7 +578,7 @@ def _build_wheels_env(*, platform: Platform) -> List[str]:
 
 
 def build_wheels_linux() -> Dict:
-    command = " && ".join(_build_wheels_command())
+    command = " && ".join(_build_wheels_command(homedir="/travis/home"))
     shard: Dict = {
         **CACHE_NATIVE_ENGINE,
         **linux_shard(use_docker=True),
@@ -579,7 +597,7 @@ def build_wheels_osx() -> Dict:
         "name": "Build macOS wheels and fs_util",
         "script": _build_wheels_command(),
         "before_install": _osx_before_install(
-            python_versions=[PythonVersion.py36, PythonVersion.py37, PythonVersion.py38],
+            python_versions=[PythonVersion.py37, PythonVersion.py38],
             install_py27=False,
         ),
         "if": SKIP_WHEELS_CONDITION,
@@ -608,10 +626,9 @@ def rust_tests_linux() -> Dict:
         "name": "Rust tests - Linux",
         "env": [
             "CACHE_NAME=rust_tests.linux",
-            # TODO: Despite being successfully linked at build time, the Linux rust tests
-            # shard is unable to locate `libpython3.6m.so.1.0` at runtime without this pointer:
-            # OSX appears to be fine.
-            'LD_LIBRARY_PATH="/opt/python/3.6.7/lib:${LD_LIBRARY_PATH}"',
+            # Despite being successfully linked at build time, the Linux Rust tests are unable to
+            # locate libpython3.7m.so.1.0 at runtime without this pointer.
+            'LD_LIBRARY_PATH="/opt/python/3.7.1/lib:${LD_LIBRARY_PATH}"',
         ],
     }
 
@@ -622,24 +639,26 @@ def rust_tests_osx() -> Dict:
         "name": "Rust tests - OSX",
         "os": "osx",
         # We need to use xcode8 because:
-        # 1) versions of OSX newer than xcode8.3 won't let new kexts be installed without travis
+        # 1) versions of macOS newer than xcode8.3 won't let new kexts be installed without Travis
         #    taking some action, and we need the osxfuse kext.
         #      See https://github.com/travis-ci/travis-ci/issues/10017
         # 2) xcode 8.3 fails to compile grpc-sys:
         #      See https://gist.github.com/stuhood/856a9b09bbaa86141f36c9925c14fae7
         "osx_image": "xcode8",
         "before_install": [
-            './build-support/bin/install_python_for_ci.sh "${MACOS_PYENV_PY36_VERSION}"',
-            # We don't use the standard travis "addons" section here because it will either silently
-            # fail (on older images) or cause a multi-minute `brew update` (on newer images), neither of
-            # which we want. This doesn't happen if we just manually run `brew cask install`.
+            './build-support/bin/install_python_for_ci.sh "${MACOS_PYENV_PY37_VERSION}"',
+            # We don't use the standard Travis "addons" section here because it will either silently
+            # fail (on older images) or cause a multi-minute `brew update` (on newer images),
+            # neither of which we want. This doesn't happen if we just manually run `brew cask
+            # install`.
             #
-            # Also, you will notice in the travis log that it says that OSX needs to be rebooted before
-            # this install will work. This is a lie.
+            # Also, you will notice in the Travis log that it says that macOS needs to be rebooted
+            # before this install will work. This is a lie.
             "brew cask install osxfuse",
-            # We don't need to install openssl because it already happens to be installed on this image.
-            # This is good, because `brew install openssl` would trigger the same issues as noted on why
-            # we don't use the `addons` section.
+            # We don't need to install openssl because it already happens to be installed on this
+            # image. This is good, because both `brew install openssl` and the Travis Brew addon
+            # would trigger the same issues as noted above.
+            *_install_rust(),
         ],
         "env": [*_osx_env_with_pyenv(), "CACHE_NAME=rust_tests.osx"],
     }
@@ -773,12 +792,18 @@ class NoAliasDumper(yaml.SafeDumper):
 
 
 def main() -> None:
-    supported_python_versions = [PythonVersion.py36, PythonVersion.py37]
+    supported_python_versions = [PythonVersion.py37, PythonVersion.py38]
     generated_yaml = yaml.dump(
         {
             # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1
             "conditions": "v1",
             "env": {"global": GLOBAL_ENV_VARS},
+            "notifications": {
+                "webhooks": {
+                    "on_start": "always",
+                    "urls": ["https://webhooks.toolchain.com/travis/repo/pantsbuild/pants/"],
+                }
+            },
             "stages": Stage.all_entries(),
             "deploy": DEPLOY_SETTINGS,
             "jobs": {
@@ -787,8 +812,7 @@ def main() -> None:
                     *[bootstrap_osx(v) for v in supported_python_versions],
                     *[lint(v) for v in supported_python_versions],
                     clippy(),
-                    # TODO: fix Cargo audit. Run `build-support/bin/ci.py --cargo-audit` locally.
-                    # cargo_audit(),
+                    cargo_audit(),
                     *[python_tests(v) for v in supported_python_versions],
                     rust_tests_linux(),
                     rust_tests_osx(),

@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use hashing::{Digest, Fingerprint};
+use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use task_executor;
 use tempfile;
 use testutil::data::TestDirectory;
@@ -54,7 +54,7 @@ async fn snapshot_one_file() {
   assert_eq!(
     snapshot,
     Snapshot {
-      digest: Digest(
+      digest: Digest::new(
         Fingerprint::from_hex_string(
           "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
         )
@@ -82,7 +82,7 @@ async fn snapshot_recursive_directories() {
   assert_eq!(
     snapshot,
     Snapshot {
-      digest: Digest(
+      digest: Digest::new(
         Fingerprint::from_hex_string(
           "8b1a7ea04eaa2527b35683edac088bc826117b53b7ec6601740b55e20bce3deb",
         )
@@ -136,7 +136,7 @@ async fn snapshot_recursive_directories_including_empty() {
       .await
       .unwrap(),
     Snapshot {
-      digest: Digest(
+      digest: Digest::new(
         Fingerprint::from_hex_string(
           "fbff703bdaac62accf2ea5083bcfed89292073bf710ef9ad14d9298c637e777b",
         )
@@ -278,8 +278,10 @@ async fn snapshot_merge_two_files() {
   assert_eq!(merged_root_directory.directories.len(), 1);
 
   let merged_child_dirnode = merged_root_directory.directories[0].clone();
-  let merged_child_dirnode_digest: Result<Digest, String> =
-    merged_child_dirnode.get_digest().try_into();
+  let merged_child_dirnode_digest: Result<Digest, String> = merged_child_dirnode
+    .digest
+    .map(|d| d.try_into())
+    .unwrap_or(Ok(EMPTY_DIGEST));
   let merged_child_directory = store
     .load_directory(merged_child_dirnode_digest.unwrap())
     .await
@@ -454,7 +456,7 @@ async fn strip_prefix_non_matching_file() {
   let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
   let result = store.strip_prefix(dir.digest(), prefix).await;
 
-  assert_eq!(result, Err(format!("Cannot strip prefix cats from root directory {:?} - root directory contained non-matching file named: treats", dir.digest()).into()));
+  assert_eq!(result, Err(format!("Cannot strip prefix cats from root directory (Digest with hash {:?}) - root directory contained non-matching file named: treats", dir.digest().hash).into()));
 }
 
 #[tokio::test]
@@ -473,7 +475,7 @@ async fn strip_prefix_non_matching_dir() {
   let prefix = RelativePath::new(PathBuf::from("animals/cats")).unwrap();
   let result = store.strip_prefix(dir.digest(), prefix).await;
 
-  assert_eq!(result, Err(format!("Cannot strip prefix animals/cats from root directory {:?} - subdirectory animals contained non-matching directory named: birds", dir.digest()).into()));
+  assert_eq!(result, Err(format!("Cannot strip prefix animals/cats from root directory (Digest with hash {:?}) - subdirectory animals contained non-matching directory named: birds", dir.digest().hash).into()));
 }
 
 #[tokio::test]
@@ -490,7 +492,7 @@ async fn strip_subdir_not_in_dir() {
     .expect("Error storing directory");
   let prefix = RelativePath::new(PathBuf::from("cats/ugly")).unwrap();
   let result = store.strip_prefix(dir.digest(), prefix).await;
-  assert_eq!(result, Err(format!("Cannot strip prefix cats/ugly from root directory {:?} - subdirectory cats didn't contain a directory named ugly but did contain file named: roland", dir.digest()).into()));
+  assert_eq!(result, Err(format!("Cannot strip prefix cats/ugly from root directory (Digest with hash {:?}) - subdirectory cats didn't contain a directory named ugly but did contain file named: roland", dir.digest().hash).into()));
 }
 
 fn make_dir_stat(root: &Path, relpath: &Path) -> PathStat {

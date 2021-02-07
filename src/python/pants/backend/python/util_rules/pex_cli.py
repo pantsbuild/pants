@@ -9,7 +9,11 @@ from typing import Iterable, List, Mapping, Optional, Tuple
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.util_rules import pex_environment
-from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
+from pants.backend.python.util_rules.pex_environment import (
+    PexEnvironment,
+    PexRuntimeEnvironment,
+    PythonExecutable,
+)
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -19,7 +23,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import Process
+from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
@@ -29,11 +33,11 @@ from pants.util.strutil import create_path_env_var
 
 
 class PexBinary(TemplatedExternalTool):
-    """The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."""
-
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.20"
+    help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
+
+    default_version = "v2.1.29"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
 
     @classproperty
@@ -43,8 +47,8 @@ class PexBinary(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "885970ed8dfbbe25abb39eac2b6f1a0feb1f6eefc4d0d5631ac67870f60e9511",
-                    "2681620",
+                    "952275a4e67990ce36036ea7a1c85d123181cfe82cc0c795129143b3bd38a43b",
+                    "2967901",
                 )
             )
             for plat in ["darwin", "linux"]
@@ -62,6 +66,7 @@ class PexCliProcess:
     output_directories: Optional[Tuple[str, ...]]
     python: Optional[PythonExecutable]
     level: LogLevel
+    cache_scope: Optional[ProcessCacheScope]
 
     def __init__(
         self,
@@ -74,6 +79,7 @@ class PexCliProcess:
         output_directories: Optional[Iterable[str]] = None,
         python: Optional[PythonExecutable] = None,
         level: LogLevel = LogLevel.INFO,
+        cache_scope: Optional[ProcessCacheScope] = None,
     ) -> None:
         self.argv = tuple(argv)
         self.description = description
@@ -83,6 +89,7 @@ class PexCliProcess:
         self.output_directories = tuple(output_directories) if output_directories else None
         self.python = python
         self.level = level
+        self.cache_scope = cache_scope
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -97,6 +104,7 @@ async def setup_pex_cli_process(
     pex_env: PexEnvironment,
     python_native_code: PythonNativeCode,
     global_options: GlobalOptions,
+    pex_runtime_env: PexRuntimeEnvironment,
 ) -> Process:
     tmpdir = ".tmp"
     gets: List[Get] = [
@@ -126,7 +134,7 @@ async def setup_pex_cli_process(
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
     pex_root_path = ".cache/pex_root"
-    argv = pex_env.create_argv(
+    argv = [
         downloaded_pex_bin.exe,
         *cert_args,
         "--python-path",
@@ -144,11 +152,14 @@ async def setup_pex_cli_process(
         # CWD can find the TMPDIR.
         "--tmpdir",
         tmpdir,
-        # NB: This comes at the end of the argv because the request may use `--` passthrough args,
-        # which must come at the end.
-        *request.argv,
-        python=request.python,
-    )
+    ]
+    if pex_runtime_env.verbosity > 0:
+        argv.append(f"-{'v' * pex_runtime_env.verbosity}")
+
+    # NB: This comes at the end of the argv because the request may use `--` passthrough args,
+    # which must come at the end.
+    argv.extend(request.argv)
+    normalized_argv = pex_env.create_argv(*argv, python=request.python)
     env = {
         **pex_env.environment_dict(python_configured=request.python is not None),
         **python_native_code.environment_dict,
@@ -156,7 +167,7 @@ async def setup_pex_cli_process(
     }
 
     return Process(
-        argv,
+        normalized_argv,
         description=request.description,
         input_digest=input_digest,
         env=env,
@@ -164,6 +175,7 @@ async def setup_pex_cli_process(
         output_directories=request.output_directories,
         append_only_caches={"pex_root": pex_root_path},
         level=request.level,
+        cache_scope=request.cache_scope,
     )
 
 

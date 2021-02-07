@@ -1,22 +1,18 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# To deploy changes to this image, you will need to be logged in the gcloud CLI locally and
-# follow this guide https://cloud.google.com/container-registry/docs/quickstart, which boils down to:
-#
-#   1. Install Docker and the gcloud CLI.
-#   2. $ gcloud auth configure-docker
-#   3. Ensure you have permissions to upload to Google Container Registry for pants-remoting-beta.
-#   4. $ docker build --tag rbe-remote-execution build-support/docker/remote_execution
-#   5. $ docker tag rbe-remote-execution gcr.io/pants-remoting-beta/rbe-remote-execution
-#   6. $ docker push gcr.io/pants-remoting-beta/rbe-remote-execution
-#   7. Update `pants.remote.toml` to use the new SHA printed to the console.
+#   1. Install Docker.
+#   2. $ docker build --tag pants-remote-execution build-support/docker/tc_remote_execution
+#   3. $ docker push [needs docker hub tag]
+#   4. Ask a toolchain developer on Slack in #infra channel to upload the new image.
 
-FROM gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:da0f21c71abce3bbb92c3a0c44c3737f007a82b60f8bd2930abc55fe64fc2729
+FROM ubuntu:xenial-20200619
 
 RUN apt-get update --fix-missing
 RUN apt-get install -y \
   build-essential \
+  curl \
+  git \
   gcc-multilib \
   g++-multilib \
   libbz2-dev \
@@ -25,14 +21,26 @@ RUN apt-get install -y \
   libssl-dev \
   libsqlite3-dev \
   libffi-dev \
+  locales \
+  openjdk-8-jdk-headless \
+  openjdk-8-jre-headless \
   python-openssl \
+  unzip \
+  zip \
   zlib1g-dev
+
+# Configure en_US.UTF-8 locale as Pants requires a UTF-8 locale to operate.
+RUN locale-gen en_US.UTF-8 && update-locale
+ENV LANG "en_US.UTF-8"
+ENV LANGUAGE "en_US.UTF-8"
+ENV LC_ALL "en_US.UTF-8"
 
 # Even though the image already comes installed with Python 2.7, 3.5, and 3.6, we install our own
 # via Pyenv because we need Python 3.7 and want consistency in how we install them.
-ARG PYTHON_27_VERSION=2.7.15
-ARG PYTHON_36_VERSION=3.6.8
-ARG PYTHON_37_VERSION=3.7.3
+ARG PYTHON_27_VERSION=2.7.18
+ARG PYTHON_36_VERSION=3.6.11
+ARG PYTHON_37_VERSION=3.7.8
+ARG PYTHON_38_VERSION=3.8.5
 
 ENV PYENV_ROOT /pyenv-docker-build
 ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
@@ -41,7 +49,19 @@ RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
 RUN ${PYENV_BIN} install ${PYTHON_27_VERSION}
 RUN ${PYENV_BIN} install ${PYTHON_36_VERSION}
 RUN ${PYENV_BIN} install ${PYTHON_37_VERSION}
+RUN ${PYENV_BIN} install ${PYTHON_38_VERSION}
 
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_36_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_37_VERSION}/bin:${PATH}"
+ENV PATH "${PYENV_ROOT}/versions/${PYTHON_38_VERSION}/bin:${PATH}"
+
+# Add a non-root user and configure image to use that user for running binaries.
+RUN adduser \
+    --disabled-password \
+    --disabled-login \
+    --uid 1000 \
+    --shell /bin/bash \
+    --gecos 'Pants Build User' \
+    pantsbuild
+USER pantsbuild

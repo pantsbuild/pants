@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::core::Failure;
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
-use crate::scheduler::Session;
+use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
@@ -22,19 +22,16 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
-  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, CommandRunner, NamedCaches,
-  Platform, ProcessMetadata,
+  self, BoundedCommandRunner, CommandRunner, NamedCaches, Platform, ProcessMetadata,
 };
 use rand::seq::SliceRandom;
 use regex::Regex;
 use rule_graph::RuleGraph;
 use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
-use store::Store;
+use store::{Store, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
 use task_executor::Executor;
 use uuid::Uuid;
 use watch::{Invalidatable, InvalidationWatcher};
-
-const GIGABYTES: usize = 1024 * 1024 * 1024;
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
 // and requires single PEM blocks. There is a crate (https://crates.io/crates/pem) that can decode
@@ -66,6 +63,7 @@ pub struct Core {
   pub watcher: Arc<InvalidationWatcher>,
   pub build_root: PathBuf,
   pub local_parallelism: usize,
+  pub sessions: Sessions,
 }
 
 #[derive(Clone, Debug)]
@@ -76,12 +74,16 @@ pub struct RemotingOptions {
   pub execution_process_cache_namespace: Option<String>,
   pub instance_name: Option<String>,
   pub root_ca_certs_path: Option<PathBuf>,
-  pub oauth_bearer_token_path: Option<PathBuf>,
+  pub store_headers: BTreeMap<String, String>,
   pub store_thread_count: usize,
   pub store_chunk_bytes: usize,
   pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
   pub store_connection_limit: usize,
+  pub store_initial_timeout: Duration,
+  pub store_timeout_multiplier: f64,
+  pub store_maximum_timeout: Duration,
+  pub cache_eager_fetch: bool,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
@@ -92,8 +94,6 @@ pub struct ExecutionStrategyOptions {
   pub local_parallelism: usize,
   pub remote_parallelism: usize,
   pub cleanup_local_dirs: bool,
-  pub speculation_delay: Duration,
-  pub speculation_strategy: String,
   pub use_local_cache: bool,
   pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
@@ -108,22 +108,24 @@ impl Core {
     remoting_opts: &RemotingOptions,
     remote_store_servers: &[String],
     root_ca_certs: &Option<Vec<u8>>,
-    oauth_bearer_token: &Option<String>,
   ) -> Result<Store, String> {
     if enable_remote {
+      let backoff_config = store::BackoffConfig::new(
+        remoting_opts.store_initial_timeout,
+        remoting_opts.store_timeout_multiplier,
+        remoting_opts.store_maximum_timeout,
+      )?;
       Store::with_remote(
         executor.clone(),
         local_store_dir,
         remote_store_servers.to_vec(),
         remoting_opts.instance_name.clone(),
         root_ca_certs.clone(),
-        oauth_bearer_token.clone(),
+        remoting_opts.store_headers.clone(),
         remoting_opts.store_thread_count,
         remoting_opts.store_chunk_bytes,
         remoting_opts.store_chunk_upload_timeout,
-        // TODO: Take a parameter
-        store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
-          .unwrap(),
+        backoff_config,
         remoting_opts.store_rpc_retries,
         remoting_opts.store_connection_limit,
       )
@@ -171,7 +173,6 @@ impl Core {
     process_execution_metadata: &ProcessMetadata,
     remoting_opts: &RemotingOptions,
     root_ca_certs: &Option<Vec<u8>>,
-    oauth_bearer_token: &Option<String>,
   ) -> Result<Box<dyn CommandRunner>, String> {
     Ok(Box::new(process_execution::remote::CommandRunner::new(
       // No problem unwrapping here because the global options validation
@@ -181,7 +182,6 @@ impl Core {
       remoting_opts.store_servers.clone(),
       process_execution_metadata.clone(),
       root_ca_certs.clone(),
-      oauth_bearer_token.clone(),
       remoting_opts.execution_headers.clone(),
       store.clone(),
       // TODO if we ever want to configure the remote platform to be something else we
@@ -193,7 +193,7 @@ impl Core {
   }
 
   fn make_command_runner(
-    store: &Store,
+    full_store: &Store,
     remote_store_servers: &[String],
     executor: &Executor,
     local_execution_root_dir: &Path,
@@ -201,20 +201,23 @@ impl Core {
     local_store_dir: &Path,
     process_execution_metadata: &ProcessMetadata,
     root_ca_certs: &Option<Vec<u8>>,
-    oauth_bearer_token: &Option<String>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
   ) -> Result<Box<dyn CommandRunner>, String> {
-    if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
-      && remoting_opts.execution_enable
-    {
-      return Err(
-        "Remote caching mode and remote execution mode cannot be enabled concurrently".into(),
-      );
-    }
+    let remote_caching_used =
+      exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write;
+
+    // If remote caching is used with eager_fetch, we do not want to use the remote store
+    // with the local command runner. This reduces the surface area of where the remote store is
+    // used to only be the remote cache command runner.
+    let store_for_local_runner = if remote_caching_used && remoting_opts.cache_eager_fetch {
+      full_store.clone().into_local_only()
+    } else {
+      full_store.clone()
+    };
 
     let local_command_runner = Core::make_local_execution_runner(
-      store,
+      &store_for_local_runner,
       executor,
       local_execution_root_dir,
       named_caches_dir,
@@ -222,76 +225,57 @@ impl Core {
       &exec_strategy_opts,
     );
 
-    let command_runner: Box<dyn CommandRunner> = if remoting_opts.execution_enable {
-      let remote_command_runner: Box<dyn process_execution::CommandRunner> = {
+    // Possibly either add the remote execution runner or the remote cache runner.
+    // `global_options.py` already validates that both are not set at the same time.
+    let maybe_remote_enabled_command_runner: Box<dyn CommandRunner> =
+      if remoting_opts.execution_enable {
         Box::new(BoundedCommandRunner::new(
           Core::make_remote_execution_runner(
-            store,
+            full_store,
             process_execution_metadata,
             &remoting_opts,
             root_ca_certs,
-            oauth_bearer_token,
           )?,
           exec_strategy_opts.remote_parallelism,
         ))
-      };
-
-      match exec_strategy_opts.speculation_strategy.as_ref() {
-        "local_first" => Box::new(SpeculatingCommandRunner::new(
-          local_command_runner,
-          remote_command_runner,
-          exec_strategy_opts.speculation_delay,
-        )),
-        "remote_first" => Box::new(SpeculatingCommandRunner::new(
-          remote_command_runner,
-          local_command_runner,
-          exec_strategy_opts.speculation_delay,
-        )),
-        "none" => remote_command_runner,
-        _ => unreachable!(),
-      }
-    } else {
-      local_command_runner
-    };
-
-    let maybe_remote_cached_command_runner =
-      if exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write {
+      } else if remote_caching_used {
         let action_cache_address = remote_store_servers
           .first()
-          .ok_or_else(|| "at least one remote store must be specified".to_owned())?;
-
+          .ok_or_else(|| "At least one remote store must be specified".to_owned())?;
         Box::new(process_execution::remote_cache::CommandRunner::new(
-          command_runner.into(),
+          local_command_runner.into(),
           process_execution_metadata.clone(),
-          store.clone(),
+          executor.clone(),
+          full_store.clone(),
           action_cache_address.as_str(),
           root_ca_certs.clone(),
-          oauth_bearer_token.clone(),
-          remoting_opts.execution_headers.clone(),
+          remoting_opts.store_headers.clone(),
           Platform::current()?,
           exec_strategy_opts.remote_cache_read,
           exec_strategy_opts.remote_cache_write,
+          remoting_opts.cache_eager_fetch,
         )?)
       } else {
-        command_runner
+        local_command_runner
       };
 
+    // Possibly use the local cache runner, regardless of remote execution/caching.
     let maybe_local_cached_command_runner = if exec_strategy_opts.use_local_cache {
       let process_execution_store = ShardedLmdb::new(
         local_store_dir.join("processes"),
-        5 * GIGABYTES,
+        2 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
         executor.clone(),
         DEFAULT_LEASE_TIME,
       )
       .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       Box::new(process_execution::cache::CommandRunner::new(
-        maybe_remote_cached_command_runner.into(),
+        maybe_remote_enabled_command_runner.into(),
         process_execution_store,
-        store.clone(),
+        full_store.clone(),
         process_execution_metadata.clone(),
       ))
     } else {
-      maybe_remote_cached_command_runner
+      maybe_remote_enabled_command_runner
     };
 
     Ok(maybe_local_cached_command_runner)
@@ -359,24 +343,6 @@ impl Core {
       None
     };
 
-    // We re-use this token for both the execution and store service; they're generally tied together.
-    let oauth_bearer_token = if let Some(ref path) = remoting_opts.oauth_bearer_token_path {
-      Some(
-        std::fs::read_to_string(path)
-          .map_err(|err| format!("Error reading OAuth bearer token file {:?}: {}", path, err))
-          .map(|v| v.trim_matches(|c| c == '\r' || c == '\n').to_owned())
-          .and_then(|v| {
-            if v.find(|c| c == '\r' || c == '\n').is_some() {
-              Err("OAuth bearer token file must not contain multiple lines".to_string())
-            } else {
-              Ok(v)
-            }
-          })?,
-      )
-    } else {
-      None
-    };
-
     let need_remote_store = remoting_opts.execution_enable
       || exec_strategy_opts.remote_cache_read
       || exec_strategy_opts.remote_cache_write;
@@ -384,20 +350,29 @@ impl Core {
       return Err("Remote store required but none provided".into());
     }
 
-    let store = safe_create_dir_all_ioerror(&local_store_dir)
-      .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
-      .and_then(|_| {
-        Core::make_store(
-          &executor,
-          &local_store_dir,
-          need_remote_store,
-          &remoting_opts,
-          &remote_store_servers,
-          &root_ca_certs,
-          &oauth_bearer_token,
-        )
-      })
-      .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
+    safe_create_dir_all_ioerror(&local_store_dir)
+      .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))?;
+    let full_store = Self::make_store(
+      &executor,
+      &local_store_dir,
+      need_remote_store,
+      &remoting_opts,
+      &remote_store_servers,
+      &root_ca_certs,
+    )
+    .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
+
+    let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
+      && remoting_opts.cache_eager_fetch
+    {
+      // In remote cache mode with eager fetching, the only interaction with the remote CAS
+      // should be through the remote cache code paths. Thus, the store seen by the rest of the
+      // code base should be the local-only store.
+      full_store.clone().into_local_only()
+    } else {
+      // Otherwise, the remote CAS should be visible everywhere.
+      full_store.clone()
+    };
 
     let process_execution_metadata = ProcessMetadata {
       instance_name: remoting_opts.instance_name.clone(),
@@ -405,8 +380,8 @@ impl Core {
       platform_properties: remoting_opts.execution_extra_platform_properties.clone(),
     };
 
-    let command_runner = Core::make_command_runner(
-      &store,
+    let command_runner = Self::make_command_runner(
+      &full_store,
       &remote_store_servers,
       &executor,
       &local_execution_root_dir,
@@ -414,7 +389,6 @@ impl Core {
       &local_store_dir,
       &process_execution_metadata,
       &root_ca_certs,
-      &oauth_bearer_token,
       &exec_strategy_opts,
       &remoting_opts,
     )?;
@@ -422,7 +396,7 @@ impl Core {
     let graph = Arc::new(InvalidatableGraph(Graph::new()));
 
     // These certs are for downloads, not to be confused with the ones used for remoting.
-    let ca_certs = Core::load_certificates(ca_certs_path)?;
+    let ca_certs = Self::load_certificates(ca_certs_path)?;
 
     let http_client_builder = ca_certs
       .iter()
@@ -451,6 +425,8 @@ impl Core {
     let watcher = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
     watcher.start(&graph);
 
+    let sessions = Sessions::new(&executor)?;
+
     Ok(Core {
       graph,
       tasks,
@@ -468,6 +444,7 @@ impl Core {
       build_root,
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
+      sessions,
     })
   }
 

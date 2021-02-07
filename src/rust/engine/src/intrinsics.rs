@@ -10,7 +10,6 @@ use crate::types::Types;
 use crate::Failure;
 
 use fs::RelativePath;
-use futures::compat::Future01CompatExt;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use indexmap::IndexMap;
 use store::{SnapshotOps, SubsetParams};
@@ -141,13 +140,12 @@ fn multi_platform_process_request_to_process_result(
     // TODO: The platform will be used in a followup.
     let _platform_val = &args[1];
 
-    let process_request = MultiPlatformExecuteProcess::lift(&context.core.types, process_val)
-      .map_err(|str| {
-        throw(&format!(
-          "Error lifting MultiPlatformExecuteProcess: {}",
-          str
-        ))
-      })?;
+    let process_request = MultiPlatformExecuteProcess::lift(process_val).map_err(|str| {
+      throw(&format!(
+        "Error lifting MultiPlatformExecuteProcess: {}",
+        str
+      ))
+    })?;
     let result = context.get(process_request).await?.0;
 
     let maybe_stdout = context
@@ -187,7 +185,9 @@ fn multi_platform_process_request_to_process_result(
       context.core.types.process_result,
       &[
         externs::store_bytes(&stdout_bytes),
+        Snapshot::store_file_digest(&context.core, &result.stdout_digest),
         externs::store_bytes(&stderr_bytes),
+        Snapshot::store_file_digest(&context.core, &result.stderr_digest),
         externs::store_i64(result.exit_code.into()),
         Snapshot::store_directory_digest(&result.output_directory).map_err(|s| throw(&s))?,
         externs::unsafe_call(
@@ -205,12 +205,11 @@ fn directory_digest_to_digest_contents(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let digest = lift_directory_digest(&context.core.types, &args[0]).map_err(|s| throw(&s))?;
+    let digest = lift_directory_digest(&args[0]).map_err(|s| throw(&s))?;
     let snapshot = context
       .core
       .store()
       .contents_for_directory(digest)
-      .compat()
       .await
       .and_then(move |digest_contents| Snapshot::store_digest_contents(&context, &digest_contents))
       .map_err(|s| throw(&s))?;
@@ -227,9 +226,8 @@ fn remove_prefix_request_to_digest(
   let store = core.store();
 
   async move {
-    let input_digest =
-      lift_directory_digest(&core.types, &externs::getattr(&args[0], "digest").unwrap())
-        .map_err(|e| throw(&e))?;
+    let input_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
+      .map_err(|e| throw(&e))?;
     let prefix = externs::getattr_as_string(&args[0], "prefix");
     let prefix = RelativePath::new(PathBuf::from(prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
@@ -249,9 +247,8 @@ fn add_prefix_request_to_digest(
   let core = context.core;
   let store = core.store();
   async move {
-    let input_digest =
-      lift_directory_digest(&core.types, &externs::getattr(&args[0], "digest").unwrap())
-        .map_err(|e| throw(&e))?;
+    let input_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
+      .map_err(|e| throw(&e))?;
     let prefix = externs::getattr_as_string(&args[0], "prefix");
     let prefix = RelativePath::new(PathBuf::from(prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
@@ -265,12 +262,11 @@ fn add_prefix_request_to_digest(
 }
 
 fn digest_to_snapshot(context: Context, args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
-  let core = context.core.clone();
   let store = context.core.store();
   async move {
-    let digest = lift_directory_digest(&context.core.types, &args[0])?;
+    let digest = lift_directory_digest(&args[0])?;
     let snapshot = store::Snapshot::from_digest(store, digest).await?;
-    Snapshot::store_snapshot(&core, &snapshot)
+    Snapshot::store_snapshot(snapshot)
   }
   .map_err(|e: String| throw(&e))
   .boxed()
@@ -286,7 +282,7 @@ fn merge_digests_request_to_digest(
     externs::getattr::<Vec<Value>>(&args[0], "digests")
       .unwrap()
       .into_iter()
-      .map(|val: Value| lift_directory_digest(&core.types, &val))
+      .map(|val: Value| lift_directory_digest(&val))
       .collect();
   async move {
     let digest = store
@@ -397,11 +393,8 @@ fn digest_subset_to_digest(
 
   async move {
     let path_globs = Snapshot::lift_prepared_path_globs(&globs).map_err(|e| throw(&e))?;
-    let original_digest = lift_directory_digest(
-      &context.core.types,
-      &externs::getattr(&args[0], "digest").unwrap(),
-    )
-    .map_err(|e| throw(&e))?;
+    let original_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
+      .map_err(|e| throw(&e))?;
     let subset_params = SubsetParams { globs: path_globs };
     let digest = store
       .subset(original_digest, subset_params)

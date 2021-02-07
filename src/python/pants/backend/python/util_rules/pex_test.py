@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
 import os.path
 import textwrap
@@ -11,7 +13,7 @@ from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, cas
 import pytest
 from pkg_resources import Requirement
 
-from pants.backend.python.target_types import PythonInterpreterCompatibility
+from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -214,12 +216,15 @@ def test_interpreter_constraints_do_not_require_python38(constraints):
 
 @dataclass(frozen=True)
 class MockFieldSet(FieldSet):
-    compatibility: PythonInterpreterCompatibility
+    interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
-    def create_for_test(cls, address: Address, compat: Optional[str]) -> "MockFieldSet":
+    def create_for_test(cls, address: Address, compat: Optional[str]) -> MockFieldSet:
         return cls(
-            address=address, compatibility=PythonInterpreterCompatibility(compat, address=address)
+            address=address,
+            interpreter_constraints=InterpreterConstraintsField(
+                [compat] if compat else None, address=address
+            ),
         )
 
 
@@ -280,7 +285,7 @@ class ExactRequirement:
     version: str
 
     @classmethod
-    def parse(cls, requirement: str) -> "ExactRequirement":
+    def parse(cls, requirement: str) -> ExactRequirement:
         req = Requirement.parse(requirement)
         assert len(req.specs) == 1, (
             f"Expected an exact requirement with only 1 specifier, given {requirement} with "
@@ -401,12 +406,11 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
     assert "main.py" in pex_files
     assert "subdir/sub.py" in pex_files
 
-    # We reasonably expect there to be a python interpreter on the test-running process's path.
-    env = {"PATH": os.getenv("PATH", "")}
-
+    # This should run the Pex using the same interpreter used to create it. We must set the `PATH` so that the shebang
+    # works.
     process = Process(
-        argv=("python", "test.pex"),
-        env=env,
+        argv=("./test.pex",),
+        env={"PATH": os.getenv("PATH", "")},
         input_digest=pex_output["pex"].digest,
         description="Run the pex and make sure it works",
     )
@@ -473,23 +477,38 @@ def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
 
 
 def test_requirement_constraints(rule_runner: RuleRunner) -> None:
-    # This is intentionally old; a constraint will resolve us to a more modern version.
-    direct_dep = "requests==1.0.0"
-    constraints = [
-        "requests==2.23.0",
-        "certifi==2019.6.16",
-        "chardet==3.0.2",
-        "idna==2.7",
-        "urllib3==1.25.6",
-    ]
-    rule_runner.create_file("constraints.txt", "\n".join(constraints))
+    direct_deps = ["requests>=1.0.0,<=2.23.0"]
 
-    pex_info = create_pex_and_get_pex_info(
+    def assert_direct_requirements(pex_info):
+        assert set(Requirement.parse(r) for r in pex_info["requirements"]) == set(
+            Requirement.parse(d) for d in direct_deps
+        )
+
+    # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
+    # the range is a transitive closure over universal wheels.
+    direct_pex_info = create_pex_and_get_pex_info(
+        rule_runner, requirements=PexRequirements(direct_deps)
+    )
+    assert_direct_requirements(direct_pex_info)
+    assert {
+        "certifi-2020.12.5-py2.py3-none-any.whl",
+        "chardet-3.0.4-py2.py3-none-any.whl",
+        "idna-2.10-py2.py3-none-any.whl",
+        "requests-2.23.0-py2.py3-none-any.whl",
+        "urllib3-1.25.11-py2.py3-none-any.whl",
+    } == set(direct_pex_info["distributions"].keys())
+
+    constraints = ["requests==2.0.0"]
+    rule_runner.create_file("constraints.txt", "\n".join(constraints))
+    constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
-        requirements=PexRequirements([direct_dep]),
+        requirements=PexRequirements(direct_deps),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )
-    assert set(parse_requirements(pex_info["requirements"])) == set(parse_requirements(constraints))
+    assert_direct_requirements(constrained_pex_info)
+    assert {"requests-2.0.0-py2.py3-none-any.whl"} == set(
+        constrained_pex_info["distributions"].keys()
+    )
 
 
 def test_entry_point(rule_runner: RuleRunner) -> None:

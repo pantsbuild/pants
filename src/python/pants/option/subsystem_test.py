@@ -45,37 +45,6 @@ def si(scope, subsystem_cls):
     return ScopeInfo(scope, subsystem_cls)
 
 
-@pytest.fixture(autouse=True)
-def init_subsystems():
-    DummySubsystem._options = DummyOptions()
-    WorkunitSubscriptableSubsystem._options = DummyOptions()
-
-
-def test_global_instance() -> None:
-    # Verify that we get the same instance back every time.
-    global_instance = DummySubsystem.global_instance()
-    assert global_instance is DummySubsystem.global_instance()
-
-
-def test_scoped_instance() -> None:
-    # Verify that we get the same instance back every time.
-    task = DummyOptionable()
-    task_instance = DummySubsystem.scoped_instance(task)
-    assert task_instance is DummySubsystem.scoped_instance(task)
-
-
-def test_invalid_subsystem_class():
-    class NoScopeSubsystem(Subsystem):
-        pass
-
-    NoScopeSubsystem._options = DummyOptions()
-    with pytest.raises(TypeError) as exc:
-        NoScopeSubsystem.global_instance()
-    assert str(exc.value) == (
-        "Can't instantiate abstract class NoScopeSubsystem with abstract methods options_scope"
-    )
-
-
 def test_scoping_simple() -> None:
     assert {si("dummy", DummySubsystem)} == DummySubsystem.known_scope_infos()
     assert {
@@ -222,29 +191,6 @@ def test_scoping_complex() -> None:
     }
 
 
-def test_uninitialized_global() -> None:
-    Subsystem.reset()
-    with pytest.raises(
-        Subsystem.UninitializedSubsystemError,
-        match=r"UninitializedSubsystem.*uninitialized-scope",
-    ):
-        UninitializedSubsystem.global_instance()
-
-
-def test_uninitialized_scoped_instance() -> None:
-    Subsystem.reset()
-
-    class UninitializedOptional(Optionable):
-        options_scope = "optional"
-
-    optional = UninitializedOptional()
-    with pytest.raises(
-        Subsystem.UninitializedSubsystemError,
-        match=r"UninitializedSubsystem.*uninitialized-scope",
-    ):
-        UninitializedSubsystem.scoped_instance(optional)
-
-
 def test_subsystem_dependencies_iter() -> None:
     class SubsystemB(Subsystem):
         options_scope = "b"
@@ -306,39 +252,3 @@ def test_subsystem_closure_iter_cycle() -> None:
 
     with pytest.raises(Subsystem.CycleException):
         list(SubsystemB.subsystem_closure_iter())
-
-
-def test_get_streaming_workunit_callbacks() -> None:
-    import_str = "pants.option.subsystem_test.WorkunitSubscriptableSubsystem"
-    callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
-    assert len(callables_list) == 1
-
-
-def test_streaming_workunit_callbacks_bad_module(caplog) -> None:
-    import_str = "nonexistent_module.AClassThatDoesntActuallyExist"
-    callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
-    assert len(callables_list) == 0
-    warnings = [record for record in caplog.records if record.levelname == "WARNING"]
-    assert len(warnings) == 1
-    assert "No module named 'nonexistent_module'" in warnings[0].msg
-
-
-def test_streaming_workunit_callbacks_good_module_bad_class(caplog) -> None:
-    import_str = "pants.option.subsystem_test.ANonexistentClass"
-    callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
-    assert len(callables_list) == 0
-    warnings = [record for record in caplog.records if record.levelname == "WARNING"]
-    assert len(warnings) == 1
-    assert (
-        "module 'pants.option.subsystem_test' has no attribute 'ANonexistentClass'"
-        in warnings[0].msg
-    )
-
-
-def test_streaming_workunit_callbacks_with_invalid_subsystem(caplog) -> None:
-    import_str = "pants.option.subsystem_test.DummySubsystem"
-    callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
-    assert len(callables_list) == 0
-    warnings = [record for record in caplog.records if record.levelname == "WARNING"]
-    assert len(warnings) == 1
-    assert "does not have a method named `handle_workunits` defined" in warnings[0].msg

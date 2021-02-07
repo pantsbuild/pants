@@ -5,7 +5,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 edition = "2018"
 
 [dependencies]
-bytes = "0.4.5"
+bytes = "0.5"
 fs = { path = "../fs" }
 futures = "0.3"
 hashing = { path = "../hashing" }

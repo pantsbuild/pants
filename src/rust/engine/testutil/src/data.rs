@@ -1,4 +1,5 @@
-use protobuf::Message;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use grpc_util::prost::MessageExt;
 
 #[derive(Clone)]
 pub struct TestData {
@@ -36,11 +37,11 @@ impl TestData {
   }
 
   pub fn bytes(&self) -> bytes::Bytes {
-    bytes::Bytes::from(self.string.as_str())
+    bytes::Bytes::copy_from_slice(self.string.as_str().as_bytes())
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
-    self.digest().0
+    self.digest().hash
   }
 
   pub fn digest(&self) -> hashing::Digest {
@@ -57,13 +58,13 @@ impl TestData {
 }
 
 pub struct TestDirectory {
-  pub directory: bazel_protos::remote_execution::Directory,
+  pub directory: remexec::Directory,
 }
 
 impl TestDirectory {
   pub fn empty() -> TestDirectory {
     TestDirectory {
-      directory: bazel_protos::remote_execution::Directory::new(),
+      directory: remexec::Directory::default(),
     }
   }
 
@@ -71,13 +72,13 @@ impl TestDirectory {
   //
   // /falcons/
   pub fn containing_falcons_dir() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_directories().push({
-      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
-      subdir.set_name("falcons".to_string());
-      subdir.set_digest((&TestDirectory::empty().digest()).into());
-      subdir
-    });
+    let directory = remexec::Directory {
+      directories: vec![remexec::DirectoryNode {
+        name: "falcons".to_string(),
+        digest: Some((&TestDirectory::empty().digest()).into()),
+      }],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -86,19 +87,19 @@ impl TestDirectory {
   // birds/falcons/
   // cats/roland
   pub fn nested_dir_and_file() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_directories().push({
-      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
-      subdir.set_name("birds".to_string());
-      subdir.set_digest((&TestDirectory::containing_falcons_dir().digest()).into());
-      subdir
-    });
-    directory.mut_directories().push({
-      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
-      subdir.set_name("cats".to_string());
-      subdir.set_digest((&TestDirectory::containing_roland().digest()).into());
-      subdir
-    });
+    let directory = remexec::Directory {
+      directories: vec![
+        remexec::DirectoryNode {
+          name: "birds".to_string(),
+          digest: Some(TestDirectory::containing_falcons_dir().digest().into()),
+        },
+        remexec::DirectoryNode {
+          name: "cats".to_string(),
+          digest: Some((TestDirectory::containing_roland().digest()).into()),
+        },
+      ],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -107,13 +108,13 @@ impl TestDirectory {
   // animals/birds/falcons/
   // animals/cats/roland
   pub fn double_nested_dir_and_file() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_directories().push({
-      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
-      subdir.set_name("animals".to_string());
-      subdir.set_digest((&TestDirectory::nested_dir_and_file().digest()).into());
-      subdir
-    });
+    let directory = remexec::Directory {
+      directories: vec![remexec::DirectoryNode {
+        name: "animals".to_string(),
+        digest: Some((&TestDirectory::nested_dir_and_file().digest()).into()),
+      }],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -121,14 +122,15 @@ impl TestDirectory {
   //
   // /roland
   pub fn containing_roland() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name("roland".to_owned());
-      file.set_digest((&TestData::roland().digest()).into());
-      file.set_is_executable(false);
-      file
-    });
+    let directory = remexec::Directory {
+      files: vec![remexec::FileNode {
+        name: "roland".to_owned(),
+        digest: Some((&TestData::roland().digest()).into()),
+        is_executable: false,
+        ..remexec::FileNode::default()
+      }],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -136,14 +138,15 @@ impl TestDirectory {
   //
   // /robin
   pub fn containing_robin() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name("robin".to_owned());
-      file.set_digest((&TestData::robin().digest()).into());
-      file.set_is_executable(false);
-      file
-    });
+    let directory = remexec::Directory {
+      files: vec![remexec::FileNode {
+        name: "robin".to_owned(),
+        digest: Some((&TestData::robin().digest()).into()),
+        is_executable: false,
+        ..remexec::FileNode::default()
+      }],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -151,14 +154,15 @@ impl TestDirectory {
   //
   // /treats
   pub fn containing_treats() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name("treats".to_owned());
-      file.set_digest((&TestData::catnip().digest()).into());
-      file.set_is_executable(false);
-      file
-    });
+    let directory = remexec::Directory {
+      files: vec![remexec::FileNode {
+        name: "treats".to_owned(),
+        digest: Some((&TestData::catnip().digest()).into()),
+        is_executable: false,
+        ..remexec::FileNode::default()
+      }],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -166,13 +170,13 @@ impl TestDirectory {
   //
   // /cats/roland
   pub fn nested() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_directories().push({
-      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
-      subdir.set_name("cats".to_string());
-      subdir.set_digest((&TestDirectory::containing_roland().digest()).into());
-      subdir
-    });
+    let directory = remexec::Directory {
+      directories: vec![remexec::DirectoryNode {
+        name: "cats".to_owned(),
+        digest: Some((&TestDirectory::containing_roland().digest()).into()),
+      }],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -180,13 +184,13 @@ impl TestDirectory {
   //
   // /pets/cats/roland
   pub fn double_nested() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_directories().push({
-      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
-      subdir.set_name("pets".to_string());
-      subdir.set_digest((&TestDirectory::nested().digest()).into());
-      subdir
-    });
+    let directory = remexec::Directory {
+      directories: vec![remexec::DirectoryNode {
+        name: "pets".to_owned(),
+        digest: Some((&TestDirectory::nested().digest()).into()),
+      }],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -194,14 +198,15 @@ impl TestDirectory {
   //
   // /dnalor
   pub fn containing_dnalor() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name("dnalor".to_owned());
-      file.set_digest((&TestData::roland().digest()).into());
-      file.set_is_executable(false);
-      file
-    });
+    let directory = remexec::Directory {
+      files: vec![remexec::FileNode {
+        name: "dnalor".to_owned(),
+        digest: Some((&TestData::roland().digest()).into()),
+        is_executable: false,
+        ..remexec::FileNode::default()
+      }],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -209,14 +214,15 @@ impl TestDirectory {
   //
   // /roland
   pub fn containing_wrong_roland() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name("roland".to_owned());
-      file.set_digest((&TestData::catnip().digest()).into());
-      file.set_is_executable(false);
-      file
-    });
+    let directory = remexec::Directory {
+      files: vec![remexec::FileNode {
+        name: "roland".to_owned(),
+        digest: Some((&TestData::catnip().digest()).into()),
+        is_executable: false,
+        ..remexec::FileNode::default()
+      }],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -225,21 +231,23 @@ impl TestDirectory {
   // /roland
   // /treats
   pub fn containing_roland_and_treats() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name("roland".to_owned());
-      file.set_digest((&TestData::roland().digest()).into());
-      file.set_is_executable(false);
-      file
-    });
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name("treats".to_owned());
-      file.set_digest((&TestData::catnip().digest()).into());
-      file.set_is_executable(false);
-      file
-    });
+    let directory = remexec::Directory {
+      files: vec![
+        remexec::FileNode {
+          name: "roland".to_owned(),
+          digest: Some((&TestData::roland().digest()).into()),
+          is_executable: false,
+          ..remexec::FileNode::default()
+        },
+        remexec::FileNode {
+          name: "treats".to_owned(),
+          digest: Some((&TestData::catnip().digest()).into()),
+          is_executable: false,
+          ..remexec::FileNode::default()
+        },
+      ],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -248,20 +256,18 @@ impl TestDirectory {
   // /cats/roland
   // /treats
   pub fn recursive() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_directories().push({
-      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
-      subdir.set_name("cats".to_string());
-      subdir.set_digest((&TestDirectory::containing_roland().digest()).into());
-      subdir
-    });
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name("treats".to_string());
-      file.set_digest((&TestData::catnip().digest()).into());
-      file.set_is_executable(false);
-      file
-    });
+    let directory = remexec::Directory {
+      directories: vec![remexec::DirectoryNode {
+        name: "cats".to_owned(),
+        digest: Some((&TestDirectory::containing_roland().digest()).into()),
+      }],
+      files: vec![remexec::FileNode {
+        name: "treats".to_owned(),
+        digest: Some((&TestData::catnip().digest()).into()),
+        ..remexec::FileNode::default()
+      }],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
@@ -270,39 +276,36 @@ impl TestDirectory {
   // /feed (executable)
   // /food
   pub fn with_mixed_executable_files() -> TestDirectory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name("feed".to_string());
-      file.set_digest((&TestData::catnip().digest()).into());
-      file.set_is_executable(true);
-      file
-    });
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name("food".to_string());
-      file.set_digest((&TestData::catnip().digest()).into());
-      file.set_is_executable(false);
-      file
-    });
+    let directory = remexec::Directory {
+      files: vec![
+        remexec::FileNode {
+          name: "feed".to_owned(),
+          digest: Some((&TestData::catnip().digest()).into()),
+          is_executable: true,
+          ..remexec::FileNode::default()
+        },
+        remexec::FileNode {
+          name: "food".to_owned(),
+          digest: Some((&TestData::catnip().digest()).into()),
+          is_executable: false,
+          ..remexec::FileNode::default()
+        },
+      ],
+      ..remexec::Directory::default()
+    };
     TestDirectory { directory }
   }
 
-  pub fn directory(&self) -> bazel_protos::remote_execution::Directory {
+  pub fn directory(&self) -> remexec::Directory {
     self.directory.clone()
   }
 
   pub fn bytes(&self) -> bytes::Bytes {
-    bytes::Bytes::from(
-      self
-        .directory
-        .write_to_bytes()
-        .expect("Error serializing proto"),
-    )
+    self.directory.to_bytes()
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
-    self.digest().0
+    self.digest().hash
   }
 
   pub fn digest(&self) -> hashing::Digest {
@@ -311,7 +314,7 @@ impl TestDirectory {
 }
 
 pub struct TestTree {
-  pub tree: bazel_protos::remote_execution::Tree,
+  pub tree: remexec::Tree,
 }
 
 impl TestTree {
@@ -326,11 +329,11 @@ impl TestTree {
 
 impl TestTree {
   pub fn bytes(&self) -> bytes::Bytes {
-    bytes::Bytes::from(self.tree.write_to_bytes().expect("Error serializing proto"))
+    self.tree.to_bytes()
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
-    self.digest().0
+    self.digest().hash
   }
 
   pub fn digest(&self) -> hashing::Digest {
@@ -340,8 +343,10 @@ impl TestTree {
 
 impl From<TestDirectory> for TestTree {
   fn from(dir: TestDirectory) -> Self {
-    let mut tree = bazel_protos::remote_execution::Tree::new();
-    tree.set_root(dir.directory);
+    let tree = remexec::Tree {
+      root: Some(dir.directory),
+      ..remexec::Tree::default()
+    };
     TestTree { tree }
   }
 }

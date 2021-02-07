@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import os
 import sys
@@ -12,12 +14,14 @@ from typing import Any, Iterator
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink, SignalHandler
+from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import GraphScheduler
-from pants.init.logging import setup_logging, setup_logging_to_file, setup_warning_filtering
+from pants.init.logging import setup_logging, setup_logging_to_file
 from pants.init.options_initializer import OptionsInitializer
+from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -44,20 +48,23 @@ class PantsDaemon(PantsDaemonProcessManager):
         """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
     @classmethod
-    def create(cls, options_bootstrapper: OptionsBootstrapper) -> "PantsDaemon":
-
+    def create(cls, options_bootstrapper: OptionsBootstrapper) -> PantsDaemon:
+        # Any warnings that would be triggered here are re-triggered later per-run of Pants, so we
+        # silence them.
         with warnings.catch_warnings(record=True):
             bootstrap_options = options_bootstrapper.bootstrap_options
             bootstrap_options_values = bootstrap_options.for_global_scope()
 
-        setup_warning_filtering(bootstrap_options_values.ignore_pants_warnings or [])
-
         native = Native()
         native.override_thread_logging_destination_to_just_pantsd()
 
-        core = PantsDaemonCore(cls._setup_services)
+        executor = PyExecutor(
+            *OptionsInitializer.compute_executor_arguments(bootstrap_options_values)
+        )
+        core = PantsDaemonCore(executor, cls._setup_services)
 
         server = native.new_nailgun_server(
+            executor,
             bootstrap_options_values.pantsd_pailgun_port,
             DaemonPantsRunner(core),
         )
@@ -170,24 +177,20 @@ class PantsDaemon(PantsDaemonProcessManager):
             self._logger.debug("Logging reinitialized in pantsd context")
             yield
 
-    def _write_nailgun_port(self):
-        """Write the nailgun port to a well known file."""
-        self.write_socket(self._server.port())
+    def _initialize_metadata(self) -> None:
+        """Writes out our pid and other metadata.
 
-    def _initialize_pid(self):
-        """Writes out our pid and metadata.
-
-        Once written, does a one-time read of the pid to confirm that we haven't raced another
-        process starting.
+        Order matters a bit here, because technically all that is necessary to connect is the port,
+        and Services are lazily initialized by the core when a connection is established. Our pid
+        needs to be on disk before that happens.
         """
 
         # Write the pidfile. The SchedulerService will monitor it after a grace period.
-        pid = os.getpid()
-        self._logger.debug(f"pantsd running with PID: {pid}")
-        self.write_pid(pid=pid)
-        self.write_metadata_by_name(
-            "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)
-        )
+        self.write_pid()
+        self.write_process_name()
+        self.write_fingerprint(ensure_text(self.options_fingerprint))
+        self._logger.debug(f"pantsd running with PID: {self.pid}")
+        self.write_socket(self._server.port())
 
     def run_sync(self):
         """Synchronously run pantsd."""
@@ -196,24 +199,18 @@ class PantsDaemon(PantsDaemonProcessManager):
         # Switch log output to the daemon's log stream from here forward.
         self._close_stdio()
         with self._pantsd_logging():
-
-            ExceptionSink.reset_signal_handler(SignalHandler(pantsd_instance=True))
-
-            # Reset the log location and the backtrace preference from the global bootstrap options.
+            # Install signal handling based on global bootstrap options.
             global_bootstrap_options = self._bootstrap_options.for_global_scope()
-            ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
+            ExceptionSink.install(
+                log_location=init_workdir(global_bootstrap_options), pantsd_instance=True
+            )
 
             self._native.set_panic_handler()
 
             # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
             set_process_title(f"pantsd [{self._build_root}]")
 
-            # Write our pid and the server's port to .pids. Order matters a bit here, because
-            # technically all that is necessary to connect is the port, and Services are lazily
-            # initialized by the core when a connection is established. Our pid needs to be on
-            # disk before that happens.
-            self._initialize_pid()
-            self._write_nailgun_port()
+            self._initialize_metadata()
 
             # Check periodically whether the core is valid, and exit if it is not.
             while self._core.is_valid():

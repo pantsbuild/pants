@@ -26,6 +26,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
             typ=bool,
             default=None,
             help="help for foo",
+            deprecation_active=False,
             deprecated_message=None,
             removal_version=None,
             removal_hint=None,

@@ -22,13 +22,13 @@ files(
 )
 
 files(
-  name = 'no_build_file_directory',
-  sources = ['no_build_file/**/*'],
+  name = 'hello_directory',
+  sources = ['hello/**/*'],
 )
 
 files(
-  name = 'plugins_directory',
-  sources = ['plugins/**/*'],
+  name = 'no_build_file_directory',
+  sources = ['no_build_file/**/*'],
 )
 
 files(

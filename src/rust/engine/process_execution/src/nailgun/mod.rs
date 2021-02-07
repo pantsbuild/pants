@@ -3,18 +3,17 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
-use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
+use nails::execution::{self, child_channel, ChildInput, Command};
 use tokio::net::TcpStream;
 
-use crate::local::CapturedWorkdir;
+use crate::local::{CapturedWorkdir, ChildOutput};
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform,
-  PlatformConstraint, Process, ProcessMetadata,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
+  ProcessCacheScope, ProcessMetadata,
 };
 
 #[cfg(test)]
@@ -44,7 +43,7 @@ fn construct_nailgun_server_request(
   nailgun_name: &str,
   args_for_the_jvm: Vec<String>,
   jdk: PathBuf,
-  platform_constraint: PlatformConstraint,
+  platform_constraint: Option<Platform>,
 ) -> Process {
   let mut full_args = args_for_the_jvm;
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
@@ -62,10 +61,10 @@ fn construct_nailgun_server_request(
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: Some(jdk),
-    target_platform: platform_constraint,
+    platform_constraint,
     is_nailgunnable: true,
     execution_slot_variable: None,
-    cache_failures: false,
+    cache_scope: ProcessCacheScope::Never,
   }
 }
 
@@ -213,8 +212,12 @@ impl CapturedWorkdir for CommandRunner {
       .jdk_home
       .clone()
       .ok_or("JDK home must be specified for all nailgunnable requests.")?;
-    let nailgun_req =
-      construct_nailgun_server_request(&nailgun_name, nailgun_args, jdk_home, req.target_platform);
+    let nailgun_req = construct_nailgun_server_request(
+      &nailgun_name,
+      nailgun_args,
+      jdk_home,
+      req.platform_constraint,
+    );
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
     let nailgun_req_digest = crate::digest(
@@ -228,26 +231,20 @@ impl CapturedWorkdir for CommandRunner {
     let build_id = context.build_id;
     let store = self.inner.store.clone();
 
-    // Streams to read child output from
-    let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
-    let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
-
-    let nails_command = self
+    let mut child = self
       .async_semaphore
       .clone()
       .with_acquired(move |_id| {
         // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
-        nailgun_pool
-          .connect(
-            nailgun_name.clone(),
-            nailgun_req,
-            workdir_for_this_nailgun,
-            nailgun_req_digest,
-            build_id,
-            store,
-            req.input_files,
-          )
-          .compat()
+        nailgun_pool.connect(
+          nailgun_name.clone(),
+          nailgun_req,
+          workdir_for_this_nailgun,
+          nailgun_req_digest,
+          build_id,
+          store,
+          req.input_files,
+        )
       })
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))
@@ -270,18 +267,28 @@ impl CapturedWorkdir for CommandRunner {
         debug!("Connecting to server at {}...", addr);
         TcpStream::connect(addr)
           .and_then(move |stream| {
-            nails::client_handle_connection(
-              nails::Config::default(),
-              stream,
-              cmd,
-              stdio_write,
-              stdin_read,
-            )
+            nails::client::handle_connection(nails::Config::default(), stream, cmd, async {
+              let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
+              stdin_read
+            })
           })
           .map_err(|e| format!("Error communicating with server: {}", e))
-          .map_ok(ChildOutput::Exit)
-      });
+      })
+      .await?;
 
-    Ok(futures::stream::select(stdio_read.map(Ok), nails_command.into_stream()).boxed())
+    let output_stream = child
+      .output_stream
+      .take()
+      .unwrap()
+      .map(|output| match output {
+        execution::ChildOutput::Stdout(bytes) => Ok(ChildOutput::Stdout(bytes)),
+        execution::ChildOutput::Stderr(bytes) => Ok(ChildOutput::Stderr(bytes)),
+      });
+    let exit_code = child
+      .wait()
+      .map_ok(ChildOutput::Exit)
+      .map_err(|e| format!("Error communicating with server: {}", e));
+
+    Ok(futures::stream::select(output_stream, exit_code.into_stream()).boxed())
   }
 }

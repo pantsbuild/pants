@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from typing import Any, ClassVar, Iterable, Tuple, TypeVar, Union, cast, overload
 
 from pants.util.ordered_set import FrozenOrderedSet
@@ -28,7 +30,7 @@ class Collection(Tuple[T, ...]):
         ...
 
     @overload  # noqa: F811
-    def __getitem__(self, index: slice) -> "Collection[T]":
+    def __getitem__(self, index: slice) -> Collection[T]:
         ...
 
     def __getitem__(self, index: Union[int, slice]) -> Union[T, "Collection[T]"]:  # noqa: F811
@@ -76,7 +78,9 @@ class DeduplicatedCollection(FrozenOrderedSet[T]):
     sort_input: ClassVar[bool] = False
 
     def __init__(self, iterable: Iterable[T] = ()) -> None:
-        super().__init__(iterable if not self.sort_input else sorted(iterable))
+        super().__init__(
+            iterable if not self.sort_input else sorted(iterable)  # type: ignore[type-var]
+        )
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({list(self._items)})"

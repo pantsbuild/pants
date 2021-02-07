@@ -27,9 +27,8 @@ class DependencyType(Enum):
 
 
 class DependenciesSubsystem(LineOriented, GoalSubsystem):
-    """List the dependencies of the input files/targets."""
-
     name = "dependencies"
+    help = "List the dependencies of the input files/targets."
 
     @classmethod
     def register_options(cls, register):

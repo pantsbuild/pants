@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import logging
 from abc import ABC, ABCMeta
@@ -19,12 +21,13 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
+from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
+    NoApplicableTargetsBehavior,
     Sources,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -40,17 +43,26 @@ logger = logging.getLogger(__name__)
 class TestResult:
     exit_code: Optional[int]
     stdout: str
+    stdout_digest: FileDigest
     stderr: str
+    stderr_digest: FileDigest
     address: Address
-    coverage_data: Optional["CoverageData"] = None
+    coverage_data: Optional[CoverageData] = None
     xml_results: Optional[Snapshot] = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
     @classmethod
-    def skip(cls, address: Address) -> "TestResult":
-        return cls(exit_code=None, stdout="", stderr="", address=address)
+    def skip(cls, address: Address) -> TestResult:
+        return cls(
+            exit_code=None,
+            stdout="",
+            stderr="",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            address=address,
+        )
 
     @classmethod
     def from_fallible_process_result(
@@ -58,28 +70,19 @@ class TestResult:
         process_result: FallibleProcessResult,
         address: Address,
         *,
-        coverage_data: Optional["CoverageData"] = None,
+        coverage_data: Optional[CoverageData] = None,
         xml_results: Optional[Snapshot] = None,
-    ) -> "TestResult":
+    ) -> TestResult:
         return cls(
             exit_code=process_result.exit_code,
             stdout=process_result.stdout.decode(),
+            stdout_digest=process_result.stdout_digest,
             stderr=process_result.stderr.decode(),
+            stderr_digest=process_result.stderr_digest,
             address=address,
             coverage_data=coverage_data,
             xml_results=xml_results,
         )
-
-
-@dataclass(frozen=True)
-class EnrichedTestResult(EngineAwareReturnType):
-    exit_code: Optional[int]
-    stdout: str
-    stderr: str
-    address: Address
-    output_setting: "ShowOutput"
-    coverage_data: Optional["CoverageData"] = None
-    xml_results: Optional[Snapshot] = None
 
     @property
     def skipped(self) -> bool:
@@ -91,10 +94,46 @@ class EnrichedTestResult(EngineAwareReturnType):
             and not self.xml_results
         )
 
-    def artifacts(self) -> Optional[Dict[str, Snapshot]]:
-        if not self.xml_results:
-            return None
-        return {"xml_results": self.xml_results}
+    def __lt__(self, other: Union[Any, EnrichedTestResult]) -> bool:
+        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
+        each group."""
+        if not isinstance(other, EnrichedTestResult):
+            return NotImplemented
+        if self.exit_code == other.exit_code:
+            return self.address.spec < other.address.spec
+        if self.exit_code is None:
+            return True
+        if other.exit_code is None:
+            return False
+        return self.exit_code < other.exit_code
+
+
+class ShowOutput(Enum):
+    """Which tests to emit detailed output for."""
+
+    ALL = "all"
+    FAILED = "failed"
+    NONE = "none"
+
+
+@dataclass(frozen=True)
+class EnrichedTestResult(TestResult, EngineAwareReturnType):
+    """A `TestResult` that is enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `TestResult`, and a rule will upcast those into
+    `EnrichedTestResult`.
+    """
+
+    output_setting: ShowOutput = ShowOutput.ALL
+
+    def artifacts(self) -> Optional[Dict[str, Union[FileDigest, Snapshot]]]:
+        output: Dict[str, Union[FileDigest, Snapshot]] = {
+            "stdout": self.stdout_digest,
+            "stderr": self.stderr_digest,
+        }
+        if self.xml_results:
+            output["xml_results"] = self.xml_results
+        return output
 
     def level(self) -> LogLevel:
         if self.skipped:
@@ -119,18 +158,8 @@ class EnrichedTestResult(EngineAwareReturnType):
             output = f"{output.rstrip()}\n\n"
         return f"{message}{output}"
 
-    def __lt__(self, other: Union[Any, "EnrichedTestResult"]) -> bool:
-        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
-        each group."""
-        if not isinstance(other, EnrichedTestResult):
-            return NotImplemented
-        if self.exit_code == other.exit_code:
-            return self.address.spec < other.address.spec
-        if self.exit_code is None:
-            return True
-        if other.exit_code is None:
-            return False
-        return self.exit_code < other.exit_code
+    def metadata(self) -> Dict[str, Any]:
+        return {"address": self.address.spec}
 
 
 @dataclass(frozen=True)
@@ -228,8 +257,8 @@ class CoverageReports(EngineAwareReturnType):
                 report_paths.append(report_path)
         return tuple(report_paths)
 
-    def artifacts(self) -> Optional[Dict[str, Snapshot]]:
-        artifacts = {}
+    def artifacts(self) -> Optional[Dict[str, Union[Snapshot, FileDigest]]]:
+        artifacts: Dict[str, Union[Snapshot, FileDigest]] = {}
         for report in self.reports:
             artifact = report.get_artifact()
             if not artifact:
@@ -238,18 +267,9 @@ class CoverageReports(EngineAwareReturnType):
         return artifacts or None
 
 
-class ShowOutput(Enum):
-    """Which tests to emit detailed output for."""
-
-    ALL = "all"
-    FAILED = "failed"
-    NONE = "none"
-
-
 class TestSubsystem(GoalSubsystem):
-    """Run tests."""
-
     name = "test"
+    help = "Run tests."
 
     required_union_implementations = (TestFieldSet,)
 
@@ -332,11 +352,6 @@ class TestSubsystem(GoalSubsystem):
         return cast(bool, self.options.open_coverage)
 
 
-@dataclass(frozen=True)
-class TestExtraEnv:
-    env: FrozenDict[str, str]
-
-
 class Test(Goal):
     subsystem_cls = TestSubsystem
 
@@ -355,7 +370,9 @@ async def run_tests(
         targets_to_valid_field_sets = await Get(
             TargetRootsToFieldSets,
             TargetRootsToFieldSetsRequest(
-                TestFieldSet, goal_description="`test --debug`", error_if_no_applicable_targets=True
+                TestFieldSet,
+                goal_description="`test --debug`",
+                no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
             ),
         )
         debug_requests = await MultiGet(
@@ -376,7 +393,7 @@ async def run_tests(
         TargetRootsToFieldSetsRequest(
             TestFieldSet,
             goal_description=f"the `{test_subsystem.name}` goal",
-            error_if_no_applicable_targets=False,
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
         ),
     )
     field_sets_with_sources = await Get(
@@ -448,6 +465,11 @@ async def run_tests(
     return Test(exit_code)
 
 
+@dataclass(frozen=True)
+class TestExtraEnv:
+    env: FrozenDict[str, str]
+
+
 @rule
 def get_filtered_environment(
     test_subsystem: TestSubsystem, pants_env: PantsEnvironment
@@ -460,14 +482,18 @@ def get_filtered_environment(
     return TestExtraEnv(env)
 
 
-@rule(desc="Run tests")
+# NB: We mark this uncachable to ensure that the results are always streamed, even if the
+# underlying TestResult is memoized. This rule is very cheap, so there's little performance hit.
+@_uncacheable_rule(desc="test")
 def enrich_test_result(
     test_result: TestResult, test_subsystem: TestSubsystem
 ) -> EnrichedTestResult:
     return EnrichedTestResult(
         exit_code=test_result.exit_code,
         stdout=test_result.stdout,
+        stdout_digest=test_result.stdout_digest,
         stderr=test_result.stderr,
+        stderr_digest=test_result.stderr_digest,
         address=test_result.address,
         coverage_data=test_result.coverage_data,
         xml_results=test_result.xml_results,

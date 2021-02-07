@@ -11,7 +11,6 @@ from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
-from pants.backend.python.typecheck.mypy.plugin_target_type import MyPySourcePlugin
 from pants.backend.python.typecheck.mypy.rules import (
     MyPyFieldSet,
     MyPyRequest,
@@ -40,7 +39,7 @@ def rule_runner() -> RuleRunner:
             *dependency_inference_rules.rules(),  # Used for import inference.
             QueryRule(TypecheckResults, (MyPyRequest,)),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary, MyPySourcePlugin],
+        target_types=[PythonLibrary, PythonRequirementLibrary],
     )
 
 
@@ -106,7 +105,7 @@ def make_target(
             python_library(
                 name={repr(name)},
                 sources={source_globs},
-                compatibility={repr(interpreter_constraints)},
+                interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
             )
             """
         ),
@@ -245,8 +244,7 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
         ),
     )
     # We hijack `--mypy-source-plugins` for our settings.py file to ensure that it is always used,
-    # even if the files we're checking don't need it. Typically, this option expects
-    # `mypy_source_plugin` targets, but that's not actually validated. We only want this specific
+    # even if the files we're checking don't need it. We only want this specific
     # file to be permanently included, not the whole original target, so we will use a file address.
     rule_runner.create_file(
         f"{PACKAGE}/settings.py",
@@ -447,7 +445,9 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    rule_runner.add_to_build_file(f"{PACKAGE}/py2", "python_library(compatibility='==2.7.*')")
+    rule_runner.add_to_build_file(
+        f"{PACKAGE}/py2", "python_library(interpreter_constraints=['==2.7.*'])"
+    )
 
     rule_runner.create_file(f"{PACKAGE}/py3/__init__.py")
     rule_runner.create_file(
@@ -459,7 +459,9 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    rule_runner.add_to_build_file(f"{PACKAGE}/py3", "python_library(compatibility='>=3.6')")
+    rule_runner.add_to_build_file(
+        f"{PACKAGE}/py3", "python_library(interpreter_constraints=['>=3.6'])"
+    )
 
     # Our input files belong to the same target, which is compatible with both Py2 and Py3.
     rule_runner.create_file(f"{PACKAGE}/__init__.py")
@@ -469,13 +471,15 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     rule_runner.create_file(
         f"{PACKAGE}/uses_py3.py", "from project.py3.lib import add\nassert add(2, 2) == 4\n"
     )
-    rule_runner.add_to_build_file(PACKAGE, "python_library(compatibility=['==2.7.*', '>=3.6'])")
+    rule_runner.add_to_build_file(
+        PACKAGE, "python_library(interpreter_constraints=['==2.7.*', '>=3.6'])"
+    )
     py2_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
     py3_target = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py3.py"))
 
     result = run_mypy(rule_runner, [py2_target, py3_target])
     assert len(result) == 2
-    py2_result, py3_result = sorted(result, key=lambda res: res.partition_description)
+    py2_result, py3_result = sorted(result, key=lambda res: res.partition_description or "")
 
     assert py2_result.exit_code == 0
     assert py2_result.partition_description == "['CPython==2.7.*', 'CPython==2.7.*,>=3.6']"
@@ -596,7 +600,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             """\
             python_requirement_library(
                 name='mypy',
-                requirements=['mypy==0.782'],
+                requirements=['mypy==0.800'],
             )
 
             python_requirement_library(
@@ -659,17 +663,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    rule_runner.add_to_build_file(
-        "pants-plugins/plugins",
-        dedent(
-            """\
-            mypy_source_plugin(
-                name='change_return_type',
-                sources=['change_return_type.py'],
-            )
-            """
-        ),
-    )
+    rule_runner.add_to_build_file("pants-plugins/plugins", "python_library()")
 
     config_content = dedent(
         """\
@@ -699,7 +693,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             rule_runner,
             [tgt],
             additional_args=[
-                "--mypy-source-plugins=['pants-plugins/plugins:change_return_type']",
+                "--mypy-source-plugins=['pants-plugins/plugins']",
                 "--source-root-patterns=['pants-plugins', 'src/python']",
             ],
             config=config_content,
@@ -717,9 +711,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     assert "(checked 2 source files)" in result.stdout
 
     # We also want to ensure that running MyPy on the plugin itself still works.
-    plugin_tgt = rule_runner.get_target(
-        Address("pants-plugins/plugins", target_name="change_return_type")
-    )
+    plugin_tgt = rule_runner.get_target(Address("pants-plugins/plugins"))
     result = run_mypy_with_plugin(plugin_tgt)
     assert result.exit_code == 0
     assert "Success: no issues found in 7 source files" in result.stdout

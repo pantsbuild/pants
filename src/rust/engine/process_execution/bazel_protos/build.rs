@@ -1,246 +1,35 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::path::{Path, PathBuf};
+use prost_build::Config;
 
-use build_utils::BuildRoot;
-use std::collections::HashSet;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  let mut config = Config::new();
+  config.bytes(&["."]);
 
-fn main() {
-  let build_root = BuildRoot::find().unwrap();
-  let thirdpartyprotobuf = build_root.join("3rdparty/protobuf");
-  mark_dir_as_rerun_trigger(&thirdpartyprotobuf);
+  tonic_build::configure()
+    .build_client(true)
+    .build_server(true)
+    .compile_with_config(
+      config,
+      &[
+        "protos/bazelbuild_remote-apis/build/bazel/remote/execution/v2/remote_execution.proto",
+        "protos/bazelbuild_remote-apis/build/bazel/semver/semver.proto",
+        "protos/buildbarn/cas.proto",
+        "protos/googleapis/google/bytestream/bytestream.proto",
+        "protos/googleapis/google/rpc/code.proto",
+        "protos/googleapis/google/rpc/error_details.proto",
+        "protos/googleapis/google/rpc/status.proto",
+        "protos/googleapis/google/longrunning/operations.proto",
+        "protos/standard/google/protobuf/empty.proto",
+      ],
+      &[
+        "protos/bazelbuild_remote-apis",
+        "protos/buildbarn",
+        "protos/googleapis",
+        "protos/standard",
+      ],
+    )?;
 
-  let grpcio_output_dir = PathBuf::from("src/gen");
-  replace_if_changed(&grpcio_output_dir, |path| {
-    generate_for_grpcio(&thirdpartyprotobuf, path);
-  });
-
-  let tower_output_dir = PathBuf::from("src/gen_for_tower");
-  replace_if_changed(&tower_output_dir, |path| {
-    generate_for_tower(&thirdpartyprotobuf, path);
-  });
-
-  // Re-gen if, say, someone does a git clean on the gen dir but not the target dir. This ensures
-  // generated sources are available for reading by programmers and tools like rustfmt alike.
-  mark_dir_as_rerun_trigger(&grpcio_output_dir);
-  mark_dir_as_rerun_trigger(&tower_output_dir);
-}
-
-fn generate_for_grpcio(thirdpartyprotobuf: &Path, gen_dir: &Path) {
-  let amended_proto_root =
-    add_rustproto_header(&thirdpartyprotobuf).expect("Error adding proto bytes header");
-
-  protoc_grpcio::compile_grpc_protos(
-    &[
-      "build/bazel/remote/execution/v2/remote_execution.proto",
-      "build/bazel/semver/semver.proto",
-      "google/bytestream/bytestream.proto",
-      "google/rpc/code.proto",
-      "google/rpc/error_details.proto",
-      "google/rpc/status.proto",
-      "google/longrunning/operations.proto",
-      "google/protobuf/empty.proto",
-    ],
-    &[
-      amended_proto_root.path().to_owned(),
-      thirdpartyprotobuf.join("standard"),
-      thirdpartyprotobuf.join("rust-protobuf"),
-    ],
-    &gen_dir,
-  )
-  .expect("Failed to compile protos!");
-
-  disable_clippy_in_generated_code(&gen_dir).expect("Failed to strip clippy from generated code");
-
-  generate_mod_rs(&gen_dir).expect("Failed to generate mod.rs");
-}
-
-fn mark_dir_as_rerun_trigger(dir: &Path) {
-  for file in walkdir::WalkDir::new(dir) {
-    println!("cargo:rerun-if-changed={}", file.unwrap().path().display());
-  }
-}
-
-const EXTRA_HEADER: &str = r#"import "rustproto.proto";
-option (rustproto.carllerche_bytes_for_bytes_all) = true;
-"#;
-
-///
-/// Copies protos from thirdpartyprotobuf, adds a header to make protoc_grpcio uses Bytes instead
-/// of Vec<u8>s, and rewrites them into a temporary directory
-///
-fn add_rustproto_header(thirdpartyprotobuf: &Path) -> Result<tempfile::TempDir, String> {
-  let amended_proto_root = tempfile::TempDir::new().unwrap();
-  for f in &["bazelbuild_remote-apis", "googleapis"] {
-    let src_root = thirdpartyprotobuf.join(f);
-    for entry in walkdir::WalkDir::new(&src_root)
-      .into_iter()
-      .filter_map(|entry| entry.ok())
-      .filter(|entry| entry.file_type().is_file())
-      .filter(|entry| entry.file_name().to_string_lossy().ends_with(".proto"))
-    {
-      let dst = amended_proto_root
-        .path()
-        .join(entry.path().strip_prefix(&src_root).unwrap());
-      std::fs::create_dir_all(dst.parent().unwrap())
-        .map_err(|err| format!("Error making dir in temp proto root: {}", err))?;
-      let original = std::fs::read_to_string(entry.path())
-        .map_err(|err| format!("Error reading proto {}: {}", entry.path().display(), err))?;
-      let mut copy = String::with_capacity(original.len() + EXTRA_HEADER.len());
-      for line in original.lines() {
-        copy += line;
-        copy += "\n";
-        if line.starts_with("package ") {
-          copy += EXTRA_HEADER
-        }
-      }
-      std::fs::write(&dst, copy.as_bytes())
-        .map_err(|err| format!("Error writing {}: {}", dst.display(), err))?;
-    }
-  }
-  Ok(amended_proto_root)
-}
-
-///
-/// protoc_grpcio generates its own clippy config, but it's for an out of date version of clippy,
-/// so strip that out so we don't get warnings about it.
-///
-/// Add our own #![allow(clippy::all)] heading to each generated file so that we don't get any
-/// warnings/errors from generated code not meeting our standards.
-///
-fn disable_clippy_in_generated_code(dir: &Path) -> Result<(), String> {
-  for file in walkdir::WalkDir::new(&dir)
-    .into_iter()
-    .filter_map(|entry| entry.ok())
-    .filter(|entry| {
-      entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".rs")
-    })
-  {
-    let lines: Vec<_> = std::fs::read_to_string(file.path())
-      .map_err(|err| {
-        format!(
-          "Error reading generated protobuf at {}: {}",
-          file.path().display(),
-          err
-        )
-      })?
-      .lines()
-      .filter(|line| !line.contains("clippy"))
-      .map(str::to_owned)
-      .collect();
-    let content = (String::from("#![allow(clippy::all)]\n") + &lines.join("\n"))
-      // Quash warnings about missing dyn, because we can't currently update the code generator
-      // to get rid of them because we forked it upstream a while ago.
-      .replace("::std::any::Any", "dyn ::std::any::Any");
-    std::fs::write(file.path(), content).map_err(|err| {
-      format!(
-        "Error re-writing generated protobuf at {}: {}",
-        file.path().display(),
-        err
-      )
-    })?;
-  }
   Ok(())
-}
-
-fn generate_mod_rs(dir: &Path) -> Result<(), String> {
-  // TODO: The ignore option in `rustfmt.toml` will stabilize in 1.45.0. Until then, we include
-  // a rustfmt::skip directive.
-  //   see https://github.com/rust-lang/rustfmt/issues/3243
-  let listing = dir.read_dir().unwrap();
-  let mut pub_mod_stmts = listing
-    .filter_map(|d| d.ok())
-    .map(|d| d.file_name().to_string_lossy().into_owned())
-    .filter(|name| name != "mod.rs" && name != ".gitignore")
-    .map(|name| {
-      format!(
-        "#[rustfmt::skip]\npub mod {};",
-        name.trim_end_matches(".rs")
-      )
-    })
-    .collect::<Vec<_>>();
-  pub_mod_stmts.sort();
-  let contents = format!(
-    "\
-// This file is generated. Do not edit.
-{}
-",
-    pub_mod_stmts.join("\n")
-  );
-
-  std::fs::write(dir.join("mod.rs"), contents)
-    .map_err(|err| format!("Failed to write mod.rs: {}", err))
-}
-
-fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: &Path) {
-  tower_grpc_build::Config::new()
-    .enable_server(true)
-    .enable_client(true)
-    .build(
-      &[PathBuf::from(
-        "build/bazel/remote/execution/v2/remote_execution.proto",
-      )],
-      &std::fs::read_dir(&thirdpartyprotobuf)
-        .unwrap()
-        .map(|d| d.unwrap().path())
-        .collect::<Vec<_>>(),
-    )
-    .unwrap_or_else(|e| panic!("protobuf compilation failed: {}", e));
-
-  let mut dirs_needing_mod_rs = HashSet::new();
-  dirs_needing_mod_rs.insert(out_dir.to_owned());
-
-  for f in walkdir::WalkDir::new(std::env::var("OUT_DIR").unwrap())
-    .into_iter()
-    .filter_map(|f| f.ok())
-    .filter(|f| f.path().extension() == Some("rs".as_ref()))
-  {
-    let mut parts: Vec<_> = f
-      .path()
-      .file_name()
-      .unwrap()
-      .to_str()
-      .unwrap()
-      .split('.')
-      .collect();
-    // pop .rs
-    parts.pop();
-
-    let mut dst = out_dir.to_owned();
-    for part in parts {
-      dst.push(part);
-      dirs_needing_mod_rs.insert(dst.clone());
-      if !dst.exists() {
-        std::fs::create_dir_all(&dst).unwrap();
-      }
-    }
-    dirs_needing_mod_rs.remove(&dst);
-    dst = dst.join("mod.rs");
-
-    std::fs::copy(f.path(), dst).unwrap();
-  }
-
-  disable_clippy_in_generated_code(out_dir).expect("Failed to strip clippy from generated code");
-
-  for dir in &dirs_needing_mod_rs {
-    generate_mod_rs(dir).expect("Failed to write mod.rs");
-  }
-}
-
-///
-/// Replaces contents of directory `path` with contents of directory populated by passed function.
-/// Does not modify `path` if the contents are identical.
-///
-fn replace_if_changed<F: FnOnce(&Path)>(path: &Path, f: F) {
-  let tempdir = tempfile::TempDir::new().unwrap();
-  f(tempdir.path());
-  if let Ok(false) = dir_diff::is_different(path, tempdir.path()) {
-    return;
-  }
-  if path.exists() {
-    std::fs::remove_dir_all(path).unwrap();
-  }
-  std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-  copy_dir::copy_dir(tempdir.path(), path).unwrap();
 }

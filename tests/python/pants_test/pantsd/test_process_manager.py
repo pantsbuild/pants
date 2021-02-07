@@ -4,8 +4,6 @@
 import errno
 import logging
 import os
-import subprocess
-import sys
 import unittest
 import unittest.mock
 from contextlib import contextmanager
@@ -48,17 +46,8 @@ class TestProcessMetadataManager(unittest.TestCase):
         self.pmm = ProcessMetadataManager(metadata_base_dir=self.BUILDROOT)
         self.assertEqual(
             self.pmm._get_metadata_dir_by_name(self.NAME, self.BUILDROOT),
-            os.path.join(self.BUILDROOT, self.NAME),
+            os.path.join(self.BUILDROOT, self.pmm.host_fingerprint, self.NAME),
         )
-
-    def test_maybe_init_metadata_dir_by_name(self):
-        with unittest.mock.patch(
-            "pants.pantsd.process_manager.safe_mkdir", **PATCH_OPTS
-        ) as mock_mkdir:
-            self.pmm._maybe_init_metadata_dir_by_name(self.NAME)
-            mock_mkdir.assert_called_once_with(
-                self.pmm._get_metadata_dir_by_name(self.NAME, self.SUBPROCESS_DIR)
-            )
 
     def test_readwrite_metadata_by_name(self):
         with temporary_dir() as tmpdir, unittest.mock.patch(
@@ -129,71 +118,9 @@ class TestProcessMetadataManager(unittest.TestCase):
 
 
 class TestProcessManager(unittest.TestCase):
-    SUBPROCESS_DIR = safe_mkdtemp()
-
     def setUp(self):
         super().setUp()
-        # N.B. We pass in `metadata_base_dir` here because ProcessManager (itself a non-task/non-
-        # subsystem) depends on an initialized `GlobalOptions` subsystem for the value of
-        # `--pants-subprocessdir` in the default case. This is normally provided by subsystem
-        # dependencies in a typical pants run (and integration tests), but not in unit tests.
-        # Thus, passing this parameter here short-circuits the subsystem-reliant path for the
-        # purposes of unit testing without requiring adhoc subsystem initialization.
-        self.pm = ProcessManager("test", metadata_base_dir=self.SUBPROCESS_DIR)
-
-    def test_process_properties(self):
-        with unittest.mock.patch.object(
-            ProcessManager, "_as_process", **PATCH_OPTS
-        ) as mock_as_process:
-            mock_as_process.return_value = fake_process(
-                name="name", cmdline=["cmd", "line"], status="status"
-            )
-            self.assertEqual(self.pm.cmdline, ["cmd", "line"])
-            self.assertEqual(self.pm.cmd, "cmd")
-
-    def test_process_properties_cmd_indexing(self):
-        with unittest.mock.patch.object(
-            ProcessManager, "_as_process", **PATCH_OPTS
-        ) as mock_as_process:
-            mock_as_process.return_value = fake_process(cmdline="")
-            self.assertEqual(self.pm.cmd, None)
-
-    def test_process_properties_none(self):
-        with unittest.mock.patch.object(ProcessManager, "_as_process", **PATCH_OPTS) as mock_asproc:
-            mock_asproc.return_value = None
-            self.assertEqual(self.pm.cmdline, None)
-            self.assertEqual(self.pm.cmd, None)
-
-    def test_get_subprocess_output(self):
-        test_str = "333"
-        self.assertEqual(self.pm.get_subprocess_output(["echo", "-n", test_str]), test_str)
-
-    def test_get_subprocess_output_interleaved(self):
-        cmd_payload = "import sys; " + (
-            'sys.stderr.write("9"); sys.stderr.flush(); sys.stdout.write("3"); sys.stdout.flush();'
-            * 3
-        )
-        cmd = [sys.executable, "-c", cmd_payload]
-
-        self.assertEqual(self.pm.get_subprocess_output(cmd), "333")
-        self.assertEqual(self.pm.get_subprocess_output(cmd, ignore_stderr=False), "939393")
-        self.assertEqual(self.pm.get_subprocess_output(cmd, stderr=subprocess.STDOUT), "939393")
-
-    def test_get_subprocess_output_interleaved_bash(self):
-        cmd_payload = 'printf "9">&2; printf "3";' * 3
-        cmd = ["/bin/bash", "-c", cmd_payload]
-
-        self.assertEqual(self.pm.get_subprocess_output(cmd), "333")
-        self.assertEqual(self.pm.get_subprocess_output(cmd, ignore_stderr=False), "939393")
-        self.assertEqual(self.pm.get_subprocess_output(cmd, stderr=subprocess.STDOUT), "939393")
-
-    def test_get_subprocess_output_oserror_exception(self):
-        with self.assertRaises(ProcessManager.ExecutionError):
-            self.pm.get_subprocess_output(["i_do_not_exist"])
-
-    def test_get_subprocess_output_failure_exception(self):
-        with self.assertRaises(ProcessManager.ExecutionError):
-            self.pm.get_subprocess_output(["false"])
+        self.pm = ProcessManager("test", metadata_base_dir=safe_mkdtemp())
 
     def test_await_pid(self):
         with unittest.mock.patch.object(ProcessManager, "await_metadata_by_name") as mock_await:
@@ -228,19 +155,20 @@ class TestProcessManager(unittest.TestCase):
         sentinel = 3333
         with unittest.mock.patch("psutil.Process", **PATCH_OPTS) as mock_proc:
             mock_proc.return_value = sentinel
-            self.pm._pid = sentinel
+            self.pm.write_pid(sentinel)
             self.assertEqual(self.pm._as_process(), sentinel)
 
     def test_as_process_no_pid(self):
         fake_pid = 3
         with unittest.mock.patch("psutil.Process", **PATCH_OPTS) as mock_proc:
             mock_proc.side_effect = psutil.NoSuchProcess(fake_pid)
-            self.pm._pid = fake_pid
+            self.pm.write_pid(fake_pid)
             with self.assertRaises(psutil.NoSuchProcess):
                 self.pm._as_process()
 
     def test_as_process_none(self):
-        self.assertEqual(self.pm._as_process(), None)
+        with self.assertRaises(self.pm.NotStarted):
+            self.pm._as_process()
 
     def test_is_alive_neg(self):
         with unittest.mock.patch.object(
@@ -285,7 +213,7 @@ class TestProcessManager(unittest.TestCase):
             mock_as_process.return_value = fake_process(
                 name="not_test", pid=3, status=psutil.STATUS_IDLE
             )
-            self.pm._process_name = "test"
+            self.pm.write_process_name("test")
             self.assertFalse(self.pm.is_alive())
             mock_as_process.assert_called_with(self.pm)
 
@@ -316,7 +244,7 @@ class TestProcessManager(unittest.TestCase):
 
     def test_kill(self):
         with unittest.mock.patch("os.kill", **PATCH_OPTS) as mock_kill:
-            self.pm._pid = 42
+            self.pm.write_pid(42)
             self.pm._kill(0)
             mock_kill.assert_called_once_with(42, 0)
 

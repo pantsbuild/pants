@@ -3,10 +3,12 @@
 
 use std::collections::HashMap;
 use std::hash;
+use std::sync::atomic;
 
-use cpython::{ObjectProtocol, PyClone, PyErr, PyType, Python, PythonObject, ToPyObject};
+use cpython::{ObjectProtocol, PyErr, PyType, Python, ToPyObject};
+use parking_lot::{Mutex, RwLock};
 
-use crate::core::{Key, TypeId, Value, FNV};
+use crate::core::{Key, Value, FNV};
 use crate::externs;
 
 ///
@@ -33,13 +35,15 @@ use crate::externs;
 ///      avoided doing this so far because it would hide a relatively expensive operation behind
 ///      those usually-inexpensive traits).
 ///
+/// To avoid deadlocks, methods of Interns require that the GIL is held, and then explicitly release
+/// it before acquiring inner locks. That way we can guarantee that these locks are always acquired
+/// before the GIL (Value equality in particular might re-acquire it).
+///
 #[derive(Default)]
 pub struct Interns {
-  forward_keys: HashMap<InternKey, Key, FNV>,
-  reverse_keys: HashMap<Key, Value, FNV>,
-  forward_types: HashMap<InternType, TypeId, FNV>,
-  reverse_types: HashMap<TypeId, PyType, FNV>,
-  id_generator: u64,
+  forward_keys: Mutex<HashMap<InternKey, Key, FNV>>,
+  reverse_keys: RwLock<HashMap<Key, Value, FNV>>,
+  id_generator: atomic::AtomicU64,
 }
 
 impl Interns {
@@ -47,48 +51,39 @@ impl Interns {
     Interns::default()
   }
 
-  pub fn key_insert(&mut self, py: Python, v: Value) -> Result<Key, PyErr> {
-    let intern_key = InternKey(v.hash(py)?, v.to_py_object(py).into());
-
-    let key = if let Some(key) = self.forward_keys.get(&intern_key) {
-      *key
-    } else {
-      let id = self.id_generator;
-      self.id_generator += 1;
-      let key = Key::new(id, self.type_insert(py, v.get_type(py)));
-      self.forward_keys.insert(intern_key, key);
-      self.reverse_keys.insert(key, v);
-      key
+  pub fn key_insert(&self, py: Python, v: Value) -> Result<Key, PyErr> {
+    let (intern_key, type_id) = {
+      let obj = v.to_py_object(py).into();
+      (InternKey(v.hash(py)?, obj), (&v.get_type(py)).into())
     };
-    Ok(key)
+
+    py.allow_threads(|| {
+      let (key, key_was_new) = {
+        let mut forward_keys = self.forward_keys.lock();
+        if let Some(key) = forward_keys.get(&intern_key) {
+          (*key, false)
+        } else {
+          let id = self.id_generator.fetch_add(1, atomic::Ordering::SeqCst);
+          let key = Key::new(id, type_id);
+          forward_keys.insert(intern_key, key);
+          (key, true)
+        }
+      };
+      if key_was_new {
+        self.reverse_keys.write().insert(key, v);
+      }
+      Ok(key)
+    })
   }
 
-  pub fn key_get(&self, k: &Key) -> &Value {
+  pub fn key_get(&self, k: &Key) -> Value {
+    // NB: We do not need to acquire+release the GIL before getting a Value for a Key, because
+    // neither `Key::eq` nor `Value::clone` acquire the GIL.
     self
       .reverse_keys
+      .read()
       .get(&k)
-      .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
-  }
-
-  pub fn type_insert(&mut self, py: Python, v: PyType) -> TypeId {
-    let intern_type = InternType(v.as_object().hash(py).unwrap(), v.clone_ref(py));
-
-    if let Some(type_id) = self.forward_types.get(&intern_type) {
-      *type_id
-    } else {
-      let id = self.id_generator;
-      self.id_generator += 1;
-      let type_id = TypeId(id);
-      self.forward_types.insert(intern_type, type_id);
-      self.reverse_types.insert(type_id, v);
-      type_id
-    }
-  }
-
-  pub fn type_get(&self, k: &TypeId) -> &PyType {
-    self
-      .reverse_types
-      .get(&k)
+      .cloned()
       .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
   }
 }

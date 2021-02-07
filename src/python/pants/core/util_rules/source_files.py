@@ -14,11 +14,7 @@ from pants.util.meta import frozen_after_init
 
 @dataclass(frozen=True)
 class SourceFiles:
-    """A merged snapshot of the `sources` fields of multiple targets.
-
-    Possibly containing a subset of the `sources` when using `SpecifiedSourceFilesRequest` (instead
-    of `AllSourceFilesRequest`).
-    """
+    """A merged snapshot of the `sources` fields of multiple targets."""
 
     snapshot: Snapshot
 

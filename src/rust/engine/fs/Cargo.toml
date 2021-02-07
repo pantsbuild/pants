@@ -7,8 +7,8 @@ publish = false
 
 [dependencies]
 async-trait = "0.1"
-bytes = "0.4.5"
-dirs = "1"
+bytes = "0.5"
+dirs-next = "2"
 futures = "0.3"
 glob = "0.2.11"
 ignore = "0.4.11"
@@ -21,4 +21,4 @@ task_executor = { path = "../task_executor" }
 [dev-dependencies]
 tempfile = "3"
 testutil = { path = "../testutil" }
-tokio = { version = "0.2.22", features = ["rt-core", "macros"] }
+tokio = { version = "0.2.23", features = ["rt-core", "macros"] }

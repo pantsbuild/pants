@@ -6,7 +6,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 
 from pants.engine.collection import Collection
-from pants.engine.internals.native_engine import PyDigest
+from pants.engine.internals.native_engine import PyDigest, PySnapshot
 from pants.engine.rules import QueryRule, side_effecting
 from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.util.meta import frozen_after_init
@@ -23,25 +23,20 @@ Get(DigestContents, Digest)` to see the actual file content.
 Digest = PyDigest
 
 
-@dataclass(frozen=True)
-class Snapshot:
-    """A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
-    names/content.
+"""A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
+names/content.
 
-    You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
-    """
-
-    digest: Digest
-    files: Tuple[str, ...]
-    dirs: Tuple[str, ...]
+You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
+"""
+Snapshot = PySnapshot
 
 
 @dataclass(frozen=True)
 class Paths:
     """A Paths object is a collection of sorted file paths and dir paths.
 
-    Paths is like a Snapshot, but has a performance optimization that it does digest the files or
-    save them to the LMDB store.
+    Paths is like a Snapshot, but has the performance optimization that it does not digest the files
+    or save them to the LMDB store.
     """
 
     files: Tuple[str, ...]
@@ -248,7 +243,7 @@ class AddPrefix:
 
 @dataclass(frozen=True)
 class DownloadFile:
-    """Download an asset via a GET request.
+    """Retrieve the contents of a file via an HTTP GET request or directly for local file:// URLs.
 
     To compute the `expected_digest`, manually download the file, then run `shasum -a 256` to
     compute the fingerprint and `wc -c` to compute the expected length of the downloaded file in
@@ -278,12 +273,12 @@ class Workspace:
 _EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 EMPTY_DIGEST = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
 EMPTY_FILE_DIGEST = FileDigest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
-EMPTY_SNAPSHOT = Snapshot(EMPTY_DIGEST, files=(), dirs=())
+EMPTY_SNAPSHOT = Snapshot()
 
 
 @dataclass(frozen=True)
-class SourcesSnapshot:
-    """Sources matched by command line specs.
+class SpecsSnapshot:
+    """All files matched by command line specs.
 
     `@goal_rule`s may request this when they only need source files to operate and do not need any
     target information. This allows running on files with no owning targets.

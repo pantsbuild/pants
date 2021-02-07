@@ -1,33 +1,29 @@
-use crate::remote_execution;
+use std::collections::HashSet;
 
 use hashing::Digest;
-use std::collections::HashSet;
+
+use crate::gen::build::bazel::remote::execution::v2 as remote_execution;
 
 pub fn verify_directory_canonical(
   digest: Digest,
   directory: &remote_execution::Directory,
 ) -> Result<(), String> {
-  verify_no_unknown_fields(directory)?;
-  verify_nodes(directory.get_files(), |n| n.get_name(), |n| n.get_digest())
+  verify_nodes(&directory.files, |n| &n.name, |n| n.digest.as_ref())
     .map_err(|e| format!("Invalid file in {:?}: {}", digest, e))?;
-  verify_nodes(
-    directory.get_directories(),
-    |n| n.get_name(),
-    |n| n.get_digest(),
-  )
-  .map_err(|e| format!("Invalid directory in {:?}: {}", digest, e))?;
+  verify_nodes(&directory.directories, |n| &n.name, |n| n.digest.as_ref())
+    .map_err(|e| format!("Invalid directory in {:?}: {}", digest, e))?;
   let child_names: HashSet<&str> = directory
-    .get_files()
+    .files
     .iter()
-    .map(remote_execution::FileNode::get_name)
+    .map(|file_node| file_node.name.as_str())
     .chain(
       directory
-        .get_directories()
+        .directories
         .iter()
-        .map(remote_execution::DirectoryNode::get_name),
+        .map(|dir_node| dir_node.name.as_str()),
     )
     .collect();
-  if child_names.len() != directory.get_files().len() + directory.get_directories().len() {
+  if child_names.len() != directory.files.len() + directory.directories.len() {
     return Err(format!(
       "Child paths must be unique, but a child path of {:?} was both a file and a directory: {:?}",
       digest, directory
@@ -42,14 +38,12 @@ fn verify_nodes<Node, GetName, GetDigest>(
   get_digest: GetDigest,
 ) -> Result<(), String>
 where
-  Node: protobuf::Message,
+  Node: prost::Message,
   GetName: Fn(&Node) -> &str,
-  GetDigest: Fn(&Node) -> &remote_execution::Digest,
+  GetDigest: Fn(&Node) -> Option<&remote_execution::Digest>,
 {
   let mut prev: Option<&Node> = None;
   for node in nodes {
-    verify_no_unknown_fields(node)?;
-    verify_no_unknown_fields(get_digest(node))?;
     let name = get_name(node);
     if name.is_empty() {
       return Err(format!(
@@ -72,16 +66,6 @@ where
       }
     }
     prev = Some(node);
-  }
-  Ok(())
-}
-
-fn verify_no_unknown_fields(message: &dyn protobuf::Message) -> Result<(), String> {
-  if message.get_unknown_fields().fields.is_some() {
-    return Err(format!(
-      "Found unknown fields: {:?}",
-      message.get_unknown_fields()
-    ));
   }
   Ok(())
 }

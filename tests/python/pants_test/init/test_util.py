@@ -3,48 +3,52 @@
 
 import os
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Iterator, cast
 
 from pants.fs.fs import safe_filename_from_path
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
+from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import temporary_dir
 
 
-class UtilTest(TestBase):
-    @contextmanager
-    def physical_workdir_base(self) -> Iterator[OptionValueContainer]:
-        with temporary_dir(cleanup=False) as physical_workdir_base:
-            bootstrap_options = create_options_bootstrapper(
-                args=[f"--pants-physical-workdir-base={physical_workdir_base}"]
-            ).bootstrap_options.for_global_scope()
-            yield bootstrap_options
+@contextmanager
+def physical_workdir_base() -> Iterator[OptionValueContainer]:
+    with temporary_dir(cleanup=False) as physical_workdir_base:
+        bootstrap_options = create_options_bootstrapper(
+            [f"--pants-physical-workdir-base={physical_workdir_base}"]
+        ).bootstrap_options.for_global_scope()
+        yield bootstrap_options
 
-    def assert_exists(self, path):
-        self.assertTrue(os.path.exists(path))
 
-    def assert_symlink(self, path):
-        self.assertTrue(os.path.islink(path))
+def assert_exists(path: str) -> None:
+    assert os.path.exists(path) is True
 
-    def physical_workdir(self, bootstrap_options):
-        if bootstrap_options.pants_physical_workdir_base:
-            return os.path.join(
-                bootstrap_options.pants_physical_workdir_base,
-                safe_filename_from_path(self.pants_workdir),
-            )
-        else:
-            return self.pants_workdir
 
-    def test_init_workdir(self) -> None:
-        with self.physical_workdir_base() as bootstrap_options:
-            # Assert pants_workdir exists
-            self.assert_exists(self.pants_workdir)
+def assert_symlink(path: str) -> None:
+    assert os.path.islink(path) is True
 
-            init_workdir(bootstrap_options)
 
-            # Assert pants_workdir is a symlink after init_workdir above
-            self.assert_symlink(self.pants_workdir)
-            # Assert symlink target's physical dir exists
-            self.assert_exists(os.path.join(self.physical_workdir(bootstrap_options)))
+def physical_workdir(pants_workdir: str, bootstrap_options: OptionValueContainer) -> str:
+    if bootstrap_options.pants_physical_workdir_base:
+        res = os.path.join(
+            bootstrap_options.pants_physical_workdir_base,
+            safe_filename_from_path(pants_workdir),
+        )
+        return cast(str, res)
+    return pants_workdir
+
+
+def test_init_workdir() -> None:
+    rule_runner = RuleRunner()
+    with physical_workdir_base() as bootstrap_options:
+        # Assert pants_workdir exists
+        assert_exists(rule_runner.pants_workdir)
+
+        init_workdir(bootstrap_options)
+
+        # Assert pants_workdir is a symlink after init_workdir above
+        assert_symlink(rule_runner.pants_workdir)
+        # Assert symlink target's physical dir exists
+        assert_exists(os.path.join(physical_workdir(rule_runner.pants_workdir, bootstrap_options)))

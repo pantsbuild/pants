@@ -1,11 +1,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union, cast
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, Tuple, Union
 
 from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
@@ -190,21 +192,6 @@ class AddressSpecs:
     def specs(self) -> Tuple[AddressSpec, ...]:
         return (*self.literals, *self.globs)
 
-    @staticmethod
-    def more_specific(spec1: Optional[AddressSpec], spec2: Optional[AddressSpec]) -> AddressSpec:
-        # Note that if either of spec1 or spec2 is None, the other will be returned.
-        if spec1 is None and spec2 is None:
-            raise ValueError("Internal error: both specs provided to more_specific() were None")
-        _specificity = {
-            AddressLiteralSpec: 0,
-            SiblingAddresses: 1,
-            AscendantAddresses: 2,
-            DescendantAddresses: 3,
-            type(None): 99,
-        }
-        result = spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
-        return cast(AddressSpec, result)
-
     def to_path_globs(
         self, *, build_patterns: Iterable[str], build_ignore_patterns: Iterable[str]
     ) -> PathGlobs:
@@ -280,21 +267,6 @@ class FilesystemSpecs:
         return (*self.includes, *self.ignores)
 
     @staticmethod
-    def more_specific(
-        spec1: Optional[FilesystemSpec], spec2: Optional[FilesystemSpec]
-    ) -> FilesystemSpec:
-        # Note that if either of spec1 or spec2 is None, the other will be returned.
-        if spec1 is None and spec2 is None:
-            raise ValueError("Internal error: both specs provided to more_specific() were None")
-        _specificity = {
-            FilesystemLiteralSpec: 0,
-            FilesystemGlobSpec: 1,
-            type(None): 99,
-        }
-        result = spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
-        return cast(FilesystemSpec, result)
-
-    @staticmethod
     def _generate_path_globs(
         specs: Iterable[FilesystemSpec], glob_match_error_behavior: GlobMatchErrorBehavior
     ) -> PathGlobs:
@@ -336,3 +308,7 @@ class Specs:
     def provided(self) -> bool:
         """Did the user provide specs?"""
         return bool(self.address_specs) or bool(self.filesystem_specs)
+
+    @classmethod
+    def empty(cls) -> Specs:
+        return Specs(AddressSpecs([], filter_by_global_options=True), FilesystemSpecs([]))

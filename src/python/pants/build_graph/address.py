@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -11,7 +13,7 @@ from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
 # Currently unused, but reserved for possible future needs.
-BANNED_CHARS_IN_TARGET_NAME = frozenset("@!?=")
+BANNED_CHARS_IN_TARGET_NAME = frozenset(r"@!?/\:=")
 
 
 class InvalidSpecPath(ValueError):
@@ -40,13 +42,6 @@ class AddressInput:
                     f"Address spec {self.path_component}:{self.target_component} has no name part."
                 )
 
-            banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(self.target_component)
-            if banned_chars:
-                raise InvalidTargetName(
-                    f"Banned chars found in target name. {banned_chars} not allowed in target "
-                    f"name: {self.target_component}"
-                )
-
         # A root is okay.
         if self.path_component == "":
             return
@@ -67,7 +62,7 @@ class AddressInput:
         spec: str,
         relative_to: Optional[str] = None,
         subproject_roots: Optional[Sequence[str]] = None,
-    ) -> "AddressInput":
+    ) -> AddressInput:
         """Parse a string into an AddressInput.
 
         :param spec: Target address spec.
@@ -142,7 +137,7 @@ class AddressInput:
 
         return cls(path_component, target_component)
 
-    def file_to_address(self) -> "Address":
+    def file_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a file on disk."""
         if self.target_component is None:
             # Use the default target in the same directory as the file.
@@ -192,7 +187,7 @@ class AddressInput:
         target_name = os.path.basename(self.target_component)
         return Address(spec_path, relative_file_path=relative_file_path, target_name=target_name)
 
-    def dir_to_address(self) -> "Address":
+    def dir_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a directory on disk."""
         return Address(spec_path=self.path_component, target_name=self.target_component)
 
@@ -233,10 +228,21 @@ class Address(EngineAwareParameter):
         """
         self.spec_path = spec_path
         self._relative_file_path = relative_file_path
+
         # If the target_name is the same as the default name would be, we normalize to None.
-        self._target_name = (
-            target_name if target_name and target_name != os.path.basename(self.spec_path) else None
-        )
+        self._target_name: Optional[str]
+        if target_name and target_name != os.path.basename(self.spec_path):
+            banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(target_name)
+            if banned_chars:
+                raise InvalidTargetName(
+                    f"The target name {target_name} (defined in directory {self.spec_path}) "
+                    f"contains banned characters (`{'`,`'.join(banned_chars)}`). Please replace "
+                    "these characters with another separator character like `_` or `-`."
+                )
+            self._target_name = target_name
+        else:
+            self._target_name = None
+
         self._hash = hash((self.spec_path, self._relative_file_path, self._target_name))
         if PurePath(spec_path).name.startswith("BUILD"):
             raise InvalidSpecPath(
@@ -246,8 +252,8 @@ class Address(EngineAwareParameter):
             )
 
     @property
-    def is_base_target(self) -> bool:
-        return self._relative_file_path is None
+    def is_file_target(self) -> bool:
+        return self._relative_file_path is not None
 
     @property
     def is_default_target(self) -> bool:
@@ -260,7 +266,7 @@ class Address(EngineAwareParameter):
     @property
     def filename(self) -> str:
         if self._relative_file_path is None:
-            raise ValueError("Only a file Address (`not self.is_base_target`) has a filename.")
+            raise ValueError("Only a file Address (`self.is_file_target`) has a filename.")
         return os.path.join(self.spec_path, self._relative_file_path)
 
     @property
@@ -311,15 +317,12 @@ class Address(EngineAwareParameter):
             target_portion = f"{parent_prefix}{target_name}"
         return f"{self.spec_path.replace(os.path.sep, '.')}{file_portion}{target_portion}"
 
-    def maybe_convert_to_base_target(self) -> "Address":
-        """If this address is a generated subtarget, convert it back into its original base target.
+    def maybe_convert_to_build_target(self) -> Address:
+        """If this address is for a file target, convert it back into its BUILD target.
 
         Otherwise, return itself unmodified.
-
-        TODO: This is not correct: we don't know the owning BUILD file of the base target without
-        resolving. But it's possible that this method can be removed.
         """
-        if self.is_base_target:
+        if not self.is_file_target:
             return self
         return self.__class__(self.spec_path, relative_file_path=None, target_name=self.target_name)
 

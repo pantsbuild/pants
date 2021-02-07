@@ -7,18 +7,19 @@ from typing import List
 
 import pytest
 
+from pants.backend.codegen.protobuf.python import python_protobuf_module_mapper
+from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.dependency_inference.module_mapper import (
-    FirstPartyModuleToAddressMapping,
+    FirstPartyPythonModuleMapping,
     PythonModule,
     PythonModuleOwners,
-    ThirdPartyModuleToAddressMapping,
+    ThirdPartyPythonModuleMapping,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.frozendict import FrozenDict
 
 
 @pytest.mark.parametrize(
@@ -40,8 +41,8 @@ def test_create_module_from_path(stripped_path: PurePath, expected: str) -> None
 def test_first_party_modules_mapping() -> None:
     util_addr = Address("src/python/util", relative_file_path="strutil.py")
     test_addr = Address("tests/python/project_test", relative_file_path="test.py")
-    mapping = FirstPartyModuleToAddressMapping(
-        FrozenDict({"util.strutil": (util_addr,), "project_test.test": (test_addr,)})
+    mapping = FirstPartyPythonModuleMapping(
+        {"util.strutil": (util_addr,), "project_test.test": (test_addr,)}
     )
     assert mapping.addresses_for_module("util.strutil") == (util_addr,)
     assert mapping.addresses_for_module("util.strutil.ensure_text") == (util_addr,)
@@ -56,9 +57,7 @@ def test_first_party_modules_mapping() -> None:
 def test_third_party_modules_mapping() -> None:
     colors_addr = Address("", target_name="ansicolors")
     pants_addr = Address("", target_name="pantsbuild")
-    mapping = ThirdPartyModuleToAddressMapping(
-        FrozenDict({"colors": colors_addr, "pants": pants_addr})
-    )
+    mapping = ThirdPartyPythonModuleMapping({"colors": colors_addr, "pants": pants_addr})
     assert mapping.address_for_module("colors") == colors_addr
     assert mapping.address_for_module("colors.red") == colors_addr
     assert mapping.address_for_module("pants") == pants_addr
@@ -73,11 +72,12 @@ def rule_runner() -> RuleRunner:
         rules=[
             *stripped_source_files.rules(),
             *module_mapper_rules(),
-            QueryRule(FirstPartyModuleToAddressMapping, ()),
-            QueryRule(ThirdPartyModuleToAddressMapping, ()),
-            QueryRule(PythonModuleOwners, (PythonModule,)),
+            *python_protobuf_module_mapper.rules(),
+            QueryRule(FirstPartyPythonModuleMapping, []),
+            QueryRule(ThirdPartyPythonModuleMapping, []),
+            QueryRule(PythonModuleOwners, [PythonModule]),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary],
+        target_types=[PythonLibrary, PythonRequirementLibrary, ProtobufLibrary],
     )
 
 
@@ -85,24 +85,41 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         ["--source-root-patterns=['src/python', 'tests/python', 'build-support']"]
     )
+
     # Two modules belonging to the same target. We should generate subtargets for each file.
     rule_runner.create_files("src/python/project/util", ["dirutil.py", "tarutil.py"])
     rule_runner.add_to_build_file("src/python/project/util", "python_library()")
+
     # A module with two owners, meaning that neither should be resolved.
     rule_runner.create_file("src/python/two_owners.py")
     rule_runner.add_to_build_file("src/python", "python_library()")
     rule_runner.create_file("build-support/two_owners.py")
     rule_runner.add_to_build_file("build-support", "python_library()")
+
     # A package module. Because there's only one source file belonging to the target, we should
     # not generate subtargets.
     rule_runner.create_file("tests/python/project_test/demo_test/__init__.py")
     rule_runner.add_to_build_file("tests/python/project_test/demo_test", "python_library()")
+
     # A module with both an implementation and a type stub.
     rule_runner.create_files("src/python/stubs", ["stub.py", "stub.pyi"])
     rule_runner.add_to_build_file("src/python/stubs", "python_library()")
 
-    result = rule_runner.request(FirstPartyModuleToAddressMapping, [])
-    assert result.mapping == FrozenDict(
+    # Check that plugin mappings work. Note that we duplicate one of the files with a normal
+    # python_library(), which means neither the Protobuf nor Python targets should be used.
+    rule_runner.create_files("src/python/protos", ["f1.proto", "f2.proto", "f2_pb2.py"])
+    rule_runner.add_to_build_file(
+        "src/python/protos",
+        dedent(
+            """\
+            protobuf_library(name='protos')
+            python_library(name='py')
+            """
+        ),
+    )
+
+    result = rule_runner.request(FirstPartyPythonModuleMapping, [])
+    assert result == FirstPartyPythonModuleMapping(
         {
             "project.util.dirutil": (
                 Address("src/python/project/util", relative_file_path="dirutil.py"),
@@ -112,6 +129,9 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             ),
             "project_test.demo_test": (
                 Address("tests/python/project_test/demo_test", relative_file_path="__init__.py"),
+            ),
+            "protos.f1_pb2": (
+                Address("src/python/protos", relative_file_path="f1.proto", target_name="protos"),
             ),
             "stubs.stub": (
                 Address("src/python/stubs", relative_file_path="stub.py"),
@@ -151,8 +171,8 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    result = rule_runner.request(ThirdPartyModuleToAddressMapping, [])
-    assert result.mapping == FrozenDict(
+    result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
+    assert result == ThirdPartyPythonModuleMapping(
         {
             "colors": Address("3rdparty/python", target_name="ansicolors"),
             "local_dist": Address("3rdparty/python", target_name="direct_references"),

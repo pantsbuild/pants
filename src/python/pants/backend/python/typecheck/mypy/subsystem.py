@@ -9,10 +9,10 @@ from pants.option.custom_types import file_option, shell_str, target_option
 
 
 class MyPy(PythonToolBase):
-    """The MyPy Python type checker (http://mypy-lang.org/)."""
-
     options_scope = "mypy"
-    default_version = "mypy==0.782"
+    help = "The MyPy Python type checker (http://mypy-lang.org/)."
+
+    default_version = "mypy==0.800"
     default_entry_point = "mypy"
     # See `mypy/rules.py`. We only use these default constraints in some situations. Technically,
     # MyPy only requires 3.5+, but some popular plugins like `django-stubs` require 3.6+. Because
@@ -50,9 +50,11 @@ class MyPy(PythonToolBase):
             member_type=target_option,
             advanced=True,
             help=(
-                "An optional list of `mypy_source_plugin` target addresses. This allows you to "
-                "load custom plugins defined in source code. Run `./pants help mypy_source_plugin` "
-                "for instructions, including how to load third-party plugins."
+                "An optional list of `python_library` target addresses to load first-party "
+                "plugins.\n\nYou must also set `plugins = path.to.module` in your `mypy.ini`, and "
+                "set the `[mypy].config` option in your `pants.toml`.\n\nTo instead load "
+                "third-party plugins, set the option `[mypy].extra_requirements` and set the "
+                "`plugins` option in `mypy.ini`."
             ),
         )
 

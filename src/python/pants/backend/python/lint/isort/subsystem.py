@@ -8,9 +8,9 @@ from pants.option.custom_types import file_option, shell_str
 
 
 class Isort(PythonToolBase):
-    """The Python import sorter tool (https://timothycrosley.github.io/isort/)."""
-
     options_scope = "isort"
+    help = "The Python import sorter tool (https://timothycrosley.github.io/isort/)."
+
     default_version = "isort[pyproject]>=5.5.1,<5.6"
     default_extra_requirements = ["setuptools"]
     register_interpreter_constraints = True

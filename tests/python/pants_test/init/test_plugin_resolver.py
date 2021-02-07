@@ -6,7 +6,7 @@ import shutil
 from contextlib import contextmanager
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Iterable
+from typing import Dict, Iterable, Optional
 
 import pytest
 from pex.interpreter import PythonInterpreter
@@ -20,248 +20,265 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Sna
 from pants.engine.process import Process, ProcessResult
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import (
     PY_36,
     PY_37,
     python_interpreter_path,
     skip_unless_python36_and_python37_present,
 )
-from pants.testutil.rule_runner import QueryRule
-from pants.testutil.test_base import TestBase
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree, touch
 
 DEFAULT_VERSION = "0.0.0"
 
 
-class PluginResolverTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
             *pex.rules(),
             *external_tool.rules(),
             *archive.rules(),
-            QueryRule(Pex, (PexRequest,)),
-            QueryRule(Process, (PexProcess,)),
-            QueryRule(ProcessResult, (Process,)),
-        )
+            QueryRule(Pex, [PexRequest]),
+            QueryRule(Process, [PexProcess]),
+            QueryRule(ProcessResult, [Process]),
+        ]
+    )
 
-    def _create_pex(self) -> Pex:
-        return self.request(
-            Pex,
-            [
-                PexRequest(
-                    output_filename="setup-py-runner.pex",
-                    internal_only=True,
-                    requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"]),
-                ),
-                create_options_bootstrapper(args=["--backend-packages=pants.backend.python"]),
-            ],
-        )
 
-    def _run_setup_py(
-        self, plugin: str, version: str, setup_py_args: Iterable[str], install_dir: str
-    ) -> None:
-        pex_obj = self._create_pex()
-        source_digest = self.request(
-            Digest,
-            [
-                CreateDigest(
-                    [
-                        FileContent(
-                            "setup.py",
-                            dedent(
-                                f"""
-                    from setuptools import setup
+def _create_pex(rule_runner: RuleRunner) -> Pex:
+    rule_runner.set_options(["--backend-packages=pants.backend.python"])
+    request = PexRequest(
+        output_filename="setup-py-runner.pex",
+        internal_only=True,
+        requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"]),
+    )
+    return rule_runner.request(Pex, [request])
 
-                    setup(name="{plugin}", version="{version or DEFAULT_VERSION}")
-                """
-                            ).encode(),
-                        )
-                    ]
-                )
-            ],
-        )
-        merged_digest = self.request(Digest, [MergeDigests([pex_obj.digest, source_digest])])
 
-        process = Process(
-            argv=("python", "setup-py-runner.pex", "setup.py") + tuple(setup_py_args),
-            # We reasonably expect there to be a python interpreter on the test-running
-            # process's path.
-            env={"PATH": os.getenv("PATH", "")},
-            input_digest=merged_digest,
-            description="Run setup.py",
-            output_directories=("dist/",),
-        )
-        result = self.request(ProcessResult, [process])
-        result_snapshot = self.request(Snapshot, [result.output_digest])
-        self.scheduler.write_digest(result.output_digest, path_prefix="output")
-        safe_mkdir(install_dir)
-        for path in result_snapshot.files:
-            shutil.copy(PurePath(self.build_root, "output", path), install_dir)
+def _run_setup_py(
+    rule_runner: RuleRunner,
+    plugin: str,
+    version: Optional[str],
+    setup_py_args: Iterable[str],
+    install_dir: str,
+) -> None:
+    pex_obj = _create_pex(rule_runner)
+    setup_py_file = FileContent(
+        "setup.py",
+        dedent(
+            f"""
+                from setuptools import setup
 
+                setup(name="{plugin}", version="{version or DEFAULT_VERSION}")
+            """
+        ).encode(),
+    )
+    source_digest = rule_runner.request(
+        Digest,
+        [CreateDigest([setup_py_file])],
+    )
+    merged_digest = rule_runner.request(Digest, [MergeDigests([pex_obj.digest, source_digest])])
+
+    # This should run the Pex using the same interpreter used to create it. We must set the `PATH` so that the shebang
+    # works.
+    process = Process(
+        argv=("./setup-py-runner.pex", "setup.py", *setup_py_args),
+        env={"PATH": os.getenv("PATH", "")},
+        input_digest=merged_digest,
+        description="Run setup.py",
+        output_directories=("dist/",),
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    result_snapshot = rule_runner.request(Snapshot, [result.output_digest])
+    rule_runner.scheduler.write_digest(result.output_digest, path_prefix="output")
+    safe_mkdir(install_dir)
+    for path in result_snapshot.files:
+        shutil.copy(PurePath(rule_runner.build_root, "output", path), install_dir)
+
+
+@contextmanager
+def plugin_resolution(
+    rule_runner: RuleRunner, *, interpreter=None, chroot=None, plugins=None, sdist=True
+):
     @contextmanager
-    def plugin_resolution(self, *, interpreter=None, chroot=None, plugins=None, sdist=True):
-        @contextmanager
-        def provide_chroot(existing):
-            if existing:
-                yield existing, False
-            else:
-                with temporary_dir() as new_chroot:
-                    yield new_chroot, True
+    def provide_chroot(existing):
+        if existing:
+            yield existing, False
+        else:
+            with temporary_dir() as new_chroot:
+                yield new_chroot, True
 
-        with provide_chroot(chroot) as (root_dir, create_artifacts):
-            env = {}
-            repo_dir = None
-            if plugins:
-                repo_dir = os.path.join(root_dir, "repo")
-                env.update(
-                    PANTS_PYTHON_REPOS_REPOS=f"[{repo_dir!r}]",
-                    PANTS_PYTHON_REPOS_INDEXES="[]",
-                    PANTS_PYTHON_SETUP_RESOLVER_CACHE_TTL="1",
-                )
-                plugin_list = []
-                for plugin in plugins:
-                    version = None
-                    if isinstance(plugin, tuple):
-                        plugin, version = plugin
-                    plugin_list.append(f"{plugin}=={version}" if version else plugin)
-                    if create_artifacts:
-                        setup_py_args = ["sdist" if sdist else "bdist_wheel", "--dist-dir", "dist/"]
-                        self._run_setup_py(plugin, version, setup_py_args, repo_dir)
-                env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
-                env["PANTS_PLUGIN_CACHE_DIR"] = os.path.join(root_dir, "plugin-cache")
-
-            configpath = os.path.join(root_dir, "pants.toml")
-            if create_artifacts:
-                touch(configpath)
-            args = [f"--pants-config-files=['{configpath}']"]
-
-            options_bootstrapper = OptionsBootstrapper.create(
-                env=env, args=args, allow_pantsrc=False
+    with provide_chroot(chroot) as (root_dir, create_artifacts):
+        env: Dict[str, str] = {}
+        repo_dir = None
+        if plugins:
+            repo_dir = os.path.join(root_dir, "repo")
+            env.update(
+                PANTS_PYTHON_REPOS_REPOS=f"[{repo_dir!r}]",
+                PANTS_PYTHON_REPOS_INDEXES="[]",
+                PANTS_PYTHON_SETUP_RESOLVER_CACHE_TTL="1",
             )
-            plugin_resolver = PluginResolver(options_bootstrapper, interpreter=interpreter)
-            cache_dir = plugin_resolver.plugin_cache_dir
+            plugin_list = []
+            for plugin in plugins:
+                version = None
+                if isinstance(plugin, tuple):
+                    plugin, version = plugin
+                plugin_list.append(f"{plugin}=={version}" if version else plugin)
+                if create_artifacts:
+                    setup_py_args = ["sdist" if sdist else "bdist_wheel", "--dist-dir", "dist/"]
+                    _run_setup_py(rule_runner, plugin, version, setup_py_args, repo_dir)
+            env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
+            env["PANTS_PLUGIN_CACHE_DIR"] = os.path.join(root_dir, "plugin-cache")
 
-            working_set = plugin_resolver.resolve(WorkingSet(entries=[]))
-            for dist in working_set:
-                assert (
-                    Path(os.path.realpath(cache_dir))
-                    in Path(os.path.realpath(dist.location)).parents
+        configpath = os.path.join(root_dir, "pants.toml")
+        if create_artifacts:
+            touch(configpath)
+        args = [f"--pants-config-files=['{configpath}']"]
+
+        options_bootstrapper = OptionsBootstrapper.create(env=env, args=args, allow_pantsrc=False)
+        plugin_resolver = PluginResolver(options_bootstrapper, interpreter=interpreter)
+        cache_dir = plugin_resolver.plugin_cache_dir
+
+        working_set = plugin_resolver.resolve(WorkingSet(entries=[]))
+        for dist in working_set:
+            assert (
+                Path(os.path.realpath(cache_dir)) in Path(os.path.realpath(dist.location)).parents
+            )
+
+        yield working_set, root_dir, repo_dir, cache_dir
+
+
+def test_no_plugins(rule_runner: RuleRunner) -> None:
+    with plugin_resolution(rule_runner) as (working_set, _, _, _):
+        assert [] == list(working_set)
+
+
+def test_plugins_sdist(rule_runner: RuleRunner) -> None:
+    _do_test_plugins(rule_runner, True)
+
+
+def test_plugins_bdist(rule_runner: RuleRunner) -> None:
+    _do_test_plugins(rule_runner, False)
+
+
+def _do_test_plugins(rule_runner: RuleRunner, sdist: bool) -> None:
+    with plugin_resolution(rule_runner, plugins=[("jake", "1.2.3"), "jane"], sdist=sdist) as (
+        working_set,
+        _,
+        _,
+        cache_dir,
+    ):
+
+        def assert_dist_version(name, expected_version):
+            dist = working_set.find(Requirement.parse(name))
+            assert expected_version == dist.version
+
+        assert 2 == len(working_set.entries)
+
+        assert_dist_version(name="jake", expected_version="1.2.3")
+        assert_dist_version(name="jane", expected_version=DEFAULT_VERSION)
+
+
+def test_exact_requirements_sdist(rule_runner: RuleRunner) -> None:
+    _do_test_exact_requirements(rule_runner, True)
+
+
+def test_exact_requirements_bdist(rule_runner: RuleRunner) -> None:
+    _do_test_exact_requirements(rule_runner, False)
+
+
+def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
+    with plugin_resolution(
+        rule_runner, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")], sdist=sdist
+    ) as results:
+        working_set, chroot, repo_dir, cache_dir = results
+
+        # Kill the repo source dir and re-resolve.  If the PluginResolver truly detects exact
+        # requirements it should skip any resolves and load directly from the still intact
+        # cache.
+        safe_rmtree(repo_dir)
+
+        with plugin_resolution(
+            rule_runner, chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
+        ) as results2:
+
+            working_set2, _, _, _ = results2
+
+            assert list(working_set) == list(working_set2)
+
+
+@skip_unless_python36_and_python37_present
+def test_exact_requirements_interpreter_change_sdist(rule_runner: RuleRunner) -> None:
+    _do_test_exact_requirements_interpreter_change(rule_runner, True)
+
+
+@skip_unless_python36_and_python37_present
+def test_exact_requirements_interpreter_change_bdist(rule_runner: RuleRunner) -> None:
+    _do_test_exact_requirements_interpreter_change(rule_runner, False)
+
+
+def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: bool) -> None:
+    python36 = PythonInterpreter.from_binary(python_interpreter_path(PY_36))
+    python37 = PythonInterpreter.from_binary(python_interpreter_path(PY_37))
+
+    with plugin_resolution(
+        rule_runner,
+        interpreter=python36,
+        plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
+        sdist=sdist,
+    ) as results:
+
+        working_set, chroot, repo_dir, cache_dir = results
+
+        safe_rmtree(repo_dir)
+        with pytest.raises(Unsatisfiable):
+            with plugin_resolution(
+                rule_runner,
+                interpreter=python37,
+                chroot=chroot,
+                plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
+            ):
+                pytest.fail(
+                    "Plugin re-resolution is expected for an incompatible interpreter and it is "
+                    "expected to fail since we removed the dist `repo_dir` above."
                 )
 
-            yield working_set, root_dir, repo_dir, cache_dir
+        # But for a compatible interpreter the exact resolve results should be re-used and load
+        # directly from the still in-tact cache.
+        with plugin_resolution(
+            rule_runner,
+            interpreter=python36,
+            chroot=chroot,
+            plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
+        ) as results2:
 
-    def test_no_plugins(self) -> None:
-        with self.plugin_resolution() as (working_set, _, _, _):
-            assert [] == list(working_set)
+            working_set2, _, _, _ = results2
+            assert list(working_set) == list(working_set2)
 
-    def test_plugins_sdist(self) -> None:
-        self._do_test_plugins(True)
 
-    def test_plugins_bdist(self) -> None:
-        self._do_test_plugins(False)
+def test_inexact_requirements_sdist(rule_runner: RuleRunner) -> None:
+    _do_test_inexact_requirements(rule_runner, True)
 
-    def _do_test_plugins(self, sdist: bool) -> None:
-        with self.plugin_resolution(plugins=[("jake", "1.2.3"), "jane"], sdist=sdist) as (
-            working_set,
-            _,
-            _,
-            cache_dir,
-        ):
 
-            def assert_dist_version(name, expected_version):
-                dist = working_set.find(Requirement.parse(name))
-                assert expected_version == dist.version
+def test_inexact_requirements_bdist(rule_runner: RuleRunner) -> None:
+    _do_test_inexact_requirements(rule_runner, False)
 
-            assert 2 == len(working_set.entries)
 
-            assert_dist_version(name="jake", expected_version="1.2.3")
-            assert_dist_version(name="jane", expected_version=DEFAULT_VERSION)
+def _do_test_inexact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
+    with plugin_resolution(
+        rule_runner, plugins=[("jake", "1.2.3"), "jane"], sdist=sdist
+    ) as results:
 
-    def test_exact_requirements_sdist(self) -> None:
-        self._do_test_exact_requirements(True)
+        working_set, chroot, repo_dir, cache_dir = results
 
-    def test_exact_requirements_bdist(self) -> None:
-        self._do_test_exact_requirements(False)
+        # Kill the cache and the repo source dir and wait past our 1s test TTL, if the PluginResolver
+        # truly detects inexact plugin requirements it should skip perma-caching and fall through to
+        # a pex resolve and then fail.
+        safe_rmtree(repo_dir)
+        safe_rmtree(cache_dir)
 
-    def _do_test_exact_requirements(self, sdist: bool) -> None:
-        with self.plugin_resolution(
-            plugins=[("jake", "1.2.3"), ("jane", "3.4.5")], sdist=sdist
-        ) as results:
-            working_set, chroot, repo_dir, cache_dir = results
-
-            # Kill the repo source dir and re-resolve.  If the PluginResolver truly detects exact
-            # requirements it should skip any resolves and load directly from the still intact
-            # cache.
-            safe_rmtree(repo_dir)
-
-            with self.plugin_resolution(
-                chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
-            ) as results2:
-
-                working_set2, _, _, _ = results2
-
-                assert list(working_set) == list(working_set2)
-
-    @skip_unless_python36_and_python37_present
-    def test_exact_requirements_interpreter_change_sdist(self) -> None:
-        self._do_test_exact_requirements_interpreter_change(True)
-
-    @skip_unless_python36_and_python37_present
-    def test_exact_requirements_interpreter_change_bdist(self) -> None:
-        self._do_test_exact_requirements_interpreter_change(False)
-
-    def _do_test_exact_requirements_interpreter_change(self, sdist: bool) -> None:
-        python36 = PythonInterpreter.from_binary(python_interpreter_path(PY_36))
-        python37 = PythonInterpreter.from_binary(python_interpreter_path(PY_37))
-
-        with self.plugin_resolution(
-            interpreter=python36, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")], sdist=sdist
-        ) as results:
-
-            working_set, chroot, repo_dir, cache_dir = results
-
-            safe_rmtree(repo_dir)
-            with pytest.raises(Unsatisfiable):
-                with self.plugin_resolution(
-                    interpreter=python37,
-                    chroot=chroot,
-                    plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
-                ):
-                    pytest.fail(
-                        "Plugin re-resolution is expected for an incompatible interpreter and it is "
-                        "expected to fail since we removed the dist `repo_dir` above."
-                    )
-
-            # But for a compatible interpreter the exact resolve results should be re-used and load
-            # directly from the still in-tact cache.
-            with self.plugin_resolution(  # type: ignore[unreachable]
-                interpreter=python36, chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
-            ) as results2:
-
-                working_set2, _, _, _ = results2
-                assert list(working_set) == list(working_set2)
-
-    def test_inexact_requirements_sdist(self) -> None:
-        self._do_test_inexact_requirements(True)
-
-    def test_inexact_requirements_bdist(self) -> None:
-        self._do_test_inexact_requirements(False)
-
-    def _do_test_inexact_requirements(self, sdist: bool) -> None:
-        with self.plugin_resolution(plugins=[("jake", "1.2.3"), "jane"], sdist=sdist) as results:
-
-            working_set, chroot, repo_dir, cache_dir = results
-
-            # Kill the cache and the repo source dir and wait past our 1s test TTL, if the PluginResolver
-            # truly detects inexact plugin requirements it should skip perma-caching and fall through to
-            # a pex resolve and then fail.
-            safe_rmtree(repo_dir)
-            safe_rmtree(cache_dir)
-
-            with pytest.raises(Unsatisfiable):
-                with self.plugin_resolution(chroot=chroot, plugins=[("jake", "1.2.3"), "jane"]):
-                    pytest.fail("Should not reach here, should raise first.")
+        with pytest.raises(Unsatisfiable):
+            with plugin_resolution(rule_runner, chroot=chroot, plugins=[("jake", "1.2.3"), "jane"]):
+                pytest.fail("Should not reach here, should raise first.")

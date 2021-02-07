@@ -14,6 +14,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     FieldSet,
+    NoApplicableTargetsBehavior,
     StringField,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -46,46 +47,25 @@ class BuiltPackage:
 
 
 class OutputPathField(StringField):
-    """Where the built asset should be located.
-
-    If undefined, this will use the path to the the BUILD, followed by the target name. For
-    example, `src/python/project:app` would be `src.python.project/app.ext`.
-
-    When running `./pants package`, this path will be prefixed by `--distdir` (e.g. `dist/`).
-
-    Warning: setting this value risks naming collisions with other package targets you may have.
-    """
-
     alias = "output_path"
+    help = (
+        "Where the built asset should be located.\n\nIf undefined, this will use the path to the "
+        "BUILD file, followed by the target name. For example, `src/python/project:app` would be "
+        "`src.python.project/app.ext.\n\nWhen running `./pants package`, this path will be "
+        "prefixed by `--distdir` (e.g. `dist/`).\n\nWarning: setting this value risks naming "
+        "collisions with other package targets you may have."
+    )
 
-    def value_or_default(
-        self, address: Address, *, file_ending: str, use_legacy_format: bool
-    ) -> str:
+    def value_or_default(self, address: Address, *, file_ending: str) -> str:
         assert not file_ending.startswith("."), "`file_ending` should not start with `.`"
-        if self.value is not None:
-            return self.value
-        disambiguated = os.path.join(
+        return self.value or os.path.join(
             address.spec_path.replace(os.sep, "."), f"{address.target_name}.{file_ending}"
         )
-        if use_legacy_format:
-            ambiguous_name = f"{address.target_name}.{file_ending}"
-            logger.warning(
-                f"Writing to the legacy subpath {repr(ambiguous_name)} for the target {address}. "
-                f"This location may not be unique. An upcoming version of Pants will switch to "
-                f"writing to the fully-qualified subpath: {disambiguated}.\n\nYou can make that "
-                "switch now (and silence this warning) by setting "
-                "`pants_distdir_legacy_paths = false` in the [GLOBAL] section "
-                "of pants.toml.\n\nAlternatively, you can set the field `output_path` on the "
-                f"target {address} to a hardcoded value."
-            )
-            return ambiguous_name
-        return disambiguated
 
 
 class PackageSubsystem(GoalSubsystem):
-    """Create a distributable package."""
-
     name = "package"
+    help = "Create a distributable package."
 
     required_union_implementations = (PackageFieldSet,)
 
@@ -101,9 +81,12 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
         TargetRootsToFieldSetsRequest(
             PackageFieldSet,
             goal_description="the `package` goal",
-            error_if_no_applicable_targets=True,
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
         ),
     )
+    if not target_roots_to_field_sets.field_sets:
+        return Package(exit_code=0)
+
     packages = await MultiGet(
         Get(BuiltPackage, PackageFieldSet, field_set)
         for field_set in target_roots_to_field_sets.field_sets

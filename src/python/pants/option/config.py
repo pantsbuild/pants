@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import configparser
 import getpass
 import io
@@ -18,7 +20,7 @@ from typing import Any, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple
 import toml
 from typing_extensions import Literal
 
-from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
+from pants.base.build_environment import get_buildroot
 from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
 from pants.util.ordered_set import OrderedSet
@@ -130,7 +132,7 @@ class Config(ABC):
     @classmethod
     def _parse_toml(
         cls, config_content: str, normalized_seed_values: Dict[str, str]
-    ) -> "_ConfigValues":
+    ) -> _ConfigValues:
         """Attempt to parse as TOML, raising an exception on failure."""
         toml_values = cast(Dict[str, Any], toml.loads(config_content))
         toml_values["DEFAULT"] = {
@@ -152,8 +154,6 @@ class Config(ABC):
             "buildroot": buildroot,
             "homedir": os.path.expanduser("~"),
             "user": getpass.getuser(),
-            "pants_bootstrapdir": get_pants_cachedir(),
-            "pants_configdir": get_pants_configdir(),
         }
 
         def update_seed_values(key: str, *, default_dir: str) -> None:
@@ -537,12 +537,9 @@ class _SingleFileConfig(Config):
 
 @dataclass(frozen=True)
 class _ChainedConfig(Config):
-    """Config read from multiple sources.
+    """Config read from multiple sources."""
 
-    :param chained_configs: A tuple of Config instances to chain. Later instances take precedence
-                            over earlier ones.
-    """
-
+    # Config instances to chain. Later instances take precedence over earlier ones.
     chained_configs: Tuple[_SingleFileConfig, ...]
 
     @property
@@ -616,7 +613,7 @@ class TomlSerializer:
       }
     """
 
-    parsed: Dict[str, Dict[str, Union[int, float, str, bool, List, Dict]]]
+    parsed: Mapping[str, Dict[str, Union[int, float, str, bool, List, Dict]]]
 
     def normalize(self) -> Dict:
         result: Dict = {}

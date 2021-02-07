@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import logging
 import os
@@ -15,6 +17,7 @@ from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import docs_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -39,9 +42,7 @@ class SourceRootError(Exception):
     """An error related to SourceRoot computation."""
 
     def __init__(self, msg: str):
-        super().__init__(
-            f"{msg}See https://www.pantsbuild.org/docs/source-roots for how to define source roots."
-        )
+        super().__init__(f"{msg}See {docs_url('source-roots')} for how to define source roots.")
 
 
 class InvalidSourceRootPatternError(SourceRootError):
@@ -89,25 +90,14 @@ class SourceRootPatternMatcher:
 
 
 class SourceRootConfig(Subsystem):
-    """Configuration for roots of source trees."""
-
     options_scope = "source"
+    help = "Configuration for roots of source trees."
 
     DEFAULT_ROOT_PATTERNS = ["/", "src", "src/python", "src/py"]
 
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--unmatched",
-            choices=["create", "fail"],
-            default="create",
-            advanced=True,
-            help="Configures the behavior when sources are defined outside of any configured "
-            "source root. `create` will cause a source root to be implicitly created at "
-            "the definition location of the sources; `fail` will trigger an error.",
-        )
-
         register(
             "--root-patterns",
             metavar='["pattern1", "pattern2", ...]',
@@ -121,9 +111,8 @@ class SourceRootConfig(Subsystem):
             "`<buildroot>/project1/src/python`. A `*` wildcard will match a single path segment, "
             "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
             "Use `/` to signify that the buildroot itself is a source root. "
-            "See https://www.pantsbuild.org/docs/source-roots.",
+            f"See {docs_url('source-roots')}",
         )
-
         register(
             "--marker-filenames",
             metavar="filename",
@@ -163,7 +152,7 @@ class SourceRootsRequest:
                 raise ValueError(f"SourceRootRequest path must be relative: {path}")
 
     @classmethod
-    def for_files(cls, file_paths: Iterable[str]) -> "SourceRootsRequest":
+    def for_files(cls, file_paths: Iterable[str]) -> SourceRootsRequest:
         """Create a request for the source root for the given file."""
         return cls({PurePath(file_path) for file_path in file_paths}, ())
 
@@ -185,19 +174,19 @@ class SourceRootRequest(EngineAwareParameter):
             raise ValueError(f"SourceRootRequest path must be relative: {self.path}")
 
     @classmethod
-    def for_file(cls, file_path: str) -> "SourceRootRequest":
+    def for_file(cls, file_path: str) -> SourceRootRequest:
         """Create a request for the source root for the given file."""
         # The file itself cannot be a source root, so we may as well start the search
         # from its enclosing directory, and save on some superfluous checking.
         return cls(PurePath(file_path).parent)
 
     @classmethod
-    def for_address(cls, address: Address) -> "SourceRootRequest":
+    def for_address(cls, address: Address) -> SourceRootRequest:
         # Note that we don't use for_file() here because the spec_path is a directory.
         return cls(PurePath(address.spec_path))
 
     @classmethod
-    def for_target(cls, target: Target) -> "SourceRootRequest":
+    def for_target(cls, target: Target) -> SourceRootRequest:
         return cls.for_address(target.address)
 
     def debug_hint(self) -> str:

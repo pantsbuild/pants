@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import itertools
 import logging
@@ -8,12 +10,9 @@ from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from pkg_resources import Requirement, parse_requirements
+from pkg_resources import Requirement
 
-from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonRequirementsField,
-)
+from pants.backend.python.target_types import PythonRequirementsField, parse_requirements_file
 from pants.backend.python.util_rules.pex import (
     PexInterpreterConstraints,
     PexPlatforms,
@@ -143,7 +142,7 @@ class PexFromTargetsRequest:
         hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints] = None,
         zip_safe: bool = False,
         direct_deps_only: bool = False,
-    ) -> "PexFromTargetsRequest":
+    ) -> PexFromTargetsRequest:
         """Create an instance that can be used to get a requirements pex.
 
         Useful to ensure that these requests are uniform (e.g., the using the same output filename),
@@ -208,13 +207,8 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     if request.hardcoded_interpreter_constraints:
         interpreter_constraints = request.hardcoded_interpreter_constraints
     else:
-        calculated_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-            (
-                tgt[PythonInterpreterCompatibility]
-                for tgt in all_targets
-                if tgt.has_field(PythonInterpreterCompatibility)
-            ),
-            python_setup,
+        calculated_constraints = PexInterpreterConstraints.create_from_targets(
+            all_targets, python_setup
         )
         # If there are no targets, we fall back to the global constraints. This is relevant,
         # for example, when running `./pants repl` with no specs.
@@ -252,7 +246,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             ),
         )
         constraints_file_reqs = set(
-            parse_requirements(next(iter(constraints_file_contents)).content.decode())
+            parse_requirements_file(
+                constraints_file_contents[0].content.decode(),
+                rel_path=python_setup.requirement_constraints,
+            )
         )
         constraint_file_projects = {
             canonicalize_project_name(req.project_name) for req in constraints_file_reqs

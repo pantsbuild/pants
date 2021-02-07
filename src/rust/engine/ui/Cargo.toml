@@ -8,9 +8,8 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 path = "src/console_ui.rs"
 
 [dependencies]
+futures = "0.3"
 indicatif = "0.14.0"
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
 indexmap = "1.4"
 uuid = { version = "0.7", features = ["v4"] }
 logging = { path = "../logging" }

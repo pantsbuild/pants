@@ -63,20 +63,6 @@ class PythonToolBase(Subsystem):
                 default=cls.default_interpreter_constraints,
                 help="Python interpreter constraints for this tool.",
             )
-        else:
-            register(
-                "--interpreter-constraints",
-                type=list,
-                advanced=True,
-                default=[],
-                help="Python interpreter constraints for this tool.",
-                removal_version="2.1.0.dev0",
-                removal_hint=(
-                    "This option no longer does anything, as Pants auto-configures the interpreter "
-                    f"constraints for {cls.options_scope} based on your code's interpreter "
-                    "constraints."
-                ),
-            )
 
     @property
     def version(self) -> Optional[str]:

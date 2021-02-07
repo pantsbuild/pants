@@ -3,28 +3,9 @@
 
 import os
 
-from pants.base.deprecated import warn_or_error
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import collect_rules, goal_rule
 from pants.option.custom_types import file_option
-
-
-class DeprecationWarningSubsystem(GoalSubsystem):
-    """Make a deprecation warning so that warning filters can be integration tested."""
-
-    name = "deprecation-warning"
-
-
-class DeprecationWarningGoal(Goal):
-    subsystem_cls = DeprecationWarningSubsystem
-
-
-@goal_rule
-async def show_warning() -> DeprecationWarningGoal:
-    warn_or_error(
-        removal_version="999.999.9.dev9", deprecated_entity_description="This is a test warning!",
-    )
-    return DeprecationWarningGoal(0)
 
 
 class LifecycleStubsSubsystem(GoalSubsystem):

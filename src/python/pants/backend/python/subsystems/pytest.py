@@ -8,9 +8,8 @@ from pants.option.subsystem import Subsystem
 
 
 class PyTest(Subsystem):
-    """The pytest Python test framework (https://docs.pytest.org/)."""
-
     options_scope = "pytest"
+    help = "The pytest Python test framework (https://docs.pytest.org/)."
 
     @classmethod
     def register_options(cls, register):
@@ -27,7 +26,7 @@ class PyTest(Subsystem):
             # This should be kept in sync with `requirements.txt`.
             # TODO: To fix this, we should allow using a `target_option` referring to a
             #  `python_requirement_library` to override the version.
-            default="pytest>=6.0.1,<6.1",
+            default="pytest>=6.0.1,<6.3",
             advanced=True,
             help="Requirement string for Pytest.",
         )
@@ -35,13 +34,10 @@ class PyTest(Subsystem):
             "--pytest-plugins",
             type=list,
             advanced=True,
-            default=[
-                "pytest-cov>=2.10.1,<2.11",
-                # NB: zipp has frequently destabilized builds due to floating transitive versions
-                # under pytest.
-                "zipp==2.1.0",
-            ],
-            help="Requirement strings for any plugins or additional requirements you'd like to use.",
+            default=["pytest-cov>=2.10.1,<2.12"],
+            help=(
+                "Requirement strings for any plugins or additional requirements you'd like to use."
+            ),
         )
         register(
             "--timeouts",

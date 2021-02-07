@@ -1,12 +1,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import copy
 import logging
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import resolve_conflicting_options, warn_or_error
+from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
 from pants.option.option_util import is_list_option
@@ -114,7 +116,7 @@ class Options:
         known_scope_infos: Iterable[ScopeInfo],
         args: Sequence[str],
         bootstrap_option_values: Optional[OptionValueContainer] = None,
-    ) -> "Options":
+    ) -> Options:
         """Create an Options instance.
 
         :param env: a dict of environment variables.
@@ -139,17 +141,7 @@ class Options:
             )
 
         if bootstrap_option_values:
-            spec_files = resolve_conflicting_options(
-                old_option="spec_file",
-                new_option="spec_files",
-                old_scope="",
-                new_scope="",
-                old_container=bootstrap_option_values,
-                new_container=bootstrap_option_values,
-            )
-            # TODO: After --spec-file is removed, replace the above with:
-            # spec_files = bootstrap_option_values.spec_files
-
+            spec_files = bootstrap_option_values.spec_files
             if spec_files:
                 for spec_file in spec_files:
                     with open(spec_file, "r") as f:
@@ -274,7 +266,7 @@ class Options:
                 "remove.\n(Specify --no-verify-config to disable this check.)"
             )
 
-    def drop_flag_values(self) -> "Options":
+    def drop_flag_values(self) -> Options:
         """Returns a copy of these options that ignores values specified via flags.
 
         Any pre-cached option values are cleared and only option values that come from option

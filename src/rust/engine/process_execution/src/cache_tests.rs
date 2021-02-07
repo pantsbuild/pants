@@ -1,18 +1,18 @@
-use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
-  Process, ProcessMetadata,
-};
-
 use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
 
-use futures::compat::Future01CompatExt;
 use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::relative_paths;
+use workunit_store::WorkunitStore;
+
+use crate::{
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
+  Process, ProcessMetadata,
+};
 
 struct RoundtripResults {
   uncached: Result<FallibleProcessResultWithPlatform, String>,
@@ -51,17 +51,11 @@ fn create_cached_runner(
   )
   .unwrap();
 
-  let metadata = ProcessMetadata {
-    instance_name: None,
-    cache_key_gen_version: None,
-    platform_properties: vec![],
-  };
-
   let runner = Box::new(crate::cache::CommandRunner::new(
     local.into(),
     process_execution_store,
     store,
-    metadata,
+    ProcessMetadata::default(),
   ));
 
   (runner, cache_dir)
@@ -118,12 +112,14 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
 
 #[tokio::test]
 async fn cache_success() {
+  WorkunitStore::setup_for_tests();
   let results = run_roundtrip(0).await;
   assert_eq!(results.uncached, results.maybe_cached);
 }
 
 #[tokio::test]
 async fn failures_not_cached() {
+  WorkunitStore::setup_for_tests();
   let results = run_roundtrip(1).await;
   assert_ne!(results.uncached, results.maybe_cached);
   assert_eq!(results.uncached.unwrap().exit_code, 1);
@@ -132,6 +128,8 @@ async fn failures_not_cached() {
 
 #[tokio::test]
 async fn recover_from_missing_store_contents() {
+  WorkunitStore::setup_for_tests();
+
   let (local, store, _local_runner_dir) = create_local_runner();
   let (caching, _cache_dir) = create_cached_runner(local, store.clone());
   let (process, _script_path, _script_dir) = create_script(0);
@@ -152,17 +150,18 @@ async fn recover_from_missing_store_contents() {
       .unwrap()
       .unwrap();
     let output_child_digest = output_dir
-      .get_files()
+      .files
       .first()
       .unwrap()
-      .get_digest()
+      .digest
+      .as_ref()
+      .unwrap()
       .try_into()
       .unwrap();
     let removed = store.remove_file(output_child_digest).await.unwrap();
     assert!(removed);
     assert!(store
       .contents_for_directory(output_dir_digest)
-      .compat()
       .await
       .err()
       .is_some())
@@ -177,7 +176,6 @@ async fn recover_from_missing_store_contents() {
   // And that the entire output directory can be loaded.
   assert!(store
     .contents_for_directory(second_result.output_directory)
-    .compat()
     .await
     .ok()
     .is_some())

@@ -1,10 +1,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from functools import total_ordering
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
 
 
 @total_ordering
@@ -19,16 +21,16 @@ class Rank(Enum):
 
     _rank: int
 
-    def __new__(cls, rank: int, display: str) -> "Rank":
+    def __new__(cls, rank: int, display: str) -> Rank:
         member: "Rank" = object.__new__(cls)
         member._value_ = display
         member._rank = rank
         return member
 
-    def __lt__(self, other: Any) -> Union["NotImplemented", bool]:
+    def __lt__(self, other: Any) -> bool:
         if type(other) != Rank:
             return NotImplemented
-        return self._rank < other._rank
+        return cast(bool, self._rank < other._rank)
 
 
 Value = Union[str, int, float, None, Dict, Enum, List]

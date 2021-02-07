@@ -22,8 +22,8 @@ python_integration_tests(
   name='exception_sink_integration_test',
   sources=['exception_sink_integration_test.py'],
   dependencies=[
-    'examples/src/python/example:hello_directory',
     'testprojects/src/python:coordinated_runs_directory',
+    'testprojects/src/python:hello_directory',
     'testprojects:pants_plugins_directory',
   ],
   uses_pants_run=True,

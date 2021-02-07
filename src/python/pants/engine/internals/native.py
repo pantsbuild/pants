@@ -17,16 +17,19 @@ from pants.engine.internals.native_engine import (
     PyGeneratorResponseBreak,
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
+    PyNailgunClient,
     PyNailgunServer,
     PyRemotingOptions,
     PyScheduler,
     PySession,
+    PySessionCancellationLatch,
     PyTasks,
     PyTypes,
 )
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import Get
 from pants.engine.unions import union
+from pants.option.global_options import ExecutionOptions
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
@@ -43,7 +46,7 @@ class Externs:
     def __init__(self, lib):
         self.lib = lib
 
-    _do_raise_keyboardinterrupt = bool(os.environ.get("_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS", False))
+    _do_raise_keyboardinterrupt_in = os.environ.get("_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS", None)
 
     def is_union(self, input_type):
         """Return whether or not a type is a member of a union."""
@@ -59,7 +62,10 @@ class Externs:
         self, func, arg
     ) -> Union[PyGeneratorResponseGet, PyGeneratorResponseGetMulti, PyGeneratorResponseBreak]:
         """Given a generator, send it the given value and return a response."""
-        if self._do_raise_keyboardinterrupt:
+        if (
+            self._do_raise_keyboardinterrupt_in
+            and self._do_raise_keyboardinterrupt_in in func.__name__
+        ):
             raise KeyboardInterrupt("ctrl-c interrupted execution of a ffi method!")
         try:
             res = func.send(arg)
@@ -100,6 +106,7 @@ class RawFdRunner(Protocol):
         args: Tuple[str, ...],
         env: Dict[str, str],
         working_directory: bytes,
+        cancellation_latch: PySessionCancellationLatch,
         stdin_fd: int,
         stdout_fd: int,
         stderr_fd: int,
@@ -113,7 +120,6 @@ class Native(metaclass=SingletonMetaclass):
     def __init__(self):
         self.externs = Externs(self.lib)
         self.lib.externs_set(self.externs)
-        self._executor = PyExecutor()
 
     class BinaryLocationError(Exception):
         pass
@@ -130,10 +136,16 @@ class Native(metaclass=SingletonMetaclass):
         use_color: bool,
         show_target: bool,
         log_levels_by_target: Mapping[str, LogLevel],
+        message_regex_filters: Iterable[str],
     ):
         log_levels_as_ints = {k: v.level for k, v in log_levels_by_target.items()}
         return self.lib.init_logging(
-            level, log_show_rust_3rdparty, use_color, show_target, log_levels_as_ints
+            level,
+            log_show_rust_3rdparty,
+            use_color,
+            show_target,
+            log_levels_as_ints,
+            tuple(message_regex_filters),
         )
 
     def set_per_run_log_path(self, path: Optional[str]) -> None:
@@ -143,9 +155,6 @@ class Native(metaclass=SingletonMetaclass):
 
     def default_cache_path(self) -> str:
         return cast(str, self.lib.default_cache_path())
-
-    def default_config_path(self) -> str:
-        return cast(str, self.lib.default_config_path())
 
     def setup_pantsd_logger(self, log_file_path):
         return self.lib.setup_pantsd_logger(log_file_path)
@@ -188,14 +197,19 @@ class Native(metaclass=SingletonMetaclass):
 
         Raises an exception if the server exited abnormally
         """
-        self.lib.nailgun_server_await_shutdown(self._executor, nailgun_server)
+        self.lib.nailgun_server_await_shutdown(nailgun_server)
 
-    def new_nailgun_server(self, port: int, runner: RawFdRunner) -> PyNailgunServer:
+    def new_nailgun_server(
+        self, executor: PyExecutor, port: int, runner: RawFdRunner
+    ) -> PyNailgunServer:
         """Creates a nailgun server with a requested port.
 
         Returns the server and the actual port it bound to.
         """
-        return cast(PyNailgunServer, self.lib.nailgun_server_create(self._executor, port, runner))
+        return cast(PyNailgunServer, self.lib.nailgun_server_create(executor, port, runner))
+
+    def new_nailgun_client(self, executor: PyExecutor, port: int) -> PyNailgunClient:
+        return cast(PyNailgunClient, self.lib.nailgun_client_create(executor, port))
 
     def new_tasks(self) -> PyTasks:
         return PyTasks()
@@ -208,15 +222,15 @@ class Native(metaclass=SingletonMetaclass):
         scheduler,
         dynamic_ui: bool,
         build_id,
-        should_report_workunits: bool,
         session_values: SessionValues,
+        cancellation_latch: PySessionCancellationLatch,
     ) -> PySession:
         return PySession(
             scheduler=scheduler,
             should_render_ui=dynamic_ui,
             build_id=build_id,
-            should_report_workunits=should_report_workunits,
             session_values=session_values,
+            cancellation_latch=cancellation_latch,
         )
 
     def new_scheduler(
@@ -229,7 +243,8 @@ class Native(metaclass=SingletonMetaclass):
         ca_certs_path: Optional[str],
         ignore_patterns: List[str],
         use_gitignore: bool,
-        execution_options,
+        executor: PyExecutor,
+        execution_options: ExecutionOptions,
         types: PyTypes,
     ) -> PyScheduler:
         """Create and return a native Scheduler."""
@@ -238,22 +253,24 @@ class Native(metaclass=SingletonMetaclass):
             execution_enable=execution_options.remote_execution,
             store_servers=execution_options.remote_store_server,
             execution_server=execution_options.remote_execution_server,
-            execution_process_cache_namespace=execution_options.remote_execution_process_cache_namespace,
+            execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,
             root_ca_certs_path=execution_options.remote_ca_certs_path,
-            oauth_bearer_token_path=execution_options.remote_oauth_bearer_token_path,
+            store_headers=tuple(execution_options.remote_store_headers.items()),
             store_thread_count=execution_options.remote_store_thread_count,
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,
             store_connection_limit=execution_options.remote_store_connection_limit,
+            store_initial_timeout=execution_options.remote_store_initial_timeout,
+            store_timeout_multiplier=execution_options.remote_store_timeout_multiplier,
+            store_maximum_timeout=execution_options.remote_store_maximum_timeout,
+            cache_eager_fetch=execution_options.remote_cache_eager_fetch,
             execution_extra_platform_properties=tuple(
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties
             ),
-            execution_headers=tuple(
-                (k, v) for (k, v) in execution_options.remote_execution_headers.items()
-            ),
+            execution_headers=tuple(execution_options.remote_execution_headers.items()),
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
         )
 
@@ -261,8 +278,6 @@ class Native(metaclass=SingletonMetaclass):
             local_parallelism=execution_options.process_execution_local_parallelism,
             remote_parallelism=execution_options.process_execution_remote_parallelism,
             cleanup_local_dirs=execution_options.process_execution_cleanup_local_dirs,
-            speculation_delay=execution_options.process_execution_speculation_delay,
-            speculation_strategy=execution_options.process_execution_speculation_strategy,
             use_local_cache=execution_options.process_execution_use_local_cache,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
             remote_cache_read=execution_options.remote_cache_read,
@@ -272,7 +287,7 @@ class Native(metaclass=SingletonMetaclass):
         return cast(
             PyScheduler,
             self.lib.scheduler_create(
-                self._executor,
+                executor,
                 tasks,
                 types,
                 # Project tree.

@@ -49,7 +49,6 @@ impl Executor {
   /// existence of a Handle does not prevent a Runtime from shutting down. This is guaranteed by
   /// the scope of the tokio::{test, main} macros.
   ///
-
   pub fn new() -> Executor {
     Executor {
       runtime: None,
@@ -62,14 +61,10 @@ impl Executor {
   ///
   /// Dropping all clones of the Executor will cause the Runtime to shut down.
   ///
-  pub fn new_owned() -> Result<Executor, String> {
+  pub fn new_owned(core_threads: usize, num_threads: usize) -> Result<Executor, String> {
     let runtime = Builder::new()
-      // This use of Builder (rather than just Runtime::new()) is to allow us to lower the
-      // max_threads setting. As of tokio `0.2.13`, the core threads default to num_cpus, and
-      // the max threads default to a fixed value of 512. In practice, it appears to be slower
-      // to allow 512 threads (although we should re-evaluate that periodically).
-      .core_threads(num_cpus::get())
-      .max_threads(num_cpus::get() * 4)
+      .core_threads(core_threads)
+      .max_threads(num_threads)
       .threaded_scheduler()
       .enable_all()
       .build()

@@ -7,7 +7,7 @@ from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.python.grpc_python_plugin import GrpcPythonPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
-from pants.backend.codegen.protobuf.target_types import ProtobufGrcpToggle, ProtobufSources
+from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import extract_pex, pex
 from pants.backend.python.util_rules.extract_pex import ExtractedPexDistributions
@@ -37,7 +37,7 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     Sources,
     TransitiveTargets,
-    TransitiveTargetsRequestLite,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -66,9 +66,8 @@ async def generate_python_from_protobuf(
     # Protoc needs all transitive dependencies on `protobuf_libraries` to work properly. It won't
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
-    # TODO(#10917): Use TransitiveTargets instead of TransitiveTargetsLite.
     transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequestLite([request.protocol_target.address])
+        TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])
     )
 
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
@@ -120,7 +119,7 @@ async def generate_python_from_protobuf(
             ExternalToolRequest,
             grpc_python_plugin.get_request(Platform.current),
         )
-        if request.protocol_target.get(ProtobufGrcpToggle).value
+        if request.protocol_target.get(ProtobufGrpcToggle).value
         else None
     )
 

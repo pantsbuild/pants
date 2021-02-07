@@ -29,13 +29,14 @@
 #![type_length_limit = "44109434"]
 
 use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::HashMap;
-use std::convert::TryInto;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bazel_protos::require_digest;
 use futures::future::FutureExt;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
@@ -84,7 +85,7 @@ pub fn digest_from_filepath(str: &str) -> Result<Digest, String> {
     .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?
     .parse::<usize>()
     .map_err(|err| format!("Invalid digest; size {} not a number: {}", str, err))?;
-  Ok(Digest(fingerprint, size_bytes))
+  Ok(Digest::new(fingerprint, size_bytes))
 }
 
 type Inode = u64;
@@ -114,8 +115,8 @@ struct ReaddirEntry {
 }
 
 enum Node {
-  Directory(bazel_protos::remote_execution::DirectoryNode),
-  File(bazel_protos::remote_execution::FileNode),
+  Directory(remexec::DirectoryNode),
+  File(remexec::FileNode),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -155,16 +156,16 @@ impl BuildResultFS {
 impl BuildResultFS {
   pub fn node_for_digest(
     &mut self,
-    directory: &bazel_protos::remote_execution::Directory,
+    directory: &remexec::Directory,
     filename: &str,
   ) -> Option<Node> {
-    for file in directory.get_files() {
-      if file.get_name() == filename {
+    for file in &directory.files {
+      if file.name == filename {
         return Some(Node::File(file.clone()));
       }
     }
-    for child in directory.get_directories() {
-      if child.get_name() == filename {
+    for child in &directory.directories {
+      if child.name == filename {
         return Some(Node::Directory(child.clone()));
       }
     }
@@ -262,7 +263,7 @@ impl BuildResultFS {
     self.inode_digest_cache.get(&inode).map(|f| {
       attr_for(
         inode,
-        f.digest.1 as u64,
+        f.digest.size_bytes as u64,
         fuse::FileType::RegularFile,
         if f.is_executable { 0o555 } else { 0o444 },
       )
@@ -344,25 +345,25 @@ impl BuildResultFS {
                 },
               ];
 
-              let directories = directory.get_directories().iter().map(|directory| {
+              let directories = directory.directories.iter().map(|directory| {
                 (
-                  directory.get_digest(),
-                  directory.get_name(),
+                  directory.digest.clone(),
+                  directory.name.clone(),
                   fuse::FileType::Directory,
                   true,
                 )
               });
-              let files = directory.get_files().iter().map(|file| {
+              let files = directory.files.iter().map(|file| {
                 (
-                  file.get_digest(),
-                  file.get_name(),
+                  file.digest.clone(),
+                  file.name.clone(),
                   fuse::FileType::RegularFile,
-                  file.get_is_executable(),
+                  file.is_executable,
                 )
               });
 
               for (digest, name, filetype, is_executable) in directories.chain(files) {
-                let child_digest = digest.try_into().map_err(|err| {
+                let child_digest = require_digest(digest.as_ref()).map_err(|err| {
                   error!("Error parsing digest: {:?}", err);
                   libc::ENOENT
                 })?;
@@ -480,19 +481,19 @@ impl fuse::Filesystem for BuildResultFS {
             })
             .and_then(|node| match node {
               Node::Directory(directory_node) => {
-                let digest = directory_node.get_digest().try_into().map_err(|err| {
+                let digest = require_digest(directory_node.digest.as_ref()).map_err(|err| {
                   error!("Error parsing digest: {:?}", err);
                   libc::ENOENT
                 })?;
                 self.dir_attr_for(digest)
               }
               Node::File(file_node) => {
-                let digest = file_node.get_digest().try_into().map_err(|err| {
+                let digest = require_digest(file_node.digest.as_ref()).map_err(|err| {
                   error!("Error parsing digest: {:?}", err);
                   libc::ENOENT
                 })?;
                 self
-                  .inode_for_file(digest, file_node.get_is_executable())
+                  .inode_for_file(digest, file_node.is_executable)
                   .map_err(|err| {
                     error!("Error loading file by digest {}: {}", filename, err);
                     libc::EINVAL
@@ -712,11 +713,23 @@ async fn main() {
     None
   };
 
-  let oauth_bearer_token = if let Some(path) = args.value_of("oauth-bearer-token-file") {
-    Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
-  } else {
-    None
-  };
+  let mut headers = BTreeMap::new();
+  if let Some(oauth_path) = args.value_of("oauth-bearer-token-file") {
+    let token = match std::fs::read_to_string(oauth_path) {
+      Ok(token) => token,
+      Err(err) => {
+        error!(
+          "Error reading oauth bearer token from {:?}: {}",
+          oauth_path, err
+        );
+        std::process::exit(1);
+      }
+    };
+    headers.insert(
+      "authorization".to_owned(),
+      format!("Bearer {}", token.trim()),
+    );
+  }
 
   let runtime = task_executor::Executor::new();
 
@@ -727,7 +740,7 @@ async fn main() {
       vec![address.to_owned()],
       args.value_of("remote-instance-name").map(str::to_owned),
       root_ca_certs,
-      oauth_bearer_token,
+      headers,
       1,
       4 * 1024 * 1024,
       std::time::Duration::from_secs(5 * 60),

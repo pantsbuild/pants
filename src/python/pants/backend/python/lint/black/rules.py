@@ -8,7 +8,7 @@ from typing import Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -36,7 +36,7 @@ class BlackFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
-    interpreter_constraints: PythonInterpreterCompatibility
+    interpreter_constraints: InterpreterConstraintsField
 
 
 class BlackRequest(PythonFmtRequest, LintRequest):

@@ -202,6 +202,6 @@ def test_coverage_html_xml_json() -> None:
     assert html_cov_dir.exists() is True
     assert (html_cov_dir / "index.html").exists() is True
 
-    assert "Wrote json coverage report to `dist/coverage/python`" in result.stderr_data
+    assert "Wrote json coverage report to `dist/coverage/python`" in result.stderr
     json_coverage = coverage_path / "coverage.json"
     assert json_coverage.exists() is True

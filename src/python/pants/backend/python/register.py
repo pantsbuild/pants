@@ -6,6 +6,7 @@
 See https://www.pantsbuild.org/docs/python-backend.
 """
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import (
     coverage_py,
@@ -22,14 +23,12 @@ from pants.backend.python.macros.python_requirements import PythonRequirements
 from pants.backend.python.subsystems import python_native_code
 from pants.backend.python.target_types import (
     PexBinary,
-    PythonBinary,
     PythonDistribution,
     PythonLibrary,
     PythonRequirementLibrary,
     PythonRequirementsFile,
     PythonTests,
 )
-from pants.backend.python.target_types import rules as target_type_rules
 from pants.backend.python.util_rules import (
     ancestor_files,
     extract_pex,
@@ -40,16 +39,11 @@ from pants.backend.python.util_rules import (
     python_sources,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.python.python_requirement import PythonRequirement
 
 
 def build_file_aliases():
     return BuildFileAliases(
-        objects={
-            "python_requirement": PythonRequirement,
-            "python_artifact": PythonArtifact,
-            "setup_py": PythonArtifact,
-        },
+        objects={"python_artifact": PythonArtifact, "setup_py": PythonArtifact},
         context_aware_object_factories={
             "python_requirements": PythonRequirements,
             "pipenv_requirements": PipenvRequirements,
@@ -74,7 +68,7 @@ def rules():
         *python_native_code.rules(),
         *repl.rules(),
         *run_pex_binary.rules(),
-        *target_type_rules(),
+        *target_types_rules.rules(),
         *setup_py.rules(),
     )
 
@@ -82,7 +76,6 @@ def rules():
 def target_types():
     return [
         PexBinary,
-        PythonBinary,
         PythonDistribution,
         PythonLibrary,
         PythonRequirementLibrary,
