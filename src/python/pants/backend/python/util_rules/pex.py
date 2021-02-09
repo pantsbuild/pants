@@ -247,7 +247,7 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
         """
         if self.includes_python2():
             return "2.7"
-        max_expected_py3_patch_version = 12  # The current max is 9.
+        max_expected_py3_patch_version = 15  # The current max is 3.6.12.
         for major_minor in ("3.5", "3.6", "3.7", "3.8", "3.9", "3.10"):
             if self._includes_version(major_minor, last_patch=max_expected_py3_patch_version):
                 return major_minor
@@ -256,8 +256,8 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
     def _requires_python3_version_or_newer(
         self, *, allowed_versions: Iterable[str], prior_version: str
     ) -> bool:
-        # Assume any 3.x release has no more than 13 releases. The max is currently 10.
-        patch_versions = list(reversed(range(0, 13)))
+        # Assume any 3.x release has no more than 15 releases. The max is currently 3.6.12.
+        patch_versions = list(reversed(range(0, 15)))
         # We only need to look at the prior Python release. For example, consider Python 3.8+
         # looking at 3.7. If using something like `>=3.5`, Py37 will be included.
         # `==3.6.*,!=3.7.*,==3.8.*` is extremely unlikely, and even that will work correctly as
@@ -285,7 +285,7 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
         allowed.
         """
         return self._requires_python3_version_or_newer(
-            allowed_versions=["3.8", "3.9"], prior_version="3.7"
+            allowed_versions=["3.8", "3.9", "3.10"], prior_version="3.7"
         )
 
     def __str__(self) -> str:
