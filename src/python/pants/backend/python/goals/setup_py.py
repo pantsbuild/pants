@@ -416,7 +416,11 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
             output_filename="setuptools.pex",
             internal_only=True,
             requirements=PexRequirements(setuptools.all_requirements),
-            interpreter_constraints=req.interpreter_constraints,
+            interpreter_constraints=(
+                req.interpreter_constraints
+                if setuptools.options.is_default("interpreter_constraints")
+                else PexInterpreterConstraints(setuptools.interpreter_constraints)
+            ),
         ),
     )
     input_digest = await Get(Digest, MergeDigests((req.chroot.digest, setuptools_pex.digest)))

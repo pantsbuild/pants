@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Tuple
+
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 
 
@@ -28,12 +30,16 @@ class Setuptools(PythonToolRequirementsBase):
             type=list,
             advanced=True,
             help=(
-                "DEPRECATED: Unused. Interpreter constraints for setup.py execution are now "
-                "derived from the `python_distribution` being packaged."
+                "DEPRECATED: Python interpreter constraints to use when selecting an interpreter "
+                "to package `python_distribution` targets using setup.py."
             ),
             removal_version="2.5.0.dev0",
             removal_hint=(
-                "This is no longer used. Interpreter constraints for setup.py execution are now "
-                "derived from the `python_distribution` being packaged."
+                "Interpreter constraints for setup.py execution are now derived from the "
+                "`python_distribution` being packaged so this option is not needed."
             ),
         )
+
+    @property
+    def interpreter_constraints(self) -> Tuple[str, ...]:
+        return tuple(self.options.interpreter_constraints)
