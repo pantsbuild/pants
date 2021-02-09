@@ -77,21 +77,21 @@ async def setup_black(
     setup_request: SetupRequest, black: Black, python_setup: PythonSetup
 ) -> Setup:
     # Black requires 3.6+ but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6, and 3.7.
-    # However, typed-ast does not understand 3.8, so instead we must run Black with Python 3.8 when
-    # relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement like
-    # `>=3.6` to result in requiring Python 3.8, which would error if 3.8 is not installed on the
-    # machine.
+    # However, typed-ast does not understand 3.8+, so instead we must run Black with Python 3.8+
+    # when relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement
+    # like `>=3.6` to result in requiring Python 3.8, which would error if 3.8 is not installed on
+    # the machine.
     all_interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (field_set.interpreter_constraints for field_set in setup_request.request.field_sets),
         python_setup,
     )
-    tool_interpreter_constraints = PexInterpreterConstraints(
-        ("CPython>=3.8",)
+    tool_interpreter_constraints = (
+        all_interpreter_constraints
         if (
             all_interpreter_constraints.requires_python38_or_newer()
             and black.options.is_default("interpreter_constraints")
         )
-        else black.interpreter_constraints
+        else PexInterpreterConstraints(black.interpreter_constraints)
     )
 
     black_pex_request = Get(
