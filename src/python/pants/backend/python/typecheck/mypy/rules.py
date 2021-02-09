@@ -206,17 +206,17 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
     )
 
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
-    # and 3.7. However, typed-ast does not understand 3.8, so instead we must run MyPy with
-    # Python 3.8 when relevant. We only do this if <3.8 can't be used, as we don't want a
-    # loose requirement like `>=3.6` to result in requiring Python 3.8, which would error if
-    # 3.8 is not installed on the machine.
-    tool_interpreter_constraints = PexInterpreterConstraints(
-        ("CPython>=3.8",)
+    # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
+    # Python 3.8+ when relevant. We only do this if <3.8 can't be used, as we don't want a
+    # loose requirement like `>=3.6` to result in requiring Python 3.8+, which would error if
+    # 3.8+ is not installed on the machine.
+    tool_interpreter_constraints = (
+        partition.interpreter_constraints
         if (
             mypy.options.is_default("interpreter_constraints")
             and partition.interpreter_constraints.requires_python38_or_newer()
         )
-        else mypy.interpreter_constraints
+        else PexInterpreterConstraints(mypy.interpreter_constraints)
     )
 
     plugin_sources_request = Get(

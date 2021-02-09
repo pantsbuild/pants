@@ -27,6 +27,7 @@ from pants.testutil.python_interpreter_selection import (
     skip_unless_python27_and_python3_present,
     skip_unless_python27_present,
     skip_unless_python38_present,
+    skip_unless_python39_present,
 )
 from pants.testutil.rule_runner import RuleRunner
 
@@ -419,6 +420,28 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         ).encode(),
     )
     target = make_target(rule_runner, [py38_sources], interpreter_constraints=">=3.8")
+    result = run_mypy(rule_runner, [target])
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert "Success: no issues found" in result[0].stdout.strip()
+
+
+@skip_unless_python39_present
+def test_works_with_python39(rule_runner: RuleRunner) -> None:
+    """MyPy's typed-ast dependency does not understand Python 3.9, so we must instead run MyPy with
+    Python 3.9 when relevant."""
+    rule_runner.create_file(f"{PACKAGE}/__init__.py")
+    py39_sources = FileContent(
+        f"{PACKAGE}/py39.py",
+        dedent(
+            """\
+            @lambda _: int
+            def replaced(x: bool) -> str:
+                return "42" if x is True else "1/137"
+            """
+        ).encode(),
+    )
+    target = make_target(rule_runner, [py39_sources], interpreter_constraints=">=3.9")
     result = run_mypy(rule_runner, [target])
     assert len(result) == 1
     assert result[0].exit_code == 0
