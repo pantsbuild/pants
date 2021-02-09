@@ -85,13 +85,13 @@ async def setup_black(
         (field_set.interpreter_constraints for field_set in setup_request.request.field_sets),
         python_setup,
     )
-    tool_interpreter_constraints = PexInterpreterConstraints(
+    tool_interpreter_constraints = (
         all_interpreter_constraints
         if (
             all_interpreter_constraints.requires_python38_or_newer()
             and black.options.is_default("interpreter_constraints")
         )
-        else black.interpreter_constraints
+        else PexInterpreterConstraints(black.interpreter_constraints)
     )
 
     black_pex_request = Get(
