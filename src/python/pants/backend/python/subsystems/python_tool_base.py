@@ -6,16 +6,13 @@ from typing import ClassVar, Optional, Sequence, Tuple, cast
 from pants.option.subsystem import Subsystem
 
 
-class PythonToolBase(Subsystem):
-    """Base class for subsystems that configure a python tool to be invoked out-of-process."""
+class PythonToolRequirementsBase(Subsystem):
+    """Base class for subsystems that configure a set of requirements for a python tool."""
 
     # Subclasses must set.
-    default_version: ClassVar[Optional[str]] = None
-    default_entry_point: ClassVar[Optional[str]] = None
+    default_version: ClassVar[str]
     # Subclasses do not need to override.
     default_extra_requirements: ClassVar[Sequence[str]] = []
-    default_interpreter_constraints: ClassVar[Sequence[str]] = []
-    register_interpreter_constraints: ClassVar[bool] = False
 
     @classmethod
     def register_options(cls, register):
@@ -37,6 +34,32 @@ class PythonToolBase(Subsystem):
             "tool allows you to install plugins or if you need to constrain a dependency to "
             "a certain version.",
         )
+
+    @property
+    def version(self) -> str:
+        return cast(str, self.options.version)
+
+    @property
+    def extra_requirements(self) -> Tuple[str, ...]:
+        return tuple(self.options.extra_requirements)
+
+    @property
+    def all_requirements(self) -> Tuple[str, ...]:
+        return (self.options.version, *self.options.extra_requirements)
+
+
+class PythonToolBase(PythonToolRequirementsBase):
+    """Base class for subsystems that configure a python tool to be invoked out-of-process."""
+
+    # Subclasses must set.
+    default_entry_point: ClassVar[str]
+    # Subclasses do not need to override.
+    default_interpreter_constraints: ClassVar[Sequence[str]] = []
+    register_interpreter_constraints: ClassVar[bool] = False
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
         register(
             "--entry-point",
             type=str,
@@ -63,18 +86,6 @@ class PythonToolBase(Subsystem):
                 default=cls.default_interpreter_constraints,
                 help="Python interpreter constraints for this tool.",
             )
-
-    @property
-    def version(self) -> Optional[str]:
-        return cast(Optional[str], self.options.version)
-
-    @property
-    def extra_requirements(self) -> Tuple[str, ...]:
-        return tuple(self.options.extra_requirements)
-
-    @property
-    def all_requirements(self) -> Tuple[str, ...]:
-        return (self.options.version, *self.options.extra_requirements)
 
     @property
     def interpreter_constraints(self) -> Tuple[str, ...]:
