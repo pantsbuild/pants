@@ -1,16 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 
 
-class Setuptools(PythonToolBase):
+class Setuptools(PythonToolRequirementsBase):
     options_scope = "setuptools"
     help = "The Python setuptools library (https://github.com/pypa/setuptools)."
 
-    # NB: setuptools doesn't have an entrypoint, unlike most python tools.
-    # We call it via a generated setup.py script.
     default_version = "setuptools>=50.3.0,<54.0"
     default_extra_requirements = ["wheel>=0.35.1,<0.37"]
-    register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.5"]
