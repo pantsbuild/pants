@@ -109,14 +109,13 @@ class Parser:
             dym = "Did you mean "
 
             candidates = get_close_matches(build_file_content,valid_symbols)
-            if build_file_content not in candidates:
-                if len(candidates) == 1:
-                    dym += candidates[0] + '?'
-                    err_string = dym + err_string
-                elif len(candidates) > 1:
-                    dym += ", ".join(candidates)[:-1]
-                    dym += ", or  " + candidates[-1]  # naturally, we use the oxford comma
-                    err_string = dym + err_string
+            if len(candidates) == 1:
+                dym += candidates[0] + '?'
+                err_string = dym + err_string
+            elif len(candidates) > 1:
+                dym += ", ".join(candidates)[:-1]
+                dym += ", or  " + candidates[-1]  # naturally, we use the oxford comma
+                err_string = dym + err_string
             raise ParseError(f"{err_string}\n\n{original}.\n\nAll registered symbols: {valid_symbols}")
 
         error_on_imports(build_file_content, filepath)
