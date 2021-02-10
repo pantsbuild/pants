@@ -91,7 +91,6 @@ class Parser:
         # those extra symbols will not see our target aliases etc. This also means that if multiple
         # prelude files are present, they probably cannot see each others' symbols. We may choose
         # to change this at some point.
-        # did you mean?
 
         global_symbols = dict(self._symbols)
         for k, v in extra_symbols.symbols.items():
@@ -104,27 +103,21 @@ class Parser:
         except NameError as e:
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
             original = e.args[0].capitalize()
-            err_string = f"""If you expect to see more symbols activated in the
+            err_string = f"""If you expect to see more symbols activated in the 
                 below list, refer to {docs_url("enabling_backends")} for all available
                 backends to activate."""
             dym = "Did you mean "
-            # then get did u mean: store in var, if var empty, then we dont
-            # append otherwise we create list. otherwise, use join etc to
-            # create the list of did u mean candidates, stick it at the
-            # beginning.
-            # add to error if need
 
-            candidates = get_close_matches(original,valid_symbols)
-            if len(candidates) == 1:
-                dym += candidates[0] + '?'
-                err_string = dym + err_string
-            elif len(candidates) > 1:
-                dym += ", ".join(candidates)[:-1]
-                dym += ", or  " + candidates[-1]  # naturally, we use the oxford comma
-                err_string = dym + err_string
-
+            candidates = get_close_matches(build_file_content,valid_symbols)
+            if build_file_content not in candidates:
+                if len(candidates) == 1:
+                    dym += candidates[0] + '?'
+                    err_string = dym + err_string
+                elif len(candidates) > 1:
+                    dym += ", ".join(candidates)[:-1]
+                    dym += ", or  " + candidates[-1]  # naturally, we use the oxford comma
+                    err_string = dym + err_string
             raise ParseError(f"{err_string}\n\n{original}.\n\nAll registered symbols: {valid_symbols}")
-            # raise ParseError(f"{original}.\n\nAll registered symbols: {valid_symbols}")
 
         error_on_imports(build_file_content, filepath)
 
