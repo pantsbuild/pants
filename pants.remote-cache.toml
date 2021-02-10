@@ -19,3 +19,4 @@ remote_store_maximum_timeout = 5000
 # NB: this is used for Toolchain's remote caching and may need to change for other implementations.
 remote_store_server = "build.toolchain.com:443"
 remote_instance_name = "main"
+remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
