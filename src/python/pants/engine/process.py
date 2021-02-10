@@ -478,22 +478,30 @@ class BashBinary(BinaryPath):
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
 
+@dataclass(frozen=True)
+class BashBinaryRequest:
+    rationale: str
+    search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
+
+
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
-async def find_bash(search_path: SearchPath) -> BashBinary:
+async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
     request = BinaryPathRequest(
-        binary_name="bash", search_path=search_path, test=BinaryPathTest(args=["--version"])
+        binary_name="bash",
+        search_path=bash_request.search_path,
+        test=BinaryPathTest(args=["--version"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError(request, rationale="execute bash scripts")
+        raise BinaryNotFoundError(request, rationale=bash_request.rationale)
     return BashBinary(first_path.path, first_path.fingerprint)
 
 
 @rule
 async def get_bash() -> BashBinary:
     # Expose bash to external consumers.
-    return await Get(BashBinary, SearchPath, BashBinary.DEFAULT_SEARCH_PATH)
+    return await Get(BashBinary, BashBinaryRequest(rationale="execute bash scripts"))
 
 
 @rule(desc="Find binary path", level=LogLevel.DEBUG)
@@ -506,7 +514,9 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     if request.binary_name == "bash":
         shebang = "#!/usr/bin/env bash"
     else:
-        bash = await Get(BashBinary, SearchPath, BashBinary.DEFAULT_SEARCH_PATH)
+        bash = await Get(
+            BashBinary, BashBinaryRequest(rationale="use it to locate other executables")
+        )
         shebang = f"#!{bash.path}"
 
     # Note: the backslash after the """ marker ensures that the shebang is at the start of the
