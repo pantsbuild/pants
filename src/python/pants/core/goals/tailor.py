@@ -32,7 +32,6 @@ from pants.engine.target import (
     SourcesPaths,
     SourcesPathsRequest,
     Target,
-    Targets,
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership, union
@@ -197,7 +196,7 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
 
 class TailorSubsystem(GoalSubsystem):
     name = "tailor"
-    help = "Generate config for working with Pants."
+    help = "Auto-generate BUILD file targets for new source files."
 
     @classmethod
     def register_options(cls, register):
@@ -268,7 +267,9 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
     )
     source_path_set = set(source_paths.files)
     source_dirs = {os.path.dirname(path) for path in source_path_set}
-    possible_owners = await Get(Targets, AddressSpecs(AscendantAddresses(d) for d in source_dirs))
+    possible_owners = await Get(
+        UnexpandedTargets, AddressSpecs(AscendantAddresses(d) for d in source_dirs)
+    )
     possible_owners_sources = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(t.get(Sources))) for t in possible_owners
     )
