@@ -528,7 +528,7 @@ impl WorkunitStore {
   }
 
   pub fn init_thread_state(&self, parent_id: Option<SpanId>) {
-    set_thread_workunit_state(Some(WorkUnitState {
+    set_thread_workunit_store_handle(Some(WorkunitStoreHandle {
       store: self.clone(),
       parent_id,
     }))
@@ -694,8 +694,8 @@ impl WorkunitStore {
   }
 
   pub fn increment_counter(&self, counter_name: Metric, change: u64) {
-    let workunit_state = expect_workunit_state();
-    if let Some(span_id) = workunit_state.parent_id {
+    let store_handle = expect_workunit_store_handle();
+    if let Some(span_id) = store_handle.parent_id {
       let mut counters = self.metrics_data.counters.lock();
       counters
         .entry(span_id)
@@ -776,41 +776,42 @@ pub fn format_workunit_duration(duration: Duration) -> String {
 /// The per-thread/task state that tracks the current workunit store, and workunit parent id.
 ///
 #[derive(Clone)]
-pub struct WorkUnitState {
+pub struct WorkunitStoreHandle {
   pub store: WorkunitStore,
   pub parent_id: Option<SpanId>,
 }
 
 thread_local! {
-  static THREAD_WORKUNIT_STATE: RefCell<Option<WorkUnitState>> = RefCell::new(None)
+  static THREAD_WORKUNIT_STORE_HANDLE: RefCell<Option<WorkunitStoreHandle >> = RefCell::new(None)
 }
 
 task_local! {
-  static TASK_WORKUNIT_STATE: Option<WorkUnitState>;
+  static TASK_WORKUNIT_STORE_HANDLE: Option<WorkunitStoreHandle>;
 }
 
 ///
 /// Set the current parent_id for a Thread, but _not_ for a Task. Tasks must always be spawned
-/// by callers using the `scope_task_workunit_state` helper (generally via task_executor::Executor.)
+/// by callers using the `scope_task_workunit_store_handle` helper (generally via
+/// task_executor::Executor.)
 ///
-pub fn set_thread_workunit_state(workunit_state: Option<WorkUnitState>) {
-  THREAD_WORKUNIT_STATE.with(|thread_workunit_state| {
-    *thread_workunit_state.borrow_mut() = workunit_state;
+pub fn set_thread_workunit_store_handle(workunit_store_handle: Option<WorkunitStoreHandle>) {
+  THREAD_WORKUNIT_STORE_HANDLE.with(|thread_workunit_handle| {
+    *thread_workunit_handle.borrow_mut() = workunit_store_handle;
   })
 }
 
-pub fn get_workunit_state() -> Option<WorkUnitState> {
-  if let Ok(Some(workunit_state)) =
-    TASK_WORKUNIT_STATE.try_with(|workunit_state| workunit_state.clone())
+pub fn get_workunit_store_handle() -> Option<WorkunitStoreHandle> {
+  if let Ok(Some(store_handle)) =
+    TASK_WORKUNIT_STORE_HANDLE.try_with(|task_store_handle| task_store_handle.clone())
   {
-    Some(workunit_state)
+    Some(store_handle)
   } else {
-    THREAD_WORKUNIT_STATE.with(|thread_workunit_state| (*thread_workunit_state.borrow()).clone())
+    THREAD_WORKUNIT_STORE_HANDLE.with(|thread_store_handle| (*thread_store_handle.borrow()).clone())
   }
 }
 
-pub fn expect_workunit_state() -> WorkUnitState {
-  get_workunit_state().expect("A WorkunitStore has not been set for this thread.")
+pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
+  get_workunit_store_handle().expect("A WorkunitStore has not been set for this thread.")
 }
 
 pub async fn with_workunit<F, M>(
@@ -824,13 +825,13 @@ where
   F: Future,
   M: for<'a> FnOnce(&'a F::Output, WorkunitMetadata) -> WorkunitMetadata,
 {
-  let mut workunit_state = expect_workunit_state();
+  let mut store_handle = expect_workunit_store_handle();
   let span_id = SpanId::new();
-  let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id));
+  let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
   let mut workunit =
     workunit_store.start_workunit(span_id, name, parent_id, initial_metadata.clone());
   let mut guard = CanceledWorkunitGuard::new(&workunit_store, workunit.clone());
-  scope_task_workunit_state(Some(workunit_state), async move {
+  scope_task_workunit_store_handle(Some(store_handle), async move {
     let result = f.await;
     let final_metadata = final_metadata_fn(&result, initial_metadata);
     workunit.metadata = final_metadata;
@@ -895,13 +896,18 @@ impl Default for ObservationsData {
 }
 
 ///
-/// Propagate the given WorkUnitState to a Future representing a newly spawned Task.
+/// Propagate the given WorkunitStoreHandle to a Future representing a newly spawned Task.
 ///
-pub async fn scope_task_workunit_state<F>(workunit_state: Option<WorkUnitState>, f: F) -> F::Output
+pub async fn scope_task_workunit_store_handle<F>(
+  workunit_store_handle: Option<WorkunitStoreHandle>,
+  f: F,
+) -> F::Output
 where
   F: Future,
 {
-  TASK_WORKUNIT_STATE.scope(workunit_state, f).await
+  TASK_WORKUNIT_STORE_HANDLE
+    .scope(workunit_store_handle, f)
+    .await
 }
 
 #[cfg(test)]

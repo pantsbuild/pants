@@ -177,9 +177,16 @@ impl ByteStore {
       }
     });
 
-    if let Some(workunit_state) = workunit_store::get_workunit_state() {
-      let store = workunit_state.store;
-      with_workunit(store, workunit_name, metadata, result_future, |_, md| md).await
+    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+      let workunit_store = workunit_store_handle.store;
+      with_workunit(
+        workunit_store,
+        workunit_name,
+        metadata,
+        result_future,
+        |_, md| md,
+      )
+      .await
     } else {
       result_future.await
     }
@@ -242,13 +249,13 @@ impl ByteStore {
           if !got_first_response {
             got_first_response = true;
 
-            if let Some(workunit_state) = workunit_store::get_workunit_state() {
+            if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
               let timing: Result<u64, _> = Instant::now()
                 .duration_since(start_time)
                 .as_micros()
                 .try_into();
               if let Ok(obs) = timing {
-                workunit_state
+                workunit_store_handle
                   .store
                   .record_observation(ObservationMetric::RemoteStoreTimeToFirstByte, obs);
               }
@@ -282,9 +289,15 @@ impl ByteStore {
       }
     };
 
-    if let Some(workunit_state) = workunit_store::get_workunit_state() {
-      let store = workunit_state.store;
-      with_workunit(store, workunit_name, metadata, result_future, |_, md| md).await
+    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+      with_workunit(
+        workunit_store_handle.store,
+        workunit_name,
+        metadata,
+        result_future,
+        |_, md| md,
+      )
+      .await
     } else {
       result_future.await
     }
@@ -326,9 +339,15 @@ impl ByteStore {
         .collect::<Result<HashSet<_>, _>>()
     };
     async {
-      if let Some(workunit_state) = workunit_store::get_workunit_state() {
-        let store = workunit_state.store;
-        with_workunit(store, workunit_name, metadata, result_future, |_, md| md).await
+      if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+        with_workunit(
+          workunit_store_handle.store,
+          workunit_name,
+          metadata,
+          result_future,
+          |_, md| md,
+        )
+        .await
       } else {
         result_future.await
       }

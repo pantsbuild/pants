@@ -310,9 +310,9 @@ impl CommandRunner {
     execute_response: &ExecuteResponse,
     metadata: &ExecutedActionMetadata,
   ) {
-    let workunit_state = workunit_store::expect_workunit_state();
-    let workunit_store = workunit_state.store;
-    let parent_id = workunit_state.parent_id;
+    let workunit_thread_handle = workunit_store::expect_workunit_store_handle();
+    let workunit_store = workunit_thread_handle.store;
+    let parent_id = workunit_thread_handle.parent_id;
     let result_cached = execute_response.cached_result;
 
     if let (Some(queued_timestamp), Some(worker_start_timestamp)) = (
