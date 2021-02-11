@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -35,10 +36,14 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.core.target_types import FilesSources
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import Sources, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -101,11 +106,33 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 @rule(level=LogLevel.DEBUG)
 async def package_pex_binary(
-    field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults
+    field_set: PexBinaryFieldSet,
+    pex_binary_defaults: PexBinaryDefaults,
+    union_membership: UnionMembership,
 ) -> BuiltPackage:
-    resolved_entry_point = await Get(
-        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)
+    resolved_entry_point, transitive_targets = await MultiGet(
+        Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)),
+        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
+
+    # If a zip app, check for files targets because these will not be loadable as expected.
+    if field_set._execution_mode == PexExecutionMode.ZIPAPP:
+        files_addresses = sorted(
+            tgt.address.spec
+            for tgt in transitive_targets.dependencies
+            if tgt.has_field(FilesSources)
+            or tgt.get(Sources).can_generate(FilesSources, union_membership)
+        )
+        if files_addresses:
+            logger.warning(
+                f"The pex_binary target {field_set.address} depends on the below files targets, "
+                f"but it's packaged as a zip app, so you will likely not be able to open the files "
+                f"like you'd expect.\n\nInstead, consider setting the field "
+                f"`execution_mode='unzip' or `execution_mode='venv'` on {field_set.address} to be "
+                f"able to use Python's filesystem API (e.g. `with open()`) like you'd expect."
+                f"\n\nFiles targets dependencies: {files_addresses}"
+            )
+
     output_filename = field_set.output_path.value_or_default(field_set.address, file_ending="pex")
     two_step_pex = await Get(
         TwoStepPex,

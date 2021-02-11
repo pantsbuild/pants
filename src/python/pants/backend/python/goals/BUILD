@@ -6,11 +6,10 @@ python_library()
 python_tests(
   name='tests',
   sources=['*_test.py', '!*_integration_test.py'],
-  timeout=180,
 )
 
 python_integration_tests(
   name='integration',
   uses_pants_run=True,
-  timeout=480,
+  timeout=250,
 )
