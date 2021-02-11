@@ -14,7 +14,7 @@ use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
 use tonic::transport::Channel;
-use workunit_store::{with_workunit, Level, Metric, WorkunitMetadata};
+use workunit_store::{with_workunit_old, Level, Metric, WorkunitMetadata};
 
 use crate::remote::make_execute_request;
 use crate::{
@@ -342,7 +342,7 @@ impl CommandRunner {
   ) -> Result<(), String> {
     // Upload the action (and related data, i.e. the embedded command and input files).
     // Assumption: The Action and related data has already been stored locally.
-    with_workunit(
+    with_workunit_old(
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata::with_level(Level::Debug),
@@ -404,7 +404,7 @@ impl crate::CommandRunner for CommandRunner {
       make_execute_request(&request, self.metadata.clone())?;
 
     // Ensure the action and command are stored locally.
-    let (command_digest, action_digest) = with_workunit(
+    let (command_digest, action_digest) = with_workunit_old(
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
       WorkunitMetadata::with_level(Level::Debug),
@@ -418,7 +418,7 @@ impl crate::CommandRunner for CommandRunner {
     let result = if self.cache_read {
       // A future to read from the cache and log the results accordingly.
       let cache_read_future = async {
-        let response = with_workunit(
+        let response = with_workunit_old(
           context.workunit_store.clone(),
           "check_action_cache".to_owned(),
           WorkunitMetadata::with_level(Level::Debug),

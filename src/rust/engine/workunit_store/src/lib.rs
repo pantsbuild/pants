@@ -814,7 +814,32 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
   get_workunit_store_handle().expect("A WorkunitStore has not been set for this thread.")
 }
 
-pub async fn with_workunit<F, M>(
+pub async fn with_workunit<F>(
+  workunit_store: WorkunitStore,
+  name: String,
+  initial_metadata: WorkunitMetadata,
+  future_fn: impl FnOnce(&mut Workunit) -> F,
+) -> F::Output
+where
+  F: Future,
+{
+  let mut store_handle = expect_workunit_store_handle();
+  let span_id = SpanId::new();
+  let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
+  let mut workunit =
+    workunit_store.start_workunit(span_id, name, parent_id, initial_metadata.clone());
+  let future = future_fn(&mut workunit);
+  let mut guard = CanceledWorkunitGuard::new(&workunit_store, workunit.clone());
+  scope_task_workunit_store_handle(Some(store_handle), async move {
+    let result = future.await;
+    workunit_store.complete_workunit(workunit);
+    guard.not_canceled();
+    result
+  })
+  .await
+}
+
+pub async fn with_workunit_old<F, M>(
   workunit_store: WorkunitStore,
   name: String,
   initial_metadata: WorkunitMetadata,

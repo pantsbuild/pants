@@ -39,7 +39,7 @@ use reqwest::Error;
 use std::pin::Pin;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  with_workunit, ArtifactOutput, Level, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
+  with_workunit_old, ArtifactOutput, Level, UserMetadataItem, UserMetadataPyValue, WorkunitMetadata,
 };
 
 pub type NodeResult<T> = Result<T, Failure>;
@@ -1392,7 +1392,7 @@ impl Node for NodeKey {
       (result, final_metadata)
     };
 
-    with_workunit(
+    with_workunit_old(
       workunit_store_handle.store,
       workunit_name,
       metadata,

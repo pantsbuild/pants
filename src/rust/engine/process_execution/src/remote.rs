@@ -38,7 +38,7 @@ use tonic::{Code, Interceptor, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
 use workunit_store::{
-  with_workunit, Metric, ObservationMetric, SpanId, WorkunitMetadata, WorkunitStore,
+  with_workunit_old, Metric, ObservationMetric, SpanId, WorkunitMetadata, WorkunitStore,
 };
 
 use crate::{
@@ -773,7 +773,7 @@ impl crate::CommandRunner for CommandRunner {
     let deadline_duration = self.overall_deadline + request.timeout.unwrap_or_default();
 
     // Ensure the action and command are stored locally.
-    let (command_digest, action_digest) = with_workunit(
+    let (command_digest, action_digest) = with_workunit_old(
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
       WorkunitMetadata::with_level(Level::Debug),
@@ -784,7 +784,7 @@ impl crate::CommandRunner for CommandRunner {
 
     // Check the remote Action Cache to see if this request was already computed.
     // If so, return immediately with the result.
-    let cached_response_opt = with_workunit(
+    let cached_response_opt = with_workunit_old(
       context.workunit_store.clone(),
       "check_action_cache".to_owned(),
       WorkunitMetadata::with_level(Level::Debug),
@@ -809,7 +809,7 @@ impl crate::CommandRunner for CommandRunner {
     }
 
     // Upload the action (and related data, i.e. the embedded command and input files).
-    with_workunit(
+    with_workunit_old(
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata::with_level(Level::Debug),
@@ -824,7 +824,7 @@ impl crate::CommandRunner for CommandRunner {
       .increment_counter(Metric::RemoteExecutionRequests, 1);
     let result_fut = self.run_execute_request(execute_request, request, &context);
     let timeout_fut = tokio::time::timeout(deadline_duration, result_fut);
-    let response = with_workunit(
+    let response = with_workunit_old(
       context.workunit_store.clone(),
       "run_execute_request".to_owned(),
       WorkunitMetadata::with_level(Level::Debug),

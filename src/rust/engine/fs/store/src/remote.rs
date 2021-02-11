@@ -19,7 +19,7 @@ use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
 use tonic::transport::{Channel, Endpoint};
 use tonic::{Code, Interceptor, Request};
-use workunit_store::{with_workunit, ObservationMetric};
+use workunit_store::{with_workunit, ObservationMetric, WorkunitMetadata};
 
 use super::BackoffConfig;
 
@@ -125,13 +125,11 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes,
     );
-    let workunit_name = format!("store_bytes({})", resource_name.clone());
-    let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
     let store = self.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
 
-    let resource_name = resource_name.clone();
+    let workunit_name = format!("store_bytes({})", resource_name.clone());
     let chunk_size_bytes = store.chunk_size_bytes;
 
     // NOTE(tonic): The call into the Tonic library wants the slice to last for the 'static
@@ -182,9 +180,8 @@ impl ByteStore {
       with_workunit(
         workunit_store,
         workunit_name,
-        metadata,
-        result_future,
-        |_, md| md,
+        WorkunitMetadata::with_level(Level::Debug),
+        |_workunit| result_future,
       )
       .await
     } else {
@@ -208,9 +205,6 @@ impl ByteStore {
       digest.size_bytes
     );
     let workunit_name = format!("load_bytes_with({})", resource_name.clone());
-    let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
-    let resource_name = resource_name.clone();
-    let f = f.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
 
@@ -293,9 +287,8 @@ impl ByteStore {
       with_workunit(
         workunit_store_handle.store,
         workunit_name,
-        metadata,
-        result_future,
-        |_, md| md,
+        WorkunitMetadata::with_level(Level::Debug),
+        |_workunit| result_future,
       )
       .await
     } else {
@@ -316,7 +309,6 @@ impl ByteStore {
       "list_missing_digests({})",
       store.instance_name.clone().unwrap_or_default()
     );
-    let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
     let result_future = async move {
       let store2 = store.clone();
       let mut client = store2.cas_client.as_ref().clone();
@@ -343,9 +335,8 @@ impl ByteStore {
         with_workunit(
           workunit_store_handle.store,
           workunit_name,
-          metadata,
-          result_future,
-          |_, md| md,
+          WorkunitMetadata::with_level(Level::Debug),
+          |_workunit| result_future,
         )
         .await
       } else {

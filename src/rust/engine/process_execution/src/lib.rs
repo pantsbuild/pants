@@ -40,7 +40,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
-use workunit_store::{with_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
+use workunit_store::{with_workunit, UserMetadataItem, Workunit, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
 use hashing::{Digest, EMPTY_FINGERPRINT};
@@ -470,20 +470,22 @@ impl CommandRunner for BoundedCommandRunner {
     mut req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let name = format!("{}-waiting", req.workunit_name());
     let desc = req.user_facing_name();
-    let mut outer_metadata = WorkunitMetadata::with_level(Level::Debug);
 
+    let outer_workunit_name = format!("{}-waiting", req.workunit_name());
+    let mut outer_metadata = WorkunitMetadata::with_level(Level::Debug);
     outer_metadata.desc = Some(format!("(Waiting) {}", desc));
     // We don't want to display the workunit associated with processes waiting on a
     // BoundedCommandRunner to show in the dynamic UI, so set the `blocked` flag
     // on the workunit metadata in order to prevent this.
     outer_metadata.blocked = true;
+
     let bounded_fut = {
       let inner = self.inner.clone();
       let semaphore = self.inner.1.clone();
       let context = context.clone();
-      let name = format!("{}-running", req.workunit_name());
+      let context2 = context.clone();
+      let workunit_name = format!("{}-running", req.workunit_name());
 
       semaphore.with_acquired(move |concurrency_id| {
         log::debug!(
@@ -491,27 +493,8 @@ impl CommandRunner for BoundedCommandRunner {
           desc,
           concurrency_id
         );
-        let mut metadata = WorkunitMetadata::with_level(req.workunit_level());
-        metadata.desc = Some(desc);
-
-        let metadata_updater = |result: &Result<FallibleProcessResultWithPlatform, String>,
-                                old_metadata| match result {
-          Err(_) => old_metadata,
-          Ok(FallibleProcessResultWithPlatform {
-            stdout_digest,
-            stderr_digest,
-            exit_code,
-            ..
-          }) => WorkunitMetadata {
-            stdout: Some(*stdout_digest),
-            stderr: Some(*stderr_digest),
-            user_metadata: vec![(
-              "exit_code".to_string(),
-              UserMetadataItem::ImmediateId(*exit_code as i64),
-            )],
-            ..old_metadata
-          },
-        };
+        let mut initial_metadata = WorkunitMetadata::with_level(req.workunit_level());
+        initial_metadata.desc = Some(desc);
 
         for (_, process) in req.0.iter_mut() {
           if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
@@ -522,22 +505,43 @@ impl CommandRunner for BoundedCommandRunner {
           }
         }
 
+        let run_process_future = |workunit: &mut Workunit| async move {
+          let result = inner.0.run(req, context2).await;
+          let new_metadata = match result {
+            Err(_) => workunit.metadata.clone(),
+            Ok(FallibleProcessResultWithPlatform {
+              stdout_digest,
+              stderr_digest,
+              exit_code,
+              ..
+            }) => WorkunitMetadata {
+              stdout: Some(stdout_digest),
+              stderr: Some(stderr_digest),
+              user_metadata: vec![(
+                "exit_code".to_owned(),
+                UserMetadataItem::ImmediateId(exit_code as i64),
+              )],
+              ..workunit.metadata.clone()
+            },
+          };
+          workunit.metadata = new_metadata;
+          result
+        };
+
         with_workunit(
           context.workunit_store.clone(),
-          name,
-          metadata,
-          async move { inner.0.run(req, context).await },
-          metadata_updater,
+          workunit_name,
+          initial_metadata,
+          run_process_future,
         )
       })
     };
 
     with_workunit(
       context.workunit_store,
-      name,
+      outer_workunit_name,
       outer_metadata,
-      bounded_fut,
-      |_, metadata| metadata,
+      |_workunit| bounded_fut,
     )
     .await
   }
