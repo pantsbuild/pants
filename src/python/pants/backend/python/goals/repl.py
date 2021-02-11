@@ -29,9 +29,7 @@ async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) 
             (tgt.address for tgt in repl.targets), internal_only=True
         ),
     )
-    sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
-    )
+    sources_request = Get(PythonSourceFiles, PythonSourceFilesRequest(repl.targets))
     requirements_pex, sources = await MultiGet(requirements_request, sources_request)
     merged_digest = await Get(
         Digest, MergeDigests((requirements_pex.digest, sources.source_files.snapshot.digest))
@@ -70,9 +68,7 @@ async def create_ipython_repl_request(
 
     requirements_request = Get(Pex, PexRequest, requirements_pex_request)
 
-    sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
-    )
+    sources_request = Get(PythonSourceFiles, PythonSourceFilesRequest(repl.targets))
 
     ipython_request = Get(
         Pex,

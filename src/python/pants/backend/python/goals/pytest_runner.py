@@ -148,9 +148,7 @@ async def setup_pytest_for_target(
         ),
     )
 
-    prepared_sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
-    )
+    prepared_sources_request = Get(PythonSourceFiles, PythonSourceFilesRequest(all_targets))
 
     # Create any assets that the test depends on through the `runtime_package_dependencies` field.
     assets: Tuple[BuiltPackage, ...] = ()

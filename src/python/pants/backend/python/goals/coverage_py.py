@@ -276,15 +276,7 @@ async def generate_coverage_reports(
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(all_used_addresses))
-    sources = await Get(
-        PythonSourceFiles,
-        # Coverage sometimes includes non-Python files in its `.coverage` data. We need to
-        # ensure that they're present when generating the report. We include all the files included
-        # by `pytest_runner.py`.
-        PythonSourceFilesRequest(
-            transitive_targets.closure, include_files=True, include_resources=True
-        ),
-    )
+    sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
     input_digest = await Get(
         Digest,
         MergeDigests(

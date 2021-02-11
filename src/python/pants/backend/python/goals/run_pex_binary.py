@@ -48,9 +48,7 @@ async def create_pex_binary_run_request(
 
     requirements_request = Get(Pex, PexRequest, requirements_pex_request)
 
-    sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
-    )
+    sources_request = Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
 
     output_filename = f"{field_set.address.target_name}.pex"
     runner_pex_request = Get(
