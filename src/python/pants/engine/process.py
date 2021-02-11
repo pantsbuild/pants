@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Unio
 
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
+from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
 from pants.engine.internals.selectors import MultiGet
@@ -29,9 +30,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-
-BASH_SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
 
 
 @dataclass(frozen=True)
@@ -368,6 +366,10 @@ class BinaryPathTest:
         self.fingerprint_stdout = fingerprint_stdout
 
 
+class SearchPath(DeduplicatedCollection[str]):
+    """The search path for binaries; i.e.: the $PATH."""
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathRequest:
@@ -382,7 +384,7 @@ class BinaryPathRequest:
     path.
     """
 
-    search_path: Tuple[str, ...]
+    search_path: SearchPath
     binary_name: str
     test: Optional[BinaryPathTest]
 
@@ -393,7 +395,7 @@ class BinaryPathRequest:
         binary_name: str,
         test: Optional[BinaryPathTest] = None,
     ) -> None:
-        self.search_path = tuple(OrderedSet(search_path))
+        self.search_path = SearchPath(search_path)
         self.binary_name = binary_name
         self.test = test
 
@@ -470,6 +472,38 @@ class BinaryNotFoundError(EnvironmentError):
         super().__init__(msg)
 
 
+class BashBinary(BinaryPath):
+    """The `bash` binary."""
+
+    DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
+
+
+@dataclass(frozen=True)
+class BashBinaryRequest:
+    rationale: str
+    search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
+
+
+@rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
+async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
+    request = BinaryPathRequest(
+        binary_name="bash",
+        search_path=bash_request.search_path,
+        test=BinaryPathTest(args=["--version"]),
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path
+    if not first_path:
+        raise BinaryNotFoundError(request, rationale=bash_request.rationale)
+    return BashBinary(first_path.path, first_path.fingerprint)
+
+
+@rule
+async def get_bash() -> BashBinary:
+    # Expose bash to external consumers.
+    return await Get(BashBinary, BashBinaryRequest(rationale="execute bash scripts"))
+
+
 @rule(desc="Find binary path", level=LogLevel.DEBUG)
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
@@ -480,11 +514,10 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     if request.binary_name == "bash":
         shebang = "#!/usr/bin/env bash"
     else:
-        bash_request = BinaryPathRequest(binary_name="bash", search_path=BASH_SEARCH_PATHS)
-        bash_paths = await Get(BinaryPaths, BinaryPathRequest, bash_request)
-        if not bash_paths.first_path:
-            raise BinaryNotFoundError(bash_request, rationale="use it to locate other executables")
-        shebang = f"#!{bash_paths.first_path.path}"
+        bash = await Get(
+            BashBinary, BashBinaryRequest(rationale="use it to locate other executables")
+        )
+        shebang = f"#!{bash.path}"
 
     # Note: the backslash after the """ marker ensures that the shebang is at the start of the
     # script file. Many OSs will not see the shebang if there is intervening whitespace.
