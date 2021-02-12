@@ -13,7 +13,7 @@ import tempfile
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -23,11 +23,14 @@ from pants.base.build_environment import (
 )
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
+from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import docs_url
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -1282,3 +1285,88 @@ class GlobalOptions(Subsystem):
 
         validate_remote_headers("remote_execution_headers")
         validate_remote_headers("remote_store_headers")
+
+    @staticmethod
+    def compute_executor_arguments(bootstrap_options: OptionValueContainer) -> Tuple[int, int]:
+        """Computes the arguments to construct a PyExecutor.
+
+        Does not directly construct a PyExecutor to avoid cycles.
+        """
+        if bootstrap_options.rule_threads_core < 2:
+            # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
+            # at a time, and a `@goal_rule` will only block one thread.
+            raise ValueError("--rule-threads-core values less than 2 are not supported.")
+        rule_threads_max = (
+            bootstrap_options.rule_threads_max
+            if bootstrap_options.rule_threads_max
+            else 4 * bootstrap_options.rule_threads_core
+        )
+        return bootstrap_options.rule_threads_core, rule_threads_max
+
+    @staticmethod
+    def compute_pants_ignore(buildroot, global_options):
+        """Computes the merged value of the `--pants-ignore` flag.
+
+        This inherently includes the workdir and distdir locations if they are located under the
+        buildroot.
+        """
+        pants_ignore = list(global_options.pants_ignore)
+
+        def add(absolute_path, include=False):
+            # To ensure that the path is ignored regardless of whether it is a symlink or a directory, we
+            # strip trailing slashes (which would signal that we wanted to ignore only directories).
+            maybe_rel_path = fast_relpath_optional(absolute_path, buildroot)
+            if maybe_rel_path:
+                rel_path = maybe_rel_path.rstrip(os.path.sep)
+                prefix = "!" if include else ""
+                pants_ignore.append(f"{prefix}/{rel_path}")
+
+        add(global_options.pants_workdir)
+        add(global_options.pants_distdir)
+        add(global_options.pants_subprocessdir)
+
+        return pants_ignore
+
+    @staticmethod
+    def compute_pantsd_invalidation_globs(
+        buildroot: str, bootstrap_options: OptionValueContainer
+    ) -> Tuple[str, ...]:
+        """Computes the merged value of the `--pantsd-invalidation-globs` option.
+
+        Combines --pythonpath and --pants-config-files files that are in {buildroot} dir with those
+        invalidation_globs provided by users.
+        """
+        invalidation_globs: OrderedSet[str] = OrderedSet()
+
+        # Globs calculated from the sys.path and other file-like configuration need to be sanitized
+        # to relative globs (where possible).
+        potentially_absolute_globs = (
+            *sys.path,
+            *bootstrap_options.pythonpath,
+            *bootstrap_options.pants_config_files,
+        )
+        for glob in potentially_absolute_globs:
+            # NB: We use `relpath` here because these paths are untrusted, and might need to be
+            # normalized in addition to being relativized.
+            glob_relpath = os.path.relpath(glob, buildroot)
+            if glob_relpath == "." or glob_relpath.startswith(".."):
+                logger.debug(
+                    f"Changes to {glob}, outside of the buildroot, will not be invalidated."
+                )
+            else:
+                invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
+
+        # Explicitly specified globs are already relative, and are added verbatim.
+        invalidation_globs.update(
+            (
+                "!*.pyc",
+                "!__pycache__/",
+                # TODO: This is a bandaid for https://github.com/pantsbuild/pants/issues/7022:
+                # macros should be adapted to allow this dependency to be automatically detected.
+                "requirements.txt",
+                "3rdparty/**/requirements.txt",
+                *bootstrap_options.pantsd_invalidation_globs,
+            )
+        )
+
+        return tuple(invalidation_globs)

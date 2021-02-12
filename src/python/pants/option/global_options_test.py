@@ -9,9 +9,11 @@ from textwrap import dedent
 
 import pytest
 
+from pants.base.build_environment import get_buildroot
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
-from pants.option.global_options import ExecutionOptions
+from pants.option.global_options import ExecutionOptions, GlobalOptions
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.contextutil import temporary_dir
 
@@ -138,3 +140,14 @@ def test_execution_options_auth_plugin() -> None:
     exec_options = compute_exec_options("UNAVAILABLE")
     assert exec_options.remote_cache_read is False
     assert exec_options.remote_instance_name == "main"
+
+
+def test_invalidation_globs() -> None:
+    # Confirm that an un-normalized relative path in the pythonpath is filtered out.
+    suffix = "something-ridiculous"
+    ob = OptionsBootstrapper.create(env={}, args=[f"--pythonpath=../{suffix}"], allow_pantsrc=False)
+    globs = GlobalOptions.compute_pantsd_invalidation_globs(
+        get_buildroot(), ob.bootstrap_options.for_global_scope()
+    )
+    for glob in globs:
+        assert suffix not in glob

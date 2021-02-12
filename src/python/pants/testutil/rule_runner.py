@@ -35,7 +35,6 @@ from pants.engine.rules import Rule
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import ExecutionOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
@@ -126,7 +125,7 @@ class RuleRunner:
         named_caches_dir = global_options.named_caches_dir
 
         graph_session = EngineInitializer.setup_graph_extended(
-            pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
+            pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
                 self.build_root, global_options
             ),
             use_gitignore=False,

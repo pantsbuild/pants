@@ -73,7 +73,9 @@ class LocalPantsRunner:
     ) -> GraphSession:
         native = Native()
         native.set_panic_handler()
-        graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(options, build_config)
+        graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(
+            options_bootstrapper, build_config
+        )
         with OptionsInitializer.handle_unknown_flags(options_bootstrapper, raise_=True):
             global_options = options.for_global_scope()
         return graph_scheduler_helper.new_session(

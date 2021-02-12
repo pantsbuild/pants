@@ -3,7 +3,6 @@
 
 import unittest
 
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import BuildConfigurationError
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
@@ -29,15 +28,3 @@ class OptionsInitializerTest(unittest.TestCase):
         with self.assertRaises(OptionsError) as exc:
             OptionsInitializer.create_with_build_config(ob, raise_=True)
         self.assertIn("The `--remote-execution` option requires", str(exc.exception))
-
-    def test_invalidation_globs(self) -> None:
-        # Confirm that an un-normalized relative path in the pythonpath is filtered out.
-        suffix = "something-ridiculous"
-        ob = OptionsBootstrapper.create(
-            env={}, args=[f"--pythonpath=../{suffix}"], allow_pantsrc=False
-        )
-        globs = OptionsInitializer.compute_pantsd_invalidation_globs(
-            get_buildroot(), ob.bootstrap_options.for_global_scope()
-        )
-        for glob in globs:
-            assert suffix not in glob

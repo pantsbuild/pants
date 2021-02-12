@@ -79,7 +79,7 @@ class PantsDaemonCore:
                 options_bootstrapper, raise_=True
             )
             self._scheduler = EngineInitializer.setup_graph(
-                options, build_config, executor=self._executor
+                options_bootstrapper, build_config, executor=self._executor
             )
             bootstrap_options_values = options.bootstrap_option_values()
             assert bootstrap_options_values is not None
