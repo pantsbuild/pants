@@ -10,7 +10,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use sharded_lmdb::ShardedLmdb;
 use store::Store;
-use workunit_store::Metric;
+use workunit_store::{with_workunit, Level, Metric, WorkunitMetadata};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
@@ -54,64 +54,74 @@ impl crate::CommandRunner for CommandRunner {
     self.underlying.extract_compatible_request(req)
   }
 
-  // TODO: Maybe record WorkUnits for local cache checks.
   async fn run(
     &self,
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    context
-      .workunit_store
-      .increment_counter(Metric::LocalCacheRequests, 1);
+    let context2 = context.clone();
+    let cache_read_future = async move {
+      context
+        .workunit_store
+        .increment_counter(Metric::LocalCacheRequests, 1);
 
-    let digest = crate::digest(req.clone(), &self.metadata);
-    let key = digest.hash;
+      let digest = crate::digest(req.clone(), &self.metadata);
+      let key = digest.hash;
 
-    let cache_failures = req
-      .0
-      .values()
-      .any(|process| process.cache_scope == ProcessCacheScope::Always);
+      let cache_failures = req
+        .0
+        .values()
+        .any(|process| process.cache_scope == ProcessCacheScope::Always);
 
-    let command_runner = self.clone();
-    match self.lookup(key).await {
-      Ok(Some(result)) if result.exit_code == 0 || cache_failures => {
-        context
-          .workunit_store
-          .increment_counter(Metric::LocalCacheRequestsCached, 1);
-        return Ok(result);
+      let command_runner = self.clone();
+      match self.lookup(key).await {
+        Ok(Some(result)) if result.exit_code == 0 || cache_failures => {
+          context
+            .workunit_store
+            .increment_counter(Metric::LocalCacheRequestsCached, 1);
+          return Ok(result);
+        }
+        Err(err) => {
+          debug!(
+            "Error loading process execution result from local cache: {} - continuing to execute",
+            err
+          );
+          context
+            .workunit_store
+            .increment_counter(Metric::LocalCacheReadErrors, 1);
+          // Falling through to re-execute.
+        }
+        Ok(_) => {
+          // Either we missed, or we hit for a failing result.
+          context
+            .workunit_store
+            .increment_counter(Metric::LocalCacheRequestsUncached, 1);
+          // Falling through to execute.
+        }
       }
-      Err(err) => {
-        debug!(
-          "Error loading process execution result from local cache: {} - continuing to execute",
-          err
-        );
-        context
-          .workunit_store
-          .increment_counter(Metric::LocalCacheReadErrors, 1);
-        // Falling through to re-execute.
-      }
-      Ok(_) => {
-        // Either we missed, or we hit for a failing result.
-        context
-          .workunit_store
-          .increment_counter(Metric::LocalCacheRequestsUncached, 1);
-        // Falling through to execute.
-      }
-    }
 
-    let result = command_runner.underlying.run(req, context.clone()).await?;
-    if result.exit_code == 0 || cache_failures {
-      if let Err(err) = command_runner.store(key, &result).await {
-        warn!(
-          "Error storing process execution result to local cache: {} - ignoring and continuing",
-          err
-        );
-        context
-          .workunit_store
-          .increment_counter(Metric::LocalCacheWriteErrors, 1);
+      let result = command_runner.underlying.run(req, context.clone()).await?;
+      if result.exit_code == 0 || cache_failures {
+        if let Err(err) = command_runner.store(key, &result).await {
+          warn!(
+            "Error storing process execution result to local cache: {} - ignoring and continuing",
+            err
+          );
+          context
+            .workunit_store
+            .increment_counter(Metric::LocalCacheWriteErrors, 1);
+        }
       }
-    }
-    Ok(result)
+      Ok(result)
+    };
+    with_workunit(
+      context2.workunit_store,
+      "local_cache_read".to_owned(),
+      WorkunitMetadata::with_level(Level::Debug),
+      cache_read_future,
+      |_, md| md,
+    )
+    .await
   }
 }
 
