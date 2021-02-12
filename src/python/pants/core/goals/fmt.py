@@ -262,7 +262,7 @@ async def fmt(
     )
     if changed_digests:
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
-        # than silently having one result override the other. In practicality, this should never
+        # than silently having one result override the other. In practice, this should never
         # happen due to us grouping each language's formatters into a single digest.
         merged_formatted_digest = await Get(Digest, MergeDigests(changed_digests))
         workspace.write_digest(merged_formatted_digest)
