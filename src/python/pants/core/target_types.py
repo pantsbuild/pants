@@ -11,7 +11,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
-from pants.engine.addresses import AddressInput, UnparsedAddressInputs
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -28,7 +28,6 @@ from pants.engine.target import (
     StringField,
     Target,
     Targets,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -109,7 +108,9 @@ class RelocatedFiles(Target):
         "runtime to something more convenient than their actual paths in your project.\n\nFor "
         "example, you can relocate `src/resources/project1/data.json` to instead be "
         "`resources/data.json`. Your other target types can then add this target to their "
-        "`dependencies` field, rather than using the original `files` target.\n\n"
+        "`dependencies` field, rather than using the original `files` target.\n\nLike with "
+        "normal `files`, the sources are accessed via filesystem APIs, such as "
+        "Python's open(), via paths relative to the build root.\n\n"
     ) + dedent(
         """\
         To remove a prefix:
@@ -151,22 +152,14 @@ class RelocateFilesViaCodegenRequest(GenerateSourcesRequest):
 async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSources:
     # Unlike normal codegen, we operate the on the sources of the `files_targets` field, not the
     # `sources` of the original `relocated_sources` target.
-    # TODO(#10915): using `await Get(Addresses, UnparsedAddressInputs)` causes a graph failure.
-    original_files_targets = await MultiGet(
-        Get(
-            WrappedTarget,
-            AddressInput,
-            AddressInput.parse(v, relative_to=request.protocol_target.address.spec_path),
-        )
-        for v in (
-            request.protocol_target.get(RelocatedFilesOriginalTargets)
-            .to_unparsed_address_inputs()
-            .values
-        )
+    original_files_targets = await Get(
+        Targets,
+        UnparsedAddressInputs,
+        request.protocol_target.get(RelocatedFilesOriginalTargets).to_unparsed_address_inputs(),
     )
     original_files_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(wrapped_tgt.target.get(Sources)))
-        for wrapped_tgt in original_files_targets
+        Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources)))
+        for tgt in original_files_targets
     )
     snapshot = await Get(
         Snapshot, MergeDigests(sources.snapshot.digest for sources in original_files_sources)
@@ -199,6 +192,130 @@ class Resources(Target):
         "of a `resources` target are accessed via language-specific resource APIs, such as "
         "Python's pkgutil or JVM's ClassLoader, via paths relative to the target's source root."
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# `relocated_resources` target
+# -----------------------------------------------------------------------------------------------
+
+
+class RelocatedResourcesSources(Sources):
+    # We solely register this field for codegen to work.
+    alias = "_sources"
+    expected_num_files = 0
+
+
+class RelocatedResourcesOriginalTargets(SpecialCasedDependencies):
+    alias = "resources_targets"
+    required = True
+    help = (
+        "Addresses to the original `resources()` targets that you want to relocate, such as "
+        "`['//:json_files']`.\n\nEvery target will be relocated using the same mapping. This means "
+        "that every target must include the value from the `src` field in their original path."
+    )
+
+
+class RelocatedResourcesSrcField(StringField):
+    alias = "src"
+    required = True
+    help = (
+        "The original prefix that you want to replace, such as `src/resources`.\n\nYou can set "
+        "this field to `"
+        "` to preserve the original path; the value in the `dest` field will "
+        "then be added to the beginning of this original path."
+    )
+
+
+class RelocatedResourcesDestField(StringField):
+    alias = "dest"
+    required = True
+    help = (
+        "The new prefix that you want to add to the beginning of the path, such as `data`.\n\nYou "
+        'can set this field to "" to avoid adding any new values to the path; the value in the '
+        "`src` field will then be stripped, rather than replaced."
+    )
+
+
+class RelocatedResources(Target):
+    alias = "relocated_resources"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        RelocatedResourcesSources,
+        RelocatedResourcesOriginalTargets,
+        RelocatedResourcesSrcField,
+        RelocatedResourcesDestField,
+    )
+    help = (
+        "Resources with path manipulation applied.\n\nAllows you to relocate the resources at "
+        "runtime to something more convenient than their actual paths in your project.\n\nFor "
+        "example, you can relocate `src/resources/project1/data.json` to instead be "
+        "`resources/data.json`. Your other target types can then add this target to their "
+        "`dependencies` field, rather than using the original `resources` target.\n\nLike with "
+        "normal `resources`, the sources are accessed via language-specific resource APIs, such as "
+        "Python's pkgutil or JVM's ClassLoader, via paths relative to the target's source root. "
+        "\n\nThe relocated resources should live under one of your project's source roots (run "
+        "`./pants roots`).\n\n"
+    ) + dedent(
+        """\
+        To remove a prefix:
+
+            # Results in `project1/data.json`.
+            relocated_resources(
+                resources_targets=["src/resources/project1:target"],
+                src="src/resources",
+                dest="",
+            )
+
+        To add a prefix:
+
+            # Results in `src/resources/logo.svg`.
+            relocated_resources(
+                resources_targets=["//:logo"],
+                src="",
+                dest="src/resources",
+            )
+
+        To replace a prefix:
+
+            # Results in `src/resources/data.json`.
+            relocated_resources(
+                resources_targets=["src/resources/project1:target"],
+                src="old_prefix",
+                dest="src/resources",
+            )
+        """
+    )
+
+
+class RelocateResourcesViaCodegenRequest(GenerateSourcesRequest):
+    input = RelocatedResourcesSources
+    output = ResourcesSources
+
+
+@rule(desc="Relocating resources for `relocated_resources` targets", level=LogLevel.DEBUG)
+async def relocate_resources(request: RelocateResourcesViaCodegenRequest) -> GeneratedSources:
+    # Unlike normal codegen, we operate the on the sources of the `resources_targets` field, not the
+    # `sources` of the original `relocated_sources` target.
+    original_resources_targets = await Get(
+        Targets,
+        UnparsedAddressInputs,
+        request.protocol_target.get(RelocatedResourcesOriginalTargets).to_unparsed_address_inputs(),
+    )
+    original_files_sources = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources)))
+        for tgt in original_resources_targets
+    )
+    snapshot = await Get(
+        Snapshot, MergeDigests(sources.snapshot.digest for sources in original_files_sources)
+    )
+
+    src_val = request.protocol_target.get(RelocatedResourcesSrcField).value
+    dest_val = request.protocol_target.get(RelocatedResourcesDestField).value
+    if src_val:
+        snapshot = await Get(Snapshot, RemovePrefix(snapshot.digest, src_val))
+    if dest_val:
+        snapshot = await Get(Snapshot, AddPrefix(snapshot.digest, dest_val))
+    return GeneratedSources(snapshot)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -328,5 +445,6 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),
+        UnionRule(GenerateSourcesRequest, RelocateResourcesViaCodegenRequest),
         UnionRule(PackageFieldSet, ArchiveFieldSet),
     )

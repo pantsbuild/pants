@@ -6,7 +6,7 @@ import zipfile
 from io import BytesIO
 from textwrap import dedent
 
-from pants.backend.python import target_types_rules
+from pants.backend.python import target_types_rules as python_target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
@@ -17,7 +17,11 @@ from pants.core.target_types import (
     Files,
     FilesSources,
     RelocatedFiles,
+    RelocatedResources,
     RelocateFilesViaCodegenRequest,
+    RelocateResourcesViaCodegenRequest,
+    Resources,
+    ResourcesSources,
 )
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -33,16 +37,20 @@ from pants.engine.target import (
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-def test_relocated_files() -> None:
+def test_relocated_files_and_resources() -> None:
+    # NB: The rule is the same between `files()` and `resources()`. It's only later in call sites
+    # that the two types are treated differently, such as preserving source roots for files() but
+    # stripping for resources().
     rule_runner = RuleRunner(
         rules=[
             *target_type_rules(),
             *source_files_rules(),
             QueryRule(GeneratedSources, [RelocateFilesViaCodegenRequest]),
+            QueryRule(GeneratedSources, [RelocateResourcesViaCodegenRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
-        target_types=[Files, RelocatedFiles],
+        target_types=[Files, RelocatedFiles, Resources, RelocatedResources],
     )
 
     def assert_prefix_mapping(
@@ -57,11 +65,18 @@ def test_relocated_files() -> None:
             "",
             dedent(
                 f"""\
-                files(name="original", sources=[{repr(original)}])
-
+                files(name="original_files", sources=[{repr(original)}])
                 relocated_files(
-                    name="relocated",
-                    files_targets=[":original"],
+                    name="relocated_files",
+                    files_targets=[":original_files"],
+                    src={repr(src)},
+                    dest={repr(dest)},
+                )
+
+                resources(name="original_resources", sources=[{repr(original)}])
+                relocated_resources(
+                    name="relocated_resources",
+                    resources_targets=[":original_resources"],
                     src={repr(src)},
                     dest={repr(dest)},
                 )
@@ -69,18 +84,33 @@ def test_relocated_files() -> None:
             ),
             overwrite=True,
         )
-        tgt = rule_runner.get_target(Address("", target_name="relocated"))
-        result = rule_runner.request(
-            GeneratedSources, [RelocateFilesViaCodegenRequest(EMPTY_SNAPSHOT, tgt)]
-        )
-        assert result.snapshot.files == (expected,)
 
-        # We also ensure that when looking at the transitive dependencies of the `relocated_files`
-        # target and then getting all the code of that closure, we only end up with the relocated
-        # files. If we naively marked the original files targets as a typical `Dependencies` field,
+        relocated_files_tgt = rule_runner.get_target(Address("", target_name="relocated_files"))
+        relocated_files_result = rule_runner.request(
+            GeneratedSources, [RelocateFilesViaCodegenRequest(EMPTY_SNAPSHOT, relocated_files_tgt)]
+        )
+        assert relocated_files_result.snapshot.files == (expected,)
+
+        relocated_resources_tgt = rule_runner.get_target(
+            Address("", target_name="relocated_resources")
+        )
+        relocated_resources_result = rule_runner.request(
+            GeneratedSources,
+            [RelocateResourcesViaCodegenRequest(EMPTY_SNAPSHOT, relocated_resources_tgt)],
+        )
+        assert relocated_resources_result.snapshot.files == (expected,)
+
+        # We also ensure that when looking at the transitive dependencies of the relocated targets
+        # and then getting all the code of that closure, we only end up with the relocated files.
+        # If we naively marked the original files targets as a typical `Dependencies` field,
         # we would hit this issue.
         transitive_targets = rule_runner.request(
-            TransitiveTargets, [TransitiveTargetsRequest([tgt.address])]
+            TransitiveTargets,
+            [
+                TransitiveTargetsRequest(
+                    [relocated_files_tgt.address, relocated_resources_tgt.address]
+                )
+            ],
         )
         all_sources = rule_runner.request(
             SourceFiles,
@@ -88,7 +118,7 @@ def test_relocated_files() -> None:
                 SourceFilesRequest(
                     (tgt.get(Sources) for tgt in transitive_targets.closure),
                     enable_codegen=True,
-                    for_sources_types=(FilesSources,),
+                    for_sources_types=(FilesSources, ResourcesSources),
                 )
             ],
         )
@@ -160,7 +190,7 @@ def test_archive() -> None:
             *target_type_rules(),
             *pex_from_targets.rules(),
             *package_pex_binary.rules(),
-            *target_types_rules.rules(),
+            *python_target_types_rules.rules(),
             QueryRule(BuiltPackage, [ArchiveFieldSet]),
         ],
         target_types=[ArchiveTarget, Files, RelocatedFiles, PexBinary],
