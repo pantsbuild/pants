@@ -7,8 +7,10 @@ import dataclasses
 import functools
 import itertools
 import logging
+import shlex
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import PurePath
 from textwrap import dedent
 from typing import (
     FrozenSet,
@@ -42,14 +44,22 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
+    CreateDigest,
     Digest,
+    FileContent,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
 )
 from pants.engine.platform import Platform
-from pants.engine.process import MultiPlatformProcess, Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import (
+    BashBinary,
+    MultiPlatformProcess,
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
+)
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Target
 from pants.python.python_repos import PythonRepos
@@ -321,6 +331,7 @@ class PexRequest(EngineAwareParameter):
     additional_inputs: Optional[Digest]
     entry_point: Optional[str]
     additional_args: Tuple[str, ...]
+    pex_path: Tuple[Pex, ...]
     description: Optional[str] = dataclasses.field(compare=False)
 
     def __init__(
@@ -335,6 +346,7 @@ class PexRequest(EngineAwareParameter):
         additional_inputs: Optional[Digest] = None,
         entry_point: Optional[str] = None,
         additional_args: Iterable[str] = (),
+        pex_path: Iterable[Pex] = (),
         description: Optional[str] = None,
     ) -> None:
         """A request to create a PEX from its inputs.
@@ -356,6 +368,7 @@ class PexRequest(EngineAwareParameter):
         :param entry_point: The entry-point for the built Pex, equivalent to Pex's `-m` flag. If
             left off, the Pex will open up as a REPL.
         :param additional_args: Any additional Pex flags.
+        :param pex_path: Pex files to add to the PEX_PATH.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
         """
@@ -368,6 +381,7 @@ class PexRequest(EngineAwareParameter):
         self.additional_inputs = additional_inputs
         self.entry_point = entry_point
         self.additional_args = tuple(additional_args)
+        self.pex_path = tuple(pex_path)
         self.description = description
         self.__post_init__()
 
@@ -477,14 +491,25 @@ async def find_interpreter(
     return PythonExecutable(path=path, fingerprint=fingerprint)
 
 
+@dataclass(frozen=True)
+class BuildPexResult:
+    result: ProcessResult
+    pex_filename: str
+    digest: Digest
+    python: Optional[PythonExecutable]
+
+    def create_pex(self) -> Pex:
+        return Pex(digest=self.digest, name=self.pex_filename, python=self.python)
+
+
 @rule(level=LogLevel.DEBUG)
-async def create_pex(
+async def build_pex(
     request: PexRequest,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
     platform: Platform,
     pex_runtime_env: PexRuntimeEnvironment,
-) -> Pex:
+) -> BuildPexResult:
     """Returns a PEX with the given settings."""
 
     argv = [
@@ -568,9 +593,15 @@ async def create_pex(
                 sources_digest_as_subdir,
                 additional_inputs_digest,
                 constraint_file_digest,
+                *(pex.digest for pex in request.pex_path),
             )
         ),
     )
+    # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
+    #  requirements, which could lead to problems. Support shading python binaries.
+    #  See: https://github.com/pantsbuild/pants/issues/9206
+    if request.pex_path:
+        argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
 
     description = request.description
     if description is None:
@@ -604,7 +635,176 @@ async def create_pex(
         if log_output:
             logger.info("%s", log_output)
 
-    return Pex(digest=result.output_digest, name=request.output_filename, python=python)
+    digest = (
+        await Get(
+            Digest, MergeDigests((result.output_digest, *(pex.digest for pex in request.pex_path)))
+        )
+        if request.pex_path
+        else result.output_digest
+    )
+
+    return BuildPexResult(
+        result=result, pex_filename=request.output_filename, digest=digest, python=python
+    )
+
+
+@rule
+async def create_pex(request: PexRequest) -> Pex:
+    result = await Get(BuildPexResult, PexRequest, request)
+    return result.create_pex()
+
+
+@dataclass(frozen=True)
+class Script:
+    path: PurePath
+
+    @property
+    def argv0(self) -> str:
+        return f"./{self.path}" if self.path.parent == PurePath() else str(self.path)
+
+
+@dataclass(frozen=True)
+class VenvScript:
+    script: Script
+    content: FileContent
+
+
+@dataclass(frozen=True)
+class VenvScriptWriter:
+    pex: Pex
+    venv_dir: PurePath
+
+    def _create_venv_script(
+        self,
+        bash: BashBinary,
+        pex_environment: PexEnvironment,
+        *,
+        script_path: PurePath,
+        venv_executable: PurePath,
+    ) -> VenvScript:
+        env_vars = (
+            f"{name}={shlex.quote(value)}"
+            for name, value in pex_environment.environment_dict(python_configured=True).items()
+        )
+        target_venv_executable = shlex.quote(str(venv_executable))
+        venv_dir = shlex.quote(str(self.venv_dir))
+        execute_pex_args = " ".join(
+            shlex.quote(arg)
+            for arg in pex_environment.create_argv(self.pex.name, python=self.pex.python)
+        )
+
+        script = dedent(
+            f"""\
+            #!{bash.path}
+            set -euo pipefail
+
+            export {" ".join(env_vars)}
+
+            # If the seeded venv has been removed from the PEX_ROOT, we re-seed from the original
+            # `--venv` mode PEX file.
+            if [ ! -e {target_venv_executable} ]; then
+                rm -rf {venv_dir} || true
+                PEX_INTERPRETER=1 {execute_pex_args} -c ''
+            fi
+
+            exec {target_venv_executable} "$@"
+            """
+        )
+        return VenvScript(
+            script=Script(script_path),
+            content=FileContent(path=str(script_path), content=script.encode(), is_executable=True),
+        )
+
+    def exe(self, bash: BashBinary, pex_environment: PexEnvironment) -> VenvScript:
+        """Writes a safe shim for the venv's executable `pex` script."""
+        script_path = PurePath(f"{self.pex.name}_pex_shim.sh")
+        return self._create_venv_script(
+            bash, pex_environment, script_path=script_path, venv_executable=self.venv_dir / "pex"
+        )
+
+    def bin(self, bash: BashBinary, pex_environment: PexEnvironment, name: str) -> VenvScript:
+        """Writes a safe shim for an executable or script in the venv's `bin` directory."""
+        script_path = PurePath(f"{self.pex.name}_bin_{name}_shim.sh")
+        return self._create_venv_script(
+            bash,
+            pex_environment,
+            script_path=script_path,
+            venv_executable=self.venv_dir / "bin" / name,
+        )
+
+    def python(self, bash: BashBinary, pex_environment: PexEnvironment) -> VenvScript:
+        """Writes a safe shim for the venv's python binary."""
+        return self.bin(bash, pex_environment, "python")
+
+
+@dataclass(frozen=True)
+class VenvPex:
+    digest: Digest
+    pex: Script
+    python: Script
+    bin: FrozenDict[str, Script]
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class VenvPexRequest:
+    pex_request: PexRequest
+    bin_names: Tuple[str, ...] = ()
+
+    def __init__(self, pex_request: PexRequest, bin_names: Iterable[str] = ()) -> None:
+        """A request for a PEX that runs in a venv and optionally exposes select vanv `bin` scripts.
+
+        :param pex_request: The details of the desired PEX.
+        :param bin_names: The names of venv `bin` scripts to expose for execution.
+        """
+        self.pex_request = pex_request
+        self.bin_names = tuple(bin_names)
+
+
+@rule
+def wrap_venv_prex_request(pex_request: PexRequest) -> VenvPexRequest:
+    # Allow creating a VenvPex from a plain PexRequest when no extra bin scripts need to be exposed.
+    return VenvPexRequest(pex_request)
+
+
+@rule
+async def create_venv_pex(
+    request: VenvPexRequest, bash: BashBinary, pex_environment: PexEnvironment
+) -> VenvPex:
+    pex_request = request.pex_request
+    seeded_venv_request = dataclasses.replace(
+        pex_request, additional_args=pex_request.additional_args + ("--venv", "--seed")
+    )
+    result = await Get(BuildPexResult, PexRequest, seeded_venv_request)
+    # Pex --seed mode outputs the path of the PEX executable. In the --venv case this is the `pex`
+    # script in the venv root directory.
+    venv_dir = PurePath(result.result.stdout.decode().strip()).parent
+
+    venv_script_writer = VenvScriptWriter(pex=result.create_pex(), venv_dir=venv_dir)
+    pex = venv_script_writer.exe(bash, pex_environment)
+    python = venv_script_writer.python(bash, pex_environment)
+    scripts = {
+        bin_name: venv_script_writer.bin(bash, pex_environment, bin_name)
+        for bin_name in request.bin_names
+    }
+    scripts_digest = await Get(
+        Digest,
+        CreateDigest(
+            (
+                pex.content,
+                python.content,
+                *(venv_script.content for venv_script in scripts.values()),
+            )
+        ),
+    )
+    input_digest = await Get(Digest, MergeDigests((venv_script_writer.pex.digest, scripts_digest)))
+
+    return VenvPex(
+        digest=input_digest,
+        pex=pex.script,
+        python=python.script,
+        bin=FrozenDict((bin_name, venv_script.script) for bin_name, venv_script in scripts.items()),
+    )
 
 
 @rule(level=LogLevel.DEBUG)
@@ -657,7 +857,7 @@ class PexProcess:
     argv: Tuple[str, ...]
     description: str = dataclasses.field(compare=False)
     level: LogLevel
-    input_digest: Digest
+    input_digest: Optional[Digest]
     extra_env: Optional[FrozenDict[str, str]]
     output_files: Optional[Tuple[str, ...]]
     output_directories: Optional[Tuple[str, ...]]
@@ -669,8 +869,8 @@ class PexProcess:
         self,
         pex: Pex,
         *,
-        argv: Iterable[str],
         description: str,
+        argv: Iterable[str] = (),
         level: LogLevel = LogLevel.INFO,
         input_digest: Optional[Digest] = None,
         extra_env: Optional[Mapping[str, str]] = None,
@@ -684,7 +884,7 @@ class PexProcess:
         self.argv = tuple(argv)
         self.description = description
         self.level = level
-        self.input_digest = input_digest or pex.digest
+        self.input_digest = input_digest
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
@@ -694,22 +894,90 @@ class PexProcess:
 
 
 @rule
-def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
-    argv = pex_environment.create_argv(
-        f"./{request.pex.name}",
-        *request.argv,
-        python=request.pex.python,
-    )
+async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
+    pex = request.pex
+    argv = pex_environment.create_argv(pex.name, *request.argv, python=pex.python)
     env = {
-        **pex_environment.environment_dict(python_configured=request.pex.python is not None),
+        **pex_environment.environment_dict(python_configured=pex.python is not None),
         **(request.extra_env or {}),
     }
+    input_digest = (
+        await Get(Digest, MergeDigests((pex.digest, request.input_digest)))
+        if request.input_digest
+        else pex.digest
+    )
     return Process(
         argv,
         description=request.description,
         level=request.level,
-        input_digest=request.input_digest,
+        input_digest=input_digest,
         env=env,
+        output_files=request.output_files,
+        output_directories=request.output_directories,
+        timeout_seconds=request.timeout_seconds,
+        execution_slot_variable=request.execution_slot_variable,
+        cache_scope=request.cache_scope,
+    )
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class VenvPexProcess:
+    venv_pex: VenvPex
+    argv: Tuple[str, ...]
+    description: str = dataclasses.field(compare=False)
+    level: LogLevel
+    input_digest: Optional[Digest]
+    extra_env: Optional[FrozenDict[str, str]]
+    output_files: Optional[Tuple[str, ...]]
+    output_directories: Optional[Tuple[str, ...]]
+    timeout_seconds: Optional[int]
+    execution_slot_variable: Optional[str]
+    cache_scope: Optional[ProcessCacheScope]
+
+    def __init__(
+        self,
+        venv_pex: VenvPex,
+        *,
+        description: str,
+        argv: Iterable[str] = (),
+        level: LogLevel = LogLevel.INFO,
+        input_digest: Optional[Digest] = None,
+        extra_env: Optional[Mapping[str, str]] = None,
+        output_files: Optional[Iterable[str]] = None,
+        output_directories: Optional[Iterable[str]] = None,
+        timeout_seconds: Optional[int] = None,
+        execution_slot_variable: Optional[str] = None,
+        cache_scope: Optional[ProcessCacheScope] = None,
+    ) -> None:
+        self.venv_pex = venv_pex
+        self.argv = tuple(argv)
+        self.description = description
+        self.level = level
+        self.input_digest = input_digest
+        self.extra_env = FrozenDict(extra_env) if extra_env else None
+        self.output_files = tuple(output_files) if output_files else None
+        self.output_directories = tuple(output_directories) if output_directories else None
+        self.timeout_seconds = timeout_seconds
+        self.execution_slot_variable = execution_slot_variable
+        self.cache_scope = cache_scope
+
+
+@rule
+async def setup_venv_pex_process(request: VenvPexProcess) -> Process:
+    venv_pex = request.venv_pex
+    argv = (venv_pex.pex.argv0, *request.argv)
+    input_digest = (
+        await Get(Digest, MergeDigests((venv_pex.digest, request.input_digest)))
+        if request.input_digest
+        else venv_pex.digest
+    )
+    return Process(
+        argv=argv,
+        description=request.description,
+        level=request.level,
+        input_digest=input_digest,
+        env=request.extra_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
         timeout_seconds=request.timeout_seconds,
