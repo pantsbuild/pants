@@ -166,6 +166,7 @@ class EngineInitializer:
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
         executor: Optional[PyExecutor] = None,
+        execution_options: Optional[ExecutionOptions] = None,
     ) -> GraphScheduler:
         native = Native()
         build_root = get_buildroot()
@@ -175,9 +176,10 @@ class EngineInitializer:
         executor = executor or PyExecutor(
             *GlobalOptions.compute_executor_arguments(bootstrap_options)
         )
+        execution_options = execution_options or ExecutionOptions.from_options(options)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
-            ExecutionOptions.from_options(options),
+            execution_options,
             native=native,
             executor=executor,
             pants_ignore_patterns=GlobalOptions.compute_pants_ignore(build_root, bootstrap_options),

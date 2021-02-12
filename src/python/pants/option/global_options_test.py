@@ -39,7 +39,7 @@ def create_execution_options(
     if plugin:
         args.append(f"--remote-auth-plugin={plugin}")
     ob = create_options_bootstrapper(args)
-    _build_config, options = OptionsInitializer.create_with_build_config(ob, raise_=False)
+    _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, raise_=False)
     return ExecutionOptions.from_options(options)
 
 

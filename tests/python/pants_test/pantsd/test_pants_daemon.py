@@ -10,6 +10,7 @@ from pants.engine.internals.native_engine import PyExecutor
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.pantsd.service.pants_service import PantsServices
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.contextutil import stdio_as
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -20,10 +21,7 @@ TEST_LOG_LEVEL = logging.INFO
 
 @unittest.mock.patch("os.close", **PATCH_OPTS)
 def test_close_stdio(mock_close):
-    mock_options = unittest.mock.Mock()
-    mock_options_values = unittest.mock.Mock()
-    mock_options.for_global_scope.return_value = mock_options_values
-    mock_options_values.pants_subprocessdir = "non_existent_dir"
+    ob = create_options_bootstrapper([])
     mock_server = unittest.mock.Mock()
 
     def create_services(bootstrap_options, legacy_graph_scheduler):
@@ -34,9 +32,9 @@ def test_close_stdio(mock_close):
         work_dir="test_work_dir",
         log_level=logging.INFO,
         server=mock_server,
-        core=PantsDaemonCore(PyExecutor(2, 4), create_services),
+        core=PantsDaemonCore(ob, PyExecutor(2, 4), create_services),
         metadata_base_dir="/tmp/pants_test_metadata_dir",
-        bootstrap_options=mock_options,
+        bootstrap_options=ob.bootstrap_options,
     )
 
     with stdio_as(-1, -1, -1):

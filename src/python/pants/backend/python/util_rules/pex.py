@@ -321,6 +321,7 @@ class PexRequest(EngineAwareParameter):
     entry_point: str | None
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
+    apply_requirement_constraints: bool
     description: str | None = dataclasses.field(compare=False)
 
     def __init__(
@@ -336,6 +337,7 @@ class PexRequest(EngineAwareParameter):
         entry_point: str | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
+        apply_requirement_constraints: bool = True,
         description: str | None = None,
     ) -> None:
         """A request to create a PEX from its inputs.
@@ -358,6 +360,8 @@ class PexRequest(EngineAwareParameter):
             left off, the Pex will open up as a REPL.
         :param additional_args: Any additional Pex flags.
         :param pex_path: Pex files to add to the PEX_PATH.
+        :param apply_requirement_constraints: Whether to apply any configured
+            requirement_constraints while building this PEX.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
         """
@@ -371,6 +375,7 @@ class PexRequest(EngineAwareParameter):
         self.entry_point = entry_point
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
+        self.apply_requirement_constraints = apply_requirement_constraints
         self.description = description
         self.__post_init__()
 
@@ -550,16 +555,14 @@ async def build_pex(
     if request.entry_point is not None:
         argv.extend(["--entry-point", request.entry_point])
 
-    if python_setup.requirement_constraints is not None:
-        argv.extend(["--constraints", python_setup.requirement_constraints])
-
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
 
     argv.extend(request.requirements)
 
     constraint_file_digest = EMPTY_DIGEST
-    if python_setup.requirement_constraints is not None:
+    if request.apply_requirement_constraints and python_setup.requirement_constraints is not None:
+        argv.extend(["--constraints", python_setup.requirement_constraints])
         constraint_file_digest = await Get(
             Digest,
             PathGlobs(

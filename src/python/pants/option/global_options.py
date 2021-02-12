@@ -344,6 +344,10 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=os.path.join(get_pants_cachedir(), "plugins"),
             help="Cache resolved plugin requirements here.",
+            removal_version="2.5.0.dev0",
+            removal_hint=(
+                "This option now no-ops, the plugins cache is now housed in the named caches."
+            ),
         )
 
         register(

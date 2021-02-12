@@ -18,7 +18,9 @@ class OptionsInitializerTest(unittest.TestCase):
         )
 
         with self.assertRaises(BuildConfigurationError):
-            OptionsInitializer.create_with_build_config(options_bootstrapper, raise_=True)
+            OptionsInitializer(options_bootstrapper).build_config_and_options(
+                options_bootstrapper, raise_=True
+            )
 
     def test_global_options_validation(self):
         # Specify an invalid combination of options.
@@ -26,5 +28,5 @@ class OptionsInitializerTest(unittest.TestCase):
             env={}, args=["--backend-packages=[]", "--remote-execution"], allow_pantsrc=False
         )
         with self.assertRaises(OptionsError) as exc:
-            OptionsInitializer.create_with_build_config(ob, raise_=True)
+            OptionsInitializer(ob).build_config_and_options(ob, raise_=True)
         self.assertIn("The `--remote-execution` option requires", str(exc.exception))

@@ -59,7 +59,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         native.override_thread_logging_destination_to_just_pantsd()
 
         executor = PyExecutor(*GlobalOptions.compute_executor_arguments(bootstrap_options_values))
-        core = PantsDaemonCore(executor, cls._setup_services)
+        core = PantsDaemonCore(options_bootstrapper, executor, cls._setup_services)
 
         server = native.new_nailgun_server(
             executor,
