@@ -11,7 +11,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
-from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.addresses import AddressInput, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -28,6 +28,7 @@ from pants.engine.target import (
     StringField,
     Target,
     Targets,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -152,14 +153,23 @@ class RelocateFilesViaCodegenRequest(GenerateSourcesRequest):
 async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSources:
     # Unlike normal codegen, we operate the on the sources of the `files_targets` field, not the
     # `sources` of the original `relocated_sources` target.
-    original_files_targets = await Get(
-        Targets,
-        UnparsedAddressInputs,
-        request.protocol_target.get(RelocatedFilesOriginalTargets).to_unparsed_address_inputs(),
+    # TODO: using `await Get(Addresses, UnparsedAddressInputs)` causes a rule graph
+    #  failure in the test `test_archive` for some reason.
+    original_files_targets = await MultiGet(
+        Get(
+            WrappedTarget,
+            AddressInput,
+            AddressInput.parse(v, relative_to=request.protocol_target.address.spec_path),
+        )
+        for v in (
+            request.protocol_target.get(RelocatedFilesOriginalTargets)
+            .to_unparsed_address_inputs()
+            .values
+        )
     )
     original_files_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources)))
-        for tgt in original_files_targets
+        Get(HydratedSources, HydrateSourcesRequest(wrapped_tgt.target.get(Sources)))
+        for wrapped_tgt in original_files_targets
     )
     snapshot = await Get(
         Snapshot, MergeDigests(sources.snapshot.digest for sources in original_files_sources)
@@ -296,17 +306,26 @@ class RelocateResourcesViaCodegenRequest(GenerateSourcesRequest):
 async def relocate_resources(request: RelocateResourcesViaCodegenRequest) -> GeneratedSources:
     # Unlike normal codegen, we operate the on the sources of the `resources_targets` field, not the
     # `sources` of the original `relocated_sources` target.
-    original_resources_targets = await Get(
-        Targets,
-        UnparsedAddressInputs,
-        request.protocol_target.get(RelocatedResourcesOriginalTargets).to_unparsed_address_inputs(),
+    # TODO: using `await Get(Addresses, UnparsedAddressInputs)` causes a rule graph
+    #  failure in the test `test_archive` for some reason.
+    original_resources_targets = await MultiGet(
+        Get(
+            WrappedTarget,
+            AddressInput,
+            AddressInput.parse(v, relative_to=request.protocol_target.address.spec_path),
+        )
+        for v in (
+            request.protocol_target.get(RelocatedResourcesOriginalTargets)
+            .to_unparsed_address_inputs()
+            .values
+        )
     )
-    original_files_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources)))
-        for tgt in original_resources_targets
+    original_resources_sources = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(wrapped_tgt.target.get(Sources)))
+        for wrapped_tgt in original_resources_targets
     )
     snapshot = await Get(
-        Snapshot, MergeDigests(sources.snapshot.digest for sources in original_files_sources)
+        Snapshot, MergeDigests(sources.snapshot.digest for sources in original_resources_sources)
     )
 
     src_val = request.protocol_target.get(RelocatedResourcesSrcField).value
