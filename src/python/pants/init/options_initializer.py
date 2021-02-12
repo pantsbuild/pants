@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 from contextlib import contextmanager
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Tuple
 
 import pkg_resources
 
@@ -27,49 +27,35 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
-class BuildConfigInitializer:
-    """Initializes a BuildConfiguration object.
+def _initialize_build_configuration(
+    options_bootstrapper: OptionsBootstrapper,
+) -> BuildConfiguration:
+    """Initialize a BuildConfiguration for the given OptionsBootstrapper.
 
-    This class uses a class-level cache for the internally generated `BuildConfiguration` object,
-    which permits multiple invocations in the same runtime context without re-incurring backend &
-    plugin loading, which can be expensive and cause issues (double task registration, etc).
+    NB: This method:
+      1. has the side-effect of (idempotently) adding PYTHONPATH entries for this process
+      2. is expensive to call, because it might resolve plugins from the network
     """
 
-    _cached_build_config: Optional[BuildConfiguration] = None
+    bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
+    working_set = PluginResolver(options_bootstrapper).resolve()
 
-    @classmethod
-    def get(cls, options_bootstrapper: OptionsBootstrapper) -> BuildConfiguration:
-        if cls._cached_build_config is None:
-            cls._cached_build_config = cls(options_bootstrapper).setup()
-        return cls._cached_build_config
+    # Add any extra paths to python path (e.g., for loading extra source backends).
+    for path in bootstrap_options.pythonpath:
+        if path not in sys.path:
+            sys.path.append(path)
+            pkg_resources.fixup_namespace_packages(path)
 
-    @classmethod
-    def reset(cls) -> None:
-        cls._cached_build_config = None
-
-    def __init__(self, options_bootstrapper: OptionsBootstrapper) -> None:
-        self._bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-        self._working_set = PluginResolver(options_bootstrapper).resolve()
-
-    def setup(self) -> BuildConfiguration:
-        """Loads backends and plugins."""
-
-        # Add any extra paths to python path (e.g., for loading extra source backends).
-        for path in self._bootstrap_options.pythonpath:
-            if path not in sys.path:
-                sys.path.append(path)
-                pkg_resources.fixup_namespace_packages(path)
-
-        # Load plugins and backends.
-        return load_backends_and_plugins(
-            self._bootstrap_options.plugins,
-            self._working_set,
-            self._bootstrap_options.backend_packages,
-        )
+    # Load plugins and backends.
+    return load_backends_and_plugins(
+        bootstrap_options.plugins,
+        working_set,
+        bootstrap_options.backend_packages,
+    )
 
 
 class OptionsInitializer:
-    """Initializes options."""
+    """Initializes BuildConfiguration and Options instances."""
 
     @staticmethod
     def compute_executor_arguments(bootstrap_options: OptionValueContainer) -> Tuple[int, int]:
@@ -183,7 +169,7 @@ class OptionsInitializer:
     def create_with_build_config(
         cls, options_bootstrapper: OptionsBootstrapper, *, raise_: bool
     ) -> Tuple[BuildConfiguration, Options]:
-        build_config = BuildConfigInitializer.get(options_bootstrapper)
+        build_config = _initialize_build_configuration(options_bootstrapper)
         with OptionsInitializer.handle_unknown_flags(options_bootstrapper, raise_=raise_):
             options = OptionsInitializer.create(options_bootstrapper, build_config)
         return build_config, options
@@ -197,7 +183,7 @@ class OptionsInitializer:
         try:
             yield
         except UnknownFlagsError as err:
-            build_config = BuildConfigInitializer.get(options_bootstrapper)
+            build_config = _initialize_build_configuration(options_bootstrapper)
             # We need an options instance in order to get "did you mean" suggestions, but we know
             # there are bad flags in the args, so we generate options with no flags.
             no_arg_bootstrapper = dataclasses.replace(

@@ -9,7 +9,7 @@ from typing_extensions import Protocol
 
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
-from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -75,9 +75,9 @@ class PantsDaemonCore:
                 logger.info("initializing pantsd...")
             if self._services:
                 self._services.shutdown()
-            with OptionsInitializer.handle_unknown_flags(options_bootstrapper, raise_=True):
-                build_config = BuildConfigInitializer.get(options_bootstrapper)
-                options = OptionsInitializer.create(options_bootstrapper, build_config)
+            build_config, options = OptionsInitializer.create_with_build_config(
+                options_bootstrapper, raise_=True
+            )
             self._scheduler = EngineInitializer.setup_graph(
                 options, build_config, executor=self._executor
             )
