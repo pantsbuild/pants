@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Sequence, Set, Tuple, Type
 
-from pants.base.build_environment import get_default_pants_config_file
+from pants.base.build_environment import get_default_pants_config_file, pants_version
+from pants.base.exceptions import BuildConfigurationError
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptions
@@ -227,7 +229,7 @@ class OptionsBootstrapper:
 
         return options
 
-    def get_full_options(self, known_scope_infos: Iterable[ScopeInfo]) -> Options:
+    def full_options_for_scopes(self, known_scope_infos: Iterable[ScopeInfo]) -> Options:
         """Get the full Options instance bootstrapped by this object for the given known scopes.
 
         :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
@@ -237,3 +239,21 @@ class OptionsBootstrapper:
         return self._full_options(
             FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope))
         )
+
+    def full_options(self, build_configuration: BuildConfiguration) -> Options:
+        global_bootstrap_options = self.get_bootstrap_options().for_global_scope()
+        if global_bootstrap_options.pants_version != pants_version():
+            raise BuildConfigurationError(
+                f"Version mismatch: Requested version was {global_bootstrap_options.pants_version}, "
+                f"our version is {pants_version()}."
+            )
+
+        # Parse and register options.
+        known_scope_infos = [
+            si
+            for optionable in build_configuration.all_optionables
+            for si in optionable.known_scope_infos()
+        ]
+        options = self.full_options_for_scopes(known_scope_infos)
+        GlobalOptions.validate_instance(options.for_global_scope())
+        return options
