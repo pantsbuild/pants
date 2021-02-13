@@ -16,7 +16,6 @@ python_integration_tests(
   sources = ['goal_rule_integration_test.py'],
   dependencies = [
     'testprojects/src/python:hello_directory',
-    'testprojects/tests/python/pants:dummies_directory',
   ],
   uses_pants_run=True,
   timeout = 330,
@@ -37,7 +36,7 @@ python_integration_tests(
   name = 'list_integration',
   sources = ['list_integration_test.py'],
   dependencies = [
-    'testprojects/tests/python/pants:build_parsing_directory',
+    'testprojects/src/python:hello_directory',
   ],
   uses_pants_run=True,
   timeout = 240,

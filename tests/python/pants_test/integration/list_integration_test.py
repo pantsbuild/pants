@@ -27,11 +27,14 @@ def test_list_testproject() -> None:
         [
             "--backend-packages=pants.backend.python",
             "list",
-            "testprojects/tests/python/pants/build_parsing::",
+            "testprojects/src/python/hello::",
         ]
     )
     pants_run.assert_success()
     assert (
         pants_run.stdout.strip()
-        == "testprojects/tests/python/pants/build_parsing:test-nested-variable-access-in-function-call"
+        == "\n".join(["testprojects/src/python/hello",
+                     "testprojects/src/python/hello/greet",
+                     "testprojects/src/python/hello/main",
+                     "testprojects/src/python/hello/main:lib"])
     )
