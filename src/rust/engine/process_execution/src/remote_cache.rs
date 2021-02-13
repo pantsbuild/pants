@@ -504,7 +504,8 @@ impl crate::CommandRunner for CommandRunner {
             .workunit_store
             .increment_counter(Metric::RemoteCacheWriteErrors, 1);
         };
-      };
+      }
+      .boxed();
 
       let _write_join = self.executor.spawn(with_workunit(
         context.workunit_store,

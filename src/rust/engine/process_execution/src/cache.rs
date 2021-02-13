@@ -113,7 +113,8 @@ impl crate::CommandRunner for CommandRunner {
         }
       }
       Ok(result)
-    };
+    }
+    .boxed();
     with_workunit(
       context2.workunit_store,
       "local_cache_read".to_owned(),
