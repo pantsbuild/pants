@@ -476,37 +476,44 @@ impl crate::CommandRunner for CommandRunner {
     };
 
     if result.exit_code == 0 && self.cache_write {
-      context
-        .workunit_store
-        .increment_counter(Metric::RemoteCacheWriteStarted, 1);
       let command_runner = self.clone();
       let result = result.clone();
+      let context2 = context.clone();
       // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
-      let _write_join = self.executor.spawn(
-        async move {
-          let write_result = command_runner
-            .update_action_cache(
-              &context,
-              &request,
-              &result,
-              &command_runner.metadata,
-              &command,
-              action_digest,
-              command_digest,
-            )
-            .await;
-          context
+      let cache_write_future = async move {
+        context2
+          .workunit_store
+          .increment_counter(Metric::RemoteCacheWriteStarted, 1);
+        let write_result = command_runner
+          .update_action_cache(
+            &context2,
+            &request,
+            &result,
+            &command_runner.metadata,
+            &command,
+            action_digest,
+            command_digest,
+          )
+          .await;
+        context2
+          .workunit_store
+          .increment_counter(Metric::RemoteCacheWriteFinished, 1);
+        if let Err(err) = write_result {
+          log::warn!("Failed to write to remote cache: {}", err);
+          context2
             .workunit_store
-            .increment_counter(Metric::RemoteCacheWriteFinished, 1);
-          if let Err(err) = write_result {
-            log::warn!("Failed to write to remote cache: {}", err);
-            context
-              .workunit_store
-              .increment_counter(Metric::RemoteCacheWriteErrors, 1);
-          };
-        }
-        .boxed(),
-      );
+            .increment_counter(Metric::RemoteCacheWriteErrors, 1);
+        };
+      }
+      .boxed();
+
+      let _write_join = self.executor.spawn(with_workunit(
+        context.workunit_store,
+        "remote_cache_write".to_owned(),
+        WorkunitMetadata::with_level(Level::Debug),
+        cache_write_future,
+        |_, md| md,
+      ));
     }
 
     Ok(result)
