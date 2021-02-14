@@ -94,34 +94,34 @@ jobs:
         run: |
           ./pants test ::
 
-run_python_lint:
-  runs-on: ubuntu-20.04
-  needs: bootstrap_pants
-  strategy:
-    matrix:
-      python-version: [ 3.7.7 ]
-  steps:
-    - name: Check out code
-      uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Download native_engine.so
-      uses: actions/download-artifact@v2
-      with:
-        name: native_engine.so
-        path: src/python/pants/engine/internals/
-    - name: Set env vars
-      run: |
-        echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
-    - name: Run smoke tests
-      run: |
-        ./pants help goals
-        ./pants list ::
-        ./pants roots
-        ./pants help targets
-    - name: Lint
-      run: |
-        ./pants validate '**'
-        ./pants --tag=-nolint lint typecheck ::
+  run_python_lint:
+    runs-on: ubuntu-20.04
+    needs: bootstrap_pants
+    strategy:
+      matrix:
+        python-version: [ 3.7.7 ]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Download native_engine.so
+        uses: actions/download-artifact@v2
+        with:
+          name: native_engine.so
+          path: src/python/pants/engine/internals/
+      - name: Set env vars
+        run: |
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+      - name: Run smoke tests
+        run: |
+          ./pants help goals
+          ./pants list ::
+          ./pants roots
+          ./pants help targets
+      - name: Lint
+        run: |
+          ./pants validate '**'
+          ./pants lint typecheck ::
