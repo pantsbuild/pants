@@ -16,6 +16,7 @@ import pytest
 from pants.testutil.pants_integration_test import (
     PantsJoinHandle,
     read_pantsd_log,
+    setup_tmpdir,
     temporary_workdir,
 )
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
@@ -54,6 +55,14 @@ def launch_file_toucher(f):
     return join
 
 
+compilation_failure_dir_layout = {
+    os.path.join("compilation_failure", "main.py"): "if __name__ == '__main__':\n    import sys¡",
+    os.path.join(
+        "compilation_failure", "BUILD"
+    ): "python_library()\npex_binary(name='bin', entry_point='main.py')",
+}
+
+
 class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     hermetic = False
 
@@ -76,11 +85,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             # Run target that throws an exception in pants.
-            self.run_pants_with_workdir(
-                ["lint", "testprojects/src/python/unicode/compilation_failure/main:lib"],
-                workdir=workdir,
-                config=pantsd_config,
-            ).assert_failure()
+            with setup_tmpdir(compilation_failure_dir_layout) as tmpdir:
+                self.run_pants_with_workdir(
+                    ["lint", os.path.join(tmpdir, "compilation_failure", "main.py")],
+                    workdir=workdir,
+                    config=pantsd_config,
+                ).assert_failure()
             checker.assert_started()
 
             # Assert pantsd is in a good functional state.

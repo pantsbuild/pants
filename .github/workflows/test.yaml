@@ -1,0 +1,127 @@
+name: Pants CI
+
+on:
+  pull_request
+jobs:
+  bootstrap_pants:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        python-version: [3.7.7]
+    env:
+      rust_version: 1.49.0
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Cache Rust toolchain
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.rustup/toolchains/${{ env.rust_version }}-*
+            ~/.rustup/update-hashes
+            ~/.rustup/settings.toml
+          key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: |
+            ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-
+      - name: Cache Rust Build
+        uses: actions/cache@v2
+        with:
+          path: |
+            src/rust/engine/target/*/deps
+          key: |
+            ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/**/*.rs', 'src/rust/engine/**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain') }}-
+      - name: Cache Pants Virtualenv
+        uses: actions/cache@v2
+        with:
+          path: |
+            build-support/virtualenvs
+          key: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**') }}
+          restore-keys: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-
+      - name: Set env vars
+        run: |
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+      - name: Bootstrap Pants
+        run: |
+          ls -l src/rust/engine/target/release/deps/ || true
+          ./pants --version
+          ls -l src/rust/engine/target/release/deps/ || true
+      - name: Upload native_engine.so
+        uses: actions/upload-artifact@v2
+        with:
+          name: native_engine.so
+          path: |
+            src/python/pants/engine/internals/native_engine.so
+            src/python/pants/engine/internals/native_engine.so.metadata
+
+  run_python_tests:
+    runs-on: ubuntu-20.04
+    needs: bootstrap_pants
+    strategy:
+      matrix:
+        python-version: [ 3.7.7 ]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Download native_engine.so
+        uses: actions/download-artifact@v2
+        with:
+          name: native_engine.so
+          path: src/python/pants/engine/internals/
+      - name: Set env vars
+        run: |
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+      - name: Run Python tests
+        run: |
+          ./pants test ::
+
+run_python_lint:
+  runs-on: ubuntu-20.04
+  needs: bootstrap_pants
+  strategy:
+    matrix:
+      python-version: [ 3.7.7 ]
+  steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Download native_engine.so
+      uses: actions/download-artifact@v2
+      with:
+        name: native_engine.so
+        path: src/python/pants/engine/internals/
+    - name: Set env vars
+      run: |
+        echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+    - name: Run smoke tests
+      run: |
+        ./pants help goals
+        ./pants list ::
+        ./pants roots
+        ./pants help targets
+    - name: Lint
+      run: |
+        ./pants validate '**'
+        ./pants --tag=-nolint lint typecheck ::
