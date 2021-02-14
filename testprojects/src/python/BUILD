@@ -45,9 +45,3 @@ files(
   name = 'sources_directory',
   sources = ['sources/**/*'],
 )
-
-files(
-  name = 'unicode_directory',
-  sources = ['unicode/**/*'],
-  tags = {'nolint'},
-)
