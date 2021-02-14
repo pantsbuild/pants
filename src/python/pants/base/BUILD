@@ -36,9 +36,6 @@ python_integration_tests(
 python_integration_tests(
   name='exiter_integration_test',
   sources=['exiter_integration_test.py'],
-  dependencies=[
-    'testprojects/src/python:unicode_directory',
-  ],
   uses_pants_run=True,
   timeout=180,
 )
