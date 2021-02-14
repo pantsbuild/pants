@@ -31,10 +31,11 @@ def test_list_testproject() -> None:
         ]
     )
     pants_run.assert_success()
-    assert (
-        pants_run.stdout.strip()
-        == "\n".join(["testprojects/src/python/hello",
-                     "testprojects/src/python/hello/greet",
-                     "testprojects/src/python/hello/main",
-                     "testprojects/src/python/hello/main:lib"])
+    assert pants_run.stdout.strip() == "\n".join(
+        [
+            "testprojects/src/python/hello",
+            "testprojects/src/python/hello/greet",
+            "testprojects/src/python/hello/main",
+            "testprojects/src/python/hello/main:lib",
+        ]
     )
