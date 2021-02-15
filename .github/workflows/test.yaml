@@ -35,15 +35,19 @@ jobs:
             ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}
           restore-keys: |
             ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-
-      - name: Cache Rust Build
+      - name: Get Engine Hash
+        id: get-engine-hash
+        run: |
+          echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
+        shell: bash
+      - name: Cache Native Engine
         uses: actions/cache@v2
         with:
           path: |
-            src/rust/engine/target/*/deps
+            src/python/pants/engine/internals/native_engine.so
+            src/python/pants/engine/internals/native_engine.so.metadata
           key: |
-            ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/**/*.rs', 'src/rust/engine/**/Cargo.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain') }}-
+            ${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
       - name: Cache Pants Virtualenv
         uses: actions/cache@v2
         with:
@@ -58,9 +62,7 @@ jobs:
           echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
       - name: Bootstrap Pants
         run: |
-          ls -l src/rust/engine/target/release/deps/ || true
           ./pants --version
-          ls -l src/rust/engine/target/release/deps/ || true
       - name: Upload native_engine.so
         uses: actions/upload-artifact@v2
         with:
