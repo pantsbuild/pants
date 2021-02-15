@@ -15,10 +15,10 @@ class CoursierSubsystem(Script):
     """
 
     options_scope = "coursier"
-    default_version = "1.1.0.cf365ea27a710d5f09db1f0a6feee129aa1fc417"
+    default_version = "v2.0.11"
 
     _default_urls = [
-        "https://github.com/coursier/coursier/releases/download/pants_release_1.5.x/coursier-cli-{version}.jar",
+        "https://github.com/coursier/coursier/releases/download/{version}/coursier.jar",
     ]
 
     class Error(Exception):
