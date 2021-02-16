@@ -41,8 +41,9 @@ jobs:
         with:
           path: |
             build-support/virtualenvs
+            ~/.cache/pants/plugins/
           key: |
-            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**') }}
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
           restore-keys: |
             ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-
       - name: Get Engine Hash
