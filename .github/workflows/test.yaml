@@ -35,6 +35,16 @@ jobs:
             ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}
           restore-keys: |
             ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-
+      # Note: Must run before get-engine hash, which uses the virtualenv.
+      - name: Cache Pants Virtualenv
+        uses: actions/cache@v2
+        with:
+          path: |
+            build-support/virtualenvs
+          key: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**') }}
+          restore-keys: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-
       - name: Get Engine Hash
         id: get-engine-hash
         run: |
@@ -48,15 +58,6 @@ jobs:
             src/python/pants/engine/internals/native_engine.so.metadata
           key: |
             ${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
-      - name: Cache Pants Virtualenv
-        uses: actions/cache@v2
-        with:
-          path: |
-            build-support/virtualenvs
-          key: |
-            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**') }}
-          restore-keys: |
-            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-
       - name: Set env vars
         run: |
           echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
@@ -121,7 +122,7 @@ jobs:
         run: |
           ./pants help goals
           ./pants list ::
-          #./pants roots
+          ./pants roots
           ./pants help targets
       - name: Lint
         run: |
