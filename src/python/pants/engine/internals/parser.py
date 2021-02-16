@@ -103,20 +103,24 @@ class Parser:
         except NameError as e:
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
             original = e.args[0].capitalize()
-            err_string = f"""If you expect to see more symbols activated in the 
-                below list, refer to {docs_url("enabling_backends")} for all available
-                backends to activate."""
+            err_string = (
+                    "If you expect to see more symbols activated in the below list,"
+                    f"refer to {docs_url('enabling_backends')} for all available"
+                    " backends to activate."
+            )
             dym = "Did you mean "
 
+            # note that this only includes 3 matches at the most by default
             candidates = get_close_matches(build_file_content,valid_symbols)
             if len(candidates) == 1:
-                dym += candidates[0] + '?'
+                dym += candidates[0] + '?\n\n'
                 err_string = dym + err_string
             elif len(candidates) > 1:
-                dym += ", ".join(candidates)[:-1]
-                dym += ", or  " + candidates[-1]  # naturally, we use the oxford comma
+                dym += ", ".join(candidates[:-1])
+                # no oxford comma for len==2
+                dym += " or " + candidates[-1] + "?\n\n"
                 err_string = dym + err_string
-            raise ParseError(f"{err_string}\n\n{original}.\n\nAll registered symbols: {valid_symbols}")
+            raise ParseError(f"{original}.\n\n{err_string}\n\nAll registered symbols: {valid_symbols}")
 
         error_on_imports(build_file_content, filepath)
 
