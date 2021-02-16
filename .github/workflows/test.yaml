@@ -44,8 +44,6 @@ jobs:
             ~/.cache/pants/plugins/
           key: |
             ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-
       - name: Get Engine Hash
         id: get-engine-hash
         run: |
@@ -86,6 +84,14 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Cache Pants Virtualenv
+        uses: actions/cache@v2
+        with:
+          path: |
+            build-support/virtualenvs
+            ~/.cache/pants/plugins/
+          key: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
       - name: Download native_engine.so
         uses: actions/download-artifact@v2
         with:
@@ -111,6 +117,14 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Cache Pants Virtualenv
+        uses: actions/cache@v2
+        with:
+          path: |
+            build-support/virtualenvs
+            ~/.cache/pants/plugins/
+          key: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
       - name: Download native_engine.so
         uses: actions/download-artifact@v2
         with:
