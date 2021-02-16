@@ -121,7 +121,7 @@ jobs:
         run: |
           ./pants help goals
           ./pants list ::
-          ./pants roots
+          #./pants roots
           ./pants help targets
       - name: Lint
         run: |
