@@ -11,7 +11,7 @@ jobs:
         with:
           # We need to fetch more than one commit to be able to access HEAD^2 in case
           # of a pull request.
-          fetch-depth: 3
+          fetch-depth: 2
       - name: List
         run: |
           git log -n 10
@@ -40,3 +40,5 @@ jobs:
         run: |
           echo "COMMIT BRANCH ${COMMIT_BRANCH}"
           echo "COMMIT MESSAGE ${COMMIT_MESSAGE}"
+          echo "REF ${{ github.ref }}"
+          echo "HEAD REF ${{ github.head_ref }}"
