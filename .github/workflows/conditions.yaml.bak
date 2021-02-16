@@ -1,0 +1,26 @@
+name: Pants CI
+
+on:
+  pull_request
+jobs:
+  bootstrap_pants:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          # We need to fetch more than one commit to be able to access ~HEAD in the PR case.
+          fetch-depth: 2
+      # For a push event, the commit we care about is HEAD itself.
+      - name: Get commit message for branch builds
+        if: github.event_name == 'push'
+        run: |
+          echo "COMMIT_MESSAGE=$(git log --format=%B -n 1 HEAD)" >> ${GITHUB_ENV}
+      # For a pull_request event, the commit we care about is the parent of the merge commit.
+      - name: Get commit message for PR builds
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "COMMIT_MESSAGE=$(git log --format=%B -n 1 HEAD)" >> ${GITHUB_ENV}
+      - name: Print
+        run: |
+          echo "COMMIT MESSAGE ${COMMIT_MESSAGE}"
