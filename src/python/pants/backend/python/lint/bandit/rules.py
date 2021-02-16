@@ -8,11 +8,11 @@ from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexInterpreterConstraints,
-    PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
 from pants.core.util_rules import stripped_source_files
@@ -63,7 +63,7 @@ async def bandit_lint_partition(
     partition: BanditPartition, bandit: Bandit, lint_subsystem: LintSubsystem
 ) -> LintResult:
     bandit_pex_request = Get(
-        Pex,
+        VenvPex,
         PexRequest(
             output_filename="bandit.pex",
             internal_only=True,
@@ -90,15 +90,13 @@ async def bandit_lint_partition(
         bandit_pex_request, config_digest_request, source_files_request
     )
 
-    input_digest = await Get(
-        Digest, MergeDigests((source_files.snapshot.digest, bandit_pex.digest, config_digest))
-    )
+    input_digest = await Get(Digest, MergeDigests((source_files.snapshot.digest, config_digest)))
 
     report_file_name = "bandit_report.txt" if lint_subsystem.reports_dir else None
 
     result = await Get(
         FallibleProcessResult,
-        PexProcess(
+        VenvPexProcess(
             bandit_pex,
             argv=generate_args(
                 source_files=source_files, bandit=bandit, report_file_name=report_file_name

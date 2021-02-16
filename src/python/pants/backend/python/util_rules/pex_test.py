@@ -8,7 +8,7 @@ import os.path
 import textwrap
 import zipfile
 from dataclasses import dataclass
-from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, cast
+from typing import Dict, Iterable, Iterator, List, Mapping, Tuple, cast
 
 import pytest
 from pkg_resources import Requirement
@@ -21,6 +21,8 @@ from pants.backend.python.util_rules.pex import (
     PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.engine.addresses import Address
@@ -220,7 +222,7 @@ class MockFieldSet(FieldSet):
     interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
-    def create_for_test(cls, address: Address, compat: Optional[str]) -> MockFieldSet:
+    def create_for_test(cls, address: Address, compat: str | None) -> MockFieldSet:
         return cls(
             address=address,
             interpreter_constraints=InterpreterConstraintsField(
@@ -311,7 +313,9 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pex_rules(),
             QueryRule(Pex, (PexRequest,)),
+            QueryRule(VenvPex, (PexRequest,)),
             QueryRule(Process, (PexProcess,)),
+            QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
         ]
     )
@@ -320,15 +324,16 @@ def rule_runner() -> RuleRunner:
 def create_pex_and_get_all_data(
     rule_runner: RuleRunner,
     *,
-    requirements=PexRequirements(),
-    entry_point=None,
-    interpreter_constraints=PexInterpreterConstraints(),
-    platforms=PexPlatforms(),
-    sources: Optional[Digest] = None,
-    additional_inputs: Optional[Digest] = None,
+    pex_type: type[Pex | VenvPex] = Pex,
+    requirements: PexRequirements = PexRequirements(),
+    entry_point: str | None = None,
+    interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints(),
+    platforms: PexPlatforms = PexPlatforms(),
+    sources: Digest | None = None,
+    additional_inputs: Digest | None = None,
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
-    env: Optional[Mapping[str, str]] = None,
+    env: Mapping[str, str] | None = None,
     internal_only: bool = True,
 ) -> Dict:
     request = PexRequest(
@@ -345,8 +350,14 @@ def create_pex_and_get_all_data(
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", *additional_pants_args], env=env
     )
-    pex = rule_runner.request(Pex, [request])
-    rule_runner.scheduler.write_digest(pex.digest)
+    pex = rule_runner.request(pex_type, [request])
+    if isinstance(pex, Pex):
+        digest = pex.digest
+    elif isinstance(pex, VenvPex):
+        digest = pex.digest
+    else:
+        raise AssertionError(f"Expected a Pex or a VenvPex but got a {type(pex)}.")
+    rule_runner.scheduler.write_digest(digest)
     pex_path = os.path.join(rule_runner.build_root, "test.pex")
     with zipfile.ZipFile(pex_path, "r") as zipfp:
         with zipfp.open("PEX-INFO", "r") as pex_info:
@@ -363,11 +374,12 @@ def create_pex_and_get_all_data(
 def create_pex_and_get_pex_info(
     rule_runner: RuleRunner,
     *,
-    requirements=PexRequirements(),
-    entry_point=None,
-    interpreter_constraints=PexInterpreterConstraints(),
-    platforms=PexPlatforms(),
-    sources: Optional[Digest] = None,
+    pex_type: type[Pex | VenvPex] = Pex,
+    requirements: PexRequirements = PexRequirements(),
+    entry_point: str | None = None,
+    interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints(),
+    platforms: PexPlatforms = PexPlatforms(),
+    sources: Digest | None = None,
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
     internal_only: bool = True,
@@ -376,6 +388,7 @@ def create_pex_and_get_pex_info(
         Dict,
         create_pex_and_get_all_data(
             rule_runner,
+            pex_type=pex_type,
             requirements=requirements,
             entry_point=entry_point,
             interpreter_constraints=interpreter_constraints,
@@ -419,7 +432,8 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"from main\n"
 
 
-def test_pex_environment(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("pex_type", (Pex, VenvPex))
+def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
     sources = rule_runner.request(
         Digest,
         [
@@ -429,10 +443,10 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
                         path="main.py",
                         content=textwrap.dedent(
                             """
-                        from os import environ
-                        print(f"LANG={environ.get('LANG')}")
-                        print(f"ftp_proxy={environ.get('ftp_proxy')}")
-                        """
+                            from os import environ
+                            print(f"LANG={environ.get('LANG')}")
+                            print(f"ftp_proxy={environ.get('ftp_proxy')}")
+                            """
                         ).encode(),
                     ),
                 )
@@ -441,6 +455,7 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
     )
     pex_output = create_pex_and_get_all_data(
         rule_runner,
+        pex_type=pex_type,
         entry_point="main",
         sources=sources,
         additional_pants_args=(
@@ -450,13 +465,13 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
         env={"LANG": "es_PY.UTF-8"},
     )
 
+    pex = pex_output["pex"]
+    pex_process_type = PexProcess if isinstance(pex, Pex) else VenvPexProcess
     process = rule_runner.request(
         Process,
         [
-            PexProcess(
-                pex_output["pex"],
-                argv=["python", "test.pex"],
-                input_digest=pex_output["pex"].digest,
+            pex_process_type(
+                pex,
                 description="Run the pex and check its reported environment",
             ),
         ],
