@@ -106,6 +106,12 @@ async def generate_python_from_protobuf(
                     output_filename="mypy_protobuf.pex",
                     internal_only=True,
                     requirements=PexRequirements([python_protobuf_subsystem.mypy_plugin_version]),
+                    # TODO(John Sirois): Fix these interpreter constraints to track the actual
+                    #  python requirement of the mypy_plugin_version or else plumb an option for
+                    #  manually setting the constraint to track what mypy_plugin_version needs:
+                    #  https://github.com/pantsbuild/pants/issues/11565
+                    # Here we guess a constraint that will likely work with any mypy_plugin_version
+                    # selected.
                     interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5"]),
                 ),
             ),

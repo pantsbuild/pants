@@ -8,7 +8,7 @@ import os.path
 import textwrap
 import zipfile
 from dataclasses import dataclass
-from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, cast
+from typing import Dict, Iterable, Iterator, List, Mapping, Tuple, cast
 
 import pytest
 from pkg_resources import Requirement
@@ -222,7 +222,7 @@ class MockFieldSet(FieldSet):
     interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
-    def create_for_test(cls, address: Address, compat: Optional[str]) -> MockFieldSet:
+    def create_for_test(cls, address: Address, compat: str | None) -> MockFieldSet:
         return cls(
             address=address,
             interpreter_constraints=InterpreterConstraintsField(
@@ -326,14 +326,14 @@ def create_pex_and_get_all_data(
     *,
     pex_type: type[Pex | VenvPex] = Pex,
     requirements: PexRequirements = PexRequirements(),
-    entry_point: Optional[str] = None,
+    entry_point: str | None = None,
     interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
-    sources: Optional[Digest] = None,
-    additional_inputs: Optional[Digest] = None,
+    sources: Digest | None = None,
+    additional_inputs: Digest | None = None,
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
-    env: Optional[Mapping[str, str]] = None,
+    env: Mapping[str, str] | None = None,
     internal_only: bool = True,
 ) -> Dict:
     request = PexRequest(
@@ -376,10 +376,10 @@ def create_pex_and_get_pex_info(
     *,
     pex_type: type[Pex | VenvPex] = Pex,
     requirements: PexRequirements = PexRequirements(),
-    entry_point: Optional[str] = None,
+    entry_point: str | None = None,
     interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
-    sources: Optional[Digest] = None,
+    sources: Digest | None = None,
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
     internal_only: bool = True,
