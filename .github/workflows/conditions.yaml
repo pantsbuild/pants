@@ -24,3 +24,7 @@ jobs:
       - name: Print
         run: |
           echo "COMMIT MESSAGE ${COMMIT_MESSAGE}"
+      - name: Is skip rust?
+        run: |
+          echo "Do not skip rust!"
+        if: "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
