@@ -20,7 +20,7 @@ jobs:
       - name: Get commit message for PR builds
         if: github.event_name == 'pull_request'
         run: |
-          echo "COMMIT_MESSAGE=$(git log --format=%B -n 1 HEAD)" >> ${GITHUB_ENV}
+          echo "COMMIT_MESSAGE=$(git log --format=%B -n 1 HEAD~1)" >> ${GITHUB_ENV}
       - name: Print
         run: |
           echo "COMMIT MESSAGE ${COMMIT_MESSAGE}"
