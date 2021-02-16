@@ -78,11 +78,14 @@ class AuthPluginResult:
     have used normally, e.g. what is set with `--remote-store-headers`. This allows you to control
     the merge strategy if your plugin sets conflicting headers. Usually, you will want to preserve
     the `initial_store_headers` and `initial_execution_headers` passed to the plugin.
+
+    If set, the returned `instance_name` will override by `--remote-instance-name`.
     """
 
     state: AuthPluginState
-    store_headers: Dict[str, str]
-    execution_headers: Dict[str, str]
+    store_headers: dict[str, str]
+    execution_headers: dict[str, str]
+    instance_name: str | None = None
 
     @property
     def is_available(self) -> bool:
@@ -133,9 +136,10 @@ class ExecutionOptions:
     def from_options(cls, options: Options) -> ExecutionOptions:
         bootstrap_options = options.bootstrap_option_values()
         assert bootstrap_options is not None
-        # Possibly insert some headers and disable remote execution/caching.
+        # Possibly change some remoting options.
         remote_execution_headers = cast(Dict[str, str], bootstrap_options.remote_execution_headers)
         remote_store_headers = cast(Dict[str, str], bootstrap_options.remote_store_headers)
+        remote_instance_name = cast(Optional[str], bootstrap_options.remote_instance_name)
         remote_execution = cast(bool, bootstrap_options.remote_execution)
         remote_cache_read = cast(bool, bootstrap_options.remote_cache_read)
         remote_cache_write = cast(bool, bootstrap_options.remote_cache_write)
@@ -183,6 +187,16 @@ class ExecutionOptions:
             else:
                 remote_execution_headers = auth_plugin_result.execution_headers
                 remote_store_headers = auth_plugin_result.store_headers
+                if (
+                    remote_instance_name is not None
+                    and remote_instance_name != auth_plugin_result.instance_name
+                ):
+                    logger.debug(
+                        f"Overriding `--remote-instance-name={repr(remote_instance_name)}` to "
+                        f"instead be {repr(auth_plugin_result.instance_name)} due to the plugin "
+                        "from `--remote-auth-plugin`."
+                    )
+                remote_instance_name = auth_plugin_result.instance_name
 
         return cls(
             # Remote execution strategy.
@@ -190,7 +204,7 @@ class ExecutionOptions:
             remote_cache_read=remote_cache_read,
             remote_cache_write=remote_cache_write,
             # General remote setup.
-            remote_instance_name=bootstrap_options.remote_instance_name,
+            remote_instance_name=remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             # Process execution setup.
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
@@ -819,8 +833,12 @@ class GlobalOptions(Subsystem):
         register(
             "--remote-instance-name",
             advanced=True,
-            help="Name of the remote execution instance to use. Used for routing within "
-            "--remote-execution-server and --remote-store-server.",
+            help=(
+                "Name of the remote instance to use by remote caching and remote execution.\n\n"
+                "This is used by some remote servers used for for routing. Consult your remote "
+                "server for whether this should be set.\n\nYou can also use "
+                "`--remote-auth-plugin` to provide a plugin to dynamically set this value."
+            ),
         )
         register(
             "--remote-ca-certs-path",
@@ -847,19 +865,22 @@ class GlobalOptions(Subsystem):
             type=str,
             default=None,
             help=(
-                "Path to a plugin to dynamically set headers used during gRPC calls for remote "
-                "caching and remote execution.\n\nFormat: `path.to.module:my_func`. Pants will "
-                "import your module and run your function. Update the `--pythonpath` option to "
-                "ensure your file is loadable.\n\nThe function should take the kwargs "
-                "`initial_store_headers: Dict[str, str]`, "
+                "Path to a plugin to dynamically configure remote caching and execution "
+                "options.\n\n"
+                "Format: `path.to.module:my_func`. Pants will import your module and run your "
+                "function. Update the `--pythonpath` option to ensure your file is loadable.\n\n"
+                "The function should take the kwargs `initial_store_headers: Dict[str, str]`, "
                 "`initial_execution_headers: Dict[str, str]`, and `options: Options` (from "
                 "pants.option.options). It should return an instance of "
-                "`AuthPluginResult` from `pants.option.global_options`.\n\nPants will "
-                "replace the headers it would normally use with whatever your plugin returns; "
-                "usually, you should include the `initial_store_headers` and "
+                "`AuthPluginResult` from `pants.option.global_options`.\n\n"
+                "Pants will replace the headers it would normally use with whatever your plugin "
+                "returns; usually, you should include the `initial_store_headers` and "
                 "`initial_execution_headers` in your result so that options like "
-                "`--remote-store-headers` still work. If the returned auth state is "
-                "AuthPluginState.UNAVAILABLE, Pants will disable remote caching and execution."
+                "`--remote-store-headers` still work.\n\n"
+                "If you return `instance_name`, Pants will replace `--remote-instance-name` "
+                "with this value.\n\n"
+                "If the returned auth state is AuthPluginState.UNAVAILABLE, Pants will disable "
+                "remote caching and execution."
             ),
         )
 

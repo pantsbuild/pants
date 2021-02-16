@@ -25,6 +25,7 @@ def create_execution_options(
         "--remote-store-server=www.fake.url",
         f"--remote-store-headers={initial_headers}",
         f"--remote-execution-headers={initial_headers}",
+        "--remote-instance-name=main",
     ]
     if token_path:
         args.append(f"--remote-oauth-bearer-token-path={token_path}")
@@ -74,6 +75,7 @@ def test_execution_options_auth_plugin() -> None:
                                 "store": "abc",
                                 "store_url": options.for_global_scope().remote_store_server,
                             }},
+                            instance_name="custom_instance",
                         )
                     """
                 )
@@ -93,6 +95,8 @@ def test_execution_options_auth_plugin() -> None:
     }
     assert exec_options.remote_execution_headers == {"exec": "xyz", "foo": "baz"}
     assert exec_options.remote_cache_read is True
+    assert exec_options.remote_instance_name == "custom_instance"
 
     exec_options = compute_exec_options("UNAVAILABLE")
     assert exec_options.remote_cache_read is False
+    assert exec_options.remote_instance_name == "main"
