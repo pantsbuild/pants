@@ -70,6 +70,10 @@ jobs:
           path: |
             src/python/pants/engine/internals/native_engine.so
             src/python/pants/engine/internals/native_engine.so.metadata
+      - name: Lint Rust
+        run: |
+          ./cargo clippy --all
+        if: "!contains(github.event.head_commit.message, '[ci skip-rust]')"
 
   run_python_tests:
     runs-on: ubuntu-20.04
