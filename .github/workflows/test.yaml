@@ -98,7 +98,7 @@ jobs:
 
   run_python_tests_linux:
     runs-on: ubuntu-20.04
-    needs: bootstrap_pants
+    needs: bootstrap_pants_linux
     strategy:
       matrix:
         python-version: [ 3.7.7 ]
@@ -131,7 +131,7 @@ jobs:
 
   run_python_lint_linux:
     runs-on: ubuntu-20.04
-    needs: bootstrap_pants
+    needs: bootstrap_pants_linux
     strategy:
       matrix:
         python-version: [ 3.7.7 ]
@@ -256,7 +256,7 @@ jobs:
             src/python/pants/engine/internals/native_engine.so.metadata
       - name: Test and Lint Rust
         run: |
-          sudo apt-get install -y pkg-config fuse libfuse-dev
+          brew cask install osxfuse
           ./cargo clippy --all
           # We pass --tests to skip doc tests because our generated protos contain invalid
           # doc tests in their comments.
@@ -265,7 +265,7 @@ jobs:
 
   run_python_tests_macos:
     runs-on: macos-10.15
-    needs: bootstrap_pants
+    needs: bootstrap_pants_macos
     strategy:
       matrix:
         python-version: [ 3.7.9 ]
@@ -298,7 +298,7 @@ jobs:
 
   run_python_lint_macos:
     runs-on: macos-10.15
-    needs: bootstrap_pants
+    needs: bootstrap_pants_macos
     strategy:
       matrix:
         python-version: [ 3.7.9 ]
