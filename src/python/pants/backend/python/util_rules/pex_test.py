@@ -432,7 +432,9 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"from main\n"
 
 
-@pytest.mark.parametrize("pex_type", (Pex, VenvPex))
+# TODO(John Sirois): Add VenvPex to the pex_type parameter list once Pants is upgraded to Pex with
+#  a fix for: https://github.com/pantsbuild/pex/issues/1239
+@pytest.mark.parametrize("pex_type", [Pex])
 def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
     sources = rule_runner.request(
         Digest,
