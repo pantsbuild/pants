@@ -1,8 +1,4 @@
 # Enable remote caching by running `./pants --pants-config-files=pants.remote-cache.toml`.
-#
-# You must also set `remote_ca_certs_path`, which is usually "/etc/ssl/certs/ca-certificates.crt" on Linux and
-# "/usr/local/etc/openssl/cert.pem" on macOS. You may want to set this value in a pantsrc file or an `.envrc` file
-# and use `direnv` (https://direnv.net/).
 
 [GLOBAL]
 remote_cache_read = true

@@ -1032,6 +1032,7 @@ dependencies = [
  "futures",
  "prost",
  "prost-types",
+ "rustls-native-certs",
  "tokio",
  "tokio-rustls",
  "tokio-util 0.2.0",
@@ -1377,9 +1378,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.81"
+version = "0.2.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1482821306169ec4d07f6aca392a4681f66c75c9918aa49641a2595db64053cb"
+checksum = "b7282d924be3275cec7f6756ff4121987bc6481325397dde6ba3e7802b1a8b1c"
 
 [[package]]
 name = "lmdb"

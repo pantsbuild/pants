@@ -128,9 +128,16 @@ impl CommandRunner {
     overall_deadline: Duration,
     retry_interval_duration: Duration,
   ) -> Result<Self, String> {
-    let tls_client_config = match root_ca_certs {
-      Some(pem_bytes) => Some(grpc_util::create_tls_config(pem_bytes)?),
-      _ => None,
+    let execution_use_tls = address.starts_with("https://");
+    let store_use_tls = store_addresses
+      .first()
+      .map(|addr| addr.starts_with("https://"))
+      .unwrap_or(false);
+
+    let tls_client_config = if execution_use_tls || store_use_tls {
+      Some(grpc_util::create_tls_config(root_ca_certs)?)
+    } else {
+      None
     };
 
     let interceptor = if headers.is_empty() {
@@ -139,7 +146,14 @@ impl CommandRunner {
       Some(Interceptor::new(headers_to_interceptor_fn(&headers)?))
     };
 
-    let endpoint = grpc_util::create_endpoint(&address, tls_client_config.as_ref())?;
+    let endpoint = grpc_util::create_endpoint(
+      &address,
+      if execution_use_tls {
+        tls_client_config.as_ref()
+      } else {
+        None
+      },
+    )?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let execution_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => ExecutionClient::with_interceptor(channel.clone(), interceptor.clone()),
@@ -148,7 +162,16 @@ impl CommandRunner {
 
     let (store_endpoints, store_endpoints_errors): (Vec<Endpoint>, Vec<String>) = store_addresses
       .iter()
-      .map(|addr| grpc_util::create_endpoint(addr.as_str(), tls_client_config.as_ref()))
+      .map(|addr| {
+        grpc_util::create_endpoint(
+          addr.as_str(),
+          if store_use_tls {
+            tls_client_config.as_ref()
+          } else {
+            None
+          },
+        )
+      })
       .partition_map(|result| match result {
         Ok(endpoint) => Either::Left(endpoint),
         Err(err) => Either::Right(err),
