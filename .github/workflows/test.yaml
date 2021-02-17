@@ -14,18 +14,22 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
         with:
-          # We need to fetch more than one commit to be able to access ~HEAD in the PR case.
-          fetch-depth: 2
+          # We need to fetch a few commits back, to be able to access HEAD^2 in the PR case.
+          fetch-depth: 10
+      # For a push event, the commit we care about is HEAD itself.
       - name: Get commit message for branch builds
         if: github.event_name == 'push'
         run: |
-          # For a push event, the commit we care about is HEAD itself.
-          echo "COMMIT_MESSAGE=$(git log --format=%B -n 1 HEAD)" >> ${GITHUB_ENV}
+          echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+          echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      # For a pull_request event, the commit we care about is the second parent of the merge commit.
       - name: Get commit message for PR builds
         if: github.event_name == 'pull_request'
         run: |
-          # For a pull_request event, the commit we care about is the parent of the merge commit.
-          echo "COMMIT_MESSAGE=$(git log --format=%B -n 1 HEAD)" >> ${GITHUB_ENV}
+          echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+          echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
@@ -83,10 +87,13 @@ jobs:
           path: |
             src/python/pants/engine/internals/native_engine.so
             src/python/pants/engine/internals/native_engine.so.metadata
-      - name: Lint Rust
+      - name: Test and Lint Rust
         run: |
           sudo apt-get install -y pkg-config fuse libfuse-dev
           ./cargo clippy --all
+          # We pass --tests to skip doc tests because our generated protos contain invalid
+          # doc tests in their comments.
+          ./cargo test --all --tests -- --nocapture
         if: "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
 
   run_python_tests:
