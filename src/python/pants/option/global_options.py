@@ -188,7 +188,8 @@ class ExecutionOptions:
         remote_address_scheme = "https://" if bootstrap_options.remote_ca_certs_path else "http://"
         remote_execution_address = (
             f"{remote_address_scheme}{bootstrap_options.remote_execution_server}"
-            if bootstrap_options.remote_execution_server else None
+            if bootstrap_options.remote_execution_server
+            else None
         )
         remote_store_addresses = [
             f"{remote_address_scheme}{addr}" for addr in bootstrap_options.remote_store_server
