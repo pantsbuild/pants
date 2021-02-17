@@ -1214,6 +1214,7 @@ class GlobalOptions(Subsystem):
                 "also used the deprecated remote_store_server.\n\nPlease use only of these "
                 "(preferably remote_store_address)."
             )
+
         remote_execution_address_configured = (
             opts.remote_execution_server or opts.remote_execution_address
         )
@@ -1231,15 +1232,17 @@ class GlobalOptions(Subsystem):
                 "`--remote-store-server`. Often these have the same value."
             )
 
-        if opts.remote_cache_read and not opts.remote_store_server:
+        if opts.remote_cache_read and not remote_store_address_configured:
             raise OptionsError(
                 "The `--remote-cache-read` option requires also setting "
-                "`--remote-store-server` to work properly."
+                "`--remote-store-address` or the deprecated `--remote-store-server` to work "
+                "properly."
             )
-        if opts.remote_cache_write and not opts.remote_store_server:
+        if opts.remote_cache_write and not remote_store_address_configured:
             raise OptionsError(
                 "The `--remote-cache-write` option requires also setting "
-                "`--remote-store-server` to work properly."
+                "`--remote-store-address` or the deprecated `--remote-store-server` to work "
+                "properly."
             )
 
         # Ensure that timeout values are non-zero.
@@ -1260,11 +1263,12 @@ class GlobalOptions(Subsystem):
             )
 
         def validate_remote_address(opt_name: str) -> None:
-            valid_schemes = ["grpc", "grpcs"]
+            valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
             address = getattr(opts, opt_name)
-            if address and not any(address.startswith(f"{scheme}//:") for scheme in valid_schemes):
+            if address and not any(address.startswith(scheme) for scheme in valid_schemes):
                 raise OptionsError(
-                    f"The `{opt_name}` option must begin with one of {valid_schemes}."
+                    f"The `{opt_name}` option must begin with one of {valid_schemes}, but "
+                    f"was {address}."
                 )
 
         validate_remote_address("remote_execution_address")

@@ -129,7 +129,7 @@ def test_execution_options_auth_plugin() -> None:
     assert exec_options.remote_store_headers == {
         "store": "abc",
         "foo": "baz",
-        "store_url": "www.fake.url",
+        "store_url": "grpc://fake.url:10",
     }
     assert exec_options.remote_execution_headers == {"exec": "xyz", "foo": "baz"}
     assert exec_options.remote_cache_read is True
