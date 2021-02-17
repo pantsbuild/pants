@@ -31,7 +31,6 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use rustls_native_certs;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::metadata::{AsciiMetadataKey, AsciiMetadataValue, KeyAndValueRef, MetadataMap};
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
@@ -88,7 +87,6 @@ pub fn create_tls_config(root_ca_certs: Option<Vec<u8>>) -> Result<ClientConfig,
             the correct PEM file.\n\n{}",
             e
           )
-          .to_owned()
         })?;
     }
   }
