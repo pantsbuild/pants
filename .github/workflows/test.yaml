@@ -266,7 +266,7 @@ jobs:
             src/python/pants/engine/internals/native_engine.so.metadata
       - name: Test Rust
         run: |
-          brew cask install osxfuse
+          brew install osxfuse
           # We pass --tests to skip doc tests because our generated protos contain invalid
           # doc tests in their comments.
           ./cargo test --all --tests -- --nocapture
