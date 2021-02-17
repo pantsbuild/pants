@@ -187,7 +187,10 @@ class ExecutionOptions:
             else:
                 remote_execution_headers = auth_plugin_result.execution_headers
                 remote_store_headers = auth_plugin_result.store_headers
-                if remote_instance_name != auth_plugin_result.instance_name:
+                if (
+                    auth_plugin_result.instance_name is not None
+                    and auth_plugin_result.instance_name != remote_instance_name
+                ):
                     logger.debug(
                         f"Overriding `--remote-instance-name={repr(remote_instance_name)}` to "
                         f"instead be {repr(auth_plugin_result.instance_name)} due to the plugin "
