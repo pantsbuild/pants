@@ -9,11 +9,11 @@ from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexInterpreterConstraints,
-    PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
@@ -71,7 +71,7 @@ def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool) 
 @rule(level=LogLevel.DEBUG)
 async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
     isort_pex_request = Get(
-        Pex,
+        VenvPex,
         PexRequest(
             output_filename="isort.pex",
             internal_only=True,
@@ -105,14 +105,11 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
         else setup_request.request.prior_formatter_result
     )
 
-    input_digest = await Get(
-        Digest,
-        MergeDigests((source_files_snapshot.digest, isort_pex.digest, config_digest)),
-    )
+    input_digest = await Get(Digest, MergeDigests((source_files_snapshot.digest, config_digest)))
 
     process = await Get(
         Process,
-        PexProcess(
+        VenvPexProcess(
             isort_pex,
             argv=generate_args(
                 source_files=source_files, isort=isort, check_only=setup_request.check_only

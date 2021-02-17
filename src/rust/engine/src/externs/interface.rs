@@ -543,8 +543,8 @@ py_class!(class PyRemotingOptions |py| {
   def __new__(
     _cls,
     execution_enable: bool,
-    store_servers: Vec<String>,
-    execution_server: Option<String>,
+    store_addresses: Vec<String>,
+    execution_address: Option<String>,
     execution_process_cache_namespace: Option<String>,
     instance_name: Option<String>,
     root_ca_certs_path: Option<String>,
@@ -565,8 +565,8 @@ py_class!(class PyRemotingOptions |py| {
     Self::create_instance(py,
       RemotingOptions {
         execution_enable,
-        store_servers,
-        execution_server,
+        store_addresses,
+        execution_address,
         execution_process_cache_namespace,
         instance_name,
         root_ca_certs_path: root_ca_certs_path.map(PathBuf::from),

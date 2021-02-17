@@ -24,11 +24,11 @@ from pants.backend.python.target_types import (
     SetupPyCommandsField,
 )
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexInterpreterConstraints,
-    PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
@@ -411,7 +411,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
     # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
     # in turn imports from and invokes setuptools.
     setuptools_pex = await Get(
-        Pex,
+        VenvPex,
         PexRequest(
             output_filename="setuptools.pex",
             internal_only=True,
@@ -423,16 +423,15 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
             ),
         ),
     )
-    input_digest = await Get(Digest, MergeDigests((req.chroot.digest, setuptools_pex.digest)))
     # The setuptools dist dir, created by it under the chroot (not to be confused with
     # pants's own dist dir, at the buildroot).
     dist_dir = "dist/"
     result = await Get(
         ProcessResult,
-        PexProcess(
+        VenvPexProcess(
             setuptools_pex,
             argv=("setup.py", *req.args),
-            input_digest=input_digest,
+            input_digest=req.chroot.digest,
             # setuptools commands that create dists write them to the distdir.
             # TODO: Could there be other useful files to capture?
             output_directories=(dist_dir,),

@@ -69,8 +69,8 @@ pub struct Core {
 #[derive(Clone, Debug)]
 pub struct RemotingOptions {
   pub execution_enable: bool,
-  pub store_servers: Vec<String>,
-  pub execution_server: Option<String>,
+  pub store_addresses: Vec<String>,
+  pub execution_address: Option<String>,
   pub execution_process_cache_namespace: Option<String>,
   pub instance_name: Option<String>,
   pub root_ca_certs_path: Option<PathBuf>,
@@ -106,7 +106,7 @@ impl Core {
     local_store_dir: &Path,
     enable_remote: bool,
     remoting_opts: &RemotingOptions,
-    remote_store_servers: &[String],
+    remote_store_addresses: &[String],
     root_ca_certs: &Option<Vec<u8>>,
   ) -> Result<Store, String> {
     if enable_remote {
@@ -118,7 +118,7 @@ impl Core {
       Store::with_remote(
         executor.clone(),
         local_store_dir,
-        remote_store_servers.to_vec(),
+        remote_store_addresses.to_vec(),
         remoting_opts.instance_name.clone(),
         root_ca_certs.clone(),
         remoting_opts.store_headers.clone(),
@@ -178,8 +178,8 @@ impl Core {
       // No problem unwrapping here because the global options validation
       // requires the remoting_opts.execution_server be present when
       // remoting_opts.execution_enable is set.
-      &remoting_opts.execution_server.clone().unwrap(),
-      remoting_opts.store_servers.clone(),
+      &remoting_opts.execution_address.clone().unwrap(),
+      remoting_opts.store_addresses.clone(),
       process_execution_metadata.clone(),
       root_ca_certs.clone(),
       remoting_opts.execution_headers.clone(),
@@ -194,7 +194,7 @@ impl Core {
 
   fn make_command_runner(
     full_store: &Store,
-    remote_store_servers: &[String],
+    remote_store_addresses: &[String],
     executor: &Executor,
     local_execution_root_dir: &Path,
     named_caches_dir: &Path,
@@ -239,7 +239,7 @@ impl Core {
           exec_strategy_opts.remote_parallelism,
         ))
       } else if remote_caching_used {
-        let action_cache_address = remote_store_servers
+        let action_cache_address = remote_store_addresses
           .first()
           .ok_or_else(|| "At least one remote store must be specified".to_owned())?;
         Box::new(process_execution::remote_cache::CommandRunner::new(
@@ -330,8 +330,8 @@ impl Core {
     exec_strategy_opts: ExecutionStrategyOptions,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
-    let mut remote_store_servers = remoting_opts.store_servers.clone();
-    remote_store_servers.shuffle(&mut rand::thread_rng());
+    let mut remote_store_addresses = remoting_opts.store_addresses.clone();
+    remote_store_addresses.shuffle(&mut rand::thread_rng());
 
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(ref path) = remoting_opts.root_ca_certs_path {
@@ -346,7 +346,7 @@ impl Core {
     let need_remote_store = remoting_opts.execution_enable
       || exec_strategy_opts.remote_cache_read
       || exec_strategy_opts.remote_cache_write;
-    if need_remote_store && remote_store_servers.is_empty() {
+    if need_remote_store && remote_store_addresses.is_empty() {
       return Err("Remote store required but none provided".into());
     }
 
@@ -357,7 +357,7 @@ impl Core {
       &local_store_dir,
       need_remote_store,
       &remoting_opts,
-      &remote_store_servers,
+      &remote_store_addresses,
       &root_ca_certs,
     )
     .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
@@ -382,7 +382,7 @@ impl Core {
 
     let command_runner = Self::make_command_runner(
       &full_store,
-      &remote_store_servers,
+      &remote_store_addresses,
       &executor,
       &local_execution_root_dir,
       &named_caches_dir,
