@@ -10,17 +10,21 @@ jobs:
         uses: actions/checkout@v2
         with:
           # We need to fetch more than one commit to be able to access HEAD^1 in the PR case.
-          fetch-depth: 2
+          fetch-depth: 3
       # For a push event, the commit we care about is HEAD itself.
       - name: Get commit message for branch builds
         if: github.event_name == 'push'
         run: |
-          echo "COMMIT_MESSAGE=$(git log --format=%B -n 1 HEAD)" >> ${GITHUB_ENV}
-      # For a pull_request event, the commit we care about is the parent of the merge commit.
+          echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+          echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      # For a pull_request event, the commit we care about is the grandparent of the merge commit.
       - name: Get commit message for PR builds
         if: github.event_name == 'pull_request'
         run: |
-          echo "COMMIT_MESSAGE=$(git log --format=%B -n 1 HEAD^1)" >> ${GITHUB_ENV}
+          echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+          echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
       - name: Print
         run: |
           echo "COMMIT MESSAGE ${COMMIT_MESSAGE}"
