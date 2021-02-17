@@ -16,6 +16,7 @@ from pants.backend.python.util_rules.pex import (
     PexRequirements,
     VenvPex,
     VenvPexProcess,
+    VenvPexRequest,
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
@@ -94,14 +95,18 @@ async def setup_black(
         else PexInterpreterConstraints(black.interpreter_constraints)
     )
 
+    black_script = "black"
     black_pex_request = Get(
         VenvPex,
-        PexRequest(
-            output_filename="black.pex",
-            internal_only=True,
-            requirements=PexRequirements(black.all_requirements),
-            interpreter_constraints=tool_interpreter_constraints,
-            entry_point=black.entry_point,
+        VenvPexRequest(
+            bin_names=[black_script],
+            pex_request=PexRequest(
+                output_filename="black.pex",
+                internal_only=True,
+                requirements=PexRequirements(black.all_requirements),
+                interpreter_constraints=tool_interpreter_constraints,
+                entry_point=black.entry_point,
+            ),
         ),
     )
 
@@ -134,6 +139,7 @@ async def setup_black(
         Process,
         VenvPexProcess(
             black_pex,
+            script=black_pex.bin[black_script],
             argv=generate_args(
                 source_files=source_files, black=black, check_only=setup_request.check_only
             ),

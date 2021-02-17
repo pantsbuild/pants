@@ -927,6 +927,7 @@ class VenvPexProcess:
     argv: Tuple[str, ...]
     description: str = dataclasses.field(compare=False)
     level: LogLevel
+    script: Optional[Script]
     input_digest: Optional[Digest]
     extra_env: Optional[FrozenDict[str, str]]
     output_files: Optional[Tuple[str, ...]]
@@ -942,6 +943,7 @@ class VenvPexProcess:
         description: str,
         argv: Iterable[str] = (),
         level: LogLevel = LogLevel.INFO,
+        script: Optional[Script] = None,
         input_digest: Optional[Digest] = None,
         extra_env: Optional[Mapping[str, str]] = None,
         output_files: Optional[Iterable[str]] = None,
@@ -954,6 +956,7 @@ class VenvPexProcess:
         self.argv = tuple(argv)
         self.description = description
         self.level = level
+        self.script = script
         self.input_digest = input_digest
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
@@ -966,7 +969,7 @@ class VenvPexProcess:
 @rule
 async def setup_venv_pex_process(request: VenvPexProcess) -> Process:
     venv_pex = request.venv_pex
-    argv = (venv_pex.pex.argv0, *request.argv)
+    argv = (request.script.argv0 if request.script else venv_pex.pex.argv0, *request.argv)
     input_digest = (
         await Get(Digest, MergeDigests((venv_pex.digest, request.input_digest)))
         if request.input_digest
