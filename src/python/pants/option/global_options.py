@@ -7,6 +7,7 @@ import enum
 import importlib
 import logging
 import os
+import re
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -198,16 +199,30 @@ class ExecutionOptions:
                     )
                     remote_instance_name = auth_plugin_result.instance_name
 
-        # Prefix the remote servers with a scheme.
+        # Determine the remote servers.
+        # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
+        # We validate that users set `grpc` and `grpcs` in the options system for clarity, but then
+        # normalize to `http`/`https`.
         remote_address_scheme = "https://" if bootstrap_options.remote_ca_certs_path else "http://"
-        remote_execution_address = (
-            f"{remote_address_scheme}{bootstrap_options.remote_execution_server}"
-            if bootstrap_options.remote_execution_server
-            else None
-        )
-        remote_store_addresses = [
-            f"{remote_address_scheme}{addr}" for addr in bootstrap_options.remote_store_server
-        ]
+        if bootstrap_options.remote_execution_address:
+            remote_execution_address = re.sub(
+                r"^grpc", "http", bootstrap_options.remote_execution_address
+            )
+        elif bootstrap_options.remote_execution_server:
+            remote_execution_address = (
+                f"{remote_address_scheme}{bootstrap_options.remote_execution_server}"
+            )
+        else:
+            remote_execution_address = None
+
+        if bootstrap_options.remote_store_address:
+            remote_store_addresses = [
+                re.sub(r"^grpc", "http", bootstrap_options.remote_store_address)
+            ]
+        else:
+            remote_store_addresses = [
+                f"{remote_address_scheme}{addr}" for addr in bootstrap_options.remote_store_server
+            ]
 
         return cls(
             # Remote execution strategy.
@@ -854,16 +869,17 @@ class GlobalOptions(Subsystem):
         register(
             "--remote-ca-certs-path",
             advanced=True,
-            help="Path to a PEM file containing CA certificates used for verifying secure "
-            "connections to --remote-execution-server and --remote-store-server. "
-            "If not specified, TLS will not be used.",
+            help=(
+                "Path to a PEM file containing CA certificates used for verifying secure "
+                "connections to --remote-execution-address and --remote-store-address."
+            ),
         )
         register(
             "--remote-oauth-bearer-token-path",
             advanced=True,
             help=(
                 "Path to a file containing an oauth token to use for gGRPC connections to "
-                "--remote-execution-server and --remote-store-server.\n\nIf specified, Pants will "
+                "--remote-execution-address and --remote-store-address.\n\nIf specified, Pants will "
                 "add a header in the format `authorization: Bearer <token>`. You can also manually "
                 "add this header via `--remote-execution-headers` and `--remote-store-headers`, or "
                 "use `--remote-auth-plugin` to provide a plugin to dynamically set the relevant "
@@ -901,6 +917,25 @@ class GlobalOptions(Subsystem):
             type=list,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_addresses,
             help="host:port of grpc server to use as remote execution file store.",
+            removal_version="2.4.0.dev0",
+            removal_hint=(
+                "Use `--remote-store-address` instead.\n\nNote that you must add the prefix "
+                "`grpc://` or `grpcs://` to identify whether TLS should be used.\n\n"
+                "`--remote-store-address` also is a string option, rather than list option; if you "
+                "still need support for multiple servers, please open a GitHub issue or reach out "
+                f"on Slack in the #remoting channel. See {docs_url('community')}."
+            ),
+        )
+        register(
+            "--remote-store-address",
+            advanced=True,
+            type=str,
+            default=None,
+            help=(
+                "The URI of a server used for the remote file store.\n\nFormat: "
+                "`scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC "
+                "with TLS enabled. If `grpc` is used, TLS will be disabled."
+            ),
         )
         register(
             "--remote-store-headers",
@@ -908,7 +943,7 @@ class GlobalOptions(Subsystem):
             type=dict,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_headers,
             help=(
-                "Headers to set on remote store requests. Format: header=value. Pants "
+                "Headers to set on remote store requests.\n\nFormat: header=value. Pants "
                 "may add additional headers.\n\nSee `--remote-execution-headers` as well."
             ),
         )
@@ -988,6 +1023,23 @@ class GlobalOptions(Subsystem):
             type=str,
             default=DEFAULT_EXECUTION_OPTIONS.remote_execution_address,
             help="host:port of grpc server to use as remote execution scheduler.",
+            removal_version="2.4.0.dev0",
+            removal_hint=(
+                "Use `--remote-execution-address` instead.\n\nNote that you must add the prefix "
+                "`grpc://` or `grpcs://` to identify whether TLS should be used."
+            ),
+        )
+        register(
+            "--remote-execution-address",
+            advanced=True,
+            type=str,
+            default=None,
+            help=(
+                "The URI of a server used as a remote execution scheduler.\n\nFormat: "
+                "`scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC "
+                "with TLS enabled. If `grpc` is used, TLS will be disabled.\n\nYou must also set "
+                "`--remote-store-address`, which will often be the same value."
+            ),
         )
         register(
             "--remote-execution-extra-platform-properties",
@@ -1151,26 +1203,47 @@ class GlobalOptions(Subsystem):
                 "enabled, it will already use remote caching."
             )
 
-        if opts.remote_execution and not opts.remote_execution_server:
+        if opts.remote_execution_address and opts.remote_execution_server:
+            raise OptionsError(
+                "Conflicting options used. You used the new, preferred remote_execution_address, "
+                "but also used the deprecated remote_execution_server.\n\nPlease use only of these "
+                "(preferably remote_execution_address)."
+            )
+        if opts.remote_store_address and opts.remote_store_server:
+            raise OptionsError(
+                "Conflicting options used. You used the new, preferred remote_store_address, but "
+                "also used the deprecated remote_store_server.\n\nPlease use only of these "
+                "(preferably remote_store_address)."
+            )
+
+        remote_execution_address_configured = (
+            opts.remote_execution_server or opts.remote_execution_address
+        )
+        remote_store_address_configured = opts.remote_store_server or opts.remote_store_address
+        if opts.remote_execution and not remote_execution_address_configured:
             raise OptionsError(
                 "The `--remote-execution` option requires also setting "
+                "either `--remote-execution-address` or the deprecated "
                 "`--remote-execution-server` to work properly."
             )
-        if opts.remote_execution_server and not opts.remote_store_server:
+        if remote_execution_address_configured and not remote_store_address_configured:
             raise OptionsError(
-                "The `--remote-execution-server` option requires also setting "
+                "The `--remote-execution-address` and deprecated `--remote-execution-server` "
+                "options require also setting `--remote-store-address` or the deprecated "
                 "`--remote-store-server`. Often these have the same value."
             )
 
-        if opts.remote_cache_read and not opts.remote_store_server:
+        if opts.remote_cache_read and not remote_store_address_configured:
             raise OptionsError(
                 "The `--remote-cache-read` option requires also setting "
-                "`--remote-store-server` to work properly."
+                "`--remote-store-address` or the deprecated `--remote-store-server` to work "
+                "properly."
             )
-        if opts.remote_cache_write and not opts.remote_store_server:
+        if opts.remote_cache_write and not remote_store_address_configured:
             raise OptionsError(
                 "The `--remote-cache-write` option requires also setting "
-                "`--remote-store-server` to work properly."
+                "`--remote-store-address` or the deprecated `--remote-store-server` to work "
+                "properly."
             )
 
         # Ensure that timeout values are non-zero.
@@ -1190,8 +1263,20 @@ class GlobalOptions(Subsystem):
                 "milliseconds."
             )
 
+        def validate_remote_address(opt_name: str) -> None:
+            valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
+            address = getattr(opts, opt_name)
+            if address and not any(address.startswith(scheme) for scheme in valid_schemes):
+                raise OptionsError(
+                    f"The `{opt_name}` option must begin with one of {valid_schemes}, but "
+                    f"was {address}."
+                )
+
+        validate_remote_address("remote_execution_address")
+        validate_remote_address("remote_store_address")
+
         # Ensure that remote headers are ASCII.
-        def validate_headers(opt_name: str) -> None:
+        def validate_remote_headers(opt_name: str) -> None:
             command_line_opt_name = f"--{opt_name.replace('_', '-')}"
             for k, v in getattr(opts, opt_name).items():
                 if not k.isascii():
@@ -1205,5 +1290,5 @@ class GlobalOptions(Subsystem):
                         f"`{k}: {v}` has non-ASCII characters."
                     )
 
-        validate_headers("remote_execution_headers")
-        validate_headers("remote_store_headers")
+        validate_remote_headers("remote_execution_headers")
+        validate_remote_headers("remote_store_headers")
