@@ -7,6 +7,7 @@ import enum
 import importlib
 import logging
 import os
+import re
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -204,8 +205,8 @@ class ExecutionOptions:
         # normalize to `http`/`https`.
         remote_address_scheme = "https://" if bootstrap_options.remote_ca_certs_path else "http://"
         if bootstrap_options.remote_execution_address:
-            remote_execution_address = bootstrap_options.remote_execution_address.replace(
-                "grpc", "http", 1
+            remote_execution_address = re.sub(
+                r"^grpc", "http", bootstrap_options.remote_execution_address
             )
         elif bootstrap_options.remote_execution_server:
             remote_execution_address = (
@@ -216,7 +217,7 @@ class ExecutionOptions:
 
         if bootstrap_options.remote_store_address:
             remote_store_addresses = [
-                bootstrap_options.remote_store_address.replace("grpc", "http", 1)
+                re.sub(r"^grpc", "http", bootstrap_options.remote_store_address)
             ]
         else:
             remote_store_addresses = [
