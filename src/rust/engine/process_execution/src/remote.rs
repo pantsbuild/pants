@@ -119,7 +119,7 @@ impl CommandRunner {
   /// Construct a new CommandRunner
   pub fn new(
     address: &str,
-    store_servers: Vec<String>,
+    store_addresses: Vec<String>,
     metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
@@ -133,39 +133,26 @@ impl CommandRunner {
       _ => None,
     };
 
-    let scheme = if tls_client_config.is_some() {
-      "https"
-    } else {
-      "http"
-    };
-    let address_with_scheme = format!("{}://{}", scheme, address);
-
     let interceptor = if headers.is_empty() {
       None
     } else {
       Some(Interceptor::new(headers_to_interceptor_fn(&headers)?))
     };
 
-    let endpoint = grpc_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
+    let endpoint = grpc_util::create_endpoint(&address, tls_client_config.as_ref())?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let execution_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => ExecutionClient::with_interceptor(channel.clone(), interceptor.clone()),
       None => ExecutionClient::new(channel.clone()),
     });
 
-    let store_servers_with_scheme: Vec<_> = store_servers
+    let (store_endpoints, store_endpoints_errors): (Vec<Endpoint>, Vec<String>) = store_addresses
       .iter()
-      .map(|addr| format!("{}://{}", scheme, addr))
-      .collect();
-
-    let (store_endpoints, store_endpoints_errors): (Vec<Endpoint>, Vec<String>) =
-      store_servers_with_scheme
-        .iter()
-        .map(|addr| grpc_util::create_endpoint(addr.as_str(), tls_client_config.as_ref()))
-        .partition_map(|result| match result {
-          Ok(endpoint) => Either::Left(endpoint),
-          Err(err) => Either::Right(err),
-        });
+      .map(|addr| grpc_util::create_endpoint(addr.as_str(), tls_client_config.as_ref()))
+      .partition_map(|result| match result {
+        Ok(endpoint) => Either::Left(endpoint),
+        Err(err) => Either::Right(err),
+      });
 
     if !store_endpoints_errors.is_empty() {
       return Err(format!(

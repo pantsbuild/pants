@@ -63,14 +63,7 @@ impl CommandRunner {
       _ => None,
     };
 
-    let scheme = if tls_client_config.is_some() {
-      "https"
-    } else {
-      "http"
-    };
-    let address_with_scheme = format!("{}://{}", scheme, action_cache_address);
-
-    let endpoint = grpc_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
+    let endpoint = grpc_util::create_endpoint(&action_cache_address, tls_client_config.as_ref())?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let action_cache_client = Arc::new(if headers.is_empty() {
       ActionCacheClient::new(channel)
