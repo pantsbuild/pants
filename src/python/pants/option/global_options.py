@@ -200,12 +200,12 @@ class ExecutionOptions:
 
         # Determine the remote servers.
         # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
-        # We have users set `grpc` and `grpcs` in the options system for clarity, but then
+        # We validate that users set `grpc` and `grpcs` in the options system for clarity, but then
         # normalize to `http`/`https`.
         remote_address_scheme = "https://" if bootstrap_options.remote_ca_certs_path else "http://"
         if bootstrap_options.remote_execution_address:
             remote_execution_address = bootstrap_options.remote_execution_address.replace(
-                "grpc", "http"
+                "grpc", "http", 1
             )
         elif bootstrap_options.remote_execution_server:
             remote_execution_address = (
@@ -216,7 +216,7 @@ class ExecutionOptions:
 
         if bootstrap_options.remote_store_address:
             remote_store_addresses = [
-                bootstrap_options.remote_store_address.replace("grpc", "http")
+                bootstrap_options.remote_store_address.replace("grpc", "http", 1)
             ]
         else:
             remote_store_addresses = [
@@ -918,8 +918,8 @@ class GlobalOptions(Subsystem):
             help="host:port of grpc server to use as remote execution file store.",
             removal_version="2.4.0.dev0",
             removal_hint=(
-                "Use `--remote-store-address` instead.\n\nNote that you must add the scheme "
-                "prefix `grpc://` or `grpcs://`, i.e. gRPC with TLS enabled.\n\n"
+                "Use `--remote-store-address` instead.\n\nNote that you must add the prefix "
+                "`grpc://` or `grpcs://` to identify whether TLS should be used.\n\n"
                 "`--remote-store-address` also is a string option, rather than list option; if you "
                 "still need support for multiple servers, please open a GitHub issue or reach out "
                 f"on Slack in the #remoting channel. See {docs_url('community')}."
@@ -1024,8 +1024,8 @@ class GlobalOptions(Subsystem):
             help="host:port of grpc server to use as remote execution scheduler.",
             removal_version="2.4.0.dev0",
             removal_hint=(
-                "Use `--remote-execution-address` instead.\n\nNote that you must add the scheme "
-                "prefix `grpc://` or `grpcs://`, i.e. gRPC with TLS enabled."
+                "Use `--remote-execution-address` instead.\n\nNote that you must add the prefix "
+                "`grpc://` or `grpcs://` to identify whether TLS should be used."
             ),
         )
         register(

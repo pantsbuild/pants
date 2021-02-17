@@ -58,7 +58,7 @@ def test_execution_options_remote_oauth_bearer_token_path() -> None:
 
 def test_execution_options_remote_addresses() -> None:
     # Test that we properly validate and normalize the scheme.
-    host = "fake.com:10"
+    host = "fake-with-http-in-url.com:10"
     exec_options = create_execution_options(
         initial_headers={},
         remote_store_address=f"grpc://{host}",
