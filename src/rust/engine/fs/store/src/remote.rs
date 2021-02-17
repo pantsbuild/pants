@@ -59,17 +59,7 @@ impl ByteStore {
       None => None,
     };
 
-    let scheme = if tls_client_config.is_some() {
-      "https"
-    } else {
-      "http"
-    };
-    let cas_addresses_with_scheme: Vec<_> = cas_addresses
-      .iter()
-      .map(|addr| format!("{}://{}", scheme, addr))
-      .collect();
-
-    let (endpoints, errors): (Vec<Endpoint>, Vec<String>) = cas_addresses_with_scheme
+    let (endpoints, errors): (Vec<Endpoint>, Vec<String>) = cas_addresses
       .iter()
       .map(|addr| grpc_util::create_endpoint(addr, tls_client_config.as_ref()))
       .partition_map(|result| match result {

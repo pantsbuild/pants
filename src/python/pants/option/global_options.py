@@ -111,7 +111,7 @@ class ExecutionOptions:
     process_execution_use_local_cache: bool
     process_execution_local_enable_nailgun: bool
 
-    remote_store_server: List[str]
+    remote_store_addresses: list[str]
     remote_store_headers: Dict[str, str]
     remote_store_thread_count: int
     remote_store_chunk_bytes: Any
@@ -124,7 +124,7 @@ class ExecutionOptions:
 
     remote_cache_eager_fetch: bool
 
-    remote_execution_server: Optional[str]
+    remote_execution_address: str | None
     remote_execution_extra_platform_properties: List[str]
     remote_execution_headers: Dict[str, str]
     remote_execution_overall_deadline_secs: int
@@ -184,6 +184,17 @@ class ExecutionOptions:
                 remote_execution_headers = auth_plugin_result.execution_headers
                 remote_store_headers = auth_plugin_result.store_headers
 
+        # Prefix the remote servers with a scheme.
+        remote_address_scheme = "https://" if bootstrap_options.remote_ca_certs_path else "http://"
+        remote_execution_address = (
+            f"{remote_address_scheme}{bootstrap_options.remote_execution_server}"
+            if bootstrap_options.remote_execution_server
+            else None
+        )
+        remote_store_addresses = [
+            f"{remote_address_scheme}{addr}" for addr in bootstrap_options.remote_store_server
+        ]
+
         return cls(
             # Remote execution strategy.
             remote_execution=remote_execution,
@@ -200,7 +211,7 @@ class ExecutionOptions:
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             # Remote store setup.
-            remote_store_server=bootstrap_options.remote_store_server,
+            remote_store_addresses=remote_store_addresses,
             remote_store_headers=remote_store_headers,
             remote_store_thread_count=bootstrap_options.remote_store_thread_count,
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
@@ -213,7 +224,7 @@ class ExecutionOptions:
             # Remote cache setup.
             remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
             # Remote execution setup.
-            remote_execution_server=bootstrap_options.remote_execution_server,
+            remote_execution_address=remote_execution_address,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=remote_execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
@@ -241,7 +252,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_use_local_cache=True,
     process_execution_local_enable_nailgun=False,
     # Remote store setup.
-    remote_store_server=[],
+    remote_store_addresses=[],
     remote_store_headers={},
     remote_store_thread_count=1,
     remote_store_chunk_bytes=1024 * 1024,
@@ -254,7 +265,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # Remote cache setup.
     remote_cache_eager_fetch=True,
     # Remote execution setup.
-    remote_execution_server=None,
+    remote_execution_address=None,
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
@@ -867,7 +878,7 @@ class GlobalOptions(Subsystem):
             "--remote-store-server",
             advanced=True,
             type=list,
-            default=DEFAULT_EXECUTION_OPTIONS.remote_store_server,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_store_addresses,
             help="host:port of grpc server to use as remote execution file store.",
         )
         register(
@@ -953,6 +964,8 @@ class GlobalOptions(Subsystem):
         register(
             "--remote-execution-server",
             advanced=True,
+            type=str,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_execution_address,
             help="host:port of grpc server to use as remote execution scheduler.",
         )
         register(
