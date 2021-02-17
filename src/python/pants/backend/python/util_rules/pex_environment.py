@@ -112,10 +112,11 @@ class PexEnvironment(EngineAwareReturnType):
         self, pex_filepath: str, *args: str, python: Optional[PythonExecutable] = None
     ) -> Tuple[str, ...]:
         python = python or self.bootstrap_python
-        argv = [python.path] if python else []
-        argv.append(pex_filepath)
-        argv.extend(args)
-        return tuple(argv)
+        if python:
+            return (python.path, pex_filepath, *args)
+        if os.path.basename(pex_filepath) == pex_filepath:
+            return (f"./{pex_filepath}", *args)
+        return (pex_filepath, *args)
 
     def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
         """The environment to use for running anything with PEX.
