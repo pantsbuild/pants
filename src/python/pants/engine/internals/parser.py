@@ -105,7 +105,7 @@ class Parser:
             original = e.args[0].capitalize()
             help_str = (
                 "If you expect to see more symbols activated in the below list,"
-                f" refer to {docs_url('enabling_backends')} for all available"
+                f" refer to {docs_url('enabling-backends')} for all available"
                 " backends to activate."
             )
 
