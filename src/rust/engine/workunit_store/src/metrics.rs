@@ -27,9 +27,20 @@ clippy::unseparated_literal_suffix,
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use strum_macros::AsRefStr;
+use std::string::ToString;
+use strum::IntoEnumIterator;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, AsRefStr)]
+#[derive(
+  Clone,
+  Copy,
+  PartialEq,
+  Eq,
+  Hash,
+  Debug,
+  strum_macros::AsRefStr,
+  strum_macros::EnumIter,
+  strum_macros::ToString,
+)]
 #[strum(serialize_all = "snake_case")]
 pub enum Metric {
   LocalCacheRequests,
@@ -57,7 +68,13 @@ pub enum Metric {
   RemoteExecutionTimeouts,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, AsRefStr)]
+impl Metric {
+  pub fn all_metrics() -> Vec<String> {
+    Metric::iter().map(|variant| variant.to_string()).collect()
+  }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, strum_macros::AsRefStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum ObservationMetric {
   TestObservation,
