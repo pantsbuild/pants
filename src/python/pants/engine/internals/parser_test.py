@@ -1,13 +1,15 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import pytest
+from __future__ import annotations
 
+import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.parser import BuildFilePreludeSymbols, ParseError, Parser
 from pants.util.docutil import docs_url
 from pants.util.frozendict import FrozenDict
+
 
 def test_imports_banned() -> None:
     parser = Parser(target_type_aliases=[], object_aliases=BuildFileAliases())
@@ -19,9 +21,9 @@ def test_imports_banned() -> None:
 
 
 def test_unrecogonized_symbol() -> None:
-    def perform_test(tta: list, good_err: str) -> None:
+    def perform_test(extra_targets: list[str], dym: str) -> None:
         parser = Parser(
-            target_type_aliases=tta,
+            target_type_aliases=["tgt", *extra_targets],
             object_aliases=BuildFileAliases(
                 objects={"obj": 0},
                 context_aware_object_factories={"caof": lambda parse_context: lambda _: None},
@@ -30,58 +32,26 @@ def test_unrecogonized_symbol() -> None:
         prelude_symbols = BuildFilePreludeSymbols(FrozenDict({"prelude": 0}))
         with pytest.raises(ParseError) as exc:
             parser.parse("dir/BUILD", "fake", prelude_symbols)
-        assert (
-            str(exc.value)
-            == good_err
-    )
+        assert str(exc.value) == (
+            f"Name 'fake' is not defined.\n\n{dym}"
+            "If you expect to see more symbols activated in the below list,"
+            f" refer to {docs_url('enabling_backends')} for all available"
+            " backends to activate.\n\n"
+            "All registered symbols: ['caof', "
+            f"{str(extra_targets)[1:-1] + (', ') if len(extra_targets) != 0 else ''}"
+            "'obj', 'prelude', 'tgt']"
+        )
 
-    # confirm that it works if there's nothing similar
-    no_match_tta = ["tgt"]
-    no_match_str = ("Name 'fake' is not defined.\n\n"
-                    "If you expect to see more symbols activated in the below list,"
-                    f"refer to {docs_url('enabling_backends')} for all available"
-                    " backends to activate.\n\n"
-                    "All registered symbols: ['caof', 'obj', 'prelude', 'tgt']"
-    )
+    test_targs = ["fake1", "fake2", "fake3", "fake4", "fake5"]
 
-    # confirm that "did you mean x" works
-    one_match_tta = ["tgt","fake1"]
-    one_match_str = ("Name 'fake' is not defined.\n\n"
-                    "Did you mean fake1?\n\n"
-                    "If you expect to see more symbols activated in the below list,"
-                    f"refer to {docs_url('enabling_backends')} for all available"
-                    " backends to activate.\n\n"
-                    "All registered symbols: ['caof', 'fake1', 'obj', 'prelude', 'tgt']"
-    )
+    dym_one = "Did you mean fake1?\n\n"
+    dym_two = "Did you mean fake2 or fake1?\n\n"
+    dym_many = "Did you mean fake5, fake4, or fake3?\n\n"
 
-
-    # confirm that "did you mean x or y" works
-    two_match_tta = ["tgt","fake1","fake2"]
-    two_match_str = ("Name 'fake' is not defined.\n\n"
-                    "Did you mean fake2 or fake1?\n\n"
-                    "If you expect to see more symbols activated in the below list,"
-                    f"refer to {docs_url('enabling_backends')} for all available"
-                    " backends to activate.\n\n"
-                    "All registered symbols: ['caof', 'fake1', 'fake2', 'obj', 'prelude', 'tgt']"
-    )
-
-
-    # confirm that "did you mean x, y or z" works (limit to 3 match)
-    many_match_tta = ["tgt","fake1","fake2","fake3","fake4","fake5"]
-    many_match_str = ("Name 'fake' is not defined.\n\n"
-                    "Did you mean fake5, fake4 or fake3?\n\n"
-                    "If you expect to see more symbols activated in the below list,"
-                    f"refer to {docs_url('enabling_backends')} for all available"
-                    " backends to activate.\n\n"
-                    "All registered symbols: ['caof', 'fake1', 'fake2',"
-                    " 'fake3', 'fake4', 'fake5', 'obj', 'prelude', 'tgt']"
-    )
-
-
-    perform_test(no_match_tta,no_match_str)
-    perform_test(one_match_tta,one_match_str)
-    perform_test(two_match_tta,two_match_str)
-    perform_test(many_match_tta,many_match_str)
-
-
-
+    # This first test tests the error message when no matches are found (i.e.
+    # we don't need to add any additional targets and don't have a "Did you
+    # mean...? message.
+    perform_test([], "")
+    perform_test(test_targs[:1], dym_one)
+    perform_test(test_targs[:2], dym_two)
+    perform_test(test_targs, dym_many)

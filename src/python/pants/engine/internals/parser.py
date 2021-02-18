@@ -103,24 +103,24 @@ class Parser:
         except NameError as e:
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
             original = e.args[0].capitalize()
-            err_string = (
-                    "If you expect to see more symbols activated in the below list,"
-                    f"refer to {docs_url('enabling_backends')} for all available"
-                    " backends to activate."
+            help_str = (
+                "If you expect to see more symbols activated in the below list,"
+                f" refer to {docs_url('enabling_backends')} for all available"
+                " backends to activate."
             )
-            dym = "Did you mean "
 
-            # note that this only includes 3 matches at the most by default
-            candidates = get_close_matches(build_file_content,valid_symbols)
-            if len(candidates) == 1:
-                dym += candidates[0] + '?\n\n'
-                err_string = dym + err_string
-            elif len(candidates) > 1:
-                dym += ", ".join(candidates[:-1])
-                # no oxford comma for len==2
-                dym += " or " + candidates[-1] + "?\n\n"
-                err_string = dym + err_string
-            raise ParseError(f"{original}.\n\n{err_string}\n\nAll registered symbols: {valid_symbols}")
+            candidates = get_close_matches(build_file_content, valid_symbols)
+            if candidates:
+                if len(candidates) == 1:
+                    formatted_candidates = candidates[0]
+                elif len(candidates) == 2:
+                    formatted_candidates = " or ".join(candidates)
+                else:
+                    formatted_candidates = f"{', '.join(candidates[:-1])}, or {candidates[-1]}"
+                help_str = f"Did you mean {formatted_candidates}?\n\n" + help_str
+            raise ParseError(
+                f"{original}.\n\n{help_str}\n\nAll registered symbols: {valid_symbols}"
+            )
 
         error_on_imports(build_file_content, filepath)
 
