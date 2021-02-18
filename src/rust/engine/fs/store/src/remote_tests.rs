@@ -231,7 +231,7 @@ async fn write_file_errors() {
 #[tokio::test]
 async fn write_connection_error() {
   let store = ByteStore::new(
-    vec![String::from("doesnotexist.example")],
+    vec![String::from("http://doesnotexist.example")],
     None,
     None,
     BTreeMap::new(),
