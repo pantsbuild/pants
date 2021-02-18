@@ -70,7 +70,7 @@ use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
 use task_executor::Executor;
 use workunit_store::{
-  ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
+  ArtifactOutput, Metric, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
 };
 
 use crate::{
@@ -321,6 +321,7 @@ py_module_initializer!(native_engine, |py, m| {
       session_record_test_observation(a: PyScheduler, b: PySession, c: u64)
     ),
   )?;
+  m.add(py, "all_counter_names", py_fn!(py, all_counter_names()))?;
 
   m.add(
     py,
@@ -1052,7 +1053,7 @@ async fn workunit_to_py_value(
       .iter()
       .map(|(counter_name, counter_value)| {
         (
-          externs::store_utf8(counter_name.as_str()),
+          externs::store_utf8(counter_name.as_ref()),
           externs::store_u64(*counter_value),
         )
       })
@@ -1137,6 +1138,10 @@ fn scheduler_metrics(
       externs::store_dict(values).map(|d| d.consume_into_py_object(py))
     })
   })
+}
+
+fn all_counter_names(_: Python) -> CPyResult<Vec<String>> {
+  Ok(Metric::all_metrics())
 }
 
 fn scheduler_execute(

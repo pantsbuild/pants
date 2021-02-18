@@ -749,12 +749,12 @@ impl WorkunitStore {
         .map_err(|err| {
           format!(
             "Failed to encode histogram for key `{}`: {}",
-            metric.as_str(),
+            metric.as_ref(),
             err
           )
         })?;
 
-      result.insert(metric.as_str().to_owned(), writer.into_inner().freeze());
+      result.insert(metric.as_ref().to_owned(), writer.into_inner().freeze());
     }
 
     Ok(result)

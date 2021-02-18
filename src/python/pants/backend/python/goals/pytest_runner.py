@@ -172,7 +172,7 @@ async def setup_pytest_for_target(
         PexRequest(
             output_filename="pytest_runner.pex",
             interpreter_constraints=interpreter_constraints,
-            entry_point="pytest:main",
+            entry_point="pytest",
             internal_only=True,
             pex_path=[pytest_pex, requirements_pex],
         ),
