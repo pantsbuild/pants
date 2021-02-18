@@ -1,14 +1,12 @@
 # Enable remote caching by running `./pants --pants-config-files=pants.remote-cache.toml`.
+#
+# This requires having had first run `./pants auth-acquire` to get a long-lived access token.
+# If you are not able to authenticate, post in #remoting in Pants Slack to ask to be added.
 
 [GLOBAL]
 remote_cache_read = true
 remote_cache_write = true
 
-remote_store_initial_timeout = 250
-remote_store_timeout_multiplier = 1.5
-remote_store_maximum_timeout = 5000
-
-# NB: this is used for Toolchain's remote caching and may need to change for other implementations.
 remote_store_address = "grpcs://build.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"

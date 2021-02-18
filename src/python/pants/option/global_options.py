@@ -117,14 +117,9 @@ class ExecutionOptions:
 
     remote_store_addresses: list[str]
     remote_store_headers: Dict[str, str]
-    remote_store_thread_count: int
     remote_store_chunk_bytes: Any
     remote_store_chunk_upload_timeout_seconds: int
     remote_store_rpc_retries: int
-    remote_store_connection_limit: int
-    remote_store_initial_timeout: int
-    remote_store_timeout_multiplier: float
-    remote_store_maximum_timeout: int
 
     remote_cache_eager_fetch: bool
 
@@ -242,14 +237,9 @@ class ExecutionOptions:
             # Remote store setup.
             remote_store_addresses=remote_store_addresses,
             remote_store_headers=remote_store_headers,
-            remote_store_thread_count=bootstrap_options.remote_store_thread_count,
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
             remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
-            remote_store_connection_limit=bootstrap_options.remote_store_connection_limit,
-            remote_store_initial_timeout=bootstrap_options.remote_store_initial_timeout,
-            remote_store_timeout_multiplier=bootstrap_options.remote_store_timeout_multiplier,
-            remote_store_maximum_timeout=bootstrap_options.remote_store_maximum_timeout,
             # Remote cache setup.
             remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
             # Remote execution setup.
@@ -283,14 +273,9 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # Remote store setup.
     remote_store_addresses=[],
     remote_store_headers={},
-    remote_store_thread_count=1,
     remote_store_chunk_bytes=1024 * 1024,
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
-    remote_store_connection_limit=5,
-    remote_store_initial_timeout=10,
-    remote_store_timeout_multiplier=2.0,
-    remote_store_maximum_timeout=10,
     # Remote cache setup.
     remote_cache_eager_fetch=True,
     # Remote execution setup.
@@ -954,8 +939,10 @@ class GlobalOptions(Subsystem):
             "--remote-store-thread-count",
             type=int,
             advanced=True,
-            default=DEFAULT_EXECUTION_OPTIONS.remote_store_thread_count,
+            default=0,
             help="Thread count to use for the pool that interacts with the remote file store.",
+            removal_version="2.4.0.dev0",
+            removal_hint="This option now no-ops.",
         )
         register(
             "--remote-store-chunk-bytes",
@@ -982,29 +969,47 @@ class GlobalOptions(Subsystem):
             "--remote-store-connection-limit",
             type=int,
             advanced=True,
-            default=DEFAULT_EXECUTION_OPTIONS.remote_store_connection_limit,
+            default=0,
             help="Number of remote stores to concurrently allow connections to.",
+            removal_version="2.4.0.dev0",
+            removal_hint="This option now no-ops.",
         )
         register(
             "--remote-store-initial-timeout",
             type=int,
             advanced=True,
-            default=DEFAULT_EXECUTION_OPTIONS.remote_store_initial_timeout,
-            help="Initial timeout (in milliseconds) when there is a failure in accessing a remote store.",
+            default=0,
+            help=(
+                "Initial timeout (in milliseconds) when there is a failure in accessing a "
+                "remote store."
+            ),
+            removal_version="2.4.0.dev0",
+            removal_hint="This option now no-ops.",
         )
         register(
             "--remote-store-timeout-multiplier",
             type=float,
             advanced=True,
-            default=DEFAULT_EXECUTION_OPTIONS.remote_store_timeout_multiplier,
-            help="Multiplier used to increase the timeout (starting with value of --remote-store-initial-timeout) between retry attempts in accessing a remote store.",
+            default=0,
+            help=(
+                "Multiplier used to increase the timeout (starting with value of "
+                "--remote-store-initial-timeout) between retry attempts in accessing a remote "
+                "store."
+            ),
+            removal_version="2.4.0.dev0",
+            removal_hint="This option now no-ops.",
         )
         register(
             "--remote-store-maximum-timeout",
             type=int,
             advanced=True,
-            default=DEFAULT_EXECUTION_OPTIONS.remote_store_maximum_timeout,
-            help="Maximum timeout (in millseconds) to allow between retry attempts in accessing a remote store.",
+            default=0,
+            help=(
+                "Maximum timeout (in millseconds) to allow between retry attempts in accessing a "
+                "remote store."
+            ),
+            removal_version="2.4.0.dev0",
+            removal_hint="This option now no-ops.",
         )
 
         register(
@@ -1246,23 +1251,6 @@ class GlobalOptions(Subsystem):
                 "The `--remote-cache-write` option requires also setting "
                 "`--remote-store-address` or the deprecated `--remote-store-server` to work "
                 "properly."
-            )
-
-        # Ensure that timeout values are non-zero.
-        if opts.remote_store_initial_timeout <= 0:
-            raise OptionsError(
-                "The --remote-store-initial-timeout option requires a positive number of "
-                "milliseconds."
-            )
-        if opts.remote_store_timeout_multiplier <= 0.0:
-            raise OptionsError(
-                "The --remote-store-timeout-multiplier option requires a positive number for the "
-                "multiplier."
-            )
-        if opts.remote_store_maximum_timeout <= 0:
-            raise OptionsError(
-                "The --remote-store-initial-timeout option requires a positive number of "
-                "milliseconds."
             )
 
         def validate_remote_address(opt_name: str) -> None:
