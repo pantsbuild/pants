@@ -9,7 +9,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, DefaultDict, Dict, Set, Type, Union, cast
+from typing import Any, DefaultDict, Dict, Set, Type, cast
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.goal import GoalSubsystem
@@ -156,7 +156,7 @@ class BuildConfiguration:
         # in this because we pass whatever people put in their `register.py`s to this function;
         # I.e., this is an impure function that reads from the outside world. So, we use the type
         # hint `Any` and perform runtime type checking.
-        def register_optionables(self, optionables: Union[typing.Iterable[Type[Optionable]], Any]):
+        def register_optionables(self, optionables: typing.Iterable[Type[Optionable]] | Any):
             """Registers the given subsystem types."""
             if not isinstance(optionables, Iterable):
                 raise TypeError("The optionables must be an iterable, given {}".format(optionables))
@@ -198,9 +198,7 @@ class BuildConfiguration:
         # this because we pass whatever people put in their `register.py`s to this function;
         # I.e., this is an impure function that reads from the outside world. So, we use the type
         # hint `Any` and perform runtime type checking.
-        def register_target_types(
-            self, target_types: Union[typing.Iterable[Type[Target]], Any]
-        ) -> None:
+        def register_target_types(self, target_types: typing.Iterable[Type[Target]] | Any) -> None:
             """Registers the given target types."""
             if not isinstance(target_types, Iterable):
                 raise TypeError(

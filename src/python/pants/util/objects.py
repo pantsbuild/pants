@@ -1,15 +1,17 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
-from typing import Any, Iterable, Optional, Type, Union
+from typing import Any, Iterable, Type, Union
 
 from pants.util.strutil import first_paragraph
 
 
 def get_docstring_summary(
     cls: Type, *, fallback_to_ancestors: bool = False, ignored_ancestors: Iterable[Type] = (object,)
-) -> Optional[str]:
+) -> str | None:
     """Get the summary line(s) of docstring for a class.
 
     If the summary is one more than one line, this will flatten them into a single line.
@@ -27,7 +29,7 @@ def get_docstring(
     flatten: bool = False,
     fallback_to_ancestors: bool = False,
     ignored_ancestors: Iterable[Type] = (object,),
-) -> Optional[str]:
+) -> str | None:
     """Get the docstring for a class with properly handled indentation.
 
     :param cls: the class, e.g. MyClass.

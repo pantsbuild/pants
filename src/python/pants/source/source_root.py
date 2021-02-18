@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, Iterable, Optional, Set, Tuple, Union
+from typing import Dict, Iterable, Optional, Set, Tuple
 
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
@@ -56,7 +56,7 @@ class InvalidMarkerFileError(SourceRootError):
 class NoSourceRootError(SourceRootError):
     """Indicates we failed to map a source file to a source root."""
 
-    def __init__(self, path: Union[str, PurePath], extra_msg: str = ""):
+    def __init__(self, path: str | PurePath, extra_msg: str = ""):
         super().__init__(f"No source root found for `{path}`. {extra_msg}")
 
 

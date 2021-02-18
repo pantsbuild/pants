@@ -1,9 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
-from typing import Optional, Union
 
 import pytest
 
@@ -20,7 +21,7 @@ from pants.base.specs import (
 from pants.base.specs_parser import SpecsParser
 
 
-def address_literal(directory: str, name: Optional[str] = None) -> AddressLiteralSpec:
+def address_literal(directory: str, name: str | None = None) -> AddressLiteralSpec:
     name = name if name is not None else os.path.basename(directory)
     return AddressLiteralSpec(directory, name)
 
@@ -162,9 +163,7 @@ def test_ambiguous_files(tmp_path: Path, spec: str) -> None:
         ("a.txt", file_literal("a.txt")),
     ],
 )
-def test_absolute(
-    tmp_path: Path, spec_suffix: str, expected: Union[AddressSpec, FilesystemSpec]
-) -> None:
+def test_absolute(tmp_path: Path, spec_suffix: str, expected: AddressSpec | FilesystemSpec) -> None:
     spec = os.path.join(tmp_path, spec_suffix)
     if isinstance(expected, AddressSpec):
         assert_address_spec_parsed(tmp_path, spec, expected)

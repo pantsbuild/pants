@@ -1,7 +1,9 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Optional, Tuple, cast
+from __future__ import annotations
+
+from typing import Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.engine.addresses import UnparsedAddressInputs
@@ -67,8 +69,8 @@ class MyPy(PythonToolBase):
         return tuple(self.options.args)
 
     @property
-    def config(self) -> Optional[str]:
-        return cast(Optional[str], self.options.config)
+    def config(self) -> str | None:
+        return cast("str | None", self.options.config)
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:

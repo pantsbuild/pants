@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from functools import partial
 from hashlib import sha1
 from pathlib import PurePath
-from typing import Any, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
+from typing import Any, ClassVar, Dict, List, Mapping, Sequence, Tuple, Union, cast
 
 import toml
 from typing_extensions import Literal
@@ -51,8 +51,8 @@ class Config(ABC):
         cls,
         file_contents,
         *,
-        seed_values: Optional[SeedValues] = None,
-    ) -> Union["_EmptyConfig", "_ChainedConfig"]:
+        seed_values: SeedValues | None = None,
+    ) -> _EmptyConfig | _ChainedConfig:
         """Loads config from the given string payloads, with later payloads taking precedence over
         earlier ones.
 
@@ -73,8 +73,8 @@ class Config(ABC):
         cls,
         config_paths: List[str],
         *,
-        seed_values: Optional[SeedValues] = None,
-    ) -> Union["_EmptyConfig", "_ChainedConfig"]:
+        seed_values: SeedValues | None = None,
+    ) -> _EmptyConfig | _ChainedConfig:
         """Loads config from the given paths, with later paths taking precedence over earlier ones.
 
         A handful of seed values will be set to act as if specified in the loaded config file's
@@ -95,8 +95,8 @@ class Config(ABC):
         open_ctx,
         config_items: Sequence,
         *,
-        seed_values: Optional[SeedValues] = None,
-    ) -> Union["_EmptyConfig", "_ChainedConfig"]:
+        seed_values: SeedValues | None = None,
+    ) -> _EmptyConfig | _ChainedConfig:
         if not config_items:
             return _EmptyConfig()
 
@@ -142,7 +142,7 @@ class Config(ABC):
         return _ConfigValues(toml_values)
 
     @staticmethod
-    def _determine_seed_values(*, seed_values: Optional[SeedValues] = None) -> Dict[str, str]:
+    def _determine_seed_values(*, seed_values: SeedValues | None = None) -> Dict[str, str]:
         """We pre-populate several default values to allow %([key-name])s interpolation.
 
         This sets up those defaults and checks if the user overrode any of the values.
@@ -211,12 +211,12 @@ class Config(ABC):
         """Returns whether this config specified a value for the option."""
 
     @abstractmethod
-    def get_value(self, section: str, option: str) -> Optional[str]:
+    def get_value(self, section: str, option: str) -> str | None:
         """Returns the value of the option in this config as a string, or None if no value
         specified."""
 
     @abstractmethod
-    def get_source_for_option(self, section: str, option: str) -> Optional[str]:
+    def get_source_for_option(self, section: str, option: str) -> str | None:
         """Returns the path to the source file the given option was defined in.
 
         :param section: the scope of the option.
@@ -236,7 +236,7 @@ class _ConfigValues:
     values: Dict[str, Any]
 
     @staticmethod
-    def _is_an_option(option_value: Union[_TomlValue, Dict]) -> bool:
+    def _is_an_option(option_value: _TomlValue | dict) -> bool:
         """Determine if the value is actually an option belonging to that section.
 
         A value that looks like an option might actually be a subscope, e.g. the option value
@@ -268,14 +268,14 @@ class _ConfigValues:
         blank_section = len(section_values.values()) == 0
         return at_least_one_option_defined or blank_section
 
-    def _find_section_values(self, section: str) -> Optional[Dict]:
+    def _find_section_values(self, section: str) -> dict | None:
         """Find the values for a section, if any.
 
         For example, if the config file was `{'GLOBAL': {'foo': 1}}`, this function would return
         `{'foo': 1}` given `section='GLOBAL'`.
         """
 
-        def recurse(mapping: Dict, *, remaining_sections: List[str]) -> Optional[Dict]:
+        def recurse(mapping: Dict, *, remaining_sections: List[str]) -> dict | None:
             if not remaining_sections:
                 return None
             current_section = remaining_sections[0]
@@ -339,7 +339,7 @@ class _ConfigValues:
         section: str,
         section_values: Dict,
         interpolate: bool = True,
-        list_prefix: Optional[str] = None,
+        list_prefix: str | None = None,
     ) -> str:
         """For parity with configparser, we convert all values back to strings, which allows us to
         avoid upstream changes to files like parser.py.
@@ -382,7 +382,7 @@ class _ConfigValues:
     def sections(self) -> List[str]:
         sections: List[str] = []
 
-        def recurse(mapping: Dict, *, parent_section: Optional[str] = None) -> None:
+        def recurse(mapping: Dict, *, parent_section: str | None = None) -> None:
             for section, section_values in mapping.items():
                 if not isinstance(section_values, dict):
                     continue
@@ -409,7 +409,7 @@ class _ConfigValues:
         else:
             return True
 
-    def get_value(self, section: str, option: str) -> Optional[str]:
+    def get_value(self, section: str, option: str) -> str | None:
         section_values = self._find_section_values(section)
         if section_values is None:
             raise configparser.NoSectionError(section)
@@ -515,10 +515,10 @@ class _SingleFileConfig(Config):
     def has_option(self, section: str, option: str) -> bool:
         return self.values.has_option(section, option)
 
-    def get_value(self, section: str, option: str) -> Optional[str]:
+    def get_value(self, section: str, option: str) -> str | None:
         return self.values.get_value(section, option)
 
-    def get_source_for_option(self, section: str, option: str) -> Optional[str]:
+    def get_source_for_option(self, section: str, option: str) -> str | None:
         if self.has_option(section, option):
             return self.sources()[0]
         return None
@@ -571,7 +571,7 @@ class _ChainedConfig(Config):
                 return True
         return False
 
-    def get_value(self, section: str, option: str) -> Optional[str]:
+    def get_value(self, section: str, option: str) -> str | None:
         for cfg in self._configs:
             try:
                 return cfg.get_value(section, option)
@@ -581,7 +581,7 @@ class _ChainedConfig(Config):
             raise configparser.NoSectionError(section)
         raise configparser.NoOptionError(option, section)
 
-    def get_source_for_option(self, section: str, option: str) -> Optional[str]:
+    def get_source_for_option(self, section: str, option: str) -> str | None:
         for cfg in self._configs:
             if cfg.has_option(section, option):
                 return cfg.get_source_for_option(section, option)
@@ -613,7 +613,7 @@ class TomlSerializer:
       }
     """
 
-    parsed: Mapping[str, Dict[str, Union[int, float, str, bool, List, Dict]]]
+    parsed: Mapping[str, dict[str, int | float | str | bool | list | dict]]
 
     def normalize(self) -> Dict:
         result: Dict = {}
