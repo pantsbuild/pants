@@ -27,7 +27,10 @@ clippy::unseparated_literal_suffix,
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+use strum_macros::AsRefStr;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, AsRefStr)]
+#[strum(serialize_all = "snake_case")]
 pub enum Metric {
   LocalCacheRequests,
   LocalCacheRequestsCached,
@@ -54,57 +57,11 @@ pub enum Metric {
   RemoteExecutionTimeouts,
 }
 
-impl Metric {
-  pub fn as_str(&self) -> &'static str {
-    use Metric::*;
-
-    match *self {
-      LocalCacheRequests => "local_cache_requests",
-      LocalCacheRequestsCached => "local_cache_requests_cached",
-      LocalCacheRequestsUncached => "local_cache_requests_uncached",
-      LocalCacheReadErrors => "local_cache_read_errors",
-      LocalCacheWriteErrors => "local_cache_write_errors",
-      LocalExecutionRequests => "local_execution_requests",
-      RemoteCacheRequests => "remote_cache_requests",
-      RemoteCacheRequestsCached => "remote_cache_requests_cached",
-      RemoteCacheRequestsUncached => "remote_cache_requests_uncached",
-      RemoteCacheReadErrors => "remote_cache_read_errors",
-      RemoteCacheWriteErrors => "remote_cache_write_errors",
-      RemoteCacheWriteStarted => "remote_cache_write_started",
-      RemoteCacheWriteFinished => "remote_cache_write_finished",
-      RemoteCacheSpeculationLocalCompletedFirst => "remote_cache_speculation_local_completed_first",
-      RemoteCacheSpeculationRemoteCompletedFirst => {
-        "remote_cache_speculation_remote_completed_first"
-      }
-      RemoteExecutionErrors => "remote_execution_errors",
-      RemoteExecutionRequests => "remote_execution_requests",
-      RemoteExecutionRPCRetries => "remote_execution_rpc_retries",
-      RemoteExecutionRPCErrors => "remote_execution_rpc_errors",
-      RemoteExecutionRPCExecute => "remote_execution_rpc_execute",
-      RemoteExecutionRPCWaitExecution => "remote_execution_rpc_wait_execution",
-      RemoteExecutionSuccess => "remote_execution_success",
-      RemoteExecutionTimeouts => "remote_execution_timeouts",
-    }
-  }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, AsRefStr)]
+#[strum(serialize_all = "snake_case")]
 pub enum ObservationMetric {
   TestObservation,
   LocalStoreReadBlobSize,
   RemoteExecutionRPCFirstResponseTime,
   RemoteStoreTimeToFirstByte,
-}
-
-impl ObservationMetric {
-  pub fn as_str(&self) -> &'static str {
-    use ObservationMetric::*;
-
-    match *self {
-      TestObservation => "test_observation",
-      LocalStoreReadBlobSize => "local_store_read_blob_size",
-      RemoteExecutionRPCFirstResponseTime => "remote_execution_rpc_first_response_time",
-      RemoteStoreTimeToFirstByte => "remote_store_time_to_first_byte",
-    }
-  }
 }

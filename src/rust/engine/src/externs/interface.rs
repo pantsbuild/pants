@@ -1062,7 +1062,7 @@ async fn workunit_to_py_value(
       .iter()
       .map(|(counter_name, counter_value)| {
         (
-          externs::store_utf8(counter_name.as_str()),
+          externs::store_utf8(counter_name.as_ref()),
           externs::store_u64(*counter_value),
         )
       })
