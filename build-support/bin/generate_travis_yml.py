@@ -330,7 +330,7 @@ def linux_shard(
         ],
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage().value,
-        "env": ["PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt"],
+        "env": [],
     }
     if load_test_config:
         setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]

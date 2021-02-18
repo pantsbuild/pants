@@ -58,9 +58,10 @@ impl CommandRunner {
     cache_write: bool,
     eager_fetch: bool,
   ) -> Result<Self, String> {
-    let tls_client_config = match root_ca_certs {
-      Some(pem_bytes) => Some(grpc_util::create_tls_config(pem_bytes)?),
-      _ => None,
+    let tls_client_config = if action_cache_address.starts_with("https://") {
+      Some(grpc_util::create_tls_config(root_ca_certs)?)
+    } else {
+      None
     };
 
     let endpoint = grpc_util::create_endpoint(&action_cache_address, tls_client_config.as_ref())?;

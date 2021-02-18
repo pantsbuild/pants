@@ -55,8 +55,9 @@ pub fn create_endpoint(
   Ok(maybe_tls_endpoint)
 }
 
-/// Create a rust-tls `ClientConfig` from root CA certs.
-pub fn create_tls_config(pem_bytes: Vec<u8>) -> Result<ClientConfig, String> {
+/// Create a rust-tls `ClientConfig` from root CA certs, falling back to the rust-tls-native-certs
+/// crate if specific root CA certs were not given.
+pub fn create_tls_config(root_ca_certs: Option<Vec<u8>>) -> Result<ClientConfig, String> {
   let mut tls_config = ClientConfig::new();
 
   // Must set HTTP/2 as ALPN protocol otherwise cannot connect over TLS to gRPC servers.
@@ -64,11 +65,31 @@ pub fn create_tls_config(pem_bytes: Vec<u8>) -> Result<ClientConfig, String> {
   // any helper function to encapsulate this knowledge.
   tls_config.set_protocols(&[Vec::from(&"h2"[..])]);
 
-  let mut reader = std::io::Cursor::new(pem_bytes);
-  tls_config
-    .root_store
-    .add_pem_file(&mut reader)
-    .map_err(|_| "unexpected state in PEM file add".to_owned())?;
+  // Add the root store.
+  match root_ca_certs {
+    Some(pem_bytes) => {
+      let mut reader = std::io::Cursor::new(pem_bytes);
+      tls_config
+        .root_store
+        .add_pem_file(&mut reader)
+        .map_err(|_| {
+          "Unexpected state when adding PEM file from `--remote-ca-certs-path`. Please \
+          check that it points to a valid file."
+            .to_owned()
+        })?;
+    }
+    None => {
+      tls_config.root_store =
+        rustls_native_certs::load_native_certs().map_err(|(_maybe_store, e)| {
+          format!(
+            "Could not discover root CA cert files to use TLS with remote caching and remote \
+            execution. Consider setting `--remote-ca-certs-path` instead to explicitly point to \
+            the correct PEM file.\n\n{}",
+            e
+          )
+        })?;
+    }
+  }
 
   Ok(tls_config)
 }

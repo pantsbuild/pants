@@ -54,9 +54,14 @@ impl ByteStore {
     rpc_retries: usize,
     _connection_limit: usize,
   ) -> Result<ByteStore, String> {
-    let tls_client_config = match root_ca_certs {
-      Some(pem_bytes) => Some(grpc_util::create_tls_config(pem_bytes)?),
-      None => None,
+    let tls_client_config = if cas_addresses
+      .first()
+      .map(|addr| addr.starts_with("https://"))
+      .unwrap_or(false)
+    {
+      Some(grpc_util::create_tls_config(root_ca_certs)?)
+    } else {
+      None
     };
 
     let (endpoints, errors): (Vec<Endpoint>, Vec<String>) = cas_addresses
