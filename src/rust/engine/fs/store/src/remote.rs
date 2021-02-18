@@ -21,8 +21,6 @@ use tonic::transport::{Channel, Endpoint};
 use tonic::{Code, Interceptor, Request};
 use workunit_store::{with_workunit, ObservationMetric};
 
-use super::BackoffConfig;
-
 #[derive(Clone)]
 pub struct ByteStore {
   instance_name: Option<String>,
@@ -47,12 +45,9 @@ impl ByteStore {
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
-    _thread_count: usize,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
-    _backoff_config: BackoffConfig,
     rpc_retries: usize,
-    _connection_limit: usize,
   ) -> Result<ByteStore, String> {
     let tls_client_config = if cas_addresses
       .first()

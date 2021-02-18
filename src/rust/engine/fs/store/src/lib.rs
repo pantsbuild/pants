@@ -48,7 +48,6 @@ use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use serde_derive::Serialize;
-pub use serverset::BackoffConfig;
 use tryfuture::try_future;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -262,12 +261,9 @@ impl Store {
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
-    thread_count: usize,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
-    backoff_config: BackoffConfig,
     rpc_retries: usize,
-    connection_limit: usize,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new(executor, path)?,
@@ -276,12 +272,9 @@ impl Store {
         instance_name,
         root_ca_certs,
         headers,
-        thread_count,
         chunk_size_bytes,
         upload_timeout,
-        backoff_config,
         rpc_retries,
-        connection_limit,
       )?),
     })
   }

@@ -12,7 +12,7 @@ use hashing::{Digest, EMPTY_DIGEST};
 use maplit::hashset;
 use mock::{StubActionCache, StubCAS};
 use remexec::ActionResult;
-use store::{BackoffConfig, Store};
+use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use tokio::time::delay_for;
@@ -90,11 +90,8 @@ impl StoreSetup {
       None,
       None,
       BTreeMap::new(),
-      1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-      1,
       1,
     )
     .unwrap();
