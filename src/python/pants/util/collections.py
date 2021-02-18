@@ -1,9 +1,11 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import collections
 import collections.abc
-from typing import Any, Iterable, List, MutableMapping, Type, TypeVar, Union
+from typing import Any, Iterable, List, MutableMapping, TypeVar
 
 
 def recursively_update(d: MutableMapping, d2: MutableMapping) -> None:
@@ -37,8 +39,8 @@ def assert_single_element(iterable: Iterable[_T]) -> _T:
 
 
 def ensure_list(
-    val: Union[Any, Iterable[Any]], *, expected_type: Type[_T], allow_single_scalar: bool = False
-) -> List[_T]:
+    val: Any | Iterable[Any], *, expected_type: type[_T], allow_single_scalar: bool = False
+) -> list[_T]:
     """Ensure that every element of an iterable is the expected type and convert the result to a
     list.
 
@@ -63,7 +65,7 @@ def ensure_list(
     return result
 
 
-def ensure_str_list(val: Union[str, Iterable[str]], *, allow_single_str: bool = False) -> List[str]:
+def ensure_str_list(val: str | Iterable[str], *, allow_single_str: bool = False) -> list[str]:
     """Ensure that every element of an iterable is a string and convert the result to a list.
 
     If `allow_single_str` is True, a single `str` will be wrapped into a `List[str]`.

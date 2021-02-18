@@ -12,6 +12,8 @@ Recipes by Raymond Hettiger and released under the MIT license:
 http://code.activestate.com/recipes/576694/.
 """
 
+from __future__ import annotations
+
 import itertools
 from typing import (
     AbstractSet,
@@ -21,7 +23,6 @@ from typing import (
     Iterable,
     Iterator,
     MutableSet,
-    Optional,
     Set,
     TypeVar,
     cast,
@@ -35,7 +36,7 @@ _TAbstractOrderedSet = TypeVar("_TAbstractOrderedSet", bound="_AbstractOrderedSe
 class _AbstractOrderedSet(AbstractSet[T]):
     """Common functionality shared between OrderedSet and FrozenOrderedSet."""
 
-    def __init__(self, iterable: Optional[Iterable[T]] = None) -> None:
+    def __init__(self, iterable: Iterable[T] | None = None) -> None:
         # Using a dictionary, rather than using the recipe's original `self |= iterable`, results
         # in a ~20% performance increase for the constructor.
         #
@@ -82,12 +83,16 @@ class _AbstractOrderedSet(AbstractSet[T]):
 
         Each item's order is defined by its first appearance.
         """
-        # Differences with AbstractSet: our set union forces "other" to have the same type. That is, while
-        # AbstractSet allows {1, 2, 3} | {(True, False)} resulting in Set[Union[int, Tuple[bool, bool]]], the analogous
-        # for descendants  of _TAbstractOrderedSet is not allowed.
+        # Differences with AbstractSet: our set union forces "other" to have the same type. That
+        # is, while AbstractSet allows {1, 2, 3} | {(True, False)} resulting in
+        # set[int | tuple[bool, bool]], the analogous for descendants  of _TAbstractOrderedSet is
+        # not allowed.
+        #
         # GOTCHA: given _TAbstractOrderedSet[S]:
-        #   if T is a subclass of S => _TAbstractOrderedSet[S] => *appears* to perform unification but it doesn't
-        #   if S is a subclass of T => type error (while AbstractSet would resolve to AbstractSet[T])
+        #   if T is a subclass of S => _TAbstractOrderedSet[S] => *appears* to perform
+        #     unification but it doesn't
+        #   if S is a subclass of T => type error (while AbstractSet would resolve to
+        #     AbstractSet[T])
         merged_iterables = itertools.chain([cast(Iterable[T], self)], others)
         return self.__class__(itertools.chain.from_iterable(merged_iterables))
 
@@ -208,9 +213,9 @@ class FrozenOrderedSet(_AbstractOrderedSet[T_co], Hashable):
     This is safe to use with the V2 engine.
     """
 
-    def __init__(self, iterable: Optional[Iterable[T_co]] = None) -> None:
+    def __init__(self, iterable: Iterable[T_co] | None = None) -> None:
         super().__init__(iterable)
-        self._hash: Optional[int] = None
+        self._hash: int | None = None
 
     def __hash__(self) -> int:
         if self._hash is None:

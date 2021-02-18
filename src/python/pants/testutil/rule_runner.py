@@ -10,19 +10,7 @@ from io import StringIO
 from pathlib import PurePath
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    Mapping,
-    Optional,
-    Sequence,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Iterable, Mapping, Sequence, Type, TypeVar, cast
 
 from colors import blue, cyan, green, magenta, red, yellow
 
@@ -95,12 +83,12 @@ class RuleRunner:
     def __init__(
         self,
         *,
-        rules: Optional[Iterable] = None,
-        target_types: Optional[Iterable[Type[Target]]] = None,
-        objects: Optional[Dict[str, Any]] = None,
-        context_aware_object_factories: Optional[Dict[str, Any]] = None,
+        rules: Iterable | None = None,
+        target_types: Iterable[type[Target]] | None = None,
+        objects: dict[str, Any] | None = None,
+        context_aware_object_factories: dict[str, Any] | None = None,
         isolated_local_store: bool = False,
-        ca_certs_path: Optional[str] = None,
+        ca_certs_path: str | None = None,
     ) -> None:
         self.build_root = os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
         safe_mkdir(self.build_root, clean=True)
@@ -194,9 +182,9 @@ class RuleRunner:
         self,
         goal: Type[Goal],
         *,
-        global_args: Optional[Iterable[str]] = None,
-        args: Optional[Iterable[str]] = None,
-        env: Optional[Mapping[str, str]] = None,
+        global_args: Iterable[str] | None = None,
+        args: Iterable[str] | None = None,
+        env: Mapping[str, str] | None = None,
     ) -> GoalRuleResult:
         merged_args = (*(global_args or []), goal.name, *(args or []))
         self.set_options(merged_args, env=env)
@@ -223,7 +211,7 @@ class RuleRunner:
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
 
-    def set_options(self, args: Iterable[str], *, env: Optional[Mapping[str, str]] = None) -> None:
+    def set_options(self, args: Iterable[str], *, env: Mapping[str, str] | None = None) -> None:
         """Update the engine session with new options and/or environment variables.
 
         The environment variables will be used to set the `PantsEnvironment`, which is the
@@ -262,7 +250,7 @@ class RuleRunner:
         self._invalidate_for(relpath)
         return path
 
-    def create_file(self, relpath: str, contents: Union[bytes, str] = "", mode: str = "w") -> str:
+    def create_file(self, relpath: str, contents: bytes | str = "", mode: str = "w") -> str:
         """Writes to a file under the buildroot.
 
         :API: public
@@ -289,7 +277,7 @@ class RuleRunner:
             self.create_file(os.path.join(path, f), contents=f)
 
     def add_to_build_file(
-        self, relpath: Union[str, PurePath], target: str, *, overwrite: bool = False
+        self, relpath: str | PurePath, target: str, *, overwrite: bool = False
     ) -> str:
         """Adds the given target specification to the BUILD file at relpath.
 
@@ -305,7 +293,7 @@ class RuleRunner:
         mode = "w" if overwrite else "a"
         return self.create_file(str(build_path), target, mode=mode)
 
-    def make_snapshot(self, files: Mapping[str, Union[str, bytes]]) -> Snapshot:
+    def make_snapshot(self, files: Mapping[str, str | bytes]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content."""
         with temporary_dir() as temp_dir:
             for file_name, content in files.items():
@@ -350,9 +338,9 @@ class MockGet:
 def run_rule_with_mocks(
     rule: Callable,
     *,
-    rule_args: Optional[Sequence[Any]] = None,
-    mock_gets: Optional[Sequence[MockGet]] = None,
-    union_membership: Optional[UnionMembership] = None,
+    rule_args: Sequence[Any] | None = None,
+    mock_gets: Sequence[MockGet] | None = None,
+    union_membership: UnionMembership | None = None,
 ):
     """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
 

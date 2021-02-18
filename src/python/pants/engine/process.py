@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Iterable, Mapping, Tuple
 
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
@@ -55,15 +55,15 @@ class Process:
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest
-    working_directory: Optional[str]
+    working_directory: str | None
     env: FrozenDict[str, str]
     append_only_caches: FrozenDict[str, str]
     output_files: Tuple[str, ...]
     output_directories: Tuple[str, ...]
-    timeout_seconds: Union[int, float]
-    jdk_home: Optional[str]
+    timeout_seconds: int | float
+    jdk_home: str | None
     is_nailgunnable: bool
-    execution_slot_variable: Optional[str]
+    execution_slot_variable: str | None
     cache_scope: ProcessCacheScope
 
     def __init__(
@@ -73,17 +73,17 @@ class Process:
         description: str,
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
-        working_directory: Optional[str] = None,
-        env: Optional[Mapping[str, str]] = None,
-        append_only_caches: Optional[Mapping[str, str]] = None,
-        output_files: Optional[Iterable[str]] = None,
-        output_directories: Optional[Iterable[str]] = None,
-        timeout_seconds: Optional[Union[int, float]] = None,
-        jdk_home: Optional[str] = None,
+        working_directory: str | None = None,
+        env: Mapping[str, str] | None = None,
+        append_only_caches: Mapping[str, str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
+        timeout_seconds: int | float | None = None,
+        jdk_home: str | None = None,
         is_nailgunnable: bool = False,
-        execution_slot_variable: Optional[str] = None,
-        cache_scope: Optional[ProcessCacheScope] = None,
-        cache_failures: Optional[bool] = None,
+        execution_slot_variable: str | None = None,
+        cache_scope: ProcessCacheScope | None = None,
+        cache_failures: bool | None = None,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -139,10 +139,10 @@ class Process:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class MultiPlatformProcess:
-    platform_constraints: Tuple[Optional[str], ...]
+    platform_constraints: tuple[str | None, ...]
     processes: Tuple[Process, ...]
 
-    def __init__(self, request_dict: Dict[Optional[Platform], Process]) -> None:
+    def __init__(self, request_dict: dict[Platform | None, Process]) -> None:
         if len(request_dict) == 0:
             raise ValueError("At least one platform-constrained Process must be passed.")
         serialized_constraints = tuple(
@@ -297,7 +297,7 @@ class InteractiveProcess:
         self,
         argv: Iterable[str],
         *,
-        env: Optional[Mapping[str, str]] = None,
+        env: Mapping[str, str] | None = None,
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
         hermetic_env: bool = True,
@@ -386,14 +386,14 @@ class BinaryPathRequest:
 
     search_path: SearchPath
     binary_name: str
-    test: Optional[BinaryPathTest]
+    test: BinaryPathTest | None
 
     def __init__(
         self,
         *,
         search_path: Iterable[str],
         binary_name: str,
-        test: Optional[BinaryPathTest] = None,
+        test: BinaryPathTest | None = None,
     ) -> None:
         self.search_path = SearchPath(search_path)
         self.binary_name = binary_name
@@ -406,18 +406,18 @@ class BinaryPath:
     path: str
     fingerprint: str
 
-    def __init__(self, path: str, fingerprint: Optional[str] = None) -> None:
+    def __init__(self, path: str, fingerprint: str | None = None) -> None:
         self.path = path
         self.fingerprint = self._fingerprint() if fingerprint is None else fingerprint
 
     @staticmethod
-    def _fingerprint(content: Optional[Union[bytes, bytearray, memoryview]] = None) -> str:
+    def _fingerprint(content: bytes | bytearray | memoryview | None = None) -> str:
         hasher = hashlib.sha256() if content is None else hashlib.sha256(content)
         return hasher.hexdigest()
 
     @classmethod
     def fingerprinted(
-        cls, path: str, representative_content: Union[bytes, bytearray, memoryview]
+        cls, path: str, representative_content: bytes | bytearray | memoryview
     ) -> BinaryPath:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
@@ -428,7 +428,7 @@ class BinaryPaths(EngineAwareReturnType):
     binary_name: str
     paths: Tuple[BinaryPath, ...]
 
-    def __init__(self, binary_name: str, paths: Optional[Iterable[BinaryPath]] = None):
+    def __init__(self, binary_name: str, paths: Iterable[BinaryPath] | None = None):
         self.binary_name = binary_name
         self.paths = tuple(OrderedSet(paths) if paths else ())
 
@@ -441,7 +441,7 @@ class BinaryPaths(EngineAwareReturnType):
         return found_msg
 
     @property
-    def first_path(self) -> Optional[BinaryPath]:
+    def first_path(self) -> BinaryPath | None:
         """Return the first path to the binary that was discovered, if any."""
         return next(iter(self.paths), None)
 
@@ -451,8 +451,8 @@ class BinaryNotFoundError(EnvironmentError):
         self,
         request: BinaryPathRequest,
         *,
-        rationale: Optional[str] = None,
-        alternative_solution: Optional[str] = None,
+        rationale: str | None = None,
+        alternative_solution: str | None = None,
     ) -> None:
         """When no binary is found via `BinaryPaths`, and it is not recoverable.
 

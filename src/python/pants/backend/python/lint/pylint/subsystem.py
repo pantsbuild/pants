@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, cast
+from __future__ import annotations
+
+from typing import List, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.engine.addresses import UnparsedAddressInputs
@@ -71,8 +73,8 @@ class Pylint(PythonToolBase):
         return cast(List[str], self.options.args)
 
     @property
-    def config(self) -> Optional[str]:
-        return cast(Optional[str], self.options.config)
+    def config(self) -> str | None:
+        return cast("str | None", self.options.config)
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:

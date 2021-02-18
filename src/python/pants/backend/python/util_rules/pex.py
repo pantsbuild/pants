@@ -12,18 +12,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import (
-    FrozenSet,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import FrozenSet, Iterable, List, Mapping, Sequence, Set, Tuple, TypeVar
 
 from pkg_resources import Requirement
 from typing_extensions import Protocol
@@ -102,7 +91,7 @@ _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
 class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter):
-    def __init__(self, constraints: Iterable[Union[str, Requirement]] = ()) -> None:
+    def __init__(self, constraints: Iterable[str | Requirement] = ()) -> None:
         super().__init__(
             v if isinstance(v, Requirement) else self.parse_constraint(v)
             for v in sorted(constraints, key=lambda c: str(c))
@@ -249,7 +238,7 @@ class PexInterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParame
         last_py27_patch_version = 18
         return self._includes_version("2.7", last_patch=last_py27_patch_version)
 
-    def minimum_python_version(self) -> Optional[str]:
+    def minimum_python_version(self) -> str | None:
         """Find the lowest major.minor Python version that will work with these constraints.
 
         The constraints may also be compatible with later versions; this is the lowest version that
@@ -327,12 +316,12 @@ class PexRequest(EngineAwareParameter):
     requirements: PexRequirements
     interpreter_constraints: PexInterpreterConstraints
     platforms: PexPlatforms
-    sources: Optional[Digest]
-    additional_inputs: Optional[Digest]
-    entry_point: Optional[str]
+    sources: Digest | None
+    additional_inputs: Digest | None
+    entry_point: str | None
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
-    description: Optional[str] = dataclasses.field(compare=False)
+    description: str | None = dataclasses.field(compare=False)
 
     def __init__(
         self,
@@ -342,12 +331,12 @@ class PexRequest(EngineAwareParameter):
         requirements: PexRequirements = PexRequirements(),
         interpreter_constraints=PexInterpreterConstraints(),
         platforms=PexPlatforms(),
-        sources: Optional[Digest] = None,
-        additional_inputs: Optional[Digest] = None,
-        entry_point: Optional[str] = None,
+        sources: Digest | None = None,
+        additional_inputs: Digest | None = None,
+        entry_point: str | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> None:
         """A request to create a PEX from its inputs.
 
@@ -418,7 +407,7 @@ class Pex:
 
     digest: Digest
     name: str
-    python: Optional[PythonExecutable]
+    python: PythonExecutable | None
 
 
 @dataclass(frozen=True)
@@ -496,7 +485,7 @@ class BuildPexResult:
     result: ProcessResult
     pex_filename: str
     digest: Digest
-    python: Optional[PythonExecutable]
+    python: PythonExecutable | None
 
     def create_pex(self) -> Pex:
         return Pex(digest=self.digest, name=self.pex_filename, python=self.python)
@@ -527,7 +516,7 @@ async def build_pex(
         *request.additional_args,
     ]
 
-    python: Optional[PythonExecutable] = None
+    python: PythonExecutable | None = None
 
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
@@ -813,7 +802,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
     request = two_step_pex_request.pex_request
     req_pex_name = "__requirements.pex"
 
-    additional_inputs: Optional[Digest]
+    additional_inputs: Digest | None
 
     # Create a pex containing just the requirements.
     if request.requirements:
@@ -857,13 +846,13 @@ class PexProcess:
     argv: Tuple[str, ...]
     description: str = dataclasses.field(compare=False)
     level: LogLevel
-    input_digest: Optional[Digest]
-    extra_env: Optional[FrozenDict[str, str]]
-    output_files: Optional[Tuple[str, ...]]
-    output_directories: Optional[Tuple[str, ...]]
-    timeout_seconds: Optional[int]
-    execution_slot_variable: Optional[str]
-    cache_scope: Optional[ProcessCacheScope]
+    input_digest: Digest | None
+    extra_env: FrozenDict[str, str] | None
+    output_files: tuple[str, ...] | None
+    output_directories: tuple[str, ...] | None
+    timeout_seconds: int | None
+    execution_slot_variable: str | None
+    cache_scope: ProcessCacheScope | None
 
     def __init__(
         self,
@@ -872,13 +861,13 @@ class PexProcess:
         description: str,
         argv: Iterable[str] = (),
         level: LogLevel = LogLevel.INFO,
-        input_digest: Optional[Digest] = None,
-        extra_env: Optional[Mapping[str, str]] = None,
-        output_files: Optional[Iterable[str]] = None,
-        output_directories: Optional[Iterable[str]] = None,
-        timeout_seconds: Optional[int] = None,
-        execution_slot_variable: Optional[str] = None,
-        cache_scope: Optional[ProcessCacheScope] = None,
+        input_digest: Digest | None = None,
+        extra_env: Mapping[str, str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
+        timeout_seconds: int | None = None,
+        execution_slot_variable: str | None = None,
+        cache_scope: ProcessCacheScope | None = None,
     ) -> None:
         self.pex = pex
         self.argv = tuple(argv)
@@ -927,13 +916,13 @@ class VenvPexProcess:
     argv: Tuple[str, ...]
     description: str = dataclasses.field(compare=False)
     level: LogLevel
-    input_digest: Optional[Digest]
-    extra_env: Optional[FrozenDict[str, str]]
-    output_files: Optional[Tuple[str, ...]]
-    output_directories: Optional[Tuple[str, ...]]
-    timeout_seconds: Optional[int]
-    execution_slot_variable: Optional[str]
-    cache_scope: Optional[ProcessCacheScope]
+    input_digest: Digest | None
+    extra_env: FrozenDict[str, str] | None
+    output_files: tuple[str, ...] | None
+    output_directories: tuple[str, ...] | None
+    timeout_seconds: int | None
+    execution_slot_variable: str | None
+    cache_scope: ProcessCacheScope | None
 
     def __init__(
         self,
@@ -942,13 +931,13 @@ class VenvPexProcess:
         description: str,
         argv: Iterable[str] = (),
         level: LogLevel = LogLevel.INFO,
-        input_digest: Optional[Digest] = None,
-        extra_env: Optional[Mapping[str, str]] = None,
-        output_files: Optional[Iterable[str]] = None,
-        output_directories: Optional[Iterable[str]] = None,
-        timeout_seconds: Optional[int] = None,
-        execution_slot_variable: Optional[str] = None,
-        cache_scope: Optional[ProcessCacheScope] = None,
+        input_digest: Digest | None = None,
+        extra_env: Mapping[str, str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
+        timeout_seconds: int | None = None,
+        execution_slot_variable: str | None = None,
+        cache_scope: ProcessCacheScope | None = None,
     ) -> None:
         self.venv_pex = venv_pex
         self.argv = tuple(argv)
