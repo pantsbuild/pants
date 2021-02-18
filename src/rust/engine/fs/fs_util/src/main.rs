@@ -238,27 +238,12 @@ to this directory.",
               .long("chunk-bytes")
               .required(false)
               .default_value(&format!("{}", 3 * 1024 * 1024))
-        ).arg(
-          Arg::with_name("thread-count")
-              .help("Number of threads to use for uploads and downloads")
-              .takes_value(true)
-              .long("thread-count")
-              .required(false)
-              .default_value("1")
         )
         .arg(
           Arg::with_name("rpc-attempts")
               .help("Number of times to attempt any RPC before giving up.")
               .takes_value(true)
               .long("rpc-attempts")
-              .required(false)
-              .default_value("3")
-        )
-        .arg(
-          Arg::with_name("connection-limit")
-              .help("Number of concurrent servers to allow connections to.")
-              .takes_value(true)
-              .long("connection-limit")
               .required(false)
               .default_value("3")
         )
@@ -323,7 +308,6 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .map(str::to_owned),
             root_ca_certs,
             headers,
-            value_t!(top_match.value_of("thread-count"), usize).expect("Invalid thread count"),
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures
             // leave this hanging forever.
@@ -334,15 +318,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             //
             // See https://github.com/pantsbuild/pants/pull/6433 for more context.
             Duration::from_secs(30 * 60),
-            // TODO: Take a command line arg.
-            store::BackoffConfig::new(
-              std::time::Duration::from_secs(1),
-              1.2,
-              std::time::Duration::from_secs(20),
-            )?,
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
-            value_t!(top_match.value_of("connection-limit"), usize)
-              .expect("Bad connection-limit flag"),
           ),
           true,
         )

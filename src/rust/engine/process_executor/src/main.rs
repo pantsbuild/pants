@@ -41,7 +41,7 @@ use fs::RelativePath;
 use hashing::{Digest, Fingerprint};
 use process_execution::{Context, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata};
 use prost::Message;
-use store::{BackoffConfig, Store, StoreWrapper};
+use store::{Store, StoreWrapper};
 use structopt::StructOpt;
 use workunit_store::WorkunitStore;
 
@@ -168,10 +168,6 @@ struct Opt {
   #[structopt(long, default_value = "3145728")]
   upload_chunk_bytes: usize,
 
-  /// Number of concurrent servers to allow connections to.
-  #[structopt(long, default_value = "3")]
-  store_connection_limit: usize,
-
   /// Whether or not to enable running the process through a Nailgun server.
   /// This will likely start a new Nailgun server as a side effect.
   #[structopt(long)]
@@ -235,13 +231,10 @@ async fn main() {
         args.remote_instance_name.clone(),
         root_ca_certs,
         headers,
-        1,
         args.upload_chunk_bytes,
         Duration::from_secs(30),
         // TODO: Take a command line arg.
-        BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
         3,
-        args.store_connection_limit,
       )
     }
     (None, None) => Store::local_only(executor.clone(), local_store_path),
