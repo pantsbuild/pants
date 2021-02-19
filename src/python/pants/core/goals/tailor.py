@@ -220,11 +220,35 @@ class Tailor(Goal):
     subsystem_cls = TailorSubsystem
 
 
+def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
+    """For a list of file paths, returns a dict of directory path -> files in that dir."""
+    ret = defaultdict(set)
+    for path in paths:
+        dirname, filename = os.path.split(path)
+        ret[dirname].add(filename)
+    return ret
+
+
 def group_by_build_file(ptgts: Iterable[PutativeTarget]) -> Dict[str, List[PutativeTarget]]:
     ret = defaultdict(list)
     for ptgt in ptgts:
         ret[ptgt.build_file_path].append(ptgt)
     return ret
+
+
+class AllOwnedSources(DeduplicatedCollection[str]):
+    """All files in the project already owned by targets."""
+
+
+@rule(level=LogLevel.DEBUG, desc="Determine all files already owned by targets")
+async def determine_all_owned_sources() -> AllOwnedSources:
+    all_tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+    all_sources_paths = await MultiGet(
+        Get(SourcesPaths, SourcesPathsRequest(tgt.get(Sources))) for tgt in all_tgts
+    )
+    return AllOwnedSources(
+        itertools.chain.from_iterable(sources_paths.files for sources_paths in all_sources_paths)
+    )
 
 
 @dataclass(frozen=True)
@@ -379,21 +403,6 @@ async def tailor(
                     f"{console.cyan(ptgt.address.spec)}"
                 )
     return Tailor(0)
-
-
-class AllOwnedSources(DeduplicatedCollection[str]):
-    """All files in the project already owned by targets."""
-
-
-@rule(level=LogLevel.DEBUG, desc="Determine all files already owned by targets")
-async def determine_all_owned_sources() -> AllOwnedSources:
-    all_tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
-    all_sources_paths = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt.get(Sources))) for tgt in all_tgts
-    )
-    return AllOwnedSources(
-        itertools.chain.from_iterable(sources_paths.files for sources_paths in all_sources_paths)
-    )
 
 
 def rules():

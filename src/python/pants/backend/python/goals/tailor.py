@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 import os
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -15,6 +14,7 @@ from pants.core.goals.tailor import (
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
+    group_by_dir,
 )
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.internals.selectors import Get
@@ -41,15 +41,6 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     test_files = {path for path in paths if os.path.basename(path) in test_filenames}
     library_files = set(paths) - test_files
     return {PythonTests: test_files, PythonLibrary: library_files}
-
-
-def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
-    """For a list of file paths, returns a dict of directory path -> files in that dir."""
-    ret = defaultdict(set)
-    for path in paths:
-        dirname, filename = os.path.split(path)
-        ret[dirname].add(filename)
-    return ret
 
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Python targets to create")

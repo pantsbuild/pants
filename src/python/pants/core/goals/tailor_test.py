@@ -17,6 +17,7 @@ from pants.core.goals.tailor import (
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
     default_sources_for_target_type,
+    group_by_dir,
     make_content_str,
 )
 from pants.core.util_rules import source_files
@@ -239,6 +240,26 @@ def test_edit_build_files(rule_runner: RuleRunner) -> None:
         assert efc.path == afc.path
         assert efc.content.decode() == afc.content.decode()
         assert efc.is_executable == afc.is_executable
+
+
+def test_group_by_dir() -> None:
+    paths = {
+        "foo/bar/baz1.ext",
+        "foo/bar/baz1_test.ext",
+        "foo/bar/qux/quux1.ext",
+        "foo/__init__.ext",
+        "foo/bar/__init__.ext",
+        "foo/bar/baz2.ext",
+        "foo/bar1.ext",
+        "foo1.ext",
+        "__init__.ext",
+    }
+    assert {
+        "": {"__init__.ext", "foo1.ext"},
+        "foo": {"__init__.ext", "bar1.ext"},
+        "foo/bar": {"__init__.ext", "baz1.ext", "baz1_test.ext", "baz2.ext"},
+        "foo/bar/qux": {"quux1.ext"},
+    } == group_by_dir(paths)
 
 
 def test_tailor_rule(rule_runner: RuleRunner) -> None:
