@@ -39,3 +39,13 @@ class FetchersTest(TestBase):
 
     def test_default_gopkg(self):
         self.check_default("gopkg.in/check.v1", expected_root="gopkg.in/check.v1")
+
+    def test_default_cloud_google_com(self):
+        self.check_default("cloud.google.com/go/pubsub", expected_root="cloud.google.com/go")
+
+    def test_default_cloud_google_com_issues_11579(self):
+        # This internal package has no meta tag page / is not publicly addressable. Test that
+        # we fall back to searching for the internal package's root in parents.
+        self.check_default(
+            "cloud.google.com/go/internal/pubsub", expected_root="cloud.google.com/go"
+        )
