@@ -1,28 +1,28 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
+from __future__ import annotations
+
 import logging
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, Iterable, Set, Type
+from typing import Iterable
 
 from pants.backend.python.target_types import PythonLibrary, PythonTests, PythonTestsSources
-from pants.base.specs import AddressSpecs, MaybeEmptyDescendantAddresses
-from pants.core.goals.tailor import PutativeTarget, PutativeTargets, PutativeTargetsRequest
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    Sources,
-    SourcesPaths,
-    SourcesPathsRequest,
-    Target,
-    UnexpandedTargets,
+from pants.core.goals.tailor import (
+    AllOwnedSources,
+    PutativeTarget,
+    PutativeTargets,
+    PutativeTargetsRequest,
 )
+from pants.engine.fs import PathGlobs, Paths
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec, matches_filespec
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class PutativePythonTargetsRequest:
     pass
 
 
-def classify_source_files(paths: Iterable[str]) -> Dict[Type[Target], Set[str]]:
+def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
     tests_filespec = Filespec(includes=list(PythonTestsSources.default))
     test_filenames = set(
@@ -43,7 +43,7 @@ def classify_source_files(paths: Iterable[str]) -> Dict[Type[Target], Set[str]]:
     return {PythonTests: test_files, PythonLibrary: library_files}
 
 
-def group_by_dir(paths: Iterable[str]) -> Dict[str, Set[str]]:
+def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
     """For a list of file paths, returns a dict of directory path -> files in that dir."""
     ret = defaultdict(set)
     for path in paths:
@@ -52,16 +52,10 @@ def group_by_dir(paths: Iterable[str]) -> Dict[str, Set[str]]:
     return ret
 
 
-@rule
+@rule(level=LogLevel.DEBUG, desc="Determine candidate Python targets to create")
 async def find_putative_targets(
-    req: PutativePythonTargetsRequest,
+    _: PutativePythonTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
-    all_tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
-    all_sources_paths = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt.get(Sources))) for tgt in all_tgts
-    )
-    all_owned_sources = itertools.chain.from_iterable(spaths.files for spaths in all_sources_paths)
-
     all_py_files = await Get(Paths, PathGlobs(["**/*.py"]))
     unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
     classified_unowned_py_files = classify_source_files(unowned_py_files)

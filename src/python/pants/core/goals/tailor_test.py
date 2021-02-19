@@ -7,6 +7,7 @@ import pytest
 
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
+    AllOwnedSources,
     DisjointSourcePutativeTarget,
     EditBuildFilesRequest,
     EditedBuildFiles,
@@ -62,6 +63,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(UniquelyNamedPutativeTargets, (PutativeTargets,)),
             QueryRule(DisjointSourcePutativeTarget, (PutativeTarget,)),
             QueryRule(EditedBuildFiles, (EditBuildFilesRequest,)),
+            QueryRule(AllOwnedSources, ()),
         ],
         target_types=[FortranLibrary, FortranTests],
     )
@@ -323,3 +325,19 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
         "Updated src/fortran/conflict/BUILD:\n  - Added fortran_library target "
         "src/fortran/conflict:conflict0"
     ) in stdout_str
+
+
+def test_all_owned_sources(rule_runner: RuleRunner) -> None:
+    for path in [
+        "dir/a.f90",
+        "dir/b.f90",
+        "dir/a_test.f90",
+        "dir/unowned.txt",
+        "unowned.txt",
+        "unowned.f90",
+    ]:
+        rule_runner.create_file(path)
+    rule_runner.add_to_build_file("dir", "fortran_library()\nfortran_tests(name='tests')")
+    assert rule_runner.request(AllOwnedSources, []) == AllOwnedSources(
+        ["dir/a.f90", "dir/b.f90", "dir/a_test.f90"]
+    )

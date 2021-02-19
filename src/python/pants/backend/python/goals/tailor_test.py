@@ -10,7 +10,7 @@ from pants.backend.python.goals.tailor import (
     group_by_dir,
 )
 from pants.backend.python.target_types import PythonLibrary, PythonTests
-from pants.core.goals.tailor import PutativeTarget, PutativeTargets
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.core.util_rules import source_files
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -22,7 +22,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *tailor.rules(),
             *source_files.rules(),
-            QueryRule(PutativeTargets, (PutativePythonTargetsRequest,)),
+            QueryRule(PutativeTargets, (PutativePythonTargetsRequest, AllOwnedSources)),
         ],
         target_types=[PythonLibrary, PythonTests],
     )
@@ -66,21 +66,25 @@ def test_group_by_dir() -> None:
 
 
 def test_find_putative_targets(rule_runner: RuleRunner) -> None:
-    dir_structure = {
-        "src/python/foo/__init__.py": "",
-        "src/python/foo/bar/BUILD": "python_library(sources=['__init__.py', 'baz1.py'])",
-        "src/python/foo/bar/__init__.py": "",
-        "src/python/foo/bar/baz1.py": "",
-        "src/python/foo/bar/baz1_test.py": "",
-        "src/python/foo/bar/baz2.py": "",
-        "src/python/foo/bar/baz2_test.py": "",
-        "src/python/foo/bar/baz3.py": "",
-    }
+    for path in [
+        "src/python/foo/__init__.py",
+        "src/python/foo/bar/BUILD",
+        "src/python/foo/bar/__init__.py",
+        "src/python/foo/bar/baz1.py",
+        "src/python/foo/bar/baz1_test.py",
+        "src/python/foo/bar/baz2.py",
+        "src/python/foo/bar/baz2_test.py",
+        "src/python/foo/bar/baz3.py",
+    ]:
+        rule_runner.create_file(path)
 
-    for path, content in dir_structure.items():
-        rule_runner.create_file(path, content)
-
-    pts = rule_runner.request(PutativeTargets, [PutativePythonTargetsRequest()])
+    pts = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativePythonTargetsRequest(),
+            AllOwnedSources(["src/python/foo/bar/__init__.py", "src/python/foo/bar/baz1.py"]),
+        ],
+    )
     assert (
         PutativeTargets(
             [

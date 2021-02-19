@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import itertools
 import logging
 import os
 from abc import ABCMeta
@@ -36,6 +37,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 
@@ -314,7 +316,7 @@ def make_content_str(
     return "\n\n".join(new_content) + "\n"
 
 
-@rule
+@rule(desc="Edit BUILD files with new targets")
 async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
     ptgts_by_build_file = group_by_build_file(req.putative_targets)
     existing_build_files_contents = await Get(DigestContents, PathGlobs(ptgts_by_build_file.keys()))
@@ -377,6 +379,21 @@ async def tailor(
                     f"{console.cyan(ptgt.address.spec)}"
                 )
     return Tailor(0)
+
+
+class AllOwnedSources(DeduplicatedCollection[str]):
+    """All files in the project already owned by targets."""
+
+
+@rule(level=LogLevel.DEBUG, desc="Determine all files already owned by targets")
+async def determine_all_owned_sources() -> AllOwnedSources:
+    all_tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+    all_sources_paths = await MultiGet(
+        Get(SourcesPaths, SourcesPathsRequest(tgt.get(Sources))) for tgt in all_tgts
+    )
+    return AllOwnedSources(
+        itertools.chain.from_iterable(sources_paths.files for sources_paths in all_sources_paths)
+    )
 
 
 def rules():
