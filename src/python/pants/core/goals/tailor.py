@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
-import logging
 import os
 from abc import ABCMeta
 from collections import defaultdict
@@ -40,8 +39,6 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
-
-logger = logging.getLogger(__name__)
 
 
 @union

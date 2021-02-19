@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass
 from typing import Iterable
@@ -23,8 +22,6 @@ from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.logging import LogLevel
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
