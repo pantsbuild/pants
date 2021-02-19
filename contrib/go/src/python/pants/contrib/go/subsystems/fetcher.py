@@ -1,7 +1,6 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 import logging
 from abc import ABC, abstractmethod
 from collections import namedtuple
@@ -78,26 +77,31 @@ class CloningFetcher(Fetcher):
         if imported_repo:
             return imported_repo.import_prefix
 
-        components = list(
-            itertools.takewhile(lambda package: package != "internal", self.import_path.split("/"))
-        )
-        if len(components) >= 2:
-            # The import path is for an internal package is described here:
-            # https://golang.org/cmd/go/#hdr-Internal_Directories. Since an internal directory is
-            # only importable in the tree rooted at its parent, we assume it's parent must have a
-            # public meta tag page. Failing that, we crawl all the way back up the ancestry.
-            host, parents = components[0], components[1:]
-            while parents:
-                parent_import_path = "/".join((host, *parents))
-                imported_repo = self._meta_tag_reader.get_imported_repo(parent_import_path)
-                if imported_repo:
-                    logger.info(
-                        "Found public root for private internal import {} in parent {}.".format(
-                            self.import_path, parent_import_path
-                        )
+        # The import path is for an internal package which is described here:
+        #   https://golang.org/cmd/go/#hdr-Internal_Directories.
+        #
+        # Since an internal directory is only importable in the tree rooted at its parent, we
+        # assume its parent must have a public meta tag page. Failing that, we crawl all the way
+        # back up the ancestry.
+        import_path_components = self.import_path.split("/")
+        try:
+            internal_index = import_path_components.index("internal")
+        except ValueError:
+            internal_import_public_parent_candidates = []
+        else:
+            internal_import_public_parent_candidates = import_path_components[:internal_index]
+
+        while internal_import_public_parent_candidates:
+            parent_import_path = "/".join(internal_import_public_parent_candidates)
+            imported_repo = self._meta_tag_reader.get_imported_repo(parent_import_path)
+            if imported_repo:
+                logger.info(
+                    "Found public root for private internal import {} in parent {}.".format(
+                        self.import_path, parent_import_path
                     )
-                    return imported_repo.import_prefix
-                parents.pop()
+                )
+                return imported_repo.import_prefix
+            internal_import_public_parent_candidates.pop()
 
         raise FetchError(f'No <meta name="go-import"> tag found at {self.import_path}')
 

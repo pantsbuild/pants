@@ -4,6 +4,7 @@
 from pants.testutil.subsystem.util import global_subsystem_instance
 from pants.testutil.test_base import TestBase
 
+from pants.contrib.go.subsystems.fetch_error import FetchError
 from pants.contrib.go.subsystems.fetcher_factory import FetcherFactory
 
 
@@ -49,3 +50,9 @@ class FetchersTest(TestBase):
         self.check_default(
             "cloud.google.com/go/internal/pubsub", expected_root="cloud.google.com/go"
         )
+
+        with self.assertRaises(FetchError):
+            self.fetcher("internal").root()
+
+        with self.assertRaises(FetchError):
+            self.fetcher("host/internal").root()
