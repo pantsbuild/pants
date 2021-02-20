@@ -4,6 +4,7 @@
 from pants.testutil.subsystem.util import global_subsystem_instance
 from pants.testutil.test_base import TestBase
 
+from pants.contrib.go.subsystems.fetch_error import FetchError
 from pants.contrib.go.subsystems.fetcher_factory import FetcherFactory
 
 
@@ -39,3 +40,19 @@ class FetchersTest(TestBase):
 
     def test_default_gopkg(self):
         self.check_default("gopkg.in/check.v1", expected_root="gopkg.in/check.v1")
+
+    def test_default_cloud_google_com(self):
+        self.check_default("cloud.google.com/go/pubsub", expected_root="cloud.google.com/go")
+
+    def test_default_cloud_google_com_issues_11579(self):
+        # This internal package has no meta tag page / is not publicly addressable. Test that
+        # we fall back to searching for the internal package's root in parents.
+        self.check_default(
+            "cloud.google.com/go/internal/pubsub", expected_root="cloud.google.com/go"
+        )
+
+        with self.assertRaises(FetchError):
+            self.fetcher("internal").root()
+
+        with self.assertRaises(FetchError):
+            self.fetcher("host/internal").root()

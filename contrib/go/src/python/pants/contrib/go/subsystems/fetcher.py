@@ -62,7 +62,7 @@ class CloningFetcher(Fetcher):
     https://golang.org/cmd/go/#hdr-Remote_import_paths. In particular, it inspects go-import
     meta tags.
 
-    Not that currently we require meta tags, and don't support the explicit form:
+    Note that currently we require meta tags, and don't support the explicit form:
     import "example.org/repo.git/foo/bar", as it looks like it's not used much in practice.
     """
 
@@ -76,8 +76,34 @@ class CloningFetcher(Fetcher):
         imported_repo = self._meta_tag_reader.get_imported_repo(self.import_path)
         if imported_repo:
             return imported_repo.import_prefix
+
+        # The import path is for an internal package which is described here:
+        #   https://golang.org/cmd/go/#hdr-Internal_Directories.
+        #
+        # Since an internal directory is only importable in the tree rooted at its parent, we
+        # assume its parent must have a public meta tag page. Failing that, we crawl all the way
+        # back up the ancestry.
+        import_path_components = self.import_path.split("/")
+        try:
+            internal_index = import_path_components.index("internal")
+        except ValueError:
+            internal_import_public_parent_candidates = []
         else:
-            raise FetchError(f'No <meta name="go-import"> tag found at {self.import_path}')
+            internal_import_public_parent_candidates = import_path_components[:internal_index]
+
+        while internal_import_public_parent_candidates:
+            parent_import_path = "/".join(internal_import_public_parent_candidates)
+            imported_repo = self._meta_tag_reader.get_imported_repo(parent_import_path)
+            if imported_repo:
+                logger.info(
+                    "Found public root for private internal import {} in parent {}.".format(
+                        self.import_path, parent_import_path
+                    )
+                )
+                return imported_repo.import_prefix
+            internal_import_public_parent_candidates.pop()
+
+        raise FetchError(f'No <meta name="go-import"> tag found at {self.import_path}')
 
     def fetch(self, dest, rev=None):
         imported_repo = self._meta_tag_reader.get_imported_repo(self.import_path)
