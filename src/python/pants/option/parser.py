@@ -169,12 +169,14 @@ class Parser:
         flag_value_map: Dict[str, List[Any]]
         namespace: OptionValueContainerBuilder
         passthrough_args: List[str]
+        allow_unknown_flags: bool
 
         def __init__(
             self,
             flags_in_scope: Iterable[str],
             namespace: OptionValueContainerBuilder,
             passthrough_args: List[str],
+            allow_unknown_flags: bool,
         ) -> None:
             """
             :param flags_in_scope: Iterable of arg strings to parse into flag values.
@@ -183,6 +185,7 @@ class Parser:
             self.flag_value_map = self._create_flag_value_map(flags_in_scope)
             self.namespace = namespace
             self.passthrough_args = passthrough_args
+            self.allow_unknown_flags = allow_unknown_flags
 
         @staticmethod
         def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, list[str | None]]:
@@ -296,7 +299,7 @@ class Parser:
 
             setattr(namespace, dest, val)
 
-        if flag_value_map:
+        if not parse_args_request.allow_unknown_flags and flag_value_map:
             # There were unconsumed flags.
             raise UnknownFlagsError(tuple(flag_value_map.keys()), self.scope)
         return namespace.build()
