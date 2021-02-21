@@ -99,12 +99,12 @@ def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool) 
         # We don't really expect users of isort<4
         if len(isort.config) >= 2:
             logger.warning(
-                "Found more than one config file for isort, taking the first one (%s) since isort only allows for a"
-                "single config file. For more, customization, set [isort].args.",
-                isort.config[0],
+                "Found more than one config file for isort, taking the last one (%s) since isort uses a single config"
+                "file: the last one provided. For more, customization, set [isort].args.",
+                isort.config[-1],
             )
         if isort.version is None or not is_old_isort_version(isort.version):  # isort>=5
-            args.append(f"--settings-path={isort.config[0]}")
+            args.append(f"--settings-path={isort.config[-1]}")
     if check_only:
         args.append("--check-only")
     args.extend(isort.args)
