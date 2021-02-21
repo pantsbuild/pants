@@ -1,8 +1,9 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 from dataclasses import dataclass
-from typing import Tuple, cast
+from typing import Tuple, cast, Optional
 
 from packaging.specifiers import SpecifierSet
 from pkg_resources import Requirement
@@ -37,6 +38,9 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass(frozen=True)
 class IsortFieldSet(FieldSet):
     required_fields = (PythonSources,)
@@ -60,27 +64,45 @@ class Setup:
     original_digest: Digest
 
 
-def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool) -> Tuple[str, ...]:
-    # NB: isort auto-discovers config files in versions <5. Only isort>=5 we need to hardcode them via command line
-    # flags.
-    args = []
+def is_old_isort_version(version: Optional[str]) -> bool:
+    if version is None:
+        return False
 
-    old_releases = (  # Should this be a top level constant?
+    requirement = Requirement.parse(version)
+    specifier = cast(SpecifierSet, requirement.specifier)
+
+    old_releases = (
         *[f'4.3.{i}' for i in range(22)],
         *[f'4.2.{i}' for i in range(16)],
         *[f'4.1.{i}' for i in range(3)],
         '4.0.0',
     )
+    old_releases_match = any(old_release in specifier for old_release in old_releases)
+    if not old_releases_match:
+        return False  # if no old release matches, the version must be new
+
+    # if old releases match, the version may still be >=5 (e.g. isort!=5.0.0 or simply isort)
+    new_releases_match = any(  # This will match as soon as a new version matches
+        f'{major}.{minor}.{patch}' in specifier
+        for major in range(5, 10)
+        for minor in range(20)
+        for patch in range(50))
+    return not new_releases_match
+
+
+def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool) -> Tuple[str, ...]:
+    # NB: isort auto-discovers config files in versions <5. Only for isort>=5 we need to hardcode them via command line
+    # flags.
+    args = []
 
     if isort.config:
         # We don't really expect users of isort<4
-        if isort.version is not None:
-            args.append(f"--settings-path={isort.config[0]}")  # TODO: which one to pick?
-        else:
-            requirement = Requirement.parse(isort.version)
-            specifier = cast(SpecifierSet, requirement.specifier)
-            if not list(specifier.filter(old_releases)):  # if isort>=5
-                args.append(f"--settings-path={isort.config[0]}")
+        if len(isort.config) >= 2:
+            logger.warning(
+                'Found more than one config file for isort, taking the first one (%s) since isort only allows for a'
+                'single config file. For more, customization, set [isort].args.', isort.config[0])
+        if isort.version is None or not is_old_isort_version(isort.version):  # isort>=5
+            args.append(f"--settings-path={isort.config[0]}")
     if check_only:
         args.append("--check-only")
     args.extend(isort.args)
