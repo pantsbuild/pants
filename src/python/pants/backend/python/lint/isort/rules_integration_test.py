@@ -138,11 +138,14 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is True
 
 
-@pytest.mark.parametrize('config_path', ['.isort.cfg', 'build-support/.isort.cfg'])
+@pytest.mark.parametrize("config_path", [".isort.cfg", "build-support/.isort.cfg"])
 def test_respects_config_file(rule_runner: RuleRunner, config_path: str) -> None:
     target = make_target(rule_runner, [NEEDS_CONFIG_SOURCE])
     lint_results, fmt_result = run_isort(
-        rule_runner, [target], config="[settings]\ncombine_as_imports=True\n", config_path=config_path
+        rule_runner,
+        [target],
+        config="[settings]\ncombine_as_imports=True\n",
+        config_path=config_path,
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
