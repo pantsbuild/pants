@@ -3,7 +3,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Tuple, cast, Optional
+from typing import Optional, Tuple, cast
 
 from packaging.specifiers import SpecifierSet
 from pkg_resources import Requirement
@@ -36,7 +36,6 @@ from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
-
 
 logger = logging.getLogger(__name__)
 
@@ -72,10 +71,10 @@ def is_old_isort_version(version: Optional[str]) -> bool:
     specifier = cast(SpecifierSet, requirement.specifier)
 
     old_releases = (
-        *[f'4.3.{i}' for i in range(22)],
-        *[f'4.2.{i}' for i in range(16)],
-        *[f'4.1.{i}' for i in range(3)],
-        '4.0.0',
+        *[f"4.3.{i}" for i in range(22)],
+        *[f"4.2.{i}" for i in range(16)],
+        *[f"4.1.{i}" for i in range(3)],
+        "4.0.0",
     )
     old_releases_match = any(old_release in specifier for old_release in old_releases)
     if not old_releases_match:
@@ -83,10 +82,11 @@ def is_old_isort_version(version: Optional[str]) -> bool:
 
     # if old releases match, the version may still be >=5 (e.g. isort!=5.0.0 or simply isort)
     new_releases_match = any(  # This will match as soon as a new version matches
-        f'{major}.{minor}.{patch}' in specifier
+        f"{major}.{minor}.{patch}" in specifier
         for major in range(5, 10)
         for minor in range(20)
-        for patch in range(50))
+        for patch in range(50)
+    )
     return not new_releases_match
 
 
@@ -99,8 +99,10 @@ def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool) 
         # We don't really expect users of isort<4
         if len(isort.config) >= 2:
             logger.warning(
-                'Found more than one config file for isort, taking the first one (%s) since isort only allows for a'
-                'single config file. For more, customization, set [isort].args.', isort.config[0])
+                "Found more than one config file for isort, taking the first one (%s) since isort only allows for a"
+                "single config file. For more, customization, set [isort].args.",
+                isort.config[0],
+            )
         if isort.version is None or not is_old_isort_version(isort.version):  # isort>=5
             args.append(f"--settings-path={isort.config[0]}")
     if check_only:

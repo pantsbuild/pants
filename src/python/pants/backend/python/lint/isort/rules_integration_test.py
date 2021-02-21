@@ -58,7 +58,7 @@ def run_isort(
     passthrough_args: Optional[str] = None,
     skip: bool = False,
     version: str = "isort",
-    config_path: str = ""
+    config_path: str = "",
 ) -> Tuple[Sequence[LintResult], FmtResult]:
     args = ["--backend-packages=pants.backend.python.lint.isort"]
     if config is not None:
@@ -196,22 +196,22 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
 
 def test_is_old_isort_version() -> None:
     assert not is_old_isort_version(None)
-    assert not is_old_isort_version('isort')
-    assert not is_old_isort_version('isort==6.7.8')
-    assert not is_old_isort_version('isort==5.7.0')
-    assert not is_old_isort_version('isort==5.6.*')
-    assert not is_old_isort_version('isort~=5.6.1')
-    assert not is_old_isort_version('isort==5.0.0')
-    assert not is_old_isort_version('isort~=5.0')
-    assert not is_old_isort_version('isort>5.6.1')
-    assert not is_old_isort_version('isort>5.6.1,<5.7.0')
-    assert not is_old_isort_version('isort>=5.0.0')
-    assert not is_old_isort_version('isort!=5.0.0')
-    assert not is_old_isort_version('isort!=5.6.1')
-    assert not is_old_isort_version('isort!=4.3.7')
-    assert is_old_isort_version('isort==4.3.21')
-    assert is_old_isort_version('isort==4.3.7')
-    assert is_old_isort_version('isort<=4.3.21')
-    assert is_old_isort_version('isort~=4.3.0')
-    assert is_old_isort_version('isort==4.3.*')
-    assert is_old_isort_version('isort<=4.3.21,>4.0.0')
+    assert not is_old_isort_version("isort")
+    assert not is_old_isort_version("isort==6.7.8")
+    assert not is_old_isort_version("isort==5.7.0")
+    assert not is_old_isort_version("isort==5.6.*")
+    assert not is_old_isort_version("isort~=5.6.1")
+    assert not is_old_isort_version("isort==5.0.0")
+    assert not is_old_isort_version("isort~=5.0")
+    assert not is_old_isort_version("isort>5.6.1")
+    assert not is_old_isort_version("isort>5.6.1,<5.7.0")
+    assert not is_old_isort_version("isort>=5.0.0")
+    assert not is_old_isort_version("isort!=5.0.0")
+    assert not is_old_isort_version("isort!=5.6.1")
+    assert not is_old_isort_version("isort!=4.3.7")
+    assert is_old_isort_version("isort==4.3.21")
+    assert is_old_isort_version("isort==4.3.7")
+    assert is_old_isort_version("isort<=4.3.21")
+    assert is_old_isort_version("isort~=4.3.0")
+    assert is_old_isort_version("isort==4.3.*")
+    assert is_old_isort_version("isort<=4.3.21,>4.0.0")
