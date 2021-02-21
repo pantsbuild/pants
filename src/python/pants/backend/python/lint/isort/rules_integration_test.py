@@ -57,13 +57,12 @@ def run_isort(
     config: Optional[str] = None,
     passthrough_args: Optional[str] = None,
     skip: bool = False,
-    version: str = "isort",
-    config_path: str = "",
+    config_path: str = ".isort.cfg",
 ) -> Tuple[Sequence[LintResult], FmtResult]:
     args = ["--backend-packages=pants.backend.python.lint.isort"]
     if config is not None:
-        rule_runner.create_file(relpath=".isort.cfg", contents=config)
-        args.append("--isort-config=.isort.cfg")
+        rule_runner.create_file(relpath=config_path, contents=config)
+        args.append(f"--isort-config={config_path}")
     if passthrough_args:
         args.append(f"--isort-args='{passthrough_args}'")
     if skip:
@@ -139,10 +138,11 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is True
 
 
-def test_respects_config_file(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize('config_path', ['.isort.cfg', 'build-support/.isort.cfg'])
+def test_respects_config_file(rule_runner: RuleRunner, config_path: str) -> None:
     target = make_target(rule_runner, [NEEDS_CONFIG_SOURCE])
     lint_results, fmt_result = run_isort(
-        rule_runner, [target], config="[settings]\ncombine_as_imports=True\n"
+        rule_runner, [target], config="[settings]\ncombine_as_imports=True\n", config_path=config_path
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
