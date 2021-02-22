@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple, cast
 
-from packaging.specifiers import SpecifierSet
+from packaging.requirements import Requirement as PackagingRequirement
 from pkg_resources import Requirement
 
 from pants.backend.python.lint.isort.subsystem import Isort
@@ -67,8 +67,8 @@ def is_old_isort_version(version: Optional[str]) -> bool:
     if version is None:
         return False
 
-    requirement = Requirement.parse(version)
-    specifier = cast(SpecifierSet, requirement.specifier)
+    requirement = cast(PackagingRequirement, Requirement.parse(version))
+    specifier = requirement.specifier
 
     old_releases = (
         *[f"4.3.{i}" for i in range(22)],
