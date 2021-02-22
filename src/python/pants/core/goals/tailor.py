@@ -197,6 +197,8 @@ class TailorSubsystem(GoalSubsystem):
     name = "tailor"
     help = "Auto-generate BUILD file targets for new source files."
 
+    required_union_implementations = (PutativeTargetsRequest,)
+
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
