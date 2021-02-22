@@ -10,14 +10,21 @@ from typing import Dict, Iterable, Optional
 
 import pytest
 from pex.interpreter import PythonInterpreter
-from pex.resolver import Unsatisfiable
 from pkg_resources import Requirement, WorkingSet
 
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex import (
+    Pex,
+    PexInterpreterConstraints,
+    PexProcess,
+    PexRequest,
+    PexRequirements,
+)
 from pants.core.util_rules import archive, external_tool
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
+from pants.init.options_initializer import create_bootstrap_scheduler
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.python_interpreter_selection import (
@@ -116,7 +123,7 @@ def plugin_resolution(
         if plugins:
             repo_dir = os.path.join(root_dir, "repo")
             env.update(
-                PANTS_PYTHON_REPOS_REPOS=f"[{repo_dir!r}]",
+                PANTS_PYTHON_REPOS_REPOS=f"['file://{repo_dir}']",
                 PANTS_PYTHON_REPOS_INDEXES="[]",
                 PANTS_PYTHON_SETUP_RESOLVER_CACHE_TTL="1",
             )
@@ -137,21 +144,30 @@ def plugin_resolution(
             touch(configpath)
         args = [f"--pants-config-files=['{configpath}']"]
 
-        options_bootstrapper = OptionsBootstrapper.create(env=env, args=args, allow_pantsrc=False)
-        plugin_resolver = PluginResolver(options_bootstrapper, interpreter=interpreter)
-        cache_dir = plugin_resolver.plugin_cache_dir
+        interpreter_constraints = (
+            PexInterpreterConstraints([f"=={interpreter.identity.version_str}"])
+            if interpreter
+            else None
+        )
 
-        working_set = plugin_resolver.resolve(WorkingSet(entries=[]))
+        options_bootstrapper = OptionsBootstrapper.create(env=env, args=args, allow_pantsrc=False)
+        bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper)
+        plugin_resolver = PluginResolver(
+            bootstrap_scheduler, interpreter_constraints=interpreter_constraints
+        )
+        cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
+
+        working_set = plugin_resolver.resolve(options_bootstrapper, WorkingSet(entries=[]))
         for dist in working_set:
             assert (
                 Path(os.path.realpath(cache_dir)) in Path(os.path.realpath(dist.location)).parents
             )
 
-        yield working_set, root_dir, repo_dir, cache_dir
+        yield working_set, root_dir, repo_dir
 
 
 def test_no_plugins(rule_runner: RuleRunner) -> None:
-    with plugin_resolution(rule_runner) as (working_set, _, _, _):
+    with plugin_resolution(rule_runner) as (working_set, _, _):
         assert [] == list(working_set)
 
 
@@ -168,14 +184,11 @@ def _do_test_plugins(rule_runner: RuleRunner, sdist: bool) -> None:
         working_set,
         _,
         _,
-        cache_dir,
     ):
 
         def assert_dist_version(name, expected_version):
             dist = working_set.find(Requirement.parse(name))
             assert expected_version == dist.version
-
-        assert 2 == len(working_set.entries)
 
         assert_dist_version(name="jake", expected_version="1.2.3")
         assert_dist_version(name="jane", expected_version=DEFAULT_VERSION)
@@ -193,7 +206,7 @@ def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
     with plugin_resolution(
         rule_runner, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")], sdist=sdist
     ) as results:
-        working_set, chroot, repo_dir, cache_dir = results
+        working_set, chroot, repo_dir = results
 
         # Kill the repo source dir and re-resolve.  If the PluginResolver truly detects exact
         # requirements it should skip any resolves and load directly from the still intact
@@ -204,7 +217,7 @@ def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
             rule_runner, chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
         ) as results2:
 
-            working_set2, _, _, _ = results2
+            working_set2, _, _ = results2
 
             assert list(working_set) == list(working_set2)
 
@@ -230,10 +243,10 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
         sdist=sdist,
     ) as results:
 
-        working_set, chroot, repo_dir, cache_dir = results
+        working_set, chroot, repo_dir = results
 
         safe_rmtree(repo_dir)
-        with pytest.raises(Unsatisfiable):
+        with pytest.raises(ExecutionError):
             with plugin_resolution(
                 rule_runner,
                 interpreter=python37,
@@ -254,31 +267,5 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
             plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
         ) as results2:
 
-            working_set2, _, _, _ = results2
+            working_set2, _, _ = results2
             assert list(working_set) == list(working_set2)
-
-
-def test_inexact_requirements_sdist(rule_runner: RuleRunner) -> None:
-    _do_test_inexact_requirements(rule_runner, True)
-
-
-def test_inexact_requirements_bdist(rule_runner: RuleRunner) -> None:
-    _do_test_inexact_requirements(rule_runner, False)
-
-
-def _do_test_inexact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
-    with plugin_resolution(
-        rule_runner, plugins=[("jake", "1.2.3"), "jane"], sdist=sdist
-    ) as results:
-
-        working_set, chroot, repo_dir, cache_dir = results
-
-        # Kill the cache and the repo source dir and wait past our 1s test TTL, if the PluginResolver
-        # truly detects inexact plugin requirements it should skip perma-caching and fall through to
-        # a pex resolve and then fail.
-        safe_rmtree(repo_dir)
-        safe_rmtree(cache_dir)
-
-        with pytest.raises(Unsatisfiable):
-            with plugin_resolution(rule_runner, chroot=chroot, plugins=[("jake", "1.2.3"), "jane"]):
-                pytest.fail("Should not reach here, should raise first.")

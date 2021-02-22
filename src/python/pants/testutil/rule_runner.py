@@ -35,7 +35,6 @@ from pants.engine.rules import Rule
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import ExecutionOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
@@ -115,7 +114,7 @@ class RuleRunner:
         self.build_config = build_config_builder.create()
 
         options_bootstrapper = create_options_bootstrapper()
-        options = OptionsInitializer.create(options_bootstrapper, self.build_config)
+        options = options_bootstrapper.full_options(self.build_config)
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         local_store_dir = (
             os.path.realpath(safe_mkdtemp())
@@ -126,7 +125,7 @@ class RuleRunner:
         named_caches_dir = global_options.named_caches_dir
 
         graph_session = EngineInitializer.setup_graph_extended(
-            pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
+            pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
                 self.build_root, global_options
             ),
             use_gitignore=False,
@@ -190,7 +189,7 @@ class RuleRunner:
         self.set_options(merged_args, env=env)
         options_bootstrapper = create_options_bootstrapper(args=merged_args, env=env)
 
-        raw_specs = options_bootstrapper.get_full_options(
+        raw_specs = options_bootstrapper.full_options_for_scopes(
             [*GlobalOptions.known_scope_infos(), *goal.subsystem_cls.known_scope_infos()]
         ).specs
         specs = SpecsParser(self.build_root).parse_specs(raw_specs)

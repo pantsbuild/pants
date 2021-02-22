@@ -12,8 +12,8 @@ from typing import List, Mapping
 from pants.base.exiter import ExitCode
 from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
-from pants.init.options_initializer import OptionsInitializer
 from pants.nailgun.nailgun_protocol import NailgunProtocol
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
 
@@ -103,7 +103,7 @@ class RemotePantsRunner:
         native = Native()
 
         global_options = self._bootstrap_options.for_global_scope()
-        executor = PyExecutor(*OptionsInitializer.compute_executor_arguments(global_options))
+        executor = PyExecutor(*GlobalOptions.compute_executor_arguments(global_options))
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
         ng_env = NailgunProtocol.ttynames_to_env(sys.stdin, sys.stdout.buffer, sys.stderr.buffer)

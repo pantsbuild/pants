@@ -20,8 +20,8 @@ from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import setup_logging, setup_logging_to_file
-from pants.init.options_initializer import OptionsInitializer
 from pants.init.util import init_workdir
+from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -58,10 +58,8 @@ class PantsDaemon(PantsDaemonProcessManager):
         native = Native()
         native.override_thread_logging_destination_to_just_pantsd()
 
-        executor = PyExecutor(
-            *OptionsInitializer.compute_executor_arguments(bootstrap_options_values)
-        )
-        core = PantsDaemonCore(executor, cls._setup_services)
+        executor = PyExecutor(*GlobalOptions.compute_executor_arguments(bootstrap_options_values))
+        core = PantsDaemonCore(options_bootstrapper, executor, cls._setup_services)
 
         server = native.new_nailgun_server(
             executor,
@@ -90,7 +88,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         """
         build_root = get_buildroot()
 
-        invalidation_globs = OptionsInitializer.compute_pantsd_invalidation_globs(
+        invalidation_globs = GlobalOptions.compute_pantsd_invalidation_globs(
             build_root,
             bootstrap_options,
         )

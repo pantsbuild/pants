@@ -493,7 +493,7 @@ py_class!(class PyTypes |py| {
 py_class!(pub class PyExecutor |py| {
     data executor: Executor;
     def __new__(_cls, core_threads: usize, max_threads: usize) -> CPyResult<Self> {
-      let executor = Executor::new_owned(core_threads, max_threads).map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+      let executor = Executor::global(core_threads, max_threads).map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
       Self::create_instance(py, executor)
     }
 });

@@ -108,6 +108,8 @@ class Process:
             result = await Get(ProcessResult, Process(["/bin/echo", "hello world"], description="demo"))
             assert result.stdout == b"hello world"
         """
+        if isinstance(argv, str):
+            raise ValueError("argv must be a sequence of strings, but was a single string.")
         self.argv = tuple(argv)
         self.description = description
         self.level = level

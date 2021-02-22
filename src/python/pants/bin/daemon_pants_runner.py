@@ -19,7 +19,6 @@ from pants.init.logging import (
     set_logging_handlers,
     setup_logging,
 )
-from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.util.contextutil import argv_as, hermetic_environment_as, stdio_as
@@ -144,7 +143,6 @@ class DaemonPantsRunner(RawFdRunner):
         # of a local run: once we allow for concurrent runs, this information should be
         # propagated down from the caller.
         #   see https://github.com/pantsbuild/pants/issues/7654
-        BuildConfigInitializer.reset()
         options_bootstrapper = OptionsBootstrapper.create(
             env=os.environ, args=sys.argv, allow_pantsrc=True
         )
@@ -153,11 +151,12 @@ class DaemonPantsRunner(RawFdRunner):
         # Run using the pre-warmed Session.
         with self._stderr_logging(global_bootstrap_options):
             try:
-                scheduler = self._core.prepare_scheduler(options_bootstrapper)
+                scheduler, options_initializer = self._core.prepare(options_bootstrapper)
                 runner = LocalPantsRunner.create(
                     os.environ,
                     options_bootstrapper,
                     scheduler=scheduler,
+                    options_initializer=options_initializer,
                     cancellation_latch=cancellation_latch,
                 )
                 return runner.run(start_time)

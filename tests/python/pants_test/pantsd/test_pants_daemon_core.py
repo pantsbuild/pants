@@ -12,8 +12,13 @@ def test_prepare_scheduler():
     def create_services(bootstrap_options, legacy_graph_scheduler):
         return PantsServices()
 
-    core = PantsDaemonCore(PyExecutor(2, 4), create_services)
+    core = PantsDaemonCore(create_options_bootstrapper([]), PyExecutor(2, 4), create_services)
 
-    first_scheduler = core.prepare_scheduler(create_options_bootstrapper(["-ldebug"]))
-    second_scheduler = core.prepare_scheduler(create_options_bootstrapper(["-lwarn"]))
+    first_scheduler, first_options_initializer = core.prepare(
+        create_options_bootstrapper(["-ldebug"])
+    )
+    second_scheduler, second_options_initializer = core.prepare(
+        create_options_bootstrapper(["-lwarn"])
+    )
     assert first_scheduler is not second_scheduler
+    assert first_options_initializer is second_options_initializer

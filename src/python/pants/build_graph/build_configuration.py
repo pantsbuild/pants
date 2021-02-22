@@ -43,6 +43,7 @@ class BuildConfiguration:
     rules: FrozenOrderedSet[Rule]
     union_rules: FrozenOrderedSet[UnionRule]
     target_types: FrozenOrderedSet[Type[Target]]
+    allow_unknown_options: bool
 
     @property
     def all_optionables(self) -> FrozenOrderedSet[Type[Optionable]]:
@@ -93,6 +94,7 @@ class BuildConfiguration:
         _rules: OrderedSet = field(default_factory=OrderedSet)
         _union_rules: OrderedSet = field(default_factory=OrderedSet)
         _target_types: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
+        _allow_unknown_options: bool = False
 
         def registered_aliases(self) -> BuildFileAliases:
             """Return the registered aliases exposed in BUILD files.
@@ -217,6 +219,14 @@ class BuildConfiguration:
                 )
             self._target_types.update(target_types)
 
+        def allow_unknown_options(self, allow: bool = True) -> None:
+            """Allows overriding whether Options parsing will fail for unrecognized Options.
+
+            Used to defer options failures while bootstrapping BuildConfiguration until after the
+            complete set of plugins is known.
+            """
+            self._allow_unknown_options = True
+
         def create(self) -> BuildConfiguration:
             registered_aliases = BuildFileAliases(
                 objects=self._exposed_object_by_alias.copy(),
@@ -228,4 +238,5 @@ class BuildConfiguration:
                 rules=FrozenOrderedSet(self._rules),
                 union_rules=FrozenOrderedSet(self._union_rules),
                 target_types=FrozenOrderedSet(self._target_types),
+                allow_unknown_options=self._allow_unknown_options,
             )
