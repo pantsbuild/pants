@@ -760,6 +760,32 @@ def wrap_venv_prex_request(pex_request: PexRequest) -> VenvPexRequest:
 async def create_venv_pex(
     request: VenvPexRequest, bash: BashBinary, pex_environment: PexEnvironment
 ) -> VenvPex:
+    # VenvPex is motivated by improving performance of Python tools by eliminating traditional PEX
+    # file startup overhead.
+    #
+    # To achieve the minimal overhead (on the order of 1ms) we discard:
+    # 1. Using Pex `--unzip` mode:
+    #    Although this does reduce steady-state overhead, it still leaves a minimum O(100ms) of
+    #    overhead per tool invocation. Fundamentally, Pex still needs to execute its `sys.path`
+    #    isolation bootstrap code in this case.
+    # 2. Using the Pex `venv` tool:
+    #    The idea here would be to create a tool venv as a Process output and then use the tool
+    #    venv as an input digest for all tool invocations. This was tried and netted ~500ms of
+    #    overhead over raw venv use.
+    #
+    # Instead we use Pex's `--venv` mode. In this mode you can run the Pex file and it will create a
+    # venv on the fly in the PEX_ROOT as needed. Since the PEX_ROOT is a named_cache, we avoid the
+    # digest materialization overhead present in 2 above. Since the venv is naturally isolated we
+    # avoid the `sys.path` isolation overhead of Pex itself present in 1 above.
+    #
+    # This does leave O(50ms) of overhead though for the PEX bootstrap code to detect an already
+    # created venv in the PEX_ROOT and re-exec into it. To eliminate this overhead we execute the
+    # `pex` venv script in the PEX_ROOT directly. This is not robust on its own though, since the
+    # named caches store might be pruned at any time. To guard against that case we introduce a shim
+    # bash script that checks to see if the `pex` venv script exists in the PEX_ROOT and re-creates
+    # the PEX_ROOT venv if not. Using the shim script to run Python tools gets us down to the ~1ms
+    # of overhead we currently enjoy.
+
     pex_request = request.pex_request
     seeded_venv_request = dataclasses.replace(
         pex_request, additional_args=pex_request.additional_args + ("--venv", "--seed")
