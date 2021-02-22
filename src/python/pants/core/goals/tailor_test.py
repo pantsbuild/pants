@@ -7,6 +7,7 @@ import pytest
 
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
+    AllOwnedSources,
     DisjointSourcePutativeTarget,
     EditBuildFilesRequest,
     EditedBuildFiles,
@@ -16,6 +17,7 @@ from pants.core.goals.tailor import (
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
     default_sources_for_target_type,
+    group_by_dir,
     make_content_str,
 )
 from pants.core.util_rules import source_files
@@ -62,6 +64,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(UniquelyNamedPutativeTargets, (PutativeTargets,)),
             QueryRule(DisjointSourcePutativeTarget, (PutativeTarget,)),
             QueryRule(EditedBuildFiles, (EditBuildFilesRequest,)),
+            QueryRule(AllOwnedSources, ()),
         ],
         target_types=[FortranLibrary, FortranTests],
     )
@@ -239,6 +242,26 @@ def test_edit_build_files(rule_runner: RuleRunner) -> None:
         assert efc.is_executable == afc.is_executable
 
 
+def test_group_by_dir() -> None:
+    paths = {
+        "foo/bar/baz1.ext",
+        "foo/bar/baz1_test.ext",
+        "foo/bar/qux/quux1.ext",
+        "foo/__init__.ext",
+        "foo/bar/__init__.ext",
+        "foo/bar/baz2.ext",
+        "foo/bar1.ext",
+        "foo1.ext",
+        "__init__.ext",
+    }
+    assert {
+        "": {"__init__.ext", "foo1.ext"},
+        "foo": {"__init__.ext", "bar1.ext"},
+        "foo/bar": {"__init__.ext", "baz1.ext", "baz1_test.ext", "baz2.ext"},
+        "foo/bar/qux": {"quux1.ext"},
+    } == group_by_dir(paths)
+
+
 def test_tailor_rule(rule_runner: RuleRunner) -> None:
     console = MockConsole(use_colors=False)
     workspace = Workspace(rule_runner.scheduler)
@@ -323,3 +346,19 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
         "Updated src/fortran/conflict/BUILD:\n  - Added fortran_library target "
         "src/fortran/conflict:conflict0"
     ) in stdout_str
+
+
+def test_all_owned_sources(rule_runner: RuleRunner) -> None:
+    for path in [
+        "dir/a.f90",
+        "dir/b.f90",
+        "dir/a_test.f90",
+        "dir/unowned.txt",
+        "unowned.txt",
+        "unowned.f90",
+    ]:
+        rule_runner.create_file(path)
+    rule_runner.add_to_build_file("dir", "fortran_library()\nfortran_tests(name='tests')")
+    assert rule_runner.request(AllOwnedSources, []) == AllOwnedSources(
+        ["dir/a.f90", "dir/b.f90", "dir/a_test.f90"]
+    )
