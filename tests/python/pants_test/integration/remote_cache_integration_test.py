@@ -13,7 +13,6 @@ def test_warns_on_remote_cache_errors():
     builder = PyStubCAS.builder()
     builder.always_errors()
     cas = builder.build(executor)
-    address = cas.address()
 
     pants_run = run_pants(
         [
@@ -28,7 +27,9 @@ def test_warns_on_remote_cache_errors():
             GLOBAL_SCOPE_CONFIG_SECTION: {
                 "remote_cache_read": True,
                 "remote_cache_write": True,
-                "remote_store_server": address,
+                # NB: Our options code expects `grpc://`, which it will then convert back to
+                # `http://` before sending over FFI.
+                "remote_store_address": cas.address().replace("http://", "grpc://"),
             }
         },
     )

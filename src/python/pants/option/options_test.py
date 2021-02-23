@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
 import os
 import shlex
@@ -10,7 +12,7 @@ from collections import defaultdict
 from enum import Enum
 from functools import partial
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, cast
 
 import pytest
 import toml
@@ -180,7 +182,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
 
 class OptionsTest(unittest.TestCase):
     @staticmethod
-    def _create_config(config: Optional[Dict[str, Dict[str, str]]] = None) -> Config:
+    def _create_config(config: dict[str, dict[str, str]] | None = None) -> Config:
         with open(os.path.join(safe_mkdtemp(), "test_config.toml"), "w") as fp:
             toml.dump(config or {}, fp)
         return Config.load(config_paths=[fp.name])
@@ -189,8 +191,8 @@ class OptionsTest(unittest.TestCase):
         self,
         *,
         flags: str = "",
-        env: Optional[Dict[str, str]] = None,
-        config: Optional[Dict[str, Dict[str, Any]]] = None,
+        env: dict[str, str] | None = None,
+        config: dict[str, dict[str, Any]] | None = None,
         bootstrap_option_values=None,
     ) -> Options:
         args = ["./pants", *shlex.split(flags)]
@@ -593,8 +595,8 @@ class OptionsTest(unittest.TestCase):
             *,
             expected: List[int],
             flags: str = "",
-            env_val: Optional[str] = None,
-            config_val: Optional[str] = None,
+            env_val: str | None = None,
+            config_val: str | None = None,
         ) -> None:
             env = {"PANTS_GLOBAL_LISTY": env_val} if env_val else None
             config = {"GLOBAL": {"listy": config_val}} if config_val else None
@@ -691,8 +693,8 @@ class OptionsTest(unittest.TestCase):
             *,
             expected: List[Dict[str, int]],
             flags: str = "",
-            env_val: Optional[str] = None,
-            config_val: Optional[str] = None,
+            env_val: str | None = None,
+            config_val: str | None = None,
         ) -> None:
             env = {"PANTS_GLOBAL_DICT_LISTY": env_val} if env_val else None
             config = {"GLOBAL": {"dict_listy": config_val}} if config_val else None
@@ -730,8 +732,8 @@ class OptionsTest(unittest.TestCase):
             *,
             expected: List[str],
             flags: str = "",
-            env_val: Optional[str] = None,
-            config_val: Optional[str] = None,
+            env_val: str | None = None,
+            config_val: str | None = None,
         ) -> None:
             env = {"PANTS_GLOBAL_TARGET_LISTY": env_val} if env_val else None
             config = {"GLOBAL": {"target_listy": config_val}} if config_val else None
@@ -761,8 +763,8 @@ class OptionsTest(unittest.TestCase):
             *,
             expected: List[str],
             flags: str = "",
-            env_val: Optional[str] = None,
-            config_val: Optional[str] = None,
+            env_val: str | None = None,
+            config_val: str | None = None,
         ) -> None:
             env = {"PANTS_GLOBAL_SHELL_STR_LISTY": env_val} if env_val else None
             config = {"GLOBAL": {"shell_str_listy": config_val}} if config_val else None
@@ -794,7 +796,7 @@ class OptionsTest(unittest.TestCase):
             *,
             expected: Dict[str, str],
             flags: str = "",
-            config_val: Optional[str] = None,
+            config_val: str | None = None,
         ) -> None:
             config = {"GLOBAL": {"dicty": config_val}} if config_val else None
             global_options = self._parse(flags=flags, config=config).for_global_scope()
@@ -1131,10 +1133,10 @@ class OptionsTest(unittest.TestCase):
             *,
             flags: str = "",
             option: str,
-            expected: Union[str, bool],
-            scope: Optional[str] = None,
-            env: Optional[Dict[str, str]] = None,
-            config: Optional[Dict[str, Dict[str, str]]] = None,
+            expected: str | bool,
+            scope: str | None = None,
+            env: dict[str, str] | None = None,
+            config: dict[str, dict[str, str]] | None = None,
         ) -> None:
             warnings.simplefilter("always")
             with pytest.warns(DeprecationWarning) as record:
@@ -1236,9 +1238,9 @@ class OptionsTest(unittest.TestCase):
         def assert_mutually_exclusive_raised(
             *,
             flags: str,
-            scope: Optional[str] = None,
-            env: Optional[Dict[str, str]] = None,
-            config: Optional[Dict[str, Dict[str, str]]] = None,
+            scope: str | None = None,
+            env: dict[str, str] | None = None,
+            config: dict[str, dict[str, str]] | None = None,
         ) -> None:
             with self.assertRaises(MutuallyExclusiveOptionError):
                 options = self._parse(flags=flags, env=env, config=config)
@@ -1294,9 +1296,9 @@ class OptionsTest(unittest.TestCase):
             *,
             flags: str = "",
             other_option: str,
-            scope: Optional[str] = None,
-            env: Optional[Dict[str, str]] = None,
-            config: Optional[Dict[str, Dict[str, str]]] = None,
+            scope: str | None = None,
+            env: dict[str, str] | None = None,
+            config: dict[str, dict[str, str]] | None = None,
         ) -> None:
             options = self._parse(flags=flags, env=env, config=config)
             scoped_options = options.for_global_scope() if not scope else options.for_scope(scope)

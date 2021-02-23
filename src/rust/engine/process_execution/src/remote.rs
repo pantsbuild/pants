@@ -148,11 +148,7 @@ impl CommandRunner {
 
     let endpoint = grpc_util::create_endpoint(
       &address,
-      if execution_use_tls {
-        tls_client_config.as_ref()
-      } else {
-        None
-      },
+      tls_client_config.as_ref().filter(|_| execution_use_tls),
     )?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let execution_client = Arc::new(match interceptor.as_ref() {
@@ -165,11 +161,7 @@ impl CommandRunner {
       .map(|addr| {
         grpc_util::create_endpoint(
           addr.as_str(),
-          if store_use_tls {
-            tls_client_config.as_ref()
-          } else {
-            None
-          },
+          tls_client_config.as_ref().filter(|_| store_use_tls),
         )
       })
       .partition_map(|result| match result {

@@ -4,7 +4,6 @@ use std::time::Duration;
 use bytes::Bytes;
 use hashing::Digest;
 use mock::StubCAS;
-use serverset::BackoffConfig;
 use testutil::data::{TestData, TestDirectory};
 
 use crate::remote::ByteStore;
@@ -156,11 +155,8 @@ async fn write_file_multiple_chunks() {
     None,
     None,
     BTreeMap::new(),
-    1,
     10 * 1024,
     Duration::from_secs(5),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap();
@@ -231,15 +227,12 @@ async fn write_file_errors() {
 #[tokio::test]
 async fn write_connection_error() {
   let store = ByteStore::new(
-    vec![String::from("doesnotexist.example")],
+    vec![String::from("http://doesnotexist.example")],
     None,
     None,
     BTreeMap::new(),
-    1,
     10 * 1024 * 1024,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap();
@@ -322,12 +315,9 @@ async fn reads_from_multiple_cas_servers() {
     None,
     None,
     BTreeMap::new(),
-    1,
     10 * 1024 * 1024,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
-    2,
   )
   .unwrap();
 
@@ -351,11 +341,8 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
     None,
     None,
     BTreeMap::new(),
-    1,
     10 * MEGABYTES,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap()

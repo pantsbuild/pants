@@ -75,14 +75,9 @@ pub struct RemotingOptions {
   pub instance_name: Option<String>,
   pub root_ca_certs_path: Option<PathBuf>,
   pub store_headers: BTreeMap<String, String>,
-  pub store_thread_count: usize,
   pub store_chunk_bytes: usize,
   pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
-  pub store_connection_limit: usize,
-  pub store_initial_timeout: Duration,
-  pub store_timeout_multiplier: f64,
-  pub store_maximum_timeout: Duration,
   pub cache_eager_fetch: bool,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
@@ -110,11 +105,6 @@ impl Core {
     root_ca_certs: &Option<Vec<u8>>,
   ) -> Result<Store, String> {
     if enable_remote {
-      let backoff_config = store::BackoffConfig::new(
-        remoting_opts.store_initial_timeout,
-        remoting_opts.store_timeout_multiplier,
-        remoting_opts.store_maximum_timeout,
-      )?;
       Store::with_remote(
         executor.clone(),
         local_store_dir,
@@ -122,12 +112,9 @@ impl Core {
         remoting_opts.instance_name.clone(),
         root_ca_certs.clone(),
         remoting_opts.store_headers.clone(),
-        remoting_opts.store_thread_count,
         remoting_opts.store_chunk_bytes,
         remoting_opts.store_chunk_upload_timeout,
-        backoff_config,
         remoting_opts.store_rpc_retries,
-        remoting_opts.store_connection_limit,
       )
     } else {
       Store::local_only(executor.clone(), local_store_dir.to_path_buf())

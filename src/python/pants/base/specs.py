@@ -7,7 +7,7 @@ import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, Tuple
 
 from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
@@ -256,8 +256,8 @@ class FilesystemIgnoreSpec(FilesystemSpec):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class FilesystemSpecs:
-    includes: Tuple[Union[FilesystemLiteralSpec, FilesystemGlobSpec], ...]
-    ignores: Tuple[FilesystemIgnoreSpec, ...]
+    includes: tuple[FilesystemLiteralSpec | FilesystemGlobSpec, ...]
+    ignores: tuple[FilesystemIgnoreSpec, ...]
 
     def __init__(self, specs: Iterable[FilesystemSpec]) -> None:
         includes = []
@@ -294,7 +294,7 @@ class FilesystemSpecs:
 
     def path_globs_for_spec(
         self,
-        spec: Union[FilesystemLiteralSpec, FilesystemGlobSpec],
+        spec: FilesystemLiteralSpec | FilesystemGlobSpec,
         glob_match_error_behavior: GlobMatchErrorBehavior,
     ) -> PathGlobs:
         """Generate PathGlobs for the specific spec, automatically including the instance's

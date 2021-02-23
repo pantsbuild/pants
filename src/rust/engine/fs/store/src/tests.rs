@@ -14,7 +14,6 @@ use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use maplit::btreemap;
 use mock::StubCAS;
-use serverset::BackoffConfig;
 
 use crate::{
   DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Store, UploadSummary,
@@ -105,11 +104,8 @@ fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
     None,
     None,
     BTreeMap::new(),
-    1,
     10 * MEGABYTES,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap()
@@ -848,11 +844,8 @@ async fn instance_name_upload() {
     Some("dark-tower".to_owned()),
     None,
     BTreeMap::new(),
-    1,
     10 * MEGABYTES,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap();
@@ -878,11 +871,8 @@ async fn instance_name_download() {
     Some("dark-tower".to_owned()),
     None,
     BTreeMap::new(),
-    1,
     10 * MEGABYTES,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap();
@@ -930,11 +920,8 @@ async fn auth_upload() {
     None,
     None,
     headers,
-    1,
     10 * MEGABYTES,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap();
@@ -962,11 +949,8 @@ async fn auth_download() {
     None,
     None,
     headers,
-    1,
     10 * MEGABYTES,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap();

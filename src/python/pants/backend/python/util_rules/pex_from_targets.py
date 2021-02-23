@@ -7,7 +7,7 @@ import dataclasses
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
@@ -57,18 +57,18 @@ class PexFromTargetsRequest:
     addresses: Addresses
     output_filename: str
     internal_only: bool
-    entry_point: Optional[str]
+    entry_point: str | None
     platforms: PexPlatforms
     additional_args: Tuple[str, ...]
     additional_requirements: Tuple[str, ...]
     include_source_files: bool
-    additional_sources: Optional[Digest]
-    additional_inputs: Optional[Digest]
-    hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints]
+    additional_sources: Digest | None
+    additional_inputs: Digest | None
+    hardcoded_interpreter_constraints: PexInterpreterConstraints | None
     direct_deps_only: bool
     # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
     # the result.
-    description: Optional[str] = dataclasses.field(compare=False)
+    description: str | None = dataclasses.field(compare=False)
 
     def __init__(
         self,
@@ -76,16 +76,16 @@ class PexFromTargetsRequest:
         *,
         output_filename: str,
         internal_only: bool,
-        entry_point: Optional[str] = None,
+        entry_point: str | None = None,
         platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
         additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
-        additional_sources: Optional[Digest] = None,
-        additional_inputs: Optional[Digest] = None,
-        hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints] = None,
+        additional_sources: Digest | None = None,
+        additional_inputs: Digest | None = None,
+        hardcoded_interpreter_constraints: PexInterpreterConstraints | None = None,
         direct_deps_only: bool = False,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> None:
         """Request to create a Pex from the transitive closure of the given addresses.
 
@@ -139,7 +139,7 @@ class PexFromTargetsRequest:
         addresses: Iterable[Address],
         *,
         internal_only: bool,
-        hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints] = None,
+        hardcoded_interpreter_constraints: PexInterpreterConstraints | None = None,
         zip_safe: bool = False,
         direct_deps_only: bool = False,
     ) -> PexFromTargetsRequest:
