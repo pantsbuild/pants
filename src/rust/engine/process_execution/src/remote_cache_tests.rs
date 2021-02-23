@@ -44,7 +44,6 @@ impl MockLocalCommandRunner {
         stderr_digest: EMPTY_DIGEST,
         exit_code,
         output_directory: EMPTY_DIGEST,
-        execution_attempts: vec![],
         platform: Platform::current().unwrap(),
       }),
       call_counter,
@@ -564,7 +563,6 @@ async fn make_action_result_basic() {
     exit_code: 102,
     platform: Platform::Linux,
     output_directory: directory_digest,
-    execution_attempts: Vec::new(),
   };
 
   let (action_result, digests) = runner

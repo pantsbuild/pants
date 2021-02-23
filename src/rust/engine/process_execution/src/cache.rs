@@ -155,7 +155,6 @@ impl CommandRunner {
         crate::remote::populate_fallible_execution_result(
           self.file_store.clone(),
           action_result,
-          vec![],
           platform,
           true,
         )

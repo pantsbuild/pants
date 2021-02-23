@@ -621,7 +621,6 @@ export {}
           stderr_digest,
           exit_code: child_results.exit_code,
           output_directory: output_snapshot.digest,
-          execution_attempts: vec![],
           platform,
         })
       }
@@ -637,7 +636,6 @@ export {}
           stderr_digest: hashing::EMPTY_DIGEST,
           exit_code: -libc::SIGTERM,
           output_directory: hashing::EMPTY_DIGEST,
-          execution_attempts: vec![],
           platform,
         })
       }

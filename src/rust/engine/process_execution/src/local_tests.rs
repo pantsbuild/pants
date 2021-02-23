@@ -41,7 +41,6 @@ async fn stdout() {
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.original.execution_attempts, vec![]);
 }
 
 #[tokio::test]
@@ -61,7 +60,6 @@ async fn stdout_and_stderr_and_exit_code() {
   assert_eq!(result.stderr_bytes, "bar".as_bytes());
   assert_eq!(result.original.exit_code, 1);
   assert_eq!(result.original.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.original.execution_attempts, vec![]);
 }
 
 #[tokio::test]
@@ -161,7 +159,6 @@ async fn output_files_none() {
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.original.execution_attempts, vec![]);
 }
 
 #[tokio::test]
