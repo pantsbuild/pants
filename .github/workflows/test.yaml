@@ -267,7 +267,6 @@ jobs:
             src/python/pants/engine/internals/native_engine.so.metadata
       - name: Test Rust
         run: |
-          echo "XXXXX ${TMPDIR} XXXXX"
           brew install osxfuse
           # We pass --tests to skip doc tests because our generated protos contain invalid
           # doc tests in their comments.
