@@ -42,8 +42,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
-  Process, ProcessCacheScope, ProcessMetadata,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
+  ProcessCacheScope, ProcessMetadata,
 };
 use grpc_util::headers_to_interceptor_fn;
 
@@ -501,7 +501,6 @@ impl CommandRunner {
             populate_fallible_execution_result(
               self.store.clone(),
               action_result,
-              vec![],
               self.platform,
               false,
             )
@@ -735,7 +734,6 @@ impl CommandRunner {
               &process.description,
               process.timeout,
               start_time.elapsed(),
-              Vec::new(),
               self.platform,
             )
             .await;
@@ -1085,7 +1083,6 @@ pub async fn populate_fallible_execution_result_for_timeout(
   description: &str,
   timeout: Option<Duration>,
   elapsed: Duration,
-  execution_attempts: Vec<ExecutionStats>,
   platform: Platform,
 ) -> Result<FallibleProcessResultWithPlatform, String> {
   let timeout_msg = if let Some(timeout) = timeout {
@@ -1101,7 +1098,6 @@ pub async fn populate_fallible_execution_result_for_timeout(
     stderr_digest: hashing::EMPTY_DIGEST,
     exit_code: -libc::SIGTERM,
     output_directory: hashing::EMPTY_DIGEST,
-    execution_attempts,
     platform,
   })
 }
@@ -1116,7 +1112,6 @@ pub async fn populate_fallible_execution_result_for_timeout(
 pub fn populate_fallible_execution_result(
   store: Store,
   action_result: &remexec::ActionResult,
-  execution_attempts: Vec<ExecutionStats>,
   platform: Platform,
   treat_tree_digest_as_final_directory_hack: bool,
 ) -> BoxFuture<Result<FallibleProcessResultWithPlatform, String>> {
@@ -1137,7 +1132,6 @@ pub fn populate_fallible_execution_result(
         stderr_digest,
         exit_code,
         output_directory,
-        execution_attempts,
         platform,
       })
     },
@@ -1391,8 +1385,7 @@ pub async fn check_action_cache(
     Ok(action_result) => {
       let action_result = action_result.into_inner();
       let response =
-        populate_fallible_execution_result(store.clone(), &action_result, vec![], platform, false)
-          .await?;
+        populate_fallible_execution_result(store.clone(), &action_result, platform, false).await?;
       if eager_fetch {
         future::try_join_all(vec![
           store.ensure_local_has_file(response.stdout_digest).boxed(),
