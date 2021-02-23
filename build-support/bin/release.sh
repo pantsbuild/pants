@@ -364,14 +364,11 @@ function build_pex() {
     requirements=("${requirements[@]}" "${pkg_name}==${PANTS_UNSTABLE_VERSION}")
   done
 
-  # Pants depends on twitter.common libraries that trigger pex warnings for not properly declaring
-  # their dependency on setuptools (for namespace package support). To prevent these known warnings
-  # from polluting stderr we pass `--no-emit-warnings`.
   execute_pex \
     -o "${dest}" \
-    --no-emit-warnings \
     --no-strip-pex-env \
     --script=pants \
+    --venv \
     "${distribution_target_flags[@]}" \
     "${requirements[@]}"
 
