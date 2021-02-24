@@ -65,7 +65,17 @@ class HelpPrinter(MaybeColor):
                 )
             )
             if did_you_mean:
-                print(f"Did you mean: {', '.join(self.maybe_cyan(g) for g in did_you_mean)}?")
+                if len(did_you_mean) == 1:
+                    formatted_candidates = self.maybe_cyan(did_you_mean[0])
+                elif len(did_you_mean) == 2:
+                    formatted_candidates = " or ".join(self.maybe_cyan(g) for g in did_you_mean)
+                else:
+                    formatted_candidates = (f"{', '.join(self.maybe_cyan(g) for g in did_you_mean[:-1])}"
+                                            ", or {did_you_mean[-1]}"
+                                            )
+                print(f"Did you mean {formatted_candidates}?")
+
+                #print(f"Did you mean: {', '.join(self.maybe_cyan(g) for g in did_you_mean)}?")
             print_hint()
             return 1
         elif isinstance(self._help_request, NoGoalHelp):
