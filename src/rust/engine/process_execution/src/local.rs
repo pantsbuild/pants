@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
@@ -32,6 +33,7 @@ use workunit_store::Metric;
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
+  ProcessResultMetadata,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -400,6 +402,8 @@ pub trait CapturedWorkdir {
     workdir_base: &Path,
     platform: Platform,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let start_time = Instant::now();
+
     // Set up a temporary workdir, which will optionally be preserved.
     let (workdir_path, maybe_workdir) = {
       let workdir = tempfile::Builder::new()
@@ -565,6 +569,9 @@ pub trait CapturedWorkdir {
       }
     }
 
+    let elapsed = start_time.elapsed();
+    let result_metadata = ProcessResultMetadata::new(Some(elapsed.into()));
+
     match child_results_result {
       Ok(child_results) => {
         let stdout = child_results.stdout;
@@ -579,6 +586,7 @@ pub trait CapturedWorkdir {
           exit_code: child_results.exit_code,
           output_directory: output_snapshot.digest,
           platform,
+          metadata: result_metadata,
         })
       }
       Err(msg) if msg == "deadline has elapsed" => {
@@ -594,6 +602,7 @@ pub trait CapturedWorkdir {
           exit_code: -libc::SIGTERM,
           output_directory: hashing::EMPTY_DIGEST,
           platform,
+          metadata: result_metadata,
         })
       }
       Err(msg) => Err(msg),

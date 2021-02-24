@@ -193,18 +193,20 @@ impl CommandRunner {
     let stdout_digest = result.stdout_digest;
     let stderr_digest = result.stderr_digest;
 
+    let action_result = remexec::ActionResult {
+      exit_code: result.exit_code,
+      output_directories: vec![remexec::OutputDirectory {
+        path: String::new(),
+        tree_digest: Some((&result.output_directory).into()),
+      }],
+      stdout_digest: Some((&stdout_digest).into()),
+      stderr_digest: Some((&stderr_digest).into()),
+      execution_metadata: Some(result.metadata.clone().into()),
+      ..remexec::ActionResult::default()
+    };
     let execute_response = remexec::ExecuteResponse {
       cached_result: true,
-      result: Some(remexec::ActionResult {
-        exit_code: result.exit_code,
-        output_directories: vec![remexec::OutputDirectory {
-          path: String::new(),
-          tree_digest: Some((&result.output_directory).into()),
-        }],
-        stdout_digest: Some((&stdout_digest).into()),
-        stderr_digest: Some((&stderr_digest).into()),
-        ..remexec::ActionResult::default()
-      }),
+      result: Some(action_result),
       ..remexec::ExecuteResponse::default()
     };
 

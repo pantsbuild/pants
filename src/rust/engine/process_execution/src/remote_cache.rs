@@ -273,6 +273,7 @@ impl CommandRunner {
       exit_code: result.exit_code,
       stdout_digest: Some(result.stdout_digest.into()),
       stderr_digest: Some(result.stderr_digest.into()),
+      execution_metadata: Some(result.metadata.clone().into()),
       ..ActionResult::default()
     };
 

@@ -31,7 +31,9 @@
 extern crate derivative;
 
 use async_trait::async_trait;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 pub use log::Level;
+use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
@@ -65,6 +67,7 @@ pub mod named_caches;
 extern crate uname;
 
 pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
+use concrete_time::{Duration, TimeSpan};
 use fs::RelativePath;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -341,13 +344,73 @@ pub struct ProcessMetadata {
 ///
 /// The result of running a process.
 ///
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Derivative, Clone, Debug, Eq)]
+#[derivative(PartialEq, Hash)]
 pub struct FallibleProcessResultWithPlatform {
   pub stdout_digest: Digest,
   pub stderr_digest: Digest,
   pub exit_code: i32,
-  pub platform: Platform,
   pub output_directory: hashing::Digest,
+  pub platform: Platform,
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
+  pub metadata: ProcessResultMetadata,
+}
+
+/// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
+/// conversion is lossy, but the interesting parts are preserved.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProcessResultMetadata {
+  /// The time from starting to completion, including preparing the chroot and cleanup.
+  /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
+  /// `ExecutedActionMetadata`.
+  pub total_elapsed: Option<Duration>,
+}
+
+impl ProcessResultMetadata {
+  pub fn new(total_elapsed: Option<Duration>) -> Self {
+    ProcessResultMetadata { total_elapsed }
+  }
+}
+
+impl From<ExecutedActionMetadata> for ProcessResultMetadata {
+  fn from(metadata: ExecutedActionMetadata) -> Self {
+    let total_elapsed = match (
+      metadata.worker_start_timestamp,
+      metadata.worker_completed_timestamp,
+    ) {
+      (Some(started), Some(completed)) => TimeSpan::from_start_and_end(&started, &completed, "")
+        .map(|span| span.duration)
+        .ok(),
+      _ => None,
+    };
+    Self { total_elapsed }
+  }
+}
+
+impl Into<ExecutedActionMetadata> for ProcessResultMetadata {
+  fn into(self) -> ExecutedActionMetadata {
+    let (total_start, total_end) = match self.total_elapsed {
+      Some(elapsed) => {
+        // Because we do not have the precise start time, we hardcode to starting at UNIX_EPOCH. We
+        // only care about accurately preserving the duration.
+        let start = prost_types::Timestamp {
+          seconds: 0,
+          nanos: 0,
+        };
+        let end = prost_types::Timestamp {
+          seconds: elapsed.secs as i64,
+          nanos: elapsed.nanos as i32,
+        };
+        (Some(start), Some(end))
+      }
+      None => (None, None),
+    };
+    ExecutedActionMetadata {
+      worker_start_timestamp: total_start,
+      worker_completed_timestamp: total_end,
+      ..ExecutedActionMetadata::default()
+    }
+  }
 }
 
 #[derive(Clone)]
