@@ -265,6 +265,15 @@ jobs:
           path: |
             src/python/pants/engine/internals/native_engine.so
             src/python/pants/engine/internals/native_engine.so.metadata
+      - name: osfux
+        run: |
+          brew install osxfuse
+          git clone --recursive https://github.com/netheril96/securefs
+          cd securefs
+          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug ..
+          cd ..
+          cmake --build build
+          cd build && ctest -V
       - name: Test Rust
         run: |
           brew install osxfuse
