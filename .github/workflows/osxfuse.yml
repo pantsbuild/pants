@@ -4,21 +4,12 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [macos-10.15]
-    runs-on: ${{ matrix.os }}
+        fuse-package: [osxfuse, macfuse]
+    runs-on: macos-10.15
     steps:
-    - name: osxfuse
+    - name: ${{ matrix.fuse-package }}
       run: |
-        brew install --cask osxfuse
-        git clone --recursive https://github.com/netheril96/securefs
-        cd securefs
-        mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug ..
-        cd ..
-        cmake --build build
-        cd build && ctest -V
-    - name: macfuse
-      run: |
-        brew install --cask macfuse
+        brew install --cask ${{ matrix.fuse-package }}
         git clone --recursive https://github.com/netheril96/securefs
         cd securefs
         mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug ..
