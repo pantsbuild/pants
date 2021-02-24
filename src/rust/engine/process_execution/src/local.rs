@@ -32,6 +32,7 @@ use workunit_store::Metric;
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
+  ProcessResultMetadata,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -579,6 +580,7 @@ pub trait CapturedWorkdir {
           exit_code: child_results.exit_code,
           output_directory: output_snapshot.digest,
           platform,
+          metadata: ProcessResultMetadata::default(),
         })
       }
       Err(msg) if msg == "deadline has elapsed" => {
@@ -594,6 +596,7 @@ pub trait CapturedWorkdir {
           exit_code: -libc::SIGTERM,
           output_directory: hashing::EMPTY_DIGEST,
           platform,
+          metadata: ProcessResultMetadata::default(),
         })
       }
       Err(msg) => Err(msg),

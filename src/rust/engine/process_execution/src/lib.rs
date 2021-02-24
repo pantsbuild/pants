@@ -31,7 +31,9 @@
 extern crate derivative;
 
 use async_trait::async_trait;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 pub use log::Level;
+use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
@@ -65,6 +67,7 @@ pub mod named_caches;
 extern crate uname;
 
 pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
+use concrete_time::TimeSpan;
 use fs::RelativePath;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -341,13 +344,54 @@ pub struct ProcessMetadata {
 ///
 /// The result of running a process.
 ///
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Derivative, Clone, Debug, Eq)]
+#[derivative(PartialEq, Hash)]
 pub struct FallibleProcessResultWithPlatform {
   pub stdout_digest: Digest,
   pub stderr_digest: Digest,
   pub exit_code: i32,
-  pub platform: Platform,
   pub output_directory: hashing::Digest,
+  pub platform: Platform,
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
+  pub metadata: ProcessResultMetadata,
+}
+
+/// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProcessResultMetadata {
+  pub execution_time: Option<TimeSpan>,
+}
+
+impl From<ExecutedActionMetadata> for ProcessResultMetadata {
+  fn from(metadata: ExecutedActionMetadata) -> Self {
+    let execution_time = match (
+      metadata.execution_start_timestamp,
+      metadata.execution_completed_timestamp,
+    ) {
+      (Some(started), Some(completed)) => {
+        TimeSpan::from_start_and_end(&started, &completed, "").ok()
+      }
+      _ => None,
+    };
+    Self { execution_time }
+  }
+}
+
+impl Into<ExecutedActionMetadata> for ProcessResultMetadata {
+  fn into(self) -> ExecutedActionMetadata {
+    let (exec_start, exec_end) = match self.execution_time {
+      Some(timespan) => {
+        let (start, end) = timespan.as_timestamps();
+        (Some(start), Some(end))
+      }
+      None => (None, None),
+    };
+    ExecutedActionMetadata {
+      execution_start_timestamp: exec_start,
+      execution_completed_timestamp: exec_end,
+      ..ExecutedActionMetadata::default()
+    }
+  }
 }
 
 #[derive(Clone)]

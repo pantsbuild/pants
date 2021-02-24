@@ -43,7 +43,7 @@ use workunit_store::{
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessCacheScope, ProcessMetadata,
+  ProcessCacheScope, ProcessMetadata, ProcessResultMetadata,
 };
 use grpc_util::headers_to_interceptor_fn;
 
@@ -1099,6 +1099,7 @@ pub async fn populate_fallible_execution_result_for_timeout(
     exit_code: -libc::SIGTERM,
     output_directory: hashing::EMPTY_DIGEST,
     platform,
+    metadata: ProcessResultMetadata::default(),
   })
 }
 
@@ -1115,7 +1116,6 @@ pub fn populate_fallible_execution_result(
   platform: Platform,
   treat_tree_digest_as_final_directory_hack: bool,
 ) -> BoxFuture<Result<FallibleProcessResultWithPlatform, String>> {
-  let exit_code = action_result.exit_code;
   future::try_join3(
     extract_stdout(&store, action_result),
     extract_stderr(&store, action_result),
@@ -1130,9 +1130,13 @@ pub fn populate_fallible_execution_result(
       Ok(FallibleProcessResultWithPlatform {
         stdout_digest,
         stderr_digest,
-        exit_code,
+        exit_code: action_result.exit_code,
         output_directory,
         platform,
+        metadata: action_result
+          .execution_metadata
+          .clone()
+          .map_or(ProcessResultMetadata::default(), |metadata| metadata.into()),
       })
     },
   )
