@@ -265,21 +265,12 @@ jobs:
           path: |
             src/python/pants/engine/internals/native_engine.so
             src/python/pants/engine/internals/native_engine.so.metadata
-      - name: osfux
-        run: |
-          brew install osxfuse
-          git clone --recursive https://github.com/netheril96/securefs
-          cd securefs
-          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug ..
-          cd ..
-          cmake --build build
-          cd build && ctest -V
       - name: Test Rust
         run: |
-          brew install osxfuse
           # We pass --tests to skip doc tests because our generated protos contain invalid
           # doc tests in their comments.
-          ./cargo test --all --tests -- --nocapture
+          # We do not pass --all as BRFS tests don't pass on GHA MacOS containers.
+          ./cargo test --tests -- --nocapture
         if: "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
         env:
           TMPDIR: ${{ runner.temp }}
