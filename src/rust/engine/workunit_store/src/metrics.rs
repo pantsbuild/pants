@@ -81,4 +81,10 @@ pub enum ObservationMetric {
   LocalStoreReadBlobSize,
   RemoteExecutionRPCFirstResponseTime,
   RemoteStoreTimeToFirstByte,
+  /// The time saved (in milliseconds) thanks to a local cache hit compared to running the process
+  /// again.
+  LocalCacheTimeSavedMs,
+  /// The time saved (in milliseconds) thanks to a remote cache hit compared to running the process
+  /// again.
+  RemoteCacheTimeSavedMs,
 }

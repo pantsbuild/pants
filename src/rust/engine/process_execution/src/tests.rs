@@ -88,3 +88,16 @@ fn process_result_metadata_to_and_from_executed_action_metadata() {
   let process_result_missing: ExecutedActionMetadata = ProcessResultMetadata::default().into();
   assert_eq!(process_result_missing, ExecutedActionMetadata::default());
 }
+
+#[test]
+fn process_result_metadata_time_saved_from_cache() {
+  let metadata = ProcessResultMetadata::new(Some(concrete_time::Duration::new(5, 150)));
+  let time_saved = metadata.time_saved_from_cache(Duration::new(1, 100));
+  assert_eq!(time_saved, Some(Duration::new(4, 50)));
+
+  // If the original process time wasn't recorded, we can't compute the time saved.
+  assert_eq!(
+    ProcessResultMetadata::default().time_saved_from_cache(Duration::new(1, 100)),
+    None
+  );
+}

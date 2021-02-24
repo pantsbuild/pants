@@ -370,6 +370,23 @@ impl ProcessResultMetadata {
   pub fn new(total_elapsed: Option<Duration>) -> Self {
     ProcessResultMetadata { total_elapsed }
   }
+
+  /// How much faster a cache hit was than running the process again.
+  ///
+  /// This includes the overhead of setting up and cleaning up the process for execution, and it
+  /// should include all overhead for the cache lookup.
+  pub fn time_saved_from_cache(
+    &self,
+    cache_lookup: std::time::Duration,
+  ) -> Option<std::time::Duration> {
+    match self.total_elapsed {
+      None => None,
+      Some(original_process) => {
+        let original_process: std::time::Duration = original_process.into();
+        original_process.checked_sub(cache_lookup)
+      }
+    }
+  }
 }
 
 impl From<ExecutedActionMetadata> for ProcessResultMetadata {
