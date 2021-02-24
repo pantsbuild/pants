@@ -11,7 +11,7 @@ use store::Store;
 use testutil::data::TestData;
 
 #[tokio::test]
-async fn read_file_by_digest_exact_bytes() {
+async fn brfs_read_file_by_digest_exact_bytes() {
   let (store_dir, mount_dir) = make_dirs();
   let runtime = task_executor::Executor::new();
 

@@ -10,7 +10,7 @@ use testutil::{
 };
 
 #[tokio::test]
-async fn missing_digest() {
+async fn brfs_missing_digest() {
   let (store_dir, mount_dir) = make_dirs();
 
   let runtime = task_executor::Executor::new();
@@ -27,7 +27,7 @@ async fn missing_digest() {
 }
 
 #[tokio::test]
-async fn read_file_by_digest() {
+async fn brfs_read_file_by_digest() {
   let (store_dir, mount_dir) = make_dirs();
   let runtime = task_executor::Executor::new();
 
@@ -51,7 +51,7 @@ async fn read_file_by_digest() {
 }
 
 #[tokio::test]
-async fn list_directory() {
+async fn brfs_list_directory() {
   let (store_dir, mount_dir) = make_dirs();
   let runtime = task_executor::Executor::new();
 
@@ -79,7 +79,7 @@ async fn list_directory() {
 }
 
 #[tokio::test]
-async fn read_file_from_directory() {
+async fn brfs_read_file_from_directory() {
   let (store_dir, mount_dir) = make_dirs();
   let runtime = task_executor::Executor::new();
 
@@ -109,7 +109,7 @@ async fn read_file_from_directory() {
 }
 
 #[tokio::test]
-async fn list_recursive_directory() {
+async fn brfs_list_recursive_directory() {
   let (store_dir, mount_dir) = make_dirs();
   let runtime = task_executor::Executor::new();
 
@@ -148,7 +148,7 @@ async fn list_recursive_directory() {
 }
 
 #[tokio::test]
-async fn read_file_from_recursive_directory() {
+async fn brfs_read_file_from_recursive_directory() {
   let (store_dir, mount_dir) = make_dirs();
   let runtime = task_executor::Executor::new();
 
@@ -192,7 +192,7 @@ async fn read_file_from_recursive_directory() {
 }
 
 #[tokio::test]
-async fn files_are_correctly_executable() {
+async fn brfs_files_are_correctly_executable() {
   let (store_dir, mount_dir) = make_dirs();
   let runtime = task_executor::Executor::new();
 
