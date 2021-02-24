@@ -48,11 +48,11 @@ fn process_equality() {
 #[test]
 fn process_result_metadata_to_and_from_executed_action_metadata() {
   let action_metadata = ExecutedActionMetadata {
-    execution_start_timestamp: Some(Timestamp {
+    worker_start_timestamp: Some(Timestamp {
       seconds: 100,
       nanos: 20,
     }),
-    execution_completed_timestamp: Some(Timestamp {
+    worker_completed_timestamp: Some(Timestamp {
       seconds: 120,
       nanos: 50,
     }),
@@ -70,11 +70,11 @@ fn process_result_metadata_to_and_from_executed_action_metadata() {
   assert_eq!(
     restored_action_metadata,
     ExecutedActionMetadata {
-      execution_start_timestamp: Some(Timestamp {
+      worker_start_timestamp: Some(Timestamp {
         seconds: 0,
         nanos: 0,
       }),
-      execution_completed_timestamp: Some(Timestamp {
+      worker_completed_timestamp: Some(Timestamp {
         seconds: 20,
         nanos: 30,
       }),

@@ -402,6 +402,8 @@ pub trait CapturedWorkdir {
     workdir_base: &Path,
     platform: Platform,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let start_time = Instant::now();
+
     // Set up a temporary workdir, which will optionally be preserved.
     let (workdir_path, maybe_workdir) = {
       let workdir = tempfile::Builder::new()
@@ -513,7 +515,6 @@ pub trait CapturedWorkdir {
     // code. The idea going forward though is we eventually want to pass incremental results on
     // down the line for streaming process results to console logs, etc. as tracked by:
     //   https://github.com/pantsbuild/pants/issues/6089
-    let exec_time_start = Instant::now();
     let child_results_result = {
       let child_results_future = ChildResults::collect_from(
         self
@@ -529,7 +530,6 @@ pub trait CapturedWorkdir {
         child_results_future.await
       }
     };
-    let exec_time_elapsed = exec_time_start.elapsed();
 
     // Capture the process outputs, and optionally clean up the workdir.
     let output_snapshot = if req.output_files.is_empty() && req.output_directories.is_empty() {
@@ -569,7 +569,8 @@ pub trait CapturedWorkdir {
       }
     }
 
-    let result_metadata = ProcessResultMetadata::new(Some(exec_time_elapsed.into()));
+    let elapsed = start_time.elapsed();
+    let result_metadata = ProcessResultMetadata::new(Some(elapsed.into()));
 
     match child_results_result {
       Ok(child_results) => {

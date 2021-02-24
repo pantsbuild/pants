@@ -360,33 +360,36 @@ pub struct FallibleProcessResultWithPlatform {
 /// conversion is lossy, but the interesting parts are preserved.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ProcessResultMetadata {
-  pub execution_time: Option<Duration>,
+  /// The time from starting to completion, including preparing the chroot and cleanup.
+  /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
+  /// `ExecutedActionMetadata`.
+  pub total_elapsed: Option<Duration>,
 }
 
 impl ProcessResultMetadata {
-  pub fn new(execution_time: Option<Duration>) -> Self {
-    ProcessResultMetadata { execution_time }
+  pub fn new(total_elapsed: Option<Duration>) -> Self {
+    ProcessResultMetadata { total_elapsed }
   }
 }
 
 impl From<ExecutedActionMetadata> for ProcessResultMetadata {
   fn from(metadata: ExecutedActionMetadata) -> Self {
-    let execution_time = match (
-      metadata.execution_start_timestamp,
-      metadata.execution_completed_timestamp,
+    let total_elapsed = match (
+      metadata.worker_start_timestamp,
+      metadata.worker_completed_timestamp,
     ) {
       (Some(started), Some(completed)) => TimeSpan::from_start_and_end(&started, &completed, "")
         .map(|span| span.duration)
         .ok(),
       _ => None,
     };
-    Self { execution_time }
+    Self { total_elapsed }
   }
 }
 
 impl Into<ExecutedActionMetadata> for ProcessResultMetadata {
   fn into(self) -> ExecutedActionMetadata {
-    let (exec_start, exec_end) = match self.execution_time {
+    let (total_start, total_end) = match self.total_elapsed {
       Some(elapsed) => {
         // Because we do not have the precise start time, we hardcode to starting at UNIX_EPOCH. We
         // only care about accurately preserving the duration.
@@ -403,8 +406,8 @@ impl Into<ExecutedActionMetadata> for ProcessResultMetadata {
       None => (None, None),
     };
     ExecutedActionMetadata {
-      execution_start_timestamp: exec_start,
-      execution_completed_timestamp: exec_end,
+      worker_start_timestamp: total_start,
+      worker_completed_timestamp: total_end,
       ..ExecutedActionMetadata::default()
     }
   }
