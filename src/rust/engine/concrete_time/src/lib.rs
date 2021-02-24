@@ -28,6 +28,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use serde_derive::Serialize;
+use std::ops::Add;
 
 /// A concrete data representation of a duration.
 /// Unlike std::time::Duration, it doesn't hide how the time is stored as the purpose of this
@@ -128,16 +129,37 @@ impl TimeSpan {
   ) -> Result<Self, String> {
     let start = Self::std_duration_from_timestamp(start);
     let end = Self::std_duration_from_timestamp(end);
-    let time_span = end.checked_sub(start).map(|duration| TimeSpan {
-      start: start.into(),
-      duration: duration.into(),
-    });
-    time_span.ok_or_else(|| {
-      format!(
+    match end.checked_sub(start) {
+      Some(duration) => Ok(TimeSpan {
+        start: start.into(),
+        duration: duration.into(),
+      }),
+      None => Err(format!(
         "Got negative {} time: {:?} - {:?}",
         time_span_description, end, start
-      )
-    })
+      )),
+    }
+  }
+
+  /// Duration since the UNIX_EPOCH.
+  pub fn end(&self) -> Duration {
+    let start: std::time::Duration = self.start.into();
+    start.add(self.duration.into()).into()
+  }
+
+  /// The start and end time of the span as Prost Timestamps.
+  pub fn as_timestamps(&self) -> (prost_types::Timestamp, prost_types::Timestamp) {
+    let end = self.end();
+    (
+      prost_types::Timestamp {
+        seconds: self.start.secs as i64,
+        nanos: self.start.nanos as i32,
+      },
+      prost_types::Timestamp {
+        seconds: end.secs as i64,
+        nanos: end.nanos as i32,
+      },
+    )
   }
 }
 
