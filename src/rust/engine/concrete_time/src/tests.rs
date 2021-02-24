@@ -51,7 +51,7 @@ fn time_span_from_start_and_duration_in_seconds(
 }
 
 #[test]
-fn time_span_to_and_from_prost_timestamp() {
+fn time_span_from_prost_timestamp() {
   let span = time_span_from_start_and_duration_in_seconds(42, 10).unwrap();
   assert_eq!(
     TimeSpan {
@@ -59,22 +59,6 @@ fn time_span_to_and_from_prost_timestamp() {
       duration: Duration::new(10, 0),
     },
     span
-  );
-
-  let (start, end) = span.as_timestamps();
-  assert_eq!(
-    start,
-    prost_types::Timestamp {
-      seconds: 42,
-      nanos: 0,
-    }
-  );
-  assert_eq!(
-    end,
-    prost_types::Timestamp {
-      seconds: 42 + 10,
-      nanos: 0,
-    }
   );
 
   // A negative duration is invalid.

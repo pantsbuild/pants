@@ -67,7 +67,7 @@ pub mod named_caches;
 extern crate uname;
 
 pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
-use concrete_time::TimeSpan;
+use concrete_time::{Duration, TimeSpan};
 use fs::RelativePath;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -356,10 +356,17 @@ pub struct FallibleProcessResultWithPlatform {
   pub metadata: ProcessResultMetadata,
 }
 
-/// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto.
+/// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
+/// conversion is lossy, but the interesting parts are preserved.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ProcessResultMetadata {
-  pub execution_time: Option<TimeSpan>,
+  pub execution_time: Option<Duration>,
+}
+
+impl ProcessResultMetadata {
+  pub fn new(execution_time: Option<Duration>) -> Self {
+    ProcessResultMetadata { execution_time }
+  }
 }
 
 impl From<ExecutedActionMetadata> for ProcessResultMetadata {
@@ -368,9 +375,9 @@ impl From<ExecutedActionMetadata> for ProcessResultMetadata {
       metadata.execution_start_timestamp,
       metadata.execution_completed_timestamp,
     ) {
-      (Some(started), Some(completed)) => {
-        TimeSpan::from_start_and_end(&started, &completed, "").ok()
-      }
+      (Some(started), Some(completed)) => TimeSpan::from_start_and_end(&started, &completed, "")
+        .map(|span| span.duration)
+        .ok(),
       _ => None,
     };
     Self { execution_time }
@@ -380,8 +387,17 @@ impl From<ExecutedActionMetadata> for ProcessResultMetadata {
 impl Into<ExecutedActionMetadata> for ProcessResultMetadata {
   fn into(self) -> ExecutedActionMetadata {
     let (exec_start, exec_end) = match self.execution_time {
-      Some(timespan) => {
-        let (start, end) = timespan.as_timestamps();
+      Some(elapsed) => {
+        // Because we do not have the precise start time, we hardcode to starting at UNIX_EPOCH. We
+        // only care about accurately preserving the duration.
+        let start = prost_types::Timestamp {
+          seconds: 0,
+          nanos: 0,
+        };
+        let end = prost_types::Timestamp {
+          seconds: elapsed.secs as i64,
+          nanos: elapsed.nanos as i32,
+        };
         (Some(start), Some(end))
       }
       None => (None, None),
