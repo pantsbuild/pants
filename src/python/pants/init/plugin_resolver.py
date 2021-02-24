@@ -48,6 +48,9 @@ async def resolve_plugins(
     ProcessCacheScope reference in the body.
     """
     requirements = PexRequirements(sorted(global_options.options.plugins))
+    if not requirements:
+        return ResolvedPluginDistributions()
+
     plugins_pex = await Get(
         VenvPex,
         PexRequest(
@@ -58,7 +61,7 @@ async def resolve_plugins(
             # The repository's constraints are not relevant here, because this resolve is mixed
             # into the Pants' process' path, and never into user code.
             apply_requirement_constraints=False,
-            description=f"Resolving plugins: {requirements}",
+            description=f"Resolving plugins: {', '.join(requirements)}",
         ),
     )
 
