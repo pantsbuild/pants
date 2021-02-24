@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
@@ -512,6 +513,7 @@ pub trait CapturedWorkdir {
     // code. The idea going forward though is we eventually want to pass incremental results on
     // down the line for streaming process results to console logs, etc. as tracked by:
     //   https://github.com/pantsbuild/pants/issues/6089
+    let exec_time_start = Instant::now();
     let child_results_result = {
       let child_results_future = ChildResults::collect_from(
         self
@@ -527,6 +529,7 @@ pub trait CapturedWorkdir {
         child_results_future.await
       }
     };
+    let exec_time_elapsed = exec_time_start.elapsed();
 
     // Capture the process outputs, and optionally clean up the workdir.
     let output_snapshot = if req.output_files.is_empty() && req.output_directories.is_empty() {
@@ -566,6 +569,8 @@ pub trait CapturedWorkdir {
       }
     }
 
+    let result_metadata = ProcessResultMetadata::new(Some(exec_time_elapsed.into()));
+
     match child_results_result {
       Ok(child_results) => {
         let stdout = child_results.stdout;
@@ -580,7 +585,7 @@ pub trait CapturedWorkdir {
           exit_code: child_results.exit_code,
           output_directory: output_snapshot.digest,
           platform,
-          metadata: ProcessResultMetadata::default(),
+          metadata: result_metadata,
         })
       }
       Err(msg) if msg == "deadline has elapsed" => {
@@ -596,7 +601,7 @@ pub trait CapturedWorkdir {
           exit_code: -libc::SIGTERM,
           output_directory: hashing::EMPTY_DIGEST,
           platform,
-          metadata: ProcessResultMetadata::default(),
+          metadata: result_metadata,
         })
       }
       Err(msg) => Err(msg),
