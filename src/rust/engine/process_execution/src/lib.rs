@@ -379,13 +379,10 @@ impl ProcessResultMetadata {
     &self,
     cache_lookup: std::time::Duration,
   ) -> Option<std::time::Duration> {
-    match self.total_elapsed {
-      None => None,
-      Some(original_process) => {
-        let original_process: std::time::Duration = original_process.into();
-        original_process.checked_sub(cache_lookup)
-      }
-    }
+    self.total_elapsed.and_then(|original_process| {
+      let original_process: std::time::Duration = original_process.into();
+      original_process.checked_sub(cache_lookup)
+    })
   }
 }
 
