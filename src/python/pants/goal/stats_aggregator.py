@@ -19,7 +19,6 @@ from pants.engine.streaming_workunit_handler import (
     WorkunitsCallbackFactoryRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
 
 logger = logging.getLogger(__name__)
@@ -32,39 +31,27 @@ class StatsAggregatorSubsystem(Subsystem):
     @classmethod
     def register_options(cls, register):
         register(
-            "--counters",
+            "--log",
+            advanced=True,
             type=bool,
             default=False,
             help=(
-                "At the end of the Pants run, log counts of how often certain events like cache "
-                "reads and cache errors occurred."
-            ),
-        )
-        register(
-            "--histograms",
-            type=bool,
-            default=False,
-            help=(
-                "At the end of the Pants run, log histograms of observation metrics, e.g. the "
-                "time saved thanks to caching.\n\nYou must add `hdrhistogram` to the global "
-                "`--plugins` option for this to work."
+                "At the end of the Pants run, log all counter metrics and histograms of "
+                "observation metrics, e.g. the number of cache hits.\n\nFor histograms to work, "
+                "you must add `hdrhistogram` to `[GLOBAL].plugins`."
             ),
         )
 
     @property
-    def counters(self) -> bool:
-        return cast(bool, self.options.counters)
-
-    @property
-    def histograms(self) -> bool:
-        return cast(bool, self.options.histograms)
+    def log(self) -> bool:
+        return cast(bool, self.options.log)
 
 
 class StatsAggregatorCallback(WorkunitsCallback):
-    def __init__(self, *, counter_enabled: bool, histograms_enabled: bool) -> None:
+    def __init__(self, *, enabled: bool, has_histogram_module: bool) -> None:
         super().__init__()
-        self.counters_enabled = counter_enabled
-        self.histograms_enabled = histograms_enabled
+        self.enabled = enabled
+        self.has_histogram_module = has_histogram_module
         self.counters: Counter = Counter()
 
     def __call__(
@@ -75,43 +62,46 @@ class StatsAggregatorCallback(WorkunitsCallback):
         finished: bool,
         context: StreamingWorkunitContext,
     ) -> None:
-        if self.counters_enabled:
-            for workunit in completed_workunits:
-                if "counters" not in workunit:
-                    continue
+        if not self.enabled:
+            return
+
+        # Aggregate counters on completed workunits.
+        for workunit in completed_workunits:
+            if "counters" in workunit:
                 for name, value in workunit["counters"].items():
                     self.counters[name] += value
 
         if not finished:
             return
 
-        if self.counters_enabled:
-            # Add any counters with a count of 0.
-            for counter in context.run_tracker.counter_names:
-                if counter not in self.counters:
-                    self.counters[counter] = 0
+        # Add any counters with a count of 0.
+        for counter in context.run_tracker.counter_names:
+            if counter not in self.counters:
+                self.counters[counter] = 0
 
-            # Log aggregated counters.
-            counter_lines = "\n".join(
-                f"  {name}: {count}" for name, count in sorted(self.counters.items())
+        # Log aggregated counters.
+        counter_lines = "\n".join(
+            f"  {name}: {count}" for name, count in sorted(self.counters.items())
+        )
+        logger.info(f"Counters:\n{counter_lines}")
+
+        # Retrieve all of the observation histograms.
+        if not self.has_histogram_module:
+            return
+        from hdrh.histogram import HdrHistogram
+
+        histogram_info = context.get_observation_histograms()
+        logger.info("Observation histograms:")
+        for name, encoded_histogram in histogram_info["histograms"].items():
+            # Note: The Python library for HDR Histogram will only decode compressed histograms
+            # that are further encoded with base64. See
+            # https://github.com/HdrHistogram/HdrHistogram_py/issues/29.
+            histogram = HdrHistogram.decode(base64.b64encode(encoded_histogram))
+            buffer = BytesIO()
+            histogram.output_percentile_distribution(buffer, 1)
+            logger.info(
+                f"  Histogram for `{name}`:\n{textwrap.indent(buffer.getvalue().decode(), '    ')}"
             )
-            logger.info(f"Counters:\n{counter_lines}")
-
-        if self.histograms_enabled:
-            from hdrh.histogram import HdrHistogram
-
-            histogram_info = context.get_observation_histograms()
-            logger.info("Observation histograms:")
-            for name, encoded_histogram in histogram_info["histograms"].items():
-                # Note: The Python library for HDR Histogram will only decode compressed histograms
-                # that are further encoded with base64. See
-                # https://github.com/HdrHistogram/HdrHistogram_py/issues/29.
-                histogram = HdrHistogram.decode(base64.b64encode(encoded_histogram))
-                buffer = BytesIO()
-                histogram.output_percentile_distribution(buffer, 1)
-                logger.info(
-                    f"  Histogram for `{name}`:\n{textwrap.indent(buffer.getvalue().decode(), '    ')}"
-                )
 
 
 class StatsAggregatorCallbackFactoryRequest:
@@ -122,21 +112,23 @@ class StatsAggregatorCallbackFactoryRequest:
 def construct_callback(
     _: StatsAggregatorCallbackFactoryRequest, subsystem: StatsAggregatorSubsystem
 ) -> WorkunitsCallbackFactory:
-    if subsystem.histograms:
+    enabled = subsystem.log
+
+    has_histogram_module = False
+    if enabled:
         try:
             import hdrh.histogram  # noqa: F401
         except ImportError:
-            raise OptionsError(
-                "`--stats-histograms` is used, but `hdrhistogram` is not in the "
-                "global `--plugins` option.\n\nPlease run again with `--plugins=hdrhistogram`  "
-                "or add `[GLOBAL].plugins = ['hdrhistogram']` to your `pants.toml`. This will "
-                "cause Pants to install the `hdrhistogram` dependency from PyPI."
+            logger.warning(
+                "Please run with `--plugins=hdrhistogram` if you would like histograms to be shown "
+                "at the end of the run, or permanently add `[GLOBAL].plugins = ['hdrhistogram']`. "
+                "This will cause Pants to install the `hdrhistogram` dependency from PyPI."
             )
+        else:
+            has_histogram_module = True
 
     return WorkunitsCallbackFactory(
-        lambda: StatsAggregatorCallback(
-            counter_enabled=subsystem.counters, histograms_enabled=subsystem.histograms
-        )
+        lambda: StatsAggregatorCallback(enabled=enabled, has_histogram_module=has_histogram_module)
     )
 
 
