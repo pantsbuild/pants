@@ -812,7 +812,7 @@ class GlobalOptions(Subsystem):
             help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
             advanced=True,
             removal_version="2.5.0.dev0",
-            removal_hint="This option no-ops as Pants does not yet support the JVM."
+            removal_hint="This option no-ops as Pants does not yet support the JVM.",
         )
 
         register(
