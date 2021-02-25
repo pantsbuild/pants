@@ -84,7 +84,7 @@ impl Metric {
 #[strum(serialize_all = "snake_case")]
 pub enum ObservationMetric {
   TestObservation,
-  LocalCacheReadBlobSize,
+  LocalStoreReadBlobSize,
   RemoteExecutionRPCFirstResponseTime,
   RemoteStoreTimeToFirstByte,
   /// The time saved (in milliseconds) thanks to a local cache hit instead of running the process

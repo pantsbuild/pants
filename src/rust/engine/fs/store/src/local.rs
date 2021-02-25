@@ -302,7 +302,7 @@ impl ByteStore {
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
       workunit_store_handle.store.record_observation(
-        ObservationMetric::LocalCacheReadBlobSize,
+        ObservationMetric::LocalStoreReadBlobSize,
         digest.size_bytes as u64,
       );
     }
