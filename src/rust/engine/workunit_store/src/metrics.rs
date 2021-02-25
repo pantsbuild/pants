@@ -48,6 +48,9 @@ pub enum Metric {
   LocalCacheRequestsUncached,
   LocalCacheReadErrors,
   LocalCacheWriteErrors,
+  /// The total time saved (in milliseconds) thanks to local cache hits instead of running the
+  /// processes directly.
+  LocalCacheTotalTimeSavedMs,
   LocalExecutionRequests,
   RemoteCacheRequests,
   RemoteCacheRequestsCached,
@@ -58,6 +61,9 @@ pub enum Metric {
   RemoteCacheWriteFinished,
   RemoteCacheSpeculationLocalCompletedFirst,
   RemoteCacheSpeculationRemoteCompletedFirst,
+  /// The total time saved (in milliseconds) thanks to remote cache hits instead of running the
+  /// processes directly.
+  RemoteCacheTotalTimeSavedMs,
   RemoteExecutionErrors,
   RemoteExecutionRequests,
   RemoteExecutionRPCErrors,
@@ -78,13 +84,13 @@ impl Metric {
 #[strum(serialize_all = "snake_case")]
 pub enum ObservationMetric {
   TestObservation,
-  LocalStoreReadBlobSize,
+  LocalCacheReadBlobSize,
   RemoteExecutionRPCFirstResponseTime,
   RemoteStoreTimeToFirstByte,
-  /// The time saved (in milliseconds) thanks to a local cache hit compared to running the process
-  /// again.
+  /// The time saved (in milliseconds) thanks to a local cache hit instead of running the process
+  /// directly.
   LocalCacheTimeSavedMs,
-  /// The time saved (in milliseconds) thanks to a remote cache hit compared to running the process
-  /// again.
+  /// The time saved (in milliseconds) thanks to a remote cache hit instead of running the process
+  /// directly.
   RemoteCacheTimeSavedMs,
 }
