@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import base64
 import logging
-import textwrap
 from collections import Counter
-from io import BytesIO
 from typing import cast
 
 from pants.engine.internals.scheduler import Workunit
@@ -36,9 +34,10 @@ class StatsAggregatorSubsystem(Subsystem):
             type=bool,
             default=False,
             help=(
-                "At the end of the Pants run, log all counter metrics and histograms of "
-                "observation metrics, e.g. the number of cache hits.\n\nFor histograms to work, "
-                "you must add `hdrhistogram` to `[GLOBAL].plugins`."
+                "At the end of the Pants run, log all counter metrics and summaries of "
+                "observation histograms, e.g. the number of cache hits and the time saved by "
+                "caching.\n\nFor histogram summaries to work, you must add `hdrhistogram` to "
+                "`[GLOBAL].plugins`."
             ),
         )
 
@@ -85,22 +84,31 @@ class StatsAggregatorCallback(WorkunitsCallback):
         )
         logger.info(f"Counters:\n{counter_lines}")
 
-        # Retrieve all of the observation histograms.
         if not self.has_histogram_module:
             return
         from hdrh.histogram import HdrHistogram
 
         histogram_info = context.get_observation_histograms()
-        logger.info("Observation histograms:")
+        logger.info("Observation histogram summaries:")
         for name, encoded_histogram in histogram_info["histograms"].items():
             # Note: The Python library for HDR Histogram will only decode compressed histograms
             # that are further encoded with base64. See
             # https://github.com/HdrHistogram/HdrHistogram_py/issues/29.
             histogram = HdrHistogram.decode(base64.b64encode(encoded_histogram))
-            buffer = BytesIO()
-            histogram.output_percentile_distribution(buffer, 1)
+            percentile_to_vals = "\n".join(
+                f"  p{percentile}: {value}"
+                for percentile, value in histogram.get_percentile_to_value_dict(
+                    [25, 50, 75, 90, 95, 99]
+                ).items()
+            )
             logger.info(
-                f"  Histogram for `{name}`:\n{textwrap.indent(buffer.getvalue().decode(), '    ')}"
+                f"Summary of `{name}` observation histogram:\n"
+                f"  min: {histogram.get_min_value()}\n"
+                f"  max: {histogram.get_max_value()}\n"
+                f"  mean: {histogram.get_mean_value():.3f}\n"
+                f"  std dev: {histogram.get_stddev():.3f}\n"
+                f"  total observations: {histogram.total_count}\n"
+                f"{percentile_to_vals}"
             )
 
 
@@ -120,9 +128,10 @@ def construct_callback(
             import hdrh.histogram  # noqa: F401
         except ImportError:
             logger.warning(
-                "Please run with `--plugins=hdrhistogram` if you would like histograms to be shown "
-                "at the end of the run, or permanently add `[GLOBAL].plugins = ['hdrhistogram']`. "
-                "This will cause Pants to install the `hdrhistogram` dependency from PyPI."
+                "Please run with `--plugins=hdrhistogram` if you would like histogram summaries to "
+                "be shown at the end of the run, or permanently add "
+                "`[GLOBAL].plugins = ['hdrhistogram']`. This will cause Pants to install "
+                "the `hdrhistogram` dependency from PyPI."
             )
         else:
             has_histogram_module = True
