@@ -90,7 +90,6 @@ pub struct ExecutionStrategyOptions {
   pub remote_parallelism: usize,
   pub cleanup_local_dirs: bool,
   pub use_local_cache: bool,
-  pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
   pub remote_cache_write: bool,
 }
@@ -121,64 +120,6 @@ impl Core {
     }
   }
 
-  fn make_local_execution_runner(
-    store: &Store,
-    executor: &Executor,
-    local_execution_root_dir: &Path,
-    named_caches_dir: &Path,
-    process_execution_metadata: &ProcessMetadata,
-    exec_strategy_opts: &ExecutionStrategyOptions,
-  ) -> Box<dyn CommandRunner> {
-    let local_command_runner = process_execution::local::CommandRunner::new(
-      store.clone(),
-      executor.clone(),
-      local_execution_root_dir.to_path_buf(),
-      NamedCaches::new(named_caches_dir.to_path_buf()),
-      exec_strategy_opts.cleanup_local_dirs,
-    );
-
-    let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =
-      if exec_strategy_opts.local_enable_nailgun {
-        Box::new(process_execution::nailgun::CommandRunner::new(
-          local_command_runner,
-          process_execution_metadata.clone(),
-          local_execution_root_dir.to_path_buf(),
-          executor.clone(),
-        ))
-      } else {
-        Box::new(local_command_runner)
-      };
-
-    Box::new(BoundedCommandRunner::new(
-      maybe_nailgunnable_local_command_runner,
-      exec_strategy_opts.local_parallelism,
-    ))
-  }
-
-  fn make_remote_execution_runner(
-    store: &Store,
-    process_execution_metadata: &ProcessMetadata,
-    remoting_opts: &RemotingOptions,
-    root_ca_certs: &Option<Vec<u8>>,
-  ) -> Result<Box<dyn CommandRunner>, String> {
-    Ok(Box::new(process_execution::remote::CommandRunner::new(
-      // No problem unwrapping here because the global options validation
-      // requires the remoting_opts.execution_server be present when
-      // remoting_opts.execution_enable is set.
-      &remoting_opts.execution_address.clone().unwrap(),
-      remoting_opts.store_addresses.clone(),
-      process_execution_metadata.clone(),
-      root_ca_certs.clone(),
-      remoting_opts.execution_headers.clone(),
-      store.clone(),
-      // TODO if we ever want to configure the remote platform to be something else we
-      // need to take an option all the way down here and into the remote::CommandRunner struct.
-      Platform::Linux,
-      remoting_opts.execution_overall_deadline,
-      Duration::from_millis(100),
-    )?))
-  }
-
   fn make_command_runner(
     full_store: &Store,
     remote_store_addresses: &[String],
@@ -202,27 +143,38 @@ impl Core {
     } else {
       full_store.clone()
     };
-
-    let local_command_runner = Core::make_local_execution_runner(
-      &store_for_local_runner,
-      executor,
-      local_execution_root_dir,
-      named_caches_dir,
-      process_execution_metadata,
-      &exec_strategy_opts,
-    );
+    let local_command_runner = Box::new(BoundedCommandRunner::new(
+      Box::new(process_execution::local::CommandRunner::new(
+        store_for_local_runner,
+        executor.clone(),
+        local_execution_root_dir.to_path_buf(),
+        NamedCaches::new(named_caches_dir.to_path_buf()),
+        exec_strategy_opts.cleanup_local_dirs,
+      )),
+      exec_strategy_opts.local_parallelism,
+    ));
 
     // Possibly either add the remote execution runner or the remote cache runner.
     // `global_options.py` already validates that both are not set at the same time.
     let maybe_remote_enabled_command_runner: Box<dyn CommandRunner> =
       if remoting_opts.execution_enable {
         Box::new(BoundedCommandRunner::new(
-          Core::make_remote_execution_runner(
-            full_store,
-            process_execution_metadata,
-            &remoting_opts,
-            root_ca_certs,
-          )?,
+          Box::new(process_execution::remote::CommandRunner::new(
+            // No problem unwrapping here because the global options validation
+            // requires the remoting_opts.execution_server be present when
+            // remoting_opts.execution_enable is set.
+            &remoting_opts.execution_address.clone().unwrap(),
+            remoting_opts.store_addresses.clone(),
+            process_execution_metadata.clone(),
+            root_ca_certs.clone(),
+            remoting_opts.execution_headers.clone(),
+            full_store.clone(),
+            // TODO if we ever want to configure the remote platform to be something else we
+            // need to take an option all the way down here and into the remote::CommandRunner struct.
+            Platform::Linux,
+            remoting_opts.execution_overall_deadline,
+            Duration::from_millis(100),
+          )?),
           exec_strategy_opts.remote_parallelism,
         ))
       } else if remote_caching_used {
