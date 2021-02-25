@@ -24,9 +24,9 @@ from pants.option.subsystem import Subsystem
 logger = logging.getLogger(__name__)
 
 
-class ExecStatsSubsystem(Subsystem):
-    options_scope = "exec-stats"
-    help = "An aggregator for Pants execution stats, such as cache metrics."
+class StatsAggregatorSubsystem(Subsystem):
+    options_scope = "stats"
+    help = "An aggregator for Pants stats, such as cache metrics."
 
     @classmethod
     def register_options(cls, register):
@@ -36,9 +36,9 @@ class ExecStatsSubsystem(Subsystem):
             type=bool,
             default=False,
             help=(
-                "At the end of the Pants run, log all counter metrics and histograms, which give "
-                "metrics on Pants execution like the number of cache hits.\n\nFor histograms to "
-                "work, you must add `hdrhistogram` to `[GLOBAL].plugins`."
+                "At the end of the Pants run, log all counter metrics and histograms of "
+                "observation metrics, e.g. the number of cache hits.\n\nFor histograms to work, "
+                "you must add `hdrhistogram` to `[GLOBAL].plugins`."
             ),
         )
 
@@ -47,7 +47,7 @@ class ExecStatsSubsystem(Subsystem):
         return cast(bool, self.options.log)
 
 
-class ExecStatsCallback(WorkunitsCallback):
+class StatsAggregatorCallback(WorkunitsCallback):
     def __init__(self, *, enabled: bool, has_histogram_module: bool) -> None:
         super().__init__()
         self.enabled = enabled
@@ -104,15 +104,15 @@ class ExecStatsCallback(WorkunitsCallback):
             )
 
 
-class ExecStatsCallbackFactoryRequest:
+class StatsAggregatorCallbackFactoryRequest:
     """A unique request type that is installed to trigger construction of the WorkunitsCallback."""
 
 
 @rule
 def construct_callback(
-    _: ExecStatsCallbackFactoryRequest, exec_stats: ExecStatsSubsystem
+    _: StatsAggregatorCallbackFactoryRequest, subsystem: StatsAggregatorSubsystem
 ) -> WorkunitsCallbackFactory:
-    enabled = exec_stats.log
+    enabled = subsystem.log
 
     has_histogram_module = False
     if enabled:
@@ -128,12 +128,12 @@ def construct_callback(
             has_histogram_module = True
 
     return WorkunitsCallbackFactory(
-        lambda: ExecStatsCallback(enabled=enabled, has_histogram_module=has_histogram_module)
+        lambda: StatsAggregatorCallback(enabled=enabled, has_histogram_module=has_histogram_module)
     )
 
 
 def rules():
     return [
-        UnionRule(WorkunitsCallbackFactoryRequest, ExecStatsCallbackFactoryRequest),
+        UnionRule(WorkunitsCallbackFactoryRequest, StatsAggregatorCallbackFactoryRequest),
         *collect_rules(),
     ]

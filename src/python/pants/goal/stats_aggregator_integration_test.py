@@ -14,7 +14,7 @@ def test_counters_and_histograms() -> None:
         argv = [
             "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black']",
             "--plugins=hdrhistogram",
-            "--exec-stats-log",
+            "--stats-log",
             "lint",
             f"{tmpdir}::",
         ]
@@ -29,7 +29,7 @@ def test_counters_and_histograms() -> None:
 
 
 def test_warn_if_no_histograms() -> None:
-    result = run_pants(["--exec-stats-log", "roots"])
+    result = run_pants(["--stats-log", "roots"])
     result.assert_success()
     assert "Counters:" in result.stderr
     assert "Please run with `--plugins=hdrhistogram`" in result.stderr

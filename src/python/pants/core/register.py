@@ -20,7 +20,7 @@ from pants.core.util_rules import (
     stripped_source_files,
     subprocess_environment,
 )
-from pants.goal import exec_stats
+from pants.goal import stats_aggregator
 from pants.source import source_root
 
 
@@ -47,7 +47,7 @@ def rules():
         *subprocess_environment.rules(),
         *source_root.rules(),
         *target_type_rules(),
-        *exec_stats.rules(),
+        *stats_aggregator.rules(),
     ]
 
 
