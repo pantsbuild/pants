@@ -91,7 +91,7 @@ class ExecStatsCallback(WorkunitsCallback):
         from hdrh.histogram import HdrHistogram
 
         histogram_info = context.get_observation_histograms()
-        logger.info("Observation Histograms:")
+        logger.info("Observation histograms:")
         for name, encoded_histogram in histogram_info["histograms"].items():
             # Note: The Python library for HDR Histogram will only decode compressed histograms
             # that are further encoded with base64. See
