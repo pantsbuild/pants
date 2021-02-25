@@ -1,0 +1,343 @@
+# Config for Pull Request CI on Github Actions.
+
+# NOTES:
+#
+# - Does not build wheels or release artifacts. So this cannot yet
+#   replace branch builds on Travis CI. However it can replace PR builds
+#   (once we are confident about correctness and stability).
+#
+# - Does not store built native_engine.so artifacts in S3. Instead it uses
+#   Github Actions' {upload/download}-artifact functionality.
+#
+# - There is less repetition in this file than we have in Travis CI config,
+#   so it is not currently generated, but directly hand-edited. We may wish
+#   to revisit this in the future.
+
+
+# Consists of 5 jobs:
+#
+# - Bootstrap, and maybe run rust test and lint, on Linux.
+# - Bootstrap, and maybe run rust test, on MacOS.
+# - Run Python test on Linux.
+# - Run Python lint on Linux.
+# - Run Python test on MacOS.
+
+# There is no need to run linters on both platforms...
+
+name: Pull Request CI
+
+on:
+  pull_request
+jobs:
+  bootstrap_pants_linux:
+    name: Bootstrap Pants, test+lint Rust (Linux)
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        python-version: [3.7]
+    env:
+      rust_version: 1.49.0
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
+        # for details on how we get the commit message here.
+        with:
+          # We need to fetch a few commits back, to be able to access HEAD^2 in the PR case.
+          fetch-depth: 10
+      # For a push event, the commit we care about is HEAD itself.
+      # This CI currently only runs on PRs, so this is future-proofing.
+      - name: Get commit message for branch builds
+        if: github.event_name == 'push'
+        run: |
+          echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+          echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      # For a pull_request event, the commit we care about is the second parent of the merge commit.
+      # This CI currently only runs on PRs, so this is future-proofing.
+      - name: Get commit message for PR builds
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+          echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Cache Rust toolchain
+        uses: actions/cache@v2
+        with:
+          # Note that for reasons unknown, possibly related to symlinking, this fails if
+          # we try to cache ~/.rustup/ directly.
+          path: |
+            ~/.rustup/toolchains/${{ env.rust_version }}-*
+            ~/.rustup/update-hashes
+            ~/.rustup/settings.toml
+          key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          # Note that for reasons unknown, possibly related to symlinking, this fails if
+          # we try to cache ~/.cargo/ directly.
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: |
+            ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-
+      # Note: Must run before get-engine-hash, which uses the virtualenv.
+      - name: Cache Pants Virtualenv
+        uses: actions/cache@v2
+        with:
+          path: |
+            build-support/virtualenvs
+          key: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
+      - name: Get Engine Hash
+        id: get-engine-hash
+        run: |
+          echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
+        shell: bash
+      - name: Cache Native Engine
+        uses: actions/cache@v2
+        with:
+          path: |
+            src/python/pants/engine/internals/native_engine.so
+            src/python/pants/engine/internals/native_engine.so.metadata
+          key: |
+            ${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
+      - name: Set env vars
+        run: |
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+      - name: Bootstrap Pants
+        run: |
+          ./pants --version
+      - name: Run smoke tests
+        run: |
+          ./pants help goals
+          ./pants list ::
+          ./pants roots
+          ./pants help targets
+      - name: Test and Lint Rust
+        # Note that running these in a separate job would require that job to rebuild
+        # the Rust code from scratch, since Cargo uses mtimes to invalidate, and those
+        # are not conserved across git clones. And since we have to build Rust code
+        # in this job anyway, and the tests only take a couple of minutes to run, we
+        # run them in the same job.
+        run: |
+          sudo apt-get install -y pkg-config fuse libfuse-dev
+          ./cargo clippy --all
+          # We pass --tests to skip doc tests because our generated protos contain invalid
+          # doc tests in their comments.
+          ./cargo test --all --tests -- --nocapture
+        if: "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
+      - name: Upload native_engine.so
+        uses: actions/upload-artifact@v2
+        with:
+          name: native_engine.so
+          path: |
+            src/python/pants/engine/internals/native_engine.so
+            src/python/pants/engine/internals/native_engine.so.metadata
+
+  test_python_linux:
+    name: Test Python (Linux)
+    runs-on: ubuntu-20.04
+    needs: bootstrap_pants_linux
+    strategy:
+      matrix:
+        python-version: [3.7]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Cache Pants Virtualenv
+        uses: actions/cache@v2
+        with:
+          path: |
+            build-support/virtualenvs
+            ~/.cache/pants/plugins/
+          key: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
+      - name: Download native_engine.so
+        uses: actions/download-artifact@v2
+        with:
+          name: native_engine.so
+          path: src/python/pants/engine/internals/
+      - name: Set env vars
+        run: |
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+      - name: Run Python tests
+        run: |
+          ./pants test ::
+
+  lint_python_linux:
+    name: Lint Python (Linux)
+    runs-on: ubuntu-20.04
+    needs: bootstrap_pants_linux
+    strategy:
+      matrix:
+        python-version: [ 3.7 ]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Cache Pants Virtualenv
+        uses: actions/cache@v2
+        with:
+          path: |
+            build-support/virtualenvs
+            ~/.cache/pants/plugins/
+          key: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
+      - name: Download native_engine.so
+        uses: actions/download-artifact@v2
+        with:
+          name: native_engine.so
+          path: src/python/pants/engine/internals/
+      - name: Set env vars
+        run: |
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+      - name: Lint
+        run: |
+          ./pants validate '**'
+          ./pants lint typecheck ::
+
+
+  bootstrap_pants_macos:
+    name: Bootstrap Pants, test Rust (MacOS)
+    runs-on: macos-10.15
+    strategy:
+      matrix:
+        python-version: [3.7]
+    env:
+      rust_version: 1.49.0
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          # We need to fetch a few commits back, to be able to access HEAD^2 in the PR case.
+          fetch-depth: 10
+      # For a push event, the commit we care about is HEAD itself.
+      - name: Get commit message for branch builds
+        if: github.event_name == 'push'
+        run: |
+          echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+          echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      # For a pull_request event, the commit we care about is the second parent of the merge commit.
+      - name: Get commit message for PR builds
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+          echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Cache Rust toolchain
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.rustup/toolchains/${{ env.rust_version }}-*
+            ~/.rustup/update-hashes
+            ~/.rustup/settings.toml
+          key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: |
+            ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-
+      # Note: Must run before get-engine hash, which uses the virtualenv.
+      - name: Cache Pants Virtualenv
+        uses: actions/cache@v2
+        with:
+          path: |
+            build-support/virtualenvs
+            ~/.cache/pants/plugins/
+          key: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
+      - name: Get Engine Hash
+        id: get-engine-hash
+        run: |
+          echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
+        shell: bash
+      - name: Cache Native Engine
+        uses: actions/cache@v2
+        with:
+          path: |
+            src/python/pants/engine/internals/native_engine.so
+            src/python/pants/engine/internals/native_engine.so.metadata
+          key: |
+            ${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
+      - name: Set env vars
+        run: |
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+      - name: Bootstrap Pants
+        run: |
+          ./pants --version
+      - name: Upload native_engine.so
+        uses: actions/upload-artifact@v2
+        with:
+          name: native_engine.so
+          path: |
+            src/python/pants/engine/internals/native_engine.so
+            src/python/pants/engine/internals/native_engine.so.metadata
+      - name: Test Rust
+        run: |
+          # We pass --tests to skip doc tests because our generated protos contain invalid
+          # doc tests in their comments.
+          # We do not pass --all as BRFS tests don't pass on GHA MacOS containers.
+          ./cargo test --tests -- --nocapture
+        if: "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
+        env:
+          TMPDIR: ${{ runner.temp }}
+
+  test_python_macos:
+    name: Test Python (MacOS)
+    runs-on: macos-10.15
+    needs: bootstrap_pants_macos
+    strategy:
+      matrix:
+        python-version: [3.7]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Cache Pants Virtualenv
+        uses: actions/cache@v2
+        with:
+          path: |
+            build-support/virtualenvs
+            ~/.cache/pants/plugins/
+          key: |
+            ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
+      - name: Download native_engine.so
+        uses: actions/download-artifact@v2
+        with:
+          name: native_engine.so
+          path: src/python/pants/engine/internals/
+      - name: Set env vars
+        run: |
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+      - name: Run Python tests
+        run: |
+          ./pants test ::
+
+#
