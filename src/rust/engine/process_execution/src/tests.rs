@@ -95,14 +95,14 @@ fn process_result_metadata_time_saved_from_cache() {
   let time_saved = metadata.time_saved_from_cache(Duration::new(1, 100));
   assert_eq!(time_saved, Some(Duration::new(4, 50)));
 
+  // If the cache lookup took more time than the process, we return 0.
+  let metadata = ProcessResultMetadata::new(Some(concrete_time::Duration::new(1, 0)));
+  let time_saved = metadata.time_saved_from_cache(Duration::new(5, 0));
+  assert_eq!(time_saved, Some(Duration::new(0, 0)));
+
   // If the original process time wasn't recorded, we can't compute the time saved.
   assert_eq!(
     ProcessResultMetadata::default().time_saved_from_cache(Duration::new(1, 100)),
     None
   );
-
-  // If the cache lookup took more time than the process, we return None.
-  let metadata = ProcessResultMetadata::new(Some(concrete_time::Duration::new(1, 0)));
-  let time_saved = metadata.time_saved_from_cache(Duration::new(5, 0));
-  assert_eq!(time_saved, None);
 }
