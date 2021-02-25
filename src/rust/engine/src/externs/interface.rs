@@ -542,7 +542,7 @@ py_class!(class PyRemotingOptions |py| {
   def __new__(
     _cls,
     execution_enable: bool,
-    store_addresses: Vec<String>,
+    store_address: Option<String>,
     execution_address: Option<String>,
     execution_process_cache_namespace: Option<String>,
     instance_name: Option<String>,
@@ -559,7 +559,7 @@ py_class!(class PyRemotingOptions |py| {
     Self::create_instance(py,
       RemotingOptions {
         execution_enable,
-        store_addresses,
+        store_address,
         execution_address,
         execution_process_cache_namespace,
         instance_name,

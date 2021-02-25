@@ -21,8 +21,6 @@ use futures::FutureExt;
 use futures::{Stream, StreamExt};
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
-use itertools::Either;
-use itertools::Itertools;
 use log::{debug, trace, warn, Level};
 use prost::Message;
 use rand::{thread_rng, Rng};
@@ -33,7 +31,7 @@ use remexec::{
 };
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use tonic::metadata::BinaryMetadataValue;
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use tonic::{Code, Interceptor, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
@@ -118,8 +116,8 @@ enum StreamOutcome {
 impl CommandRunner {
   /// Construct a new CommandRunner
   pub fn new(
-    address: &str,
-    store_addresses: Vec<String>,
+    execution_address: &str,
+    store_address: &str,
     metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
@@ -128,11 +126,8 @@ impl CommandRunner {
     overall_deadline: Duration,
     retry_interval_duration: Duration,
   ) -> Result<Self, String> {
-    let execution_use_tls = address.starts_with("https://");
-    let store_use_tls = store_addresses
-      .first()
-      .map(|addr| addr.starts_with("https://"))
-      .unwrap_or(false);
+    let execution_use_tls = execution_address.starts_with("https://");
+    let store_use_tls = store_address.starts_with("https://");
 
     let tls_client_config = if execution_use_tls || store_use_tls {
       Some(grpc_util::create_tls_config(root_ca_certs)?)
@@ -146,37 +141,24 @@ impl CommandRunner {
       Some(Interceptor::new(headers_to_interceptor_fn(&headers)?))
     };
 
-    let endpoint = grpc_util::create_endpoint(
-      &address,
+    let execution_endpoint = grpc_util::create_endpoint(
+      &execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
     )?;
-    let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
+    let execution_channel =
+      tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter());
     let execution_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => ExecutionClient::with_interceptor(channel.clone(), interceptor.clone()),
-      None => ExecutionClient::new(channel.clone()),
+      Some(interceptor) => {
+        ExecutionClient::with_interceptor(execution_channel.clone(), interceptor.clone())
+      }
+      None => ExecutionClient::new(execution_channel.clone()),
     });
 
-    let (store_endpoints, store_endpoints_errors): (Vec<Endpoint>, Vec<String>) = store_addresses
-      .iter()
-      .map(|addr| {
-        grpc_util::create_endpoint(
-          addr.as_str(),
-          tls_client_config.as_ref().filter(|_| store_use_tls),
-        )
-      })
-      .partition_map(|result| match result {
-        Ok(endpoint) => Either::Left(endpoint),
-        Err(err) => Either::Right(err),
-      });
-
-    if !store_endpoints_errors.is_empty() {
-      return Err(format!(
-        "Endpoint errors: {}",
-        store_endpoints_errors.join(", ")
-      ));
-    }
-
-    let store_channel = tonic::transport::Channel::balance_list(store_endpoints.iter().cloned());
+    let store_endpoint = grpc_util::create_endpoint(
+      &store_address,
+      tls_client_config.as_ref().filter(|_| execution_use_tls),
+    )?;
+    let store_channel = tonic::transport::Channel::balance_list(vec![store_endpoint].into_iter());
 
     let action_cache_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => ActionCacheClient::with_interceptor(store_channel, interceptor.clone()),
@@ -185,15 +167,15 @@ impl CommandRunner {
 
     let capabilities_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => {
-        CapabilitiesClient::with_interceptor(channel.clone(), interceptor.clone())
+        CapabilitiesClient::with_interceptor(execution_channel.clone(), interceptor.clone())
       }
-      None => CapabilitiesClient::new(channel.clone()),
+      None => CapabilitiesClient::new(execution_channel.clone()),
     });
 
     let command_runner = CommandRunner {
       metadata,
       headers,
-      channel,
+      channel: execution_channel,
       execution_client,
       action_cache_client,
       store,

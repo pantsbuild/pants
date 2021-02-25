@@ -251,7 +251,7 @@ class Native(metaclass=SingletonMetaclass):
 
         remoting_options = PyRemotingOptions(
             execution_enable=execution_options.remote_execution,
-            store_addresses=execution_options.remote_store_addresses,
+            store_address=execution_options.remote_store_address,
             execution_address=execution_options.remote_execution_address,
             execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,

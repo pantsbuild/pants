@@ -227,7 +227,7 @@ async fn main() {
       Store::with_remote(
         executor.clone(),
         local_store_path,
-        vec![cas_server.clone()],
+        &cas_server,
         args.remote_instance_name.clone(),
         root_ca_certs,
         headers,
@@ -275,7 +275,7 @@ async fn main() {
         Box::new(
           process_execution::remote::CommandRunner::new(
             &address,
-            vec![address.to_owned()],
+            &address,
             process_metadata,
             root_ca_certs,
             headers,
