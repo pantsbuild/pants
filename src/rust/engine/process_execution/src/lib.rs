@@ -391,7 +391,7 @@ impl ProcessResultMetadata {
       let original_process: std::time::Duration = original_process.into();
       original_process
         .checked_sub(cache_lookup)
-        .or(Some(std::time::Duration::new(0, 0)))
+        .or_else(|| Some(std::time::Duration::new(0, 0)))
     })
   }
 }
