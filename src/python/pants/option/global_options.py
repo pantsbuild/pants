@@ -116,7 +116,6 @@ class ExecutionOptions:
     process_execution_cache_namespace: Optional[str]
     process_execution_cleanup_local_dirs: bool
     process_execution_use_local_cache: bool
-    process_execution_local_enable_nailgun: bool
 
     remote_store_addresses: list[str]
     remote_store_headers: Dict[str, str]
@@ -236,7 +235,6 @@ class ExecutionOptions:
             process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
             process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
-            process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             # Remote store setup.
             remote_store_addresses=remote_store_addresses,
             remote_store_headers=remote_store_headers,
@@ -272,7 +270,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_cache_namespace=None,
     process_execution_cleanup_local_dirs=True,
     process_execution_use_local_cache=True,
-    process_execution_local_enable_nailgun=False,
     # Remote store setup.
     remote_store_addresses=[],
     remote_store_headers={},
@@ -811,9 +808,11 @@ class GlobalOptions(Subsystem):
         register(
             "--process-execution-local-enable-nailgun",
             type=bool,
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
+            default=False,
             help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
             advanced=True,
+            removal_version="2.5.0.dev0",
+            removal_hint="This option no-ops as Pants does not yet support the JVM.",
         )
 
         register(

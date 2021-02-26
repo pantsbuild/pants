@@ -60,8 +60,6 @@ pub mod remote_cache;
 #[cfg(test)]
 mod remote_cache_tests;
 
-pub mod nailgun;
-
 pub mod named_caches;
 
 extern crate uname;
@@ -369,6 +367,30 @@ pub struct ProcessResultMetadata {
 impl ProcessResultMetadata {
   pub fn new(total_elapsed: Option<Duration>) -> Self {
     ProcessResultMetadata { total_elapsed }
+  }
+
+  /// How much faster a cache hit was than running the process again.
+  ///
+  /// This includes the overhead of setting up and cleaning up the process for execution, and it
+  /// should include all overhead for the cache lookup.
+  ///
+  /// If the cache hit was slower than the original process, we return 0. Note that the cache hit
+  /// may still have been faster than rerunning the process a second time, e.g. if speculation
+  /// is used and the cache hit completed before the rerun; still, we cannot know how long the
+  /// second run would have taken, so the best we can do is report 0.
+  ///
+  /// If the original process's execution time was not recorded, we return None because we
+  /// cannot make a meaningful comparison.
+  pub fn time_saved_from_cache(
+    &self,
+    cache_lookup: std::time::Duration,
+  ) -> Option<std::time::Duration> {
+    self.total_elapsed.and_then(|original_process| {
+      let original_process: std::time::Duration = original_process.into();
+      original_process
+        .checked_sub(cache_lookup)
+        .or_else(|| Some(std::time::Duration::new(0, 0)))
+    })
   }
 }
 
