@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        python-version: [3.7]
+        python-version: [3.7.10]
     env:
       rust_version: 1.49.0
     steps:
@@ -147,7 +147,7 @@ jobs:
     needs: bootstrap_pants_linux
     strategy:
       matrix:
-        python-version: [3.7]
+        python-version: [3.7.10]
     steps:
       - name: Check out code
         uses: actions/checkout@v2
@@ -181,7 +181,7 @@ jobs:
     needs: bootstrap_pants_linux
     strategy:
       matrix:
-        python-version: [ 3.7 ]
+        python-version: [3.7.10]
     steps:
       - name: Check out code
         uses: actions/checkout@v2
@@ -216,7 +216,7 @@ jobs:
     runs-on: macos-10.15
     strategy:
       matrix:
-        python-version: [3.7]
+        python-version: [3.7.10]
     env:
       rust_version: 1.49.0
     steps:
@@ -312,7 +312,7 @@ jobs:
     needs: bootstrap_pants_macos
     strategy:
       matrix:
-        python-version: [3.7]
+        python-version: [3.7.10]
     steps:
       - name: Check out code
         uses: actions/checkout@v2
