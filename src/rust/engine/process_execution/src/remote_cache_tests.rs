@@ -86,7 +86,7 @@ impl StoreSetup {
     let store = Store::with_remote(
       executor.clone(),
       store_dir.clone(),
-      vec![cas.address()],
+      &cas.address(),
       None,
       None,
       BTreeMap::new(),

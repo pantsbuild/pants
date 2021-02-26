@@ -67,7 +67,7 @@ def test_execution_options_remote_addresses() -> None:
         remote_execution_address=f"grpc://{host}",
     )
     assert exec_options.remote_execution_address == f"http://{host}"
-    assert exec_options.remote_store_address == [f"http://{host}"]
+    assert exec_options.remote_store_address == f"http://{host}"
 
     exec_options = create_execution_options(
         initial_headers={},
@@ -75,7 +75,7 @@ def test_execution_options_remote_addresses() -> None:
         remote_execution_address=f"grpcs://{host}",
     )
     assert exec_options.remote_execution_address == f"https://{host}"
-    assert exec_options.remote_store_address == [f"https://{host}"]
+    assert exec_options.remote_store_address == f"https://{host}"
 
     with pytest.raises(OptionsError):
         create_execution_options(

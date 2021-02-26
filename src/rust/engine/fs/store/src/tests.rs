@@ -96,11 +96,11 @@ fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
 ///
 /// Create a new store with a remote CAS.
 ///
-fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
+fn new_store<P: AsRef<Path>>(dir: P, cas_address: &str) -> Store {
   Store::with_remote(
     task_executor::Executor::new(),
     dir,
-    vec![cas_address],
+    cas_address,
     None,
     None,
     BTreeMap::new(),
@@ -124,7 +124,7 @@ async fn load_file_prefers_local() {
 
   let cas = new_cas(1024);
   assert_eq!(
-    load_file_bytes(&new_store(dir.path(), cas.address()), testdata.digest()).await,
+    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await,
     Ok(Some(testdata.bytes()))
   );
   assert_eq!(0, cas.read_request_count());
@@ -143,7 +143,7 @@ async fn load_directory_prefers_local() {
 
   let cas = new_cas(1024);
   assert_eq!(
-    new_store(dir.path(), cas.address())
+    new_store(dir.path(), &cas.address())
       .load_directory(testdir.digest(),)
       .await
       .unwrap()
@@ -162,7 +162,7 @@ async fn load_file_falls_back_and_backfills() {
 
   let cas = new_cas(1024);
   assert_eq!(
-    load_file_bytes(&new_store(dir.path(), cas.address()), testdata.digest()).await,
+    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await,
     Ok(Some(testdata.bytes())),
     "Read from CAS"
   );
@@ -187,7 +187,7 @@ async fn load_directory_falls_back_and_backfills() {
   let testdir = TestDirectory::containing_roland();
 
   assert_eq!(
-    new_store(dir.path(), cas.address())
+    new_store(dir.path(), &cas.address())
       .load_directory(testdir.digest(),)
       .await
       .unwrap()
@@ -226,7 +226,7 @@ async fn load_recursive_directory() {
     .directory(&recursive_testdir)
     .build();
 
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .ensure_local_has_recursive_directory(recursive_testdir_digest)
     .await
     .expect("Downloading recursive directory should have succeeded.");
@@ -266,7 +266,7 @@ async fn load_file_missing_is_none() {
   let cas = StubCAS::empty();
   assert_eq!(
     load_file_bytes(
-      &new_store(dir.path(), cas.address()),
+      &new_store(dir.path(), &cas.address()),
       TestData::roland().digest()
     )
     .await,
@@ -281,7 +281,7 @@ async fn load_directory_missing_is_none() {
 
   let cas = StubCAS::empty();
   assert_eq!(
-    new_store(dir.path(), cas.address())
+    new_store(dir.path(), &cas.address())
       .load_directory(TestDirectory::containing_roland().digest(),)
       .await,
     Ok(None)
@@ -295,7 +295,7 @@ async fn load_file_remote_error_is_error() {
 
   let cas = StubCAS::always_errors();
   let error = load_file_bytes(
-    &new_store(dir.path(), cas.address()),
+    &new_store(dir.path(), &cas.address()),
     TestData::roland().digest(),
   )
   .await
@@ -316,7 +316,7 @@ async fn load_directory_remote_error_is_error() {
   let dir = TempDir::new().unwrap();
 
   let cas = StubCAS::always_errors();
-  let error = new_store(dir.path(), cas.address())
+  let error = new_store(dir.path(), &cas.address())
     .load_directory(TestData::roland().digest())
     .await
     .expect_err("Want error");
@@ -338,7 +338,7 @@ async fn malformed_remote_directory_is_error() {
   let testdata = TestData::roland();
 
   let cas = new_cas(1024);
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .load_directory(testdata.digest())
     .await
     .expect_err("Want error");
@@ -376,7 +376,7 @@ async fn non_canonical_remote_directory_is_error() {
       non_canonical_directory_bytes,
     )
     .build();
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .load_directory(directory_digest.clone())
     .await
     .expect_err("Want error");
@@ -403,7 +403,7 @@ async fn wrong_remote_file_bytes_is_error() {
       TestDirectory::containing_roland().bytes(),
     )
     .build();
-  load_file_bytes(&new_store(dir.path(), cas.address()), testdata.digest())
+  load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest())
     .await
     .expect_err("Want error");
 
@@ -429,7 +429,7 @@ async fn wrong_remote_directory_bytes_is_error() {
       TestDirectory::containing_roland().bytes(),
     )
     .build();
-  load_file_bytes(&new_store(dir.path(), cas.address()), testdir.digest())
+  load_file_bytes(&new_store(dir.path(), &cas.address()), testdir.digest())
     .await
     .expect_err("Want error");
 
@@ -571,7 +571,7 @@ async fn uploads_files() {
 
   assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect("Error uploading file");
@@ -602,7 +602,7 @@ async fn uploads_directories_recursively() {
   assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
   assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect("Error uploading directory");
@@ -634,7 +634,7 @@ async fn uploads_files_recursively_when_under_three_digests_ignoring_items_alrea
     .await
     .expect("Error storing file locally");
 
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect("Error uploading file");
@@ -646,7 +646,7 @@ async fn uploads_files_recursively_when_under_three_digests_ignoring_items_alrea
   );
   assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect("Error uploading directory");
@@ -680,7 +680,7 @@ async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_d
     .await
     .expect("Error storing file locally");
 
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![roland.digest()])
     .await
     .expect("Error uploading big file");
@@ -693,7 +693,7 @@ async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_d
   assert_eq!(cas.blobs.lock().get(&catnip.fingerprint()), None);
   assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest(), catnip.digest()])
     .await
     .expect("Error uploading directory");
@@ -719,7 +719,7 @@ async fn does_not_reupload_big_file_already_in_cas() {
     .await
     .expect("Error storing file locally");
 
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![extra_big_file_digest()])
     .await
     .expect("Error uploading directory");
@@ -730,7 +730,7 @@ async fn does_not_reupload_big_file_already_in_cas() {
     Some(&extra_big_file_bytes())
   );
 
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![extra_big_file_digest()])
     .await
     .expect("Error uploading directory");
@@ -751,7 +751,7 @@ async fn upload_missing_files() {
 
   assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
-  let error = new_store(dir.path(), cas.address())
+  let error = new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect_err("Want error");
@@ -776,7 +776,7 @@ async fn upload_missing_file_in_directory() {
   assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
   assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
-  let error = new_store(dir.path(), cas.address())
+  let error = new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect_err("Want error");
@@ -806,7 +806,7 @@ async fn uploading_digest_with_wrong_size_is_error() {
 
   let wrong_digest = Digest::new(testdata.fingerprint(), testdata.len() + 1);
 
-  new_store(dir.path(), cas.address())
+  new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![wrong_digest])
     .await
     .expect_err("Expect error uploading file");
@@ -840,7 +840,7 @@ async fn instance_name_upload() {
   let store_with_remote = Store::with_remote(
     task_executor::Executor::new(),
     dir.path(),
-    vec![cas.address()],
+    &cas.address(),
     Some("dark-tower".to_owned()),
     None,
     BTreeMap::new(),
@@ -867,7 +867,7 @@ async fn instance_name_download() {
   let store_with_remote = Store::with_remote(
     task_executor::Executor::new(),
     dir.path(),
-    vec![cas.address()],
+    &cas.address(),
     Some("dark-tower".to_owned()),
     None,
     BTreeMap::new(),
@@ -916,7 +916,7 @@ async fn auth_upload() {
   let store_with_remote = Store::with_remote(
     task_executor::Executor::new(),
     dir.path(),
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
     headers,
@@ -945,7 +945,7 @@ async fn auth_download() {
   let store_with_remote = Store::with_remote(
     task_executor::Executor::new(),
     dir.path(),
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
     headers,
@@ -1278,7 +1278,7 @@ async fn returns_upload_summary_on_empty_cas() {
     .store_file_bytes(testcatnip.bytes(), false)
     .await
     .expect("Error storing file locally");
-  let mut summary = new_store(dir.path(), cas.address())
+  let mut summary = new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect("Error uploading file");
@@ -1328,7 +1328,7 @@ async fn summary_does_not_count_things_in_cas() {
     .expect("Error storing file locally");
 
   // Store testroland first, which should return a summary of one file
-  let mut data_summary = new_store(dir.path(), cas.address())
+  let mut data_summary = new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![testroland.digest()])
     .await
     .expect("Error uploading file");
@@ -1348,7 +1348,7 @@ async fn summary_does_not_count_things_in_cas() {
   // Store the directory and catnip.
   // It should see the digest of testroland already in cas,
   // and not report it in uploads.
-  let mut dir_summary = new_store(dir.path(), cas.address())
+  let mut dir_summary = new_store(dir.path(), &cas.address())
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect("Error uploading directory");
@@ -1436,7 +1436,7 @@ async fn materialize_directory_metadata_mixed() {
   let cas = StubCAS::builder().directory(&nested_dir).build();
 
   let dir = tempfile::tempdir().unwrap();
-  let store = new_store(dir.path(), cas.address());
+  let store = new_store(dir.path(), &cas.address());
   store
     .record_directory(&outer_dir.directory(), false)
     .await
@@ -1509,7 +1509,7 @@ async fn explicitly_overwrites_already_existing_file() {
     .directory(&contents_dir)
     .file(&cas_file)
     .build();
-  let store = new_store(tempfile::tempdir().unwrap(), cas.address());
+  let store = new_store(tempfile::tempdir().unwrap(), &cas.address());
 
   let _ = store
     .materialize_directory(dir_to_write_to.path().to_owned(), contents_dir.digest())
