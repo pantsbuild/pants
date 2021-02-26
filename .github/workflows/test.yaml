@@ -136,7 +136,7 @@ jobs:
       - name: Upload native_engine.so
         uses: actions/upload-artifact@v2
         with:
-          name: native_engine.so
+          name: native_engine.so.linux
           path: |
             src/python/pants/engine/internals/native_engine.so
             src/python/pants/engine/internals/native_engine.so.metadata
@@ -166,7 +166,7 @@ jobs:
       - name: Download native_engine.so
         uses: actions/download-artifact@v2
         with:
-          name: native_engine.so
+          name: native_engine.so.linux
           path: src/python/pants/engine/internals/
       - name: Set env vars
         run: |
@@ -200,7 +200,7 @@ jobs:
       - name: Download native_engine.so
         uses: actions/download-artifact@v2
         with:
-          name: native_engine.so
+          name: native_engine.so.linux
           path: src/python/pants/engine/internals/
       - name: Set env vars
         run: |
@@ -292,7 +292,7 @@ jobs:
       - name: Upload native_engine.so
         uses: actions/upload-artifact@v2
         with:
-          name: native_engine.so
+          name: native_engine.so.macos
           path: |
             src/python/pants/engine/internals/native_engine.so
             src/python/pants/engine/internals/native_engine.so.metadata
@@ -331,13 +331,11 @@ jobs:
       - name: Download native_engine.so
         uses: actions/download-artifact@v2
         with:
-          name: native_engine.so
+          name: native_engine.so.macos
           path: src/python/pants/engine/internals/
       - name: Set env vars
         run: |
           echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
       - name: Run Python tests
         run: |
-          ./pants test ::
-
-#
+          ./pants --tag=+platform_specific_behavior test ::
