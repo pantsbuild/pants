@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ffi::OsString;
 use std::path::Component;
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -14,7 +15,7 @@ use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
 use tonic::transport::Channel;
-use workunit_store::{with_workunit, Level, Metric, WorkunitMetadata};
+use workunit_store::{with_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
 
 use crate::remote::make_execute_request;
 use crate::{
@@ -391,6 +392,7 @@ impl crate::CommandRunner for CommandRunner {
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let request = self
       .extract_compatible_request(&req)
@@ -452,7 +454,17 @@ impl crate::CommandRunner for CommandRunner {
       tokio::select! {
         cache_result = cache_read_future => {
           if let Some(cached_response) = cache_result {
+            let lookup_elapsed = cache_lookup_start.elapsed();
             context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+            if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
+              let time_saved = time_saved.as_millis() as u64;
+              context
+                .workunit_store
+                .increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
+              context
+                .workunit_store
+                .record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
+              }
             return Ok(cached_response);
           } else {
             // Note that we don't increment a counter here, as there is nothing of note in this
