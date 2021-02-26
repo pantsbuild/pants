@@ -6,6 +6,7 @@ python_library()
 python_tests(
   name="tests",
   sources=["*_test.py", "!*integration_test.py"],
+  timeout = 120,
 )
 
 
