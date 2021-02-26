@@ -24,6 +24,7 @@
 
 # There is no need to run linters on both platforms...
 
+# NOTE: This name must be synced to cancel.yaml if changed.
 name: Pull Request CI
 
 on:
