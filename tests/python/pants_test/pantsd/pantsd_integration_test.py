@@ -15,7 +15,7 @@ import pytest
 
 from pants.testutil.pants_integration_test import (
     PantsJoinHandle,
-    read_pantsd_log,
+    read_pants_log,
     setup_tmpdir,
     temporary_workdir,
 )
@@ -274,8 +274,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             time.sleep(5)
             ctx.checker.assert_running()
 
-            def full_pantsd_log():
-                return "\n".join(read_pantsd_log(ctx.workdir))
+            def full_pants_log():
+                return "\n".join(read_pants_log(ctx.workdir))
 
             # Create a new file in test_dir
             with temporary_file(suffix=".py", binary_mode=False, root_dir=test_dir) as temp_f:
@@ -284,7 +284,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
                 ctx.checker.assert_stopped()
 
-            self.assertIn("saw filesystem changes covered by invalidation globs", full_pantsd_log())
+            self.assertIn("saw filesystem changes covered by invalidation globs", full_pants_log())
 
     def test_pantsd_invalidation_pants_toml_file(self):
         # Test tmp_pants_toml (--pants-config-files=$tmp_pants_toml)'s removal

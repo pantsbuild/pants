@@ -251,6 +251,8 @@ impl Scheduler {
             // A stdio handler that will immediately trigger logging.
             Err(())
           }))?;
+        // NB: Command's stdio methods take ownership of a file-like to use, so we use
+        // `TryCloneAsFile` here to `dup` our thread-local stdio.
         command
           .stdin(Stdio::from(
             term_stdin

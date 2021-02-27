@@ -8,10 +8,11 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 path = "src/console_ui.rs"
 
 [dependencies]
+console = "0.14"
 futures = "0.3"
 indexmap = "1.4"
-console = "0.14"
-indicatif = "0.15"
+# TODO: Posted as https://github.com/mitsuhiko/indicatif/pull/241.
+indicatif = { git = "https://github.com/stuhood/indicatif", branch = "stuhood/properly-query-width" }
 stdio = { path = "../stdio" }
 task_executor = { path = "../task_executor" }
 uuid = { version = "0.7", features = ["v4"] }

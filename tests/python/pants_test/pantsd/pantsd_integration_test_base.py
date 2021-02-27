@@ -16,7 +16,7 @@ from pants.testutil.pants_integration_test import (
     PantsJoinHandle,
     PantsResult,
     kill_daemon,
-    read_pantsd_log,
+    read_pants_log,
     run_pants,
     run_pants_with_workdir,
     run_pants_with_workdir_without_waiting,
@@ -160,10 +160,10 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
                 kill_daemon(pid_dir)
                 checker.assert_stopped()
             finally:
-                banner("BEGIN pantsd.log")
-                for line in read_pantsd_log(workdir):
+                banner("BEGIN pants.log")
+                for line in read_pants_log(workdir):
                     print(line)
-                banner("END pantsd.log")
+                banner("END pants.log")
 
     @contextmanager
     def pantsd_successful_run_context(self, *args, **kwargs) -> Iterator[PantsdRunContext]:

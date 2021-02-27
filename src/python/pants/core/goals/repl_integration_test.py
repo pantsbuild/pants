@@ -39,7 +39,7 @@ def test_repl_with_targets(rule_runner: RuleRunner) -> None:
     # that, e.g., the generated protobuf code is available. Right now this test prepares for
     # that by including generated code, but cannot actually verify it.
     setup_sources(rule_runner)
-    with mock_console(rule_runner.options_bootstrapper) as (_, _):
+    with mock_console(rule_runner.options_bootstrapper):
         result = rule_runner.run_goal_rule(
             Repl,
             global_args=[
@@ -53,7 +53,7 @@ def test_repl_with_targets(rule_runner: RuleRunner) -> None:
 
 def test_repl_ipython(rule_runner: RuleRunner) -> None:
     setup_sources(rule_runner)
-    with mock_console(rule_runner.options_bootstrapper) as (_, _):
+    with mock_console(rule_runner.options_bootstrapper):
         result = rule_runner.run_goal_rule(
             Repl,
             global_args=[
@@ -67,7 +67,7 @@ def test_repl_ipython(rule_runner: RuleRunner) -> None:
 
 def test_repl_bogus_repl_name(rule_runner: RuleRunner) -> None:
     setup_sources(rule_runner)
-    with mock_console(rule_runner.options_bootstrapper) as (_, _):
+    with mock_console(rule_runner.options_bootstrapper):
         result = rule_runner.run_goal_rule(
             Repl,
             global_args=["--backend-packages=pants.backend.python"],

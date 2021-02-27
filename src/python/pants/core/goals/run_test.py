@@ -89,7 +89,7 @@ def test_normal_run(rule_runner: RuleRunner) -> None:
 def test_materialize_input_files(rule_runner: RuleRunner) -> None:
     program_text = b'#!/usr/bin/python\nprint("hello")'
     binary = create_mock_run_request(rule_runner, program_text)
-    with mock_console(rule_runner.options_bootstrapper) as (_, _):
+    with mock_console(rule_runner.options_bootstrapper):
         interactive_runner = InteractiveRunner(rule_runner.scheduler)
         process = InteractiveProcess(
             argv=("./program.py",),

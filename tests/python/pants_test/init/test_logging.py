@@ -27,9 +27,7 @@ def test_file_logging() -> None:
             logger.info(f"unicode: {cat}")
 
             loglines = (
-                Path(global_bootstrap_options.pants_workdir, "pantsd", "pantsd.log")
-                .read_text()
-                .splitlines()
+                Path(global_bootstrap_options.pants_workdir, "pants.log").read_text().splitlines()
             )
             print(loglines)
             assert len(loglines) == 3
@@ -58,9 +56,7 @@ def test_log_filtering_by_rule() -> None:
             )
 
             loglines = (
-                Path(global_bootstrap_options.pants_workdir, "pantsd", "pantsd.log")
-                .read_text()
-                .splitlines()
+                Path(global_bootstrap_options.pants_workdir, "pants.log").read_text().splitlines()
             )
 
             assert "[INFO] log msg one" in loglines[0]

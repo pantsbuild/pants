@@ -404,7 +404,7 @@ pub fn new_console_destination(
 /// work that was previously spawned by it, whereas `get_destination().console_clear()` would clear
 /// the console for all previously spawned Thread/Tasks.
 ///
-/// See Arc<Destination> for more info.
+/// See InnerDestination for more info.
 ///
 pub fn set_thread_destination(destination: Arc<Destination>) {
   THREAD_DESTINATION.with(|thread_destination| {
@@ -416,7 +416,7 @@ pub fn set_thread_destination(destination: Arc<Destination>) {
 /// Propagate the current stdio Destination to a Future representing a newly spawned Task. Usage of
 /// this method should mostly be contained to task_executor::Executor.
 ///
-/// See Arc<Destination> for more info.
+/// See InnerDestination for more info.
 ///
 pub async fn scope_task_destination<F>(destination: Arc<Destination>, f: F) -> F::Output
 where

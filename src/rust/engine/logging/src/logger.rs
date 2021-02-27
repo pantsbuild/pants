@@ -178,7 +178,7 @@ impl Log for PantsLogger {
 
     let show_target = self.show_target.load(Ordering::SeqCst);
     let level = record.level();
-    // TODO: Fix application of color for log-files.
+    // TODO: Fix application of color for log-files: see https://github.com/pantsbuild/pants/issues/11020
     let use_color = self.use_color.load(Ordering::SeqCst);
 
     let level_marker = match level {

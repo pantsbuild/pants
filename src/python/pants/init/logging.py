@@ -7,9 +7,10 @@ import os
 import sys
 from contextlib import contextmanager
 from logging import Formatter, LogRecord, StreamHandler
-from typing import Dict
+from typing import Dict, Iterator
 
 import pants.util.logging as pants_logging
+from pants.base.deprecated import deprecated_conditional
 from pants.engine.internals import native_engine
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir_for
@@ -47,7 +48,7 @@ class _ExceptionFormatter(Formatter):
 
 
 @contextmanager
-def stdio_destination(stdin_fileno: int, stdout_fileno: int, stderr_fileno: int):
+def stdio_destination(stdin_fileno: int, stdout_fileno: int, stderr_fileno: int) -> Iterator[None]:
     """Sets a destination for both logging and stdio: must be called after `initialize_stdio`.
 
     After `initialize_stdio` and outside of this contextmanager, the default stdio destination is
@@ -67,7 +68,7 @@ def stdio_destination(stdin_fileno: int, stdout_fileno: int, stderr_fileno: int)
 
 
 @contextmanager
-def _python_logging_setup(level: LogLevel, print_stacktrace: bool):
+def _python_logging_setup(level: LogLevel, print_stacktrace: bool) -> Iterator[None]:
     """Installs a root Python logger that routes all logging through a Rust logger."""
 
     def trace_fn(self, message, *args, **kwargs):
@@ -110,7 +111,7 @@ def _python_logging_setup(level: LogLevel, print_stacktrace: bool):
 
 
 @contextmanager
-def initialize_stdio(global_bootstrap_options: OptionValueContainer):
+def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator[None]:
     """Mutates sys.std* and logging to route stdio for a Pants process to thread local destinations.
 
     In this context, `sys.std*` and logging handlers will route through Rust code that uses
@@ -133,13 +134,25 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer):
     print_stacktrace = global_bootstrap_options.print_stacktrace
 
     # Set the pantsd log destination.
-    # TODO: This should likely convert into a generic log, possibly with a symlink from the
-    # previous location.
-    log_path = os.path.join(global_bootstrap_options.pants_workdir, "pantsd", "pantsd.log")
+    deprecated_log_path = os.path.join(
+        global_bootstrap_options.pants_workdir, "pantsd", "pantsd.log"
+    )
+    log_path = os.path.join(global_bootstrap_options.pants_workdir, "pants.log")
+    safe_mkdir_for(deprecated_log_path)
     safe_mkdir_for(log_path)
+    # NB: We append to the deprecated log location with a deprecated conditional that never
+    # triggers, because there is nothing that the user can do about the deprecation.
+    deprecated_conditional(
+        predicate=lambda: False,
+        removal_version="2.5.0.dev0",
+        entity_description=f"Logging to {deprecated_log_path}",
+        hint_message=f"Refer to {log_path} instead.",
+    )
+    with open(deprecated_log_path, "a") as a:
+        a.write(f"This log location is deprecated: please refer to {log_path} instead.\n")
 
     # Initialize thread-local stdio, and replace sys.std* with proxies.
-    stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
+    original_stdin, original_stdout, original_stderr = sys.stdin, sys.stdout, sys.stderr
     try:
         sys.stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
             global_level.level,
@@ -154,7 +167,7 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer):
         with _python_logging_setup(global_level, print_stacktrace):
             yield
     finally:
-        sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
+        sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
 
 
 def _get_log_levels_by_target(

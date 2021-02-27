@@ -37,8 +37,7 @@ class DaemonPantsRunner(RawFdRunner):
     def _send_stderr(stderr_fileno: int, msg: str) -> None:
         """Used to send stderr on a raw filehandle _before_ stdio replacement.
 
-        After stdio replacement has happened via `stdio_destination` (which cannot happen until the
-        request lock has been acquired), sys.std* should be used directly.
+        TODO: This method will be removed as part of #7654.
         """
         with os.fdopen(stderr_fileno, mode="w", closefd=False) as stderr:
             print(msg, file=stderr, flush=True)

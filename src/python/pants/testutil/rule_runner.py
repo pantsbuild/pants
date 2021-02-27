@@ -449,7 +449,8 @@ def run_rule_with_mocks(
 def mock_console(
     options_bootstrapper: OptionsBootstrapper,
 ) -> Iterator[Tuple[Console, StdioReader]]:
-    with initialize_stdio(options_bootstrapper.bootstrap_options.for_global_scope()), open(
+    global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+    with initialize_stdio(global_bootstrap_options), open(
         "/dev/null", "r"
     ) as stdin, temporary_file(binary_mode=False) as stdout, temporary_file(
         binary_mode=False
@@ -461,7 +462,9 @@ def mock_console(
         # NB: We yield a Console without overriding the destination argument, because we have
         # already done a sys.std* level replacement. The replacement is necessary in order for
         # InteractiveProcess to have native file handles to interact with.
-        yield Console(), StdioReader(_stdout=Path(stdout.name), _stderr=Path(stderr.name))
+        yield Console(use_colors=global_bootstrap_options.colors), StdioReader(
+            _stdout=Path(stdout.name), _stderr=Path(stderr.name)
+        )
 
 
 @dataclass

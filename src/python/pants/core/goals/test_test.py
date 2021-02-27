@@ -157,9 +157,6 @@ def run_test_rule(
         return CoverageReports(reports=(console_report,))
 
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
-        pass
-
-    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Test = run_rule_with_mocks(
             run_tests,
             rule_args=[

@@ -666,6 +666,9 @@ py_class!(class PyNailgunClient |py| {
           let err_str = format!("Nailgun client error: {:?}", s);
           PyErr::new::<NailgunClientException, _>(py, (err_str,))
         },
+        NailgunClientError::BrokenPipe => {
+          PyErr::new::<exc::BrokenPipeError, _>(py, NoArgs)
+        }
         NailgunClientError::KeyboardInterrupt => {
           PyErr::new::<exc::KeyboardInterrupt, _>(py, NoArgs)
         }

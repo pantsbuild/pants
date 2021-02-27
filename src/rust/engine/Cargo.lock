@@ -1251,8 +1251,7 @@ dependencies = [
 [[package]]
 name = "indicatif"
 version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7baab56125e25686df467fe470785512329883aab42696d661247aca2a2896e4"
+source = "git+https://github.com/stuhood/indicatif?branch=stuhood/properly-query-width#7345638238a37fc2fc99faf87dbbd7a8b137b948"
 dependencies = [
  "console",
  "lazy_static",
@@ -1812,9 +1811,9 @@ dependencies = [
 
 [[package]]
 name = "number_prefix"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17b02fc0ff9a9e4b35b3342880f48e896ebf69f2967921fe8646bf5b7125956a"
+checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 
 [[package]]
 name = "once_cell"
@@ -2867,7 +2866,6 @@ dependencies = [
  "log 0.4.11",
  "parking_lot",
  "tokio",
- "uuid",
 ]
 
 [[package]]
