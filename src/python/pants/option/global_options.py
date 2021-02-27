@@ -884,16 +884,6 @@ class GlobalOptions(Subsystem):
                 "may add additional headers.\n\nSee `--remote-execution-headers` as well."
             ),
         )
-        # TODO: Infer this from remote-store-connection-limit.
-        register(
-            "--remote-store-thread-count",
-            type=int,
-            advanced=True,
-            default=0,
-            help="Thread count to use for the pool that interacts with the remote file store.",
-            removal_version="2.4.0.dev0",
-            removal_hint="This option now no-ops.",
-        )
         register(
             "--remote-store-chunk-bytes",
             type=int,
@@ -914,52 +904,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_retries,
             help="Number of times to retry any RPC to the remote store before giving up.",
-        )
-        register(
-            "--remote-store-connection-limit",
-            type=int,
-            advanced=True,
-            default=0,
-            help="Number of remote stores to concurrently allow connections to.",
-            removal_version="2.4.0.dev0",
-            removal_hint="This option now no-ops.",
-        )
-        register(
-            "--remote-store-initial-timeout",
-            type=int,
-            advanced=True,
-            default=0,
-            help=(
-                "Initial timeout (in milliseconds) when there is a failure in accessing a "
-                "remote store."
-            ),
-            removal_version="2.4.0.dev0",
-            removal_hint="This option now no-ops.",
-        )
-        register(
-            "--remote-store-timeout-multiplier",
-            type=float,
-            advanced=True,
-            default=0,
-            help=(
-                "Multiplier used to increase the timeout (starting with value of "
-                "--remote-store-initial-timeout) between retry attempts in accessing a remote "
-                "store."
-            ),
-            removal_version="2.4.0.dev0",
-            removal_hint="This option now no-ops.",
-        )
-        register(
-            "--remote-store-maximum-timeout",
-            type=int,
-            advanced=True,
-            default=0,
-            help=(
-                "Maximum timeout (in millseconds) to allow between retry attempts in accessing a "
-                "remote store."
-            ),
-            removal_version="2.4.0.dev0",
-            removal_hint="This option now no-ops.",
         )
 
         register(
