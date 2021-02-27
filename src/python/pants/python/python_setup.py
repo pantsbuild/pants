@@ -12,7 +12,6 @@ from typing import Callable, Iterable, List, Optional, Tuple, cast
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import warn_or_error
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -119,11 +118,13 @@ class PythonSetup(Subsystem):
             advanced=True,
             type=ResolverVersion,
             default=ResolverVersion.PIP_2020,
-            help=(
-                "The resolver implementation to use when resolving Python requirements.\n\nSupport "
-                f"for the {ResolverVersion.PIP_LEGACY.value!r} will be removed in Pants 2.5. "
-                "For more information on this change see "
-                "https://pip.pypa.io/en/latest/user_guide/#changes-to-the-pip-dependency-resolver-in-20-2-2020"
+            help="The resolver implementation to use when resolving Python requirements.",
+            removal_version="2.5.0.dev0",
+            removal_hint=(
+                "Support for configuring --resolver-version and selecting pip's legacy resolver "
+                "will be removed in Pants 2.5. Refer to https://pip.pypa.io/en/latest/user_guide/"
+                "#changes-to-the-pip-dependency-resolver-in-20-2-2020 for more information on the "
+                "new resolver."
             ),
         )
         register(
@@ -178,34 +179,8 @@ class PythonSetup(Subsystem):
     def interpreter_search_paths(self):
         return self.expand_interpreter_search_paths(self.options.interpreter_search_paths)
 
-    # Note: only memoized to avoid the deprecation happening multiple times. Change back once the default
-    # changes
-    @memoized_property
+    @property
     def resolver_version(self) -> ResolverVersion:
-        if not self.options.is_default("resolver_version"):
-            if self.options.resolver_version == ResolverVersion.PIP_LEGACY:
-                warn_or_error(
-                    removal_version="2.5.0.dev0",
-                    deprecated_entity_description="resolver_version",
-                    hint=(
-                        "Support for configuring resolver_version and selecting pip's legacy "
-                        "resolver will be removed in Pants 2.5. Refer to "
-                        "https://pip.pypa.io/en/latest/user_guide/"
-                        "#changes-to-the-pip-dependency-resolver-in-20-2-2020 for more information "
-                        "on the new resolver."
-                    ),
-                )
-            else:
-                warn_or_error(
-                    removal_version="2.5.0.dev0",
-                    deprecated_entity_description="resolver_version",
-                    hint=(
-                        "Support for configuring resolver_version will be removed in Pants 2.5. "
-                        "You're already using the default of "
-                        f"{ResolverVersion.PIP_2020.value!r}; so the option configuration can "
-                        "simply be removed."
-                    ),
-                )
         return cast(ResolverVersion, self.options.resolver_version)
 
     @property
