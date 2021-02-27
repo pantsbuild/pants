@@ -765,37 +765,6 @@ class GlobalOptions(Subsystem):
             ),
         )
         register(
-            "--process-execution-speculation-delay",
-            type=float,
-            default=1,
-            advanced=True,
-            help="Number of seconds to wait before speculating a second request for a slow process. "
-            " see `--process-execution-speculation-strategy`",
-            removal_version="2.4.0.dev0",
-            removal_hint=(
-                "This option now no-ops, as speculation has been removed. It will be "
-                "re-implemented in the future."
-            ),
-        )
-        register(
-            "--process-execution-speculation-strategy",
-            choices=["remote_first", "local_first", "none"],
-            default="none",
-            help="Speculate a second request for an underlying process if the first one does not complete within "
-            "`--process-execution-speculation-delay` seconds.\n"
-            "`local_first` (default): Try to run the process locally first, "
-            "and fall back to remote execution if available.\n"
-            "`remote_first`: Run the process on the remote execution backend if available, "
-            "and fall back to the local host if remote calls take longer than the speculation timeout.\n"
-            "`none`: Do not speculate about long running processes.",
-            advanced=True,
-            removal_version="2.4.0.dev0",
-            removal_hint=(
-                "This option now no-ops, as speculation has been removed. It will be "
-                "re-implemented in the future."
-            ),
-        )
-        register(
             "--process-execution-local-enable-nailgun",
             type=bool,
             default=False,
