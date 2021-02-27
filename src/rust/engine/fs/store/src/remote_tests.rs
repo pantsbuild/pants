@@ -151,7 +151,7 @@ async fn write_file_multiple_chunks() {
   let cas = StubCAS::empty();
 
   let store = ByteStore::new(
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
     BTreeMap::new(),
@@ -227,7 +227,7 @@ async fn write_file_errors() {
 #[tokio::test]
 async fn write_connection_error() {
   let store = ByteStore::new(
-    vec![String::from("http://doesnotexist.example")],
+    "http://doesnotexist.example",
     None,
     None,
     BTreeMap::new(),
@@ -298,46 +298,9 @@ async fn list_missing_digests_error() {
   );
 }
 
-// TODO(tonic): Ignored this test because, while `ByteStore` is configured with both endpoints,
-// Tonic may choose to send both requests to one endpoint, and then this test fails. It is
-// unclear how to force this behavior into strict round-robin just for this test.
-#[ignore]
-#[tokio::test()]
-async fn reads_from_multiple_cas_servers() {
-  let roland = TestData::roland();
-  let catnip = TestData::catnip();
-
-  let cas1 = StubCAS::builder().file(&roland).file(&catnip).build();
-  let cas2 = StubCAS::builder().file(&roland).file(&catnip).build();
-
-  let store = ByteStore::new(
-    vec![cas1.address(), cas2.address()],
-    None,
-    None,
-    BTreeMap::new(),
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap();
-
-  assert_eq!(
-    load_file_bytes(&store, roland.digest()).await,
-    Ok(Some(roland.bytes()))
-  );
-
-  assert_eq!(
-    load_file_bytes(&store, catnip.digest()).await,
-    Ok(Some(catnip.bytes()))
-  );
-
-  assert_eq!(cas1.read_request_count(), 1);
-  assert_eq!(cas2.read_request_count(), 1);
-}
-
 fn new_byte_store(cas: &StubCAS) -> ByteStore {
   ByteStore::new(
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
     BTreeMap::new(),

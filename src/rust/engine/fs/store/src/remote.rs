@@ -14,10 +14,9 @@ use futures::Future;
 use futures::StreamExt;
 use grpc_util::headers_to_interceptor_fn;
 use hashing::Digest;
-use itertools::{Either, Itertools};
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use tonic::{Code, Interceptor, Request};
 use workunit_store::{with_workunit, ObservationMetric};
 
@@ -41,7 +40,7 @@ impl fmt::Debug for ByteStore {
 
 impl ByteStore {
   pub fn new(
-    cas_addresses: Vec<String>,
+    cas_address: &str,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
@@ -49,32 +48,14 @@ impl ByteStore {
     upload_timeout: Duration,
     rpc_retries: usize,
   ) -> Result<ByteStore, String> {
-    let tls_client_config = if cas_addresses
-      .first()
-      .map(|addr| addr.starts_with("https://"))
-      .unwrap_or(false)
-    {
+    let tls_client_config = if cas_address.starts_with("https://") {
       Some(grpc_util::create_tls_config(root_ca_certs)?)
     } else {
       None
     };
 
-    let (endpoints, errors): (Vec<Endpoint>, Vec<String>) = cas_addresses
-      .iter()
-      .map(|addr| grpc_util::create_endpoint(addr, tls_client_config.as_ref()))
-      .partition_map(|result| match result {
-        Ok(endpoint) => Either::Left(endpoint),
-        Err(err) => Either::Right(err),
-      });
-
-    if !errors.is_empty() {
-      return Err(format!(
-        "Errors while creating gRPC endpoints: {}",
-        errors.join(", ")
-      ));
-    }
-
-    let channel = tonic::transport::Channel::balance_list(endpoints.iter().cloned());
+    let endpoint = grpc_util::create_endpoint(&cas_address, tls_client_config.as_ref())?;
+    let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let interceptor = if headers.is_empty() {
       None
     } else {

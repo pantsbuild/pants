@@ -257,7 +257,7 @@ impl Store {
   pub fn with_remote<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
-    cas_addresses: Vec<String>,
+    cas_address: &str,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
@@ -268,7 +268,7 @@ impl Store {
     Ok(Store {
       local: local::ByteStore::new(executor, path)?,
       remote: Some(remote::ByteStore::new(
-        cas_addresses,
+        cas_address,
         instance_name,
         root_ca_certs,
         headers,

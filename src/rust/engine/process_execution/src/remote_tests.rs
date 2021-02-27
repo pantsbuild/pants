@@ -859,7 +859,7 @@ async fn sends_headers() {
   let store = Store::with_remote(
     runtime.clone(),
     store_dir,
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
     BTreeMap::new(),
@@ -871,7 +871,7 @@ async fn sends_headers() {
 
   let command_runner = CommandRunner::new(
     &mock_server.address(),
-    vec![mock_server.address().clone()],
+    &mock_server.address(),
     ProcessMetadata::default(),
     None,
     btreemap! {
@@ -1054,7 +1054,7 @@ async fn ensure_inline_stdio_is_stored() {
   let store = Store::with_remote(
     runtime.clone(),
     &store_dir_path,
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
     BTreeMap::new(),
@@ -1066,7 +1066,7 @@ async fn ensure_inline_stdio_is_stored() {
 
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
-    vec![mock_server.address().clone()],
+    &mock_server.address(),
     ProcessMetadata::default(),
     None,
     BTreeMap::new(),
@@ -1431,7 +1431,7 @@ async fn execute_missing_file_uploads_if_known() {
   let store = Store::with_remote(
     runtime.clone(),
     store_dir,
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
     BTreeMap::new(),
@@ -1450,7 +1450,7 @@ async fn execute_missing_file_uploads_if_known() {
     .expect("Saving directory bytes to store");
   let command_runner = CommandRunner::new(
     &mock_server.address(),
-    vec![mock_server.address().clone()],
+    &mock_server.address(),
     ProcessMetadata::default(),
     None,
     BTreeMap::new(),
@@ -1506,7 +1506,7 @@ async fn execute_missing_file_errors_if_unknown() {
   let store = Store::with_remote(
     runtime.clone(),
     store_dir,
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
     BTreeMap::new(),
@@ -1518,7 +1518,7 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let runner = CommandRunner::new(
     &mock_server.address(),
-    vec![mock_server.address().clone()],
+    &mock_server.address(),
     ProcessMetadata::default(),
     None,
     BTreeMap::new(),
@@ -2217,7 +2217,7 @@ fn create_command_runner(
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
     &address,
-    vec![address.clone()],
+    &address,
     ProcessMetadata::default(),
     None,
     BTreeMap::new(),
@@ -2267,7 +2267,7 @@ pub(crate) fn make_store(
   Store::with_remote(
     executor,
     store_dir,
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
     BTreeMap::new(),
