@@ -4,6 +4,9 @@ colors = true
 # TODO: See #9924.
 dynamic_ui = false
 
+[stats]
+log = true
+
 [test]
 use_coverage = true
 
