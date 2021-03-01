@@ -5,16 +5,18 @@ from __future__ import annotations
 
 import multiprocessing
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, Iterable, Mapping, Sequence, Type, TypeVar, cast
+from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, Tuple, Type, TypeVar, cast
 
 from colors import blue, cyan, green, magenta, red, yellow
 
 from pants.base.build_root import BuildRoot
+from pants.base.deprecated import deprecated
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -35,12 +37,13 @@ from pants.engine.rules import Rule
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
+from pants.init.logging import initialize_stdio, stdio_destination
 from pants.option.global_options import ExecutionOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import (
     recursive_dirname,
     safe_file_dump,
@@ -76,6 +79,7 @@ class GoalRuleResult:
 @dataclass
 class RuleRunner:
     build_root: str
+    options_bootstrapper: OptionsBootstrapper
     build_config: BuildConfiguration
     scheduler: SchedulerSession
 
@@ -113,9 +117,9 @@ class RuleRunner:
         build_config_builder.register_target_types(target_types or ())
         self.build_config = build_config_builder.create()
 
-        options_bootstrapper = create_options_bootstrapper()
-        options = options_bootstrapper.full_options(self.build_config)
-        global_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        self.options_bootstrapper = create_options_bootstrapper()
+        options = self.options_bootstrapper.full_options(self.build_config)
+        global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
         local_store_dir = (
             os.path.realpath(safe_mkdtemp())
             if isolated_local_store
@@ -142,7 +146,10 @@ class RuleRunner:
         ).new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(
-                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment()}
+                {
+                    OptionsBootstrapper: self.options_bootstrapper,
+                    PantsEnvironment: PantsEnvironment(),
+                }
             ),
         )
         self.scheduler = graph_session.scheduler_session
@@ -187,9 +194,8 @@ class RuleRunner:
     ) -> GoalRuleResult:
         merged_args = (*(global_args or []), goal.name, *(args or []))
         self.set_options(merged_args, env=env)
-        options_bootstrapper = create_options_bootstrapper(args=merged_args, env=env)
 
-        raw_specs = options_bootstrapper.full_options_for_scopes(
+        raw_specs = self.options_bootstrapper.full_options_for_scopes(
             [*GlobalOptions.known_scope_infos(), *goal.subsystem_cls.known_scope_infos()]
         ).specs
         specs = SpecsParser(self.build_root).parse_specs(raw_specs)
@@ -220,11 +226,14 @@ class RuleRunner:
 
         This will override any previously configured values.
         """
-        options_bootstrapper = create_options_bootstrapper(args=args, env=env)
+        self.options_bootstrapper = create_options_bootstrapper(args=args, env=env)
         self.scheduler = self.scheduler.scheduler.new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(
-                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment(env)}
+                {
+                    OptionsBootstrapper: self.options_bootstrapper,
+                    PantsEnvironment: PantsEnvironment(env),
+                }
             ),
         )
 
@@ -436,9 +445,46 @@ def run_rule_with_mocks(
                 return e.value
 
 
+@contextmanager
+def mock_console(
+    options_bootstrapper: OptionsBootstrapper,
+) -> Iterator[Tuple[Console, StdioReader]]:
+    global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+    with initialize_stdio(global_bootstrap_options), open(
+        "/dev/null", "r"
+    ) as stdin, temporary_file(binary_mode=False) as stdout, temporary_file(
+        binary_mode=False
+    ) as stderr, stdio_destination(
+        stdin_fileno=stdin.fileno(),
+        stdout_fileno=stdout.fileno(),
+        stderr_fileno=stderr.fileno(),
+    ):
+        # NB: We yield a Console without overriding the destination argument, because we have
+        # already done a sys.std* level replacement. The replacement is necessary in order for
+        # InteractiveProcess to have native file handles to interact with.
+        yield Console(use_colors=global_bootstrap_options.colors), StdioReader(
+            _stdout=Path(stdout.name), _stderr=Path(stderr.name)
+        )
+
+
+@dataclass
+class StdioReader:
+    _stdout: Path
+    _stderr: Path
+
+    def get_stdout(self) -> str:
+        """Return all data that has been flushed to stdout so far."""
+        return self._stdout.read_text()
+
+    def get_stderr(self) -> str:
+        """Return all data that has been flushed to stderr so far."""
+        return self._stderr.read_text()
+
+
 class MockConsole:
     """An implementation of pants.engine.console.Console which captures output."""
 
+    @deprecated("2.5.0.dev0", hint_message="Use the mock_console contextmanager instead.")
     def __init__(self, use_colors=True):
         self.stdout = StringIO()
         self.stderr = StringIO()

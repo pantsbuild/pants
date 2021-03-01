@@ -42,7 +42,18 @@ use futures::{try_join, SinkExt, Stream, StreamExt};
 pub enum NailgunClientError {
   PreConnect(String),
   PostConnect(String),
+  BrokenPipe,
   KeyboardInterrupt,
+}
+
+fn handle_postconnect_stdio(err: io::Error, msg: &str) -> NailgunClientError {
+  if err.kind() == io::ErrorKind::BrokenPipe {
+    // A BrokenPipe error is a semi-expected error caused when stdout/stderr closes, and which
+    // the Python runtime has a special error type and handling for.
+    NailgunClientError::BrokenPipe
+  } else {
+    NailgunClientError::PostConnect(format!("{}: {}", msg, err))
+  }
 }
 
 async fn handle_client_output(
@@ -58,14 +69,10 @@ async fn handle_client_output(
       output = stdio_read.next() => {
         match output {
           Some(ChildOutput::Stdout(bytes)) => {
-            stdout.write_all(&bytes).await.map_err(|err| {
-              NailgunClientError::PostConnect(format!("Failed to write to stdout: {}", err))
-            })?
+            stdout.write_all(&bytes).await.map_err(|err| handle_postconnect_stdio(err, "Failed to write to stdout"))?
           },
           Some(ChildOutput::Stderr(bytes)) => {
-            stderr.write_all(&bytes).await.map_err(|err| {
-              NailgunClientError::PostConnect(format!("Failed to write to stderr: {}", err))
-            })?
+            stderr.write_all(&bytes).await.map_err(|err| handle_postconnect_stdio(err, "Failed to write to stderr"))?
           },
           None => break,
         }
@@ -85,7 +92,7 @@ async fn handle_client_output(
     }
   }
   try_join!(stdout.flush(), stderr.flush())
-    .map_err(|e| NailgunClientError::PostConnect(format!("Failed to flush stdio: {}", e)))?;
+    .map_err(|err| handle_postconnect_stdio(err, "Failed to flush stdio"))?;
   Ok(())
 }
 

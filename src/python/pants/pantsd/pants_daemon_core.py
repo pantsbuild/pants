@@ -76,9 +76,9 @@ class PantsDaemonCore:
         """
         try:
             if self._scheduler:
-                logger.info("initialization options changed: reinitializing pantsd...")
+                logger.info("initialization options changed: reinitializing scheduler...")
             else:
-                logger.info("initializing pantsd...")
+                logger.info("initializing scheduler...")
             if self._services:
                 self._services.shutdown()
             build_config, options = self._options_initializer.build_config_and_options(
@@ -92,7 +92,7 @@ class PantsDaemonCore:
 
             self._services = self._services_constructor(bootstrap_options_values, self._scheduler)
             self._fingerprint = options_fingerprint
-            logger.info("pantsd initialized.")
+            logger.info("scheduler initialized.")
         except Exception as e:
             self._kill_switch.set()
             self._scheduler = None

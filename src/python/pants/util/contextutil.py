@@ -9,7 +9,6 @@ import shutil
 import ssl
 import sys
 import tempfile
-import termios
 import threading
 import zipfile
 from contextlib import contextmanager
@@ -93,63 +92,6 @@ def argv_as(args: Tuple[str, ...]) -> Iterator[None]:
         yield
     finally:
         sys.argv = old_args
-
-
-@contextmanager
-def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str) -> Iterator[None]:
-    """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
-    src = None
-    if src_fd == -1:
-        src = open("/dev/null", mode)
-        src_fd = src.fileno()
-
-    # Capture the python and os level file handles.
-    old_dst = getattr(sys, dst_sys_attribute)
-    old_dst_fd = os.dup(dst_fd)
-    if src_fd != dst_fd:
-        os.dup2(src_fd, dst_fd)
-
-    # Open up a new file handle to temporarily replace the python-level io object, then yield.
-    new_dst = os.fdopen(dst_fd, mode)
-    is_atty = new_dst.isatty()
-    setattr(sys, dst_sys_attribute, new_dst)
-    try:
-        yield
-    finally:
-        try:
-            if src:
-                src.close()
-            if is_atty:
-                termios.tcdrain(dst_fd)
-            else:
-                new_dst.flush()
-            new_dst.close()
-        except BaseException:
-            pass
-
-        # Restore the python and os level file handles.
-        os.dup2(old_dst_fd, dst_fd)
-        setattr(sys, dst_sys_attribute, old_dst)
-
-
-@contextmanager
-def stdio_as(stdout_fd: int, stderr_fd: int, stdin_fd: int) -> Iterator[None]:
-    """Redirect sys.{stdout, stderr, stdin} to alternate file descriptors.
-
-    As a special case, if a given destination fd is `-1`, we will replace it with an open file handle
-    to `/dev/null`.
-
-    NB: If the filehandles for sys.{stdout, stderr, stdin} have previously been closed, it's
-    possible that the OS has repurposed fds `0, 1, 2` to represent other files or sockets. It's
-    impossible for this method to locate all python objects which refer to those fds, so it's up
-    to the caller to guarantee that `0, 1, 2` are safe to replace.
-
-    The streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
-    """
-    with _stdio_stream_as(stdin_fd, 0, "stdin", "r"), _stdio_stream_as(
-        stdout_fd, 1, "stdout", "w"
-    ), _stdio_stream_as(stderr_fd, 2, "stderr", "w"):
-        yield
 
 
 @contextmanager

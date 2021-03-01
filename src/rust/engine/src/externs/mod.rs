@@ -13,6 +13,7 @@ pub mod fs;
 mod interface;
 #[cfg(test)]
 mod interface_tests;
+mod stdio;
 
 use std::collections::BTreeMap;
 use std::convert::AsRef;

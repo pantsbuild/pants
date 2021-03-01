@@ -3,7 +3,7 @@
 
 import logging
 import os
-from typing import Dict, Iterable, List, Mapping, Optional, Tuple, Union, cast
+from typing import Dict, Iterable, List, Optional, Tuple, Union, cast
 
 from typing_extensions import Protocol
 
@@ -30,7 +30,6 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.rules import Get
 from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
-from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
 
@@ -129,25 +128,6 @@ class Native(metaclass=SingletonMetaclass):
         """Load the native engine as a python module."""
         return native_engine
 
-    def init_rust_logging(
-        self,
-        level: int,
-        log_show_rust_3rdparty: bool,
-        use_color: bool,
-        show_target: bool,
-        log_levels_by_target: Mapping[str, LogLevel],
-        message_regex_filters: Iterable[str],
-    ):
-        log_levels_as_ints = {k: v.level for k, v in log_levels_by_target.items()}
-        return self.lib.init_logging(
-            level,
-            log_show_rust_3rdparty,
-            use_color,
-            show_target,
-            log_levels_as_ints,
-            tuple(message_regex_filters),
-        )
-
     def set_per_run_log_path(self, path: Optional[str]) -> None:
         """Instructs the logging code to also write emitted logs to a run-specific log file; or
         disables writing to any run-specific file if `None` is passed."""
@@ -156,37 +136,12 @@ class Native(metaclass=SingletonMetaclass):
     def default_cache_path(self) -> str:
         return cast(str, self.lib.default_cache_path())
 
-    def setup_pantsd_logger(self, log_file_path):
-        return self.lib.setup_pantsd_logger(log_file_path)
-
-    def setup_stderr_logger(self):
-        return self.lib.setup_stderr_logger()
-
     def write_log(self, msg: str, *, level: int, target: str):
         """Proxy a log message to the Rust logging faculties."""
         return self.lib.write_log(msg, level, target)
 
-    def write_stdout(self, scheduler, session, msg: str, teardown_ui: bool):
-        if teardown_ui:
-            self.teardown_dynamic_ui(scheduler, session)
-        return self.lib.write_stdout(session, msg)
-
-    def write_stderr(self, scheduler, session, msg: str, teardown_ui: bool):
-        if teardown_ui:
-            self.teardown_dynamic_ui(scheduler, session)
-        return self.lib.write_stderr(session, msg)
-
-    def teardown_dynamic_ui(self, scheduler, session):
-        self.lib.teardown_dynamic_ui(scheduler, session)
-
     def flush_log(self):
         return self.lib.flush_log()
-
-    def override_thread_logging_destination_to_just_pantsd(self):
-        self.lib.override_thread_logging_destination("pantsd")
-
-    def override_thread_logging_destination_to_just_stderr(self):
-        self.lib.override_thread_logging_destination("stderr")
 
     def match_path_globs(self, path_globs: PathGlobs, paths: Iterable[str]) -> Tuple[str, ...]:
         """Return all paths that match the PathGlobs."""

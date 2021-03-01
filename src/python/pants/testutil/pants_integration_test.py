@@ -304,10 +304,10 @@ def render_logs(workdir: str) -> None:
         print(f"{rel_filename} --- ")
 
 
-def read_pantsd_log(workdir: str) -> Iterator[str]:
+def read_pants_log(workdir: str) -> Iterator[str]:
     """Yields all lines from the pantsd log under the given workdir."""
     # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
-    for line in _read_log(f"{workdir}/pantsd/pantsd.log"):
+    for line in _read_log(f"{workdir}/pants.log"):
         yield line
 
 
