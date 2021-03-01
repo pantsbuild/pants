@@ -38,7 +38,6 @@ pantsd_invalidation_globs.add = [
 # Path patterns to ignore for filesystem operations on top of the builtin patterns.
 pants_ignore.add = [
   # venv directories under build-support.
-  "/build-support/virtualenvs/",
   "/build-support/*.venv/",
   # We shouldn't walk or watch the rust compiler artifacts because it is slow.
   "/src/rust/engine/target",
