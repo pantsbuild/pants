@@ -180,7 +180,7 @@ fn insert_into_action_cache(
 async fn cache_read_success() {
   WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
-  let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
+  let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
   let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
 
   let (process, action_digest) = create_process(&store_setup.store).await;
@@ -225,7 +225,7 @@ async fn cache_read_eager_fetch() {
 
   async fn run_process(eager_fetch: bool) -> (i32, usize) {
     let store_setup = StoreSetup::new();
-    let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
+    let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
     let (cache_runner, action_cache) =
       create_cached_runner(local_runner, &store_setup, 0, 0, eager_fetch);
 
@@ -283,17 +283,17 @@ async fn cache_read_speculation() {
   }
 
   // Case 1: remote is faster than local.
-  let (exit_code, local_call_count) = run_process(20, 0, true).await;
+  let (exit_code, local_call_count) = run_process(200, 0, true).await;
   assert_eq!(exit_code, 0);
   assert_eq!(local_call_count, 0);
 
   // Case 2: local is faster than remote.
-  let (exit_code, local_call_count) = run_process(0, 20, true).await;
+  let (exit_code, local_call_count) = run_process(0, 200, true).await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 
   // Case 3: the remote lookup wins, but there is no cache entry so we fallback to local execution.
-  let (exit_code, local_call_count) = run_process(20, 0, false).await;
+  let (exit_code, local_call_count) = run_process(200, 0, false).await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 }
@@ -317,7 +317,7 @@ async fn cache_write_success() {
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 
   // Wait for the cache write block to finish.
-  delay_for(Duration::from_millis(100)).await;
+  delay_for(Duration::from_secs(1)).await;
   assert_eq!(action_cache.action_map.lock().len(), 1);
   let action_map_mutex_guard = action_cache.action_map.lock();
   assert_eq!(
@@ -376,7 +376,7 @@ async fn cache_write_does_not_block() {
   // CommandRunner::run().
   assert!(action_cache.action_map.lock().is_empty());
 
-  delay_for(Duration::from_millis(200)).await;
+  delay_for(Duration::from_secs(1)).await;
   assert_eq!(action_cache.action_map.lock().len(), 1);
   let action_map_mutex_guard = action_cache.action_map.lock();
   assert_eq!(
