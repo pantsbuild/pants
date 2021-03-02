@@ -356,7 +356,7 @@ dependencies = [
 [[package]]
 name = "console"
 version = "0.14.0"
-source = "git+https://github.com/stuhood/console?branch=stuhood/term-target-for-arbitrary-handles#a29180f638c1aa2b44efcd725b126bc89305fff7"
+source = "git+https://github.com/pantsbuild/console?rev=b6e9aa7ce734517691934d558d79a459609633db#b6e9aa7ce734517691934d558d79a459609633db"
 dependencies = [
  "encode_unicode",
  "lazy_static",
@@ -1251,7 +1251,7 @@ dependencies = [
 [[package]]
 name = "indicatif"
 version = "0.15.0"
-source = "git+https://github.com/stuhood/indicatif?branch=stuhood/properly-query-width#7345638238a37fc2fc99faf87dbbd7a8b137b948"
+source = "git+https://github.com/mitsuhiko/indicatif?rev=fa5e3c7ccc877c117f1db88bdaf19c48498d9616#fa5e3c7ccc877c117f1db88bdaf19c48498d9616"
 dependencies = [
  "console",
  "lazy_static",

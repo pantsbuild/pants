@@ -11,8 +11,8 @@ path = "src/console_ui.rs"
 console = "0.14"
 futures = "0.3"
 indexmap = "1.4"
-# TODO: Posted as https://github.com/mitsuhiko/indicatif/pull/241.
-indicatif = { git = "https://github.com/stuhood/indicatif", branch = "stuhood/properly-query-width" }
+# TODO: Waiting for https://github.com/mitsuhiko/indicatif/pull/241 to be released.
+indicatif = { git = "https://github.com/mitsuhiko/indicatif", rev = "fa5e3c7ccc877c117f1db88bdaf19c48498d9616" }
 stdio = { path = "../stdio" }
 task_executor = { path = "../task_executor" }
 uuid = { version = "0.7", features = ["v4"] }

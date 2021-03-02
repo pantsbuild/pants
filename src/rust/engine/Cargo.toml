@@ -152,4 +152,4 @@ prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444
 prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 prost-types = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 # TODO: Posted as https://github.com/mitsuhiko/console/pull/93.
-console = { git = "https://github.com/stuhood/console", branch = "stuhood/term-target-for-arbitrary-handles" }
+console = { git = "https://github.com/pantsbuild/console", rev = "b6e9aa7ce734517691934d558d79a459609633db" }
