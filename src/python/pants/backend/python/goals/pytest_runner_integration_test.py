@@ -52,6 +52,7 @@ def rule_runner() -> RuleRunner:
 SOURCE_ROOT = "tests/python"
 PACKAGE = os.path.join(SOURCE_ROOT, "pants_test")
 GOOD_SOURCE = FileContent(f"{PACKAGE}/test_good.py", b"def test():\n  pass\n")
+GOOD_WITH_PRINT = FileContent(f"{PACKAGE}/test_good.py", b"def test():\n  print('All good!')")
 BAD_SOURCE = FileContent(f"{PACKAGE}/test_bad.py", b"def test():\n  assert False\n")
 PY3_ONLY_SOURCE = FileContent(f"{PACKAGE}/test_py3.py", b"def test() -> None:\n  pass\n")
 LIBRARY_SOURCE = FileContent(f"{PACKAGE}/library.py", b"def add_two(x):\n  return x + 2\n")
@@ -143,6 +144,7 @@ def run_pytest(
     execution_slot_var: Optional[str] = None,
     extra_env_vars: Optional[str] = None,
     env: Optional[Mapping[str, str]] = None,
+    config: Optional[str] = None,
     force: bool = False,
 ) -> TestResult:
     args = [
@@ -162,6 +164,9 @@ def run_pytest(
         args.append("--test-use-coverage")
     if execution_slot_var:
         args.append(f"--pytest-execution-slot-var={execution_slot_var}")
+    if config:
+        rule_runner.create_file(relpath="pytest.ini", contents=config)
+        args.append(f"--pytest-config=pytest.ini")
     if force:
         args.append("--test-force")
     rule_runner.set_options(args, env=env)
@@ -250,6 +255,13 @@ def test_relative_import(rule_runner: RuleRunner) -> None:
     result = run_pytest(rule_runner, tgt)
     assert result.exit_code == 0
     assert f"{PACKAGE}/test_relative_import.py ." in result.stdout
+
+
+def test_respects_config(rule_runner: RuleRunner) -> None:
+    target = create_test_target(rule_runner, [GOOD_WITH_PRINT])
+    result = run_pytest(rule_runner, target, config="[pytest]\naddopts = -s\n")
+    assert result.exit_code == 0
+    assert "All good!" in result.stdout and "Captured" not in result.stdout
 
 
 def test_transitive_dep(rule_runner: RuleRunner) -> None:

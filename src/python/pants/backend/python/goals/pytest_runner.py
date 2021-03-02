@@ -40,7 +40,15 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
-from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import (
+    AddPrefix,
+    Digest,
+    DigestSubset,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
@@ -148,6 +156,15 @@ async def setup_pytest_for_target(
         ),
     )
 
+    config_digest_request = Get(
+        Digest,
+        PathGlobs(
+            globs=[pytest.config] if pytest.config else [],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin="the option `--pytest-config`",
+        ),
+    )
+
     prepared_sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
@@ -176,11 +193,18 @@ async def setup_pytest_for_target(
         SourceFiles, SourceFilesRequest([request.field_set.sources])
     )
 
-    pytest_pex, requirements_pex, prepared_sources, field_set_source_files = await MultiGet(
+    (
+        pytest_pex,
+        requirements_pex,
+        prepared_sources,
+        field_set_source_files,
+        config_digest,
+    ) = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
         prepared_sources_request,
         field_set_source_files_request,
+        config_digest_request,
     )
 
     input_digest = await Get(
@@ -191,6 +215,7 @@ async def setup_pytest_for_target(
                 prepared_sources.source_files.snapshot.digest,
                 requirements_pex.digest,
                 pytest_pex.digest,
+                config_digest,
                 *(binary.digest for binary in assets),
             )
         ),

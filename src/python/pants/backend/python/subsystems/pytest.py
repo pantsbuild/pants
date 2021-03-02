@@ -3,7 +3,7 @@
 
 from typing import Optional, Tuple, cast
 
-from pants.option.custom_types import shell_str
+from pants.option.custom_types import file_option, shell_str
 from pants.option.subsystem import Subsystem
 
 
@@ -89,6 +89,13 @@ class PyTest(Subsystem):
                 "to tests under this environment variable name."
             ),
         )
+        register(
+            "--config",
+            type=file_option,
+            default=None,
+            advanced=True,
+            help="Path to pytest.ini or alternative Pytest config file",
+        )
 
     def get_requirement_strings(self) -> Tuple[str, ...]:
         """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""
@@ -105,3 +112,7 @@ class PyTest(Subsystem):
     @property
     def timeout_maximum(self) -> Optional[int]:
         return cast(Optional[int], self.options.timeout_maximum)
+
+    @property
+    def config(self) -> Optional[str]:
+        return cast(Optional[str], self.options.config)
