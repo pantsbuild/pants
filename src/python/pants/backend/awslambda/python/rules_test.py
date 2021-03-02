@@ -36,7 +36,8 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: Address) -> Tuple[str
         [
             "--backend-packages=pants.backend.awslambda.python",
             "--source-root-patterns=src/python",
-        ]
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     target = rule_runner.get_target(addr)
     built_asset = rule_runner.request(BuiltPackage, [PythonAwsLambdaFieldSet.create(target)])

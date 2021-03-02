@@ -10,6 +10,7 @@ from textwrap import dedent
 import pytest
 
 from pants.base.build_environment import get_buildroot
+from pants.engine.environment import CompleteEnvironment
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
 from pants.option.global_options import ExecutionOptions, GlobalOptions
@@ -39,7 +40,8 @@ def create_execution_options(
     if plugin:
         args.append(f"--remote-auth-plugin={plugin}")
     ob = create_options_bootstrapper(args)
-    _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, raise_=False)
+    env = CompleteEnvironment({})
+    _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, env, raise_=False)
     return ExecutionOptions.from_options(options)
 
 

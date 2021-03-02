@@ -48,6 +48,7 @@ def assert_imports_parsed(
 ):
     if content:
         rule_runner.create_file(filename, content)
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     rule_runner.add_to_build_file("project", "python_library(sources=['**/*.py'])")
     tgt = rule_runner.get_target(Address("project"))
     imports = rule_runner.request(

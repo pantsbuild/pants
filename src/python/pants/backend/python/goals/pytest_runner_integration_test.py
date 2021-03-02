@@ -164,7 +164,7 @@ def run_pytest(
         args.append(f"--pytest-execution-slot-var={execution_slot_var}")
     if force:
         args.append("--test-force")
-    rule_runner.set_options(args, env=env)
+    rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
     inputs = [PythonTestFieldSet.create(test_target)]
     test_result = rule_runner.request(TestResult, inputs)

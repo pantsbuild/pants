@@ -21,6 +21,7 @@ from pants.backend.python.util_rules.pex import (
     PexRequirements,
 )
 from pants.core.util_rules import archive, external_tool
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
@@ -55,7 +56,10 @@ def rule_runner() -> RuleRunner:
 
 
 def _create_pex(rule_runner: RuleRunner) -> Pex:
-    rule_runner.set_options(["--backend-packages=pants.backend.python"])
+    rule_runner.set_options(
+        ["--backend-packages=pants.backend.python"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     request = PexRequest(
         output_filename="setup-py-runner.pex",
         internal_only=True,
@@ -156,8 +160,13 @@ def plugin_resolution(
             bootstrap_scheduler, interpreter_constraints=interpreter_constraints
         )
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
+        complete_env = CompleteEnvironment(
+            {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
+        )
 
-        working_set = plugin_resolver.resolve(options_bootstrapper, WorkingSet(entries=[]))
+        working_set = plugin_resolver.resolve(
+            options_bootstrapper, complete_env, WorkingSet(entries=[])
+        )
         for dist in working_set:
             assert (
                 Path(os.path.realpath(cache_dir)) in Path(os.path.realpath(dist.location)).parents

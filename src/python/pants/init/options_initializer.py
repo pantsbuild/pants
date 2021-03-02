@@ -10,6 +10,7 @@ from typing import Iterator, Optional, Tuple
 import pkg_resources
 
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.help.flag_error_help_printer import FlagErrorHelpPrinter
 from pants.init.bootstrap_scheduler import BootstrapScheduler
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 def _initialize_build_configuration(
     plugin_resolver: PluginResolver,
     options_bootstrapper: OptionsBootstrapper,
+    env: CompleteEnvironment,
 ) -> BuildConfiguration:
     """Initialize a BuildConfiguration for the given OptionsBootstrapper.
 
@@ -40,7 +42,7 @@ def _initialize_build_configuration(
     """
 
     bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-    working_set = plugin_resolver.resolve(options_bootstrapper)
+    working_set = plugin_resolver.resolve(options_bootstrapper, env)
 
     # Add any extra paths to python path (e.g., for loading extra source backends).
     for path in bootstrap_options.pythonpath:
@@ -103,23 +105,25 @@ class OptionsInitializer:
         self._plugin_resolver = PluginResolver(self._bootstrap_scheduler)
 
     def build_config_and_options(
-        self, options_bootstrapper: OptionsBootstrapper, *, raise_: bool
+        self, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironment, *, raise_: bool
     ) -> Tuple[BuildConfiguration, Options]:
-        build_config = _initialize_build_configuration(self._plugin_resolver, options_bootstrapper)
-        with self.handle_unknown_flags(options_bootstrapper, raise_=raise_):
+        build_config = _initialize_build_configuration(
+            self._plugin_resolver, options_bootstrapper, env
+        )
+        with self.handle_unknown_flags(options_bootstrapper, env, raise_=raise_):
             options = options_bootstrapper.full_options(build_config)
         return build_config, options
 
     @contextmanager
     def handle_unknown_flags(
-        self, options_bootstrapper: OptionsBootstrapper, *, raise_: bool
+        self, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironment, *, raise_: bool
     ) -> Iterator[None]:
         """If there are any unknown flags, print "Did you mean?" and possibly error."""
         try:
             yield
         except UnknownFlagsError as err:
             build_config = _initialize_build_configuration(
-                self._plugin_resolver, options_bootstrapper
+                self._plugin_resolver, options_bootstrapper, env
             )
             # We need an options instance in order to get "did you mean" suggestions, but we know
             # there are bad flags in the args, so we generate options with no flags.

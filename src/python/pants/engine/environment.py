@@ -3,11 +3,14 @@
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import Dict, Optional, Sequence
 
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
+from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +67,44 @@ class CompleteEnvironment(FrozenDict):
         return FrozenDict(env_var_subset)
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class EnvironmentRequest:
+    """Requests a subset of the variables set in the environment.
+
+    Requesting only the relevant subset of the environment reduces invalidation caused by unrelated
+    changes.
+    """
+
+    requested: FrozenOrderedSet[str]
+    allowed: Optional[FrozenOrderedSet[str]]
+
+    def __init__(self, requested: Sequence[str], allowed: Optional[Sequence[str]] = None):
+        self.requested = FrozenOrderedSet(requested)
+        self.allowed = None if allowed is None else FrozenOrderedSet(allowed)
+
+
+class Environment(FrozenDict[str, str]):
+    """A subset of the variables set in the environment."""
+
+
 @rule
 async def complete_environment(session_values: SessionValues) -> CompleteEnvironment:
     return session_values[CompleteEnvironment]
+
+
+@rule
+async def environment_subset(
+    session_values: SessionValues, request: EnvironmentRequest
+) -> Environment:
+    return Environment(
+        session_values[CompleteEnvironment]
+        .get_subset(
+            requested=tuple(request.requested),
+            allowed=(None if request.allowed is None else tuple(request.allowed)),
+        )
+        .items()
+    )
 
 
 def rules():

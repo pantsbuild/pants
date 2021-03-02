@@ -93,7 +93,7 @@ def run_pylint(
         args.append("--pylint-skip")
     if additional_args:
         args.extend(additional_args)
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     results = rule_runner.request(
         LintResults,
         [PylintRequest(PylintFieldSet.create(tgt) for tgt in targets)],
