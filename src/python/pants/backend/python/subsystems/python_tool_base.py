@@ -66,7 +66,7 @@ class PythonToolBase(PythonToolRequirementsBase):
             "--console-script",
             type=str,
             advanced=True,
-            default=cls.default_main if isinstance(cls.default_main, ConsoleScript) else None,
+            default=cls.default_main.spec if isinstance(cls.default_main, ConsoleScript) else None,
             help=(
                 "The console script for the tool. Using this option is generally preferable to "
                 "(and mutually exclusive with) specifying an --entry-point since console script "
@@ -78,7 +78,7 @@ class PythonToolBase(PythonToolRequirementsBase):
             "--entry-point",
             type=str,
             advanced=True,
-            default=cls.default_main if isinstance(cls.default_main, EntryPoint) else None,
+            default=cls.default_main.spec if isinstance(cls.default_main, EntryPoint) else None,
             help=(
                 "The entry point for the tool. Generally you only want to use this option if the "
                 "tool does not offer a --console-script (which this option is mutually exclusive "
@@ -112,9 +112,9 @@ class PythonToolBase(PythonToolRequirementsBase):
         is_default_entry_point = self.options.is_default("entry_point")
         if not is_default_console_script and not is_default_entry_point:
             raise OptionsError(
-                f"Both --console-script={self.options.console_script} and "
-                f"--entry-point={self.options.entry_point} are configured but these options are "
-                f"mutually exclusive. Pick one."
+                f"Both [{self.scope}].console-script={self.options.console_script} and "
+                f"[{self.scope}].entry-point={self.options.entry_point} are configured but these "
+                f"options are mutually exclusive. Please pick one."
             )
         if not is_default_console_script:
             return ConsoleScript(cast(str, self.options.console_script))

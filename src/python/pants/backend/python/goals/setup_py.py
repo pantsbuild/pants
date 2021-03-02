@@ -539,8 +539,8 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             raise InvalidEntryPoint(
                 "Every `pex_binary` used in `with_binaries()` for the `provides()` field for "
                 f"{exported_addr} must end in the format `:my_func` for the `entry_point` field, "
-                f"but {binary.address} set it to {repr(entry_point)}. For example, set "
-                f"`entry_point='{entry_point}:main'. See {url}."
+                f"but {binary.address} set it to {entry_point.spec!r}. For example, set "
+                f"`entry_point='{entry_point.module}:main'. See {url}."
             )
         entry_point_requests.append(ResolvePexEntryPointRequest(binary[PexEntryPointField]))
     binary_entry_points = await MultiGet(

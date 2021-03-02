@@ -112,6 +112,11 @@ class MainSpecification(ABC):
     def iter_pex_args(self) -> Iterator[str]:
         ...
 
+    @property
+    @abstractmethod
+    def spec(self) -> str:
+        ...
+
 
 @dataclass(frozen=True)
 class EntryPoint(MainSpecification):
@@ -160,7 +165,8 @@ class EntryPoint(MainSpecification):
         yield "--entry-point"
         yield str(self)
 
-    def __str__(self) -> str:
+    @property
+    def spec(self) -> str:
         return self.module if self.function is None else f"{self.module}:{self.function}"
 
 
@@ -171,6 +177,10 @@ class ConsoleScript(MainSpecification):
     def iter_pex_args(self) -> Iterator[str]:
         yield "--console-script"
         yield self.name
+
+    @property
+    def spec(self) -> str:
+        return self.name
 
 
 class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
@@ -190,9 +200,9 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
         ep = super().compute_value(raw_value, address=address)
         if ep is None:
             raise InvalidFieldException(
-                f"An entry point must be specified for for {address}. It must indicate a Python "
-                "module by name or path and an optional nullary function in that module separated "
-                "by a colon, i.e.: module_name_or_path(':'function_name)?"
+                f"An entry point must be specified for {address}. It must indicate a Python module "
+                "by name or path and an optional nullary function in that module separated by a "
+                "colon, i.e.: module_name_or_path(':'function_name)?"
             )
         try:
             return EntryPoint.parse(ep, provenance=f"for {address}")
