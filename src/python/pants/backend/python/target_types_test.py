@@ -13,6 +13,7 @@ from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
+    EntryPoint,
     PexBinary,
     PexBinaryDependencies,
     PexEntryPointField,
@@ -105,7 +106,7 @@ def test_entry_point_validation(caplog: LogCaptureFixture) -> None:
 
     ep = "custom.entry_point:"
     with caplog.at_level(logging.WARNING):
-        assert "custom.entry_point" == PexEntryPointField(ep, address=addr).value
+        assert EntryPoint("custom.entry_point") == PexEntryPointField(ep, address=addr).value
 
     assert len(caplog.record_tuples) == 1
     _, levelno, message = caplog.record_tuples[0]
@@ -122,7 +123,7 @@ def test_resolve_pex_binary_entry_point() -> None:
         ]
     )
 
-    def assert_resolved(*, entry_point: Optional[str], expected: Optional[str]) -> None:
+    def assert_resolved(*, entry_point: Optional[str], expected: Optional[EntryPoint]) -> None:
         addr = Address("src/python/project")
         rule_runner.create_file("src/python/project/app.py")
         rule_runner.create_file("src/python/project/f2.py")
@@ -131,22 +132,26 @@ def test_resolve_pex_binary_entry_point() -> None:
         assert result.val == expected
 
     # Full module provided.
-    assert_resolved(entry_point="custom.entry_point", expected="custom.entry_point")
-    assert_resolved(entry_point="custom.entry_point:func", expected="custom.entry_point:func")
+    assert_resolved(entry_point="custom.entry_point", expected=EntryPoint("custom.entry_point"))
+    assert_resolved(
+        entry_point="custom.entry_point:func", expected=EntryPoint.parse("custom.entry_point:func")
+    )
 
     # File names are expanded into the full module path.
-    assert_resolved(entry_point="app.py", expected="project.app")
-    assert_resolved(entry_point="app.py:func", expected="project.app:func")
+    assert_resolved(entry_point="app.py", expected=EntryPoint(module="project.app"))
+    assert_resolved(
+        entry_point="app.py:func", expected=EntryPoint(module="project.app", function="func")
+    )
 
     # We special case the strings `<none>` and `<None>`.
     assert_resolved(entry_point="<none>", expected=None)
     assert_resolved(entry_point="<None>", expected=None)
 
     with pytest.raises(ExecutionError):
-        assert_resolved(entry_point="doesnt_exist.py", expected="doesnt matter")
+        assert_resolved(entry_point="doesnt_exist.py", expected=EntryPoint("doesnt matter"))
     # Resolving >1 file is an error.
     with pytest.raises(ExecutionError):
-        assert_resolved(entry_point="*.py", expected="doesnt matter")
+        assert_resolved(entry_point="*.py", expected=EntryPoint("doesnt matter"))
 
 
 def test_inject_pex_binary_entry_point_dependency() -> None:

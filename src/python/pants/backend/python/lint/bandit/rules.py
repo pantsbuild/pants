@@ -69,7 +69,7 @@ async def bandit_lint_partition(
             internal_only=True,
             requirements=PexRequirements(bandit.all_requirements),
             interpreter_constraints=partition.interpreter_constraints,
-            entry_point=bandit.entry_point,
+            main=bandit.main,
         ),
     )
 

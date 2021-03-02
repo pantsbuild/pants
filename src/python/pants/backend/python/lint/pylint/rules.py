@@ -179,7 +179,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         PexRequest(
             output_filename="pylint_runner.pex",
             interpreter_constraints=partition.interpreter_constraints,
-            entry_point=pylint.entry_point,
+            main=pylint.main,
             internal_only=True,
             pex_path=[pylint_pex, requirements_pex],
         ),

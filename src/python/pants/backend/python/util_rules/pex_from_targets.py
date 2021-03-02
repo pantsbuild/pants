@@ -12,7 +12,11 @@ from typing import Iterable, Tuple
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
-from pants.backend.python.target_types import PythonRequirementsField, parse_requirements_file
+from pants.backend.python.target_types import (
+    MainSpecification,
+    PythonRequirementsField,
+    parse_requirements_file,
+)
 from pants.backend.python.util_rules.pex import (
     PexInterpreterConstraints,
     PexPlatforms,
@@ -57,7 +61,7 @@ class PexFromTargetsRequest:
     addresses: Addresses
     output_filename: str
     internal_only: bool
-    entry_point: str | None
+    main: MainSpecification | None
     platforms: PexPlatforms
     additional_args: Tuple[str, ...]
     additional_requirements: Tuple[str, ...]
@@ -76,7 +80,7 @@ class PexFromTargetsRequest:
         *,
         output_filename: str,
         internal_only: bool,
-        entry_point: str | None = None,
+        main: MainSpecification | None = None,
         platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
         additional_requirements: Iterable[str] = (),
@@ -97,7 +101,7 @@ class PexFromTargetsRequest:
             to end users, such as with the `binary` goal. Typically, instead, the user never
             directly uses the Pex, e.g. with `lint` and `test`. If True, we will use a Pex setting
             that results in faster build time but compatibility with fewer interpreters at runtime.
-        :param entry_point: The entry-point for the built Pex, equivalent to Pex's `-m` flag. If
+        :param main: The main for the built Pex, equivalent to Pex's `-e` or `-c` flag. If
             left off, the Pex will open up as a REPL.
         :param platforms: Which platforms should be supported. Setting this value will cause
             interpreter constraints to not be used because platforms already constrain the valid
@@ -122,7 +126,7 @@ class PexFromTargetsRequest:
         self.addresses = Addresses(addresses)
         self.output_filename = output_filename
         self.internal_only = internal_only
-        self.entry_point = entry_point
+        self.main = main
         self.platforms = platforms
         self.additional_args = tuple(additional_args)
         self.additional_requirements = tuple(additional_requirements)
@@ -289,7 +293,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
-        entry_point=request.entry_point,
+        main=request.main,
         sources=merged_input_digest,
         additional_inputs=request.additional_inputs,
         additional_args=request.additional_args,

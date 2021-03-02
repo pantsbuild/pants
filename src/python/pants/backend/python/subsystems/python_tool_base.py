@@ -1,8 +1,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import ClassVar, Optional, Sequence, Tuple, cast
+from typing import ClassVar, Sequence, Tuple, cast
 
+from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
+from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
 
 
@@ -52,7 +54,7 @@ class PythonToolBase(PythonToolRequirementsBase):
     """Base class for subsystems that configure a python tool to be invoked out-of-process."""
 
     # Subclasses must set.
-    default_entry_point: ClassVar[str]
+    default_main: ClassVar[MainSpecification]
     # Subclasses do not need to override.
     default_interpreter_constraints: ClassVar[Sequence[str]] = []
     register_interpreter_constraints: ClassVar[bool] = False
@@ -61,13 +63,26 @@ class PythonToolBase(PythonToolRequirementsBase):
     def register_options(cls, register):
         super().register_options(register)
         register(
+            "--console-script",
+            type=str,
+            advanced=True,
+            default=cls.default_main if isinstance(cls.default_main, ConsoleScript) else None,
+            help=(
+                "The console script for the tool. Using this option is generally preferable to "
+                "(and mutually exclusive with) specifying an --entry-point since console script "
+                "names have a higher expectation of staying stable across releases of the tool. "
+                "Usually, you will not want to change this from the default."
+            ),
+        )
+        register(
             "--entry-point",
             type=str,
             advanced=True,
-            default=cls.default_entry_point,
+            default=cls.default_main if isinstance(cls.default_main, EntryPoint) else None,
             help=(
-                "The main module for the tool. Usually, you will not want to change this from the "
-                "default."
+                "The entry point for the tool. Generally you only want to use this option if the "
+                "tool does not offer a --console-script (which this option is mutually exclusive "
+                "with). Usually, you will not want to change this from the default."
             ),
         )
 
@@ -92,5 +107,17 @@ class PythonToolBase(PythonToolRequirementsBase):
         return tuple(self.options.interpreter_constraints)
 
     @property
-    def entry_point(self) -> Optional[str]:
-        return cast(Optional[str], self.options.entry_point)
+    def main(self) -> MainSpecification:
+        is_default_console_script = self.options.is_default("console_script")
+        is_default_entry_point = self.options.is_default("entry_point")
+        if not is_default_console_script and not is_default_entry_point:
+            raise OptionsError(
+                f"Both --console-script={self.options.console_script} and "
+                f"--entry-point={self.options.entry_point} are configured but these options are "
+                f"mutually exclusive. Pick one."
+            )
+        if not is_default_console_script:
+            return ConsoleScript(cast(str, self.options.console_script))
+        if not is_default_entry_point:
+            return EntryPoint.parse(cast(str, self.options.entry_point))
+        return self.default_main

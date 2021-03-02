@@ -69,7 +69,7 @@ async def package_python_awslambda(
         PexFromTargetsRequest(
             addresses=[field_set.address],
             internal_only=False,
-            entry_point=None,
+            main=None,
             output_filename=output_filename,
             platforms=PexPlatforms([platform]),
             additional_args=[
@@ -87,7 +87,7 @@ async def package_python_awslambda(
         internal_only=True,
         requirements=PexRequirements(lambdex.all_requirements),
         interpreter_constraints=PexInterpreterConstraints(lambdex.interpreter_constraints),
-        entry_point=lambdex.entry_point,
+        main=lambdex.main,
     )
 
     lambdex_pex, pex_result, handler = await MultiGet(

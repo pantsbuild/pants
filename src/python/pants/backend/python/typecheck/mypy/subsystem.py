@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.option.custom_types import file_option, shell_str, target_option
 
@@ -15,7 +16,7 @@ class MyPy(PythonToolBase):
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
     default_version = "mypy==0.800"
-    default_entry_point = "mypy"
+    default_main = ConsoleScript("mypy")
     # See `mypy/rules.py`. We only use these default constraints in some situations. Technically,
     # MyPy only requires 3.5+, but some popular plugins like `django-stubs` require 3.6+. Because
     # 3.5 is EOL, and users can tweak this back, this seems like a more sensible default.

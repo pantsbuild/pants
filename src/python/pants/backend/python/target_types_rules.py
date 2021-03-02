@@ -6,7 +6,7 @@
 This is a separate module to avoid circular dependencies. Note that all types used by call sites are
 defined in `target_types.py`.
 """
-
+import dataclasses
 import os.path
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
@@ -64,18 +64,16 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
         )
 
     # Case #1.
-    if ep_val in ("<none>", "<None>"):
+    if ep_val.module in ("<none>", "<None>"):
         return ResolvedPexEntryPoint(None)
-
-    path, _, func = ep_val.partition(":")
 
     # If it's already a module (cases #2 and #3), simply use that. Otherwise, convert the file name
     # into a module path (cases #4 and #5).
-    if not path.endswith(".py"):
+    if not ep_val.module.endswith(".py"):
         return ResolvedPexEntryPoint(ep_val)
 
     # Use the engine to validate that the file exists and that it resolves to only one file.
-    full_glob = os.path.join(address.spec_path, path)
+    full_glob = os.path.join(address.spec_path, ep_val.module)
     entry_point_paths = await Get(
         Paths,
         PathGlobs(
@@ -101,7 +99,7 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
     module_base, _ = os.path.splitext(stripped_source_path)
     normalized_path = module_base.replace(os.path.sep, ".")
-    return ResolvedPexEntryPoint(f"{normalized_path}:{func}" if func else normalized_path)
+    return ResolvedPexEntryPoint(dataclasses.replace(ep_val, module=normalized_path))
 
 
 class InjectPexBinaryEntryPointDependency(InjectDependenciesRequest):
@@ -121,8 +119,7 @@ async def inject_pex_binary_entry_point_dependency(
     )
     if entry_point.val is None:
         return InjectedDependencies()
-    module, _, _func = entry_point.val.partition(":")
-    owners = await Get(PythonModuleOwners, PythonModule(module))
+    owners = await Get(PythonModuleOwners, PythonModule(entry_point.val.module))
     return InjectedDependencies(owners)
 
 
