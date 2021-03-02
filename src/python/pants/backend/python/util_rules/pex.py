@@ -17,7 +17,7 @@ from typing import FrozenSet, Iterable, List, Mapping, Sequence, Set, Tuple, Typ
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import InterpreterConstraintsField, MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
@@ -318,7 +318,7 @@ class PexRequest(EngineAwareParameter):
     platforms: PexPlatforms
     sources: Digest | None
     additional_inputs: Digest | None
-    entry_point: str | None
+    main: MainSpecification | None
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
     apply_requirement_constraints: bool
@@ -334,7 +334,7 @@ class PexRequest(EngineAwareParameter):
         platforms=PexPlatforms(),
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
-        entry_point: str | None = None,
+        main: MainSpecification | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
         apply_requirement_constraints: bool = True,
@@ -356,7 +356,7 @@ class PexRequest(EngineAwareParameter):
         :param sources: Any source files that should be included in the Pex.
         :param additional_inputs: Any inputs that are not source files and should not be included
             directly in the Pex, but should be present in the environment when building the Pex.
-        :param entry_point: The entry-point for the built Pex, equivalent to Pex's `-m` flag. If
+        :param main: The main for the built Pex, equivalent to Pex's `-e` or '-c' flag. If
             left off, the Pex will open up as a REPL.
         :param additional_args: Any additional Pex flags.
         :param pex_path: Pex files to add to the PEX_PATH.
@@ -372,7 +372,7 @@ class PexRequest(EngineAwareParameter):
         self.platforms = platforms
         self.sources = sources
         self.additional_inputs = additional_inputs
-        self.entry_point = entry_point
+        self.main = main
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
         self.apply_requirement_constraints = apply_requirement_constraints
@@ -552,8 +552,8 @@ async def build_pex(
     else:
         argv.append("--no-manylinux")
 
-    if request.entry_point is not None:
-        argv.extend(["--entry-point", request.entry_point])
+    if request.main is not None:
+        argv.extend(request.main.iter_pex_args())
 
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")

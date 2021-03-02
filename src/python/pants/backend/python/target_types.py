@@ -1,9 +1,12 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import collections.abc
 import logging
 import os.path
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
@@ -104,7 +107,83 @@ class PexBinaryDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PexEntryPointField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
+class MainSpecification(ABC):
+    @abstractmethod
+    def iter_pex_args(self) -> Iterator[str]:
+        ...
+
+    @property
+    @abstractmethod
+    def spec(self) -> str:
+        ...
+
+
+@dataclass(frozen=True)
+class EntryPoint(MainSpecification):
+    module: str
+    function: str | None = None
+
+    @classmethod
+    def parse(cls, value: str, provenance: str | None = None) -> EntryPoint:
+        given = f"entry point {provenance}" if provenance else "entry point"
+        entry_point = value.strip()
+        if not entry_point:
+            raise ValueError(
+                f"The {given} cannot be blank. It must indicate a Python module by name or path "
+                f"and an optional nullary function in that module separated by a colon, i.e.: "
+                f"module_name_or_path(':'function_name)?"
+            )
+        module_or_path, sep, func = entry_point.partition(":")
+        if not module_or_path:
+            raise ValueError(f"The {given} must specify a module; given: {value!r}")
+        if ":" in func:
+            raise ValueError(
+                f"The {given} can only contain one colon separating the entry point's module from "
+                f"the entry point function in that module; given: {value!r}"
+            )
+        if sep and not func:
+            logger.warning(
+                f"Assuming no entry point function and stripping trailing ':' from the {given}: "
+                f"{value!r}. Consider deleting it to make it clear no entry point function is "
+                f"intended."
+            )
+        return cls(module=module_or_path, function=func if func else None)
+
+    def __post_init__(self):
+        if ":" in self.module:
+            raise ValueError(
+                "The `:` character is not valid in a module name. Given an entry point module of "
+                f"{self.module}. Did you mean to use EntryPoint.parse?"
+            )
+        if self.function and ":" in self.function:
+            raise ValueError(
+                "The `:` character is not valid in a function name. Given an entry point function"
+                f" of {self.function}."
+            )
+
+    def iter_pex_args(self) -> Iterator[str]:
+        yield "--entry-point"
+        yield self.spec
+
+    @property
+    def spec(self) -> str:
+        return self.module if self.function is None else f"{self.module}:{self.function}"
+
+
+@dataclass(frozen=True)
+class ConsoleScript(MainSpecification):
+    name: str
+
+    def iter_pex_args(self) -> Iterator[str]:
+        yield "--console-script"
+        yield self.name
+
+    @property
+    def spec(self) -> str:
+        return self.name
+
+
+class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     help = (
         "The entry point for the binary, i.e. what gets run when executing `./my_binary.pex`.\n\n"
@@ -114,51 +193,36 @@ class PexEntryPointField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
         "will convert into `path.to.app:func`.\n\nYou must use the file name shorthand for file "
         "arguments to work with this target.\n\nTo leave off an entry point, set to '<none>'."
     )
+    required = True
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
+    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[EntryPoint]:
         ep = super().compute_value(raw_value, address=address)
-        entry_point = ep.strip() if ep is not None else None
-        if not entry_point:
+        if ep is None:
             raise InvalidFieldException(
-                f"The entry point for {address} cannot be blank. It must indicate a Python module "
+                f"An entry point must be specified for {address}. It must indicate a Python module "
                 "by name or path and an optional nullary function in that module separated by a "
                 "colon, i.e.: module_name_or_path(':'function_name)?"
             )
-        module_or_path, sep, func = entry_point.partition(":")
-        if not module_or_path:
-            raise InvalidFieldException(
-                f"The entry point for {address} must specify a module; given: {ep!r}"
-            )
-        if ":" in module_or_path or ":" in func:
-            raise InvalidFieldException(
-                f"The entry point for {address} can only contain one colon separating the entry "
-                f"point's module from the entry point function in that module; given: {ep!r}"
-            )
-        if sep and not func:
-            logger.warning(
-                f"Assuming no entry point function and stripping trailing ':' from the entry point "
-                f"{ep!r} declared in {address}. Consider deleting it to make it clear no entry "
-                f"point function is intended."
-            )
-            return module_or_path
-        return entry_point
+        try:
+            return EntryPoint.parse(ep, provenance=f"for {address}")
+        except ValueError as e:
+            raise InvalidFieldException(str(e))
 
     @property
     def filespec(self) -> Filespec:
         if not self.value:
             return {"includes": []}
-        path, _, func = self.value.partition(":")
-        if not path.endswith(".py"):
+        if not self.value.module.endswith(".py"):
             return {"includes": []}
-        full_glob = os.path.join(self.address.spec_path, path)
+        full_glob = os.path.join(self.address.spec_path, self.value.module)
         return {"includes": [full_glob]}
 
 
 # See `target_types_rules.py` for the `ResolvePexEntryPointRequest -> ResolvedPexEntryPoint` rule.
 @dataclass(frozen=True)
 class ResolvedPexEntryPoint:
-    val: Optional[str]
+    val: Optional[EntryPoint]
 
 
 @dataclass(frozen=True)

@@ -205,7 +205,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
         PexRequest(
             output_filename="mypy.pex",
             internal_only=True,
-            entry_point=mypy.entry_point,
+            main=mypy.main,
             requirements=PexRequirements((*mypy.all_requirements, *plugin_requirements)),
             interpreter_constraints=tool_interpreter_constraints,
         ),

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 
 
 class Lambdex(PythonToolBase):
@@ -14,4 +15,4 @@ class Lambdex(PythonToolBase):
     default_extra_requirements = ["setuptools>=50.3.0,<50.4"]
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.5"]
-    default_entry_point = "lambdex.bin.lambdex"
+    default_main = ConsoleScript("lambdex")

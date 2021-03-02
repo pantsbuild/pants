@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import List, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import EntryPoint
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.option.custom_types import file_option, shell_str, target_option
 from pants.util.docutil import docs_url
@@ -16,7 +17,9 @@ class Pylint(PythonToolBase):
     help = "The Pylint linter for Python code (https://www.pylint.org/)."
 
     default_version = "pylint>=2.4.4,<2.5"
-    default_entry_point = "pylint"
+    # TODO(John Sirois): Switch to ConsoleScript once Pex supports discovering console
+    #  scripts via the PEX_PATH: https://github.com/pantsbuild/pex/issues/1257
+    default_main = EntryPoint("pylint")
 
     @classmethod
     def register_options(cls, register):

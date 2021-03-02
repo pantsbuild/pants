@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 
 
 class IPython(PythonToolBase):
@@ -9,7 +10,7 @@ class IPython(PythonToolBase):
     help = "The IPython enhanced REPL (https://ipython.org/)."
 
     default_version = "ipython==7.16.1"  # The last version to support Python 3.6.
-    default_entry_point = "IPython:start_ipython"
+    default_main = ConsoleScript("ipython")
 
     @classmethod
     def register_options(cls, register):

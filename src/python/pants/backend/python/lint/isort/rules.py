@@ -77,7 +77,7 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
             internal_only=True,
             requirements=PexRequirements(isort.all_requirements),
             interpreter_constraints=PexInterpreterConstraints(isort.interpreter_constraints),
-            entry_point=isort.entry_point,
+            main=isort.main,
         ),
     )
 
