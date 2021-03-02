@@ -19,7 +19,10 @@ report = ["raw", "xml"]
 [auth]
 from_env_var = "TOOLCHAIN_AUTH_TOKEN"
 org = "pantsbuild"
-ci_env_variables = ["TRAVIS", "TRAVIS_JOB_ID", "TRAVIS_BUILD_ID", "TRAVIS_PULL_REQUEST", "TRAVIS_BUILD_WEB_URL"]
+ci_env_variables = [
+  "TRAVIS", "TRAVIS_JOB_ID", "TRAVIS_BUILD_ID", "TRAVIS_PULL_REQUEST", "TRAVIS_BUILD_WEB_URL",
+  "GITHUB_ACTIONS", "GITHUB_RUN_ID", "GITHUB_REF", "GITHUB_EVENT_NAME", "GITHUB_SHA",
+]
 
 [buildsense]
 enable = true
