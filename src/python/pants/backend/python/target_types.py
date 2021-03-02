@@ -163,7 +163,7 @@ class EntryPoint(MainSpecification):
 
     def iter_pex_args(self) -> Iterator[str]:
         yield "--entry-point"
-        yield str(self)
+        yield self.spec
 
     @property
     def spec(self) -> str:
