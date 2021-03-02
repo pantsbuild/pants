@@ -86,7 +86,7 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
     if len(entry_point_paths.files) != 1:
         raise InvalidFieldException(
-            f"Multiple files matched for the `{ep_alias}` {repr(ep_val)} for the target "
+            f"Multiple files matched for the `{ep_alias}` {ep_val.spec!r} for the target "
             f"{address}, but only one file expected. Are you using a glob, rather than a file "
             f"name?\n\nAll matching files: {list(entry_point_paths.files)}."
         )
