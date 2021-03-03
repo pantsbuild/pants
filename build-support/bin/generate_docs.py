@@ -94,7 +94,6 @@ def run_pants_help_all() -> Dict:
     activated_backends = ["pants.backend.python.lint.bandit", "pants.backend.python.lint.pylint"]
     argv = [
         "./pants",
-        "--concurrent",
         f"--backend-packages=-[{', '.join(map(repr, deactivated_backends))}]",
         f"--backend-packages=+[{', '.join(map(repr, activated_backends))}]",
         "--no-verify-config",

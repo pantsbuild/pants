@@ -598,9 +598,13 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=bool,
             default=False,
-            help="Enable concurrent runs of Pants. Without this enabled, Pants will "
-            "start up all concurrent invocations (e.g. in other terminals) without pantsd. "
-            "Enabling this option requires parallel Pants invocations to block on the first",
+            removal_version="2.5.0.dev0",
+            removal_hint="This option no-ops as Pants now allows concurrent runs.",
+            help=(
+                "Enable concurrent runs of Pants. Without this enabled, Pants will "
+                "start up all concurrent invocations (e.g. in other terminals) without pantsd. "
+                "Enabling this option requires parallel Pants invocations to block on the first."
+            ),
         )
 
         # NB: We really don't want this option to invalidate the daemon, because different clients might have
@@ -611,11 +615,15 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=float,
             default=60.0,
-            help="The maximum amount of time to wait for the invocation to start until "
-            "raising a timeout exception. "
-            "Because pantsd currently does not support parallel runs, "
-            "any prior running Pants command must be finished for the current one to start. "
-            "To never timeout, use the value -1.",
+            removal_version="2.5.0.dev0",
+            removal_hint="This option no-ops as Pants now allows concurrent runs.",
+            help=(
+                "The maximum amount of time to wait for the invocation to start until "
+                "raising a timeout exception. "
+                "Because pantsd currently does not support parallel runs, "
+                "any prior running Pants command must be finished for the current one to start. "
+                "To never timeout, use the value -1."
+            ),
         )
         register(
             "--pantsd-max-memory-usage",

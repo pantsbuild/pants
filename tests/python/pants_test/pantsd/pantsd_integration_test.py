@@ -13,12 +13,7 @@ from typing import List, Optional, Tuple
 import psutil
 import pytest
 
-from pants.testutil.pants_integration_test import (
-    PantsJoinHandle,
-    read_pants_log,
-    setup_tmpdir,
-    temporary_workdir,
-)
+from pants.testutil.pants_integration_test import PantsJoinHandle, read_pants_log, setup_tmpdir
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import (
     maybe_read_file,
@@ -528,7 +523,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_sigint_kills_request_waiting_for_lock(self):
         """Test that, when a pailgun request is blocked waiting for another one to end, sending
         SIGINT to the blocked run will kill it."""
-        config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": -1, "level": "debug"}}
+        config = {"GLOBAL": {"level": "debug"}}
         with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
             # Run a process that will wait forever.
             first_run_handle, _, file_to_create = self._launch_waiter(workdir, config)
@@ -605,17 +600,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 with open(os.path.join(directory, "BUILD"), "w") as f:
                     f.write(template.format(a_deps="", b_deps='dependencies = [":A"],'))
                 list_and_verify()
-
-    def test_concurrent_overrides_pantsd(self):
-        """Tests that the --concurrent flag overrides the --pantsd flag, because we don't allow
-        concurrent runs under pantsd."""
-        config = {"GLOBAL": {"concurrent": True, "pantsd": True}}
-        with temporary_workdir() as workdir:
-            pants_run = self.run_pants_with_workdir(
-                ["-ldebug", "help", "goals"], workdir=workdir, config=config
-            )
-            pants_run.assert_success()
-            self.assertNotIn("Connecting to pantsd", pants_run.stderr)
 
     def test_unhandled_exceptions_only_log_exceptions_once(self):
         """Tests that the unhandled exceptions triggered by LocalPantsRunner instances don't

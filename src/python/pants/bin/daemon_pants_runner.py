@@ -2,10 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
 import sys
 import time
-from contextlib import contextmanager
 from threading import Lock
 from typing import Dict, Tuple
 
@@ -32,69 +30,6 @@ class DaemonPantsRunner(RawFdRunner):
         super().__init__()
         self._core = core
         self._run_lock = Lock()
-
-    @staticmethod
-    def _send_stderr(stderr_fileno: int, msg: str) -> None:
-        """Used to send stderr on a raw filehandle _before_ stdio replacement.
-
-        TODO: This method will be removed as part of #7654.
-        """
-        with os.fdopen(stderr_fileno, mode="w", closefd=False) as stderr:
-            print(msg, file=stderr, flush=True)
-
-    @contextmanager
-    def _one_run_at_a_time(
-        self, stderr_fileno: int, cancellation_latch: PySessionCancellationLatch, timeout: float
-    ):
-        """Acquires exclusive access within the daemon.
-
-        Periodically prints a message on the given stderr_fileno while exclusive access cannot be
-        acquired.
-
-        TODO: This method will be removed as part of #7654, so it currently polls the lock and
-        cancellation latch rather than waiting for both of them asynchronously, which would be a bit
-        cleaner.
-        """
-
-        render_timeout = 5
-        should_poll_forever = timeout <= 0
-        start = time.time()
-        render_deadline = start + render_timeout
-        deadline = None if should_poll_forever else start + timeout
-
-        def should_keep_polling(now):
-            return not cancellation_latch.is_cancelled() and (not deadline or deadline > now)
-
-        acquired = self._run_lock.acquire(blocking=False)
-        if not acquired:
-            # If we don't acquire immediately, send an explanation.
-            length = "forever" if should_poll_forever else "up to {} seconds".format(timeout)
-            self._send_stderr(
-                stderr_fileno,
-                f"Another pants invocation is running. Will wait {length} for it to finish before giving up.\n"
-                "If you don't want to wait for the first run to finish, please press Ctrl-C and run "
-                "this command with PANTS_CONCURRENT=True in the environment.\n",
-            )
-        while True:
-            now = time.time()
-            if acquired:
-                try:
-                    yield
-                    break
-                finally:
-                    self._run_lock.release()
-            elif should_keep_polling(now):
-                if now > render_deadline:
-                    self._send_stderr(
-                        stderr_fileno,
-                        f"Waiting for invocation to finish (waited for {int(now - start)}s so far)...\n",
-                    )
-                    render_deadline = now + render_timeout
-                acquired = self._run_lock.acquire(blocking=True, timeout=0.1)
-            else:
-                raise ExclusiveRequestTimeout(
-                    "Timed out while waiting for another pants invocation to finish."
-                )
 
     def single_daemonized_run(
         self,
@@ -150,24 +85,17 @@ class DaemonPantsRunner(RawFdRunner):
         stdout_fileno: int,
         stderr_fileno: int,
     ) -> ExitCode:
-        request_timeout = float(env.get("PANTSD_REQUEST_TIMEOUT_LIMIT", -1))
-        # NB: Order matters: we acquire a lock before mutating either `sys.std*`, `os.environ`, etc.
-        with self._one_run_at_a_time(
-            stderr_fileno,
-            cancellation_latch=cancellation_latch,
-            timeout=request_timeout,
-        ):
-            # NB: `single_daemonized_run` implements exception handling, so only the most primitive
-            # errors will escape this function, where they will be logged by the server.
-            logger.info(f"handling request: `{' '.join(args)}`")
-            try:
-                with stdio_destination(
-                    stdin_fileno=stdin_fileno,
-                    stdout_fileno=stdout_fileno,
-                    stderr_fileno=stderr_fileno,
-                ):
-                    return self.single_daemonized_run(
-                        ((command,) + args), env, working_directory.decode(), cancellation_latch
-                    )
-            finally:
-                logger.info(f"request completed: `{' '.join(args)}`")
+        # NB: `single_daemonized_run` implements exception handling, so only the most primitive
+        # errors will escape this function, where they will be logged by the server.
+        logger.info(f"handling request: `{' '.join(args)}`")
+        try:
+            with stdio_destination(
+                stdin_fileno=stdin_fileno,
+                stdout_fileno=stdout_fileno,
+                stderr_fileno=stderr_fileno,
+            ):
+                return self.single_daemonized_run(
+                    ((command,) + args), env, working_directory.decode(), cancellation_latch
+                )
+        finally:
+            logger.info(f"request completed: `{' '.join(args)}`")

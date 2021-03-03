@@ -111,9 +111,6 @@ class RemotePantsRunner:
             **self._env,
             **ng_env,
             "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(self._start_time),
-            "PANTSD_REQUEST_TIMEOUT_LIMIT": str(
-                global_options.pantsd_timeout_when_multiple_invocations
-            ),
         }
 
         command = self._args[0]
