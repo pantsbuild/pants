@@ -3,13 +3,13 @@
 
 import shutil
 
-from pants.util.memo import memoized
 from pants.version import MAJOR_MINOR
 
 
-@memoized
-def terminal_width() -> int:
-    return shutil.get_terminal_size().columns
+# NB: This is not memoized because that would cause Pants to not pick up terminal resizing when
+# using pantsd.
+def terminal_width(*, fallback: int = 96, padding: int = 2) -> int:
+    return shutil.get_terminal_size(fallback=(fallback, 24)).columns - padding
 
 
 def docs_url(slug: str) -> str:
