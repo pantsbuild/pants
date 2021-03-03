@@ -268,6 +268,10 @@ async def rename_conflicting_targets(ptgts: PutativeTargets) -> UniquelyNamedPut
     for ptgt in ptgts:
         idx = 0
         possibly_renamed_ptgt = ptgt
+        # Targets in root-level BUILD files must be named explicitly.
+        if possibly_renamed_ptgt.path == "" and possibly_renamed_ptgt.kwargs.get("name") is None:
+            possibly_renamed_ptgt = possibly_renamed_ptgt.rename("root")
+        # Eliminate any address collisions.
         while possibly_renamed_ptgt.address.spec in existing_addrs:
             possibly_renamed_ptgt = ptgt.rename(f"{ptgt.name}{idx}")
             idx += 1
@@ -342,6 +346,15 @@ def make_content_str(
 @rule(desc="Edit BUILD files with new targets")
 async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
     ptgts_by_build_file = group_by_build_file(req.putative_targets)
+    # There may be an existing *directory* whose name collides with that of a BUILD file
+    # we want to create. This is more likely on a system with case-insensitive paths,
+    # such as MacOS. We detect such cases and use an alt BUILD file name to fix.
+    existing_paths = await Get(Paths, PathGlobs(ptgts_by_build_file.keys()))
+    existing_dirs = set(existing_paths.dirs)
+    # Technically there could be a dir named "BUILD.alt" as well, but that's pretty unlikely.
+    ptgts_by_build_file = {
+        (f"{bf}.alt" if bf in existing_dirs else bf): pts for bf, pts in ptgts_by_build_file.items()
+    }
     existing_build_files_contents = await Get(DigestContents, PathGlobs(ptgts_by_build_file.keys()))
     existing_build_files_contents_by_path = {
         ebfc.path: ebfc.content for ebfc in existing_build_files_contents

@@ -141,6 +141,28 @@ def test_rename_conflicting_targets(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_root_targets_are_explicitly_named(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file("foo.f90", "")
+    ptgt = PutativeTarget("", "", "fortran_library", ["foo.f90"], FortranLibrarySources.default)
+    unpts = rule_runner.request(UniquelyNamedPutativeTargets, [PutativeTargets([ptgt])])
+    ptgts = unpts.putative_targets
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget(
+                    "",
+                    "root",
+                    "fortran_library",
+                    ["foo.f90"],
+                    FortranLibrarySources.default,
+                    kwargs={"name": "root"},
+                )
+            ]
+        )
+        == ptgts
+    )
+
+
 def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
     dir_structure = {
         "src/fortran/foo/BUILD": "fortran_library(sources=['bar/baz1.f90'])",
@@ -173,6 +195,7 @@ def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
 
 def test_edit_build_files(rule_runner: RuleRunner) -> None:
     rule_runner.create_file("src/fortran/foo/BUILD", 'fortran_library(sources=["bar1.f90"])')
+    rule_runner.create_dir("src/fortran/baz/BUILD")  # NB: A directory, not a file.
     req = EditBuildFilesRequest(
         PutativeTargets(
             [
@@ -200,12 +223,12 @@ def test_edit_build_files(rule_runner: RuleRunner) -> None:
     )
     edited_build_files = rule_runner.request(EditedBuildFiles, [req])
 
-    assert edited_build_files.created_paths == ("src/fortran/baz/BUILD",)
+    assert edited_build_files.created_paths == ("src/fortran/baz/BUILD.alt",)
     assert edited_build_files.updated_paths == ("src/fortran/foo/BUILD",)
 
     contents = rule_runner.request(DigestContents, [edited_build_files.digest])
     expected = [
-        FileContent("src/fortran/baz/BUILD", "fortran_library()\n".encode()),
+        FileContent("src/fortran/baz/BUILD.alt", "fortran_library()\n".encode()),
         FileContent(
             "src/fortran/foo/BUILD",
             textwrap.dedent(
