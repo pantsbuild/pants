@@ -351,9 +351,10 @@ async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
     # such as MacOS. We detect such cases and use an alt BUILD file name to fix.
     existing_paths = await Get(Paths, PathGlobs(ptgts_by_build_file.keys()))
     existing_dirs = set(existing_paths.dirs)
-    # Technically there could be a dir named "BUILD.alt" as well, but that's pretty unlikely.
+    # Technically there could be a dir named "BUILD.pants" as well, but that's pretty unlikely.
     ptgts_by_build_file = {
-        (f"{bf}.alt" if bf in existing_dirs else bf): pts for bf, pts in ptgts_by_build_file.items()
+        (f"{bf}.pants" if bf in existing_dirs else bf): pts
+        for bf, pts in ptgts_by_build_file.items()
     }
     existing_build_files_contents = await Get(DigestContents, PathGlobs(ptgts_by_build_file.keys()))
     existing_build_files_contents_by_path = {

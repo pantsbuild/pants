@@ -223,12 +223,12 @@ def test_edit_build_files(rule_runner: RuleRunner) -> None:
     )
     edited_build_files = rule_runner.request(EditedBuildFiles, [req])
 
-    assert edited_build_files.created_paths == ("src/fortran/baz/BUILD.alt",)
+    assert edited_build_files.created_paths == ("src/fortran/baz/BUILD.pants",)
     assert edited_build_files.updated_paths == ("src/fortran/foo/BUILD",)
 
     contents = rule_runner.request(DigestContents, [edited_build_files.digest])
     expected = [
-        FileContent("src/fortran/baz/BUILD.alt", "fortran_library()\n".encode()),
+        FileContent("src/fortran/baz/BUILD.pants", "fortran_library()\n".encode()),
         FileContent(
             "src/fortran/foo/BUILD",
             textwrap.dedent(
