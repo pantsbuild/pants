@@ -111,7 +111,7 @@ jobs:
             ${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
       - name: Set env vars
         run: |
-          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.ci.toml" >> ${GITHUB_ENV}
       - name: Bootstrap Pants
         run: |
           ./pants --version
@@ -170,7 +170,7 @@ jobs:
           path: src/python/pants/engine/internals/
       - name: Set env vars
         run: |
-          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.ci.toml" >> ${GITHUB_ENV}
       - name: Run Python tests
         run: |
           ./pants test ::
@@ -203,7 +203,7 @@ jobs:
           path: src/python/pants/engine/internals/
       - name: Set env vars
         run: |
-          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.ci.toml" >> ${GITHUB_ENV}
       - name: Lint
         run: |
           ./pants validate '**'
@@ -283,7 +283,7 @@ jobs:
             ${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
       - name: Set env vars
         run: |
-          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.ci.toml" >> ${GITHUB_ENV}
       - name: Bootstrap Pants
         run: |
           ./pants --version
@@ -332,7 +332,7 @@ jobs:
           path: src/python/pants/engine/internals/
       - name: Set env vars
         run: |
-          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.travis-ci.toml" >> ${GITHUB_ENV}
+          echo "PANTS_CONFIG_FILES=${{ github.workspace }}/pants.ci.toml" >> ${GITHUB_ENV}
       - name: Run Python tests
         run: |
           ./pants --tag=+platform_specific_behavior test ::
