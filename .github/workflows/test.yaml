@@ -93,7 +93,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            build-support/virtualenvs
+            ~/.cache/pants/pants_dev_deps
           key: |
             ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
       - name: Get Engine Hash
@@ -160,7 +160,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            build-support/virtualenvs
+            ~/.cache/pants/pants_dev_deps
           key: |
             ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
       - name: Download native_engine.so
@@ -193,7 +193,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            build-support/virtualenvs
+            ~/.cache/pants/pants_dev_deps
           key: |
             ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
       - name: Download native_engine.so
@@ -265,7 +265,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            build-support/virtualenvs
+            ~/.cache/pants/pants_dev_deps
           key: |
             ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
       - name: Get Engine Hash
@@ -322,7 +322,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            build-support/virtualenvs
+            ~/.cache/pants/pants_dev_deps
           key: |
             ${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}
       - name: Download native_engine.so

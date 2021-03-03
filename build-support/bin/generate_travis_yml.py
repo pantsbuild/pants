@@ -219,7 +219,7 @@ CACHE_NATIVE_ENGINE = {
             *_cache_common_directories,
             "${HOME}/.rustup",
             "${HOME}/.cargo",
-            "build-support/virtualenvs",
+            "${HOME}/.cache/pants/pants_dev_deps",
             "src/rust/engine/target",
         ],
     },

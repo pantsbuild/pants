@@ -60,7 +60,7 @@ jobs:
       - ${PYENV_ROOT_OSX}
       - ${HOME}/.rustup
       - ${HOME}/.cargo
-      - build-support/virtualenvs
+      - ${HOME}/.cache/pants/pants_dev_deps
       - src/rust/engine/target
       timeout: 500
     dist: bionic
@@ -115,7 +115,7 @@ jobs:
       - ${PYENV_ROOT_OSX}
       - ${HOME}/.rustup
       - ${HOME}/.cargo
-      - build-support/virtualenvs
+      - ${HOME}/.cache/pants/pants_dev_deps
       - src/rust/engine/target
       timeout: 500
     dist: bionic
@@ -162,7 +162,7 @@ jobs:
       - ${PYENV_ROOT_OSX}
       - ${HOME}/.rustup
       - ${HOME}/.cargo
-      - build-support/virtualenvs
+      - ${HOME}/.cache/pants/pants_dev_deps
       - src/rust/engine/target
       timeout: 500
     env:
@@ -206,7 +206,7 @@ jobs:
       - ${PYENV_ROOT_OSX}
       - ${HOME}/.rustup
       - ${HOME}/.cargo
-      - build-support/virtualenvs
+      - ${HOME}/.cache/pants/pants_dev_deps
       - src/rust/engine/target
       timeout: 500
     env:
@@ -351,7 +351,7 @@ jobs:
       - ${PYENV_ROOT_OSX}
       - ${HOME}/.rustup
       - ${HOME}/.cargo
-      - build-support/virtualenvs
+      - ${HOME}/.cache/pants/pants_dev_deps
       - src/rust/engine/target
       timeout: 500
     dist: xenial
@@ -385,7 +385,7 @@ jobs:
       - ${PYENV_ROOT_OSX}
       - ${HOME}/.rustup
       - ${HOME}/.cargo
-      - build-support/virtualenvs
+      - ${HOME}/.cache/pants/pants_dev_deps
       - src/rust/engine/target
       timeout: 500
     dist: xenial
@@ -522,7 +522,7 @@ jobs:
       - ${PYENV_ROOT_OSX}
       - ${HOME}/.rustup
       - ${HOME}/.cargo
-      - build-support/virtualenvs
+      - ${HOME}/.cache/pants/pants_dev_deps
       - src/rust/engine/target
       timeout: 500
     dist: xenial
@@ -554,7 +554,7 @@ jobs:
       - ${PYENV_ROOT_OSX}
       - ${HOME}/.rustup
       - ${HOME}/.cargo
-      - build-support/virtualenvs
+      - ${HOME}/.cache/pants/pants_dev_deps
       - src/rust/engine/target
       timeout: 500
     env:
@@ -648,7 +648,7 @@ jobs:
       - ${PYENV_ROOT_OSX}
       - ${HOME}/.rustup
       - ${HOME}/.cargo
-      - build-support/virtualenvs
+      - ${HOME}/.cache/pants/pants_dev_deps
       - src/rust/engine/target
       timeout: 500
     env:
