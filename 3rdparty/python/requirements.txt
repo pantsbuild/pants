@@ -3,6 +3,8 @@ beautifulsoup4>=4.6.0,<4.7
 fasteners==0.15.0
 freezegun==1.0.0
 
+humbug==0.1.4
+
 # The MyPy requirement should be maintained in lockstep with the requirement the Pants repo uses
 # for the mypy task since it configures custom MyPy plugins. That requirement can be found via:
 #   ./pants help-all | \

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import getpass
+import json
 import logging
 import os
 import socket
@@ -13,6 +14,9 @@ import uuid
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from humbug.consent import HumbugConsent, environment_variable_opt_out
+from humbug.report import Report, Reporter
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -26,6 +30,24 @@ from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
+BUGOUT_ACCESS_TOKEN = os.environ.get("BUGOUT_ACCESS_TOKEN")
+BUGOUT_JOURNAL_ID = os.environ.get("BUGOUT_JOURNAL_ID")
+
+reporting_consent = HumbugConsent(
+    environment_variable_opt_out(
+        "PANTS_REPORTING_ENABLED",
+        ["0", "n", "f", "N", "F", "no", "false", "No", "False", "NO", "FALSE"],
+        )
+    )
+session_id = str(uuid.uuid4())
+reporter = Reporter(
+    "pantsbuild/pants",
+    reporting_consent,
+    session_id=session_id,
+    bugout_token=BUGOUT_ACCESS_TOKEN,
+    bugout_journal_id=BUGOUT_JOURNAL_ID,
+    timeout_seconds=5,
+    )
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
     """Use the json encoder we use for making options hashable to support datatypes.
@@ -138,6 +160,8 @@ class RunTracker:
         outcome_str = "SUCCESS" if exit_code == PANTS_SUCCEEDED_EXIT_CODE else "FAILURE"
         self._run_info["outcome"] = outcome_str
 
+        self._report()
+
         self.native.set_per_run_log_path(None)
 
     def get_cumulative_timings(self) -> List[Dict[str, Any]]:
@@ -190,6 +214,18 @@ class RunTracker:
             logger.warning("Error retrieving per-run logs from RunTracker.", exc_info=e)
 
         return output
+
+    def _report(self) -> None:
+        logs = "\n".join(self.retrieve_logs())
+        report = Report(
+            title="pants run: {}".format(self._run_info.get("cmd_line", "")),
+            tags=reporter.system_tags() + ["version:{}".format(VERSION)],
+            content="## Run info\n```\n{}\n```\n## Logs\n```\n{}\n```".format(
+                json.dumps(self._run_info, indent=2),
+                logs
+                ),
+            )
+        reporter.publish(report)
 
     @property
     def counter_names(self) -> tuple[str, ...]:
