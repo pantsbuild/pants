@@ -49,9 +49,10 @@ def identify_missing_ancestor_files(name: str, sources: Sequence[str]) -> Frozen
         if not source.endswith(".py"):
             continue
         pkg_dir = os.path.dirname(source)
-        if not pkg_dir or pkg_dir in packages:
+        if pkg_dir in packages:
             continue
         package = ""
+        packages.add(package)
         for component in pkg_dir.split(os.sep):
             package = os.path.join(package, component)
             packages.add(package)
