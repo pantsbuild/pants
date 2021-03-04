@@ -37,7 +37,6 @@ class PantsDaemon(PantsDaemonProcessManager):
     """A daemon that manages PantsService instances."""
 
     JOIN_TIMEOUT_SECONDS = 1
-    LOG_NAME = "pantsd.log"
 
     class StartupFailure(Exception):
         """Represents a failure to start pantsd."""
