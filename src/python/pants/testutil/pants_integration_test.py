@@ -294,7 +294,7 @@ def ensure_daemon(func):
 def render_logs(workdir: str) -> None:
     """Renders all potentially relevant logs from the given workdir to stdout."""
     filenames = list(glob.glob(os.path.join(workdir, "logs/exceptions*log"))) + list(
-        glob.glob(os.path.join(workdir, "pantsd/pantsd.log"))
+        glob.glob(os.path.join(workdir, "pants.log"))
     )
     for filename in filenames:
         rel_filename = fast_relpath(filename, workdir)
@@ -305,8 +305,8 @@ def render_logs(workdir: str) -> None:
 
 
 def read_pants_log(workdir: str) -> Iterator[str]:
-    """Yields all lines from the pantsd log under the given workdir."""
-    # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
+    """Yields all lines from the pants log under the given workdir."""
+    # Surface the pants log for easy viewing via pytest's `-s` (don't capture stdio) option.
     for line in _read_log(f"{workdir}/pants.log"):
         yield line
 
