@@ -219,11 +219,15 @@ class RunTracker:
         logs = "\n".join(self.retrieve_logs())
         report = Report(
             title="pants run: {}".format(self._run_info.get("cmd_line", "")),
-            tags=reporter.system_tags() + ["version:{}".format(VERSION)],
-            content="## Run info\n```\n{}\n```\n## Logs\n```\n{}\n```".format(
-                json.dumps(self._run_info, indent=2),
-                logs
-                ),
+            tags=(
+                reporter.system_tags() +
+                [
+                    "version:{}".format(VERSION),
+                    "outcome:{}".format(self._run_info.get("outcome", ""))
+                ]
+            ),
+            content="## Run info\n```\n{}\n```".format(
+                json.dumps(self._run_info, indent=2)),
             )
         reporter.publish(report)
 
