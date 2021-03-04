@@ -216,7 +216,6 @@ class RunTracker:
         return output
 
     def _report(self) -> None:
-        logs = "\n".join(self.retrieve_logs())
         report = Report(
             title="pants run: {}".format(self._run_info.get("cmd_line", "")),
             tags=(
