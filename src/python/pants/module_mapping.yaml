@@ -1,0 +1,35 @@
+---
+attrs:
+  - attr
+
+enum34:
+  - enum
+
+paho_mqtt:
+  - paho
+
+pyopenssl:
+  - OpenSSL
+
+pycrypto:
+  - Crypto
+
+pymongo:
+  - bson
+  - gridfs
+
+pytest_runner:
+  - ptr
+
+python_dateutil:
+  - dateutil
+
+setuptools:
+  - easy_install
+  - pkg_resources
+
+zope.event:
+  - zope
+
+zope.interface:
+  - zope

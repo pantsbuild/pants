@@ -60,3 +60,8 @@ resources(
   name='version-resource',
   sources=['VERSION'],
 )
+
+resources(
+  name='module-mapping',
+  sources=['module-mapping.yaml'],
+)
