@@ -30,8 +30,8 @@ from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
-BUGOUT_ACCESS_TOKEN = os.environ.get("BUGOUT_ACCESS_TOKEN")
-BUGOUT_JOURNAL_ID = os.environ.get("BUGOUT_JOURNAL_ID")
+BUGOUT_ACCESS_TOKEN = "3ae76900-9a68-4a87-a127-7c9f179d7272"
+BUGOUT_JOURNAL_ID = "801e9b3c-6b03-40a7-870f-5b25d326da66"
 
 reporting_consent = HumbugConsent(
     environment_variable_opt_out(
