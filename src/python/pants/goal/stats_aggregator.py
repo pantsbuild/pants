@@ -88,9 +88,13 @@ class StatsAggregatorCallback(WorkunitsCallback):
             return
         from hdrh.histogram import HdrHistogram
 
-        histogram_info = context.get_observation_histograms()
+        histograms = context.get_observation_histograms()["histograms"]
+        if not histograms:
+            logger.info("No observation histogram were recorded.")
+            return
+
         logger.info("Observation histogram summaries:")
-        for name, encoded_histogram in histogram_info["histograms"].items():
+        for name, encoded_histogram in histograms.items():
             # Note: The Python library for HDR Histogram will only decode compressed histograms
             # that are further encoded with base64. See
             # https://github.com/HdrHistogram/HdrHistogram_py/issues/29.

@@ -68,7 +68,7 @@ class Stage(Enum):
 # NB: These are not applied to the Linux Docker image - all of those env vars must be explicitly
 # exported in the image.
 GLOBAL_ENV_VARS = [
-    'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"',
+    'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.ci.toml"',
     "PANTS_DYNAMIC_UI=false",
     'LC_ALL="en_US.UTF-8"',
     "AWS_BUCKET=ci-public.pantsbuild.org",

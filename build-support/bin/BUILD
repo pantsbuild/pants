@@ -15,7 +15,6 @@ pex_binary(name="ci", entry_point="ci.py")
 pex_binary(name="deploy_to_s3", entry_point="deploy_to_s3.py")
 pex_binary(name="generate_travis_yml", entry_point="generate_travis_yml.py")
 pex_binary(name="generate_docs", entry_point="generate_docs.py", dependencies=[":docs_templates"])
-pex_binary(name="get_rbe_token", entry_point="get_rbe_token.py")
 pex_binary(name="reversion", entry_point="reversion.py",)
 pex_binary(name="shellcheck", entry_point="shellcheck.py")
 pex_binary(name="packages", entry_point="packages.py")  # TODO: rename to `release.py` after removing `release.sh`.
