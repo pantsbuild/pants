@@ -163,11 +163,13 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
             tuple(message_regex_filters),
             log_path,
         )
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
         # Install a Python logger that will route through the Rust logger.
         with _python_logging_setup(global_level, print_stacktrace):
             yield
     finally:
         sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
 
 
 def _get_log_levels_by_target(
