@@ -41,6 +41,7 @@ class HelpPrinter(MaybeColor):
         self._bin_name = bin_name
         self._help_request = help_request
         self._all_help_info = all_help_info
+        self._width = terminal_width()
 
     def print_help(self) -> Literal[0, 1]:
         """Print help to the console."""
@@ -111,9 +112,8 @@ class HelpPrinter(MaybeColor):
         else:
             self._print_global_help()
 
-    @staticmethod
-    def _format_summary_description(descr: str, chars_before_description: int) -> str:
-        lines = textwrap.wrap(descr, terminal_width() - chars_before_description)
+    def _format_summary_description(self, descr: str, chars_before_description: int) -> str:
+        lines = textwrap.wrap(descr, self._width - chars_before_description)
         if len(lines) > 1:
             lines = [
                 lines[0],
@@ -258,7 +258,7 @@ class HelpPrinter(MaybeColor):
         self._print_title(target_alias)
         tinfo = self._all_help_info.name_to_target_type_info[target_alias]
         if tinfo.description:
-            formatted_desc = "\n".join(hard_wrap(tinfo.description, width=terminal_width()))
+            formatted_desc = "\n".join(hard_wrap(tinfo.description, width=self._width))
             print(formatted_desc)
         print("\n\nValid fields:")
         for field in sorted(tinfo.fields, key=lambda x: x.alias):
@@ -270,7 +270,7 @@ class HelpPrinter(MaybeColor):
             print(self.maybe_cyan(f"{indent}{required_or_default}"))
             if field.description:
                 formatted_desc = "\n".join(
-                    hard_wrap(field.description, indent=len(indent), width=terminal_width())
+                    hard_wrap(field.description, indent=len(indent), width=self._width)
                 )
                 print(formatted_desc)
         print()

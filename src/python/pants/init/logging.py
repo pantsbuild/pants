@@ -168,12 +168,8 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
         with _python_logging_setup(global_level, print_stacktrace):
             yield
     finally:
-        sys.__stdin__, sys.__stdout__, sys.__stderr__ = (
-            original_stdin,
-            original_stdout,
-            original_stderr,
-        )
         sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
 
 
 def _get_log_levels_by_target(
