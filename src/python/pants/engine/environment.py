@@ -3,13 +3,11 @@
 
 import logging
 import re
-from dataclasses import dataclass
-from typing import Dict, Mapping, Optional, Sequence
+from typing import Dict, Optional, Sequence
 
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
@@ -17,21 +15,12 @@ name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
 shorthand_re = re.compile(r"([A-Za-z_]\w*)")
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class PantsEnvironment:
-    """PantsEnvironment is a representation of the environment variables the currently-executing
-    Pants process was invoked with."""
+class CompleteEnvironment(FrozenDict):
+    """CompleteEnvironment contains all environment variables from the current Pants process.
 
-    env: FrozenDict[str, str]
-
-    def __init__(self, env: Optional[Mapping[str, str]] = None):
-        """Initialize a `PantsEnvironment` with the current contents of the environment.
-
-        Explicitly specify the env argument to create a mock environment for testing.
-        """
-
-        self.env = FrozenDict(env or {})
+    Accesses to `os.environ` cannot be accurately tracked, so @rules that need access to the
+    environment should request this type instead.
+    """
 
     def get_subset(
         self, requested: Sequence[str], *, allowed: Optional[Sequence[str]] = None
@@ -65,7 +54,7 @@ class PantsEnvironment:
             if name_value_match:
                 check_and_set(name_value_match[1], name_value_match[2])
             elif shorthand_re.match(env_var):
-                check_and_set(env_var, self.env.get(env_var))
+                check_and_set(env_var, self.get(env_var))
             else:
                 raise ValueError(
                     f"An invalid variable was requested via the --test-extra-env-var "
@@ -76,8 +65,8 @@ class PantsEnvironment:
 
 
 @rule
-async def pants_environment(session_values: SessionValues) -> PantsEnvironment:
-    return session_values[PantsEnvironment]
+async def complete_environment(session_values: SessionValues) -> CompleteEnvironment:
+    return session_values[CompleteEnvironment]
 
 
 def rules():

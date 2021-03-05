@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.core.util_rules.pants_environment import PantsEnvironment
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.rules import collect_rules, rule
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -68,12 +68,10 @@ class SubprocessEnvironmentVars:
 
 @rule
 def get_subprocess_environment(
-    subproc_env: SubprocessEnvironment, pants_env: PantsEnvironment
+    subproc_env: SubprocessEnvironment, env: CompleteEnvironment
 ) -> SubprocessEnvironmentVars:
     return SubprocessEnvironmentVars(
-        pants_env.get_subset(
-            subproc_env.env_vars_to_pass_to_subprocesses, allowed=SETTABLE_ENV_VARS
-        )
+        env.get_subset(subproc_env.env_vars_to_pass_to_subprocesses, allowed=SETTABLE_ENV_VARS)
     )
 
 

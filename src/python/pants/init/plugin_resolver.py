@@ -16,8 +16,8 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
 )
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.collection import DeduplicatedCollection
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, QueryRule, collect_rules, rule
@@ -124,7 +124,7 @@ class PluginResolver:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
-                    PantsEnvironment: PantsEnvironment(dict(options_bootstrapper.env_tuples)),
+                    CompleteEnvironment: CompleteEnvironment(dict(options_bootstrapper.env_tuples)),
                 }
             ),
         )

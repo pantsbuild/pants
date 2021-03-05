@@ -13,7 +13,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine import desktop, fs, platform, process
+from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
@@ -247,6 +247,7 @@ class EngineInitializer:
                 *collect_rules(locals()),
                 *build_files.rules(),
                 *fs.rules(),
+                *environment.rules(),
                 *desktop.rules(),
                 *graph.rules(),
                 *options_parsing.rules(),

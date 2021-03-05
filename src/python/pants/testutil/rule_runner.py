@@ -20,10 +20,9 @@ from pants.base.deprecated import deprecated
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules import pants_environment
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.console import Console
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
@@ -103,7 +102,6 @@ class RuleRunner:
         all_rules = (
             *(rules or ()),
             *source_root.rules(),
-            *pants_environment.rules(),
             QueryRule(WrappedTarget, [Address]),
             QueryRule(UnionMembership, []),
         )
@@ -148,7 +146,7 @@ class RuleRunner:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
-                    PantsEnvironment: PantsEnvironment(),
+                    CompleteEnvironment: CompleteEnvironment(),
                 }
             ),
         )
@@ -219,7 +217,7 @@ class RuleRunner:
     def set_options(self, args: Iterable[str], *, env: Mapping[str, str] | None = None) -> None:
         """Update the engine session with new options and/or environment variables.
 
-        The environment variables will be used to set the `PantsEnvironment`, which is the
+        The environment variables will be used to set the `CompleteEnvironment`, which is the
         environment variables captured by the parent Pants process. Some rules use this to be able
         to read arbitrary env vars. Any options that start with `PANTS_` will also be used to set
         options.
@@ -232,7 +230,7 @@ class RuleRunner:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
-                    PantsEnvironment: PantsEnvironment(env),
+                    CompleteEnvironment: CompleteEnvironment(env or {}),
                 }
             ),
         )
