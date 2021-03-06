@@ -1,22 +1,26 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.base.pants_env_vars import IGNORE_UNRECOGNIZED_ENCODING, RECURSION_LIMIT
 from pants.bin.pants_loader import PantsLoader
 from pants.testutil.pants_integration_test import PantsResult, run_pants
 
 
 def test_invalid_locale() -> None:
-    bypass_env = PantsLoader.ENCODING_IGNORE_ENV_VAR
     pants_run = run_pants(
         command=["help"], extra_env={"LC_ALL": "iNvALiD-lOcALe", "PYTHONUTF8": "0"}
     )
+
     pants_run.assert_failure()
     assert "Pants requires" in pants_run.stderr
-    assert bypass_env in pants_run.stderr
-
+    assert IGNORE_UNRECOGNIZED_ENCODING in pants_run.stderr
     run_pants(
         command=["help"],
-        extra_env={"LC_ALL": "iNvALiD-lOcALe", "PYTHONUTF8": "0", bypass_env: "1"},
+        extra_env={
+            "LC_ALL": "iNvALiD-lOcALe",
+            "PYTHONUTF8": "0",
+            IGNORE_UNRECOGNIZED_ENCODING: "1",
+        },
     ).assert_success()
 
 
@@ -31,7 +35,8 @@ def test_alternate_entrypoint() -> None:
 def test_alternate_entrypoint_bad() -> None:
     pants_run = run_pants(command=["help"], extra_env={"PANTS_ENTRYPOINT": "badness"})
     pants_run.assert_failure()
-    assert "entrypoint must be" in pants_run.stderr
+
+    assert "must be of the form" in pants_run.stderr
 
 
 def test_alternate_entrypoint_not_callable() -> None:
@@ -53,7 +58,7 @@ def test_alternate_entrypoint_scrubbing() -> None:
 
 def test_recursion_limit() -> None:
     def run(limit: str) -> PantsResult:
-        return run_pants(command=["help"], extra_env={"PANTS_RECURSION_LIMIT": limit})
+        return run_pants(command=["help"], extra_env={RECURSION_LIMIT: limit})
 
     # Large value succeeds.
     run("100000").assert_success()

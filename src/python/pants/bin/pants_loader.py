@@ -8,22 +8,15 @@ import sys
 import warnings
 from textwrap import dedent
 
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE
+from pants.base.pants_env_vars import IGNORE_UNRECOGNIZED_ENCODING, RECURSION_LIMIT
+
 
 class PantsLoader:
     """Loads and executes entrypoints."""
 
-    ENTRYPOINT_ENV_VAR = "PANTS_ENTRYPOINT"
-    DEFAULT_ENTRYPOINT = "pants.bin.pants_exe:main"
-
-    RECURSION_LIMIT_ENV_VAR = "PANTS_RECURSION_LIMIT"
-
-    ENCODING_IGNORE_ENV_VAR = "PANTS_IGNORE_UNRECOGNIZED_ENCODING"
-
-    class InvalidLocaleError(Exception):
-        """Raised when a valid locale can't be found."""
-
     @staticmethod
-    def setup_warnings():
+    def setup_warnings() -> None:
         # We want to present warnings to the user, set this up before importing any of our own code,
         # to ensure all deprecation warnings are seen, including module deprecations.
         # The "default" action displays a warning for a particular file and line number exactly once.
@@ -43,63 +36,60 @@ class PantsLoader:
         )
 
     @classmethod
-    def ensure_locale(cls):
-        # Sanity check for locale, See https://github.com/pantsbuild/pants/issues/2465.
-        # This check is done early to give good feedback to user on how to fix the problem. Other
-        # libraries called by Pants may fail with more obscure errors.
+    def ensure_locale(cls) -> None:
+        """Ensure the locale uses UTF-8 encoding, or prompt for an explicit bypass."""
+
         encoding = locale.getpreferredencoding()
         if (
             encoding.lower() != "utf-8"
-            and os.environ.get(cls.ENCODING_IGNORE_ENV_VAR, None) is None
+            and os.environ.get(IGNORE_UNRECOGNIZED_ENCODING, None) is None
         ):
-            raise cls.InvalidLocaleError(
+            raise RuntimeError(
                 dedent(
-                    """
-                    Your system's preferred encoding is `{}`, but Pants requires `UTF-8`.
+                    f"""
+                    Your system's preferred encoding is `{encoding}`, but Pants requires `UTF-8`.
                     Specifically, Python's `locale.getpreferredencoding()` must resolve to `UTF-8`.
 
-                    Fix it by setting the LC_* and LANG environment settings. Example:
+                    You can fix this by setting the LC_* and LANG environment variables, e.g.:
                       LC_ALL=en_US.UTF-8
                       LANG=en_US.UTF-8
-                    Or, bypass it by setting the below environment variable.
-                      {}=1
-                    Note: we cannot guarantee consistent behavior with this bypass enabled.
-                    """.format(
-                        encoding, cls.ENCODING_IGNORE_ENV_VAR
-                    )
+                    Or, bypass it by setting {IGNORE_UNRECOGNIZED_ENCODING}=1. Note that
+                    pants may exhibit inconsistent behavior if this check is bypassed.
+                    """
                 )
             )
 
-    @classmethod
-    def set_recursion_limit(cls):
-        sys.setrecursionlimit(int(os.environ.get(cls.RECURSION_LIMIT_ENV_VAR, "10000")))
-
     @staticmethod
-    def determine_entrypoint(env_var, default):
-        return os.environ.pop(env_var, default)
+    def load_and_execute(entrypoint: str) -> None:
+        try:
+            module_path, func_name = entrypoint.split(":", 1)
+        except ValueError:
+            print("PANTS_ENTRYPOINT must be of the form `module.path:callable`", file=sys.stderr)
+            sys.exit(PANTS_FAILED_EXIT_CODE)
 
-    @staticmethod
-    def load_and_execute(entrypoint):
-        assert ":" in entrypoint, "ERROR: entrypoint must be of the form `module.path:callable`"
-        module_path, func_name = entrypoint.split(":", 1)
         module = importlib.import_module(module_path)
-        entrypoint_main = getattr(module, func_name)
-        assert callable(entrypoint_main), "ERROR: entrypoint `{}` is not callable".format(
-            entrypoint
-        )
-        entrypoint_main()
+        entrypoint_fn = getattr(module, func_name)
+        try:
+            entrypoint_fn()
+        except TypeError:
+            print(f"PANTS_ENTRYPOINT {func_name} is not callable", file=sys.stderr)
+            sys.exit(PANTS_FAILED_EXIT_CODE)
 
     @classmethod
-    def run(cls):
+    def main(cls) -> None:
         cls.setup_warnings()
         cls.ensure_locale()
-        cls.set_recursion_limit()
-        entrypoint = cls.determine_entrypoint(cls.ENTRYPOINT_ENV_VAR, cls.DEFAULT_ENTRYPOINT)
+
+        sys.setrecursionlimit(int(os.environ.get(RECURSION_LIMIT, "10000")))
+
+        default_entrypoint = "pants.bin.pants_exe:main"
+        entrypoint = os.environ.pop("PANTS_ENTRYPOINT", default_entrypoint)
+
         cls.load_and_execute(entrypoint)
 
 
-def main():
-    PantsLoader.run()
+def main() -> None:
+    PantsLoader.main()
 
 
 if __name__ == "__main__":
