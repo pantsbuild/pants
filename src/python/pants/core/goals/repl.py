@@ -9,6 +9,7 @@ from typing import ClassVar, Dict, Iterable, Mapping, Optional, Tuple, Type, cas
 from pants.base.build_root import BuildRoot
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveRunner
@@ -91,6 +92,7 @@ async def run_repl(
     build_root: BuildRoot,
     union_membership: UnionMembership,
     global_options: GlobalOptions,
+    complete_env: CompleteEnvironment,
 ) -> Repl:
     transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest(all_specified_addresses)
@@ -121,10 +123,9 @@ async def run_repl(
         workspace.write_digest(
             request.digest, path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix()
         )
+        env = {**complete_env, **request.extra_env}
         result = interactive_runner.run(
-            InteractiveProcess(
-                argv=request.args, env=request.extra_env, run_in_workspace=True, hermetic_env=False
-            )
+            InteractiveProcess(argv=request.args, env=env, run_in_workspace=True)
         )
     return Repl(result.exit_code)
 

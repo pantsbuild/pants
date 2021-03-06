@@ -1759,19 +1759,11 @@ fn run_local_interactive_process(
       let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
       let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
       let input_digest: Digest = nodes::lift_directory_digest(&input_digest_value)?;
-      let hermetic_env: bool = externs::getattr(&value, "hermetic_env").unwrap();
       let env = externs::getattr_from_frozendict(&value, "env");
 
       let code = block_in_place_and_wait(py, || {
         scheduler
-          .run_local_interactive_process(
-            session,
-            input_digest,
-            argv,
-            env,
-            hermetic_env,
-            run_in_workspace,
-          )
+          .run_local_interactive_process(session, input_digest, argv, env, run_in_workspace)
           .boxed_local()
       })?;
 
