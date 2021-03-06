@@ -14,6 +14,7 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.base.pants_env_vars import (
     DAEMON_ENTRYPOINT,
     IGNORE_UNRECOGNIZED_ENCODING,
+    PANTSC_PROFILE,
     RECURSION_LIMIT,
 )
 from pants.bin.pants_runner import PantsRunner
@@ -21,7 +22,10 @@ from pants.util.contextutil import maybe_profiled
 
 
 class PantsLoader:
-    """Loads and executes entrypoints."""
+    """Initial entrypoint for pants.
+
+    Executes a pants_runner by default, or executs a pantsd-specific entrypoint.
+    """
 
     @staticmethod
     def setup_warnings() -> None:
@@ -89,7 +93,7 @@ class PantsLoader:
     @staticmethod
     def run_default_entrypoint() -> None:
         logger = logging.getLogger(__name__)
-        with maybe_profiled(os.environ.get("PANTSC_PROFILE")):
+        with maybe_profiled(os.environ.get(PANTSC_PROFILE)):
             start_time = time.time()
             try:
                 runner = PantsRunner(args=sys.argv, env=os.environ)
