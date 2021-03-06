@@ -11,7 +11,7 @@ import warnings
 from textwrap import dedent
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
-from pants.base.pants_env_vars import (
+from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
     IGNORE_UNRECOGNIZED_ENCODING,
     PANTSC_PROFILE,

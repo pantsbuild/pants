@@ -3,7 +3,7 @@
 
 import os
 
-from pants.base.pants_env_vars import (
+from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
     IGNORE_UNRECOGNIZED_ENCODING,
     RECURSION_LIMIT,

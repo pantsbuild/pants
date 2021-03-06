@@ -14,7 +14,7 @@ from typing import Callable, Optional, cast
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.base.pants_env_vars import DAEMON_ENTRYPOINT
+from pants.bin.pants_env_vars import DAEMON_ENTRYPOINT
 from pants.option.options import Options
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
