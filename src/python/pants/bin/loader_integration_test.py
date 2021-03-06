@@ -1,7 +1,13 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.base.pants_env_vars import IGNORE_UNRECOGNIZED_ENCODING, RECURSION_LIMIT
+import os
+
+from pants.base.pants_env_vars import (
+    DAEMON_ENTRYPOINT,
+    IGNORE_UNRECOGNIZED_ENCODING,
+    RECURSION_LIMIT,
+)
 from pants.bin.pants_loader import PantsLoader
 from pants.testutil.pants_integration_test import PantsResult, run_pants
 
@@ -24,16 +30,26 @@ def test_invalid_locale() -> None:
     ).assert_success()
 
 
+TEST_STR = "T E S T"
+
+
+def exercise_alternate_entrypoint() -> None:
+    print(TEST_STR)
+
+
 def test_alternate_entrypoint() -> None:
     pants_run = run_pants(
-        command=["help"], extra_env={"PANTS_ENTRYPOINT": "pants.bin.pants_exe:test"}
+        command=["help"],
+        extra_env={
+            DAEMON_ENTRYPOINT: "pants.bin.loader_integration_test:exercise_alternate_entrypoint"
+        },
     )
     pants_run.assert_success()
     assert "T E S T" in pants_run.stdout
 
 
 def test_alternate_entrypoint_bad() -> None:
-    pants_run = run_pants(command=["help"], extra_env={"PANTS_ENTRYPOINT": "badness"})
+    pants_run = run_pants(command=["help"], extra_env={DAEMON_ENTRYPOINT: "badness"})
     pants_run.assert_failure()
 
     assert "must be of the form" in pants_run.stderr
@@ -41,19 +57,29 @@ def test_alternate_entrypoint_bad() -> None:
 
 def test_alternate_entrypoint_not_callable() -> None:
     pants_run = run_pants(
-        command=["help"], extra_env={"PANTS_ENTRYPOINT": "pants.bin.pants_exe:TEST_STR"}
+        command=["help"],
+        extra_env={DAEMON_ENTRYPOINT: "pants.bin.loader_integration_test:TEST_STR"},
     )
     pants_run.assert_failure()
     assert "TEST_STR" in pants_run.stderr
     assert "not callable" in pants_run.stderr
 
 
+def exercise_alternate_entrypoint_scrubbing():
+    """An alternate test entrypoint for exercising scrubbing."""
+    print(f"{DAEMON_ENTRYPOINT}={os.environ.get(DAEMON_ENTRYPOINT)}")
+
+
 def test_alternate_entrypoint_scrubbing() -> None:
+
     pants_run = run_pants(
-        command=["help"], extra_env={"PANTS_ENTRYPOINT": "pants.bin.pants_exe:test_env"}
+        command=["help"],
+        extra_env={
+            DAEMON_ENTRYPOINT: "pants.bin.loader_integration_test:exercise_alternate_entrypoint_scrubbing"
+        },
     )
     pants_run.assert_success()
-    assert "PANTS_ENTRYPOINT=None" in pants_run.stdout
+    assert f"{DAEMON_ENTRYPOINT}=None" in pants_run.stdout
 
 
 def test_recursion_limit() -> None:

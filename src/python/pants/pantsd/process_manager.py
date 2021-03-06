@@ -14,6 +14,7 @@ from typing import Callable, Optional, cast
 import psutil
 
 from pants.base.build_environment import get_buildroot
+from pants.base.pants_env_vars import DAEMON_ENTRYPOINT
 from pants.option.options import Options
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
@@ -559,13 +560,13 @@ class PantsDaemonProcessManager(ProcessManager, metaclass=ABCMeta):
 
     def post_fork_child(self):
         """Post-fork() child callback for ProcessManager.daemon_spawn()."""
-        spawn_control_env = dict(
-            PANTS_ENTRYPOINT=f"{self._daemon_entrypoint}:launch_new_pantsd_instance",
+        spawn_control_env = {
+            DAEMON_ENTRYPOINT: f"{self._daemon_entrypoint}:launch_new_pantsd_instance",
             # The daemon should run under the same sys.path as us; so we ensure
             # this. NB: It will scrub PYTHONPATH once started to avoid infecting
             # its own unrelated subprocesses.
-            PYTHONPATH=os.pathsep.join(sys.path),
-        )
+            "PYTHONPATH": os.pathsep.join(sys.path),
+        }
         exec_env = {**os.environ, **spawn_control_env}
 
         # Pass all of sys.argv so that we can proxy arg flags e.g. `-ldebug`.

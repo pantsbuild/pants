@@ -9,7 +9,11 @@ import warnings
 from textwrap import dedent
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
-from pants.base.pants_env_vars import IGNORE_UNRECOGNIZED_ENCODING, RECURSION_LIMIT
+from pants.base.pants_env_vars import (
+    DAEMON_ENTRYPOINT,
+    IGNORE_UNRECOGNIZED_ENCODING,
+    RECURSION_LIMIT,
+)
 
 
 class PantsLoader:
@@ -64,15 +68,18 @@ class PantsLoader:
         try:
             module_path, func_name = entrypoint.split(":", 1)
         except ValueError:
-            print("PANTS_ENTRYPOINT must be of the form `module.path:callable`", file=sys.stderr)
+            print(
+                f"{DAEMON_ENTRYPOINT} must be of the form `module.path:callable`", file=sys.stderr
+            )
             sys.exit(PANTS_FAILED_EXIT_CODE)
 
         module = importlib.import_module(module_path)
         entrypoint_fn = getattr(module, func_name)
+
         try:
             entrypoint_fn()
         except TypeError:
-            print(f"PANTS_ENTRYPOINT {func_name} is not callable", file=sys.stderr)
+            print(f"{DAEMON_ENTRYPOINT} {func_name} is not callable", file=sys.stderr)
             sys.exit(PANTS_FAILED_EXIT_CODE)
 
     @classmethod
@@ -83,7 +90,7 @@ class PantsLoader:
         sys.setrecursionlimit(int(os.environ.get(RECURSION_LIMIT, "10000")))
 
         default_entrypoint = "pants.bin.pants_exe:main"
-        entrypoint = os.environ.pop("PANTS_ENTRYPOINT", default_entrypoint)
+        entrypoint = os.environ.pop(DAEMON_ENTRYPOINT, default_entrypoint)
 
         cls.load_and_execute(entrypoint)
 
