@@ -3,8 +3,10 @@
 
 import importlib
 import locale
+import logging
 import os
 import sys
+import time
 import warnings
 from textwrap import dedent
 
@@ -14,6 +16,8 @@ from pants.base.pants_env_vars import (
     IGNORE_UNRECOGNIZED_ENCODING,
     RECURSION_LIMIT,
 )
+from pants.bin.pants_runner import PantsRunner
+from pants.util.contextutil import maybe_profiled
 
 
 class PantsLoader:
@@ -64,7 +68,7 @@ class PantsLoader:
             )
 
     @staticmethod
-    def load_and_execute(entrypoint: str) -> None:
+    def run_alternate_entrypoint(entrypoint: str) -> None:
         try:
             module_path, func_name = entrypoint.split(":", 1)
         except ValueError:
@@ -82,6 +86,22 @@ class PantsLoader:
             print(f"{DAEMON_ENTRYPOINT} {func_name} is not callable", file=sys.stderr)
             sys.exit(PANTS_FAILED_EXIT_CODE)
 
+    @staticmethod
+    def run_default_entrypoint() -> None:
+        logger = logging.getLogger(__name__)
+        with maybe_profiled(os.environ.get("PANTSC_PROFILE")):
+            start_time = time.time()
+            try:
+                runner = PantsRunner(args=sys.argv, env=os.environ)
+                exit_code = runner.run(start_time)
+            except KeyboardInterrupt as e:
+                print(f"Interrupted by user:\n{e}", file=sys.stderr)
+                exit_code = PANTS_FAILED_EXIT_CODE
+            except Exception as e:
+                logger.exception(e)
+                exit_code = PANTS_FAILED_EXIT_CODE
+        sys.exit(exit_code)
+
     @classmethod
     def main(cls) -> None:
         cls.setup_warnings()
@@ -89,10 +109,12 @@ class PantsLoader:
 
         sys.setrecursionlimit(int(os.environ.get(RECURSION_LIMIT, "10000")))
 
-        default_entrypoint = "pants.bin.pants_exe:main"
-        entrypoint = os.environ.pop(DAEMON_ENTRYPOINT, default_entrypoint)
+        entrypoint = os.environ.pop(DAEMON_ENTRYPOINT, None)
 
-        cls.load_and_execute(entrypoint)
+        if entrypoint:
+            cls.run_alternate_entrypoint(entrypoint)
+        else:
+            cls.run_default_entrypoint()
 
 
 def main() -> None:

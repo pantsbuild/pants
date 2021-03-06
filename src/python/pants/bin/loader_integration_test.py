@@ -8,7 +8,6 @@ from pants.base.pants_env_vars import (
     IGNORE_UNRECOGNIZED_ENCODING,
     RECURSION_LIMIT,
 )
-from pants.bin.pants_loader import PantsLoader
 from pants.testutil.pants_integration_test import PantsResult, run_pants
 
 
