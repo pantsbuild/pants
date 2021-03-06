@@ -89,14 +89,12 @@ class Environment(FrozenDict[str, str]):
 
 
 @rule
-async def complete_environment(session_values: SessionValues) -> CompleteEnvironment:
+def complete_environment(session_values: SessionValues) -> CompleteEnvironment:
     return session_values[CompleteEnvironment]
 
 
 @rule
-async def environment_subset(
-    session_values: SessionValues, request: EnvironmentRequest
-) -> Environment:
+def environment_subset(session_values: SessionValues, request: EnvironmentRequest) -> Environment:
     return Environment(
         session_values[CompleteEnvironment]
         .get_subset(
