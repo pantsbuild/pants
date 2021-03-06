@@ -70,7 +70,7 @@ class Zinc:
                 help="Use a pre-compiled native-image for zinc. Requires running in hermetic mode",
             )
 
-            zinc_rev = "1.1.7"
+            zinc_rev = "1.3.5"
 
             shader_rules = [
                 # The compiler-interface and compiler-bridge tool jars carry xsbt and
