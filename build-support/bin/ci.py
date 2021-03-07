@@ -131,13 +131,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 def setup_environment(*, python_version: PythonVersion):
     set_cxx_compiler()
-    set_pants_dev()
     setup_python_interpreter(python_version)
-
-
-def set_pants_dev() -> None:
-    """We do this because we are running against a Pants clone."""
-    os.environ["PANTS_DEV"] = "1"
 
 
 def set_cxx_compiler() -> None:
