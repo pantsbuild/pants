@@ -4,19 +4,18 @@
 from __future__ import annotations
 
 import getpass
-import json
 import logging
 import os
 import socket
 import sys
+import textwrap
 import time
 import uuid
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from humbug.consent import HumbugConsent, environment_variable_opt_out
-from humbug.report import Report, Reporter
+from humbug.report import Report
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -25,29 +24,12 @@ from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
+from pants.report import reporter
 from pants.util.dirutil import safe_mkdir_for
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
-BUGOUT_ACCESS_TOKEN = "3ae76900-9a68-4a87-a127-7c9f179d7272"
-BUGOUT_JOURNAL_ID = "801e9b3c-6b03-40a7-870f-5b25d326da66"
-
-reporting_consent = HumbugConsent(
-    environment_variable_opt_out(
-        "PANTS_REPORTING_ENABLED",
-        ["0", "n", "f", "N", "F", "no", "false", "No", "False", "NO", "FALSE"],
-        )
-    )
-session_id = str(uuid.uuid4())
-reporter = Reporter(
-    "pantsbuild/pants",
-    reporting_consent,
-    session_id=session_id,
-    bugout_token=BUGOUT_ACCESS_TOKEN,
-    bugout_journal_id=BUGOUT_JOURNAL_ID,
-    timeout_seconds=5,
-    )
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
     """Use the json encoder we use for making options hashable to support datatypes.
@@ -216,18 +198,50 @@ class RunTracker:
         return output
 
     def _report(self) -> None:
-        report = Report(
-            title="pants run: {}".format(self._run_info.get("cmd_line", "")),
-            tags=(
-                reporter.system_tags() +
-                [
-                    "version:{}".format(VERSION),
-                    "outcome:{}".format(self._run_info.get("outcome", ""))
-                ]
-            ),
-            content="## Run info\n```\n{}\n```".format(
-                json.dumps(self._run_info, indent=2)),
+        total_run_time = "Unknown"
+        try:
+            total_run_time = str(self._total_run_time)
+        except:
+            pass
+
+        outcome = self._run_info.get("outcome", "Unknown")
+
+        content = textwrap.dedent(
+            """
+        ## Outcome
+        `{}`
+
+        ## Pants version
+        `{}`
+
+        ## Time
+        Timestamp: `{}`
+        Date: `{}`
+        Total run time: `{}`
+
+        ## Command
+        argv: `{}`
+        specs: `{}`
+        """.format(
+                outcome,
+                VERSION,
+                self._run_info.get("timestamp", ""),
+                self._run_info.get("datetime", ""),
+                total_run_time,
+                self._run_info.get("cmd_line", ""),
+                self._run_info.get("specs_from_command_line", []),
             )
+        )
+        report = Report(
+            title="pants run: {}".format(
+                self._run_info.get("cmd_line", ""),
+            ),
+            tags=(
+                reporter.system_tags()
+                + ["version:{}".format(VERSION), "outcome:{}".format(outcome)]
+            ),
+            content=content,
+        )
         reporter.publish(report)
 
     @property
