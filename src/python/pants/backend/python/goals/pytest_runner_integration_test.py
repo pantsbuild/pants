@@ -166,7 +166,7 @@ def run_pytest(
         args.append(f"--pytest-execution-slot-var={execution_slot_var}")
     if config:
         rule_runner.create_file(relpath="pytest.ini", contents=config)
-        args.append(f"--pytest-config=pytest.ini")
+        args.append("--pytest-config=pytest.ini")
     if force:
         args.append("--test-force")
     rule_runner.set_options(args, env=env)
