@@ -14,7 +14,7 @@ from pants.backend.python.goals.coverage_py import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
-    EntryPoint,
+    ConsoleScript,
     PythonRuntimePackageDependencies,
     PythonTestsSources,
     PythonTestsTimeout,
@@ -197,9 +197,7 @@ async def setup_pytest_for_target(
         PexRequest(
             output_filename="pytest_runner.pex",
             interpreter_constraints=interpreter_constraints,
-            # TODO(John Sirois): Switch to ConsoleScript once Pex supports discovering console
-            #  scripts via the PEX_PATH: https://github.com/pantsbuild/pex/issues/1257
-            main=EntryPoint("pytest"),
+            main=ConsoleScript("pytest"),
             internal_only=True,
             pex_path=[pytest_pex, requirements_pex],
         ),
