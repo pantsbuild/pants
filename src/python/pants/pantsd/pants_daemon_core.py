@@ -40,10 +40,11 @@ class PantsDaemonCore:
     def __init__(
         self,
         options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironment,
         executor: PyExecutor,
         services_constructor: PantsServicesConstructor,
     ):
-        self._options_initializer = OptionsInitializer(options_bootstrapper, executor=executor)
+        self._options_initializer = OptionsInitializer(options_bootstrapper, env, executor=executor)
         self._executor = executor
         self._services_constructor = services_constructor
         self._lifecycle_lock = threading.RLock()
@@ -89,7 +90,7 @@ class PantsDaemonCore:
                 options_bootstrapper, env, raise_=True
             )
             self._scheduler = EngineInitializer.setup_graph(
-                options_bootstrapper, build_config, executor=self._executor
+                options_bootstrapper, build_config, env, executor=self._executor
             )
             bootstrap_options_values = options.bootstrap_option_values()
             assert bootstrap_options_values is not None

@@ -139,7 +139,7 @@ class RuleRunner:
             build_root=self.build_root,
             build_configuration=self.build_config,
             executor=_EXECUTOR,
-            execution_options=ExecutionOptions.from_options(options),
+            execution_options=ExecutionOptions.from_options(options, self.environment),
             ca_certs_path=ca_certs_path,
             native_engine_visualize_to=None,
         ).new_session(

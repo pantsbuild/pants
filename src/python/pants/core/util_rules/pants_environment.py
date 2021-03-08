@@ -4,14 +4,11 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, Optional, Sequence, cast
+from typing import Dict, Mapping, Optional, Sequence
 
-from pants.core.util_rules.pants_environment import PantsEnvironment
-from pants.engine.internals.session import SessionValues
-from pants.engine.rules import collect_rules, rule
+from pants.base.deprecated import deprecated
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +16,25 @@ name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
 shorthand_re = re.compile(r"([A-Za-z_]\w*)")
 
 
-class CompleteEnvironment(FrozenDict):
-    """CompleteEnvironment contains all environment variables from the current Pants process.
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class PantsEnvironment:
+    """PantsEnvironment is a representation of the environment variables the currently-executing
+    Pants process was invoked with."""
 
-    Accesses to `os.environ` cannot be accurately tracked, so @rules that need access to the
-    environment should request this type instead.
-    """
+    env: FrozenDict[str, str]
+
+    @deprecated(
+        "2.5.0.dev0",
+        hint_message="Request a subset Environment (using EnvironmentRequest) or the CompleteEnvironment.",
+    )
+    def __init__(self, env: Optional[Mapping[str, str]] = None) -> None:
+        """Initialize a `PantsEnvironment` with the current contents of the environment.
+
+        Explicitly specify the env argument to create a mock environment for testing.
+        """
+
+        self.env = FrozenDict(env or {})
 
     def get_subset(
         self, requested: Sequence[str], *, allowed: Optional[Sequence[str]] = None
@@ -58,7 +68,7 @@ class CompleteEnvironment(FrozenDict):
             if name_value_match:
                 check_and_set(name_value_match[1], name_value_match[2])
             elif shorthand_re.match(env_var):
-                check_and_set(env_var, self.get(env_var))
+                check_and_set(env_var, self.env.get(env_var))
             else:
                 raise ValueError(
                     f"An invalid variable was requested via the --test-extra-env-var "
@@ -66,51 +76,3 @@ class CompleteEnvironment(FrozenDict):
                 )
 
         return FrozenDict(env_var_subset)
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class EnvironmentRequest:
-    """Requests a subset of the variables set in the environment.
-
-    Requesting only the relevant subset of the environment reduces invalidation caused by unrelated
-    changes.
-    """
-
-    requested: FrozenOrderedSet[str]
-    allowed: Optional[FrozenOrderedSet[str]]
-
-    def __init__(self, requested: Sequence[str], allowed: Optional[Sequence[str]] = None):
-        self.requested = FrozenOrderedSet(requested)
-        self.allowed = None if allowed is None else FrozenOrderedSet(allowed)
-
-
-class Environment(FrozenDict[str, str]):
-    """A subset of the variables set in the environment."""
-
-
-@rule
-def pants_environment(session_values: SessionValues) -> PantsEnvironment:
-    # TODO: The @deprecated decorator seems to obscure type information.
-    return cast(PantsEnvironment, PantsEnvironment(session_values[CompleteEnvironment]))
-
-
-@rule
-def complete_environment(session_values: SessionValues) -> CompleteEnvironment:
-    return session_values[CompleteEnvironment]
-
-
-@rule
-def environment_subset(session_values: SessionValues, request: EnvironmentRequest) -> Environment:
-    return Environment(
-        session_values[CompleteEnvironment]
-        .get_subset(
-            requested=tuple(request.requested),
-            allowed=(None if request.allowed is None else tuple(request.allowed)),
-        )
-        .items()
-    )
-
-
-def rules():
-    return collect_rules()

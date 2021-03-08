@@ -15,6 +15,7 @@ from setproctitle import setproctitle as set_process_title
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import GraphScheduler
@@ -46,7 +47,9 @@ class PantsDaemon(PantsDaemonProcessManager):
         """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
     @classmethod
-    def create(cls, options_bootstrapper: OptionsBootstrapper) -> PantsDaemon:
+    def create(
+        cls, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironment
+    ) -> PantsDaemon:
         # Any warnings that would be triggered here are re-triggered later per-run of Pants, so we
         # silence them.
         with warnings.catch_warnings(record=True):
@@ -56,7 +59,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         native = Native()
 
         executor = PyExecutor(*GlobalOptions.compute_executor_arguments(bootstrap_options_values))
-        core = PantsDaemonCore(options_bootstrapper, executor, cls._setup_services)
+        core = PantsDaemonCore(options_bootstrapper, env, executor, cls._setup_services)
 
         server = native.new_nailgun_server(
             executor,
@@ -197,5 +200,6 @@ def launch_new_pantsd_instance():
     options_bootstrapper = OptionsBootstrapper.create(
         env=os.environ, args=sys.argv, allow_pantsrc=True
     )
-    daemon = PantsDaemon.create(options_bootstrapper)
+    env = CompleteEnvironment(os.environ)
+    daemon = PantsDaemon.create(options_bootstrapper, env)
     daemon.run_sync()

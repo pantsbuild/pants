@@ -41,8 +41,10 @@ def create_execution_options(
         args.append(f"--remote-auth-plugin={plugin}")
     ob = create_options_bootstrapper(args)
     env = CompleteEnvironment({})
-    _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, env, raise_=False)
-    return ExecutionOptions.from_options(options)
+    _build_config, options = OptionsInitializer(ob, env).build_config_and_options(
+        ob, env, raise_=False
+    )
+    return ExecutionOptions.from_options(options, env)
 
 
 def test_execution_options_remote_oauth_bearer_token_path() -> None:

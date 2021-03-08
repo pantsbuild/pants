@@ -15,6 +15,7 @@ from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing
@@ -165,8 +166,9 @@ class EngineInitializer:
     def setup_graph(
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
+        env: CompleteEnvironment,
         executor: Optional[PyExecutor] = None,
-        execution_options: Optional[ExecutionOptions] = None,
+        local_only: bool = False,
     ) -> GraphScheduler:
         native = Native()
         build_root = get_buildroot()
@@ -176,7 +178,7 @@ class EngineInitializer:
         executor = executor or PyExecutor(
             *GlobalOptions.compute_executor_arguments(bootstrap_options)
         )
-        execution_options = execution_options or ExecutionOptions.from_options(options)
+        execution_options = ExecutionOptions.from_options(options, env, local_only=local_only)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
             execution_options,

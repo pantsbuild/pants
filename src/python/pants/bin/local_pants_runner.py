@@ -75,7 +75,7 @@ class LocalPantsRunner:
         native = Native()
         native.set_panic_handler()
         graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(
-            options_bootstrapper, build_config
+            options_bootstrapper, build_config, env
         )
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             global_options = options.for_global_scope()
@@ -110,7 +110,7 @@ class LocalPantsRunner:
         :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
         :param scheduler: If being called from the daemon, a warmed scheduler to use.
         """
-        options_initializer = options_initializer or OptionsInitializer(options_bootstrapper)
+        options_initializer = options_initializer or OptionsInitializer(options_bootstrapper, env)
         build_config, options = options_initializer.build_config_and_options(
             options_bootstrapper, env, raise_=True
         )

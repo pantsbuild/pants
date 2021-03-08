@@ -22,7 +22,6 @@ from pants.init.extension_loader import (
 from pants.init.plugin_resolver import PluginResolver
 from pants.init.plugin_resolver import rules as plugin_resolver_rules
 from pants.option.errors import UnknownFlagsError
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
@@ -60,6 +59,7 @@ def _initialize_build_configuration(
 
 def create_bootstrap_scheduler(
     options_bootstrapper: OptionsBootstrapper,
+    env: CompleteEnvironment,
     executor: Optional[PyExecutor] = None,
 ) -> BootstrapScheduler:
     bc_builder = BuildConfiguration.Builder()
@@ -74,9 +74,10 @@ def create_bootstrap_scheduler(
             options_bootstrapper,
             bc_builder.create(),
             executor=executor,
-            # TODO: We use the default execution options to avoid invoking remote execution auth
-            # plugins. They should be loaded via rules using the bootstrap Scheduler in the future.
-            execution_options=DEFAULT_EXECUTION_OPTIONS,
+            env=env,
+            # TODO: We set local_only to avoid invoking remote execution auth plugins. They should
+            # be loaded via rules using the bootstrap Scheduler in the future.
+            local_only=True,
         ).scheduler
     )
 
@@ -97,10 +98,11 @@ class OptionsInitializer:
     def __init__(
         self,
         options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironment,
         executor: Optional[PyExecutor] = None,
     ) -> None:
         self._bootstrap_scheduler = create_bootstrap_scheduler(
-            options_bootstrapper, executor=executor
+            options_bootstrapper, env, executor=executor
         )
         self._plugin_resolver = PluginResolver(self._bootstrap_scheduler)
 
