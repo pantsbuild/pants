@@ -94,7 +94,16 @@ class PyTest(Subsystem):
             type=file_option,
             default=None,
             advanced=True,
-            help="Path to pytest.ini or alternative Pytest config file",
+            help=(
+                "Path to pytest.ini or alternative Pytest config file.\n\n",
+                "Pytest will attempt to auto-discover the config file,"
+                "meaning that it should typically be an ancestor of your",
+                "tests, such as in the build root.\n\nPants will not automatically",
+                " set --rootdir for you to force Pytest to pick up your config ",
+                "file, but you can manually set --rootdir in [pytest].args.\n\n",
+                "Refer to https://docs.pytest.org/en/stable/customize.html#",
+                "initialization-determining-rootdir-and-configfile.",
+            ),
         )
 
     def get_requirement_strings(self) -> Tuple[str, ...]:
