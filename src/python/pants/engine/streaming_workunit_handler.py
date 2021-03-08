@@ -1,11 +1,13 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterable, Iterator, Sequence, Tuple
 
 from typing_extensions import Protocol
 
@@ -24,6 +26,11 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
+# -----------------------------------------------------------------------------------------------
+# Streaming workunits plugin API
+# -----------------------------------------------------------------------------------------------
+
+
 @dataclass(frozen=True)
 class TargetInfo:
     filename: str
@@ -31,7 +38,7 @@ class TargetInfo:
 
 @dataclass(frozen=True)
 class ExpandedSpecs:
-    targets: Dict[str, List[TargetInfo]]
+    targets: dict[str, list[TargetInfo]]
 
 
 @dataclass(frozen=True)
@@ -46,7 +53,7 @@ class StreamingWorkunitContext:
         """Returns the RunTracker for the current run of Pants."""
         return self._run_tracker
 
-    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes, ...]:
+    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> tuple[bytes, ...]:
         """Given a list of Digest objects, each representing the contents of a single file, return a
         list of the bytes corresponding to each of those Digests in sequence."""
         return self._scheduler.single_file_digests_to_bytes(digests)
@@ -82,7 +89,7 @@ class StreamingWorkunitContext:
         expanded_targets = self._scheduler.product_request(
             Targets, [Params(Addresses([addr])) for addr in unexpanded_addresses]
         )
-        targets_dict: Dict[str, List[TargetInfo]] = {}
+        targets_dict: dict[str, list[TargetInfo]] = {}
         for addr, targets in zip(unexpanded_addresses, expanded_targets):
             targets_dict[addr.spec] = [
                 TargetInfo(
@@ -99,8 +106,8 @@ class WorkunitsCallback(Protocol):
     def __call__(
         self,
         *,
-        started_workunits: Tuple[Workunit, ...],
-        completed_workunits: Tuple[Workunit, ...],
+        started_workunits: tuple[Workunit, ...],
+        completed_workunits: tuple[Workunit, ...],
         finished: bool,
         context: StreamingWorkunitContext,
     ) -> None:
@@ -133,6 +140,23 @@ class WorkunitsCallbackFactoryRequest:
     """A request for a particular WorkunitsCallbackFactory."""
 
 
+@rule
+async def construct_workunits_callback_factories(
+    union_membership: UnionMembership,
+) -> WorkunitsCallbackFactories:
+    request_types = union_membership.get(WorkunitsCallbackFactoryRequest)
+    workunit_callback_factories = await MultiGet(
+        Get(WorkunitsCallbackFactory, WorkunitsCallbackFactoryRequest, request_type())
+        for request_type in request_types
+    )
+    return WorkunitsCallbackFactories(workunit_callback_factories)
+
+
+# -----------------------------------------------------------------------------------------------
+# Streaming workunits handler
+# -----------------------------------------------------------------------------------------------
+
+
 class StreamingWorkunitHandler:
     """Periodically calls each registered WorkunitsCallback in a dedicated thread."""
 
@@ -145,18 +169,19 @@ class StreamingWorkunitHandler:
         specs: Specs,
         report_interval_seconds: float,
         max_workunit_verbosity: LogLevel = LogLevel.TRACE,
-    ):
+    ) -> None:
         self.scheduler = scheduler
         self.report_interval = report_interval_seconds
         self.callbacks = callbacks
-        self._thread_runner: Optional[_InnerHandler] = None
+        self._thread_runner: _InnerHandler | None = None
         self._context = StreamingWorkunitContext(
             _scheduler=self.scheduler,
             _run_tracker=run_tracker,
             _specs=specs,
             _options_bootstrapper=options_bootstrapper,
         )
-        # TODO(10092) The max verbosity should be a per-client setting, rather than a global setting.
+        # TODO(10092) The max verbosity should be a per-client setting, rather than a global
+        #  setting.
         self.max_workunit_verbosity = max_workunit_verbosity
 
     def start(self) -> None:
@@ -198,7 +223,7 @@ class _InnerHandler(threading.Thread):
         callbacks: Iterable[WorkunitsCallback],
         report_interval: float,
         max_workunit_verbosity: LogLevel,
-    ):
+    ) -> None:
         super().__init__(daemon=True)
         self.scheduler = scheduler
         self._context = context
@@ -217,26 +242,14 @@ class _InnerHandler(threading.Thread):
                 context=self._context,
             )
 
-    def run(self):
-        while not self.stop_request.isSet():
+    def run(self) -> None:
+        while not self.stop_request.isSet():  # type: ignore[attr-defined]
             self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)
 
-    def join(self, timeout=None):
+    def join(self, timeout: float | None = None) -> None:
         self.stop_request.set()
-        super(_InnerHandler, self).join(timeout)
-
-
-@rule
-async def construct_workunits_callback_factories(
-    union_membership: UnionMembership,
-) -> WorkunitsCallbackFactories:
-    request_types = union_membership.get(WorkunitsCallbackFactoryRequest)
-    workunit_callback_factories = await MultiGet(
-        Get(WorkunitsCallbackFactory, WorkunitsCallbackFactoryRequest, request_type())
-        for request_type in request_types
-    )
-    return WorkunitsCallbackFactories(workunit_callback_factories)
+        super().join(timeout)
 
 
 def rules():
