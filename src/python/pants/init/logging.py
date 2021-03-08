@@ -52,7 +52,7 @@ def stdio_destination(stdin_fileno: int, stdout_fileno: int, stderr_fileno: int)
     """Sets a destination for both logging and stdio: must be called after `initialize_stdio`.
 
     After `initialize_stdio` and outside of this contextmanager, the default stdio destination is
-    the pantsd.log. But inside of this block, all engine "tasks"/@rules that are spawned will have
+    the pants.log. But inside of this block, all engine "tasks"/@rules that are spawned will have
     thread/task-local state that directs their IO to the given destination. When the contextmanager
     exits all tasks will be restored to the default destination (regardless of whether they have
     completed).
@@ -133,7 +133,7 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     message_regex_filters = global_bootstrap_options.ignore_pants_warnings
     print_stacktrace = global_bootstrap_options.print_stacktrace
 
-    # Set the pantsd log destination.
+    # Set the pants log destination.
     deprecated_log_path = os.path.join(
         global_bootstrap_options.pants_workdir, "pantsd", "pantsd.log"
     )
@@ -163,11 +163,13 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
             tuple(message_regex_filters),
             log_path,
         )
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
         # Install a Python logger that will route through the Rust logger.
         with _python_logging_setup(global_level, print_stacktrace):
             yield
     finally:
         sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
 
 
 def _get_log_levels_by_target(
