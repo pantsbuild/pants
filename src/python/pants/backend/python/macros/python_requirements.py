@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
 from pants.backend.python.target_types import parse_requirements_file
-from pants.base.build_environment import get_buildroot, get_global_module_mapping
+from pants.base.build_environment import get_buildroot
 
 
 class PythonRequirements:
@@ -43,7 +43,6 @@ class PythonRequirements:
 
     def __init__(self, parse_context):
         self._parse_context = parse_context
-        self._global_module_mapping = get_global_module_mapping()
 
     def __call__(
         self,
@@ -70,11 +69,6 @@ class PythonRequirements:
         requirements = parse_requirements_file(
             req_file.read_text(), rel_path=str(req_file.relative_to(get_buildroot()))
         )
-
-        if module_mapping is None:
-            module_mapping = self._global_module_mapping
-        # TODO: else merge?
-
         for parsed_req in requirements:
             req_module_mapping = (
                 {parsed_req.project_name: module_mapping[parsed_req.project_name]}

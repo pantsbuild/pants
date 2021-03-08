@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import pkgutil
+import yaml
+
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -161,6 +164,19 @@ async def map_first_party_python_targets_to_modules(
 # -----------------------------------------------------------------------------------------------
 
 
+class ThirdPartyPythonDefaultModuleMapping(FrozenDict[str, List[str]]):
+    """Default value for the module_mapping field of a python requirement."""
+
+
+@rule(desc="Loading default Python module mapping", level=LogLevel.DEBUG)
+async def load_third_party_default_module_mapping() -> ThirdPartyPythonDefaultModuleMapping:
+    # TODO: maybe offer the name of the default mapping file to load
+    # as a target field, or config option, etc.. that could also serve
+    # as an escape hatch to disable the default global mapping
+    module_mapping_source = pkgutil.get_data(__name__, "module_mapping.yaml").decode().strip()
+    return ThirdPartyPythonDefaultModuleMapping(sorted(yaml.safe_load(module_mapping_source)))
+
+
 class ThirdPartyPythonModuleMapping(FrozenDict[str, Address]):
     def address_for_module(self, module: str) -> Address | None:
         address = self.get(module)
@@ -176,7 +192,10 @@ class ThirdPartyPythonModuleMapping(FrozenDict[str, Address]):
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
 async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMapping:
-    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    all_targets, default_map = await MultiGet(
+        Get(Targets, AddressSpecs([DescendantAddresses("")])),
+        Get(ThirdPartyPythonDefaultModuleMapping),  # No input..
+    )
     modules_to_addresses: Dict[str, Address] = {}
     modules_with_multiple_owners: Set[str] = set()
     for tgt in all_targets:
@@ -186,7 +205,10 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
         for python_req in tgt[PythonRequirementsField].value:
             modules = module_map.get(
                 python_req.project_name,
-                [python_req.project_name.lower().replace("-", "_")],
+                default_map.get(
+                    python_reg.project_name,
+                    [python_req.project_name.lower().replace("-", "_")],
+                ),
             )
             for module in modules:
                 if module in modules_to_addresses:

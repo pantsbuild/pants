@@ -27,9 +27,3 @@ python_dateutil:
 setuptools:
   - easy_install
   - pkg_resources
-
-zope.event:
-  - zope
-
-zope.interface:
-  - zope

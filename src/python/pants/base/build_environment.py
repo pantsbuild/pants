@@ -3,9 +3,7 @@
 
 import logging
 import os
-import pkgutil
-import yaml
-from typing import Iterable, Mapping, Optional
+from typing import Optional
 
 from pants.base.build_root import BuildRoot
 from pants.vcs.git import Git, GitException
@@ -62,8 +60,3 @@ def get_git() -> Optional[Git]:
         except GitException as e:
             logger.info(f"Failed to load git repository at {worktree}: {e!r}")
     return _Git
-
-
-def get_global_module_mapping() -> Mapping[str, Iterable[str]]:
-    module_mapping_source = pkgutil.get_data('pants', "module_mapping.yaml").decode().strip()
-    return yaml.safe_load(module_mapping_source)
