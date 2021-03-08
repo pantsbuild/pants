@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
@@ -8,7 +10,7 @@ import typing
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Set
 from enum import Enum
-from typing import Any, Optional, Type, Union
+from typing import Any
 
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import ensure_binary
@@ -16,7 +18,7 @@ from pants.util.strutil import ensure_binary
 logger = logging.getLogger(__name__)
 
 
-def hash_all(strs: typing.Iterable[Union[bytes, str]]) -> str:
+def hash_all(strs: typing.Iterable[bytes | str]) -> str:
     """Returns a hash of the concatenation of all the strings in strs using sha1."""
     digest = hashlib.sha1()
     for s in strs:
@@ -104,7 +106,7 @@ class CoercingEncoder(json.JSONEncoder):
         return super().encode(self.default(o))
 
 
-def json_hash(obj: Any, encoder: Optional[Type[json.JSONEncoder]] = CoercingEncoder) -> str:
+def json_hash(obj: Any, encoder: type[json.JSONEncoder] | None = CoercingEncoder) -> str:
     """Hashes `obj` by dumping to JSON.
 
     :API: public

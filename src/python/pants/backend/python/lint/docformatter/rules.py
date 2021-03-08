@@ -9,17 +9,17 @@ from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexInterpreterConstraints,
-    PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
@@ -60,13 +60,13 @@ def generate_args(
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
     docformatter_pex_request = Get(
-        Pex,
+        VenvPex,
         PexRequest(
             output_filename="docformatter.pex",
             internal_only=True,
             requirements=PexRequirements(docformatter.all_requirements),
             interpreter_constraints=PexInterpreterConstraints(docformatter.interpreter_constraints),
-            entry_point=docformatter.entry_point,
+            main=docformatter.main,
         ),
     )
 
@@ -83,20 +83,16 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
         else setup_request.request.prior_formatter_result
     )
 
-    input_digest = await Get(
-        Digest, MergeDigests((source_files_snapshot.digest, docformatter_pex.digest))
-    )
-
     process = await Get(
         Process,
-        PexProcess(
+        VenvPexProcess(
             docformatter_pex,
             argv=generate_args(
                 source_files=source_files,
                 docformatter=docformatter,
                 check_only=setup_request.check_only,
             ),
-            input_digest=input_digest,
+            input_digest=source_files_snapshot.digest,
             output_files=source_files_snapshot.files,
             description=(
                 f"Run Docformatter on {pluralize(len(setup_request.request.field_sets), 'file')}."

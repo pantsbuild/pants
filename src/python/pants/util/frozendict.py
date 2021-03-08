@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any, Iterable, Iterator, Mapping, Tuple, TypeVar, Union, overload
+from __future__ import annotations
+
+from typing import Any, Iterable, Iterator, Mapping, Tuple, TypeVar, overload
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -27,7 +29,7 @@ class FrozenDict(Mapping[K, V]):
     def __init__(self, **kwargs: V) -> None:
         ...
 
-    def __init__(self, *item: Union[Mapping[K, V], Iterable[Tuple[K, V]]], **kwargs: V) -> None:
+    def __init__(self, *item: Mapping[K, V] | Iterable[Tuple[K, V]], **kwargs: V) -> None:
         """Creates a `FrozenDict` with arguments accepted by `dict` that also must be hashable."""
         if len(item) > 1:
             raise ValueError(

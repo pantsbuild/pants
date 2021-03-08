@@ -6,32 +6,40 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from textwrap import dedent
-from typing import Dict, Optional
 
+import pytest
+
+from pants.base.build_environment import get_buildroot
 from pants.init.options_initializer import OptionsInitializer
-from pants.option.global_options import ExecutionOptions
+from pants.option.errors import OptionsError
+from pants.option.global_options import ExecutionOptions, GlobalOptions
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.contextutil import temporary_dir
 
 
 def create_execution_options(
     *,
-    initial_headers: Dict[str, str],
-    token_path: Optional[str] = None,
-    plugin: Optional[str] = None,
+    initial_headers: dict[str, str],
+    token_path: str | None = None,
+    plugin: str | None = None,
+    remote_store_address: str = "grpc://fake.url:10",
+    remote_execution_address: str = "grpc://fake.url:10",
 ) -> ExecutionOptions:
     args = [
         "--remote-cache-read",
-        "--remote-store-server=www.fake.url",
+        f"--remote-execution-address={remote_execution_address}",
+        f"--remote-store-address={remote_store_address}",
         f"--remote-store-headers={initial_headers}",
         f"--remote-execution-headers={initial_headers}",
+        "--remote-instance-name=main",
     ]
     if token_path:
         args.append(f"--remote-oauth-bearer-token-path={token_path}")
     if plugin:
         args.append(f"--remote-auth-plugin={plugin}")
     ob = create_options_bootstrapper(args)
-    _build_config, options = OptionsInitializer.create_with_build_config(ob, raise_=False)
+    _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, raise_=False)
     return ExecutionOptions.from_options(options)
 
 
@@ -48,6 +56,39 @@ def test_execution_options_remote_oauth_bearer_token_path() -> None:
         "authorization": "Bearer my-token",
         "foo": "bar",
     }
+
+
+def test_execution_options_remote_addresses() -> None:
+    # Test that we properly validate and normalize the scheme.
+    host = "fake-with-http-in-url.com:10"
+    exec_options = create_execution_options(
+        initial_headers={},
+        remote_store_address=f"grpc://{host}",
+        remote_execution_address=f"grpc://{host}",
+    )
+    assert exec_options.remote_execution_address == f"http://{host}"
+    assert exec_options.remote_store_address == f"http://{host}"
+
+    exec_options = create_execution_options(
+        initial_headers={},
+        remote_store_address=f"grpcs://{host}",
+        remote_execution_address=f"grpcs://{host}",
+    )
+    assert exec_options.remote_execution_address == f"https://{host}"
+    assert exec_options.remote_store_address == f"https://{host}"
+
+    with pytest.raises(OptionsError):
+        create_execution_options(
+            initial_headers={},
+            remote_store_address=f"http://{host}",
+            remote_execution_address=f"grpc://{host}",
+        )
+    with pytest.raises(OptionsError):
+        create_execution_options(
+            initial_headers={},
+            remote_store_address=f"grpc://{host}",
+            remote_execution_address=f"https:://{host}",
+        )
 
 
 def test_execution_options_auth_plugin() -> None:
@@ -72,8 +113,9 @@ def test_execution_options_auth_plugin() -> None:
                             store_headers={{
                                 **{{k: "baz" for k in initial_store_headers}},
                                 "store": "abc",
-                                "store_url": options.for_global_scope().remote_store_server,
+                                "store_url": options.for_global_scope().remote_store_address,
                             }},
+                            instance_name="custom_instance",
                         )
                     """
                 )
@@ -89,10 +131,23 @@ def test_execution_options_auth_plugin() -> None:
     assert exec_options.remote_store_headers == {
         "store": "abc",
         "foo": "baz",
-        "store_url": ["www.fake.url"],
+        "store_url": "grpc://fake.url:10",
     }
     assert exec_options.remote_execution_headers == {"exec": "xyz", "foo": "baz"}
     assert exec_options.remote_cache_read is True
+    assert exec_options.remote_instance_name == "custom_instance"
 
     exec_options = compute_exec_options("UNAVAILABLE")
     assert exec_options.remote_cache_read is False
+    assert exec_options.remote_instance_name == "main"
+
+
+def test_invalidation_globs() -> None:
+    # Confirm that an un-normalized relative path in the pythonpath is filtered out.
+    suffix = "something-ridiculous"
+    ob = OptionsBootstrapper.create(env={}, args=[f"--pythonpath=../{suffix}"], allow_pantsrc=False)
+    globs = GlobalOptions.compute_pantsd_invalidation_globs(
+        get_buildroot(), ob.bootstrap_options.for_global_scope()
+    )
+    for glob in globs:
+        assert suffix not in glob

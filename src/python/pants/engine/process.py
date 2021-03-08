@@ -9,10 +9,11 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Iterable, Mapping, Tuple
 
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
+from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
 from pants.engine.internals.selectors import MultiGet
@@ -29,9 +30,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-
-BASH_SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
 
 
 @dataclass(frozen=True)
@@ -57,15 +55,15 @@ class Process:
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest
-    working_directory: Optional[str]
+    working_directory: str | None
     env: FrozenDict[str, str]
     append_only_caches: FrozenDict[str, str]
     output_files: Tuple[str, ...]
     output_directories: Tuple[str, ...]
-    timeout_seconds: Union[int, float]
-    jdk_home: Optional[str]
+    timeout_seconds: int | float
+    jdk_home: str | None
     is_nailgunnable: bool
-    execution_slot_variable: Optional[str]
+    execution_slot_variable: str | None
     cache_scope: ProcessCacheScope
 
     def __init__(
@@ -75,17 +73,17 @@ class Process:
         description: str,
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
-        working_directory: Optional[str] = None,
-        env: Optional[Mapping[str, str]] = None,
-        append_only_caches: Optional[Mapping[str, str]] = None,
-        output_files: Optional[Iterable[str]] = None,
-        output_directories: Optional[Iterable[str]] = None,
-        timeout_seconds: Optional[Union[int, float]] = None,
-        jdk_home: Optional[str] = None,
+        working_directory: str | None = None,
+        env: Mapping[str, str] | None = None,
+        append_only_caches: Mapping[str, str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
+        timeout_seconds: int | float | None = None,
+        jdk_home: str | None = None,
         is_nailgunnable: bool = False,
-        execution_slot_variable: Optional[str] = None,
-        cache_scope: Optional[ProcessCacheScope] = None,
-        cache_failures: Optional[bool] = None,
+        execution_slot_variable: str | None = None,
+        cache_scope: ProcessCacheScope | None = None,
+        cache_failures: bool | None = None,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -110,6 +108,8 @@ class Process:
             result = await Get(ProcessResult, Process(["/bin/echo", "hello world"], description="demo"))
             assert result.stdout == b"hello world"
         """
+        if isinstance(argv, str):
+            raise ValueError("argv must be a sequence of strings, but was a single string.")
         self.argv = tuple(argv)
         self.description = description
         self.level = level
@@ -141,10 +141,10 @@ class Process:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class MultiPlatformProcess:
-    platform_constraints: Tuple[Optional[str], ...]
+    platform_constraints: tuple[str | None, ...]
     processes: Tuple[Process, ...]
 
-    def __init__(self, request_dict: Dict[Optional[Platform], Process]) -> None:
+    def __init__(self, request_dict: dict[Platform | None, Process]) -> None:
         if len(request_dict) == 0:
             raise ValueError("At least one platform-constrained Process must be passed.")
         serialized_constraints = tuple(
@@ -299,7 +299,7 @@ class InteractiveProcess:
         self,
         argv: Iterable[str],
         *,
-        env: Optional[Mapping[str, str]] = None,
+        env: Mapping[str, str] | None = None,
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
         hermetic_env: bool = True,
@@ -368,6 +368,10 @@ class BinaryPathTest:
         self.fingerprint_stdout = fingerprint_stdout
 
 
+class SearchPath(DeduplicatedCollection[str]):
+    """The search path for binaries; i.e.: the $PATH."""
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathRequest:
@@ -382,18 +386,18 @@ class BinaryPathRequest:
     path.
     """
 
-    search_path: Tuple[str, ...]
+    search_path: SearchPath
     binary_name: str
-    test: Optional[BinaryPathTest]
+    test: BinaryPathTest | None
 
     def __init__(
         self,
         *,
         search_path: Iterable[str],
         binary_name: str,
-        test: Optional[BinaryPathTest] = None,
+        test: BinaryPathTest | None = None,
     ) -> None:
-        self.search_path = tuple(OrderedSet(search_path))
+        self.search_path = SearchPath(search_path)
         self.binary_name = binary_name
         self.test = test
 
@@ -404,18 +408,18 @@ class BinaryPath:
     path: str
     fingerprint: str
 
-    def __init__(self, path: str, fingerprint: Optional[str] = None) -> None:
+    def __init__(self, path: str, fingerprint: str | None = None) -> None:
         self.path = path
         self.fingerprint = self._fingerprint() if fingerprint is None else fingerprint
 
     @staticmethod
-    def _fingerprint(content: Optional[Union[bytes, bytearray, memoryview]] = None) -> str:
+    def _fingerprint(content: bytes | bytearray | memoryview | None = None) -> str:
         hasher = hashlib.sha256() if content is None else hashlib.sha256(content)
         return hasher.hexdigest()
 
     @classmethod
     def fingerprinted(
-        cls, path: str, representative_content: Union[bytes, bytearray, memoryview]
+        cls, path: str, representative_content: bytes | bytearray | memoryview
     ) -> BinaryPath:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
@@ -426,7 +430,7 @@ class BinaryPaths(EngineAwareReturnType):
     binary_name: str
     paths: Tuple[BinaryPath, ...]
 
-    def __init__(self, binary_name: str, paths: Optional[Iterable[BinaryPath]] = None):
+    def __init__(self, binary_name: str, paths: Iterable[BinaryPath] | None = None):
         self.binary_name = binary_name
         self.paths = tuple(OrderedSet(paths) if paths else ())
 
@@ -439,7 +443,7 @@ class BinaryPaths(EngineAwareReturnType):
         return found_msg
 
     @property
-    def first_path(self) -> Optional[BinaryPath]:
+    def first_path(self) -> BinaryPath | None:
         """Return the first path to the binary that was discovered, if any."""
         return next(iter(self.paths), None)
 
@@ -449,8 +453,8 @@ class BinaryNotFoundError(EnvironmentError):
         self,
         request: BinaryPathRequest,
         *,
-        rationale: Optional[str] = None,
-        alternative_solution: Optional[str] = None,
+        rationale: str | None = None,
+        alternative_solution: str | None = None,
     ) -> None:
         """When no binary is found via `BinaryPaths`, and it is not recoverable.
 
@@ -470,6 +474,38 @@ class BinaryNotFoundError(EnvironmentError):
         super().__init__(msg)
 
 
+class BashBinary(BinaryPath):
+    """The `bash` binary."""
+
+    DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
+
+
+@dataclass(frozen=True)
+class BashBinaryRequest:
+    rationale: str
+    search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
+
+
+@rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
+async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
+    request = BinaryPathRequest(
+        binary_name="bash",
+        search_path=bash_request.search_path,
+        test=BinaryPathTest(args=["--version"]),
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path
+    if not first_path:
+        raise BinaryNotFoundError(request, rationale=bash_request.rationale)
+    return BashBinary(first_path.path, first_path.fingerprint)
+
+
+@rule
+async def get_bash() -> BashBinary:
+    # Expose bash to external consumers.
+    return await Get(BashBinary, BashBinaryRequest(rationale="execute bash scripts"))
+
+
 @rule(desc="Find binary path", level=LogLevel.DEBUG)
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
@@ -480,11 +516,10 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     if request.binary_name == "bash":
         shebang = "#!/usr/bin/env bash"
     else:
-        bash_request = BinaryPathRequest(binary_name="bash", search_path=BASH_SEARCH_PATHS)
-        bash_paths = await Get(BinaryPaths, BinaryPathRequest, bash_request)
-        if not bash_paths.first_path:
-            raise BinaryNotFoundError(bash_request, rationale="use it to locate other executables")
-        shebang = f"#!{bash_paths.first_path.path}"
+        bash = await Get(
+            BashBinary, BashBinaryRequest(rationale="use it to locate other executables")
+        )
+        shebang = f"#!{bash.path}"
 
     # Note: the backslash after the """ marker ensures that the shebang is at the start of the
     # script file. Many OSs will not see the shebang if there is intervening whitespace.

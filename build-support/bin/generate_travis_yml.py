@@ -68,7 +68,7 @@ class Stage(Enum):
 # NB: These are not applied to the Linux Docker image - all of those env vars must be explicitly
 # exported in the image.
 GLOBAL_ENV_VARS = [
-    'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"',
+    'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.ci.toml"',
     "PANTS_DYNAMIC_UI=false",
     'LC_ALL="en_US.UTF-8"',
     "AWS_BUCKET=ci-public.pantsbuild.org",
@@ -219,7 +219,7 @@ CACHE_NATIVE_ENGINE = {
             *_cache_common_directories,
             "${HOME}/.rustup",
             "${HOME}/.cargo",
-            "build-support/virtualenvs",
+            "${HOME}/.cache/pants/pants_dev_deps",
             "src/rust/engine/target",
         ],
     },
@@ -327,17 +327,10 @@ def linux_shard(
             *_linux_before_install(
                 include_test_config=load_test_config, install_travis_wait=install_travis_wait
             ),
-            (
-                "if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then openssl aes-256-cbc -K "
-                "$encrypted_f6717c01a353_key -iv $encrypted_f6717c01a353_iv -in "
-                "build-support/secrets/remote-cache-toolchain-jwt.txt.encrypted -out "
-                "build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted -d && export "
-                "PANTS_REMOTE_OAUTH_BEARER_TOKEN_PATH=./build-support/secrets/remote-cache-toolchain-jwt.txt.decrypted; fi"
-            ),
         ],
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage().value,
-        "env": ["PANTS_REMOTE_CA_CERTS_PATH=/etc/ssl/certs/ca-certificates.crt"],
+        "env": [],
     }
     if load_test_config:
         setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]

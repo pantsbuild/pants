@@ -11,12 +11,13 @@ from pathlib import PurePath
 from typing import List, Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexInterpreterConstraints,
-    PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -99,7 +100,7 @@ class CoverageSubsystem(PythonToolBase):
     help = "Configuration for Python test coverage measurement."
 
     default_version = "coverage>=5.0.3,<5.1"
-    default_entry_point = "coverage"
+    default_main = ConsoleScript("coverage")
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
 
@@ -216,19 +217,19 @@ async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
 
 @dataclass(frozen=True)
 class CoverageSetup:
-    pex: Pex
+    pex: VenvPex
 
 
 @rule
 async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
     pex = await Get(
-        Pex,
+        VenvPex,
         PexRequest(
             output_filename="coverage.pex",
             internal_only=True,
             requirements=PexRequirements(coverage.all_requirements),
             interpreter_constraints=PexInterpreterConstraints(coverage.interpreter_constraints),
-            entry_point=coverage.entry_point,
+            main=coverage.main,
         ),
     )
     return CoverageSetup(pex)
@@ -250,11 +251,11 @@ async def merge_coverage_data(
         Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
         for data in data_collection
     )
-    input_digest = await Get(Digest, MergeDigests((*coverage_digests, coverage_setup.pex.digest)))
+    input_digest = await Get(Digest, MergeDigests(coverage_digests))
     prefixes = sorted(f"{data.address.path_safe_spec}/.coverage" for data in data_collection)
     result = await Get(
         ProcessResult,
-        PexProcess(
+        VenvPexProcess(
             coverage_setup.pex,
             argv=("combine", *prefixes),
             input_digest=input_digest,
@@ -291,7 +292,6 @@ async def generate_coverage_reports(
             (
                 merged_coverage_data.coverage_data,
                 coverage_config.digest,
-                coverage_setup.pex.digest,
                 sources.source_files.snapshot.digest,
             )
         ),
@@ -319,7 +319,7 @@ async def generate_coverage_reports(
             else None
         )
         pex_processes.append(
-            PexProcess(
+            VenvPexProcess(
                 coverage_setup.pex,
                 argv=(report_type.report_name,),
                 input_digest=input_digest,
@@ -329,7 +329,9 @@ async def generate_coverage_reports(
                 level=LogLevel.DEBUG,
             )
         )
-    results = await MultiGet(Get(ProcessResult, PexProcess, process) for process in pex_processes)
+    results = await MultiGet(
+        Get(ProcessResult, VenvPexProcess, process) for process in pex_processes
+    )
     result_stdouts = tuple(res.stdout for res in results)
     result_snapshots = await MultiGet(Get(Snapshot, Digest, res.output_digest) for res in results)
 

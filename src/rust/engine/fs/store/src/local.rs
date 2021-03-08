@@ -300,8 +300,8 @@ impl ByteStore {
       return Ok(Some(self.executor().spawn_blocking(move || f(&[])).await));
     }
 
-    if let Some(workunit_state) = workunit_store::get_workunit_state() {
-      workunit_state.store.record_observation(
+    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+      workunit_store_handle.store.record_observation(
         ObservationMetric::LocalStoreReadBlobSize,
         digest.size_bytes as u64,
       );

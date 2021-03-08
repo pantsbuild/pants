@@ -20,7 +20,8 @@ backend_packages.add = [
 ]
 
 plugins = [
-  "toolchain.pants.plugin==0.5.0",
+  "hdrhistogram",  # For use with `--stats-log`.
+  "toolchain.pants.plugin==0.6.0",
 ]
 
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
@@ -37,7 +38,6 @@ pantsd_invalidation_globs.add = [
 # Path patterns to ignore for filesystem operations on top of the builtin patterns.
 pants_ignore.add = [
   # venv directories under build-support.
-  "/build-support/virtualenvs/",
   "/build-support/*.venv/",
   # We shouldn't walk or watch the rust compiler artifacts because it is slow.
   "/src/rust/engine/target",
@@ -59,7 +59,6 @@ root_patterns = [
 ]
 
 [python-setup]
-resolver_version = "pip-2020-resolver"
 requirement_constraints = "3rdparty/python/constraints.txt"
 resolve_all_constraints = "nondeployables"
 interpreter_constraints = [">=3.7,<3.9"]
@@ -124,6 +123,7 @@ release_notes = """
   '2.1.x': 'src/python/pants/notes/2.1.x.rst',
   '2.2.x': 'src/python/pants/notes/2.2.x.md',
   '2.3.x': 'src/python/pants/notes/2.3.x.md',
+  '2.4.x': 'src/python/pants/notes/2.4.x.md',
 }
 """
 

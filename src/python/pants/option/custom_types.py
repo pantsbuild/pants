@@ -7,7 +7,7 @@ import inspect
 import os
 import re
 from enum import Enum
-from typing import Dict, Iterable, List, Optional, Pattern, Sequence, Type, Union
+from typing import Dict, Iterable, List, Pattern, Sequence
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
@@ -29,7 +29,7 @@ class UnsetBool:
         )
 
     @classmethod
-    def coerce_bool(cls, value: Optional[Union[Type["UnsetBool"], bool]], default: bool) -> bool:
+    def coerce_bool(cls, value: type[UnsetBool] | bool | None, default: bool) -> bool:
         if value is None:
             return default
         if value is cls:

@@ -184,6 +184,6 @@ impl StubActionCache {
   /// The address on which this server is listening over insecure HTTP transport.
   ///
   pub fn address(&self) -> String {
-    format!("{}", self.local_addr)
+    format!("http://{}", self.local_addr)
   }
 }

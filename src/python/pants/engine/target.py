@@ -1268,11 +1268,15 @@ class Sources(StringSequenceField, AsyncFieldMixin):
                     f"{expected_str}, but it had {pluralize(num_files, 'file')}."
                 )
 
+    @staticmethod
+    def prefix_glob_with_dirpath(dirpath: str, glob: str) -> str:
+        if glob.startswith("!"):
+            return f"!{os.path.join(dirpath, glob[1:])}"
+        return os.path.join(dirpath, glob)
+
     @final
     def _prefix_glob_with_address(self, glob: str) -> str:
-        if glob.startswith("!"):
-            return f"!{os.path.join(self.address.spec_path, glob[1:])}"
-        return os.path.join(self.address.spec_path, glob)
+        return self.prefix_glob_with_dirpath(self.address.spec_path, glob)
 
     @final
     def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:

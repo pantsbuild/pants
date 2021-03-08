@@ -35,9 +35,7 @@ use std::time::Duration;
 use futures::future::{self, FutureExt, TryFutureExt};
 use indexmap::IndexMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
-use uuid::Uuid;
 
-use logging::logger::{StdioHandler, PANTS_LOGGER};
 use task_executor::Executor;
 use workunit_store::{format_workunit_duration, WorkunitStore};
 
@@ -59,12 +57,6 @@ impl ConsoleUI {
       teardown_in_progress: false,
       teardown_mpsc: mpsc::channel(),
     }
-  }
-
-  fn default_draw_target() -> ProgressDrawTarget {
-    // NB: We render more frequently than we receive new data in order to minimize aliasing where a
-    // render might barely miss a data refresh.
-    ProgressDrawTarget::stderr_with_hz(Self::render_rate_hz() * 2)
   }
 
   ///
@@ -108,8 +100,18 @@ impl ConsoleUI {
     }
   }
 
-  fn setup_bars(num_swimlanes: usize) -> (MultiProgress, Vec<ProgressBar>) {
-    let multi_progress_bars = MultiProgress::with_draw_target(Self::default_draw_target());
+  fn setup_bars(
+    stderr_handler: stdio::StdioHandler,
+    num_swimlanes: usize,
+  ) -> Result<(MultiProgress, Vec<ProgressBar>), String> {
+    let (term_read, _, term_stderr_write) =
+      stdio::get_destination().exclusive_start(stderr_handler)?;
+
+    let term = console::Term::read_write_pair(term_read, term_stderr_write);
+    // NB: We render more frequently than we receive new data in order to minimize aliasing where a
+    // render might barely miss a data refresh.
+    let draw_target = ProgressDrawTarget::to_term(term, Self::render_rate_hz() * 2);
+    let multi_progress_bars = MultiProgress::with_draw_target(draw_target);
 
     let bars = (0..num_swimlanes)
       .map(|_n| {
@@ -118,7 +120,7 @@ impl ConsoleUI {
       })
       .collect();
 
-    (multi_progress_bars, bars)
+    Ok((multi_progress_bars, bars))
   }
 
   fn get_label_from_heavy_hitters<'a>(
@@ -182,14 +184,15 @@ impl ConsoleUI {
   pub fn initialize(
     &mut self,
     executor: Executor,
-    stderr_handler: StdioHandler,
+    stderr_handler: stdio::StdioHandler,
   ) -> Result<(), String> {
     if self.instance.is_some() {
       return Err("A ConsoleUI cannot render multiple UIs concurrently.".to_string());
     }
 
-    // Setup bars, and then spawning rendering of the bars into a background task.
-    let (multi_progress, bars) = Self::setup_bars(self.local_parallelism);
+    // Setup bars (which will take ownership of the current Console), and then spawn rendering
+    // of the bars into a background task.
+    let (multi_progress, bars) = Self::setup_bars(stderr_handler, self.local_parallelism)?;
     let multi_progress_task = {
       executor
         .spawn_blocking(move || multi_progress.join())
@@ -199,7 +202,6 @@ impl ConsoleUI {
     self.instance = Some(Instance {
       tasks_to_display: IndexMap::new(),
       multi_progress_task,
-      logger_handle: PANTS_LOGGER.register_stderr_handler(stderr_handler),
       bars,
     });
     Ok(())
@@ -212,7 +214,8 @@ impl ConsoleUI {
     if let Some(instance) = self.instance.take() {
       let sender = self.teardown_mpsc.0.clone();
       self.teardown_in_progress = true;
-      PANTS_LOGGER.deregister_stderr_handler(instance.logger_handle);
+      // When the MultiProgress completes, the Term(Destination) is dropped, which will restore
+      // direct access to the Console.
       instance
         .multi_progress_task
         .map_err(|e| format!("Failed to render UI: {}", e))
@@ -232,5 +235,4 @@ struct Instance {
   tasks_to_display: IndexMap<String, Option<Duration>>,
   multi_progress_task: Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>>,
   bars: Vec<ProgressBar>,
-  logger_handle: Uuid,
 }

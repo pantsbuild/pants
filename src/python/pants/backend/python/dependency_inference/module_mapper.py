@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Dict, List, Optional, Set, Tuple, cast
+from typing import DefaultDict, Dict, List, Set, Tuple, cast
 
 from pants.backend.python.target_types import (
     ModuleMappingField,
@@ -162,7 +162,7 @@ async def map_first_party_python_targets_to_modules(
 
 
 class ThirdPartyPythonModuleMapping(FrozenDict[str, Address]):
-    def address_for_module(self, module: str) -> Optional[Address]:
+    def address_for_module(self, module: str) -> Address | None:
         address = self.get(module)
         if address is not None:
             return address

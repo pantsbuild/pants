@@ -34,8 +34,6 @@ class Rank(Enum):
 
 
 Value = Union[str, int, float, None, Dict, Enum, List]
-
-
 ValueAndDetails = Tuple[Optional[Value], Optional[str]]
 
 
@@ -98,4 +96,4 @@ class RankedValue:
 
     rank: Rank
     value: Value
-    details: Optional[str] = None  # Optional details about the derivation of the value.
+    details: str | None = None  # Optional details about the derivation of the value.

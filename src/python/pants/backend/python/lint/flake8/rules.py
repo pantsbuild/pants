@@ -8,11 +8,11 @@ from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexInterpreterConstraints,
-    PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
 from pants.core.util_rules import stripped_source_files
@@ -63,13 +63,13 @@ async def flake8_lint_partition(
     partition: Flake8Partition, flake8: Flake8, lint_subsystem: LintSubsystem
 ) -> LintResult:
     flake8_pex_request = Get(
-        Pex,
+        VenvPex,
         PexRequest(
             output_filename="flake8.pex",
             internal_only=True,
             requirements=PexRequirements(flake8.all_requirements),
             interpreter_constraints=partition.interpreter_constraints,
-            entry_point=flake8.entry_point,
+            main=flake8.main,
         ),
     )
 
@@ -90,16 +90,13 @@ async def flake8_lint_partition(
         flake8_pex_request, config_digest_request, source_files_request
     )
 
-    input_digest = await Get(
-        Digest,
-        MergeDigests((source_files.snapshot.digest, flake8_pex.digest, config_digest)),
-    )
+    input_digest = await Get(Digest, MergeDigests((source_files.snapshot.digest, config_digest)))
 
     report_file_name = "flake8_report.txt" if lint_subsystem.reports_dir else None
 
     result = await Get(
         FallibleProcessResult,
-        PexProcess(
+        VenvPexProcess(
             flake8_pex,
             argv=generate_args(
                 source_files=source_files, flake8=flake8, report_file_name=report_file_name

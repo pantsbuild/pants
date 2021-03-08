@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import copy
 import inspect
 import json
@@ -11,20 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    DefaultDict,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Set,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Any, Callable, DefaultDict, Dict, Iterable, List, Mapping, Set, Tuple, Type
 
 import yaml
 
@@ -90,7 +79,7 @@ class Parser:
     """
 
     @staticmethod
-    def _ensure_bool(val: Union[bool, str]) -> bool:
+    def _ensure_bool(val: bool | str) -> bool:
         if isinstance(val, bool):
             return val
         if isinstance(val, str):
@@ -103,7 +92,7 @@ class Parser:
         raise BooleanConversionError(f"Got {val}. Expected True or False.")
 
     @classmethod
-    def _invert(cls, s: Optional[Union[bool, str]]) -> Optional[bool]:
+    def _invert(cls, s: bool | str | None) -> bool | None:
         if s is None:
             return None
         b = cls._ensure_bool(s)
@@ -123,7 +112,7 @@ class Parser:
         env: Mapping[str, str],
         config: Config,
         scope_info: ScopeInfo,
-        parent_parser: Optional["Parser"],
+        parent_parser: Parser | None,
     ) -> None:
         """Create a Parser instance.
 
@@ -165,7 +154,7 @@ class Parser:
     def known_args(self) -> Set[str]:
         return self._known_args
 
-    def history(self, dest: str) -> Optional[OptionValueHistory]:
+    def history(self, dest: str) -> OptionValueHistory | None:
         return self._history.get(dest)
 
     def walk(self, callback: Callable) -> None:
@@ -180,12 +169,14 @@ class Parser:
         flag_value_map: Dict[str, List[Any]]
         namespace: OptionValueContainerBuilder
         passthrough_args: List[str]
+        allow_unknown_flags: bool
 
         def __init__(
             self,
             flags_in_scope: Iterable[str],
             namespace: OptionValueContainerBuilder,
             passthrough_args: List[str],
+            allow_unknown_flags: bool,
         ) -> None:
             """
             :param flags_in_scope: Iterable of arg strings to parse into flag values.
@@ -194,18 +185,19 @@ class Parser:
             self.flag_value_map = self._create_flag_value_map(flags_in_scope)
             self.namespace = namespace
             self.passthrough_args = passthrough_args
+            self.allow_unknown_flags = allow_unknown_flags
 
         @staticmethod
-        def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, List[Optional[str]]]:
+        def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, list[str | None]]:
             """Returns a map of flag -> list of values, based on the given flag strings.
 
             None signals no value given (e.g., -x, --foo). The value is a list because the user may
             specify the same flag multiple times, and that's sometimes OK (e.g., when appending to
             list- valued options).
             """
-            flag_value_map: DefaultDict[str, List[Optional[str]]] = defaultdict(list)
+            flag_value_map: DefaultDict[str, list[str | None]] = defaultdict(list)
             for flag in flags:
-                flag_val: Optional[str]
+                flag_val: str | None
                 key, has_equals_sign, flag_val = flag.partition("=")
                 if not has_equals_sign:
                     if not flag.startswith("--"):  # '-xfoo' style.
@@ -246,9 +238,9 @@ class Parser:
             if implicit_value is None and kwargs.get("type") == bool:
                 implicit_value = True  # Allows --foo to mean --foo=true.
 
-            flag_vals: List[Union[int, float, bool, str]] = []
+            flag_vals: list[int | float | bool | str] = []
 
-            def add_flag_val(v: Optional[Union[int, float, bool, str]]) -> None:
+            def add_flag_val(v: int | float | bool | str | None) -> None:
                 if v is None:
                     if implicit_value is None:
                         raise ParseError(
@@ -307,7 +299,7 @@ class Parser:
 
             setattr(namespace, dest, val)
 
-        if flag_value_map:
+        if not parse_args_request.allow_unknown_flags and flag_value_map:
             # There were unconsumed flags.
             raise UnknownFlagsError(tuple(flag_value_map.keys()), self.scope)
         return namespace.build()
@@ -473,7 +465,7 @@ class Parser:
 
         def error(
             exception_type: Type[RegistrationError],
-            arg_name: Optional[str] = None,
+            arg_name: str | None = None,
             **msg_kwargs,
         ) -> None:
             if arg_name is None:
@@ -804,7 +796,7 @@ class Parser:
 
         return value_history
 
-    def _inverse_arg(self, arg: str) -> Optional[str]:
+    def _inverse_arg(self, arg: str) -> str | None:
         if not arg.startswith("--"):
             return None
         if arg.startswith("--no-"):
@@ -814,7 +806,7 @@ class Parser:
     def _register_child_parser(self, child: "Parser") -> None:
         self._child_parsers.append(child)
 
-    def _scope_str(self, scope: Optional[str] = None) -> str:
+    def _scope_str(self, scope: str | None = None) -> str:
         return self.scope_str(scope if scope is not None else self.scope)
 
     def __str__(self) -> str:

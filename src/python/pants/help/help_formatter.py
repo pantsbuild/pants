@@ -2,13 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
+import textwrap
 from enum import Enum
-from textwrap import wrap
 from typing import List, Optional
 
 from pants.help.help_info_extracter import OptionHelpInfo, OptionScopeHelpInfo, to_help_str
 from pants.help.maybe_color import MaybeColor
 from pants.option.ranked_value import Rank, RankedValue
+from pants.util.docutil import terminal_width
 from pants.util.strutil import hard_wrap
 
 
@@ -17,6 +18,7 @@ class HelpFormatter(MaybeColor):
         super().__init__(color=color)
         self._show_advanced = show_advanced
         self._show_deprecated = show_deprecated
+        self._width = terminal_width()
 
     def format_options(self, oshi: OptionScopeHelpInfo):
         """Return a help message for the specified options."""
@@ -34,7 +36,7 @@ class HelpFormatter(MaybeColor):
                 # No need to repeat those in the advanced section.
                 title = f"{display_scope} options"
                 lines.append(self.maybe_green(f"{title}\n{'-' * len(title)}\n"))
-                lines.extend(hard_wrap(oshi.description))
+                lines.extend(hard_wrap(oshi.description, width=self._width))
                 lines.append(" ")
                 config_section = f"[{oshi.scope or 'GLOBAL'}]"
                 lines.append(f"Config section: {self.maybe_magenta(config_section)}")
@@ -89,7 +91,7 @@ class HelpFormatter(MaybeColor):
         choices = "" if ohi.choices is None else f"one of: [{', '.join(ohi.choices)}]"
         choices_lines = [
             f"{indent}{'  ' if i != 0 else ''}{self.maybe_cyan(s)}"
-            for i, s in enumerate(wrap(f"{choices}", 96))
+            for i, s in enumerate(textwrap.wrap(f"{choices}", self._width))
         ]
         default_lines = format_value(RankedValue(Rank.HARDCODED, ohi.default), "default: ", indent)
         if not ohi.value_history:
@@ -108,7 +110,7 @@ class HelpFormatter(MaybeColor):
             for rv in interesting_ranked_values
             for line in format_value(rv, "overrode: ", f"{indent}    ")
         ]
-        description_lines = hard_wrap(ohi.help, indent=len(indent))
+        description_lines = hard_wrap(ohi.help, indent=len(indent), width=self._width)
         lines = [
             *arg_lines,
             *choices_lines,

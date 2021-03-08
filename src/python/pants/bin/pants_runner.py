@@ -3,6 +3,7 @@
 
 import logging
 import os
+import sys
 import warnings
 from dataclasses import dataclass
 from typing import List, Mapping
@@ -10,7 +11,7 @@ from typing import List, Mapping
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
 from pants.bin.remote_pants_runner import RemotePantsRunner
-from pants.init.logging import setup_logging
+from pants.init.logging import initialize_stdio, stdio_destination
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -69,21 +70,30 @@ class PantsRunner:
 
         # We enable logging here, and everything before it will be routed through regular
         # Python logging.
-        setup_logging(global_bootstrap_options, stderr_logging=True)
+        stdin_fileno = sys.stdin.fileno()
+        stdout_fileno = sys.stdout.fileno()
+        stderr_fileno = sys.stderr.fileno()
+        with initialize_stdio(global_bootstrap_options), stdio_destination(
+            stdin_fileno=stdin_fileno,
+            stdout_fileno=stdout_fileno,
+            stderr_fileno=stderr_fileno,
+        ):
 
-        if self._should_run_with_pantsd(global_bootstrap_options):
-            try:
-                remote_runner = RemotePantsRunner(self.args, self.env, options_bootstrapper)
-                return remote_runner.run()
-            except RemotePantsRunner.Fallback as e:
-                logger.warning(f"Client exception: {e!r}, falling back to non-daemon mode")
+            if self._should_run_with_pantsd(global_bootstrap_options):
+                try:
+                    remote_runner = RemotePantsRunner(self.args, self.env, options_bootstrapper)
+                    return remote_runner.run()
+                except RemotePantsRunner.Fallback as e:
+                    logger.warning(f"Client exception: {e!r}, falling back to non-daemon mode")
 
-        # N.B. Inlining this import speeds up the python thin client run by about 100ms.
-        from pants.bin.local_pants_runner import LocalPantsRunner
+            # N.B. Inlining this import speeds up the python thin client run by about 100ms.
+            from pants.bin.local_pants_runner import LocalPantsRunner
 
-        # We only install signal handling via ExceptionSink if the run will execute in this process.
-        ExceptionSink.install(
-            log_location=init_workdir(global_bootstrap_options), pantsd_instance=False
-        )
-        runner = LocalPantsRunner.create(env=self.env, options_bootstrapper=options_bootstrapper)
-        return runner.run(start_time)
+            # We only install signal handling via ExceptionSink if the run will execute in this process.
+            ExceptionSink.install(
+                log_location=init_workdir(global_bootstrap_options), pantsd_instance=False
+            )
+            runner = LocalPantsRunner.create(
+                env=self.env, options_bootstrapper=options_bootstrapper
+            )
+            return runner.run(start_time)

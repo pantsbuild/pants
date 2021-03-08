@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ffi::OsString;
 use std::path::Component;
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -14,7 +15,7 @@ use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
 use tonic::transport::Channel;
-use workunit_store::{with_workunit, Level, Metric, WorkunitMetadata};
+use workunit_store::{with_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
 
 use crate::remote::make_execute_request;
 use crate::{
@@ -58,19 +59,13 @@ impl CommandRunner {
     cache_write: bool,
     eager_fetch: bool,
   ) -> Result<Self, String> {
-    let tls_client_config = match root_ca_certs {
-      Some(pem_bytes) => Some(grpc_util::create_tls_config(pem_bytes)?),
-      _ => None,
-    };
-
-    let scheme = if tls_client_config.is_some() {
-      "https"
+    let tls_client_config = if action_cache_address.starts_with("https://") {
+      Some(grpc_util::create_tls_config(root_ca_certs)?)
     } else {
-      "http"
+      None
     };
-    let address_with_scheme = format!("{}://{}", scheme, action_cache_address);
 
-    let endpoint = grpc_util::create_endpoint(&address_with_scheme, tls_client_config.as_ref())?;
+    let endpoint = grpc_util::create_endpoint(&action_cache_address, tls_client_config.as_ref())?;
     let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let action_cache_client = Arc::new(if headers.is_empty() {
       ActionCacheClient::new(channel)
@@ -279,6 +274,7 @@ impl CommandRunner {
       exit_code: result.exit_code,
       stdout_digest: Some(result.stdout_digest.into()),
       stderr_digest: Some(result.stderr_digest.into()),
+      execution_metadata: Some(result.metadata.clone().into()),
       ..ActionResult::default()
     };
 
@@ -396,6 +392,7 @@ impl crate::CommandRunner for CommandRunner {
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let request = self
       .extract_compatible_request(&req)
@@ -457,7 +454,17 @@ impl crate::CommandRunner for CommandRunner {
       tokio::select! {
         cache_result = cache_read_future => {
           if let Some(cached_response) = cache_result {
+            let lookup_elapsed = cache_lookup_start.elapsed();
             context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+            if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
+              let time_saved = time_saved.as_millis() as u64;
+              context
+                .workunit_store
+                .increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
+              context
+                .workunit_store
+                .record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
+              }
             return Ok(cached_response);
           } else {
             // Note that we don't increment a counter here, as there is nothing of note in this
@@ -476,37 +483,44 @@ impl crate::CommandRunner for CommandRunner {
     };
 
     if result.exit_code == 0 && self.cache_write {
-      context
-        .workunit_store
-        .increment_counter(Metric::RemoteCacheWriteStarted, 1);
       let command_runner = self.clone();
       let result = result.clone();
+      let context2 = context.clone();
       // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
-      let _write_join = self.executor.spawn(
-        async move {
-          let write_result = command_runner
-            .update_action_cache(
-              &context,
-              &request,
-              &result,
-              &command_runner.metadata,
-              &command,
-              action_digest,
-              command_digest,
-            )
-            .await;
-          context
+      let cache_write_future = async move {
+        context2
+          .workunit_store
+          .increment_counter(Metric::RemoteCacheWriteStarted, 1);
+        let write_result = command_runner
+          .update_action_cache(
+            &context2,
+            &request,
+            &result,
+            &command_runner.metadata,
+            &command,
+            action_digest,
+            command_digest,
+          )
+          .await;
+        context2
+          .workunit_store
+          .increment_counter(Metric::RemoteCacheWriteFinished, 1);
+        if let Err(err) = write_result {
+          log::warn!("Failed to write to remote cache: {}", err);
+          context2
             .workunit_store
-            .increment_counter(Metric::RemoteCacheWriteFinished, 1);
-          if let Err(err) = write_result {
-            log::warn!("Failed to write to remote cache: {}", err);
-            context
-              .workunit_store
-              .increment_counter(Metric::RemoteCacheWriteErrors, 1);
-          };
-        }
-        .boxed(),
-      );
+            .increment_counter(Metric::RemoteCacheWriteErrors, 1);
+        };
+      }
+      .boxed();
+
+      let _write_join = self.executor.spawn(with_workunit(
+        context.workunit_store,
+        "remote_cache_write".to_owned(),
+        WorkunitMetadata::with_level(Level::Debug),
+        cache_write_future,
+        |_, md| md,
+      ));
     }
 
     Ok(result)

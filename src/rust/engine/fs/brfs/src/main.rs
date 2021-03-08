@@ -737,21 +737,12 @@ async fn main() {
     Some(address) => Store::with_remote(
       runtime.clone(),
       &store_path,
-      vec![address.to_owned()],
+      address,
       args.value_of("remote-instance-name").map(str::to_owned),
       root_ca_certs,
       headers,
-      1,
       4 * 1024 * 1024,
       std::time::Duration::from_secs(5 * 60),
-      // TODO: Take a command line arg.
-      serverset::BackoffConfig::new(
-        std::time::Duration::from_secs(1),
-        1.2,
-        std::time::Duration::from_secs(20),
-      )
-      .expect("Error making BackoffConfig"),
-      1,
       1,
     ),
     None => Store::local_only(runtime.clone(), &store_path),

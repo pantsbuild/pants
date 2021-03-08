@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import glob
 import os
 import subprocess
@@ -60,9 +62,7 @@ class PantsJoinHandle:
     process: subprocess.Popen
     workdir: str
 
-    def join(
-        self, stdin_data: Optional[Union[bytes, str]] = None, tee_output: bool = False
-    ) -> PantsResult:
+    def join(self, stdin_data: bytes | str | None = None, tee_output: bool = False) -> PantsResult:
         """Wait for the pants process to complete, and return a PantsResult for it."""
 
         communicate_fn = self.process.communicate
@@ -96,8 +96,8 @@ def run_pants_with_workdir_without_waiting(
     workdir: str,
     hermetic: bool = True,
     use_pantsd: bool = True,
-    config: Optional[Mapping] = None,
-    extra_env: Optional[Mapping[str, str]] = None,
+    config: Mapping | None = None,
+    extra_env: Mapping[str, str] | None = None,
     print_stacktrace: bool = True,
     **kwargs: Any,
 ) -> PantsJoinHandle:
@@ -185,8 +185,8 @@ def run_pants_with_workdir(
     workdir: str,
     hermetic: bool = True,
     use_pantsd: bool = True,
-    config: Optional[Mapping] = None,
-    stdin_data: Optional[Union[bytes, str]] = None,
+    config: Mapping | None = None,
+    stdin_data: bytes | str | None = None,
     tee_output: bool = False,
     **kwargs: Any,
 ) -> PantsResult:
@@ -203,9 +203,9 @@ def run_pants(
     *,
     hermetic: bool = True,
     use_pantsd: bool = True,
-    config: Optional[Mapping] = None,
-    extra_env: Optional[Mapping[str, str]] = None,
-    stdin_data: Optional[Union[bytes, str]] = None,
+    config: Mapping | None = None,
+    extra_env: Mapping[str, str] | None = None,
+    stdin_data: bytes | str | None = None,
     **kwargs: Any,
 ) -> PantsResult:
     """Runs Pants in a subprocess.
@@ -294,7 +294,7 @@ def ensure_daemon(func):
 def render_logs(workdir: str) -> None:
     """Renders all potentially relevant logs from the given workdir to stdout."""
     filenames = list(glob.glob(os.path.join(workdir, "logs/exceptions*log"))) + list(
-        glob.glob(os.path.join(workdir, "pantsd/pantsd.log"))
+        glob.glob(os.path.join(workdir, "pants.log"))
     )
     for filename in filenames:
         rel_filename = fast_relpath(filename, workdir)
@@ -304,10 +304,10 @@ def render_logs(workdir: str) -> None:
         print(f"{rel_filename} --- ")
 
 
-def read_pantsd_log(workdir: str) -> Iterator[str]:
-    """Yields all lines from the pantsd log under the given workdir."""
-    # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
-    for line in _read_log(f"{workdir}/pantsd/pantsd.log"):
+def read_pants_log(workdir: str) -> Iterator[str]:
+    """Yields all lines from the pants log under the given workdir."""
+    # Surface the pants log for easy viewing via pytest's `-s` (don't capture stdio) option.
+    for line in _read_log(f"{workdir}/pants.log"):
         yield line
 
 

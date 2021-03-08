@@ -128,16 +128,16 @@ impl TimeSpan {
   ) -> Result<Self, String> {
     let start = Self::std_duration_from_timestamp(start);
     let end = Self::std_duration_from_timestamp(end);
-    let time_span = end.checked_sub(start).map(|duration| TimeSpan {
-      start: start.into(),
-      duration: duration.into(),
-    });
-    time_span.ok_or_else(|| {
-      format!(
+    match end.checked_sub(start) {
+      Some(duration) => Ok(TimeSpan {
+        start: start.into(),
+        duration: duration.into(),
+      }),
+      None => Err(format!(
         "Got negative {} time: {:?} - {:?}",
         time_span_description, end, start
-      )
-    })
+      )),
+    }
   }
 }
 
