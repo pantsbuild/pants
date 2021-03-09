@@ -1510,6 +1510,24 @@ class SecondaryOwnerMixin(ABC):
         """
 
 
+def targets_with_sources_types(
+    sources_types: Iterable[type[Sources]],
+    targets: Iterable[Target],
+    union_membership: UnionMembership,
+) -> tuple[Target, ...]:
+    """Return all targets either with the specified sources subclass(es) or which can generate those
+    sources."""
+    return tuple(
+        tgt
+        for tgt in targets
+        if any(
+            tgt.has_field(sources_type)
+            or tgt.get(Sources).can_generate(sources_type, union_membership)
+            for sources_type in sources_types
+        )
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # `Dependencies` field
 # -----------------------------------------------------------------------------------------------
