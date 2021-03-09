@@ -70,7 +70,7 @@ class Zinc:
                 help="Use a pre-compiled native-image for zinc. Requires running in hermetic mode",
             )
 
-            zinc_rev = "1.0.3"
+            zinc_rev = "1.3.5"
 
             shader_rules = [
                 # The compiler-interface and compiler-bridge tool jars carry xsbt and
@@ -133,11 +133,11 @@ class Zinc:
                 custom_rules=shader_rules,
             )
 
-            # Register scalac for fixed versions of Scala, 2.10, 2.11 and 2.12.
+            # Register scalac for fixed versions of Scala.
             # Relies on ScalaPlatform to get the revision version from the major.minor version.
             # The tool with the correct scala version will be retrieved later,
             # taking the user-passed option into account.
-            supported_scala_versions = ["2.10", "2.11", "2.12"]
+            supported_scala_versions = ["2.10", "2.11", "2.12", "2.13"]
             wanted_jars = ["scala-compiler", "scala-library", "scala-reflect"]
             for scala_version in supported_scala_versions:
                 cls.register_jvm_tool(

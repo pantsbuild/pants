@@ -21,6 +21,7 @@ scala_build_info = {
     "2.10": major_version_info(full_version="2.10.6"),
     "2.11": major_version_info(full_version="2.11.12"),
     "2.12": major_version_info(full_version="2.12.8"),
+    "2.13": major_version_info(full_version="2.13.5"),
 }
 
 
@@ -115,7 +116,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
             "--version",
             advanced=True,
             default="2.12",
-            choices=["2.10", "2.11", "2.12", "custom"],
+            choices=["2.10", "2.11", "2.12", "2.13", "custom"],
             fingerprint=True,
             help="The scala platform version. If --version=custom, the targets "
             "//:scala-library, //:scalac, //:scala-repl and //:scalastyle will be used, "
@@ -143,6 +144,10 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
         register_scala_compiler_tool("2.12")
         register_scala_repl_tool("2.12")
         register_style_tool("2.12")
+
+        register_scala_compiler_tool("2.13")
+        register_scala_repl_tool("2.13")
+        register_style_tool("2.13")
 
         # Register the custom tools. We provide a dummy classpath, so that register_jvm_tool won't
         # require that a target with the given spec actually exist (not everyone will define custom
