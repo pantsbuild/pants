@@ -11,6 +11,7 @@ from enum import Enum
 from textwrap import dedent
 from typing import TYPE_CHECKING, Iterable, Mapping, Tuple
 
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
