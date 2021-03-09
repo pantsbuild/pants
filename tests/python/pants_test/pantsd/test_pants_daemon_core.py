@@ -13,8 +13,8 @@ def test_prepare_scheduler():
     def create_services(bootstrap_options, legacy_graph_scheduler):
         return PantsServices()
 
-    core = PantsDaemonCore(create_options_bootstrapper([]), PyExecutor(2, 4), create_services)
     env = CompleteEnvironment({})
+    core = PantsDaemonCore(create_options_bootstrapper([]), env, PyExecutor(2, 4), create_services)
 
     first_scheduler, first_options_initializer = core.prepare(
         create_options_bootstrapper(["-ldebug"]),

@@ -43,7 +43,7 @@ DEFAULT_VERSION = "0.0.0"
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *pex.rules(),
             *external_tool.rules(),
@@ -53,17 +53,22 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, [Process]),
         ]
     )
-
-
-def _create_pex(rule_runner: RuleRunner) -> Pex:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python"],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
+    return rule_runner
+
+
+def _create_pex(
+    rule_runner: RuleRunner,
+    interpreter_constraints: PexInterpreterConstraints,
+) -> Pex:
     request = PexRequest(
         output_filename="setup-py-runner.pex",
         internal_only=True,
         requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"]),
+        interpreter_constraints=interpreter_constraints,
     )
     return rule_runner.request(Pex, [request])
 
@@ -71,11 +76,12 @@ def _create_pex(rule_runner: RuleRunner) -> Pex:
 def _run_setup_py(
     rule_runner: RuleRunner,
     plugin: str,
+    interpreter_constraints: PexInterpreterConstraints,
     version: Optional[str],
     setup_py_args: Iterable[str],
     install_dir: str,
 ) -> None:
-    pex_obj = _create_pex(rule_runner)
+    pex_obj = _create_pex(rule_runner, interpreter_constraints)
     setup_py_file = FileContent(
         "setup.py",
         dedent(
@@ -96,7 +102,7 @@ def _run_setup_py(
     # works.
     process = Process(
         argv=("./setup-py-runner.pex", "setup.py", *setup_py_args),
-        env={"PATH": os.getenv("PATH", "")},
+        env={k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ},
         input_digest=merged_digest,
         description="Run setup.py",
         output_directories=("dist/",),
@@ -121,6 +127,12 @@ def plugin_resolution(
             with temporary_dir() as new_chroot:
                 yield new_chroot, True
 
+    interpreter_constraints = (
+        PexInterpreterConstraints([f"=={interpreter.identity.version_str}"])
+        if interpreter
+        else PexInterpreterConstraints([">=3.7"])
+    )
+
     with provide_chroot(chroot) as (root_dir, create_artifacts):
         env: Dict[str, str] = {}
         repo_dir = None
@@ -139,30 +151,30 @@ def plugin_resolution(
                 plugin_list.append(f"{plugin}=={version}" if version else plugin)
                 if create_artifacts:
                     setup_py_args = ["sdist" if sdist else "bdist_wheel", "--dist-dir", "dist/"]
-                    _run_setup_py(rule_runner, plugin, version, setup_py_args, repo_dir)
+                    _run_setup_py(
+                        rule_runner,
+                        plugin,
+                        interpreter_constraints,
+                        version,
+                        setup_py_args,
+                        repo_dir,
+                    )
             env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
-            env["PANTS_PLUGIN_CACHE_DIR"] = os.path.join(root_dir, "plugin-cache")
 
         configpath = os.path.join(root_dir, "pants.toml")
         if create_artifacts:
             touch(configpath)
         args = [f"--pants-config-files=['{configpath}']"]
 
-        interpreter_constraints = (
-            PexInterpreterConstraints([f"=={interpreter.identity.version_str}"])
-            if interpreter
-            else None
-        )
-
         options_bootstrapper = OptionsBootstrapper.create(env=env, args=args, allow_pantsrc=False)
-        bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper)
+        complete_env = CompleteEnvironment(
+            {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
+        )
+        bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, complete_env)
         plugin_resolver = PluginResolver(
             bootstrap_scheduler, interpreter_constraints=interpreter_constraints
         )
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
-        complete_env = CompleteEnvironment(
-            {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
-        )
 
         working_set = plugin_resolver.resolve(
             options_bootstrapper, complete_env, WorkingSet(entries=[])

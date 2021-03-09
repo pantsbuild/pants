@@ -107,7 +107,7 @@ def test_execution_options_auth_plugin() -> None:
                     f"""\
                     from pants.option.global_options import AuthPluginState, AuthPluginResult
 
-                    def auth_func(initial_execution_headers, initial_store_headers, options):
+                    def auth_func(initial_execution_headers, initial_store_headers, options, **kwargs):
                         return AuthPluginResult(
                             state=AuthPluginState.{state},
                             execution_headers={{
