@@ -10,10 +10,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import Iterable, Iterator, Optional, Tuple, Union, cast
+from typing import Dict, Iterable, Iterator, Optional, Tuple, Union, cast
 
 from pkg_resources import Requirement
 
+from pants.backend.python.dependency_inference.default_module_mapping import DEFAULT_MODULE_MAPPING
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.core.goals.package import OutputPathField
@@ -41,6 +42,7 @@ from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
 from pants.util.docutil import docs_url
+from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
 
@@ -591,6 +593,14 @@ class ModuleMappingField(DictStringToStringSequenceField):
         'name as the default module, e.g. "Django" will default to `["django"]`.\n\nThis is '
         "used for Pants to be able to infer dependencies in BUILD files."
     )
+    value: FrozenDict[str, Tuple[str, ...]]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Dict[str, Iterable[str]]], *, address: Address
+    ) -> FrozenDict[str, Tuple[str, ...]]:
+        provided_mapping = super().compute_value(raw_value, address=address) or {}
+        return FrozenDict({**DEFAULT_MODULE_MAPPING, **provided_mapping})
 
 
 class PythonRequirementLibrary(Target):
