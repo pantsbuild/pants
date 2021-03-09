@@ -47,6 +47,7 @@ def test_repl_with_targets(rule_runner: RuleRunner) -> None:
                 "--backend-packages=pants.backend.codegen.protobuf.python",
             ],
             args=["src/python/lib.py"],
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
     assert result.exit_code == 0
 
@@ -61,6 +62,7 @@ def test_repl_ipython(rule_runner: RuleRunner) -> None:
                 "--backend-packages=pants.backend.codegen.protobuf.python",
             ],
             args=["--shell=ipython", "src/python/lib.py"],
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
     assert result.exit_code == 0
 
@@ -72,6 +74,7 @@ def test_repl_bogus_repl_name(rule_runner: RuleRunner) -> None:
             Repl,
             global_args=["--backend-packages=pants.backend.python"],
             args=["--shell=bogus-repl", "src/python/lib.py"],
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
     assert result.exit_code == -1
     assert "'bogus-repl' is not a registered REPL. Available REPLs" in result.stderr

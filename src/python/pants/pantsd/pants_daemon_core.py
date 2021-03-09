@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 from typing_extensions import Protocol
 
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
 from pants.init.options_initializer import OptionsInitializer
@@ -39,10 +40,11 @@ class PantsDaemonCore:
     def __init__(
         self,
         options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironment,
         executor: PyExecutor,
         services_constructor: PantsServicesConstructor,
     ):
-        self._options_initializer = OptionsInitializer(options_bootstrapper, executor=executor)
+        self._options_initializer = OptionsInitializer(options_bootstrapper, env, executor=executor)
         self._executor = executor
         self._services_constructor = services_constructor
         self._lifecycle_lock = threading.RLock()
@@ -68,7 +70,10 @@ class PantsDaemonCore:
             return self._services.are_all_alive()
 
     def _initialize(
-        self, options_fingerprint: str, options_bootstrapper: OptionsBootstrapper
+        self,
+        options_fingerprint: str,
+        options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironment,
     ) -> None:
         """(Re-)Initialize the scheduler.
 
@@ -82,10 +87,10 @@ class PantsDaemonCore:
             if self._services:
                 self._services.shutdown()
             build_config, options = self._options_initializer.build_config_and_options(
-                options_bootstrapper, raise_=True
+                options_bootstrapper, env, raise_=True
             )
             self._scheduler = EngineInitializer.setup_graph(
-                options_bootstrapper, build_config, executor=self._executor
+                options_bootstrapper, build_config, env, executor=self._executor
             )
             bootstrap_options_values = options.bootstrap_option_values()
             assert bootstrap_options_values is not None
@@ -99,7 +104,7 @@ class PantsDaemonCore:
             raise e
 
     def prepare(
-        self, options_bootstrapper: OptionsBootstrapper
+        self, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironment
     ) -> Tuple[GraphScheduler, OptionsInitializer]:
         """Get a scheduler for the given options_bootstrapper.
 
@@ -121,6 +126,6 @@ class PantsDaemonCore:
                 # The fingerprint mismatches, either because this is the first run (and there is no
                 # fingerprint) or because relevant options have changed. Create a new scheduler
                 # and services.
-                self._initialize(options_fingerprint, options_bootstrapper)
+                self._initialize(options_fingerprint, options_bootstrapper, env)
             assert self._scheduler is not None
             return self._scheduler, self._options_initializer

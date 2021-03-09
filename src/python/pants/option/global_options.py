@@ -21,6 +21,7 @@ from pants.base.build_environment import (
     get_pants_cachedir,
     pants_version,
 )
+from pants.engine.environment import CompleteEnvironment
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
@@ -131,7 +132,9 @@ class ExecutionOptions:
     remote_execution_overall_deadline_secs: int
 
     @classmethod
-    def from_options(cls, options: Options) -> ExecutionOptions:
+    def from_options(
+        cls, options: Options, env: CompleteEnvironment, local_only: bool = False
+    ) -> ExecutionOptions:
         bootstrap_options = options.bootstrap_option_values()
         assert bootstrap_options is not None
         # Possibly change some remoting options.
@@ -153,8 +156,10 @@ class ExecutionOptions:
             token_header = {"authorization": f"Bearer {oauth_token}"}
             remote_execution_headers.update(token_header)
             remote_store_headers.update(token_header)
-        if bootstrap_options.remote_auth_plugin and (
-            remote_execution or remote_cache_read or remote_cache_write
+        if (
+            not local_only
+            and bootstrap_options.remote_auth_plugin
+            and (remote_execution or remote_cache_read or remote_cache_write)
         ):
             if ":" not in bootstrap_options.remote_auth_plugin:
                 raise OptionsError(
@@ -171,6 +176,7 @@ class ExecutionOptions:
                     initial_execution_headers=remote_execution_headers,
                     initial_store_headers=remote_store_headers,
                     options=options,
+                    env=dict(env),
                 ),
             )
             if not auth_plugin_result.is_available:

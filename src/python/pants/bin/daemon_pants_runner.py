@@ -11,12 +11,12 @@ from typing import Dict, Tuple
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, ExitCode
 from pants.bin.local_pants_runner import LocalPantsRunner
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native import RawFdRunner
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.init.logging import stdio_destination
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_core import PantsDaemonCore
-from pants.util.contextutil import argv_as, hermetic_environment_as
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,11 @@ class DaemonPantsRunner(RawFdRunner):
                 )
 
     def single_daemonized_run(
-        self, working_dir: str, cancellation_latch: PySessionCancellationLatch
+        self,
+        args: Tuple[str, ...],
+        env: Dict[str, str],
+        working_dir: str,
+        cancellation_latch: PySessionCancellationLatch,
     ) -> ExitCode:
         """Run a single daemonized run of Pants.
 
@@ -110,22 +114,18 @@ class DaemonPantsRunner(RawFdRunner):
             logger.debug("Connected to pantsd")
             # Capture the client's start time, which we propagate here in order to get an accurate
             # view of total time.
-            env_start_time = os.environ.get("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+            env_start_time = env.get("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
             start_time = float(env_start_time) if env_start_time else time.time()
 
-            # Clear global mutable state before entering `LocalPantsRunner`. Note that we use
-            # `sys.argv` and `os.environ`, since they have been mutated to maintain the illusion
-            # of a local run: once we allow for concurrent runs, this information should be
-            # propagated down from the caller.
-            #   see https://github.com/pantsbuild/pants/issues/7654
             options_bootstrapper = OptionsBootstrapper.create(
-                env=os.environ, args=sys.argv, allow_pantsrc=True
+                env=env, args=args, allow_pantsrc=True
             )
 
             # Run using the pre-warmed Session.
-            scheduler, options_initializer = self._core.prepare(options_bootstrapper)
+            complete_env = CompleteEnvironment(env)
+            scheduler, options_initializer = self._core.prepare(options_bootstrapper, complete_env)
             runner = LocalPantsRunner.create(
-                os.environ,
+                complete_env,
                 options_bootstrapper,
                 scheduler=scheduler,
                 options_initializer=options_initializer,
@@ -165,9 +165,9 @@ class DaemonPantsRunner(RawFdRunner):
                     stdin_fileno=stdin_fileno,
                     stdout_fileno=stdout_fileno,
                     stderr_fileno=stderr_fileno,
-                ), hermetic_environment_as(**env), argv_as((command,) + args):
+                ):
                     return self.single_daemonized_run(
-                        working_directory.decode(), cancellation_latch
+                        ((command,) + args), env, working_directory.decode(), cancellation_latch
                     )
             finally:
                 logger.info(f"request completed: `{' '.join(args)}`")

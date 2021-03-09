@@ -59,6 +59,7 @@ def single_target_run(
                 interactive_runner,
                 workspace,
                 BuildRoot(),
+                rule_runner.environment,
             ],
             mock_gets=[
                 MockGet(

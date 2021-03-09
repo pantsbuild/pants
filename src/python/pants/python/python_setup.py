@@ -1,20 +1,22 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import multiprocessing
 import os
-import subprocess
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Tuple, cast
+from typing import Iterable, List, Optional, Tuple, cast
 
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
+from pants.engine.environment import Environment
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method
 
 logger = logging.getLogger(__name__)
 
@@ -166,9 +168,9 @@ class PythonSetup(Subsystem):
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")
 
-    @memoized_property
-    def interpreter_search_paths(self):
-        return self.expand_interpreter_search_paths(self.options.interpreter_search_paths)
+    @memoized_method
+    def interpreter_search_paths(self, env: Environment):
+        return self.expand_interpreter_search_paths(self.options.interpreter_search_paths, env)
 
     @property
     def resolver_version(self) -> ResolverVersion:
@@ -210,14 +212,12 @@ class PythonSetup(Subsystem):
         )
 
     @classmethod
-    def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):
+    def expand_interpreter_search_paths(cls, interpreter_search_paths, env: Environment):
         special_strings = {
             "<PEXRC>": cls.get_pex_python_paths,
-            "<PATH>": cls.get_environment_paths,
-            "<PYENV>": lambda: cls.get_pyenv_paths(pyenv_root_func=pyenv_root_func),
-            "<PYENV_LOCAL>": lambda: cls.get_pyenv_paths(
-                pyenv_root_func=pyenv_root_func, pyenv_local=True
-            ),
+            "<PATH>": lambda: cls.get_environment_paths(env),
+            "<PYENV>": lambda: cls.get_pyenv_paths(env),
+            "<PYENV_LOCAL>": lambda: cls.get_pyenv_paths(env, pyenv_local=True),
         }
         expanded = []
         from_pexrc = None
@@ -239,9 +239,9 @@ class PythonSetup(Subsystem):
         return expanded
 
     @staticmethod
-    def get_environment_paths():
+    def get_environment_paths(env: Environment):
         """Returns a list of paths specified by the PATH env var."""
-        pathstr = os.getenv("PATH")
+        pathstr = env.get("PATH")
         if pathstr:
             return pathstr.split(os.pathsep)
         return []
@@ -261,19 +261,15 @@ class PythonSetup(Subsystem):
             return []
 
     @staticmethod
-    def get_pyenv_paths(
-        *, pyenv_root_func: Optional[Callable] = None, pyenv_local: bool = False
-    ) -> List[str]:
+    def get_pyenv_paths(env: Environment, *, pyenv_local: bool = False) -> List[str]:
         """Returns a list of paths to Python interpreters managed by pyenv.
 
-        :param pyenv_root_func: A no-arg function that returns the pyenv root. Defaults to
-                                running `pyenv root`, but can be overridden for testing.
+        :param env: The environment to use to look up pyenv.
         :param bool pyenv_local: If True, only use the interpreter specified by
                                  '.python-version' file under `build_root`.
         """
-        pyenv_root_func = pyenv_root_func or get_pyenv_root
-        pyenv_root = pyenv_root_func()
-        if pyenv_root is None:
+        pyenv_root = get_pyenv_root(env)
+        if not pyenv_root:
             return []
 
         versions_dir = Path(pyenv_root, "versions")
@@ -303,8 +299,12 @@ class PythonSetup(Subsystem):
         return paths
 
 
-def get_pyenv_root():
-    try:
-        return subprocess.check_output(["pyenv", "root"]).decode().strip()
-    except (OSError, subprocess.CalledProcessError):
-        return None
+def get_pyenv_root(env: Environment) -> str | None:
+    """See https://github.com/pyenv/pyenv#environment-variables."""
+    from_env = env.get("PYENV_ROOT")
+    if from_env:
+        return from_env
+    home_from_env = env.get("HOME")
+    if home_from_env:
+        return os.path.join(home_from_env, ".cache")
+    return None

@@ -134,7 +134,7 @@ def run_mypy(
         args.append("--mypy-skip")
     if additional_args:
         args.extend(additional_args)
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     result = rule_runner.request(
         TypecheckResults,
         [MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets)],

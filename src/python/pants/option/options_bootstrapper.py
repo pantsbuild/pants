@@ -106,8 +106,8 @@ class OptionsBootstrapper:
     ) -> OptionsBootstrapper:
         """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
-        :param env: An environment dictionary, or None to use `os.environ`.
-        :param args: An args array, or None to use `sys.argv`.
+        :param env: An environment dictionary.
+        :param args: An args array.
         :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
           consume pantsrc files, they should pass False in order to avoid reading files from
           absolute paths. Production usecases should pass True to allow options values to make the

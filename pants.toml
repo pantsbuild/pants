@@ -21,7 +21,7 @@ backend_packages.add = [
 
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.6.0",
+  "toolchain.pants.plugin==0.7.0",
 ]
 
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
@@ -135,6 +135,12 @@ pytest_plugins.add = [
   "pygments",
 ]
 timeout_default = 60
+
+[test]
+# TODO: These are exposed to tests in order to allow for python interpreter discovery when
+# Pants-tests-Pants: in particular, the [python-setup] subsystem consumes them.
+#   see https://github.com/pantsbuild/pants/issues/11638
+extra_env_vars = ["PYENV_ROOT", "HOME", "PATH"]
 
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.9"]
