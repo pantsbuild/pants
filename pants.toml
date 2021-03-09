@@ -21,7 +21,7 @@ backend_packages.add = [
 
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.6.0",
+  "toolchain.pants.plugin==0.7.0",
 ]
 
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
