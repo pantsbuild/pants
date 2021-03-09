@@ -82,8 +82,7 @@ class Process:
         jdk_home: str | None = None,
         is_nailgunnable: bool = False,
         execution_slot_variable: str | None = None,
-        cache_scope: ProcessCacheScope | None = None,
-        cache_failures: bool | None = None,
+        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -124,18 +123,7 @@ class Process:
         self.jdk_home = jdk_home
         self.is_nailgunnable = is_nailgunnable
         self.execution_slot_variable = execution_slot_variable
-
-        deprecated_conditional(
-            predicate=lambda: cache_failures is not None,
-            removal_version="2.4.0.dev1",
-            entity_description="Process.cache_failures",
-            hint_message="Use `Process.cache_scope` instead.",
-        )
-        if cache_failures is not None:
-            cache_scope = (
-                ProcessCacheScope.ALWAYS if cache_failures else ProcessCacheScope.SUCCESSFUL
-            )
-        self.cache_scope = cache_scope or ProcessCacheScope.SUCCESSFUL
+        self.cache_scope = cache_scope
 
 
 @frozen_after_init

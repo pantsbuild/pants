@@ -881,7 +881,7 @@ class PexProcess:
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
     execution_slot_variable: str | None
-    cache_scope: ProcessCacheScope | None
+    cache_scope: ProcessCacheScope
 
     def __init__(
         self,
@@ -896,7 +896,7 @@ class PexProcess:
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | None = None,
         execution_slot_variable: str | None = None,
-        cache_scope: ProcessCacheScope | None = None,
+        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         self.pex = pex
         self.argv = tuple(argv)
@@ -951,7 +951,7 @@ class VenvPexProcess:
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
     execution_slot_variable: str | None
-    cache_scope: ProcessCacheScope | None
+    cache_scope: ProcessCacheScope
 
     def __init__(
         self,
@@ -966,7 +966,7 @@ class VenvPexProcess:
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | None = None,
         execution_slot_variable: str | None = None,
-        cache_scope: ProcessCacheScope | None = None,
+        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         self.venv_pex = venv_pex
         self.argv = tuple(argv)

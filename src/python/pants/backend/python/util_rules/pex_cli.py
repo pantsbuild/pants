@@ -66,7 +66,7 @@ class PexCliProcess:
     output_directories: Optional[Tuple[str, ...]]
     python: Optional[PythonExecutable]
     level: LogLevel
-    cache_scope: Optional[ProcessCacheScope]
+    cache_scope: ProcessCacheScope
 
     def __init__(
         self,
@@ -79,7 +79,7 @@ class PexCliProcess:
         output_directories: Optional[Iterable[str]] = None,
         python: Optional[PythonExecutable] = None,
         level: LogLevel = LogLevel.INFO,
-        cache_scope: Optional[ProcessCacheScope] = None,
+        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         self.argv = tuple(argv)
         self.description = description

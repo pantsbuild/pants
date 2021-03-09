@@ -151,15 +151,6 @@ class PythonSetup(Subsystem):
                 "high, may result in starvation and Out of Memory errors."
             ),
         )
-        register(
-            "--resolver-http-cache-ttl",
-            type=int,
-            default=0,
-            advanced=True,
-            removal_version="2.4.0.dev1",
-            removal_hint="Unused.",
-            help="Unused.",
-        )
 
     @property
     def interpreter_constraints(self) -> Tuple[str, ...]:
