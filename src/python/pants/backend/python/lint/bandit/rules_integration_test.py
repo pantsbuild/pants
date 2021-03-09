@@ -72,7 +72,7 @@ def run_bandit(
         args.append("--bandit-skip")
     if additional_args:
         args.extend(additional_args)
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     results = rule_runner.request(
         LintResults,
         [BanditRequest(BanditFieldSet.create(tgt) for tgt in targets)],

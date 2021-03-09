@@ -10,6 +10,7 @@ from textwrap import dedent
 import pytest
 
 from pants.base.build_environment import get_buildroot
+from pants.engine.environment import CompleteEnvironment
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
 from pants.option.global_options import ExecutionOptions, GlobalOptions
@@ -39,8 +40,11 @@ def create_execution_options(
     if plugin:
         args.append(f"--remote-auth-plugin={plugin}")
     ob = create_options_bootstrapper(args)
-    _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, raise_=False)
-    return ExecutionOptions.from_options(options)
+    env = CompleteEnvironment({})
+    _build_config, options = OptionsInitializer(ob, env).build_config_and_options(
+        ob, env, raise_=False
+    )
+    return ExecutionOptions.from_options(options, env)
 
 
 def test_execution_options_remote_oauth_bearer_token_path() -> None:
@@ -103,7 +107,7 @@ def test_execution_options_auth_plugin() -> None:
                     f"""\
                     from pants.option.global_options import AuthPluginState, AuthPluginResult
 
-                    def auth_func(initial_execution_headers, initial_store_headers, options):
+                    def auth_func(initial_execution_headers, initial_store_headers, options, **kwargs):
                         return AuthPluginResult(
                             state=AuthPluginState.{state},
                             execution_headers={{

@@ -15,12 +15,12 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
@@ -472,10 +472,10 @@ class TestExtraEnv:
 
 @rule
 def get_filtered_environment(
-    test_subsystem: TestSubsystem, pants_env: PantsEnvironment
+    test_subsystem: TestSubsystem, complete_env: CompleteEnvironment
 ) -> TestExtraEnv:
     env = (
-        pants_env.get_subset(test_subsystem.extra_env_vars)
+        complete_env.get_subset(test_subsystem.extra_env_vars)
         if test_subsystem.extra_env_vars
         else FrozenDict({})
     )

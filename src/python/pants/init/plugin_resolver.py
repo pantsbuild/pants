@@ -16,8 +16,8 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
 )
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.collection import DeduplicatedCollection
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, QueryRule, collect_rules, rule
@@ -100,16 +100,18 @@ class PluginResolver:
         )
 
     def resolve(
-        self, options_bootstrapper: OptionsBootstrapper, working_set: Optional[WorkingSet] = None
+        self,
+        options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironment,
+        working_set: Optional[WorkingSet] = None,
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the global working set.
 
         :param working_set: The working set to add the resolved plugins to instead of the global
                             working set (for testing).
-        :type: :class:`pkg_resources.WorkingSet`
         """
         working_set = working_set or global_working_set
-        for resolved_plugin_location in self._resolve_plugins(options_bootstrapper):
+        for resolved_plugin_location in self._resolve_plugins(options_bootstrapper, env):
             site.addsitedir(
                 resolved_plugin_location
             )  # Activate any .pth files plugin wheels may have.
@@ -117,14 +119,16 @@ class PluginResolver:
         return working_set
 
     def _resolve_plugins(
-        self, options_bootstrapper: OptionsBootstrapper
+        self,
+        options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironment,
     ) -> ResolvedPluginDistributions:
         session = self._scheduler.scheduler.new_session(
             "plugin_resolver",
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
-                    PantsEnvironment: PantsEnvironment(dict(options_bootstrapper.env_tuples)),
+                    CompleteEnvironment: env,
                 }
             ),
         )

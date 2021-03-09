@@ -15,6 +15,7 @@ from setproctitle import setproctitle as set_process_title
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import GraphScheduler
@@ -29,6 +30,7 @@ from pants.pantsd.process_manager import PantsDaemonProcessManager
 from pants.pantsd.service.pants_service import PantsServices
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
+from pants.util.contextutil import argv_as, hermetic_environment_as
 from pants.util.logging import LogLevel
 from pants.util.strutil import ensure_text
 
@@ -45,7 +47,9 @@ class PantsDaemon(PantsDaemonProcessManager):
         """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
     @classmethod
-    def create(cls, options_bootstrapper: OptionsBootstrapper) -> PantsDaemon:
+    def create(
+        cls, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironment
+    ) -> PantsDaemon:
         # Any warnings that would be triggered here are re-triggered later per-run of Pants, so we
         # silence them.
         with warnings.catch_warnings(record=True):
@@ -55,7 +59,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         native = Native()
 
         executor = PyExecutor(*GlobalOptions.compute_executor_arguments(bootstrap_options_values))
-        core = PantsDaemonCore(options_bootstrapper, executor, cls._setup_services)
+        core = PantsDaemonCore(options_bootstrapper, env, executor, cls._setup_services)
 
         server = native.new_nailgun_server(
             executor,
@@ -163,18 +167,20 @@ class PantsDaemon(PantsDaemonProcessManager):
         os.environ.pop("PYTHONPATH")
 
         global_bootstrap_options = self._bootstrap_options.for_global_scope()
+        # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
+        set_process_title(f"pantsd [{self._build_root}]")
 
-        # Switch log output to the daemon's log stream from here forward.
+        # Switch log output to the daemon's log stream, and empty `env` and `argv` to encourage all
+        # further usage of those variables to happen via engine APIs and options.
         self._close_stdio()
-        with initialize_stdio(global_bootstrap_options):
+        with initialize_stdio(global_bootstrap_options), argv_as(
+            tuple()
+        ), hermetic_environment_as():
             # Install signal and panic handling.
             ExceptionSink.install(
                 log_location=init_workdir(global_bootstrap_options), pantsd_instance=True
             )
             self._native.set_panic_handler()
-
-            # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
-            set_process_title(f"pantsd [{self._build_root}]")
 
             self._initialize_metadata()
 
@@ -194,5 +200,6 @@ def launch_new_pantsd_instance():
     options_bootstrapper = OptionsBootstrapper.create(
         env=os.environ, args=sys.argv, allow_pantsrc=True
     )
-    daemon = PantsDaemon.create(options_bootstrapper)
+    env = CompleteEnvironment(os.environ)
+    daemon = PantsDaemon.create(options_bootstrapper, env)
     daemon.run_sync()

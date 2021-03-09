@@ -4,6 +4,7 @@
 import unittest
 
 from pants.base.exceptions import BuildConfigurationError
+from pants.engine.environment import CompleteEnvironment
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -17,9 +18,10 @@ class OptionsInitializerTest(unittest.TestCase):
             allow_pantsrc=False,
         )
 
+        env = CompleteEnvironment({})
         with self.assertRaises(BuildConfigurationError):
-            OptionsInitializer(options_bootstrapper).build_config_and_options(
-                options_bootstrapper, raise_=True
+            OptionsInitializer(options_bootstrapper, env).build_config_and_options(
+                options_bootstrapper, env, raise_=True
             )
 
     def test_global_options_validation(self):
@@ -27,6 +29,7 @@ class OptionsInitializerTest(unittest.TestCase):
         ob = OptionsBootstrapper.create(
             env={}, args=["--backend-packages=[]", "--remote-execution"], allow_pantsrc=False
         )
+        env = CompleteEnvironment({})
         with self.assertRaises(OptionsError) as exc:
-            OptionsInitializer(ob).build_config_and_options(ob, raise_=True)
+            OptionsInitializer(ob, env).build_config_and_options(ob, env, raise_=True)
         self.assertIn("The `--remote-execution` option requires", str(exc.exception))

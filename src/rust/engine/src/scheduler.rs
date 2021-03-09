@@ -188,7 +188,6 @@ impl Scheduler {
     input_digest: Digest,
     argv: Vec<String>,
     env: BTreeMap<String, String>,
-    hermetic_env: bool,
     run_in_workspace: bool,
   ) -> Result<i32, String> {
     let maybe_tempdir = if run_in_workspace {
@@ -236,9 +235,7 @@ impl Scheduler {
       command.current_dir(tempdir.path());
     }
 
-    if hermetic_env {
-      command.env_clear();
-    }
+    command.env_clear();
     command.envs(env);
 
     command.kill_on_drop(true);

@@ -20,10 +20,9 @@ from pants.base.deprecated import deprecated
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules import pants_environment
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.console import Console
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
@@ -103,7 +102,6 @@ class RuleRunner:
         all_rules = (
             *(rules or ()),
             *source_root.rules(),
-            *pants_environment.rules(),
             QueryRule(WrappedTarget, [Address]),
             QueryRule(UnionMembership, []),
         )
@@ -117,6 +115,7 @@ class RuleRunner:
         build_config_builder.register_target_types(target_types or ())
         self.build_config = build_config_builder.create()
 
+        self.environment = CompleteEnvironment({})
         self.options_bootstrapper = create_options_bootstrapper()
         options = self.options_bootstrapper.full_options(self.build_config)
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
@@ -140,7 +139,7 @@ class RuleRunner:
             build_root=self.build_root,
             build_configuration=self.build_config,
             executor=_EXECUTOR,
-            execution_options=ExecutionOptions.from_options(options),
+            execution_options=ExecutionOptions.from_options(options, self.environment),
             ca_certs_path=ca_certs_path,
             native_engine_visualize_to=None,
         ).new_session(
@@ -148,7 +147,7 @@ class RuleRunner:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
-                    PantsEnvironment: PantsEnvironment(),
+                    CompleteEnvironment: self.environment,
                 }
             ),
         )
@@ -191,9 +190,10 @@ class RuleRunner:
         global_args: Iterable[str] | None = None,
         args: Iterable[str] | None = None,
         env: Mapping[str, str] | None = None,
+        env_inherit: set[str] | None = None,
     ) -> GoalRuleResult:
         merged_args = (*(global_args or []), goal.name, *(args or []))
-        self.set_options(merged_args, env=env)
+        self.set_options(merged_args, env=env, env_inherit=env_inherit)
 
         raw_specs = self.options_bootstrapper.full_options_for_scopes(
             [*GlobalOptions.known_scope_infos(), *goal.subsystem_cls.known_scope_infos()]
@@ -216,23 +216,37 @@ class RuleRunner:
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
 
-    def set_options(self, args: Iterable[str], *, env: Mapping[str, str] | None = None) -> None:
+    def set_options(
+        self,
+        args: Iterable[str],
+        *,
+        env: Mapping[str, str] | None = None,
+        env_inherit: set[str] | None = None,
+    ) -> None:
         """Update the engine session with new options and/or environment variables.
 
-        The environment variables will be used to set the `PantsEnvironment`, which is the
+        The environment variables will be used to set the `CompleteEnvironment`, which is the
         environment variables captured by the parent Pants process. Some rules use this to be able
         to read arbitrary env vars. Any options that start with `PANTS_` will also be used to set
         options.
 
+        Environment variables listed in `env_inherit` and not in `env` will be inherited from the test
+        runner's environment (os.environ)
+
         This will override any previously configured values.
         """
+        env = {
+            **{k: os.environ[k] for k in (env_inherit or set()) if k in os.environ},
+            **(env or {}),
+        }
         self.options_bootstrapper = create_options_bootstrapper(args=args, env=env)
+        self.environment = CompleteEnvironment(env)
         self.scheduler = self.scheduler.scheduler.new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
-                    PantsEnvironment: PantsEnvironment(env),
+                    CompleteEnvironment: self.environment,
                 }
             ),
         )

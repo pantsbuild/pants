@@ -352,7 +352,9 @@ def create_pex_and_get_all_data(
         additional_args=additional_pex_args,
     )
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", *additional_pants_args], env=env
+        ["--backend-packages=pants.backend.python", *additional_pants_args],
+        env=env,
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     pex = rule_runner.request(pex_type, [request])
     if isinstance(pex, Pex):
@@ -468,6 +470,7 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
             "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
             "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
         ),
+        interpreter_constraints=PexInterpreterConstraints(["CPython>=3.6"]),
         env={"LANG": "es_PY.UTF-8"},
     )
 

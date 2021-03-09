@@ -4,9 +4,8 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
-from typing import Mapping, Optional, Tuple
+from typing import Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
@@ -14,7 +13,7 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.pants_environment import PantsEnvironment
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
@@ -67,6 +66,7 @@ class LocalPantsRunner:
         options_initializer: OptionsInitializer,
         options_bootstrapper: OptionsBootstrapper,
         build_config: BuildConfiguration,
+        env: CompleteEnvironment,
         run_id: str,
         options: Options,
         scheduler: Optional[GraphScheduler] = None,
@@ -75,9 +75,9 @@ class LocalPantsRunner:
         native = Native()
         native.set_panic_handler()
         graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(
-            options_bootstrapper, build_config
+            options_bootstrapper, build_config, env
         )
-        with options_initializer.handle_unknown_flags(options_bootstrapper, raise_=True):
+        with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             global_options = options.for_global_scope()
         return graph_scheduler_helper.new_session(
             run_id,
@@ -86,7 +86,7 @@ class LocalPantsRunner:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
-                    PantsEnvironment: PantsEnvironment(os.environ),
+                    CompleteEnvironment: env,
                 }
             ),
             cancellation_latch=cancellation_latch,
@@ -95,7 +95,7 @@ class LocalPantsRunner:
     @classmethod
     def create(
         cls,
-        env: Mapping[str, str],
+        env: CompleteEnvironment,
         options_bootstrapper: OptionsBootstrapper,
         options_initializer: Optional[OptionsInitializer] = None,
         scheduler: Optional[GraphScheduler] = None,
@@ -106,13 +106,13 @@ class LocalPantsRunner:
         By the time this method runs, logging will already have been initialized in either
         PantsRunner or DaemonPantsRunner.
 
-        :param env: The environment (e.g. os.environ) for this run.
+        :param env: The environment for this run.
         :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
         :param scheduler: If being called from the daemon, a warmed scheduler to use.
         """
-        options_initializer = options_initializer or OptionsInitializer(options_bootstrapper)
+        options_initializer = options_initializer or OptionsInitializer(options_bootstrapper, env)
         build_config, options = options_initializer.build_config_and_options(
-            options_bootstrapper, raise_=True
+            options_bootstrapper, env, raise_=True
         )
 
         run_tracker = RunTracker(options)
@@ -124,6 +124,7 @@ class LocalPantsRunner:
             options_initializer,
             options_bootstrapper,
             build_config,
+            env,
             run_tracker.run_id,
             options,
             scheduler,
@@ -132,7 +133,7 @@ class LocalPantsRunner:
 
         # Option values are usually computed lazily on demand, but command line options are
         # eagerly computed for validation.
-        with options_initializer.handle_unknown_flags(options_bootstrapper, raise_=True):
+        with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             for scope in options.scope_to_flags.keys():
                 options.for_scope(scope)
 

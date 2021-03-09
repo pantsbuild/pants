@@ -292,7 +292,6 @@ class InteractiveProcess:
     env: FrozenDict[str, str]
     input_digest: Digest
     run_in_workspace: bool
-    hermetic_env: bool
     forward_signals_to_process: bool
 
     def __init__(
@@ -302,7 +301,7 @@ class InteractiveProcess:
         env: Mapping[str, str] | None = None,
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
-        hermetic_env: bool = True,
+        hermetic_env: bool | None = None,
         forward_signals_to_process: bool = True,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
@@ -320,8 +319,16 @@ class InteractiveProcess:
         self.env = FrozenDict(env or {})
         self.input_digest = input_digest
         self.run_in_workspace = run_in_workspace
-        self.hermetic_env = hermetic_env
         self.forward_signals_to_process = forward_signals_to_process
+
+        deprecated_conditional(
+            predicate=lambda: hermetic_env is not None,
+            removal_version="2.5.0.dev0",
+            entity_description="The hermetic_env flag",
+            hint_message=(
+                "@rules should request and pass either a CompleteEnvironment or Environment as the `env`."
+            ),
+        )
         self.__post_init__()
 
     def __post_init__(self):
@@ -333,7 +340,11 @@ class InteractiveProcess:
 
     @classmethod
     def from_process(
-        cls, process: Process, *, hermetic_env: bool = True, forward_signals_to_process: bool = True
+        cls,
+        process: Process,
+        *,
+        hermetic_env: bool | None = None,
+        forward_signals_to_process: bool = True,
     ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
