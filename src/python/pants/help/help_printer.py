@@ -61,13 +61,17 @@ class HelpPrinter(MaybeColor):
             # It gets confusing to try and show suggestions for multiple cases.
             unknown_goal = self._help_request.unknown_goals[0]
             print(f"Unknown goal: {self.maybe_red(unknown_goal)}")
+
             did_you_mean = list(
                 difflib.get_close_matches(
                     unknown_goal, self._all_help_info.name_to_goal_info.keys()
                 )
             )
+
             if did_you_mean:
-                print(f"Did you mean: {', '.join(self.maybe_cyan(g) for g in did_you_mean)}?")
+                formatted_matches = self._format_did_you_mean_matches(did_you_mean)
+                print(f"Did you mean {formatted_matches}?")
+
             print_hint()
             return 1
         elif isinstance(self._help_request, NoGoalHelp):
