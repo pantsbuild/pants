@@ -283,6 +283,7 @@ def generate() -> dict[Path, str]:
         },
         Dumper=NoAliasDumper,
     )
+
     cancel_yaml = yaml.dump(
         {
             # Note that this job runs in the context of the default branch, so its token
@@ -305,9 +306,30 @@ def generate() -> dict[Path, str]:
             },
         }
     )
+
+    audit_yaml = yaml.dump(
+        {
+            "name": "Cargo Audit",
+            # 11:11pm
+            "on": {"schedule": [{"cron": "11 23 * * *"}]},
+            "jobs": {
+                "audit": {
+                    "runs-on": "ubuntu-latest",
+                    "steps": [
+                        *checkout(),
+                        {
+                            "name": "Test and Lint Rust",
+                            "run": "./cargo install --version 0.13.1 cargo-audit\n./cargo audit\n",
+                        },
+                    ],
+                }
+            },
+        }
+    )
     return {
-        Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
+        Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
         Path(".github/workflows/cancel.yaml"): f"{HEADER}\n\n{cancel_yaml}",
+        Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
     }
 
 

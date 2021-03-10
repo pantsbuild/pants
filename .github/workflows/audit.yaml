@@ -1,0 +1,41 @@
+# GENERATED, DO NOT EDIT!
+# To change, edit `build-support/bin/generate_github_workflows.py` and run:
+#   ./pants run build-support/bin/generate_github_workflows.py
+
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 10
+    - if: github.event_name == 'push'
+      name: Get commit message for branch builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'pull_request'
+      name: Get commit message for PR builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - name: Test and Lint Rust
+      run: './cargo install --version 0.13.1 cargo-audit
+
+        ./cargo audit
+
+        '
+name: Cargo Audit
+'on':
+  schedule:
+  - cron: 11 23 * * *
