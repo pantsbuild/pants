@@ -5,10 +5,6 @@ from pants.help.maybe_color import MaybeColor
 
 
 def test_produce_fmt_matches() -> None:
-    # The code for the produce_formatted_matches is identical for both of the
-    # places it's in - HelpPrinter, and FlagErrorPrinter. Therefore, there
-    # isn't a need to test it twice.
-
     dummy = MaybeColor(color=False)
     diff_ex = ["match1", "match2", "match3"]
     one_match = dummy._produce_formatted_matches(diff_ex[:1])
