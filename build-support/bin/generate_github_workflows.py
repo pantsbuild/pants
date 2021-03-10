@@ -159,9 +159,10 @@ class NoAliasDumper(yaml.SafeDumper):
 
 def generate() -> dict[Path, str]:
     """Generate all YAML configs with repo-relative paths."""
+    test_workflow_name = "Pull Request CI"
     test_yaml = yaml.dump(
         {
-            "name": "Pull Request CI",
+            "name": test_workflow_name,
             "on": "pull_request",
             "jobs": {
                 "bootstrap_pants_linux": {
@@ -282,7 +283,32 @@ def generate() -> dict[Path, str]:
         },
         Dumper=NoAliasDumper,
     )
-    return {Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}"}
+    cancel_yaml = yaml.dump(
+        {
+            # Note that this job runs in the context of the default branch, so its token
+            # has permission to cancel workflows (i.e., it is not the PR's read-only token).
+            "name": "Cancel",
+            "on": {"workflow_run": {"workflows": [test_workflow_name], "types": ["requested"]}},
+            "jobs": {
+                "cancel": {
+                    "runs-on": "ubuntu-latest",
+                    "steps": [
+                        {
+                            "uses": "styfle/cancel-workflow-action@0.8.0",
+                            "with": {
+                                "workflow_id": "${{ github.event.workflow.id }}",
+                                "access_token": "${{ github.token }}",
+                            },
+                        }
+                    ],
+                }
+            },
+        }
+    )
+    return {
+        Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
+        Path(".github/workflows/cancel.yaml"): f"{HEADER}\n\n{cancel_yaml}",
+    }
 
 
 def main() -> None:
