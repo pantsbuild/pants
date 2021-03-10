@@ -189,6 +189,9 @@ class ExecutionOptions:
                 remote_cache_read = False
                 remote_cache_write = False
             else:
+                logger.debug(
+                    "`--remote-auth-plugin` succeeded. Remote caching/execution will be attempted."
+                )
                 remote_execution_headers = auth_plugin_result.execution_headers
                 remote_store_headers = auth_plugin_result.store_headers
                 if (
