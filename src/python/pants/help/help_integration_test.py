@@ -7,7 +7,6 @@ import textwrap
 
 from pants.testutil.pants_integration_test import run_pants
 
-
 def test_help() -> None:
     pants_run = run_pants(["help"])
     pants_run.assert_success()
@@ -127,9 +126,9 @@ def test_help_all() -> None:
 def test_unknown_goal() -> None:
     pants_run = run_pants(["testx"])
     pants_run.assert_failure()
+    print(pants_run.stderr)
     assert "Unknown goal: testx" in pants_run.stdout
-    assert "Did you mean: test" in pants_run.stdout
-
+    assert "Did you mean test" in pants_run.stdout
 
 def test_unknown_global_flags() -> None:
     pants_run = run_pants(["--pants-workdirx", "goals"])
@@ -143,7 +142,6 @@ def test_unknown_scoped_flags() -> None:
     pants_run.assert_failure()
     assert "Unknown flag --forcex on test scope" in pants_run.stdout
     assert "Did you mean --force" in pants_run.stdout
-
 
 def test_global_flag_in_scoped_position() -> None:
     pants_run = run_pants(

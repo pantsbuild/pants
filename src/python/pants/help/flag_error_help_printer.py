@@ -48,16 +48,8 @@ class FlagErrorHelpPrinter(MaybeColor):
                     f"come before any goals, or after any file/target arguments."
                 )
             elif did_you_mean:
-                if len(did_you_mean) == 1:
-                    formatted_candidates = self.maybe_cyan(did_you_mean[0])
-                elif len(did_you_mean) == 2:
-                    formatted_candidates = " or ".join(self.maybe_cyan(g) for g in did_you_mean)
-                else:
-                    formatted_candidates = (f"{', '.join(self.maybe_cyan(g) for g in did_you_mean[:-1])}"
-                                            ", or {did_you_mean[-1]}"
-                                            )
-                print(f"Did you mean {formatted_candidates}?")
-                #print(f"Did you mean {', '.join(self.maybe_cyan(g) for g in did_you_mean)}?")
+                formatted_matches = self._produce_formatted_matches(did_you_mean)
+                print(f"Did you mean {formatted_matches}?")
             help_cmd = (
                 f"{self._bin_name} help"
                 f"{'' if err.arg_scope == GLOBAL_SCOPE else (' ' + err.arg_scope)}"
