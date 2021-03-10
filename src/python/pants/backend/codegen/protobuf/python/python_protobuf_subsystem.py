@@ -43,7 +43,7 @@ class PythonProtobufSubsystem(Subsystem):
         register(
             "--mypy-plugin-version",
             type=str,
-            default="mypy-protobuf==1.23",
+            default="mypy-protobuf==2.4",
             advanced=True,
             help=(
                 "The pip-style requirement string for `mypy-protobuf`. You must still set "
