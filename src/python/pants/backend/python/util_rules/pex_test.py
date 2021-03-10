@@ -26,6 +26,8 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
     PexRequirements,
     VenvPex,
+    PexDistributionsInfo,
+    PexDistributionInfo,
     VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
@@ -321,6 +323,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Process, (PexProcess,)),
             QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
+            QueryRule(PexDistributionsInfo, (VenvPex,)),
         ]
     )
 
@@ -607,3 +610,21 @@ def test_additional_inputs(rule_runner: RuleRunner) -> None:
         with zipfp.open("__main__.py", "r") as main:
             main_content = main.read().decode()
     assert main_content[: len(preamble)] == preamble
+
+
+def test_venv_pex_distributions_info(rule_runner: RuleRunner) -> None:
+    venv_pex = create_pex_and_get_all_data(
+        rule_runner, pex_type=VenvPex, requirements=PexRequirements(["requests==2.23.0"])
+    )["pex"]
+    distributions = rule_runner.request(PexDistributionsInfo, [venv_pex])
+    assert len(distributions) == 5
+    assert distributions[0].project_name == "certifi"
+    assert distributions[0].version == "2020.12.5"
+    assert distributions[1].project_name == "chardet"
+    assert distributions[1].version == "3.0.4"
+    assert distributions[2].project_name == "idna"
+    assert distributions[2].version == "2.10"
+    assert distributions[3].project_name == "requests"
+    assert distributions[3].version == "2.23.0"
+    assert distributions[4].project_name == "urllib3"
+    assert distributions[4].version == "1.25.11"
