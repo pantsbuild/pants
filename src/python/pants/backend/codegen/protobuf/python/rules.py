@@ -96,12 +96,13 @@ async def generate_python_from_protobuf(
     )
 
     protoc_gen_mypy_script = "protoc-gen-mypy"
+    protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
     mypy_pex = None
     if python_protobuf_subsystem.mypy_plugin:
         mypy_pex = await Get(
             VenvPex,
             VenvPexRequest(
-                bin_names=[protoc_gen_mypy_script],
+                bin_names=[protoc_gen_mypy_script, protoc_gen_mypy_grpc_script],
                 pex_request=PexRequest(
                     output_filename="mypy_protobuf.pex",
                     internal_only=True,
@@ -147,12 +148,20 @@ async def generate_python_from_protobuf(
                 output_dir,
             ]
         )
+        if downloaded_grpc_plugin:
+            argv.extend(
+                [
+                    f"--plugin=protoc-gen-mypy_grpc={mypy_pex.bin[protoc_gen_mypy_grpc_script].argv0}",
+                    "--mypy_grpc_out",
+                    output_dir,
+                ]
+            )
     if downloaded_grpc_plugin:
         argv.extend(
             [f"--plugin=protoc-gen-grpc={downloaded_grpc_plugin.exe}", "--grpc_out", output_dir]
         )
-    argv.extend(target_sources_stripped.snapshot.files)
 
+    argv.extend(target_sources_stripped.snapshot.files)
     result = await Get(
         ProcessResult,
         Process(
