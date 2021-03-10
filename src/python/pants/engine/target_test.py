@@ -16,6 +16,7 @@ from pants.engine.target import (
     DictStringToStringSequenceField,
     Field,
     FieldSet,
+    GenerateSourcesRequest,
     IntField,
     InvalidFieldChoiceException,
     InvalidFieldException,
@@ -30,6 +31,7 @@ from pants.engine.target import (
     Target,
     generate_subtarget,
     generate_subtarget_address,
+    targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
@@ -701,3 +703,45 @@ def test_dict_string_to_string_sequence_field() -> None:
         default = FrozenDict({"default": ("val",)})
 
     assert ExampleDefault(None, address=addr).value == FrozenDict({"default": ("val",)})
+
+
+# -----------------------------------------------------------------------------------------------
+# Test `Sources` helper functions
+# -----------------------------------------------------------------------------------------------
+
+
+def test_targets_with_sources_types() -> None:
+    class Sources1(Sources):
+        pass
+
+    class Sources2(Sources):
+        pass
+
+    class CodegenSources(Sources):
+        pass
+
+    class Tgt1(Target):
+        alias = "tgt1"
+        core_fields = (Sources1,)
+
+    class Tgt2(Target):
+        alias = "tgt2"
+        core_fields = (Sources2,)
+
+    class CodegenTgt(Target):
+        alias = "codegen_tgt"
+        core_fields = (CodegenSources,)
+
+    class GenSources(GenerateSourcesRequest):
+        input = CodegenSources
+        output = Sources1
+
+    tgt1 = Tgt1({}, address=Address("tgt1"))
+    tgt2 = Tgt2({}, address=Address("tgt2"))
+    codegen_tgt = CodegenTgt({}, address=Address("codegen_tgt"))
+    result = targets_with_sources_types(
+        [Sources1],
+        [tgt1, tgt2, codegen_tgt],
+        union_membership=UnionMembership({GenerateSourcesRequest: [GenSources]}),
+    )
+    assert set(result) == {tgt1, codegen_tgt}
