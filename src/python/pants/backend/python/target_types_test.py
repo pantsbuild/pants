@@ -3,17 +3,19 @@
 
 import logging
 from textwrap import dedent
-from typing import List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import pytest
 from _pytest.logging import LogCaptureFixture
 from pkg_resources import Requirement
 
+from pants.backend.python.dependency_inference.default_module_mapping import DEFAULT_MODULE_MAPPING
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     EntryPoint,
+    ModuleMappingField,
     PexBinary,
     PexBinaryDependencies,
     PexEntryPointField,
@@ -43,6 +45,7 @@ from pants.engine.target import (
 )
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 def test_timeout_validation() -> None:
@@ -315,3 +318,20 @@ def test_python_distribution_dependency_injection() -> None:
         [InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies])],
     )
     assert injected == InjectedDependencies([Address("project", target_name="my_binary")])
+
+
+@pytest.mark.parametrize(
+    ["raw_value", "expected"],
+    (
+        (None, {}),
+        ({"new_dist": ["new_module"]}, {"new_dist": ("new_module",)}),
+        ({"PyYAML": ["custom_yaml"]}, {"PyYAML": ("custom_yaml",)}),
+    ),
+)
+def test_module_mapping_field(
+    raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str]]
+) -> None:
+    merged = dict(DEFAULT_MODULE_MAPPING)
+    merged.update(expected)
+    actual_value = ModuleMappingField(raw_value, address=Address("", target_name="tests")).value
+    assert actual_value == FrozenDict(merged)

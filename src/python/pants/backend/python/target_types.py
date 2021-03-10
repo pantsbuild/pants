@@ -599,8 +599,8 @@ class ModuleMappingField(DictStringToStringSequenceField):
     def compute_value(
         cls, raw_value: Optional[Dict[str, Iterable[str]]], *, address: Address
     ) -> FrozenDict[str, Tuple[str, ...]]:
-        provided_mapping = super().compute_value(raw_value, address=address) or {}
-        return FrozenDict({**DEFAULT_MODULE_MAPPING, **provided_mapping})
+        provided_mapping = super().compute_value(raw_value, address=address)
+        return FrozenDict({**DEFAULT_MODULE_MAPPING, **(provided_mapping or {})})
 
 
 class PythonRequirementLibrary(Target):
