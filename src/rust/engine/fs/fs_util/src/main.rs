@@ -45,7 +45,6 @@ use futures::FutureExt;
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use rand::seq::SliceRandom;
 use serde_derive::Serialize;
 use std::collections::BTreeMap;
 use store::{
@@ -210,8 +209,6 @@ to this directory.",
               .takes_value(true)
               .long("server-address")
               .required(false)
-              .multiple(true)
-              .number_of_values(1)
         )
         .arg(
           Arg::with_name("root-ca-cert-file")
@@ -238,27 +235,12 @@ to this directory.",
               .long("chunk-bytes")
               .required(false)
               .default_value(&format!("{}", 3 * 1024 * 1024))
-        ).arg(
-          Arg::with_name("thread-count")
-              .help("Number of threads to use for uploads and downloads")
-              .takes_value(true)
-              .long("thread-count")
-              .required(false)
-              .default_value("1")
         )
         .arg(
           Arg::with_name("rpc-attempts")
               .help("Number of times to attempt any RPC before giving up.")
               .takes_value(true)
               .long("rpc-attempts")
-              .required(false)
-              .default_value("3")
-        )
-        .arg(
-          Arg::with_name("connection-limit")
-              .help("Number of concurrent servers to allow connections to.")
-              .takes_value(true)
-              .long("connection-limit")
               .required(false)
               .default_value("3")
         )
@@ -281,7 +263,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .unwrap_or_else(Store::default_path);
   let runtime = task_executor::Executor::new();
   let (store, store_has_remote) = {
-    let (store_result, store_has_remote) = match top_match.values_of("server-address") {
+    let (store_result, store_has_remote) = match top_match.value_of("server-address") {
       Some(cas_address) => {
         let chunk_size =
           value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
@@ -309,21 +291,16 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           );
         }
 
-        // Randomize CAS address order to avoid thundering herds from common config.
-        let mut cas_addresses = cas_address.map(str::to_owned).collect::<Vec<_>>();
-        cas_addresses.shuffle(&mut rand::thread_rng());
-
         (
           Store::with_remote(
             runtime.clone(),
             &store_dir,
-            cas_addresses,
+            cas_address,
             top_match
               .value_of("remote-instance-name")
               .map(str::to_owned),
             root_ca_certs,
             headers,
-            value_t!(top_match.value_of("thread-count"), usize).expect("Invalid thread count"),
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures
             // leave this hanging forever.
@@ -334,15 +311,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             //
             // See https://github.com/pantsbuild/pants/pull/6433 for more context.
             Duration::from_secs(30 * 60),
-            // TODO: Take a command line arg.
-            store::BackoffConfig::new(
-              std::time::Duration::from_secs(1),
-              1.2,
-              std::time::Duration::from_secs(20),
-            )?,
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
-            value_t!(top_match.value_of("connection-limit"), usize)
-              .expect("Bad connection-limit flag"),
           ),
           true,
         )

@@ -23,30 +23,32 @@ async fn correct_semaphore_slot_ids() {
   let (tx3, rx3) = oneshot::channel();
   let (tx4, rx4) = oneshot::channel();
 
+  let scale = Duration::from_millis(100);
+
   //Process 1
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
     tx1.send(id).unwrap();
-    delay_for(Duration::from_millis(20)).await;
+    delay_for(2 * scale).await;
     future::ready(())
   }));
   //Process 2
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
-    delay_for(Duration::from_millis(10)).await;
+    delay_for(1 * scale).await;
     tx2.send(id).unwrap();
     future::ready(())
   }));
   //Process 3
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
-    delay_for(Duration::from_millis(10)).await;
+    delay_for(1 * scale).await;
     tx3.send(id).unwrap();
     future::ready(())
   }));
 
-  delay_for(Duration::from_millis(50)).await;
+  delay_for(5 * scale).await;
 
   //Process 4
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
-    delay_for(Duration::from_millis(10)).await;
+    delay_for(1 * scale).await;
     tx4.send(id).unwrap();
     future::ready(())
   }));

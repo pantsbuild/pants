@@ -62,7 +62,9 @@ async def create_pex_binary_run_request(
             internal_only=True,
             # Note that the entry point file is not in the PEX itself. It's loaded by setting
             # `PEX_EXTRA_SYS_PATH`.
-            entry_point=entry_point.val,
+            # TODO(John Sirois): Support ConsoleScript in PexBinary targets:
+            #  https://github.com/pantsbuild/pants/issues/11619
+            main=entry_point.val,
         ),
     )
 

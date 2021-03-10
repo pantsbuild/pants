@@ -14,14 +14,11 @@ use futures::Future;
 use futures::StreamExt;
 use grpc_util::headers_to_interceptor_fn;
 use hashing::Digest;
-use itertools::{Either, Itertools};
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use tonic::{Code, Interceptor, Request};
 use workunit_store::{with_workunit, ObservationMetric};
-
-use super::BackoffConfig;
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -43,48 +40,22 @@ impl fmt::Debug for ByteStore {
 
 impl ByteStore {
   pub fn new(
-    cas_addresses: Vec<String>,
+    cas_address: &str,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
-    _thread_count: usize,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
-    _backoff_config: BackoffConfig,
     rpc_retries: usize,
-    _connection_limit: usize,
   ) -> Result<ByteStore, String> {
-    let tls_client_config = match root_ca_certs {
-      Some(pem_bytes) => Some(grpc_util::create_tls_config(pem_bytes)?),
-      None => None,
-    };
-
-    let scheme = if tls_client_config.is_some() {
-      "https"
+    let tls_client_config = if cas_address.starts_with("https://") {
+      Some(grpc_util::create_tls_config(root_ca_certs)?)
     } else {
-      "http"
+      None
     };
-    let cas_addresses_with_scheme: Vec<_> = cas_addresses
-      .iter()
-      .map(|addr| format!("{}://{}", scheme, addr))
-      .collect();
 
-    let (endpoints, errors): (Vec<Endpoint>, Vec<String>) = cas_addresses_with_scheme
-      .iter()
-      .map(|addr| grpc_util::create_endpoint(addr, tls_client_config.as_ref()))
-      .partition_map(|result| match result {
-        Ok(endpoint) => Either::Left(endpoint),
-        Err(err) => Either::Right(err),
-      });
-
-    if !errors.is_empty() {
-      return Err(format!(
-        "Errors while creating gRPC endpoints: {}",
-        errors.join(", ")
-      ));
-    }
-
-    let channel = tonic::transport::Channel::balance_list(endpoints.iter().cloned());
+    let endpoint = grpc_util::create_endpoint(&cas_address, tls_client_config.as_ref())?;
+    let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
     let interceptor = if headers.is_empty() {
       None
     } else {
@@ -177,9 +148,16 @@ impl ByteStore {
       }
     });
 
-    if let Some(workunit_state) = workunit_store::get_workunit_state() {
-      let store = workunit_state.store;
-      with_workunit(store, workunit_name, metadata, result_future, |_, md| md).await
+    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+      let workunit_store = workunit_store_handle.store;
+      with_workunit(
+        workunit_store,
+        workunit_name,
+        metadata,
+        result_future,
+        |_, md| md,
+      )
+      .await
     } else {
       result_future.await
     }
@@ -242,13 +220,13 @@ impl ByteStore {
           if !got_first_response {
             got_first_response = true;
 
-            if let Some(workunit_state) = workunit_store::get_workunit_state() {
+            if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
               let timing: Result<u64, _> = Instant::now()
                 .duration_since(start_time)
                 .as_micros()
                 .try_into();
               if let Ok(obs) = timing {
-                workunit_state
+                workunit_store_handle
                   .store
                   .record_observation(ObservationMetric::RemoteStoreTimeToFirstByte, obs);
               }
@@ -282,9 +260,15 @@ impl ByteStore {
       }
     };
 
-    if let Some(workunit_state) = workunit_store::get_workunit_state() {
-      let store = workunit_state.store;
-      with_workunit(store, workunit_name, metadata, result_future, |_, md| md).await
+    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+      with_workunit(
+        workunit_store_handle.store,
+        workunit_name,
+        metadata,
+        result_future,
+        |_, md| md,
+      )
+      .await
     } else {
       result_future.await
     }
@@ -326,9 +310,15 @@ impl ByteStore {
         .collect::<Result<HashSet<_>, _>>()
     };
     async {
-      if let Some(workunit_state) = workunit_store::get_workunit_state() {
-        let store = workunit_state.store;
-        with_workunit(store, workunit_name, metadata, result_future, |_, md| md).await
+      if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+        with_workunit(
+          workunit_store_handle.store,
+          workunit_name,
+          metadata,
+          result_future,
+          |_, md| md,
+        )
+        .await
       } else {
         result_future.await
       }

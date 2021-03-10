@@ -79,8 +79,8 @@ def create_parser() -> argparse.ArgumentParser:
         "--remote-cache-enabled",
         action="store_true",
         help=(
-            "Enable remote caching via Toolchain. This requires setting the options "
-            "`remote_oauth_bearer_token_path` and `remote_ca_certs_path` in your environment."
+            "Enable remote caching via Toolchain. This requires enabling "
+            "`remote_auth_plugin` and `remote_ca_certs_path` in your environment."
         ),
     )
 
@@ -131,13 +131,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 def setup_environment(*, python_version: PythonVersion):
     set_cxx_compiler()
-    set_pants_dev()
     setup_python_interpreter(python_version)
-
-
-def set_pants_dev() -> None:
-    """We do this because we are running against a Pants clone."""
-    os.environ["PANTS_DEV"] = "1"
 
 
 def set_cxx_compiler() -> None:
@@ -156,9 +150,6 @@ def setup_python_interpreter(version: PythonVersion) -> None:
 
 def set_run_from_pex() -> None:
     os.environ["RUN_PANTS_FROM_PEX"] = "1"
-
-
-IS_PR_BUILD = "CI" in os.environ and os.environ.get("TRAVIS_PULL_REQUEST", "false") != "false"
 
 
 # -------------------------------------------------------------------------
@@ -270,7 +261,7 @@ def run_smoke_tests() -> None:
 def run_lint(*, remote_cache_enabled: bool) -> None:
     targets = ["build-support::", "src::", "tests::"]
     command = ["./pants.pex", "--tag=-nolint", "lint", "typecheck", *targets]
-    if remote_cache_enabled and IS_PR_BUILD is False:
+    if remote_cache_enabled:
         command.append("--pants-config-files=pants.remote-cache.toml")
     _run_command(
         command,
@@ -326,7 +317,7 @@ def run_python_tests(
     *, include_unit: bool, include_integration: bool, remote_cache_enabled: bool
 ) -> None:
     extra_args = []
-    if remote_cache_enabled and IS_PR_BUILD is False:
+    if remote_cache_enabled:
         extra_args.append("--pants-config-files=pants.remote-cache.toml")
     if not include_unit and not include_integration:
         raise ValueError(

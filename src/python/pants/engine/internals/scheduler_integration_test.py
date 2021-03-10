@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from pathlib import Path
 
 from pants.testutil.pants_integration_test import ensure_daemon, run_pants
@@ -11,7 +12,7 @@ def test_visualize_to():
     # Tests usage of the `--native-engine-visualize-to=` option, which triggers background
     # visualization of the graph. There are unit tests confirming the content of the rendered
     # results.
-    with temporary_dir() as destdir:
+    with temporary_dir(root_dir=os.getcwd()) as destdir:
         run_pants(
             [
                 f"--native-engine-visualize-to={destdir}",

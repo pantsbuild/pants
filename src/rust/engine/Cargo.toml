@@ -29,12 +29,12 @@ members = [
   "fs/store",
   "graph",
   "hashing",
+  "stdio",
   "logging",
   "nailgun",
   "process_execution",
   "process_executor",
   "rule_graph",
-  "serverset",
   "sharded_lmdb",
   "task_executor",
   "testutil",
@@ -66,12 +66,12 @@ default-members = [
   "fs/store",
   "graph",
   "hashing",
+  "stdio",
   "logging",
   "nailgun",
   "process_execution",
   "process_executor",
   "rule_graph",
-  "serverset",
   "sharded_lmdb",
   "task_executor",
   "testutil",
@@ -113,6 +113,7 @@ hashing = { path = "hashing" }
 indexmap = "1.4"
 itertools = "0.8.2"
 lazy_static = "1"
+libc = "0.2.39"
 log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
@@ -125,6 +126,7 @@ reqwest = { version = "0.10", default_features = false, features = ["stream", "r
 rule_graph = { path = "rule_graph" }
 sharded_lmdb = { path = "sharded_lmdb" }
 smallvec = "0.6"
+stdio = { path = "stdio" }
 store = { path = "fs/store" }
 task_executor = { path = "task_executor" }
 tempfile = "3"
@@ -149,3 +151,5 @@ env_logger = "0.5.4"
 prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 prost-build = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 prost-types = { git = "https://github.com/danburkert/prost",  rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
+# TODO: Posted as https://github.com/mitsuhiko/console/pull/93.
+console = { git = "https://github.com/pantsbuild/console", rev = "b6e9aa7ce734517691934d558d79a459609633db" }

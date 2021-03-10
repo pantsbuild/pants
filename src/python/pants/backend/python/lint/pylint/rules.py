@@ -15,9 +15,10 @@ from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
-    PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -128,19 +129,13 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         for plugin_tgt in partition.plugin_targets
         if plugin_tgt.has_field(PythonRequirementsField)
     )
-    # Right now any Pylint transitive requirements will shadow corresponding user
-    # requirements, which could lead to problems.
     pylint_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="pylint.pex",
             internal_only=True,
             requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
-            entry_point=pylint.entry_point,
             interpreter_constraints=partition.interpreter_constraints,
-            # TODO(John Sirois): Support shading python binaries:
-            #   https://github.com/pantsbuild/pants/issues/9206
-            additional_args=("--pex-path", requirements_pex_request.input.output_filename),
         ),
     )
 
@@ -179,6 +174,17 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         field_set_sources_request,
     )
 
+    pylint_runner_pex = await Get(
+        VenvPex,
+        PexRequest(
+            output_filename="pylint_runner.pex",
+            interpreter_constraints=partition.interpreter_constraints,
+            main=pylint.main,
+            internal_only=True,
+            pex_path=[pylint_pex, requirements_pex],
+        ),
+    )
+
     prefixed_plugin_sources = (
         await Get(
             Digest,
@@ -201,8 +207,6 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         Digest,
         MergeDigests(
             (
-                pylint_pex.digest,
-                requirements_pex.digest,
                 config_digest,
                 prefixed_plugin_sources,
                 prepared_python_sources.source_files.snapshot.digest,
@@ -212,8 +216,8 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
 
     result = await Get(
         FallibleProcessResult,
-        PexProcess(
-            pylint_pex,
+        VenvPexProcess(
+            pylint_runner_pex,
             argv=generate_args(source_files=field_set_sources, pylint=pylint),
             input_digest=input_digest,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},

@@ -6,7 +6,7 @@
 These are always activated and cannot be disabled.
 """
 
-from pants.core.goals import fmt, lint, package, repl, run, test, typecheck
+from pants.core.goals import fmt, lint, package, repl, run, tailor, test, typecheck
 from pants.core.target_types import ArchiveTarget, Files, GenericTarget, RelocatedFiles, Resources
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
@@ -15,11 +15,11 @@ from pants.core.util_rules import (
     external_tool,
     filter_empty_sources,
     pants_bin,
-    pants_environment,
     source_files,
     stripped_source_files,
     subprocess_environment,
 )
+from pants.goal import stats_aggregator
 from pants.source import source_root
 
 
@@ -33,6 +33,7 @@ def rules():
         *run.rules(),
         *test.rules(),
         *typecheck.rules(),
+        *tailor.rules(),
         # util_rules
         *distdir.rules(),
         *filter_empty_sources.rules(),
@@ -41,10 +42,10 @@ def rules():
         *stripped_source_files.rules(),
         *archive.rules(),
         *external_tool.rules(),
-        *pants_environment.rules(),
         *subprocess_environment.rules(),
         *source_root.rules(),
         *target_type_rules(),
+        *stats_aggregator.rules(),
     ]
 
 

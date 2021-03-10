@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
-from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import GlobalOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -33,7 +32,7 @@ class _Options:
 
     @memoized_property
     def options(self) -> Options:
-        return OptionsInitializer.create(self.options_bootstrapper, self.build_config)
+        return self.options_bootstrapper.full_options(self.build_config)
 
 
 @rule

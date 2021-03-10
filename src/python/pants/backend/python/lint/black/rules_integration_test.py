@@ -88,7 +88,7 @@ def run_black(
         args.append("--black-skip")
     if version:
         args.append(f"--black-version={version}")
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [BlackRequest(field_sets)])
     input_sources = rule_runner.request(

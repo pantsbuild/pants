@@ -116,6 +116,7 @@ class Options:
         known_scope_infos: Iterable[ScopeInfo],
         args: Sequence[str],
         bootstrap_option_values: Optional[OptionValueContainer] = None,
+        allow_unknown_options: bool = False,
     ) -> Options:
         """Create an Options instance.
 
@@ -162,6 +163,7 @@ class Options:
             parser_hierarchy=parser_hierarchy,
             bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
+            allow_unknown_options=allow_unknown_options,
         )
 
     def __init__(
@@ -174,6 +176,7 @@ class Options:
         parser_hierarchy: ParserHierarchy,
         bootstrap_option_values: Optional[OptionValueContainer],
         known_scope_to_info: Dict[str, ScopeInfo],
+        allow_unknown_options: bool = False,
     ) -> None:
         """The low-level constructor for an Options instance.
 
@@ -187,6 +190,7 @@ class Options:
         self._parser_hierarchy = parser_hierarchy
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
+        self._allow_unknown_options = allow_unknown_options
         self._frozen = False
 
     # TODO: Eliminate this in favor of a builder/factory.
@@ -388,6 +392,7 @@ class Options:
             flags_in_scope=flags_in_scope,
             namespace=namespace,
             passthrough_args=self._passthru,
+            allow_unknown_flags=self._allow_unknown_options,
         )
 
     # TODO: Eagerly precompute backing data for this?

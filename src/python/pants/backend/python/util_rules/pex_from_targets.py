@@ -7,12 +7,16 @@ import dataclasses
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
-from pants.backend.python.target_types import PythonRequirementsField, parse_requirements_file
+from pants.backend.python.target_types import (
+    MainSpecification,
+    PythonRequirementsField,
+    parse_requirements_file,
+)
 from pants.backend.python.util_rules.pex import (
     PexInterpreterConstraints,
     PexPlatforms,
@@ -57,18 +61,18 @@ class PexFromTargetsRequest:
     addresses: Addresses
     output_filename: str
     internal_only: bool
-    entry_point: Optional[str]
+    main: MainSpecification | None
     platforms: PexPlatforms
     additional_args: Tuple[str, ...]
     additional_requirements: Tuple[str, ...]
     include_source_files: bool
-    additional_sources: Optional[Digest]
-    additional_inputs: Optional[Digest]
-    hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints]
+    additional_sources: Digest | None
+    additional_inputs: Digest | None
+    hardcoded_interpreter_constraints: PexInterpreterConstraints | None
     direct_deps_only: bool
     # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
     # the result.
-    description: Optional[str] = dataclasses.field(compare=False)
+    description: str | None = dataclasses.field(compare=False)
 
     def __init__(
         self,
@@ -76,16 +80,16 @@ class PexFromTargetsRequest:
         *,
         output_filename: str,
         internal_only: bool,
-        entry_point: Optional[str] = None,
+        main: MainSpecification | None = None,
         platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
         additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
-        additional_sources: Optional[Digest] = None,
-        additional_inputs: Optional[Digest] = None,
-        hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints] = None,
+        additional_sources: Digest | None = None,
+        additional_inputs: Digest | None = None,
+        hardcoded_interpreter_constraints: PexInterpreterConstraints | None = None,
         direct_deps_only: bool = False,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> None:
         """Request to create a Pex from the transitive closure of the given addresses.
 
@@ -97,7 +101,7 @@ class PexFromTargetsRequest:
             to end users, such as with the `binary` goal. Typically, instead, the user never
             directly uses the Pex, e.g. with `lint` and `test`. If True, we will use a Pex setting
             that results in faster build time but compatibility with fewer interpreters at runtime.
-        :param entry_point: The entry-point for the built Pex, equivalent to Pex's `-m` flag. If
+        :param main: The main for the built Pex, equivalent to Pex's `-e` or `-c` flag. If
             left off, the Pex will open up as a REPL.
         :param platforms: Which platforms should be supported. Setting this value will cause
             interpreter constraints to not be used because platforms already constrain the valid
@@ -122,7 +126,7 @@ class PexFromTargetsRequest:
         self.addresses = Addresses(addresses)
         self.output_filename = output_filename
         self.internal_only = internal_only
-        self.entry_point = entry_point
+        self.main = main
         self.platforms = platforms
         self.additional_args = tuple(additional_args)
         self.additional_requirements = tuple(additional_requirements)
@@ -139,7 +143,7 @@ class PexFromTargetsRequest:
         addresses: Iterable[Address],
         *,
         internal_only: bool,
-        hardcoded_interpreter_constraints: Optional[PexInterpreterConstraints] = None,
+        hardcoded_interpreter_constraints: PexInterpreterConstraints | None = None,
         zip_safe: bool = False,
         direct_deps_only: bool = False,
     ) -> PexFromTargetsRequest:
@@ -289,7 +293,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
-        entry_point=request.entry_point,
+        main=request.main,
         sources=merged_input_digest,
         additional_inputs=request.additional_inputs,
         additional_args=request.additional_args,

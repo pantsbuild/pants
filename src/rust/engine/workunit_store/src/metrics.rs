@@ -27,13 +27,30 @@ clippy::unseparated_literal_suffix,
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+use std::string::ToString;
+use strum::IntoEnumIterator;
+
+#[derive(
+  Clone,
+  Copy,
+  PartialEq,
+  Eq,
+  Hash,
+  Debug,
+  strum_macros::AsRefStr,
+  strum_macros::EnumIter,
+  strum_macros::ToString,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum Metric {
   LocalCacheRequests,
   LocalCacheRequestsCached,
   LocalCacheRequestsUncached,
   LocalCacheReadErrors,
   LocalCacheWriteErrors,
+  /// The total time saved (in milliseconds) thanks to local cache hits instead of running the
+  /// processes directly.
+  LocalCacheTotalTimeSavedMs,
   LocalExecutionRequests,
   RemoteCacheRequests,
   RemoteCacheRequestsCached,
@@ -44,6 +61,9 @@ pub enum Metric {
   RemoteCacheWriteFinished,
   RemoteCacheSpeculationLocalCompletedFirst,
   RemoteCacheSpeculationRemoteCompletedFirst,
+  /// The total time saved (in milliseconds) thanks to remote cache hits instead of running the
+  /// processes directly.
+  RemoteCacheTotalTimeSavedMs,
   RemoteExecutionErrors,
   RemoteExecutionRequests,
   RemoteExecutionRPCErrors,
@@ -55,56 +75,22 @@ pub enum Metric {
 }
 
 impl Metric {
-  pub fn as_str(&self) -> &'static str {
-    use Metric::*;
-
-    match *self {
-      LocalCacheRequests => "local_cache_requests",
-      LocalCacheRequestsCached => "local_cache_requests_cached",
-      LocalCacheRequestsUncached => "local_cache_requests_uncached",
-      LocalCacheReadErrors => "local_cache_read_errors",
-      LocalCacheWriteErrors => "local_cache_write_errors",
-      LocalExecutionRequests => "local_execution_requests",
-      RemoteCacheRequests => "remote_cache_requests",
-      RemoteCacheRequestsCached => "remote_cache_requests_cached",
-      RemoteCacheRequestsUncached => "remote_cache_requests_uncached",
-      RemoteCacheReadErrors => "remote_cache_read_errors",
-      RemoteCacheWriteErrors => "remote_cache_write_errors",
-      RemoteCacheWriteStarted => "remote_cache_write_started",
-      RemoteCacheWriteFinished => "remote_cache_write_finished",
-      RemoteCacheSpeculationLocalCompletedFirst => "remote_cache_speculation_local_completed_first",
-      RemoteCacheSpeculationRemoteCompletedFirst => {
-        "remote_cache_speculation_remote_completed_first"
-      }
-      RemoteExecutionErrors => "remote_execution_errors",
-      RemoteExecutionRequests => "remote_execution_requests",
-      RemoteExecutionRPCRetries => "remote_execution_rpc_retries",
-      RemoteExecutionRPCErrors => "remote_execution_rpc_errors",
-      RemoteExecutionRPCExecute => "remote_execution_rpc_execute",
-      RemoteExecutionRPCWaitExecution => "remote_execution_rpc_wait_execution",
-      RemoteExecutionSuccess => "remote_execution_success",
-      RemoteExecutionTimeouts => "remote_execution_timeouts",
-    }
+  pub fn all_metrics() -> Vec<String> {
+    Metric::iter().map(|variant| variant.to_string()).collect()
   }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, strum_macros::AsRefStr)]
+#[strum(serialize_all = "snake_case")]
 pub enum ObservationMetric {
   TestObservation,
   LocalStoreReadBlobSize,
   RemoteExecutionRPCFirstResponseTime,
   RemoteStoreTimeToFirstByte,
-}
-
-impl ObservationMetric {
-  pub fn as_str(&self) -> &'static str {
-    use ObservationMetric::*;
-
-    match *self {
-      TestObservation => "test_observation",
-      LocalStoreReadBlobSize => "local_store_read_blob_size",
-      RemoteExecutionRPCFirstResponseTime => "remote_execution_rpc_first_response_time",
-      RemoteStoreTimeToFirstByte => "remote_store_time_to_first_byte",
-    }
-  }
+  /// The time saved (in milliseconds) thanks to a local cache hit instead of running the process
+  /// directly.
+  LocalCacheTimeSavedMs,
+  /// The time saved (in milliseconds) thanks to a remote cache hit instead of running the process
+  /// directly.
+  RemoteCacheTimeSavedMs,
 }

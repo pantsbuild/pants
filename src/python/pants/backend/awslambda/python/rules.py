@@ -12,13 +12,13 @@ from pants.backend.awslambda.python.target_types import (
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexInterpreterConstraints,
     PexPlatforms,
-    PexProcess,
     PexRequest,
     PexRequirements,
     TwoStepPex,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
@@ -30,7 +30,6 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
-from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -70,7 +69,7 @@ async def package_python_awslambda(
         PexFromTargetsRequest(
             addresses=[field_set.address],
             internal_only=False,
-            entry_point=None,
+            main=None,
             output_filename=output_filename,
             platforms=PexPlatforms([platform]),
             additional_args=[
@@ -88,23 +87,22 @@ async def package_python_awslambda(
         internal_only=True,
         requirements=PexRequirements(lambdex.all_requirements),
         interpreter_constraints=PexInterpreterConstraints(lambdex.interpreter_constraints),
-        entry_point=lambdex.entry_point,
+        main=lambdex.main,
     )
 
     lambdex_pex, pex_result, handler = await MultiGet(
-        Get(Pex, PexRequest, lambdex_request),
+        Get(VenvPex, PexRequest, lambdex_request),
         Get(TwoStepPex, TwoStepPexFromTargetsRequest, pex_request),
         Get(ResolvedPythonAwsHandler, ResolvePythonAwsHandlerRequest(field_set.handler)),
     )
-    input_digest = await Get(Digest, MergeDigests((pex_result.pex.digest, lambdex_pex.digest)))
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
     result = await Get(
         ProcessResult,
-        PexProcess(
+        VenvPexProcess(
             lambdex_pex,
             argv=("build", "-e", handler.val, output_filename),
-            input_digest=input_digest,
+            input_digest=pex_result.pex.digest,
             output_files=(output_filename,),
             description=f"Setting up handler in {output_filename}",
         ),

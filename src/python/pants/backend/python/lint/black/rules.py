@@ -11,11 +11,11 @@ from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSources
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexInterpreterConstraints,
-    PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
@@ -95,13 +95,13 @@ async def setup_black(
     )
 
     black_pex_request = Get(
-        Pex,
+        VenvPex,
         PexRequest(
             output_filename="black.pex",
             internal_only=True,
             requirements=PexRequirements(black.all_requirements),
             interpreter_constraints=tool_interpreter_constraints,
-            entry_point=black.entry_point,
+            main=black.main,
         ),
     )
 
@@ -128,14 +128,11 @@ async def setup_black(
         else setup_request.request.prior_formatter_result
     )
 
-    input_digest = await Get(
-        Digest,
-        MergeDigests((source_files_snapshot.digest, black_pex.digest, config_digest)),
-    )
+    input_digest = await Get(Digest, MergeDigests((source_files_snapshot.digest, config_digest)))
 
     process = await Get(
         Process,
-        PexProcess(
+        VenvPexProcess(
             black_pex,
             argv=generate_args(
                 source_files=source_files, black=black, check_only=setup_request.check_only

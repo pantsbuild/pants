@@ -284,7 +284,7 @@ class WorkunitTracker:
 
 
 def new_run_tracker() -> RunTracker:
-    # NB: A RunTracker usually observes "all options" (`get_full_options`), but it only actually
+    # NB: A RunTracker usually observes "all options" (`full_options_for_scopes`), but it only actually
     # directly consumes bootstrap options.
     return RunTracker(create_options_bootstrapper([]).bootstrap_options)
 

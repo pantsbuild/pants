@@ -14,6 +14,7 @@ from pants.backend.python.goals.coverage_py import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
+    ConsoleScript,
     PythonRuntimePackageDependencies,
     PythonTestsSources,
     PythonTestsTimeout,
@@ -21,9 +22,10 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
-    PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -40,7 +42,15 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
-from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import (
+    AddPrefix,
+    Digest,
+    DigestSubset,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
@@ -115,7 +125,6 @@ async def setup_pytest_for_target(
         all_targets, python_setup
     )
 
-    # Defaults to zip_safe=False.
     requirements_pex_request = Get(
         Pex,
         PexFromTargetsRequest,
@@ -128,23 +137,16 @@ async def setup_pytest_for_target(
             output_filename="pytest.pex",
             requirements=PexRequirements(pytest.get_requirement_strings()),
             interpreter_constraints=interpreter_constraints,
-            entry_point="pytest:main",
             internal_only=True,
-            additional_args=(
-                # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
-                # `importlib_metadata` and thus `zipp`, does not play nicely when doing import
-                # magic directly from zip files. `zipp` has pathologically bad behavior with large
-                # zipfiles.
-                # TODO: this does have a performance cost as the pex must now be expanded to disk.
-                # Long term, it would be better to fix Zipp (whose fix would then need to be used
-                # by importlib_metadata and then by Pytest). See
-                # https://github.com/jaraco/zipp/pull/26.
-                "--not-zip-safe",
-                # TODO(John Sirois): Support shading python binaries:
-                #   https://github.com/pantsbuild/pants/issues/9206
-                "--pex-path",
-                requirements_pex_request.input.output_filename,
-            ),
+        ),
+    )
+
+    config_digest_request = Get(
+        Digest,
+        PathGlobs(
+            globs=[pytest.config] if pytest.config else [],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin="the option `--pytest-config`",
         ),
     )
 
@@ -176,11 +178,29 @@ async def setup_pytest_for_target(
         SourceFiles, SourceFilesRequest([request.field_set.sources])
     )
 
-    pytest_pex, requirements_pex, prepared_sources, field_set_source_files = await MultiGet(
+    (
+        pytest_pex,
+        requirements_pex,
+        prepared_sources,
+        field_set_source_files,
+        config_digest,
+    ) = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
         prepared_sources_request,
         field_set_source_files_request,
+        config_digest_request,
+    )
+
+    pytest_runner_pex = await Get(
+        VenvPex,
+        PexRequest(
+            output_filename="pytest_runner.pex",
+            interpreter_constraints=interpreter_constraints,
+            main=ConsoleScript("pytest"),
+            internal_only=True,
+            pex_path=[pytest_pex, requirements_pex],
+        ),
     )
 
     input_digest = await Get(
@@ -189,8 +209,7 @@ async def setup_pytest_for_target(
             (
                 coverage_config.digest,
                 prepared_sources.source_files.snapshot.digest,
-                requirements_pex.digest,
-                pytest_pex.digest,
+                config_digest,
                 *(binary.digest for binary in assets),
             )
         ),
@@ -227,8 +246,8 @@ async def setup_pytest_for_target(
     cache_scope = ProcessCacheScope.NEVER if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     process = await Get(
         Process,
-        PexProcess(
-            pytest_pex,
+        VenvPexProcess(
+            pytest_runner_pex,
             argv=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
             extra_env=extra_env,
             input_digest=input_digest,

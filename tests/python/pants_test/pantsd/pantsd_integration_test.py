@@ -15,7 +15,8 @@ import pytest
 
 from pants.testutil.pants_integration_test import (
     PantsJoinHandle,
-    read_pantsd_log,
+    read_pants_log,
+    setup_tmpdir,
     temporary_workdir,
 )
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
@@ -54,6 +55,14 @@ def launch_file_toucher(f):
     return join
 
 
+compilation_failure_dir_layout = {
+    os.path.join("compilation_failure", "main.py"): "if __name__ == '__main__':\n    import sys¡",
+    os.path.join(
+        "compilation_failure", "BUILD"
+    ): "python_library()\npex_binary(name='bin', entry_point='main.py')",
+}
+
+
 class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     hermetic = False
 
@@ -76,11 +85,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             # Run target that throws an exception in pants.
-            self.run_pants_with_workdir(
-                ["lint", "testprojects/src/python/unicode/compilation_failure/main:lib"],
-                workdir=workdir,
-                config=pantsd_config,
-            ).assert_failure()
+            with setup_tmpdir(compilation_failure_dir_layout) as tmpdir:
+                self.run_pants_with_workdir(
+                    ["lint", os.path.join(tmpdir, "compilation_failure", "main.py")],
+                    workdir=workdir,
+                    config=pantsd_config,
+                ).assert_failure()
             checker.assert_started()
 
             # Assert pantsd is in a good functional state.
@@ -264,8 +274,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             time.sleep(5)
             ctx.checker.assert_running()
 
-            def full_pantsd_log():
-                return "\n".join(read_pantsd_log(ctx.workdir))
+            def full_pants_log():
+                return "\n".join(read_pants_log(ctx.workdir))
 
             # Create a new file in test_dir
             with temporary_file(suffix=".py", binary_mode=False, root_dir=test_dir) as temp_f:
@@ -274,7 +284,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
                 ctx.checker.assert_stopped()
 
-            self.assertIn("saw filesystem changes covered by invalidation globs", full_pantsd_log())
+            self.assertIn("saw filesystem changes covered by invalidation globs", full_pants_log())
 
     def test_pantsd_invalidation_pants_toml_file(self):
         # Test tmp_pants_toml (--pants-config-files=$tmp_pants_toml)'s removal
@@ -602,11 +612,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         config = {"GLOBAL": {"concurrent": True, "pantsd": True}}
         with temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(
-                ["help", "goals"], workdir=workdir, config=config
+                ["-ldebug", "help", "goals"], workdir=workdir, config=config
             )
             pants_run.assert_success()
-            pantsd_log_location = os.path.join(workdir, "pantsd", "pantsd.log")
-            self.assertFalse(os.path.exists(pantsd_log_location))
+            self.assertNotIn("Connecting to pantsd", pants_run.stderr)
 
     def test_unhandled_exceptions_only_log_exceptions_once(self):
         """Tests that the unhandled exceptions triggered by LocalPantsRunner instances don't

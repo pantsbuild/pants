@@ -4,6 +4,7 @@
 from typing import Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 from pants.option.custom_types import file_option, shell_str
 
 
@@ -14,7 +15,7 @@ class Black(PythonToolBase):
     # TODO: simplify `test_works_with_python39()` to stop using a VCS version.
     default_version = "black==20.8b1"
     default_extra_requirements = ["setuptools"]
-    default_entry_point = "black:patched_main"
+    default_main = ConsoleScript("black")
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
 

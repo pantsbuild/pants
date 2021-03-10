@@ -13,8 +13,9 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine import desktop, fs, platform, process
+from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing
@@ -30,9 +31,8 @@ from pants.engine.streaming_workunit_handler import rules as streaming_workunit_
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
-from pants.init.options_initializer import OptionsInitializer
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
-from pants.option.options import Options
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions, GlobalOptions
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
@@ -164,25 +164,27 @@ class EngineInitializer:
 
     @staticmethod
     def setup_graph(
-        options: Options,
+        options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
+        env: CompleteEnvironment,
         executor: Optional[PyExecutor] = None,
+        local_only: bool = False,
     ) -> GraphScheduler:
         native = Native()
         build_root = get_buildroot()
-        bootstrap_options = options.bootstrap_option_values()
+        bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        options = options_bootstrapper.full_options(build_configuration)
         assert bootstrap_options is not None
         executor = executor or PyExecutor(
-            *OptionsInitializer.compute_executor_arguments(bootstrap_options)
+            *GlobalOptions.compute_executor_arguments(bootstrap_options)
         )
+        execution_options = ExecutionOptions.from_options(options, env, local_only=local_only)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
-            ExecutionOptions.from_options(options),
+            execution_options,
             native=native,
             executor=executor,
-            pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
-                build_root, bootstrap_options
-            ),
+            pants_ignore_patterns=GlobalOptions.compute_pants_ignore(build_root, bootstrap_options),
             use_gitignore=bootstrap_options.pants_ignore_use_gitignore,
             local_store_dir=bootstrap_options.local_store_dir,
             local_execution_root_dir=bootstrap_options.local_execution_root_dir,
@@ -247,6 +249,7 @@ class EngineInitializer:
                 *collect_rules(locals()),
                 *build_files.rules(),
                 *fs.rules(),
+                *environment.rules(),
                 *desktop.rules(),
                 *graph.rules(),
                 *options_parsing.rules(),

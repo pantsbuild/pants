@@ -113,7 +113,9 @@ async def package_pex_binary(
             PexFromTargetsRequest(
                 addresses=[field_set.address],
                 internal_only=False,
-                entry_point=resolved_entry_point.val,
+                # TODO(John Sirois): Support ConsoleScript in PexBinary targets:
+                #  https://github.com/pantsbuild/pants/issues/11619
+                main=resolved_entry_point.val,
                 platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
                 output_filename=output_filename,
                 additional_args=field_set.generate_additional_args(pex_binary_defaults),

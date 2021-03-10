@@ -1,0 +1,16 @@
+name: Cancel
+on:
+  workflow_run:
+    workflows: ["Pull Request CI"]
+    types:
+      - requested
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: styfle/cancel-workflow-action@0.8.0
+        with:
+          # Note that this job runs in the context of the default branch, so its token
+          # has permission to cancel workflows (i.e., it is not the PR's read-only token).
+          workflow_id: ${{ github.event.workflow.id }}
+          access_token: ${{ github.token }}

@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
 use std::io::Write;
@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
@@ -32,6 +33,7 @@ use workunit_store::Metric;
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
+  ProcessResultMetadata,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -400,6 +402,8 @@ pub trait CapturedWorkdir {
     workdir_base: &Path,
     platform: Platform,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let start_time = Instant::now();
+
     // Set up a temporary workdir, which will optionally be preserved.
     let (workdir_path, maybe_workdir) = {
       let workdir = tempfile::Builder::new()
@@ -561,52 +565,12 @@ pub trait CapturedWorkdir {
         let _background_cleanup = executor.spawn_blocking(|| std::mem::drop(workdir));
       }
       None => {
-        // If we don't cleanup the workdir, we materialize a file named `__run.sh` into the output
-        // directory with command-line arguments and environment variables.
-        let mut env_var_strings: Vec<String> = vec![];
-        for (key, value) in req.env.iter() {
-          let quoted_arg = bash::escape(&value);
-          let arg_str = str::from_utf8(&quoted_arg)
-            .map_err(|e| format!("{:?}", e))?
-            .to_string();
-          let formatted_assignment = format!("{}={}", key, arg_str);
-          env_var_strings.push(formatted_assignment);
-        }
-        let stringified_env_vars: String = env_var_strings.join(" ");
-
-        // Shell-quote every command-line argument, as necessary.
-        let mut full_command_line: Vec<String> = vec![];
-        for arg in req.argv.iter() {
-          let quoted_arg = bash::escape(&arg);
-          let arg_str = str::from_utf8(&quoted_arg)
-            .map_err(|e| format!("{:?}", e))?
-            .to_string();
-          full_command_line.push(arg_str);
-        }
-
-        let stringified_command_line: String = full_command_line.join(" ");
-        let full_script = format!(
-          "#!/bin/bash
-# This command line should execute the same process as pants did internally.
-export {}
-
-{}
-",
-          stringified_env_vars, stringified_command_line,
-        );
-
-        let full_file_path = workdir_path.join("__run.sh");
-
-        ::std::fs::OpenOptions::new()
-          .create_new(true)
-          .write(true)
-          .mode(USER_EXECUTABLE_MODE) // Executable for user, read-only for others.
-          .open(&full_file_path)
-          .map_err(|e| format!("{:?}", e))?
-          .write_all(full_script.as_bytes())
-          .map_err(|e| format!("{:?}", e))?;
+        setup_run_sh_script(&req.env, &req.argv, &workdir_path)?;
       }
     }
+
+    let elapsed = start_time.elapsed();
+    let result_metadata = ProcessResultMetadata::new(Some(elapsed.into()));
 
     match child_results_result {
       Ok(child_results) => {
@@ -621,8 +585,8 @@ export {}
           stderr_digest,
           exit_code: child_results.exit_code,
           output_directory: output_snapshot.digest,
-          execution_attempts: vec![],
           platform,
+          metadata: result_metadata,
         })
       }
       Err(msg) if msg == "deadline has elapsed" => {
@@ -637,8 +601,8 @@ export {}
           stderr_digest: hashing::EMPTY_DIGEST,
           exit_code: -libc::SIGTERM,
           output_directory: hashing::EMPTY_DIGEST,
-          execution_attempts: vec![],
           platform,
+          metadata: result_metadata,
         })
       }
       Err(msg) => Err(msg),
@@ -672,4 +636,54 @@ export {}
     context: Context,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
+}
+
+/// Create a file called __run.sh with the env and argv used by Pants to facilitate debugging.
+fn setup_run_sh_script(
+  env: &BTreeMap<String, String>,
+  argv: &[String],
+  workdir_path: &PathBuf,
+) -> Result<(), String> {
+  let mut env_var_strings: Vec<String> = vec![];
+  for (key, value) in env.iter() {
+    let quoted_arg = bash::escape(&value);
+    let arg_str = str::from_utf8(&quoted_arg)
+      .map_err(|e| format!("{:?}", e))?
+      .to_string();
+    let formatted_assignment = format!("{}={}", key, arg_str);
+    env_var_strings.push(formatted_assignment);
+  }
+  let stringified_env_vars: String = env_var_strings.join(" ");
+
+  // Shell-quote every command-line argument, as necessary.
+  let mut full_command_line: Vec<String> = vec![];
+  for arg in argv.iter() {
+    let quoted_arg = bash::escape(&arg);
+    let arg_str = str::from_utf8(&quoted_arg)
+      .map_err(|e| format!("{:?}", e))?
+      .to_string();
+    full_command_line.push(arg_str);
+  }
+
+  let stringified_command_line: String = full_command_line.join(" ");
+  let full_script = format!(
+    "#!/bin/bash
+# This command line should execute the same process as pants did internally.
+export {}
+
+{}
+",
+    stringified_env_vars, stringified_command_line,
+  );
+
+  let full_file_path = workdir_path.join("__run.sh");
+
+  std::fs::OpenOptions::new()
+    .create_new(true)
+    .write(true)
+    .mode(USER_EXECUTABLE_MODE) // Executable for user, read-only for others.
+    .open(&full_file_path)
+    .map_err(|e| format!("{:?}", e))?
+    .write_all(full_script.as_bytes())
+    .map_err(|e| format!("{:?}", e))
 }

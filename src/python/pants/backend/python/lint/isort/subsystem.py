@@ -4,6 +4,7 @@
 from typing import Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 from pants.option.custom_types import file_option, shell_str
 
 
@@ -15,7 +16,7 @@ class Isort(PythonToolBase):
     default_extra_requirements = ["setuptools"]
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
-    default_entry_point = "isort.main"
+    default_main = ConsoleScript("isort")
 
     @classmethod
     def register_options(cls, register):

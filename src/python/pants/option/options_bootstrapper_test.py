@@ -139,7 +139,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             bootstrapper = OptionsBootstrapper.create(
                 env={"PANTS_SUPPORTDIR": "/pear"}, args=args, allow_pantsrc=False
             )
-            opts = bootstrapper.get_full_options(
+            opts = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo(""),
                     ScopeInfo("foo"),
@@ -180,7 +180,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             *,
             expected_worker_count: int,
         ) -> None:
-            options = options_bootstrapper.get_full_options(
+            options = options_bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo(""),
                     ScopeInfo("compile.apt"),
@@ -253,7 +253,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             )
             fp.close()
             bootstrapped_options = create_options_bootstrapper(fp.name)
-            opts_single_config = bootstrapped_options.get_full_options(
+            opts_single_config = bootstrapped_options.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo(""),
                     ScopeInfo("resolver"),
@@ -268,13 +268,13 @@ class OptionsBootstrapperTest(unittest.TestCase):
             args = self._config_path(config)
             bootstrapper = OptionsBootstrapper.create(env={}, args=args, allow_pantsrc=False)
 
-            opts1 = bootstrapper.get_full_options(
+            opts1 = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo(""),
                     ScopeInfo("foo"),
                 ]
             )
-            opts2 = bootstrapper.get_full_options(
+            opts2 = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo("foo"),
                     ScopeInfo(""),
@@ -282,7 +282,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             )
             assert opts1 is opts2
 
-            opts3 = bootstrapper.get_full_options(
+            opts3 = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo(""),
                     ScopeInfo("foo"),
@@ -291,10 +291,10 @@ class OptionsBootstrapperTest(unittest.TestCase):
             )
             assert opts1 is opts3
 
-            opts4 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo("")])
+            opts4 = bootstrapper.full_options_for_scopes(known_scope_infos=[ScopeInfo("")])
             assert opts1 is not opts4
 
-            opts5 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo("")])
+            opts5 = bootstrapper.full_options_for_scopes(known_scope_infos=[ScopeInfo("")])
             assert opts4 is opts5
             assert opts1 is not opts5
 

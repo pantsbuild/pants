@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Iterable, Tuple, TypeVar, Union, cast, overload
+from typing import Any, ClassVar, Iterable, Tuple, TypeVar, cast, overload
 
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -33,7 +33,7 @@ class Collection(Tuple[T, ...]):
     def __getitem__(self, index: slice) -> Collection[T]:
         ...
 
-    def __getitem__(self, index: Union[int, slice]) -> Union[T, "Collection[T]"]:  # noqa: F811
+    def __getitem__(self, index: int | slice) -> T | Collection[T]:  # noqa: F811
         result = super().__getitem__(index)
         if isinstance(index, int):
             return cast(T, result)

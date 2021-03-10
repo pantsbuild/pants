@@ -1,8 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
-from typing import Iterable, List, Optional, Type
+from typing import Iterable, List, Type
 
 import pytest
 
@@ -62,8 +64,8 @@ def get_stripped_sources(
     *,
     include_resources: bool = True,
     include_files: bool = False,
-    source_roots: Optional[List[str]] = None,
-    extra_args: Optional[List[str]] = None,
+    source_roots: list[str] | None = None,
+    extra_args: list[str] | None = None,
 ) -> StrippedPythonSourceFiles:
     rule_runner.set_options(
         [
@@ -88,8 +90,8 @@ def get_unstripped_sources(
     *,
     include_resources: bool = True,
     include_files: bool = False,
-    source_roots: Optional[List[str]] = None,
-    extra_args: Optional[List[str]] = None,
+    source_roots: list[str] | None = None,
+    extra_args: list[str] | None = None,
 ) -> PythonSourceFiles:
     rule_runner.set_options(
         [

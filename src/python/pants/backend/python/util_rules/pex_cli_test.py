@@ -28,7 +28,10 @@ def test_custom_ca_certs(rule_runner: RuleRunner) -> None:
     with temporary_dir() as tmpdir:
         certs_file = Path(tmpdir) / "certsfile"
         certs_file.write_text("Some fake cert")
-        rule_runner.set_options([f"--ca-certs-path={certs_file}"])
+        rule_runner.set_options(
+            [f"--ca-certs-path={certs_file}"],
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        )
         proc = rule_runner.request(
             Process,
             [PexCliProcess(argv=["some", "--args"], description="")],

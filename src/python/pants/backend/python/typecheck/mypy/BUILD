@@ -6,5 +6,5 @@ python_library()
 python_integration_tests(
   name='integration',
   uses_pants_run=False,
-  timeout=360,
+  timeout=480,
 )

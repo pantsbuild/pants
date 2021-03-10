@@ -83,7 +83,7 @@ def test_infer_python_imports() -> None:
         args = ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"]
         if enable_string_imports:
             args.append("--python-infer-string-imports")
-        rule_runner.set_options(args)
+        rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
         target = rule_runner.get_target(address)
         return rule_runner.request(
             InferredDependencies, [InferPythonImportDependencies(target[PythonSources])]
@@ -129,7 +129,8 @@ def test_infer_python_inits() -> None:
             "--backend-packages=pants.backend.python",
             "--python-infer-inits",
             "--source-root-patterns=src/python",
-        ]
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
     rule_runner.create_file("src/python/root/__init__.py")
@@ -168,7 +169,8 @@ def test_infer_python_conftests() -> None:
         target_types=[PythonTests],
     )
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"]
+        ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
     rule_runner.create_file("src/python/root/conftest.py")

@@ -7,7 +7,7 @@ import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, Tuple
 
 from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
@@ -104,8 +104,11 @@ class SiblingAddresses(AddressGlobSpec):
 
 
 @dataclass(frozen=True)
-class DescendantAddresses(AddressGlobSpec):
-    """An AddressSpec representing all addresses located recursively under the given directory."""
+class MaybeEmptyDescendantAddresses(AddressGlobSpec):
+    """An AddressSpec representing all addresses located recursively under the given directory.
+
+    It is not an error if there are no such addresses.
+    """
 
     directory: str
 
@@ -123,6 +126,13 @@ class DescendantAddresses(AddressGlobSpec):
             for ns, af in address_families_dict.items()
             if fast_relpath_optional(ns, self.directory) is not None
         )
+
+
+class DescendantAddresses(MaybeEmptyDescendantAddresses):
+    """An AddressSpec representing all addresses located recursively under the given directory.
+
+    At least one such address must exist.
+    """
 
     def matching_addresses(
         self, address_families: Sequence["AddressFamily"]
@@ -246,8 +256,8 @@ class FilesystemIgnoreSpec(FilesystemSpec):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class FilesystemSpecs:
-    includes: Tuple[Union[FilesystemLiteralSpec, FilesystemGlobSpec], ...]
-    ignores: Tuple[FilesystemIgnoreSpec, ...]
+    includes: tuple[FilesystemLiteralSpec | FilesystemGlobSpec, ...]
+    ignores: tuple[FilesystemIgnoreSpec, ...]
 
     def __init__(self, specs: Iterable[FilesystemSpec]) -> None:
         includes = []
@@ -284,7 +294,7 @@ class FilesystemSpecs:
 
     def path_globs_for_spec(
         self,
-        spec: Union[FilesystemLiteralSpec, FilesystemGlobSpec],
+        spec: FilesystemLiteralSpec | FilesystemGlobSpec,
         glob_match_error_behavior: GlobMatchErrorBehavior,
     ) -> PathGlobs:
         """Generate PathGlobs for the specific spec, automatically including the instance's

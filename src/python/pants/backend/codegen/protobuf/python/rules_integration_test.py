@@ -46,7 +46,10 @@ def assert_files_generated(
     ]
     if mypy:
         options.append("--python-protobuf-mypy-plugin")
-    rule_runner.set_options(options)
+    rule_runner.set_options(
+        options,
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     tgt = rule_runner.get_target(Address(spec))
     protocol_sources = rule_runner.request(
         HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSources])]

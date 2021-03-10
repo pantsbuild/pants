@@ -4,6 +4,7 @@
 from typing import Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 from pants.option.custom_types import shell_str
 
 
@@ -12,7 +13,7 @@ class Docformatter(PythonToolBase):
     help = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
     default_version = "docformatter>=1.3.1,<1.4"
-    default_entry_point = "docformatter:main"
+    default_main = ConsoleScript("docformatter")
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython==2.7.*", "CPython>=3.4,<3.9"]
 

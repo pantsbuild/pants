@@ -1242,7 +1242,7 @@ impl Node for NodeKey {
   type Error = Failure;
 
   async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
-    let workunit_state = workunit_store::expect_workunit_state();
+    let workunit_store_handle = workunit_store::expect_workunit_store_handle();
 
     let user_facing_name = self.user_facing_name();
     let workunit_name = self.workunit_name();
@@ -1393,7 +1393,7 @@ impl Node for NodeKey {
     };
 
     with_workunit(
-      workunit_state.store,
+      workunit_store_handle.store,
       workunit_name,
       metadata,
       result_future,

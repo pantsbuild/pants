@@ -134,7 +134,7 @@ def run_mypy(
         args.append("--mypy-skip")
     if additional_args:
         args.extend(additional_args)
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     result = rule_runner.request(
         TypecheckResults,
         [MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets)],
@@ -244,9 +244,6 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    # We hijack `--mypy-source-plugins` for our settings.py file to ensure that it is always used,
-    # even if the files we're checking don't need it. We only want this specific
-    # file to be permanently included, not the whole original target, so we will use a file address.
     rule_runner.create_file(
         f"{PACKAGE}/settings.py",
         dedent(
@@ -272,7 +269,7 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
         ),
     )
     rule_runner.add_to_build_file(PACKAGE, "python_library()")
-    app_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
+    package_tgt = rule_runner.get_target(Address(PACKAGE))
 
     config_content = dedent(
         """\
@@ -286,12 +283,11 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     )
     result = run_mypy(
         rule_runner,
-        [app_tgt],
+        [package_tgt],
         config=config_content,
         additional_args=[
             "--mypy-extra-requirements=django-stubs==1.5.0",
             "--mypy-version=mypy==0.770",
-            f"--mypy-source-plugins={PACKAGE}/settings.py",
         ],
     )
     assert len(result) == 1

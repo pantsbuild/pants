@@ -48,7 +48,6 @@ use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use serde_derive::Serialize;
-pub use serverset::BackoffConfig;
 use tryfuture::try_future;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -258,30 +257,24 @@ impl Store {
   pub fn with_remote<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
-    cas_addresses: Vec<String>,
+    cas_address: &str,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
-    thread_count: usize,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
-    backoff_config: BackoffConfig,
     rpc_retries: usize,
-    connection_limit: usize,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new(executor, path)?,
       remote: Some(remote::ByteStore::new(
-        cas_addresses,
+        cas_address,
         instance_name,
         root_ca_certs,
         headers,
-        thread_count,
         chunk_size_bytes,
         upload_timeout,
-        backoff_config,
         rpc_retries,
-        connection_limit,
       )?),
     })
   }
