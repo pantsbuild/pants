@@ -48,7 +48,7 @@ class FlagErrorHelpPrinter(MaybeColor):
                     f"come before any goals, or after any file/target arguments."
                 )
             elif did_you_mean:
-                formatted_matches = self._produce_formatted_matches(did_you_mean)
+                formatted_matches = self._format_did_you_mean_matches(did_you_mean)
                 print(f"Did you mean {formatted_matches}?")
             help_cmd = (
                 f"{self._bin_name} help"

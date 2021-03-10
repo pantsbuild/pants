@@ -18,12 +18,7 @@ class MaybeColor:
         self.maybe_magenta = magenta if color else noop
         self.maybe_yellow = yellow if color else noop
 
-    def _produce_formatted_matches(self, did_you_mean: List[str]) -> str:
-        # This function encapusaltes the creation of naturally phrased help
-        # suggestions by using "or" and commas - a dedicated helper is
-        # necessary to test due to the current lack of similar-enough goals to
-        # yield multiple results for get_close_matches, though this may eventually
-        # no longer be the case.
+    def _format_did_you_mean_matches(self, did_you_mean: List[str]) -> str:
         if len(did_you_mean) == 1:
             formatted_candidates = self.maybe_cyan(did_you_mean[0])
         elif len(did_you_mean) == 2:

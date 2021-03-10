@@ -69,7 +69,7 @@ class HelpPrinter(MaybeColor):
             )
 
             if did_you_mean:
-                formatted_matches = self._produce_formatted_matches(did_you_mean)
+                formatted_matches = self._format_did_you_mean_matches(did_you_mean)
                 print(f"Did you mean {formatted_matches}?")
 
             print_hint()
