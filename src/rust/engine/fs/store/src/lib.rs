@@ -222,7 +222,7 @@ pub enum ShrinkBehavior {
 // Note that Store doesn't implement ByteStore because it operates at a higher level of abstraction,
 // considering Directories as a standalone concept, rather than a buffer of bytes.
 // This has the nice property that Directories can be trusted to be valid and canonical.
-// We may want to re-visit this if we end up wanting to handle local/remote/merged interchangably.
+// We may want to re-visit this if we end up wanting to handle local/remote/merged interchangeably.
 impl Store {
   ///
   /// Make a store which only uses its local storage.

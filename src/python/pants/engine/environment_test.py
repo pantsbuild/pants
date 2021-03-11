@@ -15,7 +15,7 @@ from pants.engine.environment import CompleteEnvironment
         (["A=unrelated", "B"], {"A": "unrelated", "B": "b"}),
         # Test multi-word string.
         (["A=unrelated", "C=multi word"], {"A": "unrelated", "C": "multi word"}),
-        # Test emtpy string.
+        # Test empty string.
         (["A="], {"A": ""}),
         # Test string with " literal.
         (['A=has a " in it'], {"A": 'has a " in it'}),

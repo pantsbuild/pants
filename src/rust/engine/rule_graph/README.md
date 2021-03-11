@@ -57,7 +57,7 @@ There are a few constraints that decide which `Rule`s are able to provide depend
 * `param_consumption` - When a `Rule` directly uses a `Param` as a positional argument, that `Param` is removed from scope for any of that `Rule`'s dependencies.
     * For example, for a `Rule` `y` with a positional argument `A` and a `Get(B, C)`: if there is a `Param` `A` in scope at `y` and it is used to satisfy the positional argument, it cannot also be used to (transitively) to satisfy the `Get(B, C)` (i.e., a hyptothetical rule that consumes both `A` and `C` would not be eligible in that position).
     * On the other hand, for a `Rule` `w` with `Get(B, C)` and `Get(D, E)`, if there is a `Param` `A` in scope at `w`, two dependency `Rule`s that consume `A` (transitively) _can_ be used to satisfy those `Get`s. Only consuming a `Param` as a positional argument removes it from scope.
-* `provided_params` - When deciding whether one `Rule` can use another `Rule` to provide the output type of a `Get`, a constraint is applied that the candidate depedency must (transitively) consume the `Param` that is provided by the `Get`.
+* `provided_params` - When deciding whether one `Rule` can use another `Rule` to provide the output type of a `Get`, a constraint is applied that the candidate dependency must (transitively) consume the `Param` that is provided by the `Get`.
     * For example: if a `Rule` `z` has a `Get(A, B)`, only `Rule`s that compute an `A` and (transitively) consume a `B` are eligible to be used. This also means that a `Param` `A` which is already in scope for `Rule` `z` is not eligible to be used, because it would trivially not consume `B`.
 
 ## Implementation
