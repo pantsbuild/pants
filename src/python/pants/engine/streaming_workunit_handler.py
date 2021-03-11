@@ -236,13 +236,6 @@ class _InnerHandler(threading.Thread):
         # as we are only in the constructor.
         self.logging_destination = native_engine.stdio_thread_get_destination()
 
-    def _maybe_set_logging_destination(self) -> None:
-        """Set the thread's logging destination to the parent thread's, meaning the console."""
-        if self.logging_destination is None:
-            return
-        native_engine.stdio_thread_set_destination(self.logging_destination)
-        self.logging_destination = None
-
     def poll_workunits(self, *, finished: bool) -> None:
         workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
         for callback in self.callbacks:
@@ -254,7 +247,8 @@ class _InnerHandler(threading.Thread):
             )
 
     def run(self) -> None:
-        self._maybe_set_logging_destination()
+        # First, set the thread's logging destination to the parent thread's, meaning the console.
+        native_engine.stdio_thread_set_destination(self.logging_destination)
         while not self.stop_request.isSet():  # type: ignore[attr-defined]
             self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)
