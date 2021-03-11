@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{Select, Visualizer};
-use crate::session::{ObservedValueResult, Root, Session, Stderr};
+use crate::session::{ObservedValueResult, Root, Session};
 
 use futures::{future, FutureExt};
 use graph::{InvalidationResult, LastObserved};
@@ -21,7 +21,6 @@ use log::{debug, info, warn};
 use stdio::TryCloneAsFile;
 use tempfile::TempDir;
 use tokio::process;
-use tokio::sync::mpsc;
 use tokio::time;
 use ui::ConsoleUI;
 use watch::Invalidatable;
@@ -381,8 +380,7 @@ impl Scheduler {
     let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
 
     // Spawn and wait for all roots to complete.
-    let (sender, mut receiver) = mpsc::unbounded_channel();
-    session.maybe_display_initialize(&self.core.executor, &sender);
+    session.maybe_display_initialize(&self.core.executor);
     let mut execution_task = self.execute_helper(request, session).boxed();
 
     self.core.executor.block_on(async move {
@@ -408,16 +406,6 @@ impl Scheduler {
           res = &mut execution_task => {
             // Completed successfully.
             break Ok(Self::execute_record_results(&request.roots, &session, res));
-          }
-          stderr = receiver.recv() => match stderr {
-            Some(Stderr(stderr)) => {
-              session.write_stderr(&stderr);
-            }
-            None => {
-              break Err(ExecutionTermination::Fatal(
-                "UI task exited early.".to_owned(),
-              ));
-            }
           }
         }
       };
