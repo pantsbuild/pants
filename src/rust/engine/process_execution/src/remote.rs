@@ -314,7 +314,7 @@ impl CommandRunner {
           &workunit_store,
           WorkunitMetadata {
             level: Level::Debug,
-            ..Default::default()
+            ..WorkunitMetadata::default()
           },
         ),
         Err(s) => warn!("{}", s),
@@ -339,7 +339,7 @@ impl CommandRunner {
           &workunit_store,
           WorkunitMetadata {
             level: Level::Debug,
-            ..Default::default()
+            ..WorkunitMetadata::default()
           },
         ),
         Err(s) => warn!("{}", s),
@@ -364,7 +364,7 @@ impl CommandRunner {
           &workunit_store,
           WorkunitMetadata {
             level: Level::Debug,
-            ..Default::default()
+            ..WorkunitMetadata::default()
           },
         ),
         Err(s) => warn!("{}", s),
@@ -389,7 +389,7 @@ impl CommandRunner {
           &workunit_store,
           WorkunitMetadata {
             level: Level::Debug,
-            ..Default::default()
+            ..WorkunitMetadata::default()
           },
         ),
         Err(s) => warn!("{}", s),
@@ -772,7 +772,7 @@ impl crate::CommandRunner for CommandRunner {
       "ensure_action_stored_locally".to_owned(),
       WorkunitMetadata {
         level: Level::Debug,
-        ..Default::default()
+        ..WorkunitMetadata::default()
       },
       ensure_action_stored_locally(&self.store, &command, &action),
       |_, md| md,
@@ -786,7 +786,7 @@ impl crate::CommandRunner for CommandRunner {
       "check_action_cache".to_owned(),
       WorkunitMetadata {
         level: Level::Debug,
-        ..Default::default()
+        ..WorkunitMetadata::default()
       },
       check_action_cache(
         action_digest,
@@ -814,7 +814,7 @@ impl crate::CommandRunner for CommandRunner {
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata {
         level: Level::Debug,
-        ..Default::default()
+        ..WorkunitMetadata::default()
       },
       ensure_action_uploaded(&store, command_digest, action_digest, request.input_files),
       |_, md| md,
@@ -832,7 +832,7 @@ impl crate::CommandRunner for CommandRunner {
       "run_execute_request".to_owned(),
       WorkunitMetadata {
         level: Level::Debug,
-        ..Default::default()
+        ..WorkunitMetadata::default()
       },
       timeout_fut,
       |result, mut metadata| {

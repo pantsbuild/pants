@@ -536,7 +536,7 @@ impl CommandRunner for BoundedCommandRunner {
       // BoundedCommandRunner to show in the dynamic UI, so set the `blocked` flag
       // on the workunit metadata in order to prevent this.
       blocked: true,
-      ..Default::default()
+      ..WorkunitMetadata::default()
     };
 
     let bounded_fut = {
@@ -554,7 +554,7 @@ impl CommandRunner for BoundedCommandRunner {
         let metadata = WorkunitMetadata {
           level: req.workunit_level(),
           desc: Some(desc),
-          ..Default::default()
+          ..WorkunitMetadata::default()
         };
 
         let metadata_updater = |result: &Result<FallibleProcessResultWithPlatform, String>,

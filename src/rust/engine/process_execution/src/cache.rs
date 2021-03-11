@@ -132,7 +132,7 @@ impl crate::CommandRunner for CommandRunner {
       "local_cache_read".to_owned(),
       WorkunitMetadata {
         level: Level::Debug,
-        ..Default::default()
+        ..WorkunitMetadata::default()
       },
       cache_read_future,
       |_, md| md,

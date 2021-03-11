@@ -18,7 +18,7 @@ use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
 use tonic::transport::Channel;
 use tonic::{Code, Interceptor, Request};
-use workunit_store::{with_workunit, ObservationMetric};
+use workunit_store::{with_workunit, ObservationMetric, WorkunitMetadata};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -97,9 +97,9 @@ impl ByteStore {
       digest.size_bytes,
     );
     let workunit_name = format!("store_bytes({})", resource_name.clone());
-    let workunit_metadata = workunit_store::WorkunitMetadata {
+    let workunit_metadata = WorkunitMetadata {
       level: Level::Debug,
-      ..Default::default()
+      ..WorkunitMetadata::default()
     };
     let store = self.clone();
 
@@ -182,9 +182,9 @@ impl ByteStore {
       digest.size_bytes
     );
     let workunit_name = format!("load_bytes_with({})", resource_name.clone());
-    let workunit_metadata = workunit_store::WorkunitMetadata {
+    let workunit_metadata = WorkunitMetadata {
       level: Level::Debug,
-      ..Default::default()
+      ..WorkunitMetadata::default()
     };
     let resource_name = resource_name.clone();
     let f = f.clone();
@@ -293,9 +293,9 @@ impl ByteStore {
       "list_missing_digests({})",
       store.instance_name.clone().unwrap_or_default()
     );
-    let workunit_metadata = workunit_store::WorkunitMetadata {
+    let workunit_metadata = WorkunitMetadata {
       level: Level::Debug,
-      ..Default::default()
+      ..WorkunitMetadata::default()
     };
     let result_future = async move {
       let store2 = store.clone();

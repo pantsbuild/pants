@@ -343,7 +343,7 @@ impl CommandRunner {
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata {
         level: Level::Debug,
-        ..Default::default()
+        ..WorkunitMetadata::default()
       },
       crate::remote::ensure_action_uploaded(
         &self.store,
@@ -409,7 +409,7 @@ impl crate::CommandRunner for CommandRunner {
       "ensure_action_stored_locally".to_owned(),
       WorkunitMetadata {
         level: Level::Debug,
-        ..Default::default()
+        ..WorkunitMetadata::default()
       },
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action),
       |_, md| md,
@@ -426,7 +426,7 @@ impl crate::CommandRunner for CommandRunner {
           "check_action_cache".to_owned(),
           WorkunitMetadata {
             level: Level::Debug,
-            ..Default::default()
+            ..WorkunitMetadata::default()
           },
           crate::remote::check_action_cache(
             action_digest,
@@ -528,7 +528,7 @@ impl crate::CommandRunner for CommandRunner {
         "remote_cache_write".to_owned(),
         WorkunitMetadata {
           level: Level::Debug,
-          ..Default::default()
+          ..WorkunitMetadata::default()
         },
         cache_write_future,
         |_, md| md,
