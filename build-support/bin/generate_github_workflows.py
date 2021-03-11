@@ -315,8 +315,8 @@ def generate() -> dict[Path, str]:
     audit_yaml = yaml.dump(
         {
             "name": "Cargo Audit",
-            # 11:11pm
-            "on": {"schedule": [{"cron": "11 23 * * *"}]},
+            # 7:11 UTC / 11:11 PT: arbitrary time after hours.
+            "on": {"schedule": [{"cron": "11 7 * * *"}]},
             "jobs": {
                 "audit": {
                     "runs-on": "ubuntu-latest",
@@ -335,7 +335,7 @@ def generate() -> dict[Path, str]:
     test_cron_yaml = yaml.dump(
         {
             "name": "Daily Extended Python Testing",
-            # 11:45pm
+            # 7:45 UTC / 11:45 PT: arbitrary time after hours.
             "on": {"schedule": [{"cron": "45 23 * * *"}]},
             "jobs": test_workflow_jobs(["3.8.3"]),
         },
