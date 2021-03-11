@@ -70,27 +70,6 @@ impl ConsoleUI {
     Duration::from_millis(1000 / Self::render_rate_hz())
   }
 
-  pub async fn write_stdout(&mut self, msg: &str) -> Result<(), String> {
-    if self.instance.is_some() {
-      self.teardown().await?;
-    }
-    print!("{}", msg);
-    Ok(())
-  }
-
-  pub fn write_stderr(&mut self, msg: &str) {
-    if let Some(instance) = &self.instance {
-      instance.bars[0].println(msg);
-    } else {
-      if self.teardown_in_progress {
-        let receiver = &self.teardown_mpsc.1;
-        let _ = receiver.recv();
-        self.teardown_in_progress = false;
-      }
-      eprint!("{}", msg);
-    }
-  }
-
   pub async fn with_console_ui_disabled<T>(&mut self, f: impl Future<Output = T>) -> T {
     if self.instance.is_some() {
       self.teardown().await.unwrap();
@@ -100,27 +79,51 @@ impl ConsoleUI {
     }
   }
 
+  ///
+  /// Setup progress bars, and return them along with a running task that will drive them.
+  ///
   fn setup_bars(
-    stderr_handler: stdio::StdioHandler,
+    executor: Executor,
     num_swimlanes: usize,
-  ) -> Result<(MultiProgress, Vec<ProgressBar>), String> {
+  ) -> Result<(Vec<ProgressBar>, MultiProgressTask), String> {
+    // Stderr is propagated across a channel to remove lock interleavings between stdio and the UI.
+    let (stderr_sender, stderr_receiver) = mpsc::sync_channel(0);
     let (term_read, _, term_stderr_write) =
-      stdio::get_destination().exclusive_start(stderr_handler)?;
+      stdio::get_destination().exclusive_start(Box::new(move |msg: &str| {
+        // If we fail to send, it's because the UI has shut down: we fail the callback to
+        // have the logging module directly log to stderr at that point.
+        stderr_sender.send(msg.to_owned()).map_err(|_| ())
+      }))?;
 
     let term = console::Term::read_write_pair(term_read, term_stderr_write);
     // NB: We render more frequently than we receive new data in order to minimize aliasing where a
     // render might barely miss a data refresh.
     let draw_target = ProgressDrawTarget::to_term(term, Self::render_rate_hz() * 2);
-    let multi_progress_bars = MultiProgress::with_draw_target(draw_target);
+    let multi_progress = MultiProgress::with_draw_target(draw_target);
 
     let bars = (0..num_swimlanes)
       .map(|_n| {
         let style = ProgressStyle::default_bar().template("{spinner} {wide_msg}");
-        multi_progress_bars.add(ProgressBar::new(50).with_style(style))
+        multi_progress.add(ProgressBar::new(50).with_style(style))
       })
-      .collect();
+      .collect::<Vec<_>>();
+    let first_bar = bars[0].downgrade();
 
-    Ok((multi_progress_bars, bars))
+    // Spawn a task to drive the multi progress.
+    let multi_progress_task = executor
+      .spawn_blocking(move || multi_progress.join())
+      .boxed();
+    // And another to propagate stderr, which will exit automatically when the channel closes.
+    let _stderr_task = executor.spawn_blocking(move || {
+      while let Ok(stderr) = stderr_receiver.recv() {
+        match first_bar.upgrade() {
+          Some(first_bar) => first_bar.println(stderr),
+          None => break,
+        }
+      }
+    });
+
+    Ok((bars, multi_progress_task))
   }
 
   fn get_label_from_heavy_hitters<'a>(
@@ -181,23 +184,14 @@ impl ConsoleUI {
   /// Errors if a ConsoleUI is already running (which would likely indicate concurrent usage of a
   /// Session attached to a console).
   ///
-  pub fn initialize(
-    &mut self,
-    executor: Executor,
-    stderr_handler: stdio::StdioHandler,
-  ) -> Result<(), String> {
+  pub fn initialize(&mut self, executor: Executor) -> Result<(), String> {
     if self.instance.is_some() {
       return Err("A ConsoleUI cannot render multiple UIs concurrently.".to_string());
     }
 
     // Setup bars (which will take ownership of the current Console), and then spawn rendering
     // of the bars into a background task.
-    let (multi_progress, bars) = Self::setup_bars(stderr_handler, self.local_parallelism)?;
-    let multi_progress_task = {
-      executor
-        .spawn_blocking(move || multi_progress.join())
-        .boxed()
-    };
+    let (bars, multi_progress_task) = Self::setup_bars(executor, self.local_parallelism)?;
 
     self.instance = Some(Instance {
       tasks_to_display: IndexMap::new(),
@@ -230,9 +224,11 @@ impl ConsoleUI {
   }
 }
 
+type MultiProgressTask = Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>>;
+
 /// The state for one run of the ConsoleUI.
 struct Instance {
   tasks_to_display: IndexMap<String, Option<Duration>>,
-  multi_progress_task: Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>>,
+  multi_progress_task: MultiProgressTask,
   bars: Vec<ProgressBar>,
 }

@@ -130,17 +130,6 @@ py_module_initializer!(native_engine, |py, m| {
     "stdio_thread_console_clear",
     py_fn!(py, stdio_thread_console_clear()),
   )?;
-  m.add(
-    py,
-    "stdio_write_stdout",
-    py_fn!(py, stdio_write_stdout(b: &[u8])),
-  )?;
-
-  m.add(
-    py,
-    "stdio_write_stderr",
-    py_fn!(py, stdio_write_stderr(b: &[u8])),
-  )?;
 
   m.add(py, "flush_log", py_fn!(py, flush_log()))?;
   m.add(
@@ -1890,20 +1879,6 @@ fn stdio_thread_console_set(
 fn stdio_thread_console_clear(_: Python) -> PyUnitResult {
   stdio::get_destination().console_clear();
   Ok(None)
-}
-
-fn stdio_write_stdout(py: Python, payload: &[u8]) -> PyUnitResult {
-  py.allow_threads(|| {
-    stdio::get_destination().write_stdout(payload);
-    Ok(None)
-  })
-}
-
-fn stdio_write_stderr(py: Python, payload: &[u8]) -> PyUnitResult {
-  py.allow_threads(|| {
-    stdio::get_destination().write_stderr(payload);
-    Ok(None)
-  })
 }
 
 // TODO: Needs to be thread-local / associated with the Console.
