@@ -312,7 +312,10 @@ impl CommandRunner {
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
+          WorkunitMetadata {
+            level: Level::Debug,
+            ..Default::default()
+          },
         ),
         Err(s) => warn!("{}", s),
       }
@@ -334,7 +337,10 @@ impl CommandRunner {
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
+          WorkunitMetadata {
+            level: Level::Debug,
+            ..Default::default()
+          },
         ),
         Err(s) => warn!("{}", s),
       }
@@ -356,7 +362,10 @@ impl CommandRunner {
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
+          WorkunitMetadata {
+            level: Level::Debug,
+            ..Default::default()
+          },
         ),
         Err(s) => warn!("{}", s),
       }
@@ -378,7 +387,10 @@ impl CommandRunner {
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
+          WorkunitMetadata {
+            level: Level::Debug,
+            ..Default::default()
+          },
         ),
         Err(s) => warn!("{}", s),
       }
@@ -758,7 +770,10 @@ impl crate::CommandRunner for CommandRunner {
     let (command_digest, action_digest) = with_workunit(
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..Default::default()
+      },
       ensure_action_stored_locally(&self.store, &command, &action),
       |_, md| md,
     )
@@ -769,7 +784,10 @@ impl crate::CommandRunner for CommandRunner {
     let cached_response_opt = with_workunit(
       context.workunit_store.clone(),
       "check_action_cache".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..Default::default()
+      },
       check_action_cache(
         action_digest,
         &self.metadata,
@@ -794,7 +812,10 @@ impl crate::CommandRunner for CommandRunner {
     with_workunit(
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..Default::default()
+      },
       ensure_action_uploaded(&store, command_digest, action_digest, request.input_files),
       |_, md| md,
     )
@@ -809,7 +830,10 @@ impl crate::CommandRunner for CommandRunner {
     let response = with_workunit(
       context.workunit_store.clone(),
       "run_execute_request".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..Default::default()
+      },
       timeout_fut,
       |result, mut metadata| {
         if result.is_err() {
