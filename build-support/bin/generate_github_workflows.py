@@ -21,6 +21,7 @@ HEADER = dedent(
 
 
 Step = Dict[str, Any]
+Jobs = Dict[str, Any]
 
 
 def checkout() -> Sequence[Step]:
@@ -135,6 +136,125 @@ def native_engine_so_download() -> Sequence[Step]:
     ]
 
 
+def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
+    return {
+        "bootstrap_pants_linux": {
+            "name": "Bootstrap Pants, test+lint Rust (Linux)",
+            "runs-on": "ubuntu-20.04",
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "env": {"rust_version": "1.49.0"},
+            "steps": [
+                *checkout(),
+                {
+                    "name": "Set up Python ${{ matrix.python-version }}",
+                    "uses": "actions/setup-python@v2",
+                    "with": {"python-version": "${{ matrix.python-version }}"},
+                },
+                *bootstrap_caches(),
+                {
+                    "name": "Set env vars",
+                    "run": 'echo \'PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{ github.workspace }}/pants.remote-cache.toml"]\' >> ${GITHUB_ENV}\n',
+                },
+                {"name": "Bootstrap Pants", "run": "./pants --version\n"},
+                {
+                    "name": "Run smoke tests",
+                    "run": "./pants help goals\n./pants list ::\n./pants roots\n./pants help targets\n",
+                },
+                {
+                    "name": "Test and Lint Rust",
+                    "run": "sudo apt-get install -y pkg-config fuse libfuse-dev\n./cargo clippy --all\n# We pass --tests to skip doc tests because our generated protos contain invalid\n# doc tests in their comments.\n./cargo test --all --tests -- --nocapture\n",
+                    "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
+                },
+                *native_engine_so_upload(),
+            ],
+        },
+        "test_python_linux": {
+            "name": "Test Python (Linux)",
+            "runs-on": "ubuntu-20.04",
+            "needs": "bootstrap_pants_linux",
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "steps": [
+                *checkout(),
+                {
+                    "name": "Set up Python ${{ matrix.python-version }}",
+                    "uses": "actions/setup-python@v2",
+                    "with": {"python-version": "${{ matrix.python-version }}"},
+                },
+                *pants_virtualenv_cache(),
+                *native_engine_so_download(),
+                *pants_config_files(),
+                {"name": "Run Python tests", "run": "./pants test ::\n"},
+            ],
+        },
+        "lint_python_linux": {
+            "name": "Lint Python (Linux)",
+            "runs-on": "ubuntu-20.04",
+            "needs": "bootstrap_pants_linux",
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "steps": [
+                *checkout(),
+                {
+                    "name": "Set up Python ${{ matrix.python-version }}",
+                    "uses": "actions/setup-python@v2",
+                    "with": {"python-version": "${{ matrix.python-version }}"},
+                },
+                *pants_virtualenv_cache(),
+                *native_engine_so_download(),
+                *pants_config_files(),
+                {
+                    "name": "Lint",
+                    "run": "./pants validate '**'\n./pants lint typecheck ::\n",
+                },
+            ],
+        },
+        "bootstrap_pants_macos": {
+            "name": "Bootstrap Pants, test Rust (MacOS)",
+            "runs-on": "macos-10.15",
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "env": {"rust_version": "1.49.0"},
+            "steps": [
+                *checkout(),
+                {
+                    "name": "Set up Python ${{ matrix.python-version }}",
+                    "uses": "actions/setup-python@v2",
+                    "with": {"python-version": "${{ matrix.python-version }}"},
+                },
+                *bootstrap_caches(),
+                *pants_config_files(),
+                {"name": "Bootstrap Pants", "run": "./pants --version\n"},
+                *native_engine_so_upload(),
+                {
+                    "name": "Test Rust",
+                    "run": "# We pass --tests to skip doc tests because our generated protos contain invalid\n# doc tests in their comments.\n# We do not pass --all as BRFS tests don't pass on GHA MacOS containers.\n./cargo test --tests -- --nocapture\n",
+                    "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
+                    "env": {"TMPDIR": "${{ runner.temp }}"},
+                },
+            ],
+        },
+        "test_python_macos": {
+            "name": "Test Python (MacOS)",
+            "runs-on": "macos-10.15",
+            "needs": "bootstrap_pants_macos",
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "steps": [
+                {"name": "Check out code", "uses": "actions/checkout@v2"},
+                {
+                    "name": "Set up Python ${{ matrix.python-version }}",
+                    "uses": "actions/setup-python@v2",
+                    "with": {"python-version": "${{ matrix.python-version }}"},
+                },
+                *pants_virtualenv_cache(),
+                *native_engine_so_download(),
+                *pants_config_files(),
+                {
+                    "name": "Run Python tests",
+                    "run": "./pants --tag=+platform_specific_behavior test ::\n",
+                },
+            ],
+        },
+    }
+
+
 # ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
@@ -159,127 +279,13 @@ class NoAliasDumper(yaml.SafeDumper):
 
 def generate() -> dict[Path, str]:
     """Generate all YAML configs with repo-relative paths."""
+
     test_workflow_name = "Pull Request CI"
     test_yaml = yaml.dump(
         {
             "name": test_workflow_name,
             "on": "pull_request",
-            "jobs": {
-                "bootstrap_pants_linux": {
-                    "name": "Bootstrap Pants, test+lint Rust (Linux)",
-                    "runs-on": "ubuntu-20.04",
-                    "strategy": {"matrix": {"python-version": ["3.7.10"]}},
-                    "env": {"rust_version": "1.49.0"},
-                    "steps": [
-                        *checkout(),
-                        {
-                            "name": "Set up Python ${{ matrix.python-version }}",
-                            "uses": "actions/setup-python@v2",
-                            "with": {"python-version": "${{ matrix.python-version }}"},
-                        },
-                        *bootstrap_caches(),
-                        {
-                            "name": "Set env vars",
-                            "run": 'echo \'PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{ github.workspace }}/pants.remote-cache.toml"]\' >> ${GITHUB_ENV}\n',
-                        },
-                        {"name": "Bootstrap Pants", "run": "./pants --version\n"},
-                        {
-                            "name": "Run smoke tests",
-                            "run": "./pants help goals\n./pants list ::\n./pants roots\n./pants help targets\n",
-                        },
-                        {
-                            "name": "Test and Lint Rust",
-                            "run": "sudo apt-get install -y pkg-config fuse libfuse-dev\n./cargo clippy --all\n# We pass --tests to skip doc tests because our generated protos contain invalid\n# doc tests in their comments.\n./cargo test --all --tests -- --nocapture\n",
-                            "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
-                        },
-                        *native_engine_so_upload(),
-                    ],
-                },
-                "test_python_linux": {
-                    "name": "Test Python (Linux)",
-                    "runs-on": "ubuntu-20.04",
-                    "needs": "bootstrap_pants_linux",
-                    "strategy": {"matrix": {"python-version": ["3.7.10"]}},
-                    "steps": [
-                        *checkout(),
-                        {
-                            "name": "Set up Python ${{ matrix.python-version }}",
-                            "uses": "actions/setup-python@v2",
-                            "with": {"python-version": "${{ matrix.python-version }}"},
-                        },
-                        *pants_virtualenv_cache(),
-                        *native_engine_so_download(),
-                        *pants_config_files(),
-                        {"name": "Run Python tests", "run": "./pants test ::\n"},
-                    ],
-                },
-                "lint_python_linux": {
-                    "name": "Lint Python (Linux)",
-                    "runs-on": "ubuntu-20.04",
-                    "needs": "bootstrap_pants_linux",
-                    "strategy": {"matrix": {"python-version": ["3.7.10"]}},
-                    "steps": [
-                        *checkout(),
-                        {
-                            "name": "Set up Python ${{ matrix.python-version }}",
-                            "uses": "actions/setup-python@v2",
-                            "with": {"python-version": "${{ matrix.python-version }}"},
-                        },
-                        *pants_virtualenv_cache(),
-                        *native_engine_so_download(),
-                        *pants_config_files(),
-                        {
-                            "name": "Lint",
-                            "run": "./pants validate '**'\n./pants lint typecheck ::\n",
-                        },
-                    ],
-                },
-                "bootstrap_pants_macos": {
-                    "name": "Bootstrap Pants, test Rust (MacOS)",
-                    "runs-on": "macos-10.15",
-                    "strategy": {"matrix": {"python-version": ["3.7.10"]}},
-                    "env": {"rust_version": "1.49.0"},
-                    "steps": [
-                        *checkout(),
-                        {
-                            "name": "Set up Python ${{ matrix.python-version }}",
-                            "uses": "actions/setup-python@v2",
-                            "with": {"python-version": "${{ matrix.python-version }}"},
-                        },
-                        *bootstrap_caches(),
-                        *pants_config_files(),
-                        {"name": "Bootstrap Pants", "run": "./pants --version\n"},
-                        *native_engine_so_upload(),
-                        {
-                            "name": "Test Rust",
-                            "run": "# We pass --tests to skip doc tests because our generated protos contain invalid\n# doc tests in their comments.\n# We do not pass --all as BRFS tests don't pass on GHA MacOS containers.\n./cargo test --tests -- --nocapture\n",
-                            "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
-                            "env": {"TMPDIR": "${{ runner.temp }}"},
-                        },
-                    ],
-                },
-                "test_python_macos": {
-                    "name": "Test Python (MacOS)",
-                    "runs-on": "macos-10.15",
-                    "needs": "bootstrap_pants_macos",
-                    "strategy": {"matrix": {"python-version": ["3.7.10"]}},
-                    "steps": [
-                        {"name": "Check out code", "uses": "actions/checkout@v2"},
-                        {
-                            "name": "Set up Python ${{ matrix.python-version }}",
-                            "uses": "actions/setup-python@v2",
-                            "with": {"python-version": "${{ matrix.python-version }}"},
-                        },
-                        *pants_virtualenv_cache(),
-                        *native_engine_so_download(),
-                        *pants_config_files(),
-                        {
-                            "name": "Run Python tests",
-                            "run": "./pants --tag=+platform_specific_behavior test ::\n",
-                        },
-                    ],
-                },
-            },
+            "jobs": test_workflow_jobs(["3.7.10"]),
         },
         Dumper=NoAliasDumper,
     )
@@ -305,9 +311,42 @@ def generate() -> dict[Path, str]:
             },
         }
     )
+
+    audit_yaml = yaml.dump(
+        {
+            "name": "Cargo Audit",
+            # 7:11 UTC / 11:11 PT: arbitrary time after hours.
+            "on": {"schedule": [{"cron": "11 7 * * *"}]},
+            "jobs": {
+                "audit": {
+                    "runs-on": "ubuntu-latest",
+                    "steps": [
+                        *checkout(),
+                        {
+                            "name": "Test and Lint Rust",
+                            "run": "./cargo install --version 0.13.1 cargo-audit\n./cargo audit\n",
+                        },
+                    ],
+                }
+            },
+        }
+    )
+
+    test_cron_yaml = yaml.dump(
+        {
+            "name": "Daily Extended Python Testing",
+            # 7:45 UTC / 11:45 PT: arbitrary time after hours.
+            "on": {"schedule": [{"cron": "45 23 * * *"}]},
+            "jobs": test_workflow_jobs(["3.8.3"]),
+        },
+        Dumper=NoAliasDumper,
+    )
+
     return {
-        Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
+        Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
         Path(".github/workflows/cancel.yaml"): f"{HEADER}\n\n{cancel_yaml}",
+        Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
+        Path(".github/workflows/test-cron.yaml"): f"{HEADER}\n\n{test_cron_yaml}",
     }
 
 
