@@ -53,6 +53,11 @@ class StatsAggregatorCallback(WorkunitsCallback):
         self.has_histogram_module = has_histogram_module
         self.counters: Counter = Counter()
 
+    @property
+    def can_finish_async(self) -> bool:
+        # If the callback is activated, we need to finish synchronously for access to the console.
+        return not self.enabled
+
     def __call__(
         self,
         *,
