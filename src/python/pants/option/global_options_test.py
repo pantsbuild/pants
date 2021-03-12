@@ -111,6 +111,7 @@ def test_execution_options_local_only() -> None:
     assert not exec_options.remote_execution
     assert not exec_options.remote_cache_read
     assert not exec_options.remote_cache_write
+    assert exec_options.remote_store_headers == {}
     assert exec_options.remote_execution_headers == {}
 
 
