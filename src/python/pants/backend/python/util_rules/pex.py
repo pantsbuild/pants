@@ -15,6 +15,8 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import FrozenSet, Iterable, List, Mapping, Sequence, Set, Tuple, TypeVar
 
+import packaging.specifiers
+import packaging.version
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
@@ -1015,18 +1017,18 @@ async def setup_venv_pex_process(request: VenvPexProcess) -> Process:
 
 @dataclass(frozen=True)
 class PexDistributionInfo:
-    """Information about an individual distribution in a PEX file, as reported by
-    `PEX_TOOLS=1 repository info -v`."""
+    """Information about an individual distribution in a PEX file, as reported by `PEX_TOOLS=1
+    repository info -v`."""
 
     project_name: str
-    version: str
-    requires_python: str | None
-    requires_dists: list[str]
+    version: packaging.version.Version
+    requires_python: packaging.specifiers.SpecifierSet | None
+    requires_dists: tuple[Requirement, ...]
 
 
 class PexDistributionsInfo(Collection[PexDistributionInfo]):
-    """Information about all distributions in a PEX file, as reported by
-    `PEX_TOOLS=1 repository info -v`."""
+    """Information about all distributions in a PEX file, as reported by `PEX_TOOLS=1 repository
+    info -v`."""
 
 
 @rule
@@ -1048,9 +1050,11 @@ async def extract_venv_pex_distribution(venv_pex: VenvPex) -> PexDistributionsIn
         dists.append(
             PexDistributionInfo(
                 project_name=info["project_name"],
-                version=info["version"],
-                requires_python=info.get("requires_python"),
-                requires_dists=info.get("requires_dists", []),
+                version=packaging.version.Version(info["version"]),
+                requires_python=packaging.specifiers.SpecifierSet(info["requires_python"] or ""),
+                requires_dists=tuple(
+                    Requirement.parse(req) for req in sorted(info["requires_dists"])
+                ),
             )
         )
     return PexDistributionsInfo(sorted(dists, key=lambda dist: dist.project_name))

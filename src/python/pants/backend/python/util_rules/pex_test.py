@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from typing import Dict, Iterable, Iterator, List, Mapping, Tuple, cast
 
 import pytest
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 from pkg_resources import Requirement
 
 from pants.backend.python.target_types import (
@@ -20,14 +22,14 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.pex import (
     Pex,
+    PexDistributionInfo,
+    PexDistributionsInfo,
     PexInterpreterConstraints,
     PexPlatforms,
     PexProcess,
     PexRequest,
     PexRequirements,
     VenvPex,
-    PexDistributionsInfo,
-    PexDistributionInfo,
     VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
@@ -616,15 +618,13 @@ def test_venv_pex_distributions_info(rule_runner: RuleRunner) -> None:
     venv_pex = create_pex_and_get_all_data(
         rule_runner, pex_type=VenvPex, requirements=PexRequirements(["requests==2.23.0"])
     )["pex"]
-    distributions = rule_runner.request(PexDistributionsInfo, [venv_pex])
-    assert len(distributions) == 5
-    assert distributions[0].project_name == "certifi"
-    assert distributions[0].version == "2020.12.5"
-    assert distributions[1].project_name == "chardet"
-    assert distributions[1].version == "3.0.4"
-    assert distributions[2].project_name == "idna"
-    assert distributions[2].version == "2.10"
-    assert distributions[3].project_name == "requests"
-    assert distributions[3].version == "2.23.0"
-    assert distributions[4].project_name == "urllib3"
-    assert distributions[4].version == "1.25.11"
+    dists = rule_runner.request(PexDistributionsInfo, [venv_pex])
+    assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), SpecifierSet(""), ())
+    assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), SpecifierSet(""), ())
+    assert dists[2] == PexDistributionInfo(
+        "idna", Version("2.10"), SpecifierSet("!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"), ()
+    )
+    assert dists[3].project_name == "requests"
+    assert dists[3].version == Version("2.23.0")
+    assert Requirement.parse('PySocks!=1.5.7,>=1.5.6; extra == "socks"') in dists[3].requires_dists
+    assert dists[4].project_name == "urllib3"
