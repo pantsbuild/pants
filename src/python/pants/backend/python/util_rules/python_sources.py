@@ -13,7 +13,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Sources, Target
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, Sources, Target
 from pants.engine.unions import UnionMembership
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -98,15 +98,39 @@ async def prepare_python_sources(
         MergeDigests((sources.snapshot.digest, missing_init_files.snapshot.digest)),
     )
 
-    source_root_objs = await MultiGet(
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(tgt))
-        for tgt in request.targets
-        if (
-            tgt.has_field(PythonSources)
-            or tgt.has_field(ResourcesSources)
-            or tgt.get(Sources).can_generate(PythonSources, union_membership)
-            or tgt.get(Sources).can_generate(ResourcesSources, union_membership)
+    # Codegen is able to generate code in any arbitrary location, unlike sources normally being
+    # rooted under the target definition. To determine source roots for these generated files, we
+    # cannot use the normal `SourceRootRequest.for_target()` and we instead must determine
+    # a source root for every individual generated file. So, we re-resolve the codegen sources here.
+    python_and_resources_targets = []
+    codegen_targets = []
+    for tgt in request.targets:
+        if tgt.has_field(PythonSources) or tgt.has_field(ResourcesSources):
+            python_and_resources_targets.append(tgt)
+        elif tgt.get(Sources).can_generate(PythonSources, union_membership) or tgt.get(
+            Sources
+        ).can_generate(ResourcesSources, union_membership):
+            codegen_targets.append(tgt)
+    codegen_sources = await MultiGet(
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(
+                tgt.get(Sources), for_sources_types=request.valid_sources_types, enable_codegen=True
+            ),
         )
+        for tgt in codegen_targets
+    )
+    source_root_requests = [
+        *(SourceRootRequest.for_target(tgt) for tgt in python_and_resources_targets),
+        *(
+            SourceRootRequest.for_file(f)
+            for sources in codegen_sources
+            for f in sources.snapshot.files
+        ),
+    ]
+
+    source_root_objs = await MultiGet(
+        Get(SourceRoot, SourceRootRequest, req) for req in source_root_requests
     )
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
     return PythonSourceFiles(

@@ -6,6 +6,7 @@ from typing import Iterable, List, Optional, Type
 
 import pytest
 
+from pants.backend.codegen.protobuf.python import additional_fields
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.target_types import PythonSources
@@ -36,6 +37,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *python_sources_rules(),
+            *additional_fields.rules(),
             *protobuf_rules(),
             QueryRule(PythonSourceFiles, [PythonSourceFilesRequest]),
             QueryRule(StrippedPythonSourceFiles, [PythonSourceFilesRequest]),
@@ -213,17 +215,39 @@ def test_python_protobuf(rule_runner: RuleRunner) -> None:
             """
         ),
     )
+    rule_runner.create_file(
+        "src/protobuf/other_dir/f.proto",
+        dedent(
+            """\
+            syntax = "proto2";
+
+            package other_dir;
+            """
+        ),
+    )
     rule_runner.add_to_build_file("src/protobuf/dir", "protobuf_library()")
-    targets = [ProtobufLibrary({}, address=Address("src/protobuf/dir"))]
+    rule_runner.add_to_build_file(
+        "src/protobuf/other_dir", "protobuf_library(python_source_root='src/python')"
+    )
+    targets = [
+        ProtobufLibrary({}, address=Address("src/protobuf/dir")),
+        ProtobufLibrary({}, address=Address("src/protobuf/other_dir")),
+    ]
     backend_args = ["--backend-packages=pants.backend.codegen.protobuf.python"]
 
     stripped_result = get_stripped_sources(
-        rule_runner, targets, source_roots=["src/protobuf"], extra_args=backend_args
+        rule_runner, targets, source_roots=["src/protobuf", "src/python"], extra_args=backend_args
     )
-    assert stripped_result.stripped_source_files.snapshot.files == ("dir/f_pb2.py",)
+    assert stripped_result.stripped_source_files.snapshot.files == (
+        "dir/f_pb2.py",
+        "other_dir/f_pb2.py",
+    )
 
     unstripped_result = get_unstripped_sources(
-        rule_runner, targets, source_roots=["src/protobuf"], extra_args=backend_args
+        rule_runner, targets, source_roots=["src/protobuf", "src/python"], extra_args=backend_args
     )
-    assert unstripped_result.source_files.snapshot.files == ("src/protobuf/dir/f_pb2.py",)
-    assert unstripped_result.source_roots == ("src/protobuf",)
+    assert unstripped_result.source_files.snapshot.files == (
+        "src/protobuf/dir/f_pb2.py",
+        "src/python/other_dir/f_pb2.py",
+    )
+    assert unstripped_result.source_roots == ("src/protobuf", "src/python")
