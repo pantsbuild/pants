@@ -239,7 +239,7 @@ class LocalPantsRunner:
             )
 
             goals = tuple(self.options.goals)
-            with streaming_reporter.session():
+            with streaming_reporter.session(pantsd=global_options.pantsd):
                 if not goals:
                     return PANTS_SUCCEEDED_EXIT_CODE
                 engine_result = PANTS_FAILED_EXIT_CODE

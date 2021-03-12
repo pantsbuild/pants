@@ -271,6 +271,10 @@ class WorkunitTracker(WorkunitsCallback):
     started_workunit_chunks: List[List[dict]] = field(default_factory=list)
     finished: bool = False
 
+    @property
+    def can_finish_async(self) -> bool:
+        return False
+
     def __call__(self, **kwargs) -> None:
         if kwargs["finished"] is True:
             self.finished = True
@@ -315,8 +319,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
     def test_streaming_workunits_reporting(self):
         scheduler, tracker, handler = self._fixture_for_rules([fib, QueryRule(Fib, (int,))])
-
-        with handler.session():
+        with handler.session(pantsd=False):
             scheduler.product_request(Fib, subjects=[0])
 
         flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -324,7 +327,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         self.assertEqual(len(flattened), 1)
 
         tracker.finished_workunit_chunks = []
-        with handler.session():
+        with handler.session(pantsd=False):
             scheduler.product_request(Fib, subjects=[10])
 
         # Requesting a bigger fibonacci number will result in more rule executions and thus more reported workunits.
@@ -338,7 +341,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
         )
 
-        with handler.session():
+        with handler.session(pantsd=False):
             i = Input()
             scheduler.product_request(Beta, subjects=[i])
 
@@ -396,7 +399,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             max_workunit_verbosity=LogLevel.TRACE,
         )
 
-        with handler.session():
+        with handler.session(pantsd=False):
             i = Input()
             scheduler.product_request(Beta, subjects=[i])
 
@@ -426,7 +429,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
         scheduler, tracker, info_level_handler = self._fixture_for_rules(rules)
 
-        with info_level_handler.session():
+        with info_level_handler.session(pantsd=False):
             i = Input()
             scheduler.product_request(Alpha, subjects=[i])
 
@@ -447,7 +450,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             rules, max_workunit_verbosity=LogLevel.TRACE
         )
 
-        with debug_level_handler.session():
+        with debug_level_handler.session(pantsd=False):
             i = Input()
             scheduler.product_request(Alpha, subjects=[i])
 
@@ -483,7 +486,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             [a_rule, QueryRule(ModifiedOutput, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
 
-        with handler.session():
+        with handler.session(pantsd=False):
             scheduler.product_request(ModifiedOutput, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -511,7 +514,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             [a_rule, QueryRule(ModifiedOutput, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
 
-        with handler.session():
+        with handler.session(pantsd=False):
             scheduler.product_request(ModifiedOutput, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -536,7 +539,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
 
-        with handler.session():
+        with handler.session(pantsd=False):
             scheduler.product_request(Output, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -562,7 +565,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
 
-        with handler.session():
+        with handler.session(pantsd=False):
             scheduler.product_request(Output, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -593,7 +596,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
 
-        with handler.session():
+        with handler.session(pantsd=False):
             scheduler.product_request(Output, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -622,7 +625,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             max_workunit_verbosity=LogLevel.TRACE,
         )
 
-        with handler.session():
+        with handler.session(pantsd=False):
             scheduler.record_test_observation(128)
             scheduler.product_request(TrueResult, subjects=[0])
             histograms_info = scheduler.get_observation_histograms()
@@ -685,7 +688,7 @@ def test_more_complicated_engine_aware(rule_runner: RuleRunner, run_tracker: Run
         specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
     )
-    with handler.session():
+    with handler.session(pantsd=False):
         input_1 = CreateDigest(
             (
                 FileContent(path="a.txt", content=b"alpha"),
@@ -751,7 +754,7 @@ def test_process_digests_on_streaming_workunits(
         argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
     )
 
-    with handler.session():
+    with handler.session(pantsd=False):
         result = rule_runner.request(ProcessResult, [stdout_process])
 
     assert tracker.finished
@@ -783,7 +786,7 @@ def test_process_digests_on_streaming_workunits(
         argv=("/bin/bash", "-c", "1>&2 /bin/echo 'stderr output'"), description="Stderr process"
     )
 
-    with handler.session():
+    with handler.session(pantsd=False):
         result = rule_runner.request(ProcessResult, [stderr_process])
 
     assert tracker.finished
@@ -820,6 +823,10 @@ def test_context_object_on_streaming_workunits(
     scheduler = rule_runner.scheduler
 
     class Callback(WorkunitsCallback):
+        @property
+        def can_finish_async(self) -> bool:
+            return False
+
         def __call__(self, **kwargs) -> None:
             context = kwargs["context"]
             assert isinstance(context, StreamingWorkunitContext)
@@ -845,12 +852,11 @@ def test_context_object_on_streaming_workunits(
         argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
     )
 
-    with handler.session():
+    with handler.session(pantsd=False):
         rule_runner.request(ProcessResult, [stdout_process])
 
 
 def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
-
     rule_runner = RuleRunner(
         target_types=[PythonLibrary],
         rules=[
@@ -873,6 +879,10 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
     )
 
     class Callback(WorkunitsCallback):
+        @property
+        def can_finish_async(self) -> bool:
+            return False
+
         def __call__(self, **kwargs) -> None:
             context = kwargs["context"]
             assert isinstance(context, StreamingWorkunitContext)
@@ -905,5 +915,5 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
         argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
     )
 
-    with handler.session():
+    with handler.session(pantsd=False):
         rule_runner.request(ProcessResult, [stdout_process])
