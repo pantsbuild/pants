@@ -121,13 +121,13 @@ class WorkunitsCallback(ABC):
 
     @property
     def can_finish_async(self) -> bool:
-        """Can this callback finish it's work in the background after the Pants run has already
+        """Can this callback finish its work in the background after the Pants run has already
         completed?
 
         The main reason to `return False` is if your callback logs in its final call, when
         `finished=True`, as it may end up logging to `.pantsd.d/pants.log` instead of the console,
-        which is harder for users to find. Otherwise, most callbacks should return
-        `True` to avoid slowing down Pants from finishing the run.
+        which is harder for users to find. Otherwise, most callbacks should return `True` to avoid
+        slowing down Pants from finishing the run.
         """
         return False
 
