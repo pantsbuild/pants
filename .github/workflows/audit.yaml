@@ -38,4 +38,4 @@ jobs:
 name: Cargo Audit
 'on':
   schedule:
-  - cron: 11 23 * * *
+  - cron: 11 7 * * *
