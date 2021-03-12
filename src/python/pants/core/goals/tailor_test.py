@@ -7,6 +7,7 @@ import pytest
 
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
+    AllOwnedSources,
     DisjointSourcePutativeTarget,
     EditBuildFilesRequest,
     EditedBuildFiles,
@@ -16,6 +17,7 @@ from pants.core.goals.tailor import (
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
     default_sources_for_target_type,
+    group_by_dir,
     make_content_str,
 )
 from pants.core.util_rules import source_files
@@ -62,6 +64,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(UniquelyNamedPutativeTargets, (PutativeTargets,)),
             QueryRule(DisjointSourcePutativeTarget, (PutativeTarget,)),
             QueryRule(EditedBuildFiles, (EditBuildFilesRequest,)),
+            QueryRule(AllOwnedSources, ()),
         ],
         target_types=[FortranLibrary, FortranTests],
     )
@@ -138,6 +141,28 @@ def test_rename_conflicting_targets(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_root_targets_are_explicitly_named(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file("foo.f90", "")
+    ptgt = PutativeTarget("", "", "fortran_library", ["foo.f90"], FortranLibrarySources.default)
+    unpts = rule_runner.request(UniquelyNamedPutativeTargets, [PutativeTargets([ptgt])])
+    ptgts = unpts.putative_targets
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget(
+                    "",
+                    "root",
+                    "fortran_library",
+                    ["foo.f90"],
+                    FortranLibrarySources.default,
+                    kwargs={"name": "root"},
+                )
+            ]
+        )
+        == ptgts
+    )
+
+
 def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
     dir_structure = {
         "src/fortran/foo/BUILD": "fortran_library(sources=['bar/baz1.f90'])",
@@ -170,6 +195,7 @@ def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
 
 def test_edit_build_files(rule_runner: RuleRunner) -> None:
     rule_runner.create_file("src/fortran/foo/BUILD", 'fortran_library(sources=["bar1.f90"])')
+    rule_runner.create_dir("src/fortran/baz/BUILD")  # NB: A directory, not a file.
     req = EditBuildFilesRequest(
         PutativeTargets(
             [
@@ -197,12 +223,12 @@ def test_edit_build_files(rule_runner: RuleRunner) -> None:
     )
     edited_build_files = rule_runner.request(EditedBuildFiles, [req])
 
-    assert edited_build_files.created_paths == ("src/fortran/baz/BUILD",)
+    assert edited_build_files.created_paths == ("src/fortran/baz/BUILD.pants",)
     assert edited_build_files.updated_paths == ("src/fortran/foo/BUILD",)
 
     contents = rule_runner.request(DigestContents, [edited_build_files.digest])
     expected = [
-        FileContent("src/fortran/baz/BUILD", "fortran_library()\n".encode()),
+        FileContent("src/fortran/baz/BUILD.pants", "fortran_library()\n".encode()),
         FileContent(
             "src/fortran/foo/BUILD",
             textwrap.dedent(
@@ -237,6 +263,26 @@ def test_edit_build_files(rule_runner: RuleRunner) -> None:
         assert efc.path == afc.path
         assert efc.content.decode() == afc.content.decode()
         assert efc.is_executable == afc.is_executable
+
+
+def test_group_by_dir() -> None:
+    paths = {
+        "foo/bar/baz1.ext",
+        "foo/bar/baz1_test.ext",
+        "foo/bar/qux/quux1.ext",
+        "foo/__init__.ext",
+        "foo/bar/__init__.ext",
+        "foo/bar/baz2.ext",
+        "foo/bar1.ext",
+        "foo1.ext",
+        "__init__.ext",
+    }
+    assert {
+        "": {"__init__.ext", "foo1.ext"},
+        "foo": {"__init__.ext", "bar1.ext"},
+        "foo/bar": {"__init__.ext", "baz1.ext", "baz1_test.ext", "baz2.ext"},
+        "foo/bar/qux": {"quux1.ext"},
+    } == group_by_dir(paths)
 
 
 def test_tailor_rule(rule_runner: RuleRunner) -> None:
@@ -323,3 +369,19 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
         "Updated src/fortran/conflict/BUILD:\n  - Added fortran_library target "
         "src/fortran/conflict:conflict0"
     ) in stdout_str
+
+
+def test_all_owned_sources(rule_runner: RuleRunner) -> None:
+    for path in [
+        "dir/a.f90",
+        "dir/b.f90",
+        "dir/a_test.f90",
+        "dir/unowned.txt",
+        "unowned.txt",
+        "unowned.f90",
+    ]:
+        rule_runner.create_file(path)
+    rule_runner.add_to_build_file("dir", "fortran_library()\nfortran_tests(name='tests')")
+    assert rule_runner.request(AllOwnedSources, []) == AllOwnedSources(
+        ["dir/a.f90", "dir/b.f90", "dir/a_test.f90"]
+    )

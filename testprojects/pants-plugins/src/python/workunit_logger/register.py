@@ -32,6 +32,11 @@ class WorkunitsLoggerRequest:
 class WorkunitsLogger(WorkunitsCallback):
     dest: str
 
+    @property
+    def can_finish_async(self) -> bool:
+        # Because we don't write to the console, it's safe to finalize in the background.
+        return True
+
     def __call__(self, *, completed_workunits: Tuple[Workunit, ...], **kwargs) -> None:
         with open(self.dest, "a") as dest:
             print(str(completed_workunits), file=dest)

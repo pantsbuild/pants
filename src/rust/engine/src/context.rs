@@ -24,7 +24,6 @@ use parking_lot::Mutex;
 use process_execution::{
   self, BoundedCommandRunner, CommandRunner, NamedCaches, Platform, ProcessMetadata,
 };
-use rand::seq::SliceRandom;
 use regex::Regex;
 use rule_graph::RuleGraph;
 use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
@@ -69,7 +68,7 @@ pub struct Core {
 #[derive(Clone, Debug)]
 pub struct RemotingOptions {
   pub execution_enable: bool,
-  pub store_addresses: Vec<String>,
+  pub store_address: Option<String>,
   pub execution_address: Option<String>,
   pub execution_process_cache_namespace: Option<String>,
   pub instance_name: Option<String>,
@@ -90,7 +89,6 @@ pub struct ExecutionStrategyOptions {
   pub remote_parallelism: usize,
   pub cleanup_local_dirs: bool,
   pub use_local_cache: bool,
-  pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
   pub remote_cache_write: bool,
 }
@@ -101,14 +99,17 @@ impl Core {
     local_store_dir: &Path,
     enable_remote: bool,
     remoting_opts: &RemotingOptions,
-    remote_store_addresses: &[String],
+    remote_store_address: &Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
   ) -> Result<Store, String> {
     if enable_remote {
+      let remote_store_address = remote_store_address
+        .as_ref()
+        .ok_or("Remote store required, but none configured")?;
       Store::with_remote(
         executor.clone(),
         local_store_dir,
-        remote_store_addresses.to_vec(),
+        remote_store_address,
         remoting_opts.instance_name.clone(),
         root_ca_certs.clone(),
         remoting_opts.store_headers.clone(),
@@ -121,67 +122,9 @@ impl Core {
     }
   }
 
-  fn make_local_execution_runner(
-    store: &Store,
-    executor: &Executor,
-    local_execution_root_dir: &Path,
-    named_caches_dir: &Path,
-    process_execution_metadata: &ProcessMetadata,
-    exec_strategy_opts: &ExecutionStrategyOptions,
-  ) -> Box<dyn CommandRunner> {
-    let local_command_runner = process_execution::local::CommandRunner::new(
-      store.clone(),
-      executor.clone(),
-      local_execution_root_dir.to_path_buf(),
-      NamedCaches::new(named_caches_dir.to_path_buf()),
-      exec_strategy_opts.cleanup_local_dirs,
-    );
-
-    let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =
-      if exec_strategy_opts.local_enable_nailgun {
-        Box::new(process_execution::nailgun::CommandRunner::new(
-          local_command_runner,
-          process_execution_metadata.clone(),
-          local_execution_root_dir.to_path_buf(),
-          executor.clone(),
-        ))
-      } else {
-        Box::new(local_command_runner)
-      };
-
-    Box::new(BoundedCommandRunner::new(
-      maybe_nailgunnable_local_command_runner,
-      exec_strategy_opts.local_parallelism,
-    ))
-  }
-
-  fn make_remote_execution_runner(
-    store: &Store,
-    process_execution_metadata: &ProcessMetadata,
-    remoting_opts: &RemotingOptions,
-    root_ca_certs: &Option<Vec<u8>>,
-  ) -> Result<Box<dyn CommandRunner>, String> {
-    Ok(Box::new(process_execution::remote::CommandRunner::new(
-      // No problem unwrapping here because the global options validation
-      // requires the remoting_opts.execution_server be present when
-      // remoting_opts.execution_enable is set.
-      &remoting_opts.execution_address.clone().unwrap(),
-      remoting_opts.store_addresses.clone(),
-      process_execution_metadata.clone(),
-      root_ca_certs.clone(),
-      remoting_opts.execution_headers.clone(),
-      store.clone(),
-      // TODO if we ever want to configure the remote platform to be something else we
-      // need to take an option all the way down here and into the remote::CommandRunner struct.
-      Platform::Linux,
-      remoting_opts.execution_overall_deadline,
-      Duration::from_millis(100),
-    )?))
-  }
-
   fn make_command_runner(
     full_store: &Store,
-    remote_store_addresses: &[String],
+    remote_store_address: &Option<String>,
     executor: &Executor,
     local_execution_root_dir: &Path,
     named_caches_dir: &Path,
@@ -202,39 +145,45 @@ impl Core {
     } else {
       full_store.clone()
     };
-
-    let local_command_runner = Core::make_local_execution_runner(
-      &store_for_local_runner,
-      executor,
-      local_execution_root_dir,
-      named_caches_dir,
-      process_execution_metadata,
-      &exec_strategy_opts,
-    );
+    let local_command_runner = Box::new(BoundedCommandRunner::new(
+      Box::new(process_execution::local::CommandRunner::new(
+        store_for_local_runner,
+        executor.clone(),
+        local_execution_root_dir.to_path_buf(),
+        NamedCaches::new(named_caches_dir.to_path_buf()),
+        exec_strategy_opts.cleanup_local_dirs,
+      )),
+      exec_strategy_opts.local_parallelism,
+    ));
 
     // Possibly either add the remote execution runner or the remote cache runner.
     // `global_options.py` already validates that both are not set at the same time.
     let maybe_remote_enabled_command_runner: Box<dyn CommandRunner> =
       if remoting_opts.execution_enable {
         Box::new(BoundedCommandRunner::new(
-          Core::make_remote_execution_runner(
-            full_store,
-            process_execution_metadata,
-            &remoting_opts,
-            root_ca_certs,
-          )?,
+          Box::new(process_execution::remote::CommandRunner::new(
+            // We unwrap because global_options.py will have already validated these are defined.
+            remoting_opts.execution_address.as_ref().unwrap(),
+            remoting_opts.store_address.as_ref().unwrap(),
+            process_execution_metadata.clone(),
+            root_ca_certs.clone(),
+            remoting_opts.execution_headers.clone(),
+            full_store.clone(),
+            // TODO if we ever want to configure the remote platform to be something else we
+            // need to take an option all the way down here and into the remote::CommandRunner struct.
+            Platform::Linux,
+            remoting_opts.execution_overall_deadline,
+            Duration::from_millis(100),
+          )?),
           exec_strategy_opts.remote_parallelism,
         ))
       } else if remote_caching_used {
-        let action_cache_address = remote_store_addresses
-          .first()
-          .ok_or_else(|| "At least one remote store must be specified".to_owned())?;
         Box::new(process_execution::remote_cache::CommandRunner::new(
           local_command_runner.into(),
           process_execution_metadata.clone(),
           executor.clone(),
           full_store.clone(),
-          action_cache_address.as_str(),
+          remote_store_address.as_ref().unwrap(),
           root_ca_certs.clone(),
           remoting_opts.store_headers.clone(),
           Platform::current()?,
@@ -316,10 +265,6 @@ impl Core {
     remoting_opts: RemotingOptions,
     exec_strategy_opts: ExecutionStrategyOptions,
   ) -> Result<Core, String> {
-    // Randomize CAS address order to avoid thundering herds from common config.
-    let mut remote_store_addresses = remoting_opts.store_addresses.clone();
-    remote_store_addresses.shuffle(&mut rand::thread_rng());
-
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(ref path) = remoting_opts.root_ca_certs_path {
       Some(
@@ -333,9 +278,6 @@ impl Core {
     let need_remote_store = remoting_opts.execution_enable
       || exec_strategy_opts.remote_cache_read
       || exec_strategy_opts.remote_cache_write;
-    if need_remote_store && remote_store_addresses.is_empty() {
-      return Err("Remote store required but none provided".into());
-    }
 
     safe_create_dir_all_ioerror(&local_store_dir)
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))?;
@@ -344,7 +286,7 @@ impl Core {
       &local_store_dir,
       need_remote_store,
       &remoting_opts,
-      &remote_store_addresses,
+      &remoting_opts.store_address,
       &root_ca_certs,
     )
     .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
@@ -369,7 +311,7 @@ impl Core {
 
     let command_runner = Self::make_command_runner(
       &full_store,
-      &remote_store_addresses,
+      &remoting_opts.store_address,
       &executor,
       &local_execution_root_dir,
       &named_caches_dir,

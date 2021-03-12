@@ -64,7 +64,7 @@ use futures::Future;
 use hashing::Digest;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
-use logging::{Destination, Logger, PythonLogLevel};
+use logging::{Logger, PythonLogLevel};
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
@@ -103,46 +103,56 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "init_logging",
+    "stdio_initialize",
     py_fn!(
       py,
-      init_logging(a: u64, b: bool, c: bool, d: bool, e: PyDict, f: Vec<String>)
+      stdio_initialize(
+        a: u64,
+        b: bool,
+        c: bool,
+        d: bool,
+        e: PyDict,
+        f: Vec<String>,
+        g: String
+      )
     ),
   )?;
   m.add(
     py,
-    "setup_pantsd_logger",
-    py_fn!(py, setup_pantsd_logger(a: String)),
+    "stdio_thread_console_set",
+    py_fn!(
+      py,
+      stdio_thread_console_set(stdin_fileno: i32, stdout_fileno: i32, stderr_fileno: i32)
+    ),
   )?;
-  m.add(py, "setup_stderr_logger", py_fn!(py, setup_stderr_logger()))?;
+  m.add(
+    py,
+    "stdio_thread_console_clear",
+    py_fn!(py, stdio_thread_console_clear()),
+  )?;
+  m.add(
+    py,
+    "stdio_thread_get_destination",
+    py_fn!(py, stdio_thread_get_destination()),
+  )?;
+  m.add(
+    py,
+    "stdio_thread_set_destination",
+    py_fn!(py, stdio_thread_set_destination(a: PyStdioDestination)),
+  )?;
+
   m.add(py, "flush_log", py_fn!(py, flush_log()))?;
   m.add(
     py,
-    "override_thread_logging_destination",
-    py_fn!(py, override_thread_logging_destination(a: String)),
-  )?;
-  m.add(
-    py,
     "write_log",
-    py_fn!(py, write_log(a: String, b: u64, c: String)),
+    py_fn!(py, write_log(msg: String, level: u64, target: String)),
   )?;
-
   m.add(
     py,
     "set_per_run_log_path",
     py_fn!(py, set_per_run_log_path(a: Option<String>)),
   )?;
 
-  m.add(
-    py,
-    "write_stdout",
-    py_fn!(py, write_stdout(a: PySession, b: String)),
-  )?;
-  m.add(
-    py,
-    "write_stderr",
-    py_fn!(py, write_stderr(a: PySession, b: String)),
-  )?;
   m.add(
     py,
     "teardown_dynamic_ui",
@@ -424,6 +434,8 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::fs::PyDigest>(py)?;
   m.add_class::<externs::fs::PySnapshot>(py)?;
 
+  m.add_class::<PyStdioDestination>(py)?;
+
   m.add_class::<self::testutil::PyStubCAS>(py)?;
   m.add_class::<self::testutil::PyStubCASBuilder>(py)?;
 
@@ -493,13 +505,17 @@ py_class!(class PyTypes |py| {
 py_class!(pub class PyExecutor |py| {
     data executor: Executor;
     def __new__(_cls, core_threads: usize, max_threads: usize) -> CPyResult<Self> {
-      let executor = Executor::new_owned(core_threads, max_threads).map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+      let executor = Executor::global(core_threads, max_threads).map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
       Self::create_instance(py, executor)
     }
 });
 
 py_class!(class PyScheduler |py| {
     data scheduler: Scheduler;
+});
+
+py_class!(class PyStdioDestination |py| {
+  data destination: Arc<stdio::Destination>;
 });
 
 // Represents configuration related to process execution strategies.
@@ -516,7 +532,6 @@ py_class!(class PyExecutionStrategyOptions |py| {
     remote_parallelism: u64,
     cleanup_local_dirs: bool,
     use_local_cache: bool,
-    local_enable_nailgun: bool,
     remote_cache_read: bool,
     remote_cache_write: bool
   ) -> CPyResult<Self> {
@@ -526,7 +541,6 @@ py_class!(class PyExecutionStrategyOptions |py| {
         remote_parallelism: remote_parallelism as usize,
         cleanup_local_dirs,
         use_local_cache,
-        local_enable_nailgun,
         remote_cache_read,
         remote_cache_write,
       }
@@ -544,7 +558,7 @@ py_class!(class PyRemotingOptions |py| {
   def __new__(
     _cls,
     execution_enable: bool,
-    store_addresses: Vec<String>,
+    store_address: Option<String>,
     execution_address: Option<String>,
     execution_process_cache_namespace: Option<String>,
     instance_name: Option<String>,
@@ -561,7 +575,7 @@ py_class!(class PyRemotingOptions |py| {
     Self::create_instance(py,
       RemotingOptions {
         execution_enable,
-        store_addresses,
+        store_address,
         execution_address,
         execution_process_cache_namespace,
         instance_name,
@@ -655,6 +669,9 @@ py_class!(class PyNailgunClient |py| {
           let err_str = format!("Nailgun client error: {:?}", s);
           PyErr::new::<NailgunClientException, _>(py, (err_str,))
         },
+        NailgunClientError::BrokenPipe => {
+          PyErr::new::<exc::BrokenPipeError, _>(py, NoArgs)
+        }
         NailgunClientError::KeyboardInterrupt => {
           PyErr::new::<exc::KeyboardInterrupt, _>(py, NoArgs)
         }
@@ -1747,19 +1764,11 @@ fn run_local_interactive_process(
       let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
       let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
       let input_digest: Digest = nodes::lift_directory_digest(&input_digest_value)?;
-      let hermetic_env: bool = externs::getattr(&value, "hermetic_env").unwrap();
       let env = externs::getattr_from_frozendict(&value, "env");
 
       let code = block_in_place_and_wait(py, || {
         scheduler
-          .run_local_interactive_process(
-            session,
-            input_digest,
-            argv,
-            env,
-            hermetic_env,
-            run_in_workspace,
-          )
+          .run_local_interactive_process(session, input_digest, argv, env, run_in_workspace)
           .boxed_local()
       })?;
 
@@ -1822,7 +1831,7 @@ fn default_cache_path(py: Python) -> CPyResult<String> {
     })
 }
 
-fn init_logging(
+fn stdio_initialize(
   py: Python,
   level: u64,
   show_rust_3rdparty_logs: bool,
@@ -1830,7 +1839,8 @@ fn init_logging(
   show_target: bool,
   log_levels_by_target: PyDict,
   message_regex_filters: Vec<String>,
-) -> PyUnitResult {
+  log_file: String,
+) -> CPyResult<PyTuple> {
   let log_levels_by_target = log_levels_by_target
     .items(py)
     .iter()
@@ -1855,24 +1865,49 @@ fn init_logging(
     show_target,
     log_levels_by_target,
     message_regex_filters,
-  );
+    PathBuf::from(log_file),
+  )
+  .map_err(|s| {
+    PyErr::new::<exc::Exception, _>(py, (format!("Could not initialize logging: {}", s),))
+  })?;
+
+  Ok(PyTuple::new(
+    py,
+    &[
+      externs::stdio::py_stdio_read()?.into_object(),
+      externs::stdio::py_stdio_write(true)?.into_object(),
+      externs::stdio::py_stdio_write(false)?.into_object(),
+    ],
+  ))
+}
+
+fn stdio_thread_console_set(
+  _: Python,
+  stdin_fileno: i32,
+  stdout_fileno: i32,
+  stderr_fileno: i32,
+) -> PyUnitResult {
+  let destination = stdio::new_console_destination(stdin_fileno, stdout_fileno, stderr_fileno);
+  stdio::set_thread_destination(destination);
   Ok(None)
 }
 
-fn setup_pantsd_logger(py: Python, log_file: String) -> CPyResult<i64> {
-  logging::set_thread_destination(Destination::Pantsd);
-  let path = PathBuf::from(log_file);
-  PANTS_LOGGER
-    .set_pantsd_logger(path)
-    .map(i64::from)
-    .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
-}
-
-fn setup_stderr_logger(_: Python) -> PyUnitResult {
-  logging::set_thread_destination(Destination::Stderr);
+fn stdio_thread_console_clear(_: Python) -> PyUnitResult {
+  stdio::get_destination().console_clear();
   Ok(None)
 }
 
+fn stdio_thread_get_destination(py: Python) -> CPyResult<PyStdioDestination> {
+  let dest = stdio::get_destination();
+  PyStdioDestination::create_instance(py, dest)
+}
+
+fn stdio_thread_set_destination(py: Python, stdio_destination: PyStdioDestination) -> PyUnitResult {
+  stdio::set_thread_destination(stdio_destination.destination(py).clone());
+  Ok(None)
+}
+
+// TODO: Needs to be thread-local / associated with the Console.
 fn set_per_run_log_path(py: Python, log_path: Option<String>) -> PyUnitResult {
   py.allow_threads(|| {
     PANTS_LOGGER.set_per_run_logs(log_path.map(PathBuf::from));
@@ -1880,27 +1915,10 @@ fn set_per_run_log_path(py: Python, log_path: Option<String>) -> PyUnitResult {
   })
 }
 
-fn write_log(py: Python, msg: String, level: u64, path: String) -> PyUnitResult {
+fn write_log(py: Python, msg: String, level: u64, target: String) -> PyUnitResult {
   py.allow_threads(|| {
-    Logger::log_from_python(&msg, level, &path).expect("Error logging message");
+    Logger::log_from_python(&msg, level, &target).expect("Error logging message");
     Ok(None)
-  })
-}
-
-fn write_stdout(py: Python, session_ptr: PySession, msg: String) -> PyUnitResult {
-  with_session(py, session_ptr, |session| {
-    block_in_place_and_wait(py, || session.write_stdout(&msg).boxed_local())
-      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-    Ok(None)
-  })
-}
-
-fn write_stderr(py: Python, session_ptr: PySession, msg: String) -> PyUnitResult {
-  with_session(py, session_ptr, |session| {
-    py.allow_threads(|| {
-      session.write_stderr(&msg);
-      Ok(None)
-    })
   })
 }
 
@@ -1924,15 +1942,6 @@ fn flush_log(py: Python) -> PyUnitResult {
     PANTS_LOGGER.flush();
     Ok(None)
   })
-}
-
-fn override_thread_logging_destination(py: Python, destination: String) -> PyUnitResult {
-  let destination = destination
-    .as_str()
-    .try_into()
-    .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
-  logging::set_thread_destination(destination);
-  Ok(None)
 }
 
 fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {

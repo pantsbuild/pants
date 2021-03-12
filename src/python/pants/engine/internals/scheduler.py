@@ -31,6 +31,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch, PyTypes
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
@@ -485,6 +486,9 @@ class SchedulerSession:
             name = f"graph.{self._run_count:03d}.dot"
             self._run_count += 1
             self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir, name))
+
+    def teardown_dynamic_ui(self) -> None:
+        native_engine.teardown_dynamic_ui(self._scheduler._scheduler, self._session)
 
     def execute(self, execution_request: ExecutionRequest):
         """Invoke the engine for the given ExecutionRequest, returning Return and Throw states.

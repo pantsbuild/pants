@@ -10,6 +10,9 @@ function nuke_if_too_big() {
     if (( actual_mb > limit_mb )); then
       echo "${path} is too large, nuking it."
       rm -rf "${path}"
+      # Travis cache uploads will fail if a directory does not exist.
+      #   see https://docs.travis-ci.com/user/caching/#caches-and-read-permissions
+      mkdir -p "${path}"
     else
       echo "${path} is not too large, leaving it."
     fi
@@ -26,11 +29,8 @@ function nuke_if_too_big() {
 
 nuke_if_too_big "${HOME}/.pants_pyenv" 512
 nuke_if_too_big "${HOME}/.aws_cli" 128
+nuke_if_too_big "${HOME}/.cache/pants/pants_dev_deps" 128
 nuke_if_too_big "${HOME}/.cache/pants/tools" 128
-nuke_if_too_big "${HOME}/.cache/pants/zinc" 128
-nuke_if_too_big "${HOME}/.ivy2/pants" 512
-nuke_if_too_big "${HOME}/.npm" 128
-nuke_if_too_big build-support/virtualenvs 128
 nuke_if_too_big src/rust/engine/target 3072
 
 # Note that we don't prune all of ${HOME}/.cache/pants/rust/cargo, as it mostly contains git

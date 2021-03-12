@@ -21,8 +21,6 @@ use futures::FutureExt;
 use futures::{Stream, StreamExt};
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
-use itertools::Either;
-use itertools::Itertools;
 use log::{debug, trace, warn, Level};
 use prost::Message;
 use rand::{thread_rng, Rng};
@@ -33,7 +31,7 @@ use remexec::{
 };
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use tonic::metadata::BinaryMetadataValue;
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use tonic::{Code, Interceptor, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
@@ -42,8 +40,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
-  Process, ProcessCacheScope, ProcessMetadata,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
+  ProcessCacheScope, ProcessMetadata, ProcessResultMetadata,
 };
 use grpc_util::headers_to_interceptor_fn;
 
@@ -118,8 +116,8 @@ enum StreamOutcome {
 impl CommandRunner {
   /// Construct a new CommandRunner
   pub fn new(
-    address: &str,
-    store_addresses: Vec<String>,
+    execution_address: &str,
+    store_address: &str,
     metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
@@ -128,11 +126,8 @@ impl CommandRunner {
     overall_deadline: Duration,
     retry_interval_duration: Duration,
   ) -> Result<Self, String> {
-    let execution_use_tls = address.starts_with("https://");
-    let store_use_tls = store_addresses
-      .first()
-      .map(|addr| addr.starts_with("https://"))
-      .unwrap_or(false);
+    let execution_use_tls = execution_address.starts_with("https://");
+    let store_use_tls = store_address.starts_with("https://");
 
     let tls_client_config = if execution_use_tls || store_use_tls {
       Some(grpc_util::create_tls_config(root_ca_certs)?)
@@ -146,37 +141,24 @@ impl CommandRunner {
       Some(Interceptor::new(headers_to_interceptor_fn(&headers)?))
     };
 
-    let endpoint = grpc_util::create_endpoint(
-      &address,
+    let execution_endpoint = grpc_util::create_endpoint(
+      &execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
     )?;
-    let channel = tonic::transport::Channel::balance_list(vec![endpoint].into_iter());
+    let execution_channel =
+      tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter());
     let execution_client = Arc::new(match interceptor.as_ref() {
-      Some(interceptor) => ExecutionClient::with_interceptor(channel.clone(), interceptor.clone()),
-      None => ExecutionClient::new(channel.clone()),
+      Some(interceptor) => {
+        ExecutionClient::with_interceptor(execution_channel.clone(), interceptor.clone())
+      }
+      None => ExecutionClient::new(execution_channel.clone()),
     });
 
-    let (store_endpoints, store_endpoints_errors): (Vec<Endpoint>, Vec<String>) = store_addresses
-      .iter()
-      .map(|addr| {
-        grpc_util::create_endpoint(
-          addr.as_str(),
-          tls_client_config.as_ref().filter(|_| store_use_tls),
-        )
-      })
-      .partition_map(|result| match result {
-        Ok(endpoint) => Either::Left(endpoint),
-        Err(err) => Either::Right(err),
-      });
-
-    if !store_endpoints_errors.is_empty() {
-      return Err(format!(
-        "Endpoint errors: {}",
-        store_endpoints_errors.join(", ")
-      ));
-    }
-
-    let store_channel = tonic::transport::Channel::balance_list(store_endpoints.iter().cloned());
+    let store_endpoint = grpc_util::create_endpoint(
+      &store_address,
+      tls_client_config.as_ref().filter(|_| execution_use_tls),
+    )?;
+    let store_channel = tonic::transport::Channel::balance_list(vec![store_endpoint].into_iter());
 
     let action_cache_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => ActionCacheClient::with_interceptor(store_channel, interceptor.clone()),
@@ -185,15 +167,15 @@ impl CommandRunner {
 
     let capabilities_client = Arc::new(match interceptor.as_ref() {
       Some(interceptor) => {
-        CapabilitiesClient::with_interceptor(channel.clone(), interceptor.clone())
+        CapabilitiesClient::with_interceptor(execution_channel.clone(), interceptor.clone())
       }
-      None => CapabilitiesClient::new(channel.clone()),
+      None => CapabilitiesClient::new(execution_channel.clone()),
     });
 
     let command_runner = CommandRunner {
       metadata,
       headers,
-      channel,
+      channel: execution_channel,
       execution_client,
       action_cache_client,
       store,
@@ -330,7 +312,10 @@ impl CommandRunner {
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
+          WorkunitMetadata {
+            level: Level::Debug,
+            ..WorkunitMetadata::default()
+          },
         ),
         Err(s) => warn!("{}", s),
       }
@@ -352,7 +337,10 @@ impl CommandRunner {
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
+          WorkunitMetadata {
+            level: Level::Debug,
+            ..WorkunitMetadata::default()
+          },
         ),
         Err(s) => warn!("{}", s),
       }
@@ -374,7 +362,10 @@ impl CommandRunner {
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
+          WorkunitMetadata {
+            level: Level::Debug,
+            ..WorkunitMetadata::default()
+          },
         ),
         Err(s) => warn!("{}", s),
       }
@@ -396,7 +387,10 @@ impl CommandRunner {
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
+          WorkunitMetadata {
+            level: Level::Debug,
+            ..WorkunitMetadata::default()
+          },
         ),
         Err(s) => warn!("{}", s),
       }
@@ -501,7 +495,6 @@ impl CommandRunner {
             populate_fallible_execution_result(
               self.store.clone(),
               action_result,
-              vec![],
               self.platform,
               false,
             )
@@ -735,7 +728,6 @@ impl CommandRunner {
               &process.description,
               process.timeout,
               start_time.elapsed(),
-              Vec::new(),
               self.platform,
             )
             .await;
@@ -778,7 +770,10 @@ impl crate::CommandRunner for CommandRunner {
     let (command_digest, action_digest) = with_workunit(
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..WorkunitMetadata::default()
+      },
       ensure_action_stored_locally(&self.store, &command, &action),
       |_, md| md,
     )
@@ -789,7 +784,10 @@ impl crate::CommandRunner for CommandRunner {
     let cached_response_opt = with_workunit(
       context.workunit_store.clone(),
       "check_action_cache".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..WorkunitMetadata::default()
+      },
       check_action_cache(
         action_digest,
         &self.metadata,
@@ -814,7 +812,10 @@ impl crate::CommandRunner for CommandRunner {
     with_workunit(
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..WorkunitMetadata::default()
+      },
       ensure_action_uploaded(&store, command_digest, action_digest, request.input_files),
       |_, md| md,
     )
@@ -829,7 +830,10 @@ impl crate::CommandRunner for CommandRunner {
     let response = with_workunit(
       context.workunit_store.clone(),
       "run_execute_request".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..WorkunitMetadata::default()
+      },
       timeout_fut,
       |result, mut metadata| {
         if result.is_err() {
@@ -1085,7 +1089,6 @@ pub async fn populate_fallible_execution_result_for_timeout(
   description: &str,
   timeout: Option<Duration>,
   elapsed: Duration,
-  execution_attempts: Vec<ExecutionStats>,
   platform: Platform,
 ) -> Result<FallibleProcessResultWithPlatform, String> {
   let timeout_msg = if let Some(timeout) = timeout {
@@ -1101,8 +1104,8 @@ pub async fn populate_fallible_execution_result_for_timeout(
     stderr_digest: hashing::EMPTY_DIGEST,
     exit_code: -libc::SIGTERM,
     output_directory: hashing::EMPTY_DIGEST,
-    execution_attempts,
     platform,
+    metadata: ProcessResultMetadata::default(),
   })
 }
 
@@ -1116,11 +1119,9 @@ pub async fn populate_fallible_execution_result_for_timeout(
 pub fn populate_fallible_execution_result(
   store: Store,
   action_result: &remexec::ActionResult,
-  execution_attempts: Vec<ExecutionStats>,
   platform: Platform,
   treat_tree_digest_as_final_directory_hack: bool,
 ) -> BoxFuture<Result<FallibleProcessResultWithPlatform, String>> {
-  let exit_code = action_result.exit_code;
   future::try_join3(
     extract_stdout(&store, action_result),
     extract_stderr(&store, action_result),
@@ -1135,10 +1136,13 @@ pub fn populate_fallible_execution_result(
       Ok(FallibleProcessResultWithPlatform {
         stdout_digest,
         stderr_digest,
-        exit_code,
+        exit_code: action_result.exit_code,
         output_directory,
-        execution_attempts,
         platform,
+        metadata: action_result
+          .execution_metadata
+          .clone()
+          .map_or(ProcessResultMetadata::default(), |metadata| metadata.into()),
       })
     },
   )
@@ -1391,8 +1395,7 @@ pub async fn check_action_cache(
     Ok(action_result) => {
       let action_result = action_result.into_inner();
       let response =
-        populate_fallible_execution_result(store.clone(), &action_result, vec![], platform, false)
-          .await?;
+        populate_fallible_execution_result(store.clone(), &action_result, platform, false).await?;
       if eager_fetch {
         future::try_join_all(vec![
           store.ensure_local_has_file(response.stdout_digest).boxed(),

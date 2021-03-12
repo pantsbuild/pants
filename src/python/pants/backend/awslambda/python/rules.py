@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 from dataclasses import dataclass
 
 from pants.backend.awslambda.python.lambdex import Lambdex
@@ -30,10 +31,19 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
+from pants.core.target_types import FilesSources
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.engine.target import (
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    targets_with_sources_types,
+)
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.util.docutil import docs_url
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -47,7 +57,7 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
 async def package_python_awslambda(
-    field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex
+    field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex, union_membership: UnionMembership
 ) -> BuiltPackage:
     output_filename = field_set.output_path.value_or_default(
         field_set.address,
@@ -69,7 +79,7 @@ async def package_python_awslambda(
         PexFromTargetsRequest(
             addresses=[field_set.address],
             internal_only=False,
-            entry_point=None,
+            main=None,
             output_filename=output_filename,
             platforms=PexPlatforms([platform]),
             additional_args=[
@@ -87,14 +97,31 @@ async def package_python_awslambda(
         internal_only=True,
         requirements=PexRequirements(lambdex.all_requirements),
         interpreter_constraints=PexInterpreterConstraints(lambdex.interpreter_constraints),
-        entry_point=lambdex.entry_point,
+        main=lambdex.main,
     )
 
-    lambdex_pex, pex_result, handler = await MultiGet(
+    lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
         Get(VenvPex, PexRequest, lambdex_request),
         Get(TwoStepPex, TwoStepPexFromTargetsRequest, pex_request),
         Get(ResolvedPythonAwsHandler, ResolvePythonAwsHandlerRequest(field_set.handler)),
+        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
+
+    # Warn if users depend on `files` targets, which won't be included in the PEX and is a common
+    # gotcha.
+    files_tgts = targets_with_sources_types(
+        [FilesSources], transitive_targets.dependencies, union_membership
+    )
+    if files_tgts:
+        files_addresses = sorted(tgt.address.spec for tgt in files_tgts)
+        logger.warning(
+            f"The python_awslambda target {field_set.address} transitively depends on the below "
+            "files targets, but Pants will not include them in the built Lambda. Filesystem APIs "
+            "like `open()` are not able to load files within the binary itself; instead, they "
+            "read from the current working directory."
+            f"\n\nInstead, use `resources` targets. See {docs_url('resources')}."
+            f"\n\nFiles targets dependencies: {files_addresses}"
+        )
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
     result = await Get(

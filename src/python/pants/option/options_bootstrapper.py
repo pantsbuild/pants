@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Sequence, Set, Tuple, Type
 
-from pants.base.build_environment import get_default_pants_config_file
+from pants.base.build_environment import get_default_pants_config_file, pants_version
+from pants.base.exceptions import BuildConfigurationError
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptions
@@ -104,8 +106,8 @@ class OptionsBootstrapper:
     ) -> OptionsBootstrapper:
         """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
-        :param env: An environment dictionary, or None to use `os.environ`.
-        :param args: An args array, or None to use `sys.argv`.
+        :param env: An environment dictionary.
+        :param args: An args array.
         :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
           consume pantsrc files, they should pass False in order to avoid reading files from
           absolute paths. Production usecases should pass True to allow options values to make the
@@ -208,7 +210,9 @@ class OptionsBootstrapper:
         return self.bootstrap_options
 
     @memoized_method
-    def _full_options(self, known_scope_infos: FrozenOrderedSet[ScopeInfo]) -> Options:
+    def _full_options(
+        self, known_scope_infos: FrozenOrderedSet[ScopeInfo], allow_unknown_options: bool = False
+    ) -> Options:
         bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
         options = Options.create(
             self.env,
@@ -216,6 +220,7 @@ class OptionsBootstrapper:
             known_scope_infos,
             args=self.args,
             bootstrap_option_values=bootstrap_option_values,
+            allow_unknown_options=allow_unknown_options,
         )
 
         distinct_optionable_classes: Set[Type[Optionable]] = set()
@@ -227,7 +232,9 @@ class OptionsBootstrapper:
 
         return options
 
-    def get_full_options(self, known_scope_infos: Iterable[ScopeInfo]) -> Options:
+    def full_options_for_scopes(
+        self, known_scope_infos: Iterable[ScopeInfo], allow_unknown_options: bool = False
+    ) -> Options:
         """Get the full Options instance bootstrapped by this object for the given known scopes.
 
         :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
@@ -235,5 +242,26 @@ class OptionsBootstrapper:
                   scopes.
         """
         return self._full_options(
-            FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope))
+            FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope)),
+            allow_unknown_options=allow_unknown_options,
         )
+
+    def full_options(self, build_configuration: BuildConfiguration) -> Options:
+        global_bootstrap_options = self.get_bootstrap_options().for_global_scope()
+        if global_bootstrap_options.pants_version != pants_version():
+            raise BuildConfigurationError(
+                f"Version mismatch: Requested version was {global_bootstrap_options.pants_version}, "
+                f"our version is {pants_version()}."
+            )
+
+        # Parse and register options.
+        known_scope_infos = [
+            si
+            for optionable in build_configuration.all_optionables
+            for si in optionable.known_scope_infos()
+        ]
+        options = self.full_options_for_scopes(
+            known_scope_infos, allow_unknown_options=build_configuration.allow_unknown_options
+        )
+        GlobalOptions.validate_instance(options.for_global_scope())
+        return options

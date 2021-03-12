@@ -174,7 +174,7 @@ async def py_constraints(
                 "(These are the constraints used if you were to depend on all of the input "
                 "files/targets together, even though they may end up never being used together in "
                 "the real world. Consider using a more precise query or running "
-                "`./pants py-constriants --summary`.)\n"
+                "`./pants py-constraints --summary`.)\n"
             )
             output_stdout(indent(fill(merged_constraints_warning, 80), "  "))
 

@@ -30,8 +30,15 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use arc_swap::ArcSwapOption;
 use futures::future::FutureExt;
+use lazy_static::lazy_static;
 use tokio::runtime::{Builder, Handle, Runtime};
+
+lazy_static! {
+    // Lazily initialized in Executor::global.
+    static ref GLOBAL_EXECUTOR: ArcSwapOption<Runtime> = ArcSwapOption::from_pointee(None);
+}
 
 #[derive(Debug, Clone)]
 pub struct Executor {
@@ -57,11 +64,23 @@ impl Executor {
   }
 
   ///
-  /// Creates an Executor with an owned tokio::Runtime.
+  /// Gets a reference to a global static Executor with an owned tokio::Runtime, initializing it
+  /// with the given thread configuration if this is the first usage.
   ///
-  /// Dropping all clones of the Executor will cause the Runtime to shut down.
+  /// NB: The global static Executor eases lifecycle issues when consumed from Python, where we
+  /// need thread configurability, but also want to know reliably when the Runtime will shutdown
+  /// (which, because it is static, will only be at the entire process' exit).
   ///
-  pub fn new_owned(core_threads: usize, num_threads: usize) -> Result<Executor, String> {
+  pub fn global(core_threads: usize, num_threads: usize) -> Result<Executor, String> {
+    let global = GLOBAL_EXECUTOR.load();
+    if let Some(ref runtime) = *global {
+      return Ok(Executor {
+        runtime: Some(runtime.clone()),
+        handle: runtime.handle().clone(),
+      });
+    }
+
+    // Otherwise, attempt to create and swap in the Runtime.
     let runtime = Builder::new()
       .core_threads(core_threads)
       .max_threads(num_threads)
@@ -69,11 +88,10 @@ impl Executor {
       .enable_all()
       .build()
       .map_err(|e| format!("Failed to start the runtime: {}", e))?;
-    let handle = runtime.handle().clone();
-    Ok(Executor {
-      runtime: Some(Arc::new(runtime)),
-      handle,
-    })
+
+    // Attempt to swap, then recurse to retry.
+    GLOBAL_EXECUTOR.compare_and_swap(global, Some(Arc::new(runtime)));
+    Self::global(core_threads, num_threads)
   }
 
   ///
@@ -137,12 +155,12 @@ impl Executor {
     &self,
     f: F,
   ) -> impl Future<Output = R> {
-    let logging_destination = logging::get_destination();
+    let stdio_destination = stdio::get_destination();
     let workunit_store_handle = workunit_store::get_workunit_store_handle();
     // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
     // panic, in which case we want to propagate that.
     tokio::task::spawn_blocking(move || {
-      logging::set_thread_destination(logging_destination);
+      stdio::set_thread_destination(stdio_destination);
       workunit_store::set_thread_workunit_store_handle(workunit_store_handle);
       f()
     })
@@ -150,20 +168,20 @@ impl Executor {
   }
 
   ///
-  /// Copy our (thread-local or task-local) logging destination and current workunit parent into
-  /// the task. The former ensures that when a pantsd thread kicks off a future, any logging done
+  /// Copy our (thread-local or task-local) stdio destination and current workunit parent into
+  /// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
   /// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
   /// is created it has an accurate handle to its parent.
   ///
   fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::Output> {
-    let logging_destination = logging::get_destination();
+    let stdio_destination = stdio::get_destination();
     let workunit_store_handle = workunit_store::get_workunit_store_handle();
 
     // NB: It is important that the first portion of this method is synchronous (meaning that this
     // method cannot be `async`), because that means that it will run on the thread that calls it.
     // The second, async portion of the method will run in the spawned Task.
 
-    logging::scope_task_destination(logging_destination, async move {
+    stdio::scope_task_destination(stdio_destination, async move {
       workunit_store::scope_task_workunit_store_handle(workunit_store_handle, future).await
     })
   }

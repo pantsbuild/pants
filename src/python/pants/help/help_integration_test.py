@@ -128,7 +128,7 @@ def test_unknown_goal() -> None:
     pants_run = run_pants(["testx"])
     pants_run.assert_failure()
     assert "Unknown goal: testx" in pants_run.stdout
-    assert "Did you mean: test" in pants_run.stdout
+    assert "Did you mean test" in pants_run.stdout
 
 
 def test_unknown_global_flags() -> None:

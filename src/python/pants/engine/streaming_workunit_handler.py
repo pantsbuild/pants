@@ -1,17 +1,19 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import threading
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
-
-from typing_extensions import Protocol
+from typing import Any, Callable, Iterable, Iterator, Sequence, Tuple
 
 from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents, Snapshot
+from pants.engine.internals import native_engine
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
 from pants.engine.internals.selectors import Params
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
@@ -24,6 +26,11 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
+# -----------------------------------------------------------------------------------------------
+# Streaming workunits plugin API
+# -----------------------------------------------------------------------------------------------
+
+
 @dataclass(frozen=True)
 class TargetInfo:
     filename: str
@@ -31,7 +38,7 @@ class TargetInfo:
 
 @dataclass(frozen=True)
 class ExpandedSpecs:
-    targets: Dict[str, List[TargetInfo]]
+    targets: dict[str, list[TargetInfo]]
 
 
 @dataclass(frozen=True)
@@ -46,7 +53,7 @@ class StreamingWorkunitContext:
         """Returns the RunTracker for the current run of Pants."""
         return self._run_tracker
 
-    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes, ...]:
+    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> tuple[bytes, ...]:
         """Given a list of Digest objects, each representing the contents of a single file, return a
         list of the bytes corresponding to each of those Digests in sequence."""
         return self._scheduler.single_file_digests_to_bytes(digests)
@@ -82,7 +89,7 @@ class StreamingWorkunitContext:
         expanded_targets = self._scheduler.product_request(
             Targets, [Params(Addresses([addr])) for addr in unexpanded_addresses]
         )
-        targets_dict: Dict[str, List[TargetInfo]] = {}
+        targets_dict: dict[str, list[TargetInfo]] = {}
         for addr, targets in zip(unexpanded_addresses, expanded_targets):
             targets_dict[addr.spec] = [
                 TargetInfo(
@@ -95,12 +102,13 @@ class StreamingWorkunitContext:
         return ExpandedSpecs(targets=targets_dict)
 
 
-class WorkunitsCallback(Protocol):
+class WorkunitsCallback(ABC):
+    @abstractmethod
     def __call__(
         self,
         *,
-        started_workunits: Tuple[Workunit, ...],
-        completed_workunits: Tuple[Workunit, ...],
+        started_workunits: tuple[Workunit, ...],
+        completed_workunits: tuple[Workunit, ...],
         finished: bool,
         context: StreamingWorkunitContext,
     ) -> None:
@@ -110,7 +118,18 @@ class WorkunitsCallback(Protocol):
         :finished: True when the last chunk of workunit data is reported to the callback.
         :context: A context providing access to functionality relevant to the run.
         """
-        ...
+
+    @property
+    def can_finish_async(self) -> bool:
+        """Can this callback finish its work in the background after the Pants run has already
+        completed?
+
+        The main reason to `return False` is if your callback logs in its final call, when
+        `finished=True`, as it may end up logging to `.pantsd.d/pants.log` instead of the console,
+        which is harder for users to find. Otherwise, most callbacks should return `True` to avoid
+        slowing down Pants from finishing the run.
+        """
+        return False
 
 
 @dataclass(frozen=True)
@@ -133,6 +152,23 @@ class WorkunitsCallbackFactoryRequest:
     """A request for a particular WorkunitsCallbackFactory."""
 
 
+@rule
+async def construct_workunits_callback_factories(
+    union_membership: UnionMembership,
+) -> WorkunitsCallbackFactories:
+    request_types = union_membership.get(WorkunitsCallbackFactoryRequest)
+    workunit_callback_factories = await MultiGet(
+        Get(WorkunitsCallbackFactory, WorkunitsCallbackFactoryRequest, request_type())
+        for request_type in request_types
+    )
+    return WorkunitsCallbackFactories(workunit_callback_factories)
+
+
+# -----------------------------------------------------------------------------------------------
+# Streaming workunits handler
+# -----------------------------------------------------------------------------------------------
+
+
 class StreamingWorkunitHandler:
     """Periodically calls each registered WorkunitsCallback in a dedicated thread."""
 
@@ -145,45 +181,49 @@ class StreamingWorkunitHandler:
         specs: Specs,
         report_interval_seconds: float,
         max_workunit_verbosity: LogLevel = LogLevel.TRACE,
-    ):
+    ) -> None:
         self.scheduler = scheduler
         self.report_interval = report_interval_seconds
         self.callbacks = callbacks
-        self._thread_runner: Optional[_InnerHandler] = None
+        self._thread_runner: _InnerHandler | None = None
         self._context = StreamingWorkunitContext(
             _scheduler=self.scheduler,
             _run_tracker=run_tracker,
             _specs=specs,
             _options_bootstrapper=options_bootstrapper,
         )
-        # TODO(10092) The max verbosity should be a per-client setting, rather than a global setting.
+        # TODO(10092) The max verbosity should be a per-client setting, rather than a global
+        #  setting.
         self.max_workunit_verbosity = max_workunit_verbosity
 
     def start(self) -> None:
-        if self.callbacks:
-            self._thread_runner = _InnerHandler(
-                scheduler=self.scheduler,
-                context=self._context,
-                callbacks=self.callbacks,
-                report_interval=self.report_interval,
-                max_workunit_verbosity=self.max_workunit_verbosity,
-            )
-            self._thread_runner.start()
+        if not self.callbacks:
+            return
+        self._thread_runner = _InnerHandler(
+            scheduler=self.scheduler,
+            context=self._context,
+            callbacks=self.callbacks,
+            report_interval=self.report_interval,
+            max_workunit_verbosity=self.max_workunit_verbosity,
+        )
+        self._thread_runner.start()
 
-    def end(self) -> None:
-        if self._thread_runner:
-            self._thread_runner.join()
-
-            # After stopping the thread, poll workunits one last time to make sure
-            # we report any workunits that were added after the last time the thread polled.
-            self._thread_runner.poll_workunits(finished=True)
+    def end(self, *, pantsd: bool) -> None:
+        if not self._thread_runner:
+            return
+        # TODO: Have a thread per callback so that some callbacks can always finish async even
+        #  if others must be finished synchronously.
+        block_until_complete = not pantsd or any(
+            callback.can_finish_async is False for callback in self.callbacks
+        )
+        self._thread_runner.end(block_until_complete=block_until_complete)
 
     @contextmanager
-    def session(self) -> Iterator[None]:
+    def session(self, *, pantsd: bool) -> Iterator[None]:
         try:
             self.start()
             yield
-            self.end()
+            self.end(pantsd=pantsd)
         except Exception as e:
             if self._thread_runner:
                 self._thread_runner.join()
@@ -198,7 +238,7 @@ class _InnerHandler(threading.Thread):
         callbacks: Iterable[WorkunitsCallback],
         report_interval: float,
         max_workunit_verbosity: LogLevel,
-    ):
+    ) -> None:
         super().__init__(daemon=True)
         self.scheduler = scheduler
         self._context = context
@@ -206,6 +246,9 @@ class _InnerHandler(threading.Thread):
         self.report_interval = report_interval
         self.callbacks = callbacks
         self.max_workunit_verbosity = max_workunit_verbosity
+        # Get the parent thread's logging destination. Note that this thread has not yet started
+        # as we are only in the constructor.
+        self.logging_destination = native_engine.stdio_thread_get_destination()
 
     def poll_workunits(self, *, finished: bool) -> None:
         workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
@@ -217,26 +260,21 @@ class _InnerHandler(threading.Thread):
                 context=self._context,
             )
 
-    def run(self):
-        while not self.stop_request.isSet():
+    def run(self) -> None:
+        # First, set the thread's logging destination to the parent thread's, meaning the console.
+        native_engine.stdio_thread_set_destination(self.logging_destination)
+        while not self.stop_request.isSet():  # type: ignore[attr-defined]
             self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)
+        else:
+            # Make one final call. Note that this may run after the Pants run has already
+            # completed, depending on whether the thread was joined or not.
+            self.poll_workunits(finished=True)
 
-    def join(self, timeout=None):
+    def end(self, *, block_until_complete: bool) -> None:
         self.stop_request.set()
-        super(_InnerHandler, self).join(timeout)
-
-
-@rule
-async def construct_workunits_callback_factories(
-    union_membership: UnionMembership,
-) -> WorkunitsCallbackFactories:
-    request_types = union_membership.get(WorkunitsCallbackFactoryRequest)
-    workunit_callback_factories = await MultiGet(
-        Get(WorkunitsCallbackFactory, WorkunitsCallbackFactoryRequest, request_type())
-        for request_type in request_types
-    )
-    return WorkunitsCallbackFactories(workunit_callback_factories)
+        if block_until_complete:
+            super().join()
 
 
 def rules():

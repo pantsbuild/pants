@@ -535,12 +535,12 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
                 f"{binary.address} left the field off. Set `entry_point` to either "
                 f"`app.py:func` or the longhand `path.to.app:func`. See {url}."
             )
-        if ":" not in entry_point:
+        if not entry_point.function:
             raise InvalidEntryPoint(
                 "Every `pex_binary` used in `with_binaries()` for the `provides()` field for "
                 f"{exported_addr} must end in the format `:my_func` for the `entry_point` field, "
-                f"but {binary.address} set it to {repr(entry_point)}. For example, set "
-                f"`entry_point='{entry_point}:main'. See {url}."
+                f"but {binary.address} set it to {entry_point.spec!r}. For example, set "
+                f"`entry_point='{entry_point.module}:main'. See {url}."
             )
         entry_point_requests.append(ResolvePexEntryPointRequest(binary[PexEntryPointField]))
     binary_entry_points = await MultiGet(
@@ -550,7 +550,8 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     for key, binary_entry_point in zip(key_to_binary_spec.keys(), binary_entry_points):
         entry_points = setup_kwargs.setdefault("entry_points", {})
         console_scripts = entry_points.setdefault("console_scripts", [])
-        console_scripts.append(f"{key}={binary_entry_point.val}")
+        if binary_entry_point.val is not None:
+            console_scripts.append(f"{key}={binary_entry_point.val.spec}")
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(

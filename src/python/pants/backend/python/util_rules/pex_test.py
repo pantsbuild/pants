@@ -13,7 +13,11 @@ from typing import Dict, Iterable, Iterator, List, Mapping, Tuple, cast
 import pytest
 from pkg_resources import Requirement
 
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import (
+    EntryPoint,
+    InterpreterConstraintsField,
+    MainSpecification,
+)
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -326,7 +330,7 @@ def create_pex_and_get_all_data(
     *,
     pex_type: type[Pex | VenvPex] = Pex,
     requirements: PexRequirements = PexRequirements(),
-    entry_point: str | None = None,
+    main: MainSpecification | None = None,
     interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
     sources: Digest | None = None,
@@ -342,13 +346,15 @@ def create_pex_and_get_all_data(
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         platforms=platforms,
-        entry_point=entry_point,
+        main=main,
         sources=sources,
         additional_inputs=additional_inputs,
         additional_args=additional_pex_args,
     )
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", *additional_pants_args], env=env
+        ["--backend-packages=pants.backend.python", *additional_pants_args],
+        env=env,
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     pex = rule_runner.request(pex_type, [request])
     if isinstance(pex, Pex):
@@ -376,7 +382,7 @@ def create_pex_and_get_pex_info(
     *,
     pex_type: type[Pex | VenvPex] = Pex,
     requirements: PexRequirements = PexRequirements(),
-    entry_point: str | None = None,
+    main: MainSpecification | None = None,
     interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
     sources: Digest | None = None,
@@ -390,7 +396,7 @@ def create_pex_and_get_pex_info(
             rule_runner,
             pex_type=pex_type,
             requirements=requirements,
-            entry_point=entry_point,
+            main=main,
             interpreter_constraints=interpreter_constraints,
             platforms=platforms,
             sources=sources,
@@ -413,7 +419,7 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
             ),
         ],
     )
-    pex_output = create_pex_and_get_all_data(rule_runner, entry_point="main", sources=sources)
+    pex_output = create_pex_and_get_all_data(rule_runner, main=EntryPoint("main"), sources=sources)
 
     pex_files = pex_output["files"]
     assert "pex" not in pex_files
@@ -458,12 +464,13 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
     pex_output = create_pex_and_get_all_data(
         rule_runner,
         pex_type=pex_type,
-        entry_point="main",
+        main=EntryPoint("main"),
         sources=sources,
         additional_pants_args=(
             "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
             "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
         ),
+        interpreter_constraints=PexInterpreterConstraints(["CPython>=3.6"]),
         env={"LANG": "es_PY.UTF-8"},
     )
 
@@ -531,7 +538,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
 
 def test_entry_point(rule_runner: RuleRunner) -> None:
     entry_point = "pydoc"
-    pex_info = create_pex_and_get_pex_info(rule_runner, entry_point=entry_point)
+    pex_info = create_pex_and_get_pex_info(rule_runner, main=EntryPoint(entry_point))
     assert pex_info["entry_point"] == entry_point
 
 

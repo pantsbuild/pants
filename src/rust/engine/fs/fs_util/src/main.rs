@@ -45,7 +45,6 @@ use futures::FutureExt;
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use rand::seq::SliceRandom;
 use serde_derive::Serialize;
 use std::collections::BTreeMap;
 use store::{
@@ -210,8 +209,6 @@ to this directory.",
               .takes_value(true)
               .long("server-address")
               .required(false)
-              .multiple(true)
-              .number_of_values(1)
         )
         .arg(
           Arg::with_name("root-ca-cert-file")
@@ -266,7 +263,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .unwrap_or_else(Store::default_path);
   let runtime = task_executor::Executor::new();
   let (store, store_has_remote) = {
-    let (store_result, store_has_remote) = match top_match.values_of("server-address") {
+    let (store_result, store_has_remote) = match top_match.value_of("server-address") {
       Some(cas_address) => {
         let chunk_size =
           value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
@@ -294,15 +291,11 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           );
         }
 
-        // Randomize CAS address order to avoid thundering herds from common config.
-        let mut cas_addresses = cas_address.map(str::to_owned).collect::<Vec<_>>();
-        cas_addresses.shuffle(&mut rand::thread_rng());
-
         (
           Store::with_remote(
             runtime.clone(),
             &store_dir,
-            cas_addresses,
+            cas_address,
             top_match
               .value_of("remote-instance-name")
               .map(str::to_owned),

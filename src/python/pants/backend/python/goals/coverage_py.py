@@ -11,6 +11,7 @@ from pathlib import PurePath
 from typing import List, Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import (
     PexInterpreterConstraints,
     PexRequest,
@@ -99,7 +100,7 @@ class CoverageSubsystem(PythonToolBase):
     help = "Configuration for Python test coverage measurement."
 
     default_version = "coverage>=5.0.3,<5.1"
-    default_entry_point = "coverage"
+    default_main = ConsoleScript("coverage")
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
 
@@ -228,7 +229,7 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
             internal_only=True,
             requirements=PexRequirements(coverage.all_requirements),
             interpreter_constraints=PexInterpreterConstraints(coverage.interpreter_constraints),
-            entry_point=coverage.entry_point,
+            main=coverage.main,
         ),
     )
     return CoverageSetup(pex)

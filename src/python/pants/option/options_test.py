@@ -1048,6 +1048,27 @@ class OptionsTest(unittest.TestCase):
             "(args after `--`) is ambiguous."
         ) in str(exc.value)
 
+    def test_passthru_args_not_interpreted(self):
+        # Test that passthrough args are not interpreted.
+        options = Options.create(
+            env={},
+            config=self._create_config(),
+            known_scope_infos=[global_scope(), task("test"), subsystem("consumer")],
+            args=["./pants", "--consumer-shlexed=a", "--consumer-string=b", "test", "--", "[bar]"],
+        )
+        options.register(
+            "consumer", "--shlexed", passthrough=True, type=list, member_type=shell_str
+        )
+        options.register("consumer", "--string", passthrough=True, type=list, member_type=str)
+        self.assertEqual(
+            ["a", "[bar]"],
+            options.for_scope("consumer").shlexed,
+        )
+        self.assertEqual(
+            ["b", "[bar]"],
+            options.for_scope("consumer").string,
+        )
+
     def test_global_scope_env_vars(self):
         def check_pants_foo(expected_val, env):
             val = self._parse(env=env).for_global_scope().pants_foo

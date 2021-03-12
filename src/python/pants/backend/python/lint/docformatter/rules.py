@@ -66,7 +66,7 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
             internal_only=True,
             requirements=PexRequirements(docformatter.all_requirements),
             interpreter_constraints=PexInterpreterConstraints(docformatter.interpreter_constraints),
-            entry_point=docformatter.entry_point,
+            main=docformatter.main,
         ),
     )
 

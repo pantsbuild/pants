@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ffi::OsString;
 use std::path::Component;
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -14,7 +15,7 @@ use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
 use tonic::transport::Channel;
-use workunit_store::{with_workunit, Level, Metric, WorkunitMetadata};
+use workunit_store::{with_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
 
 use crate::remote::make_execute_request;
 use crate::{
@@ -273,6 +274,7 @@ impl CommandRunner {
       exit_code: result.exit_code,
       stdout_digest: Some(result.stdout_digest.into()),
       stderr_digest: Some(result.stderr_digest.into()),
+      execution_metadata: Some(result.metadata.clone().into()),
       ..ActionResult::default()
     };
 
@@ -339,7 +341,10 @@ impl CommandRunner {
     with_workunit(
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..WorkunitMetadata::default()
+      },
       crate::remote::ensure_action_uploaded(
         &self.store,
         command_digest,
@@ -390,6 +395,7 @@ impl crate::CommandRunner for CommandRunner {
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let request = self
       .extract_compatible_request(&req)
@@ -401,7 +407,10 @@ impl crate::CommandRunner for CommandRunner {
     let (command_digest, action_digest) = with_workunit(
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..WorkunitMetadata::default()
+      },
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action),
       |_, md| md,
     )
@@ -415,7 +424,10 @@ impl crate::CommandRunner for CommandRunner {
         let response = with_workunit(
           context.workunit_store.clone(),
           "check_action_cache".to_owned(),
-          WorkunitMetadata::with_level(Level::Debug),
+          WorkunitMetadata {
+            level: Level::Debug,
+            ..WorkunitMetadata::default()
+          },
           crate::remote::check_action_cache(
             action_digest,
             &self.metadata,
@@ -451,7 +463,17 @@ impl crate::CommandRunner for CommandRunner {
       tokio::select! {
         cache_result = cache_read_future => {
           if let Some(cached_response) = cache_result {
+            let lookup_elapsed = cache_lookup_start.elapsed();
             context.workunit_store.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+            if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
+              let time_saved = time_saved.as_millis() as u64;
+              context
+                .workunit_store
+                .increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
+              context
+                .workunit_store
+                .record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
+              }
             return Ok(cached_response);
           } else {
             // Note that we don't increment a counter here, as there is nothing of note in this
@@ -504,7 +526,10 @@ impl crate::CommandRunner for CommandRunner {
       let _write_join = self.executor.spawn(with_workunit(
         context.workunit_store,
         "remote_cache_write".to_owned(),
-        WorkunitMetadata::with_level(Level::Debug),
+        WorkunitMetadata {
+          level: Level::Debug,
+          ..WorkunitMetadata::default()
+        },
         cache_write_future,
         |_, md| md,
       ));

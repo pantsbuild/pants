@@ -33,7 +33,6 @@ def run_shellcheck() -> None:
         "./build-support/githooks/prepare-commit-msg",
     }
     targets -= set(glob("./build-support/virtualenv.dist/**/*.sh", recursive=True))
-    targets -= set(glob("./build-support/virtualenvs/**/*.sh", recursive=True))
     targets -= set(glob("./build-support/twine-deps.venv/**/*.sh", recursive=True))
     command = ["shellcheck", "--shell=bash", "--external-sources"] + sorted(targets)
     try:

@@ -46,7 +46,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockConsole, MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 
 
@@ -120,7 +120,6 @@ def run_test_rule(
     include_sources: bool = True,
     valid_targets: bool = True,
 ) -> Tuple[int, str]:
-    console = MockConsole(use_colors=False)
     test_subsystem = create_goal_subsystem(
         TestSubsystem,
         debug=debug,
@@ -157,57 +156,60 @@ def run_test_rule(
         console_report = ConsoleCoverageReport(f"Ran coverage on {addresses}")
         return CoverageReports(reports=(console_report,))
 
-    result: Test = run_rule_with_mocks(
-        run_tests,
-        rule_args=[
-            console,
-            test_subsystem,
-            interactive_runner,
-            workspace,
-            union_membership,
-        ],
-        mock_gets=[
-            MockGet(
-                output_type=TargetRootsToFieldSets,
-                input_type=TargetRootsToFieldSetsRequest,
-                mock=mock_find_valid_field_sets,
-            ),
-            MockGet(
-                output_type=EnrichedTestResult,
-                input_type=TestFieldSet,
-                mock=lambda fs: fs.test_result,
-            ),
-            MockGet(
-                output_type=TestDebugRequest,
-                input_type=TestFieldSet,
-                mock=mock_debug_request,
-            ),
-            MockGet(
-                output_type=FieldSetsWithSources,
-                input_type=FieldSetsWithSourcesRequest,
-                mock=lambda field_sets: FieldSetsWithSources(field_sets if include_sources else ()),
-            ),
-            # Merge XML results.
-            MockGet(
-                output_type=Digest,
-                input_type=MergeDigests,
-                mock=lambda _: EMPTY_DIGEST,
-            ),
-            MockGet(
-                output_type=CoverageReports,
-                input_type=CoverageDataCollection,
-                mock=mock_coverage_report_generation,
-            ),
-            MockGet(
-                output_type=OpenFiles,
-                input_type=OpenFilesRequest,
-                mock=lambda _: OpenFiles(()),
-            ),
-        ],
-        union_membership=union_membership,
-    )
-    assert not console.stdout.getvalue()
-    return result.exit_code, console.stderr.getvalue()
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
+        result: Test = run_rule_with_mocks(
+            run_tests,
+            rule_args=[
+                console,
+                test_subsystem,
+                interactive_runner,
+                workspace,
+                union_membership,
+            ],
+            mock_gets=[
+                MockGet(
+                    output_type=TargetRootsToFieldSets,
+                    input_type=TargetRootsToFieldSetsRequest,
+                    mock=mock_find_valid_field_sets,
+                ),
+                MockGet(
+                    output_type=EnrichedTestResult,
+                    input_type=TestFieldSet,
+                    mock=lambda fs: fs.test_result,
+                ),
+                MockGet(
+                    output_type=TestDebugRequest,
+                    input_type=TestFieldSet,
+                    mock=mock_debug_request,
+                ),
+                MockGet(
+                    output_type=FieldSetsWithSources,
+                    input_type=FieldSetsWithSourcesRequest,
+                    mock=lambda field_sets: FieldSetsWithSources(
+                        field_sets if include_sources else ()
+                    ),
+                ),
+                # Merge XML results.
+                MockGet(
+                    output_type=Digest,
+                    input_type=MergeDigests,
+                    mock=lambda _: EMPTY_DIGEST,
+                ),
+                MockGet(
+                    output_type=CoverageReports,
+                    input_type=CoverageDataCollection,
+                    mock=mock_coverage_report_generation,
+                ),
+                MockGet(
+                    output_type=OpenFiles,
+                    input_type=OpenFilesRequest,
+                    mock=lambda _: OpenFiles(()),
+                ),
+            ],
+            union_membership=union_membership,
+        )
+        assert not stdio_reader.get_stdout()
+        return result.exit_code, stdio_reader.get_stderr()
 
 
 def test_empty_target_noops(rule_runner: RuleRunner) -> None:

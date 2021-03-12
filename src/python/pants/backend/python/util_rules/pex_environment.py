@@ -11,6 +11,7 @@ from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine import process
 from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.process import BinaryPath, BinaryPathRequest, BinaryPaths, BinaryPathTest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.global_options import GlobalOptions
@@ -18,7 +19,7 @@ from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var
 
@@ -67,12 +68,12 @@ class PexRuntimeEnvironment(Subsystem):
             ),
         )
 
-    @memoized_property
-    def path(self) -> Tuple[str, ...]:
+    @memoized_method
+    def path(self, env: Environment) -> Tuple[str, ...]:
         def iter_path_entries():
             for entry in self.options.executable_search_paths:
                 if entry == "<PATH>":
-                    path = os.environ.get("PATH")
+                    path = env.get("PATH")
                     if path:
                         for path_entry in path.split(os.pathsep):
                             yield path_entry
@@ -158,6 +159,9 @@ async def find_pex_python(
     subprocess_env_vars: SubprocessEnvironmentVars,
     global_options: GlobalOptions,
 ) -> PexEnvironment:
+    pex_relevant_environment = await Get(
+        Environment, EnvironmentRequest(["PATH", "HOME", "PYENV_ROOT"])
+    )
     # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+. The bootstrap
     # code will then re-exec itself if the underlying PEX user code needs a more specific python
     # interpreter. As such, we look for many Pythons usable by the PEX bootstrap code here for
@@ -166,7 +170,7 @@ async def find_pex_python(
         Get(
             BinaryPaths,
             BinaryPathRequest(
-                search_path=python_setup.interpreter_search_paths,
+                search_path=python_setup.interpreter_search_paths(pex_relevant_environment),
                 binary_name=binary_name,
                 test=BinaryPathTest(
                     args=[
@@ -218,8 +222,10 @@ async def find_pex_python(
         return None
 
     return PexEnvironment(
-        path=pex_runtime_env.path,
-        interpreter_search_paths=tuple(python_setup.interpreter_search_paths),
+        path=pex_runtime_env.path(pex_relevant_environment),
+        interpreter_search_paths=tuple(
+            python_setup.interpreter_search_paths(pex_relevant_environment)
+        ),
         subprocess_environment_dict=subprocess_env_vars.vars,
         # TODO: This path normalization is duplicated with `engine_initializer.py`. How can we do
         #  the normalization only once, via the options system?

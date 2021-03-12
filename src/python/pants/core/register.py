@@ -15,11 +15,11 @@ from pants.core.util_rules import (
     external_tool,
     filter_empty_sources,
     pants_bin,
-    pants_environment,
     source_files,
     stripped_source_files,
     subprocess_environment,
 )
+from pants.goal import stats_aggregator
 from pants.source import source_root
 
 
@@ -42,10 +42,10 @@ def rules():
         *stripped_source_files.rules(),
         *archive.rules(),
         *external_tool.rules(),
-        *pants_environment.rules(),
         *subprocess_environment.rules(),
         *source_root.rules(),
         *target_type_rules(),
+        *stats_aggregator.rules(),
     ]
 
 

@@ -14,6 +14,7 @@ from pants.backend.python.goals.coverage_py import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
+    ConsoleScript,
     PythonRuntimePackageDependencies,
     PythonTestsSources,
     PythonTestsTimeout,
@@ -41,7 +42,15 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
-from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import (
+    AddPrefix,
+    Digest,
+    DigestSubset,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
@@ -132,6 +141,15 @@ async def setup_pytest_for_target(
         ),
     )
 
+    config_digest_request = Get(
+        Digest,
+        PathGlobs(
+            globs=[pytest.config] if pytest.config else [],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin="the option `--pytest-config`",
+        ),
+    )
+
     prepared_sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
@@ -160,11 +178,18 @@ async def setup_pytest_for_target(
         SourceFiles, SourceFilesRequest([request.field_set.sources])
     )
 
-    pytest_pex, requirements_pex, prepared_sources, field_set_source_files = await MultiGet(
+    (
+        pytest_pex,
+        requirements_pex,
+        prepared_sources,
+        field_set_source_files,
+        config_digest,
+    ) = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
         prepared_sources_request,
         field_set_source_files_request,
+        config_digest_request,
     )
 
     pytest_runner_pex = await Get(
@@ -172,7 +197,7 @@ async def setup_pytest_for_target(
         PexRequest(
             output_filename="pytest_runner.pex",
             interpreter_constraints=interpreter_constraints,
-            entry_point="pytest",
+            main=ConsoleScript("pytest"),
             internal_only=True,
             pex_path=[pytest_pex, requirements_pex],
         ),
@@ -184,6 +209,7 @@ async def setup_pytest_for_target(
             (
                 coverage_config.digest,
                 prepared_sources.source_files.snapshot.digest,
+                config_digest,
                 *(binary.digest for binary in assets),
             )
         ),

@@ -4,6 +4,7 @@
 from typing import Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 from pants.option.custom_types import file_option, shell_str
 
 
@@ -16,7 +17,7 @@ class Flake8(PythonToolBase):
         "setuptools<45; python_full_version == '2.7.*'",
         "setuptools; python_version > '2.7'",
     ]
-    default_entry_point = "flake8"
+    default_main = ConsoleScript("flake8")
 
     @classmethod
     def register_options(cls, register):

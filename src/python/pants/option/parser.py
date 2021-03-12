@@ -169,12 +169,14 @@ class Parser:
         flag_value_map: Dict[str, List[Any]]
         namespace: OptionValueContainerBuilder
         passthrough_args: List[str]
+        allow_unknown_flags: bool
 
         def __init__(
             self,
             flags_in_scope: Iterable[str],
             namespace: OptionValueContainerBuilder,
             passthrough_args: List[str],
+            allow_unknown_flags: bool,
         ) -> None:
             """
             :param flags_in_scope: Iterable of arg strings to parse into flag values.
@@ -183,6 +185,7 @@ class Parser:
             self.flag_value_map = self._create_flag_value_map(flags_in_scope)
             self.namespace = namespace
             self.passthrough_args = passthrough_args
+            self.allow_unknown_flags = allow_unknown_flags
 
         @staticmethod
         def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, list[str | None]]:
@@ -296,7 +299,7 @@ class Parser:
 
             setattr(namespace, dest, val)
 
-        if flag_value_map:
+        if not parse_args_request.allow_unknown_flags and flag_value_map:
             # There were unconsumed flags.
             raise UnknownFlagsError(tuple(flag_value_map.keys()), self.scope)
         return namespace.build()
@@ -658,7 +661,13 @@ class Parser:
         # Get value from cmd-line flags.
         flag_vals = [to_value_type(expand(x)) for x in flag_val_strs]
         if kwargs.get("passthrough"):
-            flag_vals.extend(to_value_type(x) for x in passthru_arg_strs)
+            # NB: Passthrough arguments are either of type `str` or `shell_str`
+            # (see self._validate): the former never need interpretation, and the latter do not
+            # need interpretation when they have been provided directly via `sys.argv` as the
+            # passthrough args have been.
+            flag_vals.append(
+                ListValueComponent(ListValueComponent.MODIFY, [*passthru_arg_strs], [])
+            )
 
         if is_list_option(kwargs):
             # Note: It's important to set flag_val to None if no flags were specified, so we can

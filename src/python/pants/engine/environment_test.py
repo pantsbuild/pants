@@ -5,7 +5,7 @@ from typing import Dict, List
 
 import pytest
 
-from pants.core.util_rules.pants_environment import PantsEnvironment
+from pants.engine.environment import CompleteEnvironment
 
 
 @pytest.mark.parametrize(
@@ -15,21 +15,21 @@ from pants.core.util_rules.pants_environment import PantsEnvironment
         (["A=unrelated", "B"], {"A": "unrelated", "B": "b"}),
         # Test multi-word string.
         (["A=unrelated", "C=multi word"], {"A": "unrelated", "C": "multi word"}),
-        # Test emtpy string.
+        # Test empty string.
         (["A="], {"A": ""}),
         # Test string with " literal.
         (['A=has a " in it'], {"A": 'has a " in it'}),
     ],
 )
-def test_pants_environment(input_strs: List[str], expected: Dict[str, str]) -> None:
-    pants_env = PantsEnvironment({"A": "a", "B": "b", "C": "c"})
+def test_complete_environment(input_strs: List[str], expected: Dict[str, str]) -> None:
+    pants_env = CompleteEnvironment({"A": "a", "B": "b", "C": "c"})
 
     subset = pants_env.get_subset(input_strs)
     assert dict(subset) == expected
 
 
 def test_invalid_variable() -> None:
-    pants_env = PantsEnvironment()
+    pants_env = CompleteEnvironment()
 
     with pytest.raises(ValueError) as exc:
         pants_env.get_subset(["3INVALID=doesn't matter"])

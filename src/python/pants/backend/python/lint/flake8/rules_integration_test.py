@@ -68,7 +68,7 @@ def run_flake8(
         args.append("--flake8-skip")
     if additional_args:
         args.extend(additional_args)
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     results = rule_runner.request(
         LintResults,
         [

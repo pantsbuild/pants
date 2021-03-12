@@ -5,6 +5,31 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.4rc0 (3/9/2021)
+--------------------
+
+* Scala 2.13 support for 1.x (#11633)
+  `PR #11633 <https://github.com/pantsbuild/pants/pull/11633>`_
+
+1.30.3 (2/22/2021)
+------------------
+
+The fourth stable release in the 1.30.x series, with no changes since `rc0`.
+
+Thanks to Dan Worth who uncovered `Issue #11579 <https://github.com/pantsbuild/pants/issues/11579>`_
+and helped test rc0!
+
+1.30.3rc0 (2/19/2021)
+---------------------
+
+This release fixes a bug in Pants fetching of some Go ``internal`` packages.
+
+Bugfixes
+~~~~~~~~
+
+* Find remote roots for private internal packages. (#11581)
+  `PR #11581 <https://github.com/pantsbuild/pants/pull/11581>`_
+
 1.30.2 (12/21/2020)
 -------------------
 

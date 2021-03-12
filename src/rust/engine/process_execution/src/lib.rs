@@ -31,15 +31,14 @@
 extern crate derivative;
 
 use async_trait::async_trait;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 pub use log::Level;
+use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
-use std::ops::AddAssign;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
-use store::UploadSummary;
 use workunit_store::{with_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
@@ -61,13 +60,12 @@ pub mod remote_cache;
 #[cfg(test)]
 mod remote_cache_tests;
 
-pub mod nailgun;
-
 pub mod named_caches;
 
 extern crate uname;
 
 pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
+use concrete_time::{Duration, TimeSpan};
 use fs::RelativePath;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -344,37 +342,96 @@ pub struct ProcessMetadata {
 ///
 /// The result of running a process.
 ///
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Derivative, Clone, Debug, Eq)]
+#[derivative(PartialEq, Hash)]
 pub struct FallibleProcessResultWithPlatform {
   pub stdout_digest: Digest,
   pub stderr_digest: Digest,
   pub exit_code: i32,
-  pub platform: Platform,
-
-  // It's unclear whether this should be a Snapshot or a digest of a Directory. A Directory digest
-  // is handy, so let's try that out for now.
   pub output_directory: hashing::Digest,
-
-  pub execution_attempts: Vec<ExecutionStats>,
+  pub platform: Platform,
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
+  pub metadata: ProcessResultMetadata,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct ExecutionStats {
-  uploaded_bytes: usize,
-  uploaded_file_count: usize,
-  upload: Duration,
-  remote_queue: Option<Duration>,
-  remote_input_fetch: Option<Duration>,
-  remote_execution: Option<Duration>,
-  remote_output_store: Option<Duration>,
-  was_cache_hit: bool,
+/// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
+/// conversion is lossy, but the interesting parts are preserved.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProcessResultMetadata {
+  /// The time from starting to completion, including preparing the chroot and cleanup.
+  /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
+  /// `ExecutedActionMetadata`.
+  pub total_elapsed: Option<Duration>,
 }
 
-impl AddAssign<UploadSummary> for ExecutionStats {
-  fn add_assign(&mut self, summary: UploadSummary) {
-    self.uploaded_file_count += summary.uploaded_file_count;
-    self.uploaded_bytes += summary.uploaded_file_bytes;
-    self.upload += summary.upload_wall_time;
+impl ProcessResultMetadata {
+  pub fn new(total_elapsed: Option<Duration>) -> Self {
+    ProcessResultMetadata { total_elapsed }
+  }
+
+  /// How much faster a cache hit was than running the process again.
+  ///
+  /// This includes the overhead of setting up and cleaning up the process for execution, and it
+  /// should include all overhead for the cache lookup.
+  ///
+  /// If the cache hit was slower than the original process, we return 0. Note that the cache hit
+  /// may still have been faster than rerunning the process a second time, e.g. if speculation
+  /// is used and the cache hit completed before the rerun; still, we cannot know how long the
+  /// second run would have taken, so the best we can do is report 0.
+  ///
+  /// If the original process's execution time was not recorded, we return None because we
+  /// cannot make a meaningful comparison.
+  pub fn time_saved_from_cache(
+    &self,
+    cache_lookup: std::time::Duration,
+  ) -> Option<std::time::Duration> {
+    self.total_elapsed.and_then(|original_process| {
+      let original_process: std::time::Duration = original_process.into();
+      original_process
+        .checked_sub(cache_lookup)
+        .or_else(|| Some(std::time::Duration::new(0, 0)))
+    })
+  }
+}
+
+impl From<ExecutedActionMetadata> for ProcessResultMetadata {
+  fn from(metadata: ExecutedActionMetadata) -> Self {
+    let total_elapsed = match (
+      metadata.worker_start_timestamp,
+      metadata.worker_completed_timestamp,
+    ) {
+      (Some(started), Some(completed)) => TimeSpan::from_start_and_end(&started, &completed, "")
+        .map(|span| span.duration)
+        .ok(),
+      _ => None,
+    };
+    Self { total_elapsed }
+  }
+}
+
+impl Into<ExecutedActionMetadata> for ProcessResultMetadata {
+  fn into(self) -> ExecutedActionMetadata {
+    let (total_start, total_end) = match self.total_elapsed {
+      Some(elapsed) => {
+        // Because we do not have the precise start time, we hardcode to starting at UNIX_EPOCH. We
+        // only care about accurately preserving the duration.
+        let start = prost_types::Timestamp {
+          seconds: 0,
+          nanos: 0,
+        };
+        let end = prost_types::Timestamp {
+          seconds: elapsed.secs as i64,
+          nanos: elapsed.nanos as i32,
+        };
+        (Some(start), Some(end))
+      }
+      None => (None, None),
+    };
+    ExecutedActionMetadata {
+      worker_start_timestamp: total_start,
+      worker_completed_timestamp: total_end,
+      ..ExecutedActionMetadata::default()
+    }
   }
 }
 
@@ -472,13 +529,16 @@ impl CommandRunner for BoundedCommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let name = format!("{}-waiting", req.workunit_name());
     let desc = req.user_facing_name();
-    let mut outer_metadata = WorkunitMetadata::with_level(Level::Debug);
+    let outer_metadata = WorkunitMetadata {
+      level: Level::Debug,
+      desc: Some(format!("(Waiting) {}", desc)),
+      // We don't want to display the workunit associated with processes waiting on a
+      // BoundedCommandRunner to show in the dynamic UI, so set the `blocked` flag
+      // on the workunit metadata in order to prevent this.
+      blocked: true,
+      ..WorkunitMetadata::default()
+    };
 
-    outer_metadata.desc = Some(format!("(Waiting) {}", desc));
-    // We don't want to display the workunit associated with processes waiting on a
-    // BoundedCommandRunner to show in the dynamic UI, so set the `blocked` flag
-    // on the workunit metadata in order to prevent this.
-    outer_metadata.blocked = true;
     let bounded_fut = {
       let inner = self.inner.clone();
       let semaphore = self.inner.1.clone();
@@ -491,8 +551,11 @@ impl CommandRunner for BoundedCommandRunner {
           desc,
           concurrency_id
         );
-        let mut metadata = WorkunitMetadata::with_level(req.workunit_level());
-        metadata.desc = Some(desc);
+        let metadata = WorkunitMetadata {
+          level: req.workunit_level(),
+          desc: Some(desc),
+          ..WorkunitMetadata::default()
+        };
 
         let metadata_updater = |result: &Result<FallibleProcessResultWithPlatform, String>,
                                 old_metadata| match result {

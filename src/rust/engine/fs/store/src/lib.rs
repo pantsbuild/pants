@@ -222,7 +222,7 @@ pub enum ShrinkBehavior {
 // Note that Store doesn't implement ByteStore because it operates at a higher level of abstraction,
 // considering Directories as a standalone concept, rather than a buffer of bytes.
 // This has the nice property that Directories can be trusted to be valid and canonical.
-// We may want to re-visit this if we end up wanting to handle local/remote/merged interchangably.
+// We may want to re-visit this if we end up wanting to handle local/remote/merged interchangeably.
 impl Store {
   ///
   /// Make a store which only uses its local storage.
@@ -257,7 +257,7 @@ impl Store {
   pub fn with_remote<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
-    cas_addresses: Vec<String>,
+    cas_address: &str,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
@@ -268,7 +268,7 @@ impl Store {
     Ok(Store {
       local: local::ByteStore::new(executor, path)?,
       remote: Some(remote::ByteStore::new(
-        cas_addresses,
+        cas_address,
         instance_name,
         root_ca_certs,
         headers,

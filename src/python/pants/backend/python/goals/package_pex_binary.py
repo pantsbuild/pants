@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -35,10 +36,19 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.core.target_types import FilesSources
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import (
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    targets_with_sources_types,
+)
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.util.docutil import docs_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -101,11 +111,32 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 @rule(level=LogLevel.DEBUG)
 async def package_pex_binary(
-    field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults
+    field_set: PexBinaryFieldSet,
+    pex_binary_defaults: PexBinaryDefaults,
+    union_membership: UnionMembership,
 ) -> BuiltPackage:
-    resolved_entry_point = await Get(
-        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)
+    resolved_entry_point, transitive_targets = await MultiGet(
+        Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)),
+        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
+
+    # Warn if users depend on `files` targets, which won't be included in the PEX and is a common
+    # gotcha.
+    files_tgts = targets_with_sources_types(
+        [FilesSources], transitive_targets.dependencies, union_membership
+    )
+    if files_tgts:
+        files_addresses = sorted(tgt.address.spec for tgt in files_tgts)
+        logger.warning(
+            f"The pex_binary target {field_set.address} transitively depends on the below files "
+            "targets, but Pants will not include them in the PEX. Filesystem APIs like `open()` "
+            "are not able to load files within the binary itself; instead, they read from the "
+            "current working directory."
+            "\n\nInstead, use `resources` targets or wrap this `pex_binary` in an `archive`. See "
+            f"{docs_url('resources')}."
+            f"\n\nFiles targets dependencies: {files_addresses}"
+        )
+
     output_filename = field_set.output_path.value_or_default(field_set.address, file_ending="pex")
     two_step_pex = await Get(
         TwoStepPex,
@@ -113,7 +144,9 @@ async def package_pex_binary(
             PexFromTargetsRequest(
                 addresses=[field_set.address],
                 internal_only=False,
-                entry_point=resolved_entry_point.val,
+                # TODO(John Sirois): Support ConsoleScript in PexBinary targets:
+                #  https://github.com/pantsbuild/pants/issues/11619
+                main=resolved_entry_point.val,
                 platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
                 output_filename=output_filename,
                 additional_args=field_set.generate_additional_args(pex_binary_defaults),

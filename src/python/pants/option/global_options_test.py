@@ -9,9 +9,12 @@ from textwrap import dedent
 
 import pytest
 
+from pants.base.build_environment import get_buildroot
+from pants.engine.environment import CompleteEnvironment
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
-from pants.option.global_options import ExecutionOptions
+from pants.option.global_options import ExecutionOptions, GlobalOptions
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.contextutil import temporary_dir
 
@@ -23,6 +26,7 @@ def create_execution_options(
     plugin: str | None = None,
     remote_store_address: str = "grpc://fake.url:10",
     remote_execution_address: str = "grpc://fake.url:10",
+    local_only: bool = False,
 ) -> ExecutionOptions:
     args = [
         "--remote-cache-read",
@@ -37,8 +41,11 @@ def create_execution_options(
     if plugin:
         args.append(f"--remote-auth-plugin={plugin}")
     ob = create_options_bootstrapper(args)
-    _build_config, options = OptionsInitializer.create_with_build_config(ob, raise_=False)
-    return ExecutionOptions.from_options(options)
+    env = CompleteEnvironment({})
+    _build_config, options = OptionsInitializer(ob, env).build_config_and_options(
+        ob, env, raise_=False
+    )
+    return ExecutionOptions.from_options(options, env, local_only=local_only)
 
 
 def test_execution_options_remote_oauth_bearer_token_path() -> None:
@@ -65,7 +72,7 @@ def test_execution_options_remote_addresses() -> None:
         remote_execution_address=f"grpc://{host}",
     )
     assert exec_options.remote_execution_address == f"http://{host}"
-    assert exec_options.remote_store_addresses == [f"http://{host}"]
+    assert exec_options.remote_store_address == f"http://{host}"
 
     exec_options = create_execution_options(
         initial_headers={},
@@ -73,7 +80,7 @@ def test_execution_options_remote_addresses() -> None:
         remote_execution_address=f"grpcs://{host}",
     )
     assert exec_options.remote_execution_address == f"https://{host}"
-    assert exec_options.remote_store_addresses == [f"https://{host}"]
+    assert exec_options.remote_store_address == f"https://{host}"
 
     with pytest.raises(OptionsError):
         create_execution_options(
@@ -89,6 +96,25 @@ def test_execution_options_remote_addresses() -> None:
         )
 
 
+def test_execution_options_local_only() -> None:
+    # Test that local_only properly disables remote execution. It doesn't need to prune all
+    # settings, only those which would trigger usage.
+    host = "fake-with-http-in-url.com:10"
+    exec_options = create_execution_options(
+        initial_headers={},
+        remote_store_address=f"grpc://{host}",
+        remote_execution_address=f"grpc://{host}",
+        local_only=True,
+    )
+    # Remote execution should be disabled, and the headers should still be empty, indicating that
+    # the auth plugin has not run.
+    assert not exec_options.remote_execution
+    assert not exec_options.remote_cache_read
+    assert not exec_options.remote_cache_write
+    assert exec_options.remote_store_headers == {}
+    assert exec_options.remote_execution_headers == {}
+
+
 def test_execution_options_auth_plugin() -> None:
     def compute_exec_options(state: str) -> ExecutionOptions:
         with temporary_dir() as tempdir:
@@ -101,7 +127,7 @@ def test_execution_options_auth_plugin() -> None:
                     f"""\
                     from pants.option.global_options import AuthPluginState, AuthPluginResult
 
-                    def auth_func(initial_execution_headers, initial_store_headers, options):
+                    def auth_func(initial_execution_headers, initial_store_headers, options, **kwargs):
                         return AuthPluginResult(
                             state=AuthPluginState.{state},
                             execution_headers={{
@@ -138,3 +164,14 @@ def test_execution_options_auth_plugin() -> None:
     exec_options = compute_exec_options("UNAVAILABLE")
     assert exec_options.remote_cache_read is False
     assert exec_options.remote_instance_name == "main"
+
+
+def test_invalidation_globs() -> None:
+    # Confirm that an un-normalized relative path in the pythonpath is filtered out.
+    suffix = "something-ridiculous"
+    ob = OptionsBootstrapper.create(env={}, args=[f"--pythonpath=../{suffix}"], allow_pantsrc=False)
+    globs = GlobalOptions.compute_pantsd_invalidation_globs(
+        get_buildroot(), ob.bootstrap_options.for_global_scope()
+    )
+    for glob in globs:
+        assert suffix not in glob

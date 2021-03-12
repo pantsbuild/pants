@@ -45,7 +45,8 @@ def run_black_and_isort(
         [
             "--backend-packages=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
             *(extra_args or []),
-        ]
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     results = rule_runner.request(LanguageFmtResults, [targets])
     return results

@@ -78,7 +78,7 @@ async def create_ipython_repl_request(
         Pex,
         PexRequest(
             output_filename="ipython.pex",
-            entry_point=ipython.entry_point,
+            main=ipython.main,
             requirements=PexRequirements(ipython.all_requirements),
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
             internal_only=True,

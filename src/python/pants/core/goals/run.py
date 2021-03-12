@@ -8,6 +8,7 @@ from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveRunner
@@ -90,6 +91,7 @@ async def run(
     interactive_runner: InteractiveRunner,
     workspace: Workspace,
     build_root: BuildRoot,
+    complete_env: CompleteEnvironment,
 ) -> Run:
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
@@ -109,14 +111,13 @@ async def run(
         )
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
-        extra_env = {k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}
+        env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
         try:
             result = interactive_runner.run(
                 InteractiveProcess(
                     argv=(*args, *run_subsystem.args),
-                    env=extra_env,
+                    env=env,
                     run_in_workspace=True,
-                    hermetic_env=False,
                 )
             )
             exit_code = result.exit_code

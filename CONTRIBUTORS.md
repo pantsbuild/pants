@@ -124,6 +124,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
++ Liam Wilson
 + Luc Cary
 + Luca Clementi
 + Lukasz Jastrzebski

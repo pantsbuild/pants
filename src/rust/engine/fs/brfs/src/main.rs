@@ -737,7 +737,7 @@ async fn main() {
     Some(address) => Store::with_remote(
       runtime.clone(),
       &store_path,
-      vec![address.to_owned()],
+      address,
       args.value_of("remote-instance-name").map(str::to_owned),
       root_ca_certs,
       headers,

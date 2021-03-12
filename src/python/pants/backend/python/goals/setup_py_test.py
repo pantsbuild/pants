@@ -56,7 +56,7 @@ _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 
 
 def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=rules,
         target_types=[
             PexBinary,
@@ -68,6 +68,8 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
         ],
         objects={"setup_py": PythonArtifact},
     )
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    return rule_runner
 
 
 # We use a trivial test that our SetupKwargs plugin hook works.
@@ -501,7 +503,8 @@ def test_get_requirements() -> None:
         version_scheme: FirstPartyDependencyVersionScheme = FirstPartyDependencyVersionScheme.EXACT,
     ):
         rule_runner.set_options(
-            [f"--setup-py-generation-first-party-dependency-version-scheme={version_scheme.value}"]
+            [f"--setup-py-generation-first-party-dependency-version-scheme={version_scheme.value}"],
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
         tgt = rule_runner.get_target(addr)
         reqs = rule_runner.request(

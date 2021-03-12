@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
-import logging
+import itertools
 import os
 from abc import ABCMeta
 from collections import defaultdict
@@ -36,10 +36,9 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
-
-logger = logging.getLogger(__name__)
 
 
 @union
@@ -198,6 +197,8 @@ class TailorSubsystem(GoalSubsystem):
     name = "tailor"
     help = "Auto-generate BUILD file targets for new source files."
 
+    required_union_implementations = (PutativeTargetsRequest,)
+
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -218,11 +219,35 @@ class Tailor(Goal):
     subsystem_cls = TailorSubsystem
 
 
+def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
+    """For a list of file paths, returns a dict of directory path -> files in that dir."""
+    ret = defaultdict(set)
+    for path in paths:
+        dirname, filename = os.path.split(path)
+        ret[dirname].add(filename)
+    return ret
+
+
 def group_by_build_file(ptgts: Iterable[PutativeTarget]) -> Dict[str, List[PutativeTarget]]:
     ret = defaultdict(list)
     for ptgt in ptgts:
         ret[ptgt.build_file_path].append(ptgt)
     return ret
+
+
+class AllOwnedSources(DeduplicatedCollection[str]):
+    """All files in the project already owned by targets."""
+
+
+@rule(level=LogLevel.DEBUG, desc="Determine all files already owned by targets")
+async def determine_all_owned_sources() -> AllOwnedSources:
+    all_tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+    all_sources_paths = await MultiGet(
+        Get(SourcesPaths, SourcesPathsRequest(tgt.get(Sources))) for tgt in all_tgts
+    )
+    return AllOwnedSources(
+        itertools.chain.from_iterable(sources_paths.files for sources_paths in all_sources_paths)
+    )
 
 
 @dataclass(frozen=True)
@@ -243,6 +268,10 @@ async def rename_conflicting_targets(ptgts: PutativeTargets) -> UniquelyNamedPut
     for ptgt in ptgts:
         idx = 0
         possibly_renamed_ptgt = ptgt
+        # Targets in root-level BUILD files must be named explicitly.
+        if possibly_renamed_ptgt.path == "" and possibly_renamed_ptgt.kwargs.get("name") is None:
+            possibly_renamed_ptgt = possibly_renamed_ptgt.rename("root")
+        # Eliminate any address collisions.
         while possibly_renamed_ptgt.address.spec in existing_addrs:
             possibly_renamed_ptgt = ptgt.rename(f"{ptgt.name}{idx}")
             idx += 1
@@ -314,9 +343,19 @@ def make_content_str(
     return "\n\n".join(new_content) + "\n"
 
 
-@rule
+@rule(desc="Edit BUILD files with new targets")
 async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
     ptgts_by_build_file = group_by_build_file(req.putative_targets)
+    # There may be an existing *directory* whose name collides with that of a BUILD file
+    # we want to create. This is more likely on a system with case-insensitive paths,
+    # such as MacOS. We detect such cases and use an alt BUILD file name to fix.
+    existing_paths = await Get(Paths, PathGlobs(ptgts_by_build_file.keys()))
+    existing_dirs = set(existing_paths.dirs)
+    # Technically there could be a dir named "BUILD.pants" as well, but that's pretty unlikely.
+    ptgts_by_build_file = {
+        (f"{bf}.pants" if bf in existing_dirs else bf): pts
+        for bf, pts in ptgts_by_build_file.items()
+    }
     existing_build_files_contents = await Get(DigestContents, PathGlobs(ptgts_by_build_file.keys()))
     existing_build_files_contents_by_path = {
         ebfc.path: ebfc.content for ebfc in existing_build_files_contents

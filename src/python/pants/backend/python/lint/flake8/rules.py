@@ -69,7 +69,7 @@ async def flake8_lint_partition(
             internal_only=True,
             requirements=PexRequirements(flake8.all_requirements),
             interpreter_constraints=partition.interpreter_constraints,
-            entry_point=flake8.entry_point,
+            main=flake8.main,
         ),
     )
 

@@ -1,8 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import textwrap
 from io import BytesIO
+from textwrap import dedent
 from typing import Tuple
 from zipfile import ZipFile
 
@@ -14,6 +14,8 @@ from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.package import BuiltPackage
+from pants.core.target_types import Files, RelocatedFiles, Resources
+from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -25,9 +27,10 @@ def rule_runner() -> RuleRunner:
         rules=[
             *awslambda_python_rules(),
             *target_rules(),
+            *core_target_types_rules(),
             QueryRule(BuiltPackage, (PythonAwsLambdaFieldSet,)),
         ],
-        target_types=[PythonAWSLambda, PythonLibrary],
+        target_types=[PythonAWSLambda, PythonLibrary, Files, RelocatedFiles, Resources],
     )
 
 
@@ -36,7 +39,8 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: Address) -> Tuple[str
         [
             "--backend-packages=pants.backend.awslambda.python",
             "--source-root-patterns=src/python",
-        ]
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     target = rule_runner.get_target(addr)
     built_asset = rule_runner.request(BuiltPackage, [PythonAwsLambdaFieldSet.create(target)])
@@ -54,7 +58,7 @@ def create_python_awslambda(rule_runner: RuleRunner, addr: Address) -> Tuple[str
 def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
     rule_runner.create_file(
         "src/python/foo/bar/hello_world.py",
-        textwrap.dedent(
+        dedent(
             """
             def handler(event, context):
                 print('Hello, World!')
@@ -64,7 +68,7 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
 
     rule_runner.add_to_build_file(
         "src/python/foo/bar",
-        textwrap.dedent(
+        dedent(
             """
             python_library(name='lib')
 
@@ -86,3 +90,63 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner) -> None:
     names = set(zipfile.namelist())
     assert "lambdex_handler.py" in names
     assert "foo/bar/hello_world.py" in names
+
+
+def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
+    rule_runner.create_file("assets/f.txt")
+    rule_runner.add_to_build_file(
+        "assets",
+        dedent(
+            """\
+            files(name='files', sources=['f.txt'])
+            relocated_files(
+                name='relocated',
+                files_targets=[':files'],
+                src='assets',
+                dest='new_assets',
+            )
+
+            # Resources are fine.
+            resources(name='resources', sources=['f.txt'])
+            """
+        ),
+    )
+    rule_runner.create_file("src/py/project/__init__.py")
+    rule_runner.create_file(
+        "src/py/project/app.py",
+        """\
+        def handler(event, context):
+            print('Hello, World!')
+        """,
+    )
+    rule_runner.add_to_build_file(
+        "src/py/project",
+        dedent(
+            """\
+            python_library(
+                name='lib',
+                dependencies=['assets:files', 'assets:relocated', 'assets:resources'],
+            )
+
+            python_awslambda(
+                name='lambda',
+                dependencies=[':lib'],
+                handler='foo.bar.hello_world:handler',
+                runtime='python3.7',
+            )
+            """
+        ),
+    )
+
+    assert not caplog.records
+    zip_file_relpath, _ = create_python_awslambda(
+        rule_runner, Address("src/py/project", target_name="lambda")
+    )
+    assert caplog.records
+    assert "src.py.project/lambda.zip" == zip_file_relpath
+    assert (
+        "The python_awslambda target src/py/project:lambda transitively depends on" in caplog.text
+    )
+    assert "assets/f.txt:files" in caplog.text
+    assert "assets:relocated" in caplog.text
+    assert "assets:resources" not in caplog.text

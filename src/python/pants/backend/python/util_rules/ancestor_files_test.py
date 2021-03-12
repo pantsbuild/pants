@@ -64,10 +64,11 @@ def test_unstripped(rule_runner: RuleRunner) -> None:
             "src/python/no_init/lib.py",
         ],
         original_undeclared_files=[
+            "src/python/__init__.py",
             "src/python/project/__init__.py",
             "tests/python/project/__init__.py",
         ],
-        expected_discovered=["src/python/project/__init__.py"],
+        expected_discovered=["src/python/__init__.py", "src/python/project/__init__.py"],
     )
 
 
@@ -82,20 +83,22 @@ def test_unstripped_source_root_at_buildroot(rule_runner: RuleRunner) -> None:
             "no_init/lib.py",
         ],
         original_undeclared_files=[
+            "__init__.py",
             "project/__init__.py",
         ],
-        expected_discovered=["project/__init__.py"],
+        expected_discovered=["__init__.py", "project/__init__.py"],
     )
 
 
 def test_identify_missing_ancestor_files() -> None:
-    assert {"a/__init__.py", "a/b/__init__.py", "a/b/c/d/__init__.py"} == set(
+    assert {"__init__.py", "a/__init__.py", "a/b/__init__.py", "a/b/c/d/__init__.py"} == set(
         identify_missing_ancestor_files(
             "__init__.py", ["a/b/foo.py", "a/b/c/__init__.py", "a/b/c/d/bar.py", "a/e/__init__.py"]
         )
     )
 
     assert {
+        "__init__.py",
         "src/__init__.py",
         "src/python/__init__.py",
         "src/python/a/__init__.py",

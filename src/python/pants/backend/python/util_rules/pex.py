@@ -17,7 +17,7 @@ from typing import FrozenSet, Iterable, List, Mapping, Sequence, Set, Tuple, Typ
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import InterpreterConstraintsField, MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
@@ -318,9 +318,10 @@ class PexRequest(EngineAwareParameter):
     platforms: PexPlatforms
     sources: Digest | None
     additional_inputs: Digest | None
-    entry_point: str | None
+    main: MainSpecification | None
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
+    apply_requirement_constraints: bool
     description: str | None = dataclasses.field(compare=False)
 
     def __init__(
@@ -333,9 +334,10 @@ class PexRequest(EngineAwareParameter):
         platforms=PexPlatforms(),
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
-        entry_point: str | None = None,
+        main: MainSpecification | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
+        apply_requirement_constraints: bool = True,
         description: str | None = None,
     ) -> None:
         """A request to create a PEX from its inputs.
@@ -354,10 +356,12 @@ class PexRequest(EngineAwareParameter):
         :param sources: Any source files that should be included in the Pex.
         :param additional_inputs: Any inputs that are not source files and should not be included
             directly in the Pex, but should be present in the environment when building the Pex.
-        :param entry_point: The entry-point for the built Pex, equivalent to Pex's `-m` flag. If
+        :param main: The main for the built Pex, equivalent to Pex's `-e` or '-c' flag. If
             left off, the Pex will open up as a REPL.
         :param additional_args: Any additional Pex flags.
         :param pex_path: Pex files to add to the PEX_PATH.
+        :param apply_requirement_constraints: Whether to apply any configured
+            requirement_constraints while building this PEX.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
         """
@@ -368,9 +372,10 @@ class PexRequest(EngineAwareParameter):
         self.platforms = platforms
         self.sources = sources
         self.additional_inputs = additional_inputs
-        self.entry_point = entry_point
+        self.main = main
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
+        self.apply_requirement_constraints = apply_requirement_constraints
         self.description = description
         self.__post_init__()
 
@@ -547,11 +552,8 @@ async def build_pex(
     else:
         argv.append("--no-manylinux")
 
-    if request.entry_point is not None:
-        argv.extend(["--entry-point", request.entry_point])
-
-    if python_setup.requirement_constraints is not None:
-        argv.extend(["--constraints", python_setup.requirement_constraints])
+    if request.main is not None:
+        argv.extend(request.main.iter_pex_args())
 
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
@@ -559,7 +561,8 @@ async def build_pex(
     argv.extend(request.requirements)
 
     constraint_file_digest = EMPTY_DIGEST
-    if python_setup.requirement_constraints is not None:
+    if request.apply_requirement_constraints and python_setup.requirement_constraints is not None:
+        argv.extend(["--constraints", python_setup.requirement_constraints])
         constraint_file_digest = await Get(
             Digest,
             PathGlobs(
@@ -760,6 +763,32 @@ def wrap_venv_prex_request(pex_request: PexRequest) -> VenvPexRequest:
 async def create_venv_pex(
     request: VenvPexRequest, bash: BashBinary, pex_environment: PexEnvironment
 ) -> VenvPex:
+    # VenvPex is motivated by improving performance of Python tools by eliminating traditional PEX
+    # file startup overhead.
+    #
+    # To achieve the minimal overhead (on the order of 1ms) we discard:
+    # 1. Using Pex `--unzip` mode:
+    #    Although this does reduce steady-state overhead, it still leaves a minimum O(100ms) of
+    #    overhead per tool invocation. Fundamentally, Pex still needs to execute its `sys.path`
+    #    isolation bootstrap code in this case.
+    # 2. Using the Pex `venv` tool:
+    #    The idea here would be to create a tool venv as a Process output and then use the tool
+    #    venv as an input digest for all tool invocations. This was tried and netted ~500ms of
+    #    overhead over raw venv use.
+    #
+    # Instead we use Pex's `--venv` mode. In this mode you can run the Pex file and it will create a
+    # venv on the fly in the PEX_ROOT as needed. Since the PEX_ROOT is a named_cache, we avoid the
+    # digest materialization overhead present in 2 above. Since the venv is naturally isolated we
+    # avoid the `sys.path` isolation overhead of Pex itself present in 1 above.
+    #
+    # This does leave O(50ms) of overhead though for the PEX bootstrap code to detect an already
+    # created venv in the PEX_ROOT and re-exec into it. To eliminate this overhead we execute the
+    # `pex` venv script in the PEX_ROOT directly. This is not robust on its own though, since the
+    # named caches store might be pruned at any time. To guard against that case we introduce a shim
+    # bash script that checks to see if the `pex` venv script exists in the PEX_ROOT and re-creates
+    # the PEX_ROOT venv if not. Using the shim script to run Python tools gets us down to the ~1ms
+    # of overhead we currently enjoy.
+
     pex_request = request.pex_request
     seeded_venv_request = dataclasses.replace(
         pex_request, additional_args=pex_request.additional_args + ("--venv", "--seed")
@@ -852,7 +881,7 @@ class PexProcess:
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
     execution_slot_variable: str | None
-    cache_scope: ProcessCacheScope | None
+    cache_scope: ProcessCacheScope
 
     def __init__(
         self,
@@ -867,7 +896,7 @@ class PexProcess:
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | None = None,
         execution_slot_variable: str | None = None,
-        cache_scope: ProcessCacheScope | None = None,
+        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         self.pex = pex
         self.argv = tuple(argv)
@@ -922,7 +951,7 @@ class VenvPexProcess:
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
     execution_slot_variable: str | None
-    cache_scope: ProcessCacheScope | None
+    cache_scope: ProcessCacheScope
 
     def __init__(
         self,
@@ -937,7 +966,7 @@ class VenvPexProcess:
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | None = None,
         execution_slot_variable: str | None = None,
-        cache_scope: ProcessCacheScope | None = None,
+        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         self.venv_pex = venv_pex
         self.argv = tuple(argv)

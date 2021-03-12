@@ -3,13 +3,14 @@
 
 import logging
 import threading
-from typing import Optional
+from typing import Optional, Tuple
 
 from typing_extensions import Protocol
 
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
-from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -36,7 +37,14 @@ class PantsDaemonCore:
     PantsServices.
     """
 
-    def __init__(self, executor: PyExecutor, services_constructor: PantsServicesConstructor):
+    def __init__(
+        self,
+        options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironment,
+        executor: PyExecutor,
+        services_constructor: PantsServicesConstructor,
+    ):
+        self._options_initializer = OptionsInitializer(options_bootstrapper, env, executor=executor)
         self._executor = executor
         self._services_constructor = services_constructor
         self._lifecycle_lock = threading.RLock()
@@ -61,8 +69,11 @@ class PantsDaemonCore:
                 return True
             return self._services.are_all_alive()
 
-    def _init_scheduler(
-        self, options_fingerprint: str, options_bootstrapper: OptionsBootstrapper
+    def _initialize(
+        self,
+        options_fingerprint: str,
+        options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironment,
     ) -> None:
         """(Re-)Initialize the scheduler.
 
@@ -70,29 +81,31 @@ class PantsDaemonCore:
         """
         try:
             if self._scheduler:
-                logger.info("initialization options changed: reinitializing pantsd...")
+                logger.info("initialization options changed: reinitializing scheduler...")
             else:
-                logger.info("initializing pantsd...")
+                logger.info("initializing scheduler...")
             if self._services:
                 self._services.shutdown()
-            with OptionsInitializer.handle_unknown_flags(options_bootstrapper, raise_=True):
-                build_config = BuildConfigInitializer.get(options_bootstrapper)
-                options = OptionsInitializer.create(options_bootstrapper, build_config)
+            build_config, options = self._options_initializer.build_config_and_options(
+                options_bootstrapper, env, raise_=True
+            )
             self._scheduler = EngineInitializer.setup_graph(
-                options, build_config, executor=self._executor
+                options_bootstrapper, build_config, env, executor=self._executor
             )
             bootstrap_options_values = options.bootstrap_option_values()
             assert bootstrap_options_values is not None
 
             self._services = self._services_constructor(bootstrap_options_values, self._scheduler)
             self._fingerprint = options_fingerprint
-            logger.info("pantsd initialized.")
+            logger.info("scheduler initialized.")
         except Exception as e:
             self._kill_switch.set()
             self._scheduler = None
             raise e
 
-    def prepare_scheduler(self, options_bootstrapper: OptionsBootstrapper) -> GraphScheduler:
+    def prepare(
+        self, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironment
+    ) -> Tuple[GraphScheduler, OptionsInitializer]:
         """Get a scheduler for the given options_bootstrapper.
 
         Runs in a client context (generally in DaemonPantsRunner) so logging is sent to the client.
@@ -113,6 +126,6 @@ class PantsDaemonCore:
                 # The fingerprint mismatches, either because this is the first run (and there is no
                 # fingerprint) or because relevant options have changed. Create a new scheduler
                 # and services.
-                self._init_scheduler(options_fingerprint, options_bootstrapper)
-                assert self._scheduler is not None
-            return self._scheduler
+                self._initialize(options_fingerprint, options_bootstrapper, env)
+            assert self._scheduler is not None
+            return self._scheduler, self._options_initializer

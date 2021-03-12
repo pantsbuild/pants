@@ -51,19 +51,17 @@ fn time_span_from_start_and_duration_in_seconds(
 }
 
 #[test]
-fn time_span_from_start_and_end_given_positive_duration() {
-  let span = time_span_from_start_and_duration_in_seconds(42, 10);
+fn time_span_from_prost_timestamp() {
+  let span = time_span_from_start_and_duration_in_seconds(42, 10).unwrap();
   assert_eq!(
-    Ok(TimeSpan {
+    TimeSpan {
       start: Duration::new(42, 0),
       duration: Duration::new(10, 0),
-    }),
+    },
     span
   );
-}
 
-#[test]
-fn time_span_from_start_and_end_given_negative_duration() {
+  // A negative duration is invalid.
   let span = time_span_from_start_and_duration_in_seconds(42, -10);
   assert!(span.is_err());
 }

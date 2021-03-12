@@ -101,7 +101,7 @@ async def setup_black(
             internal_only=True,
             requirements=PexRequirements(black.all_requirements),
             interpreter_constraints=tool_interpreter_constraints,
-            entry_point=black.entry_point,
+            main=black.main,
         ),
     )
 

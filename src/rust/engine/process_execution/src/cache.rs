@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -10,7 +11,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use sharded_lmdb::ShardedLmdb;
 use store::Store;
-use workunit_store::{with_workunit, Level, Metric, WorkunitMetadata};
+use workunit_store::{with_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
@@ -59,6 +60,7 @@ impl crate::CommandRunner for CommandRunner {
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let cache_lookup_start = Instant::now();
     let context2 = context.clone();
     let cache_read_future = async move {
       context
@@ -76,9 +78,19 @@ impl crate::CommandRunner for CommandRunner {
       let command_runner = self.clone();
       match self.lookup(key).await {
         Ok(Some(result)) if result.exit_code == 0 || cache_failures => {
+          let lookup_elapsed = cache_lookup_start.elapsed();
           context
             .workunit_store
             .increment_counter(Metric::LocalCacheRequestsCached, 1);
+          if let Some(time_saved) = result.metadata.time_saved_from_cache(lookup_elapsed) {
+            let time_saved = time_saved.as_millis() as u64;
+            context
+              .workunit_store
+              .increment_counter(Metric::LocalCacheTotalTimeSavedMs, time_saved);
+            context
+              .workunit_store
+              .record_observation(ObservationMetric::LocalCacheTimeSavedMs, time_saved);
+          }
           return Ok(result);
         }
         Err(err) => {
@@ -118,7 +130,10 @@ impl crate::CommandRunner for CommandRunner {
     with_workunit(
       context2.workunit_store,
       "local_cache_read".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..WorkunitMetadata::default()
+      },
       cache_read_future,
       |_, md| md,
     )
@@ -155,7 +170,6 @@ impl CommandRunner {
         crate::remote::populate_fallible_execution_result(
           self.file_store.clone(),
           action_result,
-          vec![],
           platform,
           true,
         )
@@ -194,18 +208,20 @@ impl CommandRunner {
     let stdout_digest = result.stdout_digest;
     let stderr_digest = result.stderr_digest;
 
+    let action_result = remexec::ActionResult {
+      exit_code: result.exit_code,
+      output_directories: vec![remexec::OutputDirectory {
+        path: String::new(),
+        tree_digest: Some((&result.output_directory).into()),
+      }],
+      stdout_digest: Some((&stdout_digest).into()),
+      stderr_digest: Some((&stderr_digest).into()),
+      execution_metadata: Some(result.metadata.clone().into()),
+      ..remexec::ActionResult::default()
+    };
     let execute_response = remexec::ExecuteResponse {
       cached_result: true,
-      result: Some(remexec::ActionResult {
-        exit_code: result.exit_code,
-        output_directories: vec![remexec::OutputDirectory {
-          path: String::new(),
-          tree_digest: Some((&result.output_directory).into()),
-        }],
-        stdout_digest: Some((&stdout_digest).into()),
-        stderr_digest: Some((&stderr_digest).into()),
-        ..remexec::ActionResult::default()
-      }),
+      result: Some(action_result),
       ..remexec::ExecuteResponse::default()
     };
 

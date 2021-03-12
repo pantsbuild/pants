@@ -15,7 +15,7 @@ import pytest
 
 from pants.testutil.pants_integration_test import (
     PantsJoinHandle,
-    read_pantsd_log,
+    read_pants_log,
     setup_tmpdir,
     temporary_workdir,
 )
@@ -274,8 +274,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             time.sleep(5)
             ctx.checker.assert_running()
 
-            def full_pantsd_log():
-                return "\n".join(read_pantsd_log(ctx.workdir))
+            def full_pants_log():
+                return "\n".join(read_pants_log(ctx.workdir))
 
             # Create a new file in test_dir
             with temporary_file(suffix=".py", binary_mode=False, root_dir=test_dir) as temp_f:
@@ -284,7 +284,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
                 ctx.checker.assert_stopped()
 
-            self.assertIn("saw filesystem changes covered by invalidation globs", full_pantsd_log())
+            self.assertIn("saw filesystem changes covered by invalidation globs", full_pants_log())
 
     def test_pantsd_invalidation_pants_toml_file(self):
         # Test tmp_pants_toml (--pants-config-files=$tmp_pants_toml)'s removal
@@ -612,11 +612,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         config = {"GLOBAL": {"concurrent": True, "pantsd": True}}
         with temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(
-                ["help", "goals"], workdir=workdir, config=config
+                ["-ldebug", "help", "goals"], workdir=workdir, config=config
             )
             pants_run.assert_success()
-            pantsd_log_location = os.path.join(workdir, "pantsd", "pantsd.log")
-            self.assertFalse(os.path.exists(pantsd_log_location))
+            self.assertNotIn("Connecting to pantsd", pants_run.stderr)
 
     def test_unhandled_exceptions_only_log_exceptions_once(self):
         """Tests that the unhandled exceptions triggered by LocalPantsRunner instances don't
