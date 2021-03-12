@@ -692,6 +692,12 @@ class VenvScriptWriter:
 
             export {" ".join(env_vars)}
 
+            # Let PEX_TOOLS invocations pass through to the original PEX file since venvs don't come
+            # with tools support.
+            if [ -n "${{PEX_TOOLS:-}}" ]; then
+              exec {execute_pex_args} "$@"
+            fi
+
             # If the seeded venv has been removed from the PEX_ROOT, we re-seed from the original
             # `--venv` mode PEX file.
             if [ ! -e {target_venv_executable} ]; then
