@@ -19,7 +19,6 @@ use log::warn;
 use parking_lot::{Mutex, RwLock};
 use task_executor::Executor;
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::sync::mpsc;
 use ui::ConsoleUI;
 use uuid::Uuid;
 use workunit_store::{UserMetadataPyValue, WorkunitStore};
@@ -31,8 +30,6 @@ const STRAGGLER_LOGGING_INTERVAL: Duration = Duration::from_secs(30);
 
 // Root requests are limited to Select nodes, which produce (python) Values.
 pub type Root = Select;
-
-pub struct Stderr(pub String);
 
 pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
 
@@ -209,23 +206,6 @@ impl Session {
     *run_id = Uuid::new_v4();
   }
 
-  pub async fn write_stdout(&self, msg: &str) -> Result<(), String> {
-    if let SessionDisplay::ConsoleUI(ref mut ui) = *self.0.display.lock() {
-      ui.write_stdout(msg).await
-    } else {
-      print!("{}", msg);
-      Ok(())
-    }
-  }
-
-  pub fn write_stderr(&self, msg: &str) {
-    if let SessionDisplay::ConsoleUI(ref mut ui) = *self.0.display.lock() {
-      ui.write_stderr(msg);
-    } else {
-      eprint!("{}", msg);
-    }
-  }
-
   pub async fn with_console_ui_disabled<T>(&self, f: impl Future<Output = T>) -> T {
     match *self.0.display.lock() {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.with_console_ui_disabled(f).await,
@@ -233,23 +213,9 @@ impl Session {
     }
   }
 
-  pub fn maybe_display_initialize(
-    &self,
-    executor: &Executor,
-    sender: &mpsc::UnboundedSender<Stderr>,
-  ) {
+  pub fn maybe_display_initialize(&self, executor: &Executor) {
     let result = match *self.0.display.lock() {
-      SessionDisplay::ConsoleUI(ref mut ui) => {
-        let sender = sender.clone();
-        ui.initialize(
-          executor.clone(),
-          Box::new(move |msg: &str| {
-            // If we fail to send, it's because the execute loop has exited: we fail the callback to
-            // have the logging module directly log to stderr at that point.
-            sender.send(Stderr(msg.to_owned())).map_err(|_| ())
-          }),
-        )
-      }
+      SessionDisplay::ConsoleUI(ref mut ui) => ui.initialize(executor.clone()),
       SessionDisplay::Logging {
         ref mut straggler_deadline,
         ..

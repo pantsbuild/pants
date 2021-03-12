@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import itertools
+import json
 import logging
 import shlex
 from collections import defaultdict
@@ -14,6 +15,8 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import FrozenSet, Iterable, List, Mapping, Sequence, Set, Tuple, TypeVar
 
+import packaging.specifiers
+import packaging.version
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
@@ -28,7 +31,7 @@ from pants.backend.python.util_rules.pex_environment import (
     PythonExecutable,
 )
 from pants.engine.addresses import Address
-from pants.engine.collection import DeduplicatedCollection
+from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -692,6 +695,12 @@ class VenvScriptWriter:
 
             export {" ".join(env_vars)}
 
+            # Let PEX_TOOLS invocations pass through to the original PEX file since venvs don't come
+            # with tools support.
+            if [ -n "${{PEX_TOOLS:-}}" ]; then
+              exec {execute_pex_args} "$@"
+            fi
+
             # If the seeded venv has been removed from the PEX_ROOT, we re-seed from the original
             # `--venv` mode PEX file.
             if [ ! -e {target_venv_executable} ]; then
@@ -732,6 +741,7 @@ class VenvScriptWriter:
 @dataclass(frozen=True)
 class VenvPex:
     digest: Digest
+    pex_filename: str
     pex: Script
     python: Script
     bin: FrozenDict[str, Script]
@@ -819,6 +829,7 @@ async def create_venv_pex(
 
     return VenvPex(
         digest=input_digest,
+        pex_filename=result.pex_filename,
         pex=pex.script,
         python=python.script,
         bin=FrozenDict((bin_name, venv_script.script) for bin_name, venv_script in scripts.items()),
@@ -1002,6 +1013,51 @@ async def setup_venv_pex_process(request: VenvPexProcess) -> Process:
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,
     )
+
+
+@dataclass(frozen=True)
+class PexDistributionInfo:
+    """Information about an individual distribution in a PEX file, as reported by `PEX_TOOLS=1
+    repository info -v`."""
+
+    project_name: str
+    version: packaging.version.Version
+    requires_python: packaging.specifiers.SpecifierSet | None
+    requires_dists: tuple[Requirement, ...]
+
+
+class PexResolveInfo(Collection[PexDistributionInfo]):
+    """Information about all distributions resolved in a PEX file, as reported by `PEX_TOOLS=1
+    repository info -v`."""
+
+
+@rule
+async def determine_venv_pex_resolve_info(venv_pex: VenvPex) -> PexResolveInfo:
+    process_result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            venv_pex,
+            argv=["repository", "info", "-v"],
+            extra_env={"PEX_TOOLS": "1"},
+            input_digest=venv_pex.digest,
+            description=f"Determine distributions found in {venv_pex.pex_filename}",
+            level=LogLevel.DEBUG,
+        ),
+    )
+    dists = []
+    for line in process_result.stdout.decode().splitlines():
+        info = json.loads(line)
+        dists.append(
+            PexDistributionInfo(
+                project_name=info["project_name"],
+                version=packaging.version.Version(info["version"]),
+                requires_python=packaging.specifiers.SpecifierSet(info["requires_python"] or ""),
+                requires_dists=tuple(
+                    Requirement.parse(req) for req in sorted(info["requires_dists"])
+                ),
+            )
+        )
+    return PexResolveInfo(sorted(dists, key=lambda dist: dist.project_name))
 
 
 def rules():

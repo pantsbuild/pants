@@ -21,7 +21,13 @@ backend_packages.add = [
 
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
+  # TODO: Remove the relevant `ignore_pants_warning` entry when this is bumped.
   "toolchain.pants.plugin==0.7.0",
+]
+
+ignore_pants_warnings = [
+  # TODO: Remove when `toolchain.pants.plugin` is bumped past `0.7.0`.
+  "DeprecationWarning: DEPRECATED: pants.core.util_rules.pants_environment",
 ]
 
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
@@ -137,10 +143,16 @@ pytest_plugins.add = [
 timeout_default = 60
 
 [test]
-# TODO: These are exposed to tests in order to allow for python interpreter discovery when
-# Pants-tests-Pants: in particular, the [python-setup] subsystem consumes them.
-#   see https://github.com/pantsbuild/pants/issues/11638
-extra_env_vars = ["PYENV_ROOT", "HOME", "PATH"]
+extra_env_vars = [
+  # TODO: These are exposed to tests in order to allow for python interpreter discovery when
+  # Pants-tests-Pants: in particular, the [python-setup] subsystem consumes them.
+  #   see https://github.com/pantsbuild/pants/issues/11638
+  "PYENV_ROOT",
+  "HOME",
+  "PATH",
+  # We'd always like complete backtraces in tests.
+  "RUST_BACKTRACE=1",
+]
 
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.9"]

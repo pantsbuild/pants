@@ -132,14 +132,13 @@ py_module_initializer!(native_engine, |py, m| {
   )?;
   m.add(
     py,
-    "stdio_write_stdout",
-    py_fn!(py, stdio_write_stdout(b: &[u8])),
+    "stdio_thread_get_destination",
+    py_fn!(py, stdio_thread_get_destination()),
   )?;
-
   m.add(
     py,
-    "stdio_write_stderr",
-    py_fn!(py, stdio_write_stderr(b: &[u8])),
+    "stdio_thread_set_destination",
+    py_fn!(py, stdio_thread_set_destination(a: PyStdioDestination)),
   )?;
 
   m.add(py, "flush_log", py_fn!(py, flush_log()))?;
@@ -435,6 +434,8 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<externs::fs::PyDigest>(py)?;
   m.add_class::<externs::fs::PySnapshot>(py)?;
 
+  m.add_class::<PyStdioDestination>(py)?;
+
   m.add_class::<self::testutil::PyStubCAS>(py)?;
   m.add_class::<self::testutil::PyStubCASBuilder>(py)?;
 
@@ -511,6 +512,10 @@ py_class!(pub class PyExecutor |py| {
 
 py_class!(class PyScheduler |py| {
     data scheduler: Scheduler;
+});
+
+py_class!(class PyStdioDestination |py| {
+  data destination: Arc<stdio::Destination>;
 });
 
 // Represents configuration related to process execution strategies.
@@ -1892,18 +1897,14 @@ fn stdio_thread_console_clear(_: Python) -> PyUnitResult {
   Ok(None)
 }
 
-fn stdio_write_stdout(py: Python, payload: &[u8]) -> PyUnitResult {
-  py.allow_threads(|| {
-    stdio::get_destination().write_stdout(payload);
-    Ok(None)
-  })
+fn stdio_thread_get_destination(py: Python) -> CPyResult<PyStdioDestination> {
+  let dest = stdio::get_destination();
+  PyStdioDestination::create_instance(py, dest)
 }
 
-fn stdio_write_stderr(py: Python, payload: &[u8]) -> PyUnitResult {
-  py.allow_threads(|| {
-    stdio::get_destination().write_stderr(payload);
-    Ok(None)
-  })
+fn stdio_thread_set_destination(py: Python, stdio_destination: PyStdioDestination) -> PyUnitResult {
+  stdio::set_thread_destination(stdio_destination.destination(py).clone());
+  Ok(None)
 }
 
 // TODO: Needs to be thread-local / associated with the Console.

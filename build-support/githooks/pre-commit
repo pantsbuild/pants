@@ -48,6 +48,11 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
     [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
       die "Travis config generator changed, but .travis.yml file was not regenerated. See the header of .travis.yml for instructions."
   fi
+
+  if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
+    echo "* Checking github workflows generation"
+    ./pants run build-support/bin/generate_github_workflows.py -- --check
+  fi
 else
   echo "* Skipping import/lint checks in partial working copy."
 fi

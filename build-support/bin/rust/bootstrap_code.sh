@@ -68,6 +68,9 @@ function bootstrap_native_code() {
     engine_version_calculated="$(calculate_current_hash)"
 
     # Create the native engine resource.
+    # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
+    #  process from being killed when recompiling.
+    rm -f "${NATIVE_ENGINE_RESOURCE}"
     cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
 
     # Create the accompanying metadata file.

@@ -26,6 +26,7 @@ def create_execution_options(
     plugin: str | None = None,
     remote_store_address: str = "grpc://fake.url:10",
     remote_execution_address: str = "grpc://fake.url:10",
+    local_only: bool = False,
 ) -> ExecutionOptions:
     args = [
         "--remote-cache-read",
@@ -44,7 +45,7 @@ def create_execution_options(
     _build_config, options = OptionsInitializer(ob, env).build_config_and_options(
         ob, env, raise_=False
     )
-    return ExecutionOptions.from_options(options, env)
+    return ExecutionOptions.from_options(options, env, local_only=local_only)
 
 
 def test_execution_options_remote_oauth_bearer_token_path() -> None:
@@ -93,6 +94,25 @@ def test_execution_options_remote_addresses() -> None:
             remote_store_address=f"grpc://{host}",
             remote_execution_address=f"https:://{host}",
         )
+
+
+def test_execution_options_local_only() -> None:
+    # Test that local_only properly disables remote execution. It doesn't need to prune all
+    # settings, only those which would trigger usage.
+    host = "fake-with-http-in-url.com:10"
+    exec_options = create_execution_options(
+        initial_headers={},
+        remote_store_address=f"grpc://{host}",
+        remote_execution_address=f"grpc://{host}",
+        local_only=True,
+    )
+    # Remote execution should be disabled, and the headers should still be empty, indicating that
+    # the auth plugin has not run.
+    assert not exec_options.remote_execution
+    assert not exec_options.remote_cache_read
+    assert not exec_options.remote_cache_write
+    assert exec_options.remote_store_headers == {}
+    assert exec_options.remote_execution_headers == {}
 
 
 def test_execution_options_auth_plugin() -> None:

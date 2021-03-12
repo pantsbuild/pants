@@ -340,8 +340,12 @@ impl CommandRunner {
     // Assumption: The Action and related data has already been stored locally.
     with_workunit(
       context.workunit_store.clone(),
-      format!("ensure_action_uploaded for {:?}", action_digest),
-      WorkunitMetadata::with_level(Level::Trace),
+      "ensure_action_uploaded".to_owned(),
+      WorkunitMetadata {
+        level: Level::Trace,
+        desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
+        ..WorkunitMetadata::default()
+      },
       crate::remote::ensure_action_uploaded(
         &self.store,
         command_digest,
@@ -403,8 +407,12 @@ impl crate::CommandRunner for CommandRunner {
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) = with_workunit(
       context.workunit_store.clone(),
-      format!("ensure_action_stored_locally for {:?}", action),
-      WorkunitMetadata::with_level(Level::Trace),
+      "ensure_action_stored_locally".to_owned(),
+      WorkunitMetadata {
+        level: Level::Trace,
+        desc: Some(format!("ensure action stored locally for {:?}", action)),
+        ..WorkunitMetadata::default()
+      },
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action),
       |_, md| md,
     )
@@ -417,8 +425,12 @@ impl crate::CommandRunner for CommandRunner {
       let cache_read_future = async {
         let response = with_workunit(
           context.workunit_store.clone(),
-          format!("check_action_cache for {:?}", action_digest),
-          WorkunitMetadata::with_level(Level::Trace),
+          "check_action_cache".to_owned(),
+          WorkunitMetadata {
+            level: Level::Trace,
+            desc: Some(format!("check action cache for {:?}", action_digest)),
+            ..WorkunitMetadata::default()
+          },
           crate::remote::check_action_cache(
             action_digest,
             &self.metadata,
@@ -517,7 +529,10 @@ impl crate::CommandRunner for CommandRunner {
       let _write_join = self.executor.spawn(with_workunit(
         context.workunit_store,
         "remote_cache_write".to_owned(),
-        WorkunitMetadata::with_level(Level::Trace),
+        WorkunitMetadata {
+          level: Level::Trace,
+          ..WorkunitMetadata::default()
+        },
         cache_write_future,
         |_, md| md,
       ));

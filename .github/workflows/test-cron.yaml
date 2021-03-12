@@ -133,7 +133,7 @@ jobs:
     strategy:
       matrix:
         python-version:
-        - 3.7.10
+        - 3.8.3
   bootstrap_pants_macos:
     env:
       rust_version: 1.49.0
@@ -254,7 +254,7 @@ jobs:
     strategy:
       matrix:
         python-version:
-        - 3.7.10
+        - 3.8.3
   lint_python_linux:
     name: Lint Python (Linux)
     needs: bootstrap_pants_linux
@@ -315,7 +315,7 @@ jobs:
     strategy:
       matrix:
         python-version:
-        - 3.7.10
+        - 3.8.3
   test_python_linux:
     name: Test Python (Linux)
     needs: bootstrap_pants_linux
@@ -374,7 +374,7 @@ jobs:
     strategy:
       matrix:
         python-version:
-        - 3.7.10
+        - 3.8.3
   test_python_macos:
     name: Test Python (MacOS)
     needs: bootstrap_pants_macos
@@ -413,6 +413,8 @@ jobs:
     strategy:
       matrix:
         python-version:
-        - 3.7.10
-name: Pull Request CI
-'on': pull_request
+        - 3.8.3
+name: Daily Extended Python Testing
+'on':
+  schedule:
+  - cron: 45 8 * * *
