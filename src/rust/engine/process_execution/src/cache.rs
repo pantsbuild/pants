@@ -130,7 +130,10 @@ impl crate::CommandRunner for CommandRunner {
     with_workunit(
       context2.workunit_store,
       "local_cache_read".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
+      WorkunitMetadata {
+        level: Level::Debug,
+        ..WorkunitMetadata::default()
+      },
       cache_read_future,
       |_, md| md,
     )
