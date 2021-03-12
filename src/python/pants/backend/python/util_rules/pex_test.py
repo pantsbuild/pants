@@ -349,7 +349,7 @@ def create_pex_and_get_all_data(
         main=main,
         sources=sources,
         additional_inputs=additional_inputs,
-        additional_args=additional_pex_args,
+        additional_args=("--include-tools", *additional_pex_args),
     )
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", *additional_pants_args],
@@ -365,10 +365,26 @@ def create_pex_and_get_all_data(
         raise AssertionError(f"Expected a Pex or a VenvPex but got a {type(pex)}.")
     rule_runner.scheduler.write_digest(digest)
     pex_path = os.path.join(rule_runner.build_root, "test.pex")
+
+    pex_process_type = PexProcess if isinstance(pex, Pex) else VenvPexProcess
+    process = rule_runner.request(
+        Process,
+        [
+            pex_process_type(
+                pex,
+                argv=["info"],
+                extra_env=dict(PEX_TOOLS="1"),
+                description="Extract PEX-INFO.",
+            ),
+        ],
+    )
+
+    result = rule_runner.request(ProcessResult, [process])
+    pex_info_content = result.stdout.decode()
+
     with zipfile.ZipFile(pex_path, "r") as zipfp:
-        with zipfp.open("PEX-INFO", "r") as pex_info:
-            pex_info_content = pex_info.readline().decode()
-            pex_list = zipfp.namelist()
+        pex_list = zipfp.namelist()
+
     return {
         "pex": pex,
         "local_path": pex_path,
@@ -438,9 +454,7 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"from main\n"
 
 
-# TODO(John Sirois): Add VenvPex to the pex_type parameter list once Pants is upgraded to Pex with
-#  a fix for: https://github.com/pantsbuild/pex/issues/1239
-@pytest.mark.parametrize("pex_type", [Pex])
+@pytest.mark.parametrize("pex_type", [Pex, VenvPex])
 def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
     sources = rule_runner.request(
         Digest,
