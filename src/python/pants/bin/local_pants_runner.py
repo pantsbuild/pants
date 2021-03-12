@@ -224,10 +224,13 @@ class LocalPantsRunner:
         self.run_tracker.start(run_start_time=start_time, specs=specs)
 
         with maybe_profiled(self.profile_path):
-            global_options = self.options.for_global_scope()
-
             if self.options.help_request:
                 return self._print_help(self.options.help_request)
+
+            global_options = self.options.for_global_scope()
+            goals = tuple(self.options.goals)
+            if not goals:
+                return PANTS_SUCCEEDED_EXIT_CODE
 
             streaming_reporter = StreamingWorkunitHandler(
                 self.graph_session.scheduler_session,
@@ -236,17 +239,15 @@ class LocalPantsRunner:
                 options_bootstrapper=self.options_bootstrapper,
                 callbacks=self._get_workunits_callbacks(),
                 report_interval_seconds=global_options.streaming_workunits_report_interval,
+                pantsd=global_options.pantsd,
             )
-
-            goals = tuple(self.options.goals)
-            with streaming_reporter.session(pantsd=global_options.pantsd):
-                if not goals:
-                    return PANTS_SUCCEEDED_EXIT_CODE
-                engine_result = PANTS_FAILED_EXIT_CODE
+            with streaming_reporter:
                 try:
                     engine_result = self._perform_run(goals)
                 except Exception as e:
                     ExceptionSink.log_exception(e)
+                else:
+                    engine_result = PANTS_FAILED_EXIT_CODE
 
                 metrics = self.graph_session.scheduler_session.metrics()
                 self.run_tracker.set_pantsd_scheduler_metrics(metrics)
