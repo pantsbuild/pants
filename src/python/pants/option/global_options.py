@@ -141,10 +141,10 @@ class ExecutionOptions:
         remote_execution_headers = cast(Dict[str, str], bootstrap_options.remote_execution_headers)
         remote_store_headers = cast(Dict[str, str], bootstrap_options.remote_store_headers)
         remote_instance_name = cast(Optional[str], bootstrap_options.remote_instance_name)
-        remote_execution = cast(bool, bootstrap_options.remote_execution)
-        remote_cache_read = cast(bool, bootstrap_options.remote_cache_read)
-        remote_cache_write = cast(bool, bootstrap_options.remote_cache_write)
-        if bootstrap_options.remote_oauth_bearer_token_path:
+        remote_execution = cast(bool, bootstrap_options.remote_execution) and not local_only
+        remote_cache_read = cast(bool, bootstrap_options.remote_cache_read) and not local_only
+        remote_cache_write = cast(bool, bootstrap_options.remote_cache_write) and not local_only
+        if not local_only and bootstrap_options.remote_oauth_bearer_token_path:
             oauth_token = (
                 Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
             )
