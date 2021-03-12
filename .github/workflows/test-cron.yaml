@@ -417,4 +417,4 @@ jobs:
 name: Daily Extended Python Testing
 'on':
   schedule:
-  - cron: 45 23 * * *
+  - cron: 45 8 * * *
