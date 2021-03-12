@@ -246,7 +246,6 @@ class LocalPantsRunner:
                     engine_result = self._perform_run(goals)
                 except Exception as e:
                     ExceptionSink.log_exception(e)
-                else:
                     engine_result = PANTS_FAILED_EXIT_CODE
 
                 metrics = self.graph_session.scheduler_session.metrics()
