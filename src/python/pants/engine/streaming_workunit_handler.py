@@ -5,11 +5,10 @@ from __future__ import annotations
 
 import logging
 import threading
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Iterator, Sequence, Tuple
-
-from typing_extensions import Protocol
 
 from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
@@ -103,7 +102,8 @@ class StreamingWorkunitContext:
         return ExpandedSpecs(targets=targets_dict)
 
 
-class WorkunitsCallback(Protocol):
+class WorkunitsCallback(ABC):
+    @abstractmethod
     def __call__(
         self,
         *,
@@ -118,7 +118,6 @@ class WorkunitsCallback(Protocol):
         :finished: True when the last chunk of workunit data is reported to the callback.
         :context: A context providing access to functionality relevant to the run.
         """
-        ...
 
 
 @dataclass(frozen=True)

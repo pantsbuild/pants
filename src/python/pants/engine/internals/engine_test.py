@@ -38,6 +38,7 @@ from pants.engine.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
     TargetInfo,
+    WorkunitsCallback,
 )
 from pants.goal.run_tracker import RunTracker
 from pants.testutil.option_util import create_options_bootstrapper
@@ -262,7 +263,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
 
 @dataclass
-class WorkunitTracker:
+class WorkunitTracker(WorkunitsCallback):
     """This class records every non-empty batch of started and completed workunits received from the
     engine."""
 
@@ -270,7 +271,7 @@ class WorkunitTracker:
     started_workunit_chunks: List[List[dict]] = field(default_factory=list)
     finished: bool = False
 
-    def add(self, **kwargs) -> None:
+    def __call__(self, **kwargs) -> None:
         if kwargs["finished"] is True:
             self.finished = True
 
@@ -284,8 +285,8 @@ class WorkunitTracker:
 
 
 def new_run_tracker() -> RunTracker:
-    # NB: A RunTracker usually observes "all options" (`full_options_for_scopes`), but it only actually
-    # directly consumes bootstrap options.
+    # NB: A RunTracker usually observes "all options" (`full_options_for_scopes`), but it only
+    # actually directly consumes bootstrap options.
     return RunTracker(create_options_bootstrapper([]).bootstrap_options)
 
 
@@ -304,13 +305,13 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         handler = StreamingWorkunitHandler(
             scheduler,
             run_tracker=new_run_tracker(),
-            callbacks=[tracker.add],
+            callbacks=[tracker],
             report_interval_seconds=0.01,
             max_workunit_verbosity=max_workunit_verbosity,
             specs=Specs.empty(),
             options_bootstrapper=create_options_bootstrapper([]),
         )
-        return (scheduler, tracker, handler)
+        return scheduler, tracker, handler
 
     def test_streaming_workunits_reporting(self):
         scheduler, tracker, handler = self._fixture_for_rules([fib, QueryRule(Fib, (int,))])
@@ -678,7 +679,7 @@ def test_more_complicated_engine_aware(rule_runner: RuleRunner, run_tracker: Run
     handler = StreamingWorkunitHandler(
         rule_runner.scheduler,
         run_tracker=run_tracker,
-        callbacks=[tracker.add],
+        callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.TRACE,
         specs=Specs.empty(),
@@ -739,7 +740,7 @@ def test_process_digests_on_streaming_workunits(
     handler = StreamingWorkunitHandler(
         scheduler,
         run_tracker=run_tracker,
-        callbacks=[tracker.add],
+        callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
         specs=Specs.empty(),
@@ -771,7 +772,7 @@ def test_process_digests_on_streaming_workunits(
     handler = StreamingWorkunitHandler(
         scheduler,
         run_tracker=run_tracker,
-        callbacks=[tracker.add],
+        callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
         specs=Specs.empty(),
@@ -818,21 +819,22 @@ def test_context_object_on_streaming_workunits(
 ) -> None:
     scheduler = rule_runner.scheduler
 
-    def callback(**kwargs) -> None:
-        context = kwargs["context"]
-        assert isinstance(context, StreamingWorkunitContext)
+    class Callback(WorkunitsCallback):
+        def __call__(self, **kwargs) -> None:
+            context = kwargs["context"]
+            assert isinstance(context, StreamingWorkunitContext)
 
-        completed_workunits = kwargs["completed_workunits"]
-        for workunit in completed_workunits:
-            if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
-                digest = workunit["artifacts"]["stdout_digest"]
-                output = context.single_file_digests_to_bytes([digest])
-                assert output == (b"stdout output\n",)
+            completed_workunits = kwargs["completed_workunits"]
+            for workunit in completed_workunits:
+                if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
+                    digest = workunit["artifacts"]["stdout_digest"]
+                    output = context.single_file_digests_to_bytes([digest])
+                    assert output == (b"stdout output\n",)
 
     handler = StreamingWorkunitHandler(
         scheduler,
         run_tracker=run_tracker,
-        callbacks=[callback],
+        callbacks=[Callback()],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
         specs=Specs.empty(),
@@ -870,24 +872,27 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
         ["src/python/somefiles::", "src/python/others/b.py"]
     )
 
-    def callback(**kwargs) -> None:
-        context = kwargs["context"]
-        assert isinstance(context, StreamingWorkunitContext)
+    class Callback(WorkunitsCallback):
+        def __call__(self, **kwargs) -> None:
+            context = kwargs["context"]
+            assert isinstance(context, StreamingWorkunitContext)
 
-        expanded = context.get_expanded_specs()
-        targets = expanded.targets
+            expanded = context.get_expanded_specs()
+            targets = expanded.targets
 
-        assert len(targets.keys()) == 2
-        assert targets["src/python/others/b.py"] == [TargetInfo(filename="src/python/others/b.py")]
-        assert set(targets["src/python/somefiles"]) == {
-            TargetInfo(filename="src/python/somefiles/a.py"),
-            TargetInfo(filename="src/python/somefiles/b.py"),
-        }
+            assert len(targets.keys()) == 2
+            assert targets["src/python/others/b.py"] == [
+                TargetInfo(filename="src/python/others/b.py")
+            ]
+            assert set(targets["src/python/somefiles"]) == {
+                TargetInfo(filename="src/python/somefiles/a.py"),
+                TargetInfo(filename="src/python/somefiles/b.py"),
+            }
 
     handler = StreamingWorkunitHandler(
         scheduler=rule_runner.scheduler,
         run_tracker=run_tracker,
-        callbacks=[callback],
+        callbacks=[Callback()],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
         specs=specs,
