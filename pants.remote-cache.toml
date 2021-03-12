@@ -9,4 +9,4 @@ remote_cache_write = true
 
 remote_store_address = "grpcs://build.toolchain.com:443"
 remote_instance_name = "main"
-remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
+#remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
