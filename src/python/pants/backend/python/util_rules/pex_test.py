@@ -23,12 +23,12 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexDistributionInfo,
-    PexDistributionsInfo,
     PexInterpreterConstraints,
     PexPlatforms,
     PexProcess,
     PexRequest,
     PexRequirements,
+    PexResolveInfo,
     VenvPex,
     VenvPexProcess,
 )
@@ -325,7 +325,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Process, (PexProcess,)),
             QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
-            QueryRule(PexDistributionsInfo, (VenvPex,)),
+            QueryRule(PexResolveInfo, (VenvPex,)),
         ]
     )
 
@@ -614,11 +614,11 @@ def test_additional_inputs(rule_runner: RuleRunner) -> None:
     assert main_content[: len(preamble)] == preamble
 
 
-def test_venv_pex_distributions_info(rule_runner: RuleRunner) -> None:
+def test_venv_pex_resolve_info(rule_runner: RuleRunner) -> None:
     venv_pex = create_pex_and_get_all_data(
         rule_runner, pex_type=VenvPex, requirements=PexRequirements(["requests==2.23.0"])
     )["pex"]
-    dists = rule_runner.request(PexDistributionsInfo, [venv_pex])
+    dists = rule_runner.request(PexResolveInfo, [venv_pex])
     assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), SpecifierSet(""), ())
     assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), SpecifierSet(""), ())
     assert dists[2] == PexDistributionInfo(

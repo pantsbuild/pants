@@ -1026,13 +1026,13 @@ class PexDistributionInfo:
     requires_dists: tuple[Requirement, ...]
 
 
-class PexDistributionsInfo(Collection[PexDistributionInfo]):
-    """Information about all distributions in a PEX file, as reported by `PEX_TOOLS=1 repository
-    info -v`."""
+class PexResolveInfo(Collection[PexDistributionInfo]):
+    """Information about all distributions resolved in a PEX file, as reported by `PEX_TOOLS=1
+    repository info -v`."""
 
 
 @rule
-async def extract_venv_pex_distribution(venv_pex: VenvPex) -> PexDistributionsInfo:
+async def determine_venv_pex_resolve_info(venv_pex: VenvPex) -> PexResolveInfo:
     process_result = await Get(
         ProcessResult,
         VenvPexProcess(
@@ -1057,7 +1057,7 @@ async def extract_venv_pex_distribution(venv_pex: VenvPex) -> PexDistributionsIn
                 ),
             )
         )
-    return PexDistributionsInfo(sorted(dists, key=lambda dist: dist.project_name))
+    return PexResolveInfo(sorted(dists, key=lambda dist: dist.project_name))
 
 
 def rules():
