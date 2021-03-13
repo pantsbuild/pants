@@ -10,6 +10,6 @@
 
 jar_library(name='scalac-scoverage-plugin',
   jars=[
-    scala_jar(org='com.twitter.scoverage', name='scalac-scoverage-plugin', rev='1.0.2-twitter'),
+    scala_jar(org='com.twitter.scoverage', name='scalac-scoverage-plugin', rev='1.0.3-twitter-dev0'),
     ],
   )
