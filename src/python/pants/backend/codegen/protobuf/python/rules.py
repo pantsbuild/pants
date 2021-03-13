@@ -14,6 +14,7 @@ from pants.backend.python.util_rules.pex import (
     PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
+    PexResolveInfo,
     VenvPex,
     VenvPexRequest,
 )
@@ -102,7 +103,7 @@ async def generate_python_from_protobuf(
         mypy_pex = await Get(
             VenvPex,
             VenvPexRequest(
-                bin_names=[protoc_gen_mypy_script, protoc_gen_mypy_grpc_script],
+                bin_names=[protoc_gen_mypy_script],
                 pex_request=PexRequest(
                     output_filename="mypy_protobuf.pex",
                     internal_only=True,
@@ -117,6 +118,31 @@ async def generate_python_from_protobuf(
                 ),
             ),
         )
+
+        if request.protocol_target.get(ProtobufGrpcToggle).value:
+            mypy_info = await Get(PexResolveInfo, VenvPex, mypy_pex)
+
+            # In order to generate stubs for gRPC code, we need mypy-protobuf 2.0 or above.
+            if any(
+                dist_info.project_name == "mypy-protobuf" and dist_info.version.major >= 2
+                for dist_info in mypy_info
+            ):
+                # TODO: merge PEXes together using `pex_path instead once possible through
+                #  the `VenvPex` abstraction.
+                mypy_pex = await Get(
+                    VenvPex,
+                    VenvPexRequest(
+                        bin_names=[protoc_gen_mypy_script, protoc_gen_mypy_grpc_script],
+                        pex_request=PexRequest(
+                            output_filename="mypy_protobuf.pex",
+                            internal_only=True,
+                            requirements=PexRequirements(
+                                [python_protobuf_subsystem.mypy_plugin_version]
+                            ),
+                            interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5"]),
+                        ),
+                    ),
+                )
 
     downloaded_grpc_plugin = (
         await Get(
@@ -148,7 +174,12 @@ async def generate_python_from_protobuf(
                 output_dir,
             ]
         )
-        if downloaded_grpc_plugin:
+    if downloaded_grpc_plugin:
+        argv.extend(
+            [f"--plugin=protoc-gen-grpc={downloaded_grpc_plugin.exe}", "--grpc_out", output_dir]
+        )
+
+        if mypy_pex and protoc_gen_mypy_grpc_script in mypy_pex.bin:
             argv.extend(
                 [
                     f"--plugin=protoc-gen-mypy_grpc={mypy_pex.bin[protoc_gen_mypy_grpc_script].argv0}",
@@ -156,10 +187,6 @@ async def generate_python_from_protobuf(
                     output_dir,
                 ]
             )
-    if downloaded_grpc_plugin:
-        argv.extend(
-            [f"--plugin=protoc-gen-grpc={downloaded_grpc_plugin.exe}", "--grpc_out", output_dir]
-        )
 
     argv.extend(target_sources_stripped.snapshot.files)
     result = await Get(
