@@ -342,7 +342,8 @@ impl CommandRunner {
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata {
-        level: Level::Debug,
+        level: Level::Trace,
+        desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
         ..WorkunitMetadata::default()
       },
       crate::remote::ensure_action_uploaded(
@@ -408,7 +409,8 @@ impl crate::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
       WorkunitMetadata {
-        level: Level::Debug,
+        level: Level::Trace,
+        desc: Some(format!("ensure action stored locally for {:?}", action)),
         ..WorkunitMetadata::default()
       },
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action),
@@ -425,7 +427,8 @@ impl crate::CommandRunner for CommandRunner {
           context.workunit_store.clone(),
           "check_action_cache".to_owned(),
           WorkunitMetadata {
-            level: Level::Debug,
+            level: Level::Trace,
+            desc: Some(format!("check action cache for {:?}", action_digest)),
             ..WorkunitMetadata::default()
           },
           crate::remote::check_action_cache(
@@ -527,7 +530,7 @@ impl crate::CommandRunner for CommandRunner {
         context.workunit_store,
         "remote_cache_write".to_owned(),
         WorkunitMetadata {
-          level: Level::Debug,
+          level: Level::Trace,
           ..WorkunitMetadata::default()
         },
         cache_write_future,

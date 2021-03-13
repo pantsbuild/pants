@@ -505,7 +505,7 @@ async def get_bash() -> BashBinary:
     return await Get(BashBinary, BashBinaryRequest(rationale="execute bash scripts"))
 
 
-@rule(desc="Find binary path", level=LogLevel.DEBUG)
+@rule
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
     # our shebang. This avoids mixing locations that we would search for bash into the search paths

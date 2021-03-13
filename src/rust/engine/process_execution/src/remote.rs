@@ -313,7 +313,7 @@ impl CommandRunner {
           parent_id,
           &workunit_store,
           WorkunitMetadata {
-            level: Level::Debug,
+            level: Level::Trace,
             ..WorkunitMetadata::default()
           },
         ),
@@ -338,7 +338,7 @@ impl CommandRunner {
           parent_id,
           &workunit_store,
           WorkunitMetadata {
-            level: Level::Debug,
+            level: Level::Trace,
             ..WorkunitMetadata::default()
           },
         ),
@@ -363,7 +363,7 @@ impl CommandRunner {
           parent_id,
           &workunit_store,
           WorkunitMetadata {
-            level: Level::Debug,
+            level: Level::Trace,
             ..WorkunitMetadata::default()
           },
         ),
@@ -388,7 +388,7 @@ impl CommandRunner {
           parent_id,
           &workunit_store,
           WorkunitMetadata {
-            level: Level::Debug,
+            level: Level::Trace,
             ..WorkunitMetadata::default()
           },
         ),
@@ -771,7 +771,8 @@ impl crate::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "ensure_action_stored_locally".to_owned(),
       WorkunitMetadata {
-        level: Level::Debug,
+        level: Level::Trace,
+        desc: Some(format!("ensure action stored locally for {:?}", action)),
         ..WorkunitMetadata::default()
       },
       ensure_action_stored_locally(&self.store, &command, &action),
@@ -785,7 +786,8 @@ impl crate::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "check_action_cache".to_owned(),
       WorkunitMetadata {
-        level: Level::Debug,
+        level: Level::Trace,
+        desc: Some(format!("check action cache for {:?}", action_digest)),
         ..WorkunitMetadata::default()
       },
       check_action_cache(
@@ -813,7 +815,8 @@ impl crate::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata {
-        level: Level::Debug,
+        level: Level::Trace,
+        desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
         ..WorkunitMetadata::default()
       },
       ensure_action_uploaded(&store, command_digest, action_digest, request.input_files),
@@ -831,7 +834,7 @@ impl crate::CommandRunner for CommandRunner {
       context.workunit_store.clone(),
       "run_execute_request".to_owned(),
       WorkunitMetadata {
-        level: Level::Debug,
+        level: Level::Trace,
         ..WorkunitMetadata::default()
       },
       timeout_fut,
