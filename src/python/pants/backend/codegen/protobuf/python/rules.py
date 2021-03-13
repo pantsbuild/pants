@@ -99,23 +99,25 @@ async def generate_python_from_protobuf(
     protoc_gen_mypy_script = "protoc-gen-mypy"
     protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
     mypy_pex = None
+    mypy_request = PexRequest(
+        output_filename="mypy_protobuf.pex",
+        internal_only=True,
+        requirements=PexRequirements([python_protobuf_subsystem.mypy_plugin_version]),
+        # TODO(John Sirois): Fix these interpreter constraints to track the actual
+        #  python requirement of the mypy_plugin_version or else plumb an option for
+        #  manually setting the constraint to track what mypy_plugin_version needs:
+        #  https://github.com/pantsbuild/pants/issues/11565
+        # Here we guess a constraint that will likely work with any mypy_plugin_version
+        # selected.
+        interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5"]),
+    )
+
     if python_protobuf_subsystem.mypy_plugin:
         mypy_pex = await Get(
             VenvPex,
             VenvPexRequest(
                 bin_names=[protoc_gen_mypy_script],
-                pex_request=PexRequest(
-                    output_filename="mypy_protobuf.pex",
-                    internal_only=True,
-                    requirements=PexRequirements([python_protobuf_subsystem.mypy_plugin_version]),
-                    # TODO(John Sirois): Fix these interpreter constraints to track the actual
-                    #  python requirement of the mypy_plugin_version or else plumb an option for
-                    #  manually setting the constraint to track what mypy_plugin_version needs:
-                    #  https://github.com/pantsbuild/pants/issues/11565
-                    # Here we guess a constraint that will likely work with any mypy_plugin_version
-                    # selected.
-                    interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5"]),
-                ),
+                pex_request=mypy_request,
             ),
         )
 
@@ -127,20 +129,12 @@ async def generate_python_from_protobuf(
                 dist_info.project_name == "mypy-protobuf" and dist_info.version.major >= 2
                 for dist_info in mypy_info
             ):
-                # TODO: merge PEXes together using `pex_path` instead once possible through
-                #  the `VenvPex` abstraction.
+                # TODO: Use `pex_path` once VenvPex stores a Pex field.
                 mypy_pex = await Get(
                     VenvPex,
                     VenvPexRequest(
                         bin_names=[protoc_gen_mypy_script, protoc_gen_mypy_grpc_script],
-                        pex_request=PexRequest(
-                            output_filename="mypy_protobuf.pex",
-                            internal_only=True,
-                            requirements=PexRequirements(
-                                [python_protobuf_subsystem.mypy_plugin_version]
-                            ),
-                            interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5"]),
-                        ),
+                        pex_request=mypy_request,
                     ),
                 )
 

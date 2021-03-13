@@ -17,6 +17,28 @@ from pants.engine.target import GeneratedSources, HydratedSources, HydrateSource
 from pants.source.source_root import NoSourceRootError
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
+GRPC_PROTO_STANZA = """
+syntax = "proto3";
+
+package dir1;
+
+// The greeter service definition.
+service Greeter {
+  // Sends a greeting
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+}
+
+// The request message containing the user's name.
+message HelloRequest {
+  string name = 1;
+}
+
+// The response message containing the greetings
+message HelloReply {
+  string message = 1;
+}
+"""
+
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -243,29 +265,7 @@ def test_mypy_plugin(rule_runner: RuleRunner) -> None:
 def test_grpc(rule_runner: RuleRunner) -> None:
     rule_runner.create_file(
         "src/protobuf/dir1/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
-
-            package dir1;
-
-            // The greeter service definition.
-            service Greeter {
-              // Sends a greeting
-              rpc SayHello (HelloRequest) returns (HelloReply) {}
-            }
-
-            // The request message containing the user's name.
-            message HelloRequest {
-              string name = 1;
-            }
-
-            // The response message containing the greetings
-            message HelloReply {
-              string message = 1;
-            }
-            """
-        ),
+        dedent(GRPC_PROTO_STANZA),
     )
     rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library(grpc=True)")
     assert_files_generated(
@@ -279,29 +279,7 @@ def test_grpc(rule_runner: RuleRunner) -> None:
 def test_grpc_mypy_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.create_file(
         "src/protobuf/dir1/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
-
-            package dir1;
-
-            // The greeter service definition.
-            service Greeter {
-              // Sends a greeting
-              rpc SayHello (HelloRequest) returns (HelloReply) {}
-            }
-
-            // The request message containing the user's name.
-            message HelloRequest {
-              string name = 1;
-            }
-
-            // The response message containing the greetings
-            message HelloReply {
-              string message = 1;
-            }
-            """
-        ),
+        dedent(GRPC_PROTO_STANZA),
     )
     rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library(grpc=True)")
     assert_files_generated(
@@ -321,29 +299,7 @@ def test_grpc_mypy_plugin(rule_runner: RuleRunner) -> None:
 def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.create_file(
         "src/protobuf/dir1/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
-
-            package dir1;
-
-            // The greeter service definition.
-            service Greeter {
-              // Sends a greeting
-              rpc SayHello (HelloRequest) returns (HelloReply) {}
-            }
-
-            // The request message containing the user's name.
-            message HelloRequest {
-              string name = 1;
-            }
-
-            // The response message containing the greetings
-            message HelloReply {
-              string message = 1;
-            }
-            """
-        ),
+        dedent(GRPC_PROTO_STANZA),
     )
     rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library(grpc=True)")
 
