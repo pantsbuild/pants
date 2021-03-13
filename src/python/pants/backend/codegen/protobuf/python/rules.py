@@ -127,7 +127,7 @@ async def generate_python_from_protobuf(
                 dist_info.project_name == "mypy-protobuf" and dist_info.version.major >= 2
                 for dist_info in mypy_info
             ):
-                # TODO: merge PEXes together using `pex_path instead once possible through
+                # TODO: merge PEXes together using `pex_path` instead once possible through
                 #  the `VenvPex` abstraction.
                 mypy_pex = await Get(
                     VenvPex,
