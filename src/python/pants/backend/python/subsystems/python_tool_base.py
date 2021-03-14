@@ -16,6 +16,9 @@ class PythonToolRequirementsBase(Subsystem):
     # Subclasses do not need to override.
     default_extra_requirements: ClassVar[Sequence[str]] = []
 
+    default_interpreter_constraints: ClassVar[Sequence[str]] = []
+    register_interpreter_constraints: ClassVar[bool] = False
+
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -36,9 +39,17 @@ class PythonToolRequirementsBase(Subsystem):
             "tool allows you to install plugins or if you need to constrain a dependency to "
             "a certain version.",
         )
+        if cls.register_interpreter_constraints:
+            register(
+                "--interpreter-constraints",
+                type=list,
+                advanced=True,
+                default=cls.default_interpreter_constraints,
+                help="Python interpreter constraints for this tool.",
+            )
 
     @property
-    def version(self) -> str:
+    def requirement(self) -> str:
         return cast(str, self.options.version)
 
     @property
@@ -47,7 +58,11 @@ class PythonToolRequirementsBase(Subsystem):
 
     @property
     def all_requirements(self) -> Tuple[str, ...]:
-        return (self.options.version, *self.options.extra_requirements)
+        return (self.requirement, *self.extra_requirements)
+
+    @property
+    def interpreter_constraints(self) -> Tuple[str, ...]:
+        return tuple(self.options.interpreter_constraints)
 
 
 class PythonToolBase(PythonToolRequirementsBase):
@@ -55,9 +70,6 @@ class PythonToolBase(PythonToolRequirementsBase):
 
     # Subclasses must set.
     default_main: ClassVar[MainSpecification]
-    # Subclasses do not need to override.
-    default_interpreter_constraints: ClassVar[Sequence[str]] = []
-    register_interpreter_constraints: ClassVar[bool] = False
 
     @classmethod
     def register_options(cls, register):
@@ -85,26 +97,6 @@ class PythonToolBase(PythonToolRequirementsBase):
                 "with). Usually, you will not want to change this from the default."
             ),
         )
-
-        if cls.default_interpreter_constraints and not cls.register_interpreter_constraints:
-            raise ValueError(
-                f"`default_interpreter_constraints` are configured for `{cls.options_scope}`, but "
-                "`register_interpreter_constraints` is not set to `True`, so the "
-                "`--interpreter-constraints` option will not be registered. Did you mean to set "
-                "this?"
-            )
-        if cls.register_interpreter_constraints:
-            register(
-                "--interpreter-constraints",
-                type=list,
-                advanced=True,
-                default=cls.default_interpreter_constraints,
-                help="Python interpreter constraints for this tool.",
-            )
-
-    @property
-    def interpreter_constraints(self) -> Tuple[str, ...]:
-        return tuple(self.options.interpreter_constraints)
 
     @property
     def main(self) -> MainSpecification:
