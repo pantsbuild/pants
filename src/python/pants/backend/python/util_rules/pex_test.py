@@ -325,6 +325,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Process, (PexProcess,)),
             QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
+            QueryRule(PexResolveInfo, (Pex,)),
             QueryRule(PexResolveInfo, (VenvPex,)),
         ]
     )
@@ -614,13 +615,14 @@ def test_additional_inputs(rule_runner: RuleRunner) -> None:
     assert main_content[: len(preamble)] == preamble
 
 
-def test_venv_pex_resolve_info(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("pex_type", [Pex, VenvPex])
+def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
     venv_pex = create_pex_and_get_all_data(
-        rule_runner, pex_type=VenvPex, requirements=PexRequirements(["requests==2.23.0"])
+        rule_runner, pex_type=pex_type, requirements=PexRequirements(["requests==2.23.0"])
     )["pex"]
     dists = rule_runner.request(PexResolveInfo, [venv_pex])
-    assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), SpecifierSet(""), ())
-    assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), SpecifierSet(""), ())
+    assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), None, ())
+    assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), None, ())
     assert dists[2] == PexDistributionInfo(
         "idna", Version("2.10"), SpecifierSet("!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"), ()
     )
