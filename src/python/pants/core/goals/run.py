@@ -8,11 +8,17 @@ from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import FieldSet, TargetRootsToFieldSets, TargetRootsToFieldSetsRequest
+from pants.engine.target import (
+    FieldSet,
+    NoApplicableTargetsBehavior,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
+)
 from pants.engine.unions import union
 from pants.option.custom_types import shell_str
 from pants.option.global_options import GlobalOptions
@@ -48,13 +54,11 @@ class RunRequest:
 
 
 class RunSubsystem(GoalSubsystem):
-    """Runs a binary target.
-
-    This goal propagates the return code of the underlying executable. Run `echo $?` to inspect the
-    resulting return code.
-    """
-
     name = "run"
+    help = (
+        "Runs a binary target.\n\nThis goal propagates the return code of the underlying "
+        "executable. Run `echo $?` to inspect the resulting return code."
+    )
 
     required_union_implementations = (RunFieldSet,)
 
@@ -87,13 +91,14 @@ async def run(
     interactive_runner: InteractiveRunner,
     workspace: Workspace,
     build_root: BuildRoot,
+    complete_env: CompleteEnvironment,
 ) -> Run:
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
             RunFieldSet,
             goal_description="the `run` goal",
-            error_if_no_applicable_targets=True,
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
             expect_single_field_set=True,
         ),
     )
@@ -106,14 +111,13 @@ async def run(
         )
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
-        extra_env = {k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}
+        env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
         try:
             result = interactive_runner.run(
                 InteractiveProcess(
                     argv=(*args, *run_subsystem.args),
-                    env=extra_env,
+                    env=env,
                     run_in_workspace=True,
-                    hermetic_env=False,
                 )
             )
             exit_code = result.exit_code

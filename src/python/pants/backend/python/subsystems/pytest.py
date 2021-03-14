@@ -3,14 +3,13 @@
 
 from typing import Optional, Tuple, cast
 
-from pants.option.custom_types import shell_str
+from pants.option.custom_types import file_option, shell_str
 from pants.option.subsystem import Subsystem
 
 
 class PyTest(Subsystem):
-    """The pytest Python test framework (https://docs.pytest.org/)."""
-
     options_scope = "pytest"
+    help = "The pytest Python test framework (https://docs.pytest.org/)."
 
     @classmethod
     def register_options(cls, register):
@@ -27,7 +26,7 @@ class PyTest(Subsystem):
             # This should be kept in sync with `requirements.txt`.
             # TODO: To fix this, we should allow using a `target_option` referring to a
             #  `python_requirement_library` to override the version.
-            default="pytest>=6.0.1,<6.1",
+            default="pytest>=6.0.1,<6.3",
             advanced=True,
             help="Requirement string for Pytest.",
         )
@@ -35,13 +34,10 @@ class PyTest(Subsystem):
             "--pytest-plugins",
             type=list,
             advanced=True,
-            default=[
-                "pytest-cov>=2.10.1,<2.11",
-                # NB: zipp has frequently destabilized builds due to floating transitive versions
-                # under pytest.
-                "zipp==2.1.0",
-            ],
-            help="Requirement strings for any plugins or additional requirements you'd like to use.",
+            default=["pytest-cov>=2.10.1,<2.12"],
+            help=(
+                "Requirement strings for any plugins or additional requirements you'd like to use."
+            ),
         )
         register(
             "--timeouts",
@@ -93,6 +89,22 @@ class PyTest(Subsystem):
                 "to tests under this environment variable name."
             ),
         )
+        register(
+            "--config",
+            type=file_option,
+            default=None,
+            advanced=True,
+            help=(
+                "Path to pytest.ini or alternative Pytest config file.\n\n"
+                "Pytest will attempt to auto-discover the config file,"
+                "meaning that it should typically be an ancestor of your"
+                "tests, such as in the build root.\n\nPants will not automatically"
+                " set --rootdir for you to force Pytest to pick up your config "
+                "file, but you can manually set --rootdir in [pytest].args.\n\n"
+                "Refer to https://docs.pytest.org/en/stable/customize.html#"
+                "initialization-determining-rootdir-and-configfile."
+            ),
+        )
 
     def get_requirement_strings(self) -> Tuple[str, ...]:
         """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""
@@ -109,3 +121,7 @@ class PyTest(Subsystem):
     @property
     def timeout_maximum(self) -> Optional[int]:
         return cast(Optional[int], self.options.timeout_maximum)
+
+    @property
+    def config(self) -> Optional[str]:
+        return cast(Optional[str], self.options.config)

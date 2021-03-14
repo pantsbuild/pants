@@ -25,8 +25,8 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
     # The TRAVIS env var is documented here:
     #   https://docs.travis-ci.com/user/environment-variables/#default-environment-variables
     if [[ "${TRAVIS}" != "true" ]]; then
-      echo "* Running cargo clippy"
-      ./build-support/bin/check_clippy.sh || exit 1
+      echo "* Running \`./cargo clippy --all\`"
+      ./cargo clippy --all || exit 1
     fi
     echo "* Checking formatting of Rust files"
     ./build-support/bin/check_rust_formatting.sh || exit 1
@@ -47,6 +47,11 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
     expected_travis_yml=$(./pants run build-support/bin:generate_travis_yml)
     [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
       die "Travis config generator changed, but .travis.yml file was not regenerated. See the header of .travis.yml for instructions."
+  fi
+
+  if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
+    echo "* Checking github workflows generation"
+    ./pants run build-support/bin/generate_github_workflows.py -- --check
   fi
 else
   echo "* Skipping import/lint checks in partial working copy."

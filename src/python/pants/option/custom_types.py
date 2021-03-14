@@ -1,11 +1,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import inspect
 import os
 import re
 from enum import Enum
-from typing import Dict, Iterable, List, Optional, Pattern, Sequence, Type, Union
+from typing import Dict, Iterable, List, Pattern, Sequence
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
@@ -27,7 +29,7 @@ class UnsetBool:
         )
 
     @classmethod
-    def coerce_bool(cls, value: Optional[Union[Type["UnsetBool"], bool]], default: bool) -> bool:
+    def coerce_bool(cls, value: type[UnsetBool] | bool | None, default: bool) -> bool:
         if value is None:
             return default
         if value is cls:
@@ -156,7 +158,7 @@ class ListValueComponent:
         return [s]
 
     @classmethod
-    def merge(cls, components: Iterable["ListValueComponent"]) -> "ListValueComponent":
+    def merge(cls, components: Iterable[ListValueComponent]) -> ListValueComponent:
         """Merges components into a single component, applying their actions appropriately.
 
         This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
@@ -196,7 +198,7 @@ class ListValueComponent:
         return self._action
 
     @classmethod
-    def create(cls, value, member_type=str) -> "ListValueComponent":
+    def create(cls, value, member_type=str) -> ListValueComponent:
         """Interpret value as either a list or something to extend another list with.
 
         Note that we accept tuple literals, but the internal value is always a list.
@@ -257,7 +259,7 @@ class DictValueComponent:
     EXTEND = "EXTEND"
 
     @classmethod
-    def merge(cls, components: Iterable["DictValueComponent"]) -> "DictValueComponent":
+    def merge(cls, components: Iterable["DictValueComponent"]) -> DictValueComponent:
         """Merges components into a single component, applying their actions appropriately.
 
         This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
@@ -281,7 +283,7 @@ class DictValueComponent:
         self.val = val
 
     @classmethod
-    def create(cls, value) -> "DictValueComponent":
+    def create(cls, value) -> DictValueComponent:
         """Interpret value as either a dict or something to extend another dict with.
 
         :param value: The value to convert.  Can be an instance of DictValueComponent, a dict,

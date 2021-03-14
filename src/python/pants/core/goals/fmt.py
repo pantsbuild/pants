@@ -1,27 +1,30 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
+from typing import ClassVar, Iterable, List, Optional, Tuple, Type, TypeVar, cast
 
-from pants.base.deprecated import resolve_conflicting_options
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule
 from pants.engine.target import Field, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
 
+_F = TypeVar("_F", bound="FmtResult")
+
 
 @dataclass(frozen=True)
-class FmtResult(EngineAwareReturnType):
+class FmtResult:
     input: Digest
     output: Digest
     stdout: str
@@ -29,7 +32,7 @@ class FmtResult(EngineAwareReturnType):
     formatter_name: str
 
     @classmethod
-    def skip(cls, *, formatter_name: str) -> "FmtResult":
+    def skip(cls: Type[_F], *, formatter_name: str) -> _F:
         return cls(
             input=EMPTY_DIGEST,
             output=EMPTY_DIGEST,
@@ -46,7 +49,7 @@ class FmtResult(EngineAwareReturnType):
         original_digest: Digest,
         formatter_name: str,
         strip_chroot_path: bool = False,
-    ) -> "FmtResult":
+    ) -> FmtResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
@@ -71,6 +74,15 @@ class FmtResult(EngineAwareReturnType):
     def did_change(self) -> bool:
         return self.output != self.input
 
+
+@dataclass(frozen=True)
+class EnrichedFmtResult(FmtResult, EngineAwareReturnType):
+    """A `FmtResult` that is enriched for the sake of logging results as they come in.
+
+    Plugin authors only need to return `FmtResult`, and a rule will upcast those into
+    `EnrichedFmtResult`.
+    """
+
     def level(self) -> Optional[LogLevel]:
         if self.skipped:
             return LogLevel.DEBUG
@@ -78,7 +90,7 @@ class FmtResult(EngineAwareReturnType):
 
     def message(self) -> Optional[str]:
         if self.skipped:
-            return "skipped."
+            return f"{self.formatter_name} skipped."
         message = "made changes." if self.did_change else "made no changes."
         output = ""
         if self.stdout:
@@ -87,7 +99,20 @@ class FmtResult(EngineAwareReturnType):
             output += f"\n{self.stderr}"
         if output:
             output = f"{output.rstrip()}\n\n"
-        return f"{message}{output}"
+        return f"{self.formatter_name} {message}{output}"
+
+
+# NB: We mark this uncachable to ensure that the results are always streamed, even if the
+# underlying FmtResult is memoized. This rule is very cheap, so there's little performance hit.
+@_uncacheable_rule(desc="fmt")
+async def enrich_fmt_result(result: FmtResult) -> EnrichedFmtResult:
+    return EnrichedFmtResult(
+        input=result.input,
+        output=result.output,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        formatter_name=result.formatter_name,
+    )
 
 
 @union
@@ -129,9 +154,8 @@ class LanguageFmtResults:
 
 
 class FmtSubsystem(GoalSubsystem):
-    """Autoformat source code."""
-
     name = "fmt"
+    help = "Autoformat source code."
 
     required_union_implementations = (LanguageFmtTargets,)
 
@@ -145,38 +169,18 @@ class FmtSubsystem(GoalSubsystem):
             default=False,
             help=(
                 "Rather than formatting all files in a single batch, format each file as a "
-                "separate process. Why do this? You'll get many more cache hits. Why not do this? "
-                "Formatters both have substantial startup overhead and are cheap to add one "
+                "separate process.\n\nWhy do this? You'll get many more cache hits. Why not do "
+                "this? Formatters both have substantial startup overhead and are cheap to add one "
                 "additional file to the run. On a cold cache, it is much faster to use "
-                "`--no-per-file-caching`. We only recommend using `--per-file-caching` if you "
+                "`--no-per-file-caching`.\n\nWe only recommend using `--per-file-caching` if you "
                 "are using a remote cache or if you have benchmarked that this option will be "
                 "faster than `--no-per-file-caching` for your use case."
-            ),
-        )
-        register(
-            "--per-target-caching",
-            advanced=True,
-            type=bool,
-            default=False,
-            help="See `--per-file-caching`.",
-            removal_version="2.1.0.dev0",
-            removal_hint=(
-                "Use the renamed `--per-file-caching` option instead. If this option is set, Pants "
-                "will now run per every file, rather than per target."
             ),
         )
 
     @property
     def per_file_caching(self) -> bool:
-        val = resolve_conflicting_options(
-            old_option="per_target_caching",
-            new_option="per_file_caching",
-            old_container=self.options,
-            new_container=self.options,
-            old_scope=self.name,
-            new_scope=self.name,
-        )
-        return cast(bool, val)
+        return cast(bool, self.options.per_file_caching)
 
 
 class Fmt(Goal):
@@ -258,7 +262,7 @@ async def fmt(
     )
     if changed_digests:
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
-        # than silently having one result override the other. In practicality, this should never
+        # than silently having one result override the other. In practice, this should never
         # happen due to us grouping each language's formatters into a single digest.
         merged_formatted_digest = await Get(Digest, MergeDigests(changed_digests))
         workspace.write_digest(merged_formatted_digest)

@@ -1,12 +1,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
 import shlex
-from typing import Dict, Iterable, List, Optional, Union
+import textwrap
+from typing import Iterable, List, Sequence
 
 
-def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
+def ensure_binary(text_or_binary: bytes | str) -> bytes:
     if isinstance(text_or_binary, bytes):
         return text_or_binary
     elif isinstance(text_or_binary, str):
@@ -15,7 +18,7 @@ def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
         raise TypeError(f"Argument is neither text nor binary type.({type(text_or_binary)})")
 
 
-def ensure_text(text_or_binary: Union[bytes, str]) -> str:
+def ensure_text(text_or_binary: bytes | str) -> str:
     if isinstance(text_or_binary, bytes):
         return text_or_binary.decode()
     elif isinstance(text_or_binary, str):
@@ -24,7 +27,7 @@ def ensure_text(text_or_binary: Union[bytes, str]) -> str:
         raise TypeError(f"Argument is neither text nor binary type ({type(text_or_binary)})")
 
 
-def safe_shlex_split(text_or_binary: Union[bytes, str]) -> List[str]:
+def safe_shlex_split(text_or_binary: bytes | str) -> List[str]:
     """Split a string using shell-like syntax.
 
     Safe even on python versions whose shlex.split() method doesn't accept unicode.
@@ -60,7 +63,7 @@ def safe_shlex_join(arg_list: Iterable[str]) -> str:
 
 def create_path_env_var(
     new_entries: Iterable[str],
-    env: Optional[Dict[str, str]] = None,
+    env: dict[str, str] | None = None,
     env_var: str = "PATH",
     delimiter: str = ":",
     prepend: bool = False,
@@ -122,7 +125,7 @@ def strip_prefix(string: str, prefix: str) -> str:
 
 
 # NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
-def strip_v2_chroot_path(v: Union[bytes, str]) -> str:
+def strip_v2_chroot_path(v: bytes | str) -> str:
     """Remove all instances of the chroot tmpdir path from the str so that it only uses relative
     paths.
 
@@ -133,3 +136,28 @@ def strip_v2_chroot_path(v: Union[bytes, str]) -> str:
     if isinstance(v, bytes):
         v = v.decode()
     return re.sub(r"/.*/process-execution[a-zA-Z0-9]+/", "", v)
+
+
+def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> Sequence[str]:
+    """Hard wrap a string while still preserving any prior hard wrapping (new lines).
+
+    This works well when the input uses soft wrapping, e.g. via Python's implicit string
+    concatenation.
+
+    Usually, you will want to join the lines together with "\n".join().
+    """
+    # wrap() returns [] for an empty line, but we want to emit those, hence the `or [line]`.
+    return [
+        f"{' ' * indent}{wrapped_line}"
+        for line in s.splitlines()
+        for wrapped_line in textwrap.wrap(line, width=width - indent) or [line]
+    ]
+
+
+def first_paragraph(s: str) -> str:
+    """Get the first paragraph, where paragraphs are separated by blank lines."""
+    lines = s.splitlines()
+    first_blank_line_index = next(
+        (i for i, line in enumerate(lines) if line.strip() == ""), len(lines)
+    )
+    return " ".join(lines[:first_blank_line_index])

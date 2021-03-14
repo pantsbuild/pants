@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import atexit
 import errno
 import os
@@ -11,26 +13,14 @@ import threading
 import uuid
 from collections import defaultdict
 from contextlib import contextmanager
-from typing import (
-    Any,
-    Callable,
-    DefaultDict,
-    Iterator,
-    List,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Union,
-    overload,
-)
+from typing import Any, Callable, DefaultDict, Iterator, Sequence, Set, overload
 
 from typing_extensions import Literal
 
 from pants.util.strutil import ensure_text
 
 
-def longest_dir_prefix(path: str, prefixes: Sequence[str]) -> Optional[str]:
+def longest_dir_prefix(path: str, prefixes: Sequence[str]) -> str | None:
     """Given a list of prefixes, return the one that is the longest prefix to the given path.
 
     Returns None if there are no matches.
@@ -51,7 +41,7 @@ def fast_relpath(path: str, start: str) -> str:
     return relpath
 
 
-def fast_relpath_optional(path: str, start: str) -> Optional[str]:
+def fast_relpath_optional(path: str, start: str) -> str | None:
     """A prefix-based relpath, with no normalization or support for returning `..`.
 
     Returns None if `start` is not a directory-aware prefix of `path`.
@@ -97,7 +87,7 @@ def safe_mkdir_for(path: str, clean: bool = False) -> None:
 
 
 def safe_file_dump(
-    filename: str, payload: Union[bytes, str] = "", mode: str = "w", makedirs: bool = False
+    filename: str, payload: bytes | str = "", mode: str = "w", makedirs: bool = False
 ) -> None:
     """Write a string to a file.
 
@@ -120,26 +110,26 @@ def safe_file_dump(
 
 
 @overload
-def maybe_read_file(filename: str) -> Optional[str]:
+def maybe_read_file(filename: str) -> str | None:
     ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: Literal[False]) -> Optional[str]:
+def maybe_read_file(filename: str, binary_mode: Literal[False]) -> str | None:
     ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: Literal[True]) -> Optional[bytes]:
+def maybe_read_file(filename: str, binary_mode: Literal[True]) -> bytes | None:
     ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: bool) -> Optional[Union[bytes, str]]:
+def maybe_read_file(filename: str, binary_mode: bool) -> bytes | str | None:
     ...
 
 
-def maybe_read_file(filename: str, binary_mode: bool = False) -> Optional[Union[bytes, str]]:
+def maybe_read_file(filename: str, binary_mode: bool = False) -> bytes | str | None:
     """Read and return the contents of a file in a single file.read().
 
     :param filename: The filename of the file to read.
@@ -168,11 +158,11 @@ def read_file(filename: str, binary_mode: Literal[True]) -> bytes:
 
 
 @overload
-def read_file(filename: str, binary_mode: bool) -> Union[str, bytes]:
+def read_file(filename: str, binary_mode: bool) -> bytes | str:
     ...
 
 
-def read_file(filename: str, binary_mode: bool = False) -> Union[bytes, str]:
+def read_file(filename: str, binary_mode: bool = False) -> bytes | str:
     """Read and return the contents of a file in a single file.read().
 
     :param filename: The filename of the file to read.
@@ -181,11 +171,11 @@ def read_file(filename: str, binary_mode: bool = False) -> Union[bytes, str]:
     """
     mode = "rb" if binary_mode else "r"
     with open(filename, mode) as f:
-        content: Union[bytes, str] = f.read()
+        content: bytes | str = f.read()
         return content
 
 
-def safe_walk(path: Union[bytes, str], **kwargs: Any) -> Iterator[Tuple[str, List[str], List[str]]]:
+def safe_walk(path: bytes | str, **kwargs: Any) -> Iterator[tuple[str, list[str], list[str]]]:
     """Just like os.walk, but ensures that the returned values are unicode objects.
 
     This isn't strictly safe, in that it is possible that some paths
@@ -203,7 +193,7 @@ def safe_walk(path: Union[bytes, str], **kwargs: Any) -> Iterator[Tuple[str, Lis
 
 
 _MkdtempCleanerType = Callable[[], None]
-_MKDTEMP_CLEANER: Optional[_MkdtempCleanerType] = None
+_MKDTEMP_CLEANER: _MkdtempCleanerType | None = None
 _MKDTEMP_DIRS: DefaultDict[int, Set[str]] = defaultdict(set)
 _MKDTEMP_LOCK = threading.RLock()
 
@@ -392,7 +382,7 @@ def relative_symlink(source_path: str, link_path: str) -> None:
             raise
 
 
-def touch(path: str, times: Optional[Union[int, Tuple[int, int]]] = None):
+def touch(path: str, times: int | tuple[int, int] | None = None):
     """Equivalent of unix `touch path`.
 
     :API: public

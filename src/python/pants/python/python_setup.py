@@ -1,20 +1,22 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import multiprocessing
 import os
-import subprocess
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Tuple, cast
+from typing import Iterable, List, Optional, Tuple, cast
 
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
+from pants.engine.environment import Environment
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +39,16 @@ class ResolveAllConstraintsOption(Enum):
     ALWAYS = "always"
 
 
-class PythonSetup(Subsystem):
-    """A Python environment."""
+class ResolverVersion(Enum):
+    """The resolver implementation to use when resolving Python requirements."""
 
+    PIP_LEGACY = "pip-legacy-resolver"
+    PIP_2020 = "pip-2020-resolver"
+
+
+class PythonSetup(Subsystem):
     options_scope = "python-setup"
+    help = "Options for Pants's Python support."
 
     @classmethod
     def register_options(cls, register):
@@ -51,11 +59,13 @@ class PythonSetup(Subsystem):
             type=list,
             default=["CPython>=3.6"],
             metavar="<requirement>",
-            help="Constrain the selected Python interpreter. Specify with requirement syntax, "
-            "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
-            "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
-            "be ORed together. These constraints are used as the default value for the "
-            "`compatibility` field of Python targets.",
+            help=(
+                "The Python interpreters your codebase is compatible with.\n\nSpecify with "
+                "requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with version "
+                ">=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple "
+                "constraint strings will be ORed together.\n\nThese constraints are used as the "
+                "default value for the `interpreter_constraints` field of Python targets."
+            ),
         )
         register(
             "--requirement-constraints",
@@ -63,7 +73,7 @@ class PythonSetup(Subsystem):
             type=file_option,
             help=(
                 "When resolving third-party requirements, use this "
-                "constraints file to determine which versions to use. See "
+                "constraints file to determine which versions to use.\n\nSee "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
                 "on the format of constraint files and how constraints are applied in Pex and pip."
             ),
@@ -106,6 +116,20 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--resolver-version",
+            advanced=True,
+            type=ResolverVersion,
+            default=ResolverVersion.PIP_2020,
+            help="The resolver implementation to use when resolving Python requirements.",
+            removal_version="2.5.0.dev0",
+            removal_hint=(
+                "Support for configuring --resolver-version and selecting pip's legacy resolver "
+                "will be removed in Pants 2.5. Refer to https://pip.pypa.io/en/latest/user_guide/"
+                "#changes-to-the-pip-dependency-resolver-in-20-2-2020 for more information on the "
+                "new resolver."
+            ),
+        )
+        register(
             "--resolver-manylinux",
             advanced=True,
             type=str,
@@ -127,17 +151,6 @@ class PythonSetup(Subsystem):
                 "high, may result in starvation and Out of Memory errors."
             ),
         )
-        register(
-            "--resolver-http-cache-ttl",
-            type=int,
-            default=3_600,  # This matches PEX's default.
-            advanced=True,
-            help=(
-                "The maximum time (in seconds) for items in the HTTP cache. When the cache expires,"
-                "the PEX resolver will make network requests to see if new versions of your "
-                "requirements are available."
-            ),
-        )
 
     @property
     def interpreter_constraints(self) -> Tuple[str, ...]:
@@ -155,9 +168,13 @@ class PythonSetup(Subsystem):
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")
 
-    @memoized_property
-    def interpreter_search_paths(self):
-        return self.expand_interpreter_search_paths(self.options.interpreter_search_paths)
+    @memoized_method
+    def interpreter_search_paths(self, env: Environment):
+        return self.expand_interpreter_search_paths(self.options.interpreter_search_paths, env)
+
+    @property
+    def resolver_version(self) -> ResolverVersion:
+        return cast(ResolverVersion, self.options.resolver_version)
 
     @property
     def manylinux(self) -> Optional[str]:
@@ -169,10 +186,6 @@ class PythonSetup(Subsystem):
     @property
     def resolver_jobs(self) -> int:
         return cast(int, self.options.resolver_jobs)
-
-    @property
-    def resolver_http_cache_ttl(self) -> int:
-        return cast(int, self.options.resolver_http_cache_ttl)
 
     @property
     def scratch_dir(self):
@@ -199,14 +212,12 @@ class PythonSetup(Subsystem):
         )
 
     @classmethod
-    def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):
+    def expand_interpreter_search_paths(cls, interpreter_search_paths, env: Environment):
         special_strings = {
             "<PEXRC>": cls.get_pex_python_paths,
-            "<PATH>": cls.get_environment_paths,
-            "<PYENV>": lambda: cls.get_pyenv_paths(pyenv_root_func=pyenv_root_func),
-            "<PYENV_LOCAL>": lambda: cls.get_pyenv_paths(
-                pyenv_root_func=pyenv_root_func, pyenv_local=True
-            ),
+            "<PATH>": lambda: cls.get_environment_paths(env),
+            "<PYENV>": lambda: cls.get_pyenv_paths(env),
+            "<PYENV_LOCAL>": lambda: cls.get_pyenv_paths(env, pyenv_local=True),
         }
         expanded = []
         from_pexrc = None
@@ -228,9 +239,9 @@ class PythonSetup(Subsystem):
         return expanded
 
     @staticmethod
-    def get_environment_paths():
+    def get_environment_paths(env: Environment):
         """Returns a list of paths specified by the PATH env var."""
-        pathstr = os.getenv("PATH")
+        pathstr = env.get("PATH")
         if pathstr:
             return pathstr.split(os.pathsep)
         return []
@@ -250,19 +261,15 @@ class PythonSetup(Subsystem):
             return []
 
     @staticmethod
-    def get_pyenv_paths(
-        *, pyenv_root_func: Optional[Callable] = None, pyenv_local: bool = False
-    ) -> List[str]:
+    def get_pyenv_paths(env: Environment, *, pyenv_local: bool = False) -> List[str]:
         """Returns a list of paths to Python interpreters managed by pyenv.
 
-        :param pyenv_root_func: A no-arg function that returns the pyenv root. Defaults to
-                                running `pyenv root`, but can be overridden for testing.
+        :param env: The environment to use to look up pyenv.
         :param bool pyenv_local: If True, only use the interpreter specified by
                                  '.python-version' file under `build_root`.
         """
-        pyenv_root_func = pyenv_root_func or get_pyenv_root
-        pyenv_root = pyenv_root_func()
-        if pyenv_root is None:
+        pyenv_root = get_pyenv_root(env)
+        if not pyenv_root:
             return []
 
         versions_dir = Path(pyenv_root, "versions")
@@ -292,9 +299,12 @@ class PythonSetup(Subsystem):
         return paths
 
 
-def get_pyenv_root():
-    try:
-        return subprocess.check_output(["pyenv", "root"]).decode().strip()
-    except (OSError, subprocess.CalledProcessError):
-        logger.info("No pyenv binary found. Will not use pyenv interpreters.")
+def get_pyenv_root(env: Environment) -> str | None:
+    """See https://github.com/pyenv/pyenv#environment-variables."""
+    from_env = env.get("PYENV_ROOT")
+    if from_env:
+        return from_env
+    home_from_env = env.get("HOME")
+    if home_from_env:
+        return os.path.join(home_from_env, ".cache")
     return None

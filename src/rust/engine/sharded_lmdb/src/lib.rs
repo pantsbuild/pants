@@ -108,21 +108,22 @@ pub struct ShardedLmdb {
   // First Database is content, second is leases.
   lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
   root_path: PathBuf,
-  max_size: usize,
+  max_size_per_shard: usize,
   executor: task_executor::Executor,
   lease_time: Duration,
 }
 
 impl ShardedLmdb {
+  const NUM_SHARDS: u8 = 0x10;
+  const NUM_SHARDS_SHIFT: u8 = 4;
+
   // Whenever we change the byte format of data stored in lmdb, we will
   // need to increment this schema version. This schema version will
   // be appended to the Fingerprint-derived keys to create the key
   // we actually store in the database. This way, data stored with a version
   // of pants on one schema version will not conflict with data stored
   // with a different version of pants on a different schema version.
-  pub fn schema_version() -> u8 {
-    1
-  }
+  pub const SCHEMA_VERSION: u8 = 2;
 
   // max_size is the maximum size the databases together will be allowed to grow to.
   // When calling this function, we will attempt to allocate that much virtual (not resident) memory
@@ -138,7 +139,9 @@ impl ShardedLmdb {
     trace!("Initializing ShardedLmdb at root {:?}", root_path);
     let mut lmdbs = HashMap::new();
 
-    for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path, max_size)? {
+    let max_size_per_shard = max_size / (Self::NUM_SHARDS as usize);
+
+    for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path, max_size_per_shard)? {
       let content_database = env
         .create_db(Some("content-versioned"), DatabaseFlags::empty())
         .map_err(|e| {
@@ -166,16 +169,20 @@ impl ShardedLmdb {
     Ok(ShardedLmdb {
       lmdbs,
       root_path,
-      max_size,
+      max_size_per_shard,
       executor,
       lease_time,
     })
   }
 
-  fn envs(root_path: &Path, max_size: usize) -> Result<Vec<(Environment, PathBuf, u8)>, String> {
-    let mut envs = Vec::with_capacity(0x10);
-    for b in 0x00..0x10 {
-      let fingerprint_prefix = b << 4;
+  fn envs(
+    root_path: &Path,
+    max_size_per_shard: usize,
+  ) -> Result<Vec<(Environment, PathBuf, u8)>, String> {
+    let mut envs = Vec::with_capacity(Self::NUM_SHARDS as usize);
+    for b in 0x00..Self::NUM_SHARDS {
+      // NB: This shift is NUM_SHARDS dependent.
+      let fingerprint_prefix = b << Self::NUM_SHARDS_SHIFT;
       let mut dirname = String::new();
       fmt::Write::write_fmt(&mut dirname, format_args!("{:x}", fingerprint_prefix)).unwrap();
       let dirname = dirname[0..1].to_owned();
@@ -183,7 +190,7 @@ impl ShardedLmdb {
       fs::safe_create_dir_all(&dir)
         .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
       envs.push((
-        ShardedLmdb::make_env(&dir, max_size)?,
+        ShardedLmdb::make_env(&dir, max_size_per_shard)?,
         dir,
         fingerprint_prefix,
       ));
@@ -191,7 +198,7 @@ impl ShardedLmdb {
     Ok(envs)
   }
 
-  fn make_env(dir: &Path, max_size: usize) -> Result<Environment, String> {
+  fn make_env(dir: &Path, max_size_per_shard: usize) -> Result<Environment, String> {
     Environment::new()
       // NO_SYNC
       // =======
@@ -226,7 +233,7 @@ impl ShardedLmdb {
       .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
       // 2 DBs; one for file contents, one for leases.
       .set_max_dbs(2)
-      .set_map_size(max_size)
+      .set_map_size(max_size_per_shard)
       .open(dir)
       .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))
   }
@@ -245,7 +252,7 @@ impl ShardedLmdb {
     self
       .executor
       .spawn_blocking(move || {
-        let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+        let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
         let (env, db, _lease_database) = store.get(&fingerprint);
         let del_res = env.begin_rw_txn().and_then(|mut txn| {
           txn.del(db, &effective_key, None)?;
@@ -267,7 +274,7 @@ impl ShardedLmdb {
 
   pub async fn exists(&self, fingerprint: Fingerprint) -> Result<bool, String> {
     let store = self.clone();
-    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
     self
       .executor
       .spawn_blocking(move || {
@@ -298,7 +305,7 @@ impl ShardedLmdb {
     self
       .executor
       .spawn_blocking(move || {
-        let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+        let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
         let (env, db, lease_database) = store.get(&fingerprint);
         let put_res = env.begin_rw_txn().and_then(|mut txn| {
           txn.put(db, &effective_key, &bytes, WriteFlags::NO_OVERWRITE)?;
@@ -336,7 +343,7 @@ impl ShardedLmdb {
         env.begin_rw_txn().and_then(|mut txn| {
           store.lease_inner(
             lease_database,
-            &VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version()),
+            &VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION),
             until_secs_since_epoch,
             &mut txn,
           )?;
@@ -377,7 +384,7 @@ impl ShardedLmdb {
     f: F,
   ) -> Result<Option<T>, String> {
     let store = self.clone();
-    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
     self
       .executor
       .spawn_blocking(move || {
@@ -400,7 +407,7 @@ impl ShardedLmdb {
 
   #[allow(clippy::useless_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
   pub fn compact(&self) -> Result<(), String> {
-    for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path, self.max_size)? {
+    for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path, self.max_size_per_shard)? {
       let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");
       env
         .copy(new_dir.path(), EnvironmentCopyFlags::COMPACT)

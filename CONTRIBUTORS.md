@@ -7,6 +7,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Alex Schmitt
 + Alexander Johnson
 + Alyssa Pohahau
++ Andreas Stenius
 + Andrew Hamilton
 + Andy Reitz
 + Antoine Tollenaere
@@ -103,6 +104,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + John Sirois
 + John Townsend
 + Jon Boulle
++ Jonas Stendahl
 + Jonathan Coveney
 + Jonathan D. Simms
 + Jonathan Sokolowski
@@ -124,6 +126,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
++ Liam Wilson
 + Luc Cary
 + Luca Clementi
 + Lukasz Jastrzebski
@@ -195,8 +198,10 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai
++ Thales Menato
 + Tianshuo Deng
 + Tien Nguyen
++ Tim Gates
 + Tim Treptow
 + Timur Abishev
 + Tina Huang

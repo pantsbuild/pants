@@ -6,8 +6,12 @@ from pathlib import Path
 
 from pants.base.build_root import BuildRoot
 from pants.engine.rules import collect_rules, rule
-from pants.fs.fs import is_child_of
 from pants.option.global_options import GlobalOptions
+
+
+def is_child_of(path: Path, directory: Path) -> bool:
+    abs_path = path if path.is_absolute() else directory.joinpath(path).resolve()
+    return directory == abs_path or directory in abs_path.parents
 
 
 class InvalidDistDir(Exception):

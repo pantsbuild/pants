@@ -1,13 +1,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import errno
 import os
 import unittest
 import unittest.mock
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, Tuple, Union
+from typing import Iterator, Tuple
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
@@ -153,11 +155,11 @@ class DirutilTest(unittest.TestCase):
         contents: str
 
         @classmethod
-        def empty(cls, path: str) -> "DirutilTest.File":
+        def empty(cls, path: str) -> DirutilTest.File:
             return cls(path, contents="")
 
         @classmethod
-        def read(cls, root: str, relpath: str) -> "DirutilTest.File":
+        def read(cls, root: str, relpath: str) -> DirutilTest.File:
             with open(os.path.join(root, relpath), "r") as fp:
                 return cls(relpath, fp.read())
 
@@ -165,10 +167,8 @@ class DirutilTest(unittest.TestCase):
     class Symlink:
         path: str
 
-    def assert_tree(self, root: str, *expected: Union[Dir, File, Symlink]):
-        def collect_tree() -> Iterator[
-            Union[DirutilTest.Dir, DirutilTest.File, DirutilTest.Symlink]
-        ]:
+    def assert_tree(self, root: str, *expected: Dir | File | Symlink):
+        def collect_tree() -> Iterator[DirutilTest.Dir | DirutilTest.File | DirutilTest.Symlink]:
             for path, dirnames, filenames in os.walk(root, followlinks=False):
                 relpath = os.path.relpath(path, root)
                 if relpath == os.curdir:

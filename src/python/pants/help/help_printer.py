@@ -22,6 +22,8 @@ from pants.option.arg_splitter import (
     VersionHelp,
 )
 from pants.option.scope import GLOBAL_SCOPE
+from pants.util.docutil import terminal_width
+from pants.util.strutil import first_paragraph, hard_wrap
 
 
 class HelpPrinter(MaybeColor):
@@ -39,6 +41,7 @@ class HelpPrinter(MaybeColor):
         self._bin_name = bin_name
         self._help_request = help_request
         self._all_help_info = all_help_info
+        self._width = terminal_width()
 
     def print_help(self) -> Literal[0, 1]:
         """Print help to the console."""
@@ -58,13 +61,17 @@ class HelpPrinter(MaybeColor):
             # It gets confusing to try and show suggestions for multiple cases.
             unknown_goal = self._help_request.unknown_goals[0]
             print(f"Unknown goal: {self.maybe_red(unknown_goal)}")
+
             did_you_mean = list(
                 difflib.get_close_matches(
                     unknown_goal, self._all_help_info.name_to_goal_info.keys()
                 )
             )
+
             if did_you_mean:
-                print(f"Did you mean: {', '.join(self.maybe_cyan(g) for g in did_you_mean)}?")
+                formatted_matches = self._format_did_you_mean_matches(did_you_mean)
+                print(f"Did you mean {formatted_matches}?")
+
             print_hint()
             return 1
         elif isinstance(self._help_request, NoGoalHelp):
@@ -93,9 +100,11 @@ class HelpPrinter(MaybeColor):
         if things:
             for thing in sorted(things):
                 if thing == "goals":
-                    self._print_goals_help()
+                    self._print_all_goals()
+                elif thing == "subsystems":
+                    self._print_all_subsystems()
                 elif thing == "targets":
-                    self._print_targets_help()
+                    self._print_all_targets()
                 elif thing == "global":
                     self._print_options_help(GLOBAL_SCOPE, help_request.advanced)
                 elif thing in self._all_help_info.scope_to_help_info:
@@ -107,7 +116,16 @@ class HelpPrinter(MaybeColor):
         else:
             self._print_global_help()
 
-    def _print_goals_help(self) -> None:
+    def _format_summary_description(self, descr: str, chars_before_description: int) -> str:
+        lines = textwrap.wrap(descr, self._width - chars_before_description)
+        if len(lines) > 1:
+            lines = [
+                lines[0],
+                *(f"{' ' * chars_before_description}{line}" for line in lines[1:]),
+            ]
+        return "\n".join(lines)
+
+    def _print_all_goals(self) -> None:
         goal_descriptions: Dict[str, str] = {}
 
         for goal_info in self._all_help_info.name_to_goal_info.values():
@@ -121,19 +139,55 @@ class HelpPrinter(MaybeColor):
 
         def format_goal(name: str, descr: str) -> str:
             name = self.maybe_cyan(name.ljust(chars_before_description))
-            description_lines = textwrap.wrap(descr, 80 - chars_before_description)
-            if len(description_lines) > 1:
-                description_lines = [
-                    description_lines[0],
-                    *(f"{' ' * chars_before_description}{line}" for line in description_lines[1:]),
-                ]
-            formatted_descr = "\n".join(description_lines)
-            return f"{name}{formatted_descr}\n"
+            descr = self._format_summary_description(descr, chars_before_description)
+            return f"{name}{descr}\n"
 
         for name, description in sorted(goal_descriptions.items()):
-            print(format_goal(name, description))
+            print(format_goal(name, first_paragraph(description)))
         specific_help_cmd = f"{self._bin_name} help $goal"
         print(f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal.\n")
+
+    def _print_all_subsystems(self) -> None:
+        self._print_title("Subsystems")
+
+        subsystem_description: Dict[str, str] = {}
+        for alias, help_info in self._all_help_info.scope_to_help_info.items():
+            if not help_info.is_goal and alias:
+                subsystem_description[alias] = first_paragraph(help_info.description)
+
+        longest_subsystem_alias = max(len(alias) for alias in subsystem_description.keys())
+        chars_before_description = longest_subsystem_alias + 2
+        for alias, description in sorted(subsystem_description.items()):
+            alias = self.maybe_cyan(alias.ljust(chars_before_description))
+            description = self._format_summary_description(description, chars_before_description)
+            print(f"{alias}{description}\n")
+
+        specific_help_cmd = f"{self._bin_name} help $subsystem"
+        print(
+            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a "
+            f"specific subsystem.\n"
+        )
+
+    def _print_all_targets(self) -> None:
+        self._print_title("Target types")
+
+        longest_target_alias = max(
+            len(alias) for alias in self._all_help_info.name_to_target_type_info.keys()
+        )
+        chars_before_description = longest_target_alias + 2
+        for alias, target_type_info in sorted(
+            self._all_help_info.name_to_target_type_info.items(), key=lambda x: x[0]
+        ):
+            alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
+            summary = self._format_summary_description(
+                target_type_info.summary or "<no description>", chars_before_description
+            )
+            print(f"{alias_str}{summary}\n")
+        specific_help_cmd = f"{self._bin_name} help $target_type"
+        print(
+            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific "
+            f"target type.\n"
+        )
 
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
@@ -149,6 +203,7 @@ class HelpPrinter(MaybeColor):
         print_cmd("help", "Display this usage message.")
         print_cmd("help goals", "List all installed goals.")
         print_cmd("help targets", "List all installed target types.")
+        print_cmd("help subsystems", "List all configurable subsystems.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
         print_cmd("help [target_type/goal/subsystem]", "Help for a target type, goal or subsystem.")
@@ -203,31 +258,13 @@ class HelpPrinter(MaybeColor):
         for line in formatted_lines:
             print(line)
 
-    def _print_targets_help(self) -> None:
-        self._print_title("Target types")
-
-        longest_target_alias = max(
-            len(alias) for alias in self._all_help_info.name_to_target_type_info.keys()
-        )
-        chars_before_description = longest_target_alias + 2
-        for alias, target_type_info in sorted(
-            self._all_help_info.name_to_target_type_info.items(), key=lambda x: x[0]
-        ):
-            alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
-            summary = target_type_info.summary or "<no description>"
-            print(f"{alias_str}{summary}\n")
-        specific_help_cmd = f"{self._bin_name} help $target_type"
-        print(
-            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific "
-            f"target type.\n"
-        )
-
     def _print_target_help(self, target_alias: str) -> None:
         self._print_title(target_alias)
         tinfo = self._all_help_info.name_to_target_type_info[target_alias]
         if tinfo.description:
-            print(tinfo.description)
-        print("\nValid fields:")
+            formatted_desc = "\n".join(hard_wrap(tinfo.description, width=self._width))
+            print(formatted_desc)
+        print("\n\nValid fields:")
         for field in sorted(tinfo.fields, key=lambda x: x.alias):
             print()
             print(self.maybe_magenta(field.alias))
@@ -236,8 +273,10 @@ class HelpPrinter(MaybeColor):
             print(self.maybe_cyan(f"{indent}type: {field.type_hint}"))
             print(self.maybe_cyan(f"{indent}{required_or_default}"))
             if field.description:
-                for line in textwrap.wrap(field.description, 80):
-                    print(f"{indent}{line}")
+                formatted_desc = "\n".join(
+                    hard_wrap(field.description, indent=len(indent), width=self._width)
+                )
+                print(formatted_desc)
         print()
 
     def _get_help_json(self) -> str:

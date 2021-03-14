@@ -3,23 +3,8 @@
 
 import os
 import unittest
-from pathlib import Path
 
-from pants.fs.fs import is_child_of, safe_filename
-
-
-def test_is_child_of() -> None:
-    mock_build_root = Path("/mock/build/root")
-
-    assert is_child_of(Path("/mock/build/root/dist/dir"), mock_build_root)
-    assert is_child_of(Path("dist/dir"), mock_build_root)
-    assert is_child_of(Path("./dist/dir"), mock_build_root)
-    assert is_child_of(Path("../root/dist/dir"), mock_build_root)
-    assert is_child_of(Path(""), mock_build_root)
-    assert is_child_of(Path("./"), mock_build_root)
-
-    assert not is_child_of(Path("/other/random/directory/root/dist/dir"), mock_build_root)
-    assert not is_child_of(Path("../not_root/dist/dir"), mock_build_root)
+from pants.fs.fs import safe_filename
 
 
 class SafeFilenameTest(unittest.TestCase):

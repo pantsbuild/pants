@@ -1,9 +1,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 from pathlib import Path, PurePath
-from typing import Iterable, Union
+from typing import Iterable
 
 from pants.base.specs import (
     AddressLiteralSpec,
@@ -64,7 +66,7 @@ class SpecsParser:
             normalized = ""
         return normalized
 
-    def parse_spec(self, spec: str) -> Union[AddressSpec, FilesystemSpec]:
+    def parse_spec(self, spec: str) -> AddressSpec | FilesystemSpec:
         """Parse the given spec into an `AddressSpec` or `FilesystemSpec` object.
 
         :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.

@@ -14,8 +14,7 @@ from pants.backend.python.goals.coverage_py import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonRuntimeBinaryDependencies,
+    ConsoleScript,
     PythonRuntimePackageDependencies,
     PythonTestsSources,
     PythonTestsTimeout,
@@ -23,9 +22,10 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexInterpreterConstraints,
-    PexProcess,
     PexRequest,
     PexRequirements,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -42,8 +42,21 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
-from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
+from pants.engine.fs import (
+    AddPrefix,
+    Digest,
+    DigestSubset,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
+from pants.engine.process import (
+    FallibleProcessResult,
+    InteractiveProcess,
+    Process,
+    ProcessCacheScope,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -66,13 +79,12 @@ class PythonTestFieldSet(TestFieldSet):
 
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
-    runtime_binary_dependencies: PythonRuntimeBinaryDependencies
     runtime_package_dependencies: PythonRuntimePackageDependencies
 
     def is_conftest_or_type_stub(self) -> bool:
         """We skip both `conftest.py` and `.pyi` stubs, even though though they often belong to a
         `python_tests` target, because neither contain any tests to run on."""
-        if self.address.is_base_target:
+        if not self.address.is_file_target:
             return False
         file_name = PurePath(self.address.filename)
         return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
@@ -109,16 +121,10 @@ async def setup_pytest_for_target(
     )
     all_targets = transitive_targets.closure
 
-    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (
-            tgt[PythonInterpreterCompatibility]
-            for tgt in all_targets
-            if tgt.has_field(PythonInterpreterCompatibility)
-        ),
-        python_setup,
+    interpreter_constraints = PexInterpreterConstraints.create_from_targets(
+        all_targets, python_setup
     )
 
-    # Defaults to zip_safe=False.
     requirements_pex_request = Get(
         Pex,
         PexFromTargetsRequest,
@@ -131,23 +137,16 @@ async def setup_pytest_for_target(
             output_filename="pytest.pex",
             requirements=PexRequirements(pytest.get_requirement_strings()),
             interpreter_constraints=interpreter_constraints,
-            entry_point="pytest:main",
             internal_only=True,
-            additional_args=(
-                # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
-                # `importlib_metadata` and thus `zipp`, does not play nicely when doing import
-                # magic directly from zip files. `zipp` has pathologically bad behavior with large
-                # zipfiles.
-                # TODO: this does have a performance cost as the pex must now be expanded to disk.
-                # Long term, it would be better to fix Zipp (whose fix would then need to be used
-                # by importlib_metadata and then by Pytest). See
-                # https://github.com/jaraco/zipp/pull/26.
-                "--not-zip-safe",
-                # TODO(John Sirois): Support shading python binaries:
-                #   https://github.com/pantsbuild/pants/issues/9206
-                "--pex-path",
-                requirements_pex_request.input.output_filename,
-            ),
+        ),
+    )
+
+    config_digest_request = Get(
+        Digest,
+        PathGlobs(
+            globs=[pytest.config] if pytest.config else [],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin="the option `--pytest-config`",
         ),
     )
 
@@ -160,20 +159,13 @@ async def setup_pytest_for_target(
     unparsed_runtime_packages = (
         request.field_set.runtime_package_dependencies.to_unparsed_address_inputs()
     )
-    unparsed_runtime_binaries = (
-        request.field_set.runtime_binary_dependencies.to_unparsed_address_inputs()
-    )
-    if unparsed_runtime_packages.values or unparsed_runtime_binaries.values:
-        runtime_package_targets, runtime_binary_dependencies = await MultiGet(
-            Get(Targets, UnparsedAddressInputs, unparsed_runtime_packages),
-            Get(Targets, UnparsedAddressInputs, unparsed_runtime_binaries),
+    if unparsed_runtime_packages.values:
+        runtime_package_targets = await Get(
+            Targets, UnparsedAddressInputs, unparsed_runtime_packages
         )
         field_sets_per_target = await Get(
             FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(
-                PackageFieldSet,
-                itertools.chain(runtime_package_targets, runtime_binary_dependencies),
-            ),
+            FieldSetsPerTargetRequest(PackageFieldSet, runtime_package_targets),
         )
         assets = await MultiGet(
             Get(BuiltPackage, PackageFieldSet, field_set)
@@ -186,11 +178,29 @@ async def setup_pytest_for_target(
         SourceFiles, SourceFilesRequest([request.field_set.sources])
     )
 
-    pytest_pex, requirements_pex, prepared_sources, field_set_source_files = await MultiGet(
+    (
+        pytest_pex,
+        requirements_pex,
+        prepared_sources,
+        field_set_source_files,
+        config_digest,
+    ) = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
         prepared_sources_request,
         field_set_source_files_request,
+        config_digest_request,
+    )
+
+    pytest_runner_pex = await Get(
+        VenvPex,
+        PexRequest(
+            output_filename="pytest_runner.pex",
+            interpreter_constraints=interpreter_constraints,
+            main=ConsoleScript("pytest"),
+            internal_only=True,
+            pex_path=[pytest_pex, requirements_pex],
+        ),
     )
 
     input_digest = await Get(
@@ -199,8 +209,7 @@ async def setup_pytest_for_target(
             (
                 coverage_config.digest,
                 prepared_sources.source_files.snapshot.digest,
-                requirements_pex.digest,
-                pytest_pex.digest,
+                config_digest,
                 *(binary.digest for binary in assets),
             )
         ),
@@ -233,10 +242,12 @@ async def setup_pytest_for_target(
 
     extra_env.update(test_extra_env.env)
 
+    # Cache test runs only if they are successful, or not at all if `--test-force`.
+    cache_scope = ProcessCacheScope.NEVER if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     process = await Get(
         Process,
-        PexProcess(
-            pytest_pex,
+        VenvPexProcess(
+            pytest_runner_pex,
             argv=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
             extra_env=extra_env,
             input_digest=input_digest,
@@ -245,7 +256,7 @@ async def setup_pytest_for_target(
             execution_slot_variable=pytest.options.execution_slot_var,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
-            uncacheable=test_subsystem.force and not request.is_debug,
+            cache_scope=cache_scope,
         ),
     )
     return TestSetup(process, results_file_name=results_file_name)

@@ -2,41 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from dataclasses import dataclass
-from typing import Callable, Optional, cast
+from typing import Callable, Optional
 
 from colors import blue, cyan, green, magenta, red, yellow
 
-from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.rules import side_effecting
-
-
-@dataclass(frozen=True)
-class NativeWriter:
-    scheduler_session: SchedulerSession
-    native: Native = Native()
-
-    def write(self, payload: str) -> None:
-        raise NotImplementedError
-
-    def flush(self):
-        """flush() doesn't need to do anything for NativeWriter."""
-        pass
-
-
-class NativeStdOut(NativeWriter):
-    def write(self, payload: str) -> None:
-        scheduler = self.scheduler_session.scheduler._scheduler
-        session = self.scheduler_session.session
-        self.native.write_stdout(scheduler, session, payload, teardown_ui=True)
-
-
-class NativeStdErr(NativeWriter):
-    def write(self, payload: str) -> None:
-        scheduler = self.scheduler_session.scheduler._scheduler
-        session = self.scheduler_session.session
-        self.native.write_stderr(scheduler, session, payload, teardown_ui=True)
 
 
 @side_effecting
@@ -55,28 +26,25 @@ class Console:
         """`stdout` and `stderr` may be explicitly provided when Console is constructed.
 
         We use this in tests to provide a mock we can write tests against, rather than writing to
-        the system stdout/stderr. If they are not defined, the effective stdout/stderr are proxied
-        to Rust engine intrinsic code if there is a scheduler session provided, or just written to
-        the standard Python-provided stdout/stderr if it is None. A scheduler session is provided if
-        --dynamic-ui is set.
+        the system stdout/stderr. If a SchedulerSession is set, any running UI will be torn down
+        before stdio is rendered.
         """
 
-        has_scheduler = session is not None
-
-        self._stdout = stdout or (
-            NativeStdOut(cast(SchedulerSession, session)) if has_scheduler else sys.stdout
-        )
-        self._stderr = stderr or (
-            NativeStdErr(cast(SchedulerSession, session)) if has_scheduler else sys.stderr
-        )
+        self._stdout = stdout or sys.stdout
+        self._stderr = stderr or sys.stderr
         self._use_colors = use_colors
+        self._session = session
 
     @property
     def stdout(self):
+        if self._session:
+            self._session.teardown_dynamic_ui()
         return self._stdout
 
     @property
     def stderr(self):
+        if self._session:
+            self._session.teardown_dynamic_ui()
         return self._stderr
 
     def write_stdout(self, payload: str) -> None:
@@ -86,10 +54,10 @@ class Console:
         self.stderr.write(payload)
 
     def print_stdout(self, payload: str, end: str = "\n") -> None:
-        self.stdout.write(f"{payload}{end}")
+        self.write_stdout(f"{payload}{end}")
 
     def print_stderr(self, payload: str, end: str = "\n") -> None:
-        self.stderr.write(f"{payload}{end}")
+        self.write_stderr(f"{payload}{end}")
 
     def flush(self) -> None:
         self.stdout.flush()

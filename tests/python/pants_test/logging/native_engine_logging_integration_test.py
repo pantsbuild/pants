@@ -3,7 +3,7 @@
 
 import re
 
-from pants.testutil.pants_integration_test import read_pantsd_log, run_pants
+from pants.testutil.pants_integration_test import read_pants_log, run_pants
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
@@ -29,7 +29,8 @@ class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
                 ["--backend-packages=pants.backend.python", "list", "3rdparty::"]
             )
             ctx.checker.assert_started()
-            assert "[DEBUG] connecting to pantsd on port" in daemon_run.stderr_data
+            assert "[DEBUG] Connecting to pantsd on port" in daemon_run.stderr
+            assert "[DEBUG] Connected to pantsd" in daemon_run.stderr
 
-            pantsd_log = "\n".join(read_pantsd_log(ctx.workdir))
-            assert "[DEBUG] Logging reinitialized in pantsd context" in pantsd_log
+            pants_log = "\n".join(read_pants_log(ctx.workdir))
+            assert "[INFO] handling request" in pants_log

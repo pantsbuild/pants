@@ -36,17 +36,6 @@ def get_pants_cachedir() -> str:
     return os.path.expanduser(os.path.join(cache_home, "pants"))
 
 
-def get_pants_configdir() -> str:
-    """Return the pants global config directory."""
-    # TODO: Keep in alignment with rust `fs::default_config_path`. This method
-    # is not used there directly because it would create a cycle for native bootstrap via
-    # BinaryUtil being used to download tools needed to bootstrap.
-    config_home = os.environ.get("XDG_CONFIG_HOME")
-    if not config_home:
-        config_home = "~/.config"
-    return os.path.expanduser(os.path.join(config_home, "pants"))
-
-
 def get_default_pants_config_file() -> str:
     """Return the default location of the Pants config file."""
     return os.path.join(get_buildroot(), "pants.toml")

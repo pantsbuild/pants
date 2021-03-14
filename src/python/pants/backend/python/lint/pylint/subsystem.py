@@ -1,19 +1,23 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, cast
+from __future__ import annotations
+
+from typing import List, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.option.custom_types import file_option, shell_str, target_option
+from pants.util.docutil import docs_url
 
 
 class Pylint(PythonToolBase):
-    """The PyLint linter for Python code (https://www.pylint.org/)."""
-
     options_scope = "pylint"
+    help = "The Pylint linter for Python code (https://www.pylint.org/)."
+
     default_version = "pylint>=2.4.4,<2.5"
-    default_entry_point = "pylint"
+    default_main = ConsoleScript("pylint")
 
     @classmethod
     def register_options(cls, register):
@@ -46,9 +50,18 @@ class Pylint(PythonToolBase):
             member_type=target_option,
             advanced=True,
             help=(
-                "An optional list of `pylint_source_plugin` target addresses. This allows you to "
-                "load custom plugins defined in source code. Run `./pants help "
-                "pylint_source_plugin` for instructions, including how to load third-party plugins."
+                "An optional list of `python_library` target addresses to load first-party "
+                "plugins.\n\nYou must set the plugin's parent directory as a source root. For "
+                "example, if your plugin is at `build-support/pylint/custom_plugin.py`, add "
+                "'build-support/pylint' to `[source].root_patterns` in `pants.toml`. This is "
+                "necessary for Pants to know how to tell Pylint to discover your plugin. See "
+                f"{docs_url('source-roots')}\n\nYou must also set `load-plugins=$module_name` in "
+                "your Pylint config file, and set the `[pylint].config` option in `pants.toml`."
+                "\n\nWhile your plugin's code can depend on other first-party code and third-party "
+                "requirements, all first-party dependencies of the plugin must live in the same "
+                "directory or a subdirectory.\n\nTo instead load third-party plugins, set the "
+                "option `[pylint].extra_requirements` and set the `load-plugins` option in your "
+                "Pylint config."
             ),
         )
 
@@ -61,8 +74,8 @@ class Pylint(PythonToolBase):
         return cast(List[str], self.options.args)
 
     @property
-    def config(self) -> Optional[str]:
-        return cast(Optional[str], self.options.config)
+    def config(self) -> str | None:
+        return cast("str | None", self.options.config)
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:

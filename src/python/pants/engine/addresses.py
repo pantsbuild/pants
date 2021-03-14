@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Iterable, Optional, Sequence, Tuple
 
 from pants.base.exceptions import ResolveError
-from pants.base.specs import Spec
 from pants.build_graph.address import Address as Address
 from pants.build_graph.address import AddressInput as AddressInput  # noqa: F401: rexport.
 from pants.build_graph.address import BuildFileAddress as BuildFileAddress  # noqa: F401: rexport.
@@ -28,20 +27,6 @@ def assert_single_address(addresses: Sequence[Address]) -> None:
 class Addresses(Collection[Address]):
     def expect_single(self) -> Address:
         assert_single_address(self)
-        return self[0]
-
-
-@dataclass(frozen=True)
-class AddressWithOrigin:
-    """An Address along with the cmd-line spec it was generated from."""
-
-    address: Address
-    origin: Spec
-
-
-class AddressesWithOrigins(Collection[AddressWithOrigin]):
-    def expect_single(self) -> AddressWithOrigin:
-        assert_single_address([address_with_origin.address for address_with_origin in self])
         return self[0]
 
 

@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
 import textwrap
 from dataclasses import dataclass
@@ -10,7 +12,7 @@ from typing import Any, Dict, Set, Tuple, cast
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DigestContents, SourcesSnapshot
+from pants.engine.fs import Digest, DigestContents, SpecsSnapshot
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.option.subsystem import Subsystem
@@ -36,9 +38,8 @@ class DetailLevel(Enum):
 
 
 class ValidateSubsystem(GoalSubsystem):
-    """Validate sources against regexes."""
-
     name = "validate"
+    help = "Validate sources against regexes."
 
     @classmethod
     def register_options(cls, register):
@@ -81,7 +82,7 @@ class ValidationConfig:
     required_matches: FrozenDict[str, Tuple[str]]  # path pattern name -> content pattern names.
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "ValidationConfig":
+    def from_dict(cls, d: Dict[str, Any]) -> ValidationConfig:
         return cls(
             path_patterns=tuple(PathPattern(**kwargs) for kwargs in d["path_patterns"]),
             content_patterns=tuple(ContentPattern(**kwargs) for kwargs in d["content_patterns"]),
@@ -90,9 +91,8 @@ class ValidationConfig:
 
 
 class SourceFileValidation(Subsystem):
-    """Configuration for source file validation."""
-
     options_scope = "sourcefile-validation"
+    help = "Configuration for source file validation."
 
     @classmethod
     def register_options(cls, register):
@@ -280,12 +280,12 @@ class MultiMatcher:
 @goal_rule
 async def validate(
     console: Console,
-    sources_snapshot: SourcesSnapshot,
+    specs_snapshot: SpecsSnapshot,
     validate_subsystem: ValidateSubsystem,
     source_file_validation: SourceFileValidation,
 ) -> Validate:
     multi_matcher = source_file_validation.get_multi_matcher()
-    digest_contents = await Get(DigestContents, Digest, sources_snapshot.snapshot.digest)
+    digest_contents = await Get(DigestContents, Digest, specs_snapshot.snapshot.digest)
     regex_match_results = RegexMatchResults(
         multi_matcher.check_source_file(file_content.path, file_content.content)
         for file_content in sorted(digest_contents, key=lambda fc: fc.path)

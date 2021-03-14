@@ -6,8 +6,14 @@ import time
 import unittest
 from dataclasses import dataclass, field
 from textwrap import dedent
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
+import pytest
+
+from pants.backend.python.target_types import PythonLibrary
+from pants.base.build_environment import get_buildroot
+from pants.base.specs import Specs
+from pants.base.specs_parser import SpecsParser
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import (
     EMPTY_FILE_DIGEST,
@@ -22,16 +28,21 @@ from pants.engine.internals.engine_testutil import (
     assert_equal_with_printing,
     remove_locations_from_traceback,
 )
-from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
-from pants.engine.process import Process, ProcessResult
+from pants.engine.platform import rules as platform_rules
+from pants.engine.process import MultiPlatformProcess, Process, ProcessResult
+from pants.engine.process import rules as process_rules
 from pants.engine.rules import Get, MultiGet, rule
-from pants.reporting.streaming_workunit_handler import (
+from pants.engine.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
+    TargetInfo,
+    WorkunitsCallback,
 )
-from pants.testutil.rule_runner import QueryRule
-from pants.testutil.test_base import TestBase
+from pants.goal.run_tracker import RunTracker
+from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.logging import LogLevel
 
 
@@ -252,7 +263,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
 
 @dataclass
-class WorkunitTracker:
+class WorkunitTracker(WorkunitsCallback):
     """This class records every non-empty batch of started and completed workunits received from the
     engine."""
 
@@ -260,7 +271,11 @@ class WorkunitTracker:
     started_workunit_chunks: List[List[dict]] = field(default_factory=list)
     finished: bool = False
 
-    def add(self, **kwargs) -> None:
+    @property
+    def can_finish_async(self) -> bool:
+        return False
+
+    def __call__(self, **kwargs) -> None:
         if kwargs["finished"] is True:
             self.finished = True
 
@@ -273,57 +288,64 @@ class WorkunitTracker:
             self.finished_workunit_chunks.append(completed_workunits)
 
 
-class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
-    def test_streaming_workunits_reporting(self):
-        rules = [fib, QueryRule(Fib, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
-        )
+def new_run_tracker() -> RunTracker:
+    # NB: A RunTracker usually observes "all options" (`full_options_for_scopes`), but it only
+    # actually directly consumes bootstrap options.
+    return RunTracker(create_options_bootstrapper([]).bootstrap_options)
 
+
+@pytest.fixture
+def run_tracker() -> RunTracker:
+    return new_run_tracker()
+
+
+class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
+    def _fixture_for_rules(
+        self, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
+    ) -> Tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
+        scheduler = self.mk_scheduler(rules, include_trace_on_error=False)
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
             scheduler,
-            callbacks=[tracker.add],
+            run_tracker=new_run_tracker(),
+            callbacks=[tracker],
             report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
+            max_workunit_verbosity=max_workunit_verbosity,
+            specs=Specs.empty(),
+            options_bootstrapper=create_options_bootstrapper([]),
+            pantsd=False,
         )
-        with handler.session():
-            scheduler.product_request(Fib, subjects=[0])
+        return scheduler, tracker, handler
 
+    def test_streaming_workunits_reporting(self):
+        scheduler, tracker, handler = self._fixture_for_rules([fib, QueryRule(Fib, (int,))])
+        with handler:
+            scheduler.product_request(Fib, subjects=[0])
         flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         # The execution of the single named @rule "fib" should be providing this one workunit.
-        self.assertEqual(len(flattened), 1)
+        assert len(flattened) == 1
 
-        tracker.finished_workunit_chunks = []
-        with handler.session():
+        scheduler, tracker, handler = self._fixture_for_rules([fib, QueryRule(Fib, (int,))])
+        with handler:
             scheduler.product_request(Fib, subjects=[10])
 
-        # Requesting a bigger fibonacci number will result in more rule executions and thus more reported workunits.
-        # In this case, we expect 10 invocations of the `fib` rule.
+        # Requesting a bigger fibonacci number will result in more rule executions and thus
+        # more reported workunits. In this case, we expect 11 invocations of the `fib` rule.
         flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        assert len(flattened) == 10
+        assert len(flattened) == 11
         assert tracker.finished
 
     def test_streaming_workunits_parent_id_and_rule_metadata(self):
-        rules = [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
         )
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
-        )
-
-        with handler.session():
+        with handler:
             i = Input()
             scheduler.product_request(Beta, subjects=[i])
-
         assert tracker.finished
 
-        # rule_one should complete well-after the other rules because of the artificial delay in it caused by the sleep().
+        # rule_one should complete well-after the other rules because of the artificial delay in
+        # it caused by the sleep().
         assert {item["name"] for item in tracker.finished_workunit_chunks[0]} == {
             "pants.engine.internals.engine_test.rule_two",
             "pants.engine.internals.engine_test.rule_three",
@@ -358,7 +380,8 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             if item["name"] == "pants.engine.internals.engine_test.rule_four"
         )
 
-        # rule_one should have no parent_id because its actual parent workunit was filted based on level
+        # rule_one should have no parent_id because its actual parent workunit was filtered based
+        # on level.
         assert r1.get("parent_id", None) is None
 
         assert r2["parent_id"] == r1["span_id"]
@@ -370,26 +393,19 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r4["level"] == "INFO"
 
     def test_streaming_workunit_log_levels(self) -> None:
-        rules = [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
-        )
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))],
             max_workunit_verbosity=LogLevel.TRACE,
         )
-
-        with handler.session():
+        with handler:
             i = Input()
             scheduler.product_request(Beta, subjects=[i])
 
         assert tracker.finished
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
-        # With the max_workunit_verbosity set to TRACE, we should see the workunit corresponding to the Select node.
+        # With the max_workunit_verbosity set to TRACE, we should see the workunit corresponding
+        # to the Select node.
         select = next(
             item
             for item in finished
@@ -409,18 +425,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
     def test_streaming_workunit_log_level_parent_rewrite(self) -> None:
         rules = [rule_A, rule_B, rule_C, QueryRule(Alpha, (Input,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
-        )
-        tracker = WorkunitTracker()
-        info_level_handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
-        )
 
-        with info_level_handler.session():
+        scheduler, tracker, info_level_handler = self._fixture_for_rules(rules)
+        with info_level_handler:
             i = Input()
             scheduler.product_request(Alpha, subjects=[i])
 
@@ -437,18 +444,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert "parent_id" not in r_A
         assert r_C["parent_id"] == r_A["span_id"]
 
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, debug_level_handler = self._fixture_for_rules(
+            rules, max_workunit_verbosity=LogLevel.TRACE
         )
-        tracker = WorkunitTracker()
-        debug_level_handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-
-        with debug_level_handler.session():
+        with debug_level_handler:
             i = Input()
             scheduler.product_request(Alpha, subjects=[i])
 
@@ -480,19 +479,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level=LogLevel.ERROR)
 
-        rules = [a_rule, QueryRule(ModifiedOutput, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(ModifiedOutput, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
-
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler.session():
+        with handler:
             scheduler.product_request(ModifiedOutput, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -516,19 +506,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level=None)
 
-        rules = [a_rule, QueryRule(ModifiedOutput, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(ModifiedOutput, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
-
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler.session():
+        with handler:
             scheduler.product_request(ModifiedOutput, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -549,19 +530,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> Output:
             return Output(val=n)
 
-        rules = [a_rule, QueryRule(Output, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
-
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler.session():
+        with handler:
             scheduler.product_request(Output, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -583,19 +555,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> Output:
             return Output(val=n)
 
-        rules = [a_rule, QueryRule(Output, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
-
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler.session():
+        with handler:
             scheduler.product_request(Output, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -622,19 +585,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> Output:
             return Output(val=n)
 
-        rules = [a_rule, QueryRule(Output, (int,))]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
-
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler.session():
+        with handler:
             scheduler.product_request(Output, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -643,6 +597,43 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
 
         assert workunit["metadata"] == {}
+
+    def test_counters(self) -> None:
+        @dataclass(frozen=True)
+        class TrueResult:
+            pass
+
+        @rule(desc="a_rule")
+        async def a_rule() -> TrueResult:
+            proc = Process(
+                ["/bin/sh", "-c", "true"],
+                description="always true",
+            )
+            _ = await Get(ProcessResult, MultiPlatformProcess({None: proc}))
+            return TrueResult()
+
+        scheduler, tracker, handler = self._fixture_for_rules(
+            [a_rule, QueryRule(TrueResult, tuple()), *process_rules(), *platform_rules()],
+            max_workunit_verbosity=LogLevel.TRACE,
+        )
+        with handler:
+            scheduler.record_test_observation(128)
+            scheduler.product_request(TrueResult, subjects=[0])
+            histograms_info = scheduler.get_observation_histograms()
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunits_with_counters = [item for item in finished if "counters" in item]
+        assert workunits_with_counters[0]["counters"]["local_execution_requests"] == 1
+        assert workunits_with_counters[1]["counters"]["local_cache_requests"] == 1
+        assert workunits_with_counters[1]["counters"]["local_cache_requests_uncached"] == 1
+
+        assert histograms_info["version"] == 0
+        assert "histograms" in histograms_info
+        assert "test_observation" in histograms_info["histograms"]
+        assert (
+            histograms_info["histograms"]["test_observation"]
+            == b"\x1c\x84\x93\x14\x00\x00\x00\x1fx\x9c\x93i\x99,\xcc\xc0\xc0\xc0\xcc\x00\x010\x9a\x11J3\xd9\x7f\x800\xfe32\x01\x00E\x0c\x03\x81"
+        )
 
 
 @dataclass(frozen=True)
@@ -665,153 +656,168 @@ def a_rule(input: ComplicatedInput) -> Output:
     return Output(snapshot_1=input.snapshot_1, snapshot_2=input.snapshot_2)
 
 
-class MoreComplicatedEngineAware(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
             a_rule,
             QueryRule(Output, (ComplicatedInput,)),
-        )
+            QueryRule(ProcessResult, (Process,)),
+        ],
+        isolated_local_store=True,
+    )
 
-    def test_more_complicated_engine_aware(self) -> None:
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            self.scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler.session():
-            input_1 = CreateDigest(
-                (
-                    FileContent(path="a.txt", content=b"alpha"),
-                    FileContent(path="b.txt", content=b"beta"),
-                )
+
+def test_more_complicated_engine_aware(rule_runner: RuleRunner, run_tracker: RunTracker) -> None:
+    tracker = WorkunitTracker()
+    handler = StreamingWorkunitHandler(
+        rule_runner.scheduler,
+        run_tracker=run_tracker,
+        callbacks=[tracker],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.TRACE,
+        specs=Specs.empty(),
+        options_bootstrapper=create_options_bootstrapper([]),
+        pantsd=False,
+    )
+    with handler:
+        input_1 = CreateDigest(
+            (
+                FileContent(path="a.txt", content=b"alpha"),
+                FileContent(path="b.txt", content=b"beta"),
             )
-            digest_1 = self.request(Digest, [input_1])
-            snapshot_1 = self.request(Snapshot, [digest_1])
-
-            input_2 = CreateDigest((FileContent(path="g.txt", content=b"gamma"),))
-            digest_2 = self.request(Digest, [input_2])
-            snapshot_2 = self.request(Snapshot, [digest_2])
-
-            input = ComplicatedInput(snapshot_1=snapshot_1, snapshot_2=snapshot_2)
-
-            self.request(Output, [input])
-
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
         )
+        digest_1 = rule_runner.request(Digest, [input_1])
+        snapshot_1 = rule_runner.request(Snapshot, [digest_1])
 
-        streaming_workunit_context = handler._context
+        input_2 = CreateDigest((FileContent(path="g.txt", content=b"gamma"),))
+        digest_2 = rule_runner.request(Digest, [input_2])
+        snapshot_2 = rule_runner.request(Snapshot, [digest_2])
 
-        artifacts = workunit["artifacts"]
-        output_snapshot_1 = artifacts["snapshot_1"]
-        output_snapshot_2 = artifacts["snapshot_2"]
+        input = ComplicatedInput(snapshot_1=snapshot_1, snapshot_2=snapshot_2)
 
-        output_contents_list = streaming_workunit_context.snapshots_to_file_contents(
-            [output_snapshot_1, output_snapshot_2]
-        )
-        assert len(output_contents_list) == 2
+        rule_runner.request(Output, [input])
 
-        assert isinstance(output_contents_list[0], DigestContents)
-        assert isinstance(output_contents_list[1], DigestContents)
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    workunit = next(
+        item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+    )
 
-        digest_contents_1 = output_contents_list[0]
-        digest_contents_2 = output_contents_list[1]
+    artifacts = workunit["artifacts"]
+    output_snapshot_1 = artifacts["snapshot_1"]
+    output_snapshot_2 = artifacts["snapshot_2"]
 
-        assert len(tuple(x for x in digest_contents_1 if x.content == b"alpha")) == 1
-        assert len(tuple(x for x in digest_contents_1 if x.content == b"beta")) == 1
+    output_contents_list = handler.context.snapshots_to_file_contents(
+        [output_snapshot_1, output_snapshot_2]
+    )
+    assert len(output_contents_list) == 2
 
-        assert len(tuple(x for x in digest_contents_2 if x.content == b"gamma")) == 1
+    assert isinstance(output_contents_list[0], DigestContents)
+    assert isinstance(output_contents_list[1], DigestContents)
+
+    digest_contents_1 = output_contents_list[0]
+    digest_contents_2 = output_contents_list[1]
+
+    assert len(tuple(x for x in digest_contents_1 if x.content == b"alpha")) == 1
+    assert len(tuple(x for x in digest_contents_1 if x.content == b"beta")) == 1
+
+    assert len(tuple(x for x in digest_contents_2 if x.content == b"gamma")) == 1
 
 
-class StreamingWorkunitProcessTests(TestBase):
+def test_process_digests_on_streaming_workunits(
+    rule_runner: RuleRunner, run_tracker: RunTracker
+) -> None:
+    scheduler = rule_runner.scheduler
 
-    additional_options = ["--no-process-execution-use-local-cache"]
+    tracker = WorkunitTracker()
+    handler = StreamingWorkunitHandler(
+        scheduler,
+        run_tracker=run_tracker,
+        callbacks=[tracker],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.INFO,
+        specs=Specs.empty(),
+        options_bootstrapper=create_options_bootstrapper([]),
+        pantsd=False,
+    )
 
-    @classmethod
-    def rules(cls):
-        return [*super().rules(), QueryRule(ProcessResult, (Process,))]
+    stdout_process = Process(
+        argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
+    )
 
-    def test_process_digests_on_workunits(self):
-        scheduler = self.scheduler
+    with handler:
+        result = rule_runner.request(ProcessResult, [stdout_process])
 
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
-        )
+    assert tracker.finished
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
-        stdout_process = Process(
-            argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
-        )
+    process_workunit = next(
+        item for item in finished if item["name"] == "multi_platform_process-running"
+    )
+    assert process_workunit is not None
+    stdout_digest = process_workunit["artifacts"]["stdout_digest"]
+    stderr_digest = process_workunit["artifacts"]["stderr_digest"]
 
-        with handler.session():
-            result = self.request(ProcessResult, [stdout_process])
+    assert result.stdout == b"stdout output\n"
+    assert stderr_digest == EMPTY_FILE_DIGEST
+    assert stdout_digest.serialized_bytes_length == len(result.stdout)
 
-        assert tracker.finished
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    tracker = WorkunitTracker()
+    handler = StreamingWorkunitHandler(
+        scheduler,
+        run_tracker=run_tracker,
+        callbacks=[tracker],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.INFO,
+        specs=Specs.empty(),
+        options_bootstrapper=create_options_bootstrapper([]),
+        pantsd=False,
+    )
+    stderr_process = Process(
+        argv=("/bin/bash", "-c", "1>&2 /bin/echo 'stderr output'"), description="Stderr process"
+    )
+    with handler:
+        result = rule_runner.request(ProcessResult, [stderr_process])
 
-        process_workunit = next(
-            item for item in finished if item["name"] == "multi_platform_process-running"
-        )
-        assert process_workunit is not None
-        stdout_digest = process_workunit["artifacts"]["stdout_digest"]
-        stderr_digest = process_workunit["artifacts"]["stderr_digest"]
+    assert tracker.finished
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    process_workunit = next(
+        item for item in finished if item["name"] == "multi_platform_process-running"
+    )
 
-        assert result.stdout == b"stdout output\n"
-        assert stderr_digest == EMPTY_FILE_DIGEST
-        assert stdout_digest.serialized_bytes_length == len(result.stdout)
+    assert process_workunit is not None
+    stdout_digest = process_workunit["artifacts"]["stdout_digest"]
+    stderr_digest = process_workunit["artifacts"]["stderr_digest"]
 
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            self._scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
-        )
+    assert result.stderr == b"stderr output\n"
+    assert stdout_digest == EMPTY_FILE_DIGEST
+    assert stderr_digest.serialized_bytes_length == len(result.stderr)
 
-        stderr_process = Process(
-            argv=("/bin/bash", "-c", "1>&2 /bin/echo 'stderr output'"), description="Stderr process"
-        )
+    assert process_workunit["metadata"]["exit_code"] == 0
 
-        with handler.session():
-            result = self.request(ProcessResult, [stderr_process])
+    try:
+        scheduler.ensure_remote_has_recursive([stdout_digest, stderr_digest])
+    except Exception as e:
+        # This is the exception message we should expect from invoking ensure_remote_has_recursive()
+        # in rust.
+        assert str(e) == "Cannot ensure remote has blobs without a remote"
 
-        assert tracker.finished
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        process_workunit = next(
-            item for item in finished if item["name"] == "multi_platform_process-running"
-        )
+    byte_outputs = scheduler.single_file_digests_to_bytes([stdout_digest, stderr_digest])
+    assert byte_outputs[0] == result.stdout
+    assert byte_outputs[1] == result.stderr
 
-        assert process_workunit is not None
-        stdout_digest = process_workunit["artifacts"]["stdout_digest"]
-        stderr_digest = process_workunit["artifacts"]["stderr_digest"]
 
-        assert result.stderr == b"stderr output\n"
-        assert stdout_digest == EMPTY_FILE_DIGEST
-        assert stderr_digest.serialized_bytes_length == len(result.stderr)
+def test_context_object_on_streaming_workunits(
+    rule_runner: RuleRunner, run_tracker: RunTracker
+) -> None:
+    scheduler = rule_runner.scheduler
 
-        try:
-            self._scheduler.ensure_remote_has_recursive([stdout_digest, stderr_digest])
-        except Exception as e:
-            # This is the exception message we should expect from invoking ensure_remote_has_recursive()
-            # in rust.
-            assert str(e) == "Cannot ensure remote has blobs without a remote"
+    class Callback(WorkunitsCallback):
+        @property
+        def can_finish_async(self) -> bool:
+            return False
 
-        byte_outputs = self._scheduler.single_file_digests_to_bytes([stdout_digest, stderr_digest])
-        assert byte_outputs[0] == result.stdout
-        assert byte_outputs[1] == result.stderr
-
-    def test_context_object(self):
-        scheduler = self.scheduler
-
-        def callback(**kwargs) -> None:
+        def __call__(self, **kwargs) -> None:
             context = kwargs["context"]
             assert isinstance(context, StreamingWorkunitContext)
 
@@ -822,16 +828,80 @@ class StreamingWorkunitProcessTests(TestBase):
                     output = context.single_file_digests_to_bytes([digest])
                     assert output == (b"stdout output\n",)
 
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[callback],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.INFO,
-        )
+    handler = StreamingWorkunitHandler(
+        scheduler,
+        run_tracker=run_tracker,
+        callbacks=[Callback()],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.INFO,
+        specs=Specs.empty(),
+        options_bootstrapper=create_options_bootstrapper([]),
+        pantsd=False,
+    )
+    stdout_process = Process(
+        argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
+    )
+    with handler:
+        rule_runner.request(ProcessResult, [stdout_process])
 
-        stdout_process = Process(
-            argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
-        )
 
-        with handler.session():
-            self.request(ProcessResult, [stdout_process])
+def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
+    rule_runner = RuleRunner(
+        target_types=[PythonLibrary],
+        rules=[
+            QueryRule(ProcessResult, (Process,)),
+        ],
+    )
+
+    rule_runner.set_options(["--backend-packages=pants.backend.python"])
+
+    rule_runner.create_file("src/python/somefiles/BUILD", "python_library()")
+    rule_runner.create_file("src/python/somefiles/a.py", "print('')")
+    rule_runner.create_file("src/python/somefiles/b.py", "print('')")
+
+    rule_runner.create_file("src/python/others/BUILD", "python_library()")
+    rule_runner.create_file("src/python/others/a.py", "print('')")
+    rule_runner.create_file("src/python/others/b.py", "print('')")
+
+    specs = SpecsParser(get_buildroot()).parse_specs(
+        ["src/python/somefiles::", "src/python/others/b.py"]
+    )
+
+    class Callback(WorkunitsCallback):
+        @property
+        def can_finish_async(self) -> bool:
+            return False
+
+        def __call__(self, **kwargs) -> None:
+            context = kwargs["context"]
+            assert isinstance(context, StreamingWorkunitContext)
+
+            expanded = context.get_expanded_specs()
+            targets = expanded.targets
+
+            assert len(targets.keys()) == 2
+            assert targets["src/python/others/b.py"] == [
+                TargetInfo(filename="src/python/others/b.py")
+            ]
+            assert set(targets["src/python/somefiles"]) == {
+                TargetInfo(filename="src/python/somefiles/a.py"),
+                TargetInfo(filename="src/python/somefiles/b.py"),
+            }
+
+    handler = StreamingWorkunitHandler(
+        scheduler=rule_runner.scheduler,
+        run_tracker=run_tracker,
+        callbacks=[Callback()],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=LogLevel.INFO,
+        specs=specs,
+        options_bootstrapper=create_options_bootstrapper(
+            ["--backend-packages=pants.backend.python"]
+        ),
+        pantsd=False,
+    )
+    stdout_process = Process(
+        argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
+    )
+    with handler:
+        rule_runner.request(ProcessResult, [stdout_process])

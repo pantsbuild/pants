@@ -14,9 +14,9 @@ class _IncludesDict(TypedDict, total=True):
 
 
 class Filespec(_IncludesDict, total=False):
-    """A dict of globs (required) and excludes (optional).
+    """A dict of includes (required) and excludes (optional).
 
-    For example: {'globs': ['helloworld/*.py'], 'exclude': ['helloworld/ignore.py']}.
+    For example: {'includes': ['helloworld/*.py'], 'excludes': ['helloworld/ignore.py']}.
 
     The globs are in zglobs format.
     """

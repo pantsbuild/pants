@@ -4,6 +4,7 @@
 import os
 import shutil
 import subprocess
+import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 from typing import Iterator, List, Optional
@@ -11,7 +12,7 @@ from typing import Iterator, List, Optional
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_integration_test import PantsIntegrationTest, ensure_daemon
+from pants.testutil.pants_integration_test import PantsResult, run_pants, run_pants_with_workdir
 from pants.testutil.test_base import AbstractTestGenerator
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
@@ -168,36 +169,53 @@ def create_isolated_git_repo():
                 yield worktree
 
 
-class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
-    # Git isn't detected if hermetic=True for some reason.
-    hermetic = False
+class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
+    @staticmethod
+    def run_pants(*args, **kwargs) -> PantsResult:
+        # Git isn't detected if hermetic=True for some reason.
+        return run_pants(*args, **{**kwargs, **{"hermetic": False}})
+
+    @staticmethod
+    def run_pants_with_workdir(*args, **kwargs) -> PantsResult:
+        # Git isn't detected if hermetic=True for some reason.
+        return run_pants_with_workdir(*args, **{**kwargs, **{"hermetic": False}})
 
     TEST_MAPPING = {
-        # A `pex_binary` with `sources=['file.name']`.
+        # A `pex_binary` with `entry_point='file.name'` (secondary ownership), and a
+        # `python_library` with primary ownership of the file.
         "src/python/python_targets/test_binary.py": dict(
-            none=["src/python/python_targets/test_binary.py:test"],
+            none=[
+                "src/python/python_targets/test_binary.py:binary_file",
+                "src/python/python_targets:test_binary",
+            ],
             direct=[
-                "src/python/python_targets/test_binary.py:test",
-                "src/python/python_targets:test",
+                "src/python/python_targets/test_binary.py:binary_file",
+                "src/python/python_targets:test_binary",
+                "src/python/python_targets:binary_file",
             ],
             transitive=[
-                "src/python/python_targets/test_binary.py:test",
-                "src/python/python_targets:test",
+                "src/python/python_targets/test_binary.py:binary_file",
+                "src/python/python_targets:test_binary",
+                "src/python/python_targets:binary_file",
             ],
         ),
         # A `python_library` with `sources=['file.name']`.
         "src/python/python_targets/test_library.py": dict(
             none=["src/python/python_targets/test_library.py:test_library"],
             direct=[
-                "src/python/python_targets/test_binary.py:test",
+                "src/python/python_targets/test_binary.py:binary_file",
                 "src/python/python_targets/test_library.py:test_library",
-                "src/python/python_targets:test",
+                "src/python/python_targets:binary_file",
                 "src/python/python_targets:test_library",
+                # NB: 'src/python/python_targets:test_binary' does not show up here because it is
+                # not a direct dependee of `test_library.py:test_library`; instead, it depends on
+                # `test_binary.py:binary_file`, which is itself a direct dependee.
             ],
             transitive=[
-                "src/python/python_targets/test_binary.py:test",
+                "src/python/python_targets/test_binary.py:binary_file",
                 "src/python/python_targets/test_library.py:test_library",
-                "src/python/python_targets:test",
+                "src/python/python_targets:binary_file",
+                "src/python/python_targets:test_binary",
                 "src/python/python_targets:test_library",
                 "src/python/python_targets:test_library_direct_dependee",
                 "src/python/python_targets:test_library_transitive_dependee",
@@ -357,8 +375,7 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
             pants_run.assert_success()
             self.assertEqual(pants_run.stdout.strip(), "")
 
-    @ensure_daemon
-    def test_list_changed(self):
+    def test_list_changed(self) -> None:
         deleted_file = "src/python/sources/sources.py"
 
         with create_isolated_git_repo() as worktree:

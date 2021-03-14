@@ -11,7 +11,6 @@ fs = { path = "../fs" }
 futures = "0.3"
 hashing = { path = "../hashing" }
 log = "0.4"
-logging = { path = "../logging" }
 # TODO: See https://github.com/notify-rs/notify/issues/255.
 notify = { git = "https://github.com/pantsbuild/notify", rev = "64880f0662db2b5ecbf25f1cccdca64bb8fac1bc" }
 parking_lot = "0.11"
@@ -20,4 +19,4 @@ task_executor = { path = "../task_executor" }
 [dev-dependencies]
 tempfile = "3"
 testutil = { path = "../testutil" }
-tokio = { version = "0.2.22", features = ["rt-core", "macros"] }
+tokio = { version = "0.2.23", features = ["rt-core", "macros"] }

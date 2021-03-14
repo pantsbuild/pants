@@ -124,7 +124,7 @@ async fn garbage_collect_nothing_to_do() {
     load_bytes(
       &store,
       EntryType::File,
-      Digest(
+      Digest::new(
         Fingerprint::from_hex_string(
           "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
         )
@@ -150,7 +150,7 @@ async fn garbage_collect_nothing_to_do_with_lease() {
     "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
   )
   .unwrap();
-  let file_digest = Digest(file_fingerprint, 10);
+  let file_digest = Digest::new(file_fingerprint, 10);
   store
     .lease_all(vec![(file_digest, EntryType::File)].into_iter())
     .await
@@ -175,7 +175,7 @@ async fn garbage_collect_expired() {
   )
   .unwrap();
   let file_len = 10;
-  let file_digest = Digest(file_fingerprint, file_len);
+  let file_digest = Digest::new(file_fingerprint, file_len);
 
   // Store something (in a store with a shortened lease). Confirm that it hasn't immediately
   // expired, and then wait for it to expire.
@@ -213,13 +213,13 @@ async fn garbage_collect_remove_one_of_two_files_no_leases() {
     "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
   )
   .unwrap();
-  let digest_1 = Digest(fingerprint_1, 10);
+  let digest_1 = Digest::new(fingerprint_1, 10);
   let bytes_2 = Bytes::from("9876543210");
   let fingerprint_2 = Fingerprint::from_hex_string(
     "7619ee8cea49187f309616e30ecf54be072259b43760f1f550a644945d5572f2",
   )
   .unwrap();
-  let digest_2 = Digest(fingerprint_2, 10);
+  let digest_2 = Digest::new(fingerprint_2, 10);
   store
     .store_bytes(EntryType::File, bytes_1.clone(), false)
     .await
@@ -259,13 +259,13 @@ async fn garbage_collect_remove_both_files_no_leases() {
     "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
   )
   .unwrap();
-  let digest_1 = Digest(fingerprint_1, 10);
+  let digest_1 = Digest::new(fingerprint_1, 10);
   let bytes_2 = Bytes::from("9876543210");
   let fingerprint_2 = Fingerprint::from_hex_string(
     "7619ee8cea49187f309616e30ecf54be072259b43760f1f550a644945d5572f2",
   )
   .unwrap();
-  let digest_2 = Digest(fingerprint_2, 10);
+  let digest_2 = Digest::new(fingerprint_2, 10);
   store
     .store_bytes(EntryType::File, bytes_1.clone(), false)
     .await
@@ -436,7 +436,7 @@ async fn garbage_collect_fail_because_too_many_leases() {
 async fn write_one_meg(store: &ByteStore, byte: u8) {
   let mut bytes = BytesMut::with_capacity(1024 * 1024);
   for _ in 0..1024 * 1024 {
-    bytes.put(byte);
+    bytes.put_u8(byte);
   }
   store
     .store_bytes(EntryType::File, bytes.freeze(), false)
@@ -532,7 +532,9 @@ async fn empty_file_is_known() {
   let empty_file = TestData::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::File, empty_file.digest(), |b| Bytes::from(b))
+      .load_bytes_with(EntryType::File, empty_file.digest(), |b| {
+        Bytes::copy_from_slice(b)
+      })
       .await,
     Ok(Some(empty_file.bytes())),
   )
@@ -545,7 +547,9 @@ async fn empty_directory_is_known() {
   let empty_dir = TestDirectory::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| Bytes::from(b))
+      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| {
+        Bytes::copy_from_slice(b)
+      })
       .await,
     Ok(Some(empty_dir.bytes())),
   )
@@ -584,7 +588,7 @@ pub async fn load_bytes(
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
   store
-    .load_bytes_with(entry_type, digest, |b| Bytes::from(b))
+    .load_bytes_with(entry_type, digest, |b| Bytes::copy_from_slice(b))
     .await
 }
 

@@ -10,9 +10,8 @@ from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 
 class PythonNativeCode(Subsystem):
-    """Options for building native code using Python, e.g. when resolving distributions."""
-
     options_scope = "python-native-code"
+    help = "Options for building native code using Python, e.g. when resolving distributions."
 
     @classmethod
     def register_options(cls, register):

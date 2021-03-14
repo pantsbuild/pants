@@ -28,27 +28,25 @@
 #![allow(clippy::mutex_atomic)]
 #![type_length_limit = "1881109"]
 
-use std::convert::TryInto;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
-use boxfuture::{BoxFuture, Boxable};
+use bazel_protos::require_digest;
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
 use fs::{
   GlobExpansionConjunction, GlobMatching, PreparedPathGlobs, RelativePath, StrictGlobMatching,
 };
-use futures::compat::Future01CompatExt;
-use futures::future::TryFutureExt;
-use futures01::{future, Future};
+use futures::future::{self, BoxFuture};
+use futures::FutureExt;
+use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use protobuf::Message;
-use rand::seq::SliceRandom;
 use serde_derive::Serialize;
+use std::collections::BTreeMap;
 use store::{
   Snapshot, SnapshotOps, SnapshotOpsError, Store, StoreFileByDigest, SubsetParams, UploadSummary,
 };
@@ -211,8 +209,6 @@ to this directory.",
               .takes_value(true)
               .long("server-address")
               .required(false)
-              .multiple(true)
-              .number_of_values(1)
         )
         .arg(
           Arg::with_name("root-ca-cert-file")
@@ -239,27 +235,12 @@ to this directory.",
               .long("chunk-bytes")
               .required(false)
               .default_value(&format!("{}", 3 * 1024 * 1024))
-        ).arg(
-          Arg::with_name("thread-count")
-              .help("Number of threads to use for uploads and downloads")
-              .takes_value(true)
-              .long("thread-count")
-              .required(false)
-              .default_value("1")
         )
         .arg(
           Arg::with_name("rpc-attempts")
               .help("Number of times to attempt any RPC before giving up.")
               .takes_value(true)
               .long("rpc-attempts")
-              .required(false)
-              .default_value("3")
-        )
-        .arg(
-          Arg::with_name("connection-limit")
-              .help("Number of concurrent servers to allow connections to.")
-              .takes_value(true)
-              .long("connection-limit")
               .required(false)
               .default_value("3")
         )
@@ -282,7 +263,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .unwrap_or_else(Store::default_path);
   let runtime = task_executor::Executor::new();
   let (store, store_has_remote) = {
-    let (store_result, store_has_remote) = match top_match.values_of("server-address") {
+    let (store_result, store_has_remote) = match top_match.value_of("server-address") {
       Some(cas_address) => {
         let chunk_size =
           value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
@@ -296,30 +277,30 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           None
         };
 
-        let oauth_bearer_token =
-          if let Some(path) = top_match.value_of("oauth-bearer-token-file") {
-            Some(std::fs::read_to_string(path).map_err(|err| {
-              format!("Error reading oauth bearer token from {:?}: {}", path, err)
-            })?)
-          } else {
-            None
-          };
-
-        // Randomize CAS address order to avoid thundering herds from common config.
-        let mut cas_addresses = cas_address.map(str::to_owned).collect::<Vec<_>>();
-        cas_addresses.shuffle(&mut rand::thread_rng());
+        let mut headers = BTreeMap::new();
+        if let Some(oauth_path) = top_match.value_of("oauth-bearer-token-file") {
+          let token = std::fs::read_to_string(oauth_path).map_err(|err| {
+            format!(
+              "Error reading oauth bearer token from {:?}: {}",
+              oauth_path, err
+            )
+          })?;
+          headers.insert(
+            "authorization".to_owned(),
+            format!("Bearer {}", token.trim()),
+          );
+        }
 
         (
           Store::with_remote(
             runtime.clone(),
             &store_dir,
-            cas_addresses,
+            cas_address,
             top_match
               .value_of("remote-instance-name")
               .map(str::to_owned),
             root_ca_certs,
-            oauth_bearer_token,
-            value_t!(top_match.value_of("thread-count"), usize).expect("Invalid thread count"),
+            headers,
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures
             // leave this hanging forever.
@@ -330,15 +311,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             //
             // See https://github.com/pantsbuild/pants/pull/6433 for more context.
             Duration::from_secs(30 * 60),
-            // TODO: Take a command line arg.
-            store::BackoffConfig::new(
-              std::time::Duration::from_secs(1),
-              1.2,
-              std::time::Duration::from_secs(20),
-            )?,
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
-            value_t!(top_match.value_of("connection-limit"), usize)
-              .expect("Bad connection-limit flag"),
           ),
           true,
         )
@@ -364,7 +337,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .unwrap()
             .parse::<usize>()
             .expect("size_bytes must be a non-negative number");
-          let digest = Digest(fingerprint, size_bytes);
+          let digest = Digest::new(fingerprint, size_bytes);
           let write_result = store
             .load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap())
             .await?;
@@ -396,12 +369,10 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             fs::Stat::File(f) => {
               let digest = store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
                 .store_by_digest(f)
-                .compat()
                 .await
                 .unwrap();
 
               let report = ensure_uploaded_to_remote(&store, store_has_remote, digest)
-                .compat()
                 .await
                 .unwrap();
               print_upload_summary(args.value_of("output-mode"), &report);
@@ -429,10 +400,9 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .unwrap()
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
-        let digest = Digest(fingerprint, size_bytes);
+        let digest = Digest::new(fingerprint, size_bytes);
         store
           .materialize_directory(destination, digest)
-          .compat()
           .await
           .map(|metadata| {
             eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
@@ -476,9 +446,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         )
         .await?;
 
-        let report = ensure_uploaded_to_remote(&store, store_has_remote, snapshot.digest)
-          .compat()
-          .await?;
+        let report = ensure_uploaded_to_remote(&store, store_has_remote, snapshot.digest).await?;
         print_upload_summary(args.value_of("output-mode"), &report);
 
         Ok(())
@@ -490,7 +458,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .unwrap()
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
-        let mut digest = Digest(fingerprint, size_bytes);
+        let mut digest = Digest::new(fingerprint, size_bytes);
 
         if let Some(prefix_to_strip) = args.value_of("child-dir") {
           let mut result = store
@@ -521,14 +489,14 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
           "binary" => {
             let maybe_directory = store.load_directory(digest).await?;
-            maybe_directory.map(|(d, _metadata)| d.write_to_bytes().unwrap())
+            maybe_directory.map(|(d, _metadata)| d.to_bytes().to_vec())
           }
           "text" => {
             let maybe_p = store.load_directory(digest).await?;
             maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())
           }
           "recursive-file-list" => {
-            let maybe_v = expand_files(store, digest).compat().await?;
+            let maybe_v = expand_files(store, digest).await?;
             maybe_v
               .map(|v| {
                 v.into_iter()
@@ -539,11 +507,11 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .map(String::into_bytes)
           }
           "recursive-file-list-with-digests" => {
-            let maybe_v = expand_files(store, digest).compat().await?;
+            let maybe_v = expand_files(store, digest).await?;
             maybe_v
               .map(|v| {
                 v.into_iter()
-                  .map(|(name, digest)| format!("{} {} {}\n", name, digest.0, digest.1))
+                  .map(|(name, digest)| format!("{} {} {}\n", name, digest.hash, digest.size_bytes))
                   .collect::<Vec<String>>()
                   .join("")
               })
@@ -573,20 +541,14 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .unwrap()
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
-      let digest = Digest(fingerprint, size_bytes);
+      let digest = Digest::new(fingerprint, size_bytes);
       let v = match store
-        .load_file_bytes_with(digest, |bytes| bytes.into())
+        .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
         .await?
       {
         None => {
           let maybe_dir = store.load_directory(digest).await?;
-          maybe_dir.map(|(dir, _metadata)| {
-            Bytes::from(
-              dir
-                .write_to_bytes()
-                .expect("Error serializing Directory proto"),
-            )
-          })
+          maybe_dir.map(|(dir, _metadata)| dir.to_bytes())
         }
         Some((bytes, _metadata)) => Some(bytes),
       };
@@ -607,7 +569,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .all_local_digests(::store::EntryType::Directory)
           .expect("Error opening store")
         {
-          println!("{} {}", digest.0, digest.1);
+          println!("{} {}", digest.hash, digest.size_bytes);
         }
         Ok(())
       }
@@ -624,18 +586,17 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
   }
 }
 
-fn expand_files(
+async fn expand_files(
   store: Store,
   digest: Digest,
-) -> impl Future<Item = Option<Vec<(String, Digest)>>, Error = String> {
+) -> Result<Option<Vec<(String, Digest)>>, String> {
   let files = Arc::new(Mutex::new(Vec::new()));
-  expand_files_helper(store, digest, String::new(), files.clone()).map(|maybe| {
-    maybe.map(|()| {
-      let mut v = Arc::try_unwrap(files).unwrap().into_inner();
-      v.sort_by(|(l, _), (r, _)| l.cmp(r));
-      v
-    })
-  })
+  let vec_opt = expand_files_helper(store, digest, String::new(), files.clone()).await?;
+  Ok(vec_opt.map(|_| {
+    let mut v = Arc::try_unwrap(files).unwrap().into_inner();
+    v.sort_by(|(l, _), (r, _)| l.cmp(r));
+    v
+  }))
 }
 
 fn expand_files_helper(
@@ -643,27 +604,27 @@ fn expand_files_helper(
   digest: Digest,
   prefix: String,
   files: Arc<Mutex<Vec<(String, Digest)>>>,
-) -> BoxFuture<Option<()>, String> {
-  Box::pin(async move {
+) -> BoxFuture<'static, Result<Option<()>, String>> {
+  async move {
     let maybe_dir = store.load_directory(digest).await?;
     match maybe_dir {
       Some((dir, _metadata)) => {
         {
           let mut files_unlocked = files.lock();
-          for file in dir.get_files() {
-            let file_digest: Result<Digest, String> = file.get_digest().try_into();
-            files_unlocked.push((format!("{}{}", prefix, file.name), file_digest?));
+          for file in &dir.files {
+            let file_digest = require_digest(file.digest.as_ref())?;
+            files_unlocked.push((format!("{}{}", prefix, file.name), file_digest));
           }
         }
         let subdirs_and_digests = dir
-          .get_directories()
+          .directories
           .iter()
           .map(move |subdir| {
-            let digest: Result<Digest, String> = subdir.get_digest().try_into();
+            let digest = require_digest(subdir.digest.as_ref());
             digest.map(|digest| (subdir, digest))
           })
           .collect::<Result<Vec<_>, _>>()?;
-        future::join_all(
+        future::try_join_all(
           subdirs_and_digests
             .into_iter()
             .map(move |(subdir, digest)| {
@@ -676,15 +637,13 @@ fn expand_files_helper(
             })
             .collect::<Vec<_>>(),
         )
-        .map(|_| Some(()))
-        .compat()
         .await
+        .map(|_| Some(()))
       }
       None => Ok(None),
     }
-  })
-  .compat()
-  .to_boxed()
+  }
+  .boxed()
 }
 
 fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> fs::PosixFS {
@@ -697,18 +656,18 @@ fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> 
   .unwrap()
 }
 
-fn ensure_uploaded_to_remote(
+async fn ensure_uploaded_to_remote(
   store: &Store,
   store_has_remote: bool,
   digest: Digest,
-) -> impl Future<Item = SummaryWithDigest, Error = String> {
+) -> Result<SummaryWithDigest, String> {
   let summary = if store_has_remote {
     store
       .ensure_remote_has_recursive(vec![digest])
+      .await
       .map(Some)
-      .to_boxed()
   } else {
-    future::ok(None).to_boxed()
+    Ok(None)
   };
   summary.map(move |summary| SummaryWithDigest { digest, summary })
 }
@@ -716,7 +675,7 @@ fn ensure_uploaded_to_remote(
 fn print_upload_summary(mode: Option<&str>, report: &SummaryWithDigest) {
   match mode {
     Some("json") => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
-    Some("simple") => println!("{} {}", report.digest.0, report.digest.1),
+    Some("simple") => println!("{} {}", report.digest.hash, report.digest.size_bytes),
     // This should never be reached, as clap should error with unknown formats.
     _ => eprintln!("Unknown summary format."),
   };

@@ -35,28 +35,33 @@ fn time_span_from_start_and_duration_in_seconds(
   start: i64,
   duration: i64,
 ) -> Result<TimeSpan, String> {
-  use protobuf::well_known_types::Timestamp;
-  let mut start_timestamp = Timestamp::new();
-  start_timestamp.set_seconds(start);
-  let mut end_timestamp = Timestamp::new();
-  end_timestamp.set_seconds(start + duration);
+  use prost_types::Timestamp;
+
+  let start_timestamp = Timestamp {
+    seconds: start,
+    nanos: 0,
+  };
+
+  let end_timestamp = Timestamp {
+    seconds: start + duration,
+    nanos: 0,
+  };
+
   TimeSpan::from_start_and_end(&start_timestamp, &end_timestamp, "")
 }
 
 #[test]
-fn time_span_from_start_and_end_given_positive_duration() {
-  let span = time_span_from_start_and_duration_in_seconds(42, 10);
+fn time_span_from_prost_timestamp() {
+  let span = time_span_from_start_and_duration_in_seconds(42, 10).unwrap();
   assert_eq!(
-    Ok(TimeSpan {
+    TimeSpan {
       start: Duration::new(42, 0),
       duration: Duration::new(10, 0),
-    }),
+    },
     span
   );
-}
 
-#[test]
-fn time_span_from_start_and_end_given_negative_duration() {
+  // A negative duration is invalid.
   let span = time_span_from_start_and_duration_in_seconds(42, -10);
   assert!(span.is_err());
 }

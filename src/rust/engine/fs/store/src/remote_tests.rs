@@ -1,15 +1,14 @@
-use crate::remote::ByteStore;
-use crate::MEGABYTES;
+use std::collections::{BTreeMap, HashSet};
+use std::time::Duration;
+
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
 use hashing::Digest;
 use mock::StubCAS;
-use serverset::BackoffConfig;
-use std::collections::HashSet;
-use std::time::Duration;
 use testutil::data::{TestData, TestDirectory};
 
+use crate::remote::ByteStore;
 use crate::tests::{big_file_bytes, big_file_digest, big_file_fingerprint, new_cas};
+use crate::MEGABYTES;
 
 #[tokio::test]
 async fn loads_file() {
@@ -152,15 +151,12 @@ async fn write_file_multiple_chunks() {
   let cas = StubCAS::empty();
 
   let store = ByteStore::new(
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
-    None,
-    1,
+    BTreeMap::new(),
     10 * 1024,
     Duration::from_secs(5),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap();
@@ -231,15 +227,12 @@ async fn write_file_errors() {
 #[tokio::test]
 async fn write_connection_error() {
   let store = ByteStore::new(
-    vec![String::from("doesnotexist.example")],
+    "http://doesnotexist.example",
     None,
     None,
-    None,
-    1,
+    BTreeMap::new(),
     10 * 1024 * 1024,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap();
@@ -248,7 +241,7 @@ async fn write_connection_error() {
     .await
     .expect_err("Want error");
   assert!(
-    error.contains("Error attempting to upload digest"),
+    error.contains("dns error: failed to lookup address information"),
     format!("Bad error message, got: {}", error)
   );
 }
@@ -263,7 +256,6 @@ async fn list_missing_digests_none_missing() {
       .list_missing_digests(
         store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
       )
-      .compat()
       .await,
     Ok(HashSet::new())
   );
@@ -283,7 +275,6 @@ async fn list_missing_digests_some_missing() {
   assert_eq!(
     store
       .list_missing_digests(store.find_missing_blobs_request(vec![digest].iter()),)
-      .compat()
       .await,
     Ok(digest_set)
   );
@@ -299,7 +290,6 @@ async fn list_missing_digests_error() {
     .list_missing_digests(
       store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
     )
-    .compat()
     .await
     .expect_err("Want error");
   assert!(
@@ -308,53 +298,14 @@ async fn list_missing_digests_error() {
   );
 }
 
-#[tokio::test]
-async fn reads_from_multiple_cas_servers() {
-  let roland = TestData::roland();
-  let catnip = TestData::catnip();
-
-  let cas1 = StubCAS::builder().file(&roland).file(&catnip).build();
-  let cas2 = StubCAS::builder().file(&roland).file(&catnip).build();
-
-  let store = ByteStore::new(
-    vec![cas1.address(), cas2.address()],
-    None,
-    None,
-    None,
-    1,
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
-    2,
-  )
-  .unwrap();
-
-  assert_eq!(
-    load_file_bytes(&store, roland.digest()).await,
-    Ok(Some(roland.bytes()))
-  );
-
-  assert_eq!(
-    load_file_bytes(&store, catnip.digest()).await,
-    Ok(Some(catnip.bytes()))
-  );
-
-  assert_eq!(cas1.read_request_count(), 1);
-  assert_eq!(cas2.read_request_count(), 1);
-}
-
 fn new_byte_store(cas: &StubCAS) -> ByteStore {
   ByteStore::new(
-    vec![cas.address()],
+    &cas.address(),
     None,
     None,
-    None,
-    1,
+    BTreeMap::new(),
     10 * MEGABYTES,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
     1,
   )
   .unwrap()

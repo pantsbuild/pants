@@ -1,10 +1,12 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import ABC
-from typing import Any, Dict, Optional
+from __future__ import annotations
 
-from pants.engine.fs import Snapshot
+from abc import ABC
+from typing import Any, Optional
+
+from pants.engine.fs import FileDigest, Snapshot
 from pants.util.logging import LogLevel
 
 
@@ -31,7 +33,7 @@ class EngineAwareReturnType(ABC):
     otherwise, it will use the additional metadata provided.
     """
 
-    def level(self) -> Optional[LogLevel]:
+    def level(self) -> LogLevel | None:
         """If implemented, this method will modify the level of the workunit associated with any
         `@rule`s that return the annotated type.
 
@@ -40,7 +42,7 @@ class EngineAwareReturnType(ABC):
         """
         return None
 
-    def message(self) -> Optional[str]:
+    def message(self) -> str | None:
         """If implemented, this adds a result message to the workunit for any `@rule`'s that return
         the annotated type.
 
@@ -49,15 +51,15 @@ class EngineAwareReturnType(ABC):
         """
         return None
 
-    def artifacts(self) -> Optional[Dict[str, Snapshot]]:
+    def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
         """If implemented, this sets the `artifacts` entry for the workunit of any `@rule`'s that
         return the annotated type.
 
-        `artifacts` is a mapping of arbitrary string keys to `Snapshot`s.
+        `artifacts` is a mapping of arbitrary string keys to `Snapshot`s or `FileDigest`s.
         """
         return None
 
-    def metadata(self) -> Optional[Dict[str, Any]]:
+    def metadata(self) -> dict[str, Any] | None:
         """If implemented, adds arbitrary key-value pairs to the `metadata` entry of the `@rule`
         workunit."""
 

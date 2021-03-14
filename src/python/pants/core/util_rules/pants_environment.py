@@ -6,8 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Dict, Mapping, Optional, Sequence
 
-from pants.engine.internals.session import SessionValues
-from pants.engine.rules import collect_rules, rule
+from pants.base.deprecated import deprecated
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
@@ -25,7 +24,11 @@ class PantsEnvironment:
 
     env: FrozenDict[str, str]
 
-    def __init__(self, env: Optional[Mapping[str, str]] = None):
+    @deprecated(
+        "2.5.0.dev0",
+        hint_message="Request a subset Environment (using EnvironmentRequest) or the CompleteEnvironment.",
+    )
+    def __init__(self, env: Optional[Mapping[str, str]] = None) -> None:
         """Initialize a `PantsEnvironment` with the current contents of the environment.
 
         Explicitly specify the env argument to create a mock environment for testing.
@@ -73,12 +76,3 @@ class PantsEnvironment:
                 )
 
         return FrozenDict(env_var_subset)
-
-
-@rule
-async def pants_environment(session_values: SessionValues) -> PantsEnvironment:
-    return session_values[PantsEnvironment]
-
-
-def rules():
-    return collect_rules()

@@ -2,15 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Set, Tuple, Type
+from typing import Iterable, List, Set, Tuple, Type, cast
 
 import pytest
 
 from pants.base.specs import (
     AddressLiteralSpec,
+    AddressSpecs,
     FilesystemGlobSpec,
     FilesystemLiteralSpec,
     FilesystemSpec,
@@ -18,21 +20,14 @@ from pants.base.specs import (
     Specs,
 )
 from pants.base.specs_parser import SpecsParser
-from pants.engine.addresses import (
-    Address,
-    Addresses,
-    AddressesWithOrigins,
-    AddressInput,
-    AddressWithOrigin,
-    UnparsedAddressInputs,
-)
+from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
 from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
     FileContent,
     Snapshot,
-    SourcesSnapshot,
+    SpecsSnapshot,
 )
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
@@ -48,9 +43,9 @@ from pants.engine.internals.graph import (
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
+    AsyncFieldMixin,
     Dependencies,
     DependenciesRequest,
-    DependenciesRequestLite,
     FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
@@ -60,24 +55,24 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    NoApplicableTargetsBehavior,
+    SecondaryOwnerMixin,
     Sources,
+    SourcesPaths,
+    SourcesPathsRequest,
     SpecialCasedDependencies,
+    StringField,
     Tags,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
-    TargetsWithOrigins,
-    TargetWithOrigin,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    TransitiveTargetsRequestLite,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.testutil.option_util import create_options_bootstrapper
+from pants.source.filespec import Filespec
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -103,9 +98,7 @@ def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(Targets, (DependenciesRequest,)),
-            QueryRule(Targets, (DependenciesRequestLite,)),
             QueryRule(TransitiveTargets, (TransitiveTargetsRequest,)),
-            QueryRule(TransitiveTargets, (TransitiveTargetsRequestLite,)),
         ],
         target_types=[MockTarget],
     )
@@ -149,18 +142,6 @@ def test_transitive_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
     assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
 
-    # Now test with TransitiveTargetsLite.
-    direct_deps = transitive_targets_rule_runner.request(
-        Targets, [DependenciesRequestLite(root[Dependencies])]
-    )
-    assert direct_deps == Targets([d1, d2, d3])
-    transitive_targets = transitive_targets_rule_runner.request(
-        TransitiveTargets, [TransitiveTargetsRequestLite([root.address, d2.address])]
-    )
-    assert transitive_targets.roots == (root, d2)
-    assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
-    assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
-
 
 def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: RuleRunner) -> None:
     transitive_targets_rule_runner.add_to_build_file(
@@ -193,17 +174,48 @@ def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: R
     assert transitive_targets.dependencies == FrozenOrderedSet([intermediate])
     assert transitive_targets.closure == FrozenOrderedSet([root, intermediate])
 
-    # Test with TransitiveTargetsLite.
-    intermediate_direct_deps = transitive_targets_rule_runner.request(
-        Targets, [DependenciesRequestLite(intermediate[Dependencies])]
+    # Regression test that we work with deeply nested levels of excludes.
+    transitive_targets_rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            target(name='t1')
+            target(name='t2', dependencies=[':t1'])
+            target(name='t3', dependencies=[':t2'])
+            target(name='t4', dependencies=[':t3'])
+            target(name='t5', dependencies=[':t4'])
+            target(name='t6', dependencies=[':t5'])
+            target(name='t7', dependencies=[':t6'])
+            target(name='t8', dependencies=[':t7'])
+            target(name='t9', dependencies=[':t8'])
+            target(name='t10', dependencies=[':t9'])
+            target(name='t11', dependencies=[':t10'])
+            target(name='t12', dependencies=[':t11'])
+            target(name='t13', dependencies=[':t12'])
+            target(name='t14', dependencies=[':t13'])
+            target(name='t15', dependencies=[':t14', '!!:t1', '!!:t5'])
+            """
+        ),
     )
-    assert intermediate_direct_deps == Targets([base])
     transitive_targets = transitive_targets_rule_runner.request(
-        TransitiveTargets, [TransitiveTargetsRequestLite([root.address, intermediate.address])]
+        TransitiveTargets, [TransitiveTargetsRequest([get_target("t15").address])]
     )
-    assert transitive_targets.roots == (root, intermediate)
-    assert transitive_targets.dependencies == FrozenOrderedSet([intermediate])
-    assert transitive_targets.closure == FrozenOrderedSet([root, intermediate])
+    assert transitive_targets.dependencies == FrozenOrderedSet(
+        [
+            get_target("t14"),
+            get_target("t13"),
+            get_target("t12"),
+            get_target("t11"),
+            get_target("t10"),
+            get_target("t9"),
+            get_target("t8"),
+            get_target("t7"),
+            get_target("t6"),
+            get_target("t4"),
+            get_target("t3"),
+            get_target("t2"),
+        ]
+    )
 
 
 def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) -> None:
@@ -411,7 +423,7 @@ def test_resolve_generated_subtarget() -> None:
     )
 
 
-def test_resolve_sources_snapshot() -> None:
+def test_resolve_specs_snapshot() -> None:
     """This tests that convert filesystem specs and/or address specs into a single snapshot.
 
     Some important edge cases:
@@ -420,21 +432,36 @@ def test_resolve_sources_snapshot() -> None:
     - If a file is covered both by an address spec and by a filesystem spec, we should merge it
       so that the file only shows up once.
     """
-    rule_runner = RuleRunner(
-        rules=[QueryRule(SourcesSnapshot, (Specs,))], target_types=[MockTarget]
-    )
+    rule_runner = RuleRunner(rules=[QueryRule(SpecsSnapshot, (Specs,))], target_types=[MockTarget])
     rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
     rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
     specs = SpecsParser(rule_runner.build_root).parse_specs(
         ["demo:demo", "demo/f1.txt", "demo/BUILD"]
     )
-    result = rule_runner.request(SourcesSnapshot, [specs])
+    result = rule_runner.request(SpecsSnapshot, [specs])
     assert result.snapshot.files == ("demo/BUILD", "demo/f1.txt", "demo/f2.txt")
+
+
+class MockSecondaryOwnerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
+    alias = "secondary_owner_field"
+    required = True
+
+    @property
+    def filespec(self) -> Filespec:
+        return {"includes": [os.path.join(self.address.spec_path, cast(str, self.value))]}
+
+
+class MockSecondaryOwnerTarget(Target):
+    alias = "secondary_owner"
+    core_fields = (MockSecondaryOwnerField,)
 
 
 @pytest.fixture
 def owners_rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[QueryRule(Owners, (OwnersRequest,))], target_types=[MockTarget])
+    return RuleRunner(
+        rules=[QueryRule(Owners, (OwnersRequest,))],
+        target_types=[MockTarget, MockSecondaryOwnerTarget],
+    )
 
 
 def assert_owners(
@@ -448,34 +475,41 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
     """Test when a source file belongs to a target, even though the file does not actually exist.
 
     This happens, for example, when the file is deleted and we're computing `--changed-since`. In
-    this case, we should not attempt to generate a subtarget and should use the original target.
+    this case, we should use the BUILD target as we can't use a more precise file target.
     """
     owners_rule_runner.create_file("demo/f.txt")
-    owners_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
-    assert_owners(
-        owners_rule_runner, ["demo/deleted.txt"], expected={Address("demo", target_name="demo")}
+    owners_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])\n")
+    owners_rule_runner.add_to_build_file(
+        "demo", "secondary_owner(name='secondary', secondary_owner_field='deleted.txt')"
     )
 
-    # For files that do exist, we should still use a generated subtarget, though.
+    assert_owners(
+        owners_rule_runner,
+        ["demo/deleted.txt"],
+        expected={Address("demo", target_name="demo"), Address("demo", target_name="secondary")},
+    )
+
+    # For files that do exist, we should still use a file target, though.
     assert_owners(
         owners_rule_runner,
         ["demo/f.txt"],
         expected={Address("demo", relative_file_path="f.txt", target_name="demo")},
     )
 
-    # If a sibling file uses the original target, then both should be used.
+    # If a sibling file uses the BUILD target, then both should be used.
     assert_owners(
         owners_rule_runner,
         ["demo/f.txt", "demo/deleted.txt"],
         expected={
             Address("demo", relative_file_path="f.txt", target_name="demo"),
             Address("demo"),
+            Address("demo", target_name="secondary"),
         },
     )
 
 
 def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
-    """Even if there are multiple owners of the same file, we still use generated subtargets."""
+    """Even if there are multiple owners of the same file, we still use file targets."""
     owners_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
     owners_rule_runner.add_to_build_file(
         "demo",
@@ -483,13 +517,19 @@ def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
             """\
             target(name='all', sources=['*.txt'])
             target(name='f2', sources=['f2.txt'])
+            secondary_owner(name='secondary', secondary_owner_field='f1.txt')
             """
         ),
     )
     assert_owners(
         owners_rule_runner,
         ["demo/f1.txt"],
-        expected={Address("demo", relative_file_path="f1.txt", target_name="all")},
+        expected={
+            Address("demo", relative_file_path="f1.txt", target_name="all"),
+            # This target matches through "secondary ownership", rather than through a `sources`
+            # field, so it uses a BUILD target instead of file target.
+            Address("demo", target_name="secondary"),
+        },
     )
     assert_owners(
         owners_rule_runner,
@@ -511,6 +551,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
             target(name='f1', sources=['f1.txt'])
             target(name='f2_first', sources=['f2.txt'])
             target(name='f2_second', sources=['f2.txt'])
+            secondary_owner(name='secondary', secondary_owner_field='f1.txt')
             """
         ),
     )
@@ -521,6 +562,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
             Address("demo", relative_file_path="f1.txt", target_name="f1"),
             Address("demo", relative_file_path="f2.txt", target_name="f2_first"),
             Address("demo", relative_file_path="f2.txt", target_name="f2_second"),
+            Address("demo", target_name="secondary"),
         },
     )
 
@@ -528,7 +570,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
 @pytest.fixture
 def specs_rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(AddressesWithOrigins, (FilesystemSpecs,))],
+        rules=[QueryRule(Addresses, (FilesystemSpecs,))],
         target_types=[MockTarget],
     )
 
@@ -536,46 +578,33 @@ def specs_rule_runner() -> RuleRunner:
 def resolve_filesystem_specs(
     rule_runner: RuleRunner,
     specs: Iterable[FilesystemSpec],
-) -> Set[AddressWithOrigin]:
-    result = rule_runner.request(AddressesWithOrigins, [FilesystemSpecs(specs)])
+) -> Set[Address]:
+    result = rule_runner.request(Addresses, [FilesystemSpecs(specs)])
     return set(result)
 
 
 def test_filesystem_specs_literal_file(specs_rule_runner: RuleRunner) -> None:
     specs_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
     specs_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
-    spec = FilesystemLiteralSpec("demo/f1.txt")
-    assert resolve_filesystem_specs(specs_rule_runner, [spec]) == {
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f1.txt", target_name="demo"), origin=spec
-        )
+    assert resolve_filesystem_specs(specs_rule_runner, [FilesystemLiteralSpec("demo/f1.txt")]) == {
+        Address("demo", relative_file_path="f1.txt", target_name="demo")
     }
 
 
 def test_filesystem_specs_glob(specs_rule_runner: RuleRunner) -> None:
     specs_rule_runner.create_files("demo", ["f1.txt", "f2.txt"])
     specs_rule_runner.add_to_build_file("demo", "target(sources=['*.txt'])")
-    spec = FilesystemGlobSpec("demo/*.txt")
-    assert resolve_filesystem_specs(specs_rule_runner, [spec]) == {
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f1.txt", target_name="demo"), origin=spec
-        ),
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f2.txt", target_name="demo"), origin=spec
-        ),
+    assert resolve_filesystem_specs(specs_rule_runner, [FilesystemGlobSpec("demo/*.txt")]) == {
+        Address("demo", relative_file_path="f1.txt", target_name="demo"),
+        Address("demo", relative_file_path="f2.txt", target_name="demo"),
     }
 
-    # If a glob and a literal spec both resolve to the same file, the literal spec should be
-    # used as it's more precise.
-    literal_spec = FilesystemLiteralSpec("demo/f1.txt")
-    assert resolve_filesystem_specs(specs_rule_runner, [spec, literal_spec]) == {
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f1.txt", target_name="demo"),
-            origin=literal_spec,
-        ),
-        AddressWithOrigin(
-            Address("demo", relative_file_path="f2.txt", target_name="demo"), origin=spec
-        ),
+    # We should deduplicate between glob and literal specs.
+    assert resolve_filesystem_specs(
+        specs_rule_runner, [FilesystemGlobSpec("demo/*.txt"), FilesystemLiteralSpec("demo/f1.txt")]
+    ) == {
+        Address("demo", relative_file_path="f1.txt", target_name="demo"),
+        Address("demo", relative_file_path="f2.txt", target_name="demo"),
     }
 
 
@@ -603,7 +632,7 @@ def test_filesystem_specs_no_owner(specs_rule_runner: RuleRunner) -> None:
 def test_resolve_addresses_from_specs() -> None:
     """This tests that we correctly handle resolving from both address and filesystem specs."""
     rule_runner = RuleRunner(
-        rules=[QueryRule(AddressesWithOrigins, (Specs,))],
+        rules=[QueryRule(Addresses, (Specs,))],
         target_types=[MockTarget],
     )
     rule_runner.create_file("fs_spec/f.txt")
@@ -612,9 +641,9 @@ def test_resolve_addresses_from_specs() -> None:
     rule_runner.add_to_build_file("address_spec", "target(sources=['f.txt'])")
     no_interaction_specs = ["fs_spec/f.txt", "address_spec:address_spec"]
 
-    # If a generated subtarget's original base target is included via an address spec,
-    # we will still include the generated subtarget for consistency. When we expand Targets
-    # into their base targets this redundancy is removed, but during Address expansion we
+    # If a file target's original BUILD target is included via an address spec,
+    # we will still include the file target for consistency. When we expand Targets
+    # into their BUILD targets this redundancy is removed, but during Address expansion we
     # get literal matches.
     rule_runner.create_files("multiple_files", ["f1.txt", "f2.txt"])
     rule_runner.add_to_build_file("multiple_files", "target(sources=['*.txt'])")
@@ -623,24 +652,12 @@ def test_resolve_addresses_from_specs() -> None:
     specs = SpecsParser(rule_runner.build_root).parse_specs(
         [*no_interaction_specs, *multiple_files_specs]
     )
-    result = rule_runner.request(AddressesWithOrigins, [specs])
+    result = rule_runner.request(Addresses, [specs])
     assert set(result) == {
-        AddressWithOrigin(
-            Address("fs_spec", relative_file_path="f.txt"),
-            origin=FilesystemLiteralSpec("fs_spec/f.txt"),
-        ),
-        AddressWithOrigin(
-            Address("address_spec"),
-            origin=AddressLiteralSpec("address_spec", "address_spec"),
-        ),
-        AddressWithOrigin(
-            Address("multiple_files"),
-            origin=AddressLiteralSpec("multiple_files", "multiple_files"),
-        ),
-        AddressWithOrigin(
-            Address("multiple_files", relative_file_path="f2.txt"),
-            origin=FilesystemLiteralSpec(file="multiple_files/f2.txt"),
-        ),
+        Address("fs_spec", relative_file_path="f.txt"),
+        Address("address_spec"),
+        Address("multiple_files"),
+        Address("multiple_files", relative_file_path="f2.txt"),
     }
 
 
@@ -649,7 +666,7 @@ def test_resolve_addresses_from_specs() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-def test_find_valid_field_sets() -> None:
+def test_find_valid_field_sets(caplog) -> None:
     class FortranSources(Sources):
         pass
 
@@ -679,90 +696,195 @@ def test_find_valid_field_sets() -> None:
 
     rule_runner = RuleRunner(
         rules=[
-            QueryRule(TargetRootsToFieldSets, (TargetRootsToFieldSetsRequest, TargetsWithOrigins)),
+            QueryRule(TargetRootsToFieldSets, [TargetRootsToFieldSetsRequest, Specs]),
             UnionRule(FieldSetSuperclass, FieldSetSubclass1),
             UnionRule(FieldSetSuperclass, FieldSetSubclass2),
         ],
         target_types=[FortranTarget, InvalidTarget],
     )
 
-    origin = FilesystemLiteralSpec("f.txt")
-    valid_tgt = FortranTarget({}, address=Address("", target_name=":valid"))
-    valid_tgt_with_origin = TargetWithOrigin(valid_tgt, origin)
-    invalid_tgt = InvalidTarget({}, address=Address("", target_name=":invalid"))
-    invalid_tgt_with_origin = TargetWithOrigin(invalid_tgt, origin)
+    rule_runner.add_to_build_file(
+        "",
+        dedent(
+            """\
+            fortran_target(name="valid")
+            fortran_target(name="valid2")
+            invalid_target(name="invalid")
+            """
+        ),
+    )
+    valid_tgt = FortranTarget({}, address=Address("", target_name="valid"))
+    valid_spec = AddressLiteralSpec("", "valid")
+    invalid_spec = AddressLiteralSpec("", "invalid")
 
     def find_valid_field_sets(
         superclass: Type,
-        targets_with_origins: Iterable[TargetWithOrigin],
+        address_specs: Iterable[AddressLiteralSpec],
         *,
-        error_if_no_applicable_targets: bool = False,
+        no_applicable_behavior: NoApplicableTargetsBehavior = NoApplicableTargetsBehavior.ignore,
         expect_single_config: bool = False,
     ) -> TargetRootsToFieldSets:
         request = TargetRootsToFieldSetsRequest(
             superclass,
             goal_description="fake",
-            error_if_no_applicable_targets=error_if_no_applicable_targets,
+            no_applicable_targets_behavior=no_applicable_behavior,
             expect_single_field_set=expect_single_config,
         )
         return rule_runner.request(
             TargetRootsToFieldSets,
-            [request, TargetsWithOrigins(targets_with_origins)],
+            [request, Specs(AddressSpecs(address_specs), FilesystemSpecs([]))],
         )
 
-    valid = find_valid_field_sets(
-        FieldSetSuperclass, [valid_tgt_with_origin, invalid_tgt_with_origin]
-    )
+    valid = find_valid_field_sets(FieldSetSuperclass, [valid_spec, invalid_spec])
     assert valid.targets == (valid_tgt,)
-    assert valid.targets_with_origins == (valid_tgt_with_origin,)
     assert valid.field_sets == (
         FieldSetSubclass1.create(valid_tgt),
         FieldSetSubclass2.create(valid_tgt),
     )
 
     with pytest.raises(ExecutionError) as exc:
-        find_valid_field_sets(
-            FieldSetSuperclass, [valid_tgt_with_origin], expect_single_config=True
-        )
+        find_valid_field_sets(FieldSetSuperclass, [valid_spec], expect_single_config=True)
     assert AmbiguousImplementationsException.__name__ in str(exc.value)
 
     with pytest.raises(ExecutionError) as exc:
         find_valid_field_sets(
             FieldSetSuperclass,
-            [
-                valid_tgt_with_origin,
-                TargetWithOrigin(
-                    FortranTarget({}, address=Address("", target_name=":valid2")), origin
-                ),
-            ],
+            [valid_spec, AddressLiteralSpec("", "valid2")],
             expect_single_config=True,
         )
     assert TooManyTargetsException.__name__ in str(exc.value)
 
-    no_valid_targets = find_valid_field_sets(FieldSetSuperclass, [invalid_tgt_with_origin])
+    no_valid_targets = find_valid_field_sets(FieldSetSuperclass, [invalid_spec])
     assert no_valid_targets.targets == ()
-    assert no_valid_targets.targets_with_origins == ()
     assert no_valid_targets.field_sets == ()
 
     with pytest.raises(ExecutionError) as exc:
         find_valid_field_sets(
-            FieldSetSuperclass, [invalid_tgt_with_origin], error_if_no_applicable_targets=True
+            FieldSetSuperclass,
+            [invalid_spec],
+            no_applicable_behavior=NoApplicableTargetsBehavior.error,
         )
     assert NoApplicableTargetsException.__name__ in str(exc.value)
 
+    caplog.clear()
+    find_valid_field_sets(
+        FieldSetSuperclass,
+        [invalid_spec],
+        no_applicable_behavior=NoApplicableTargetsBehavior.warn,
+    )
+    assert len(caplog.records) == 1
+    assert "No applicable files or targets matched." in caplog.text
+
+
+def test_no_applicable_targets_exception() -> None:
+    # Check that we correctly render the error message.
+    class Tgt1(Target):
+        alias = "tgt1"
+        core_fields = ()
+
+    class Tgt2(Target):
+        alias = "tgt2"
+        core_fields = (Sources,)
+
+    class Tgt3(Target):
+        alias = "tgt3"
+        core_fields = ()
+
+    # No targets/files specified. Because none of the relevant targets have a sources field, we do
+    # not give the filedeps command.
+    exc = NoApplicableTargetsException(
+        [],
+        Specs(AddressSpecs([]), FilesystemSpecs([])),
+        UnionMembership({}),
+        applicable_target_types=[Tgt1],
+        goal_description="the `foo` goal",
+    )
+    remedy = (
+        "Please specify relevant files and/or targets. Run `./pants filter --target-type=tgt1 ::` "
+        "to find all applicable targets in your project."
+    )
+    assert (
+        dedent(
+            f"""\
+            No files or targets specified. The `foo` goal works with these target types:
+
+              * tgt1
+
+            {remedy}"""
+        )
+        in str(exc)
+    )
+
+    invalid_tgt = Tgt3({}, address=Address("blah"))
+    exc = NoApplicableTargetsException(
+        [invalid_tgt],
+        Specs(AddressSpecs([]), FilesystemSpecs([FilesystemLiteralSpec("foo.ext")])),
+        UnionMembership({}),
+        applicable_target_types=[Tgt1, Tgt2],
+        goal_description="the `foo` goal",
+    )
+    remedy = (
+        "Please specify relevant files and/or targets. Run `./pants filter "
+        "--target-type=tgt1,tgt2 ::` to find all applicable targets in your project, or run "
+        "`./pants filter --target-type=tgt1,tgt2 :: | xargs ./pants filedeps` to find all "
+        "applicable files."
+    )
+    assert (
+        dedent(
+            f"""\
+            No applicable files or targets matched. The `foo` goal works with these target types:
+
+              * tgt1
+              * tgt2
+
+            However, you only specified files with these target types:
+
+              * tgt3
+
+            {remedy}"""
+        )
+        in str(exc)
+    )
+
+    # Test handling of `Specs`.
+    exc = NoApplicableTargetsException(
+        [invalid_tgt],
+        Specs(AddressSpecs([AddressLiteralSpec("foo", "bar")]), FilesystemSpecs([])),
+        UnionMembership({}),
+        applicable_target_types=[Tgt1],
+        goal_description="the `foo` goal",
+    )
+    assert "However, you only specified targets with these target types:" in str(exc)
+    exc = NoApplicableTargetsException(
+        [invalid_tgt],
+        Specs(
+            AddressSpecs([AddressLiteralSpec("foo", "bar")]),
+            FilesystemSpecs([FilesystemLiteralSpec("foo.ext")]),
+        ),
+        UnionMembership({}),
+        applicable_target_types=[Tgt1],
+        goal_description="the `foo` goal",
+    )
+    assert "However, you only specified files and targets with these target types:" in str(exc)
+
 
 # -----------------------------------------------------------------------------------------------
-# Test the Sources field, including codegen. Also see `engine/target_test.py`.
+# Test the Sources field. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------
 
 
 @pytest.fixture
 def sources_rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[QueryRule(HydratedSources, (HydrateSourcesRequest,))])
+    return RuleRunner(
+        rules=[
+            QueryRule(HydratedSources, [HydrateSourcesRequest]),
+            QueryRule(SourcesPaths, [SourcesPathsRequest]),
+        ]
+    )
 
 
 def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
-    addr = Address("src/fortran", target_name=":lib")
+    addr = Address("src/fortran", target_name="lib")
     sources_rule_runner.create_files(
         "src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"]
     )
@@ -772,12 +894,16 @@ def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
     )
     assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
-    # Also test that the Filespec is correct. This does not need hydration to be calculated.
+    # Test that `SourcesPaths` works too.
+    sources_paths = sources_rule_runner.request(SourcesPaths, [SourcesPathsRequest(sources)])
+    assert sources_paths.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
+
+    # Also test that the Filespec is correct. This does not need the engine to be calculated.
     assert (
         sources.filespec
         == {
-            "includes": ["src/fortran/*.f03", "src/fortran/f1.f95"],
-            "excludes": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"],
+            "includes": ["src/fortran/f1.f95", "src/fortran/*.f03"],
+            "excludes": ["src/fortran/ignored.f03", "src/fortran/**/ignore*"],
         }
         == hydrated_sources.filespec
     )
@@ -787,7 +913,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
     class SourcesSubclass(Sources):
         pass
 
-    addr = Address("", target_name=":lib")
+    addr = Address("", target_name="lib")
     sources_rule_runner.create_files("", files=["f1.f95"])
 
     valid_sources = SourcesSubclass(["*"], address=addr)
@@ -828,7 +954,7 @@ def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
     # than the normal `all` conjunction.
     sources_rule_runner.create_files("src/fortran", files=["default.f95", "f1.f08", "ignored.f08"])
     sources = DefaultSources(None, address=addr)
-    assert set(sources.sanitized_raw_value or ()) == set(DefaultSources.default)
+    assert set(sources.value or ()) == set(DefaultSources.default)
 
     hydrated_sources = sources_rule_runner.request(
         HydratedSources, [HydrateSourcesRequest(sources)]
@@ -870,7 +996,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
             HydratedSources,
             [
                 HydrateSourcesRequest(
-                    sources_cls(sources, address=Address("", target_name=":example"))
+                    sources_cls(sources, address=Address("", target_name="example"))
                 ),
             ],
         )
@@ -890,6 +1016,11 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         "f2.txt",
         "f3.txt",
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# Test codegen. Also see `engine/target_test.py`.
+# -----------------------------------------------------------------------------------------------
 
 
 class SmalltalkSources(Sources):
@@ -929,97 +1060,100 @@ async def generate_smalltalk_from_avro(
     return GeneratedSources(result)
 
 
-class TestCodegen(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
+@pytest.fixture
+def codegen_rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
             generate_smalltalk_from_avro,
-            QueryRule(UnionMembership, ()),
-            QueryRule(HydratedSources, (HydrateSourcesRequest,)),
-            QueryRule(GeneratedSources, (GenerateSmalltalkFromAvroRequest,)),
+            QueryRule(HydratedSources, [HydrateSourcesRequest]),
+            QueryRule(GeneratedSources, [GenerateSmalltalkFromAvroRequest]),
             UnionRule(GenerateSourcesRequest, GenerateSmalltalkFromAvroRequest),
-        )
+        ],
+        target_types=[AvroLibrary],
+    )
 
-    @classmethod
-    def target_types(cls):
-        return [AvroLibrary]
 
-    def setUp(self) -> None:
-        self.address = Address("src/avro", target_name="lib")
-        self.create_files("src/avro", files=["f.avro"])
-        self.add_to_build_file("src/avro", "avro_library(name='lib', sources=['*.avro'])")
-        self.union_membership = self.request(UnionMembership, [])
+def setup_codegen_protocol_tgt(rule_runner: RuleRunner) -> Address:
+    rule_runner.create_files("src/avro", files=["f.avro"])
+    rule_runner.add_to_build_file("src/avro", "avro_library(name='lib', sources=['*.avro'])")
+    return Address("src/avro", target_name="lib")
 
-    def test_generate_sources(self) -> None:
-        bootstrapper = create_options_bootstrapper()
-        protocol_sources = AvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
 
-        # First, get the original protocol sources.
-        hydrated_protocol_sources = self.request(
-            HydratedSources, [HydrateSourcesRequest(protocol_sources), bootstrapper]
-        )
-        assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
+def test_codegen_generates_sources(codegen_rule_runner: RuleRunner) -> None:
+    addr = setup_codegen_protocol_tgt(codegen_rule_runner)
+    protocol_sources = AvroSources(["*.avro"], address=addr)
+    assert (
+        protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
+        is True
+    )
 
-        # Test directly feeding the protocol sources into the codegen rule.
-        tgt = self.request(WrappedTarget, [self.address, bootstrapper]).target
-        generated_sources = self.request(
-            GeneratedSources,
-            [
-                GenerateSmalltalkFromAvroRequest(hydrated_protocol_sources.snapshot, tgt),
-                bootstrapper,
-            ],
-        )
-        assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
+    # First, get the original protocol sources.
+    hydrated_protocol_sources = codegen_rule_runner.request(
+        HydratedSources, [HydrateSourcesRequest(protocol_sources)]
+    )
+    assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
 
-        # Test that HydrateSourcesRequest can also be used.
-        generated_via_hydrate_sources = self.request(
-            HydratedSources,
-            [
-                HydrateSourcesRequest(
-                    protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
-                ),
-                bootstrapper,
-            ],
-        )
-        assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
-        assert generated_via_hydrate_sources.sources_type == SmalltalkSources
+    # Test directly feeding the protocol sources into the codegen rule.
+    tgt = codegen_rule_runner.get_target(addr)
+    generated_sources = codegen_rule_runner.request(
+        GeneratedSources,
+        [GenerateSmalltalkFromAvroRequest(hydrated_protocol_sources.snapshot, tgt)],
+    )
+    assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
 
-    def test_works_with_subclass_fields(self) -> None:
-        class CustomAvroSources(AvroSources):
-            pass
+    # Test that HydrateSourcesRequest can also be used.
+    generated_via_hydrate_sources = codegen_rule_runner.request(
+        HydratedSources,
+        [
+            HydrateSourcesRequest(
+                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+            )
+        ],
+    )
+    assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
+    assert generated_via_hydrate_sources.sources_type == SmalltalkSources
 
-        protocol_sources = CustomAvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
-        generated = self.request(
-            HydratedSources,
-            [
-                HydrateSourcesRequest(
-                    protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
-                ),
-                create_options_bootstrapper(),
-            ],
-        )
-        assert generated.snapshot.files == ("src/smalltalk/f.st",)
 
-    def test_cannot_generate_language(self) -> None:
-        class AdaSources(Sources):
-            pass
+def test_codegen_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> None:
+    addr = setup_codegen_protocol_tgt(codegen_rule_runner)
 
-        protocol_sources = AvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(AdaSources, self.union_membership) is False
-        generated = self.request(
-            HydratedSources,
-            [
-                HydrateSourcesRequest(
-                    protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
-                ),
-                create_options_bootstrapper(),
-            ],
-        )
-        assert generated.snapshot.files == ()
-        assert generated.sources_type is None
+    class CustomAvroSources(AvroSources):
+        pass
+
+    protocol_sources = CustomAvroSources(["*.avro"], address=addr)
+    assert (
+        protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
+        is True
+    )
+    generated = codegen_rule_runner.request(
+        HydratedSources,
+        [
+            HydrateSourcesRequest(
+                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+            )
+        ],
+    )
+    assert generated.snapshot.files == ("src/smalltalk/f.st",)
+
+
+def test_codegen_cannot_generate_language(codegen_rule_runner: RuleRunner) -> None:
+    addr = setup_codegen_protocol_tgt(codegen_rule_runner)
+
+    class AdaSources(Sources):
+        pass
+
+    protocol_sources = AvroSources(["*.avro"], address=addr)
+    assert protocol_sources.can_generate(AdaSources, codegen_rule_runner.union_membership) is False
+    generated = codegen_rule_runner.request(
+        HydratedSources,
+        [
+            HydrateSourcesRequest(
+                protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
+            )
+        ],
+    )
+    assert generated.snapshot.files == ()
+    assert generated.sources_type is None
 
 
 def test_ambiguous_codegen_implementations_exception() -> None:
@@ -1179,7 +1313,6 @@ def dependencies_rule_runner() -> RuleRunner:
             inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
             QueryRule(Addresses, (DependenciesRequest,)),
-            QueryRule(Addresses, (DependenciesRequestLite,)),
             UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
@@ -1193,11 +1326,9 @@ def assert_dependencies_resolved(
     *,
     requested_address: Address,
     expected: Iterable[Address],
-    lite: bool = False,
 ) -> None:
     target = rule_runner.get_target(requested_address)
-    request_cls = DependenciesRequestLite if lite else DependenciesRequest
-    result = rule_runner.request(Addresses, [request_cls(target[Dependencies])])
+    result = rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
     assert sorted(result) == sorted(expected)
 
 
@@ -1214,24 +1345,11 @@ def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
             Address("src/smalltalk", target_name="sibling"),
         ],
     )
-    assert_dependencies_resolved(
-        dependencies_rule_runner,
-        requested_address=Address("src/smalltalk"),
-        expected=[
-            Address("", target_name="dep1"),
-            Address("", target_name="dep2"),
-            Address("src/smalltalk", target_name="sibling"),
-        ],
-        lite=True,
-    )
 
     # Also test that we handle no dependencies.
     dependencies_rule_runner.add_to_build_file("no_deps", "smalltalk()")
     assert_dependencies_resolved(
         dependencies_rule_runner, requested_address=Address("no_deps"), expected=[]
-    )
-    assert_dependencies_resolved(
-        dependencies_rule_runner, requested_address=Address("no_deps"), expected=[], lite=True
     )
 
     # An ignore should override an include.
@@ -1240,9 +1358,6 @@ def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
     )
     assert_dependencies_resolved(
         dependencies_rule_runner, requested_address=Address("ignore"), expected=[]
-    )
-    assert_dependencies_resolved(
-        dependencies_rule_runner, requested_address=Address("ignore"), expected=[], lite=True
     )
 
 
@@ -1276,15 +1391,6 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
             Address("src/smalltalk/util", relative_file_path="f2.st", target_name="util"),
         ],
     )
-    assert_dependencies_resolved(
-        dependencies_rule_runner,
-        requested_address=Address("src/smalltalk"),
-        expected=[
-            Address("src/smalltalk/util", relative_file_path="f1.st", target_name="util"),
-            Address("src/smalltalk/util", relative_file_path="f2.st", target_name="util"),
-        ],
-        lite=True,
-    )
 
 
 def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
@@ -1313,7 +1419,7 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
     """We test that dependency inference works generally and that we merge it correctly with
     explicitly provided dependencies.
 
-    For consistency, dep inference does not merge generated subtargets with base targets: if both
+    For consistency, dep inference does not merge generated subtargets with BUILD targets: if both
     are inferred, expansion to Targets will remove the redundancy while converting to subtargets.
     """
     dependencies_rule_runner.create_files(
@@ -1422,8 +1528,8 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
 
 
 def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
-    """If the address is a base target, or none of the dependency inference rules can infer
-    dependencies on sibling files, then we should depend on all the base target's subtargets."""
+    """If the address is a BUILD target, or none of the dependency inference rules can infer
+    dependencies on sibling files, then we should depend on all the BUILD target's files."""
     dependencies_rule_runner.create_file("src/smalltalk/f1.st")
     dependencies_rule_runner.create_file("src/smalltalk/f2.st")
     dependencies_rule_runner.add_to_build_file("src/smalltalk", "smalltalk(sources=['*.st'])")
@@ -1437,15 +1543,6 @@ def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
             Address("src/smalltalk", relative_file_path="f2.st"),
         ],
     )
-    assert_dependencies_resolved(
-        dependencies_rule_runner,
-        requested_address=Address("src/smalltalk"),
-        expected=[
-            Address("src/smalltalk", relative_file_path="f1.st"),
-            Address("src/smalltalk", relative_file_path="f2.st"),
-        ],
-        lite=True,
-    )
 
     # Test that a file address depends on its siblings if it has no dependency inference rule,
     # or those inference rules do not claim to infer dependencies on siblings.
@@ -1453,12 +1550,6 @@ def test_depends_on_subtargets(dependencies_rule_runner: RuleRunner) -> None:
         dependencies_rule_runner,
         requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
         expected=[Address("src/smalltalk", relative_file_path="f2.st")],
-    )
-    assert_dependencies_resolved(
-        dependencies_rule_runner,
-        requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
-        expected=[Address("src/smalltalk", relative_file_path="f2.st")],
-        lite=True,
     )
 
     # Now we recreate the files so that the mock dependency inference will have results, which

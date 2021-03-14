@@ -39,7 +39,9 @@ def assert_pants_requirement(
     assert target[PythonRequirementsField].value == (
         Requirement.parse(f"{expected_dist}=={pants_version()}"),
     )
-    assert target[ModuleMappingField].value == FrozenDict({expected_dist: (expected_module,)})
+    actual_value = target[ModuleMappingField].value
+    assert isinstance(actual_value, FrozenDict)
+    assert actual_value.get(expected_dist) == (expected_module,)
 
 
 def test_target_name(rule_runner: RuleRunner) -> None:

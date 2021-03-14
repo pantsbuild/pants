@@ -1,21 +1,23 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import hashlib
 import logging
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union, cast
-from uuid import UUID
+from typing import TYPE_CHECKING, Iterable, Mapping, Tuple
 
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
+from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.internals.uuid import UUIDRequest, UUIDScope
-from pants.engine.platform import Platform, PlatformConstraint
+from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule, side_effecting
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -30,12 +32,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-BASH_SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
-
-
 @dataclass(frozen=True)
 class ProductDescription:
     value: str
+
+
+class ProcessCacheScope(Enum):
+    # Cached in all locations, regardless of success or failure.
+    ALWAYS = "always"
+    # Cached in all locations, but only if the process exits successfully.
+    SUCCESSFUL = "successful"
+    # Cached only in memory (i.e. memoized in pantsd), but never persistently.
+    PER_RESTART = "per_restart"
+    # Never cached anywhere: will run once per Session (i.e. once per run of Pants).
+    NEVER = "never"
 
 
 @frozen_after_init
@@ -45,16 +55,16 @@ class Process:
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest
-    working_directory: Optional[str]
+    working_directory: str | None
     env: FrozenDict[str, str]
     append_only_caches: FrozenDict[str, str]
     output_files: Tuple[str, ...]
     output_directories: Tuple[str, ...]
-    timeout_seconds: Union[int, float]
-    jdk_home: Optional[str]
+    timeout_seconds: int | float
+    jdk_home: str | None
     is_nailgunnable: bool
-    execution_slot_variable: Optional[str]
-    cache_failures: bool
+    execution_slot_variable: str | None
+    cache_scope: ProcessCacheScope
 
     def __init__(
         self,
@@ -63,16 +73,16 @@ class Process:
         description: str,
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
-        working_directory: Optional[str] = None,
-        env: Optional[Mapping[str, str]] = None,
-        append_only_caches: Optional[Mapping[str, str]] = None,
-        output_files: Optional[Iterable[str]] = None,
-        output_directories: Optional[Iterable[str]] = None,
-        timeout_seconds: Optional[Union[int, float]] = None,
-        jdk_home: Optional[str] = None,
+        working_directory: str | None = None,
+        env: Mapping[str, str] | None = None,
+        append_only_caches: Mapping[str, str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
+        timeout_seconds: int | float | None = None,
+        jdk_home: str | None = None,
         is_nailgunnable: bool = False,
-        execution_slot_variable: Optional[str] = None,
-        cache_failures: bool = False,
+        execution_slot_variable: str | None = None,
+        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -97,6 +107,8 @@ class Process:
             result = await Get(ProcessResult, Process(["/bin/echo", "hello world"], description="demo"))
             assert result.stdout == b"hello world"
         """
+        if isinstance(argv, str):
+            raise ValueError("argv must be a sequence of strings, but was a single string.")
         self.argv = tuple(argv)
         self.description = description
         self.level = level
@@ -111,42 +123,32 @@ class Process:
         self.jdk_home = jdk_home
         self.is_nailgunnable = is_nailgunnable
         self.execution_slot_variable = execution_slot_variable
-        self.cache_failures = cache_failures
+        self.cache_scope = cache_scope
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class MultiPlatformProcess:
-    # args collects a set of tuples representing platform constraints mapped to a req,
-    # just like a dict constructor can.
-    platform_constraints: Tuple[str, ...]
+    platform_constraints: tuple[str | None, ...]
     processes: Tuple[Process, ...]
 
-    def __init__(
-        self,
-        request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], Process],
-    ) -> None:
+    def __init__(self, request_dict: dict[Platform | None, Process]) -> None:
         if len(request_dict) == 0:
-            raise ValueError("At least one platform constrained Process must be passed.")
-        validated_constraints = tuple(
-            constraint.value
-            for pair in request_dict.keys()
-            for constraint in pair
-            if PlatformConstraint(constraint.value)
+            raise ValueError("At least one platform-constrained Process must be passed.")
+        serialized_constraints = tuple(
+            constraint.value if constraint else None for constraint in request_dict
         )
-        if len({req.description for req in request_dict.values()}) != 1:
+        if len([req.description for req in request_dict.values()]) != 1:
             raise ValueError(
-                f"The `description` of all processes in a {MultiPlatformProcess.__name__} must be identical."
+                f"The `description` of all processes in a {MultiPlatformProcess.__name__} must "
+                f"be identical, but got: {list(request_dict.values())}."
             )
 
-        self.platform_constraints = validated_constraints
+        self.platform_constraints = serialized_constraints
         self.processes = tuple(request_dict.values())
 
     @property
     def product_description(self) -> ProductDescription:
-        # we can safely extract the first description because we guarantee that at
-        # least one request exists and that all of their descriptions are the same
-        # in __new__
         return ProductDescription(self.processes[0].description)
 
 
@@ -159,7 +161,9 @@ class ProcessResult:
     """
 
     stdout: bytes
+    stdout_digest: FileDigest
     stderr: bytes
+    stderr_digest: FileDigest
     output_digest: Digest
 
 
@@ -171,7 +175,9 @@ class FallibleProcessResult:
     """
 
     stdout: bytes
+    stdout_digest: FileDigest
     stderr: bytes
+    stderr_digest: FileDigest
     exit_code: int
     output_digest: Digest
 
@@ -181,7 +187,9 @@ class FallibleProcessResultWithPlatform:
     """Result of executing a process which might fail, along with the platform it ran on."""
 
     stdout: bytes
+    stdout_digest: FileDigest
     stderr: bytes
+    stderr_digest: FileDigest
     exit_code: int
     output_digest: Digest
     platform: Platform
@@ -223,7 +231,7 @@ def get_multi_platform_request_description(req: MultiPlatformProcess) -> Product
 @rule
 def upcast_process(req: Process) -> MultiPlatformProcess:
     """This rule allows an Process to be run as a platform compatible MultiPlatformProcess."""
-    return MultiPlatformProcess({(PlatformConstraint.none, PlatformConstraint.none): req})
+    return MultiPlatformProcess({None: req})
 
 
 @rule
@@ -234,9 +242,11 @@ def fallible_to_exec_result_or_raise(
 
     if fallible_result.exit_code == 0:
         return ProcessResult(
-            fallible_result.stdout,
-            fallible_result.stderr,
-            fallible_result.output_digest,
+            stdout=fallible_result.stdout,
+            stdout_digest=fallible_result.stdout_digest,
+            stderr=fallible_result.stderr,
+            stderr_digest=fallible_result.stderr_digest,
+            output_digest=fallible_result.output_digest,
         )
     raise ProcessExecutionFailure(
         fallible_result.exit_code,
@@ -251,7 +261,9 @@ def remove_platform_information(res: FallibleProcessResultWithPlatform) -> Falli
     return FallibleProcessResult(
         exit_code=res.exit_code,
         stdout=res.stdout,
+        stdout_digest=res.stdout_digest,
         stderr=res.stderr,
+        stderr_digest=res.stderr_digest,
         output_digest=res.output_digest,
     )
 
@@ -268,17 +280,16 @@ class InteractiveProcess:
     env: FrozenDict[str, str]
     input_digest: Digest
     run_in_workspace: bool
-    hermetic_env: bool
     forward_signals_to_process: bool
 
     def __init__(
         self,
         argv: Iterable[str],
         *,
-        env: Optional[Mapping[str, str]] = None,
+        env: Mapping[str, str] | None = None,
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
-        hermetic_env: bool = True,
+        hermetic_env: bool | None = None,
         forward_signals_to_process: bool = True,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
@@ -296,8 +307,16 @@ class InteractiveProcess:
         self.env = FrozenDict(env or {})
         self.input_digest = input_digest
         self.run_in_workspace = run_in_workspace
-        self.hermetic_env = hermetic_env
         self.forward_signals_to_process = forward_signals_to_process
+
+        deprecated_conditional(
+            predicate=lambda: hermetic_env is not None,
+            removal_version="2.5.0.dev0",
+            entity_description="The hermetic_env flag",
+            hint_message=(
+                "@rules should request and pass either a CompleteEnvironment or Environment as the `env`."
+            ),
+        )
         self.__post_init__()
 
     def __post_init__(self):
@@ -309,8 +328,12 @@ class InteractiveProcess:
 
     @classmethod
     def from_process(
-        cls, process: Process, *, hermetic_env: bool = True, forward_signals_to_process: bool = True
-    ) -> "InteractiveProcess":
+        cls,
+        process: Process,
+        *,
+        hermetic_env: bool | None = None,
+        forward_signals_to_process: bool = True,
+    ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
@@ -344,6 +367,10 @@ class BinaryPathTest:
         self.fingerprint_stdout = fingerprint_stdout
 
 
+class SearchPath(DeduplicatedCollection[str]):
+    """The search path for binaries; i.e.: the $PATH."""
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathRequest:
@@ -358,18 +385,18 @@ class BinaryPathRequest:
     path.
     """
 
-    search_path: Tuple[str, ...]
+    search_path: SearchPath
     binary_name: str
-    test: Optional[BinaryPathTest]
+    test: BinaryPathTest | None
 
     def __init__(
         self,
         *,
         search_path: Iterable[str],
         binary_name: str,
-        test: Optional[BinaryPathTest] = None,
+        test: BinaryPathTest | None = None,
     ) -> None:
-        self.search_path = tuple(OrderedSet(search_path))
+        self.search_path = SearchPath(search_path)
         self.binary_name = binary_name
         self.test = test
 
@@ -380,19 +407,19 @@ class BinaryPath:
     path: str
     fingerprint: str
 
-    def __init__(self, path: str, fingerprint: Optional[str] = None) -> None:
+    def __init__(self, path: str, fingerprint: str | None = None) -> None:
         self.path = path
         self.fingerprint = self._fingerprint() if fingerprint is None else fingerprint
 
     @staticmethod
-    def _fingerprint(content: Optional[Union[bytes, bytearray, memoryview]] = None) -> str:
+    def _fingerprint(content: bytes | bytearray | memoryview | None = None) -> str:
         hasher = hashlib.sha256() if content is None else hashlib.sha256(content)
         return hasher.hexdigest()
 
     @classmethod
     def fingerprinted(
-        cls, path: str, representative_content: Union[bytes, bytearray, memoryview]
-    ) -> "BinaryPath":
+        cls, path: str, representative_content: bytes | bytearray | memoryview
+    ) -> BinaryPath:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 
@@ -402,7 +429,7 @@ class BinaryPaths(EngineAwareReturnType):
     binary_name: str
     paths: Tuple[BinaryPath, ...]
 
-    def __init__(self, binary_name: str, paths: Optional[Iterable[BinaryPath]] = None):
+    def __init__(self, binary_name: str, paths: Iterable[BinaryPath] | None = None):
         self.binary_name = binary_name
         self.paths = tuple(OrderedSet(paths) if paths else ())
 
@@ -415,46 +442,9 @@ class BinaryPaths(EngineAwareReturnType):
         return found_msg
 
     @property
-    def first_path(self) -> Optional[BinaryPath]:
+    def first_path(self) -> BinaryPath | None:
         """Return the first path to the binary that was discovered, if any."""
         return next(iter(self.paths), None)
-
-
-class ProcessScope(Enum):
-    PER_CALL = UUIDScope.PER_CALL
-    PER_SESSION = UUIDScope.PER_SESSION
-
-
-@dataclass(frozen=True)
-class UncacheableProcess:
-    """Ensures the wrapped Process will be run once per scope and its results never re-used.
-
-    By default the scope is PER_CALL which ensures the Process is re-run on every call.
-    """
-
-    process: Process
-    scope: ProcessScope = ProcessScope.PER_CALL
-
-
-@rule
-async def make_process_uncacheable(uncacheable_process: UncacheableProcess) -> Process:
-    uuid = await Get(
-        UUID, UUIDRequest, UUIDRequest.scoped(cast(UUIDScope, uncacheable_process.scope.value))
-    )
-
-    process = uncacheable_process.process
-    env = dict(process.env)
-
-    # This is a slightly hacky way to force the process to run: since the env var
-    #  value is unique, this input combination will never have been seen before,
-    #  and therefore never cached. The two downsides are:
-    #  1. This leaks into the process' environment, albeit with a funky var name that is
-    #     unlikely to cause problems in practice.
-    #  2. This run will be cached even though it can never be re-used.
-    # TODO: A more principled way of forcing rules to run?
-    env["__PANTS_FORCE_PROCESS_RUN__"] = str(uuid)
-
-    return dataclasses.replace(process, env=FrozenDict(env))
 
 
 class BinaryNotFoundError(EnvironmentError):
@@ -462,8 +452,8 @@ class BinaryNotFoundError(EnvironmentError):
         self,
         request: BinaryPathRequest,
         *,
-        rationale: Optional[str] = None,
-        alternative_solution: Optional[str] = None,
+        rationale: str | None = None,
+        alternative_solution: str | None = None,
     ) -> None:
         """When no binary is found via `BinaryPaths`, and it is not recoverable.
 
@@ -483,7 +473,39 @@ class BinaryNotFoundError(EnvironmentError):
         super().__init__(msg)
 
 
-@rule(desc="Find binary path", level=LogLevel.DEBUG)
+class BashBinary(BinaryPath):
+    """The `bash` binary."""
+
+    DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
+
+
+@dataclass(frozen=True)
+class BashBinaryRequest:
+    rationale: str
+    search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
+
+
+@rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
+async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
+    request = BinaryPathRequest(
+        binary_name="bash",
+        search_path=bash_request.search_path,
+        test=BinaryPathTest(args=["--version"]),
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path
+    if not first_path:
+        raise BinaryNotFoundError(request, rationale=bash_request.rationale)
+    return BashBinary(first_path.path, first_path.fingerprint)
+
+
+@rule
+async def get_bash() -> BashBinary:
+    # Expose bash to external consumers.
+    return await Get(BashBinary, BashBinaryRequest(rationale="execute bash scripts"))
+
+
+@rule
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
     # our shebang. This avoids mixing locations that we would search for bash into the search paths
@@ -493,11 +515,10 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     if request.binary_name == "bash":
         shebang = "#!/usr/bin/env bash"
     else:
-        bash_request = BinaryPathRequest(binary_name="bash", search_path=BASH_SEARCH_PATHS)
-        bash_paths = await Get(BinaryPaths, BinaryPathRequest, bash_request)
-        if not bash_paths.first_path:
-            raise BinaryNotFoundError(bash_request, rationale="use it to locate other executables")
-        shebang = f"#!{bash_paths.first_path.path}"
+        bash = await Get(
+            BashBinary, BashBinaryRequest(rationale="use it to locate other executables")
+        )
+        shebang = f"#!{bash.path}"
 
     # Note: the backslash after the """ marker ensures that the shebang is at the start of the
     # script file. Many OSs will not see the shebang if there is intervening whitespace.
@@ -526,16 +547,14 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         # We use a volatile process to force re-run since any binary found on the host system today
         # could be gone tomorrow. Ideally we'd only do this for local processes since all known
         # remoting configurations include a static container image as part of their cache key which
-        # automatically avoids this problem.
-        UncacheableProcess(
-            Process(
-                description=f"Searching for `{request.binary_name}` on PATH={search_path}",
-                level=LogLevel.DEBUG,
-                input_digest=script_digest,
-                argv=[script_path, request.binary_name],
-                env={"PATH": search_path},
-            ),
-            scope=ProcessScope.PER_SESSION,
+        # automatically avoids this problem. See #10769 for a solution that is less of a tradeoff.
+        Process(
+            description=f"Searching for `{request.binary_name}` on PATH={search_path}",
+            level=LogLevel.DEBUG,
+            input_digest=script_digest,
+            argv=[script_path, request.binary_name],
+            env={"PATH": search_path},
+            cache_scope=ProcessCacheScope.PER_RESTART,
         ),
     )
 
@@ -547,13 +566,11 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     results = await MultiGet(
         Get(
             FallibleProcessResult,
-            UncacheableProcess(
-                Process(
-                    description=f"Test binary {path}.",
-                    level=LogLevel.DEBUG,
-                    argv=[path, *request.test.args],
-                ),
-                scope=ProcessScope.PER_SESSION,
+            Process(
+                description=f"Test binary {path}.",
+                level=LogLevel.DEBUG,
+                argv=[path, *request.test.args],
+                cache_scope=ProcessCacheScope.PER_RESTART,
             ),
         )
         for path in found_paths

@@ -10,7 +10,9 @@ use std::{fmt, hash};
 
 use crate::externs;
 
-use cpython::{FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, Python, ToPyObject};
+use cpython::{
+  FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, PyType, Python, ToPyObject,
+};
 use smallvec::SmallVec;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
@@ -82,7 +84,7 @@ impl<'x> Params {
       .binary_search_by(|probe| probe.type_id().cmp(&type_id))
   }
 
-  pub fn type_ids<'a>(&'a self) -> impl Iterator<Item = TypeId> + 'a {
+  pub fn type_ids(&self) -> impl Iterator<Item = TypeId> + '_ {
     self.0.iter().map(|k| *k.type_id())
   }
 }
@@ -112,15 +114,33 @@ impl fmt::Display for Params {
 
 pub type Id = u64;
 
-// The type of a python object (which itself has a type, but which is not represented
-// by a Key, because that would result in a infinitely recursive structure.)
-#[repr(C)]
+///
+/// A pointer to an underlying PyTypeObject instance.
+///
+/// NB: This is a void pointer because the `cpython::ffi::PyTypeObject` is not public.
+///
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TypeId(pub Id);
+pub struct TypeId(*mut std::ffi::c_void);
+
+unsafe impl Send for TypeId {}
+unsafe impl Sync for TypeId {}
 
 impl TypeId {
+  pub fn as_py_type(&self, py: Python) -> PyType {
+    // NB: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
+    // type is not unloaded. That is true today, but would not be if we implemented support for hot
+    // reloading of plugins.
+    unsafe { PyType::from_type_ptr(py, self.0 as _) }
+  }
+
   fn pretty_print(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", externs::type_to_str(self))
+  }
+}
+
+impl From<&PyType> for TypeId {
+  fn from(py_type: &PyType) -> Self {
+    TypeId(py_type.as_type_ptr() as *mut std::ffi::c_void)
   }
 }
 
@@ -148,33 +168,47 @@ impl fmt::Display for TypeId {
   }
 }
 
-// An identifier for a python function.
+/// An identifier for a Python function.
 #[repr(C)]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Function(pub Key);
 
 impl Function {
+  /// A Python function's module, e.g. `project.app`.
+  pub fn module(&self) -> String {
+    let val = externs::val_for(&self.0);
+    externs::getattr_as_string(&val, "__module__")
+  }
+
+  /// A Python function's name, without its module.
   pub fn name(&self) -> String {
-    let Function(key) = self;
-    let val = externs::val_for(&key);
-    let module = externs::getattr_as_string(&val, "__module__");
-    let name = externs::getattr_as_string(&val, "__name__");
+    let val = externs::val_for(&self.0);
+    externs::getattr_as_string(&val, "__name__")
+  }
+
+  /// The line number of a Python function's first line.
+  pub fn line_number(&self) -> u64 {
+    let val = externs::val_for(&self.0);
     // NB: this is a custom dunder method that Python code should populate before sending the
     // function (e.g. an `@rule`) through FFI.
-    let line_number: u64 = externs::getattr(&val, "__line_number__").unwrap();
-    format!("{}:{}:{}", module, line_number, name)
+    externs::getattr(&val, "__line_number__").unwrap()
+  }
+
+  /// The function represented as `path.to.module:lineno:func_name`.
+  pub fn full_name(&self) -> String {
+    format!("{}:{}:{}", self.module(), self.line_number(), self.name())
   }
 }
 
 impl fmt::Display for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}()", self.name())
+    write!(f, "{}()", self.full_name())
   }
 }
 
 impl fmt::Debug for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}()", self.name())
+    write!(f, "{}()", self.full_name())
   }
 }
 
@@ -246,14 +280,6 @@ impl Value {
       Ok(handle) => handle,
       Err(arc_handle) => arc_handle.clone_ref(py),
     }
-  }
-
-  pub fn new_from_arc(handle: Arc<PyObject>) -> Value {
-    Value(handle)
-  }
-
-  pub fn consume_into_arc(self) -> Arc<PyObject> {
-    self.0
   }
 }
 

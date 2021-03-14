@@ -66,7 +66,7 @@ def run_isort(
         args.append(f"--isort-args='{passthrough_args}'")
     if skip:
         args.append("--isort-skip")
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     field_sets = [IsortFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [IsortRequest(field_sets)])
     input_sources = rule_runner.request(

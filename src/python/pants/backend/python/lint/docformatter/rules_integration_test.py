@@ -53,7 +53,7 @@ def run_docformatter(
         args.append(f"--docformatter-args='{passthrough_args}'")
     if skip:
         args.append("--docformatter-skip")
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     field_sets = [DocformatterFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [DocformatterRequest(field_sets)])
     input_sources = rule_runner.request(

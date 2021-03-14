@@ -1,11 +1,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union, cast
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, Tuple
 
 from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
@@ -102,8 +104,11 @@ class SiblingAddresses(AddressGlobSpec):
 
 
 @dataclass(frozen=True)
-class DescendantAddresses(AddressGlobSpec):
-    """An AddressSpec representing all addresses located recursively under the given directory."""
+class MaybeEmptyDescendantAddresses(AddressGlobSpec):
+    """An AddressSpec representing all addresses located recursively under the given directory.
+
+    It is not an error if there are no such addresses.
+    """
 
     directory: str
 
@@ -121,6 +126,13 @@ class DescendantAddresses(AddressGlobSpec):
             for ns, af in address_families_dict.items()
             if fast_relpath_optional(ns, self.directory) is not None
         )
+
+
+class DescendantAddresses(MaybeEmptyDescendantAddresses):
+    """An AddressSpec representing all addresses located recursively under the given directory.
+
+    At least one such address must exist.
+    """
 
     def matching_addresses(
         self, address_families: Sequence["AddressFamily"]
@@ -190,21 +202,6 @@ class AddressSpecs:
     def specs(self) -> Tuple[AddressSpec, ...]:
         return (*self.literals, *self.globs)
 
-    @staticmethod
-    def more_specific(spec1: Optional[AddressSpec], spec2: Optional[AddressSpec]) -> AddressSpec:
-        # Note that if either of spec1 or spec2 is None, the other will be returned.
-        if spec1 is None and spec2 is None:
-            raise ValueError("Internal error: both specs provided to more_specific() were None")
-        _specificity = {
-            AddressLiteralSpec: 0,
-            SiblingAddresses: 1,
-            AscendantAddresses: 2,
-            DescendantAddresses: 3,
-            type(None): 99,
-        }
-        result = spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
-        return cast(AddressSpec, result)
-
     def to_path_globs(
         self, *, build_patterns: Iterable[str], build_ignore_patterns: Iterable[str]
     ) -> PathGlobs:
@@ -259,8 +256,8 @@ class FilesystemIgnoreSpec(FilesystemSpec):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class FilesystemSpecs:
-    includes: Tuple[Union[FilesystemLiteralSpec, FilesystemGlobSpec], ...]
-    ignores: Tuple[FilesystemIgnoreSpec, ...]
+    includes: tuple[FilesystemLiteralSpec | FilesystemGlobSpec, ...]
+    ignores: tuple[FilesystemIgnoreSpec, ...]
 
     def __init__(self, specs: Iterable[FilesystemSpec]) -> None:
         includes = []
@@ -280,21 +277,6 @@ class FilesystemSpecs:
         return (*self.includes, *self.ignores)
 
     @staticmethod
-    def more_specific(
-        spec1: Optional[FilesystemSpec], spec2: Optional[FilesystemSpec]
-    ) -> FilesystemSpec:
-        # Note that if either of spec1 or spec2 is None, the other will be returned.
-        if spec1 is None and spec2 is None:
-            raise ValueError("Internal error: both specs provided to more_specific() were None")
-        _specificity = {
-            FilesystemLiteralSpec: 0,
-            FilesystemGlobSpec: 1,
-            type(None): 99,
-        }
-        result = spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
-        return cast(FilesystemSpec, result)
-
-    @staticmethod
     def _generate_path_globs(
         specs: Iterable[FilesystemSpec], glob_match_error_behavior: GlobMatchErrorBehavior
     ) -> PathGlobs:
@@ -312,7 +294,7 @@ class FilesystemSpecs:
 
     def path_globs_for_spec(
         self,
-        spec: Union[FilesystemLiteralSpec, FilesystemGlobSpec],
+        spec: FilesystemLiteralSpec | FilesystemGlobSpec,
         glob_match_error_behavior: GlobMatchErrorBehavior,
     ) -> PathGlobs:
         """Generate PathGlobs for the specific spec, automatically including the instance's
@@ -336,3 +318,7 @@ class Specs:
     def provided(self) -> bool:
         """Did the user provide specs?"""
         return bool(self.address_specs) or bool(self.filesystem_specs)
+
+    @classmethod
+    def empty(cls) -> Specs:
+        return Specs(AddressSpecs([], filter_by_global_options=True), FilesystemSpecs([]))

@@ -56,7 +56,7 @@ class StoreGCService(PantsService):
     def _maybe_garbage_collect(self):
         if time.time() < self._next_gc:
             return
-        self._logger.info("Garbage collecting store")
+        self._logger.info(f"Garbage collecting store. target_size={self._target_size_bytes:,}")
         self._scheduler_session.garbage_collect_store(self._target_size_bytes)
         self._logger.info("Done garbage collecting store")
         self._set_next_gc()
@@ -67,10 +67,14 @@ class StoreGCService(PantsService):
         Called via Thread.start() via PantsDaemon.run().
         """
         while not self._state.is_terminating:
-            self._maybe_garbage_collect()
-            self._maybe_extend_lease()
-            # Waiting with a timeout in maybe_pause has the effect of waiting until:
-            # 1) we are paused and then resumed
-            # 2) we are terminated (which will break the loop)
-            # 3) the timeout is reached, which will cause us to wake up and check gc/leases
-            self._state.maybe_pause(timeout=self._period_secs)
+            try:
+                self._maybe_garbage_collect()
+                self._maybe_extend_lease()
+                # Waiting with a timeout in maybe_pause has the effect of waiting until:
+                # 1) we are paused and then resumed
+                # 2) we are terminated (which will break the loop)
+                # 3) the timeout is reached, which will cause us to wake up and check gc/leases
+                self._state.maybe_pause(timeout=self._period_secs)
+            except Exception as e:
+                self._logger.critical(f"GC failed: {e!r}")
+                self.terminate()

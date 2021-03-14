@@ -7,7 +7,8 @@ from contextlib import contextmanager
 import pytest
 
 from pants.base.build_environment import get_pants_cachedir
-from pants.python.python_setup import PythonSetup
+from pants.engine.environment import Environment
+from pants.python.python_setup import PythonSetup, get_pyenv_root
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir_for
@@ -49,8 +50,7 @@ def fake_pyenv_root(fake_versions, fake_local_version):
 
 
 def test_get_environment_paths() -> None:
-    with environment_as(PATH="foo/bar:baz:/qux/quux"):
-        paths = PythonSetup.get_environment_paths()
+    paths = PythonSetup.get_environment_paths(Environment({"PATH": "foo/bar:baz:/qux/quux"}))
     assert ["foo/bar", "baz", "/qux/quux"] == paths
 
 
@@ -65,6 +65,16 @@ def rule_runner() -> RuleRunner:
     return RuleRunner()
 
 
+def test_get_pyenv_root() -> None:
+    home = "/♡"
+    default_root = f"{home}/.cache"
+    explicit_root = f"{home}/explicit"
+
+    assert explicit_root == get_pyenv_root(Environment({"PYENV_ROOT": explicit_root}))
+    assert default_root == get_pyenv_root(Environment({"HOME": home}))
+    assert get_pyenv_root(Environment({})) is None
+
+
 def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
     local_pyenv_version = "3.5.5"
     all_pyenv_versions = ["2.7.14", local_pyenv_version]
@@ -74,9 +84,9 @@ def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
         expected_paths,
         expected_local_paths,
     ):
-        paths = PythonSetup.get_pyenv_paths(pyenv_root_func=lambda: pyenv_root)
+        paths = PythonSetup.get_pyenv_paths(Environment({"PYENV_ROOT": pyenv_root}))
         local_paths = PythonSetup.get_pyenv_paths(
-            pyenv_root_func=lambda: pyenv_root, pyenv_local=True
+            Environment({"PYENV_ROOT": pyenv_root}), pyenv_local=True
         )
     assert expected_paths == paths
     assert expected_local_paths == local_paths
@@ -86,26 +96,27 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
     local_pyenv_version = "3.5.5"
     all_pyenv_versions = ["2.7.14", local_pyenv_version]
     rule_runner.create_file(".python-version", local_pyenv_version + "\n")
-    with environment_as(PATH="/env/path1:/env/path2"):
-        with setup_pexrc_with_pex_python_path(["/pexrc/path1:/pexrc/path2"]):
-            with fake_pyenv_root(all_pyenv_versions, local_pyenv_version) as (
-                pyenv_root,
-                expected_pyenv_paths,
-                expected_pyenv_local_paths,
-            ):
-                paths = [
-                    "/foo",
-                    "<PATH>",
-                    "/bar",
-                    "<PEXRC>",
-                    "/baz",
-                    "<PYENV>",
-                    "<PYENV_LOCAL>",
-                    "/qux",
-                ]
-                expanded_paths = PythonSetup.expand_interpreter_search_paths(
-                    paths, pyenv_root_func=lambda: pyenv_root
-                )
+    with setup_pexrc_with_pex_python_path(["/pexrc/path1:/pexrc/path2"]):
+        with fake_pyenv_root(all_pyenv_versions, local_pyenv_version) as (
+            pyenv_root,
+            expected_pyenv_paths,
+            expected_pyenv_local_paths,
+        ):
+            paths = [
+                "/foo",
+                "<PATH>",
+                "/bar",
+                "<PEXRC>",
+                "/baz",
+                "<PYENV>",
+                "<PYENV_LOCAL>",
+                "/qux",
+            ]
+            env = Environment({"PATH": "/env/path1:/env/path2", "PYENV_ROOT": pyenv_root})
+            expanded_paths = PythonSetup.expand_interpreter_search_paths(
+                paths,
+                env,
+            )
 
     expected = [
         "/foo",

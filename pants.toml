@@ -1,18 +1,33 @@
 [GLOBAL]
 print_stacktrace = true
 
-pants_distdir_legacy_paths = false
-
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
+  "pants.backend.awslambda.python",
   "pants.backend.python",
+  "pants.backend.codegen.protobuf.python",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "pants.backend.python.typecheck.mypy",
+  "pants.backend.python.mixed_interpreter_constraints",
   "internal_plugins.releases",
+  "toolchain.pants.auth",
+  "toolchain.pants.buildsense",
+  "toolchain.pants.common",
+]
+
+plugins = [
+  "hdrhistogram",  # For use with `--stats-log`.
+  # TODO: Remove the relevant `ignore_pants_warning` entry when this is bumped.
+  "toolchain.pants.plugin==0.7.0",
+]
+
+ignore_pants_warnings = [
+  # TODO: Remove when `toolchain.pants.plugin` is bumped past `0.7.0`.
+  "DeprecationWarning: DEPRECATED: pants.core.util_rules.pants_environment",
 ]
 
 build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
@@ -29,10 +44,7 @@ pantsd_invalidation_globs.add = [
 # Path patterns to ignore for filesystem operations on top of the builtin patterns.
 pants_ignore.add = [
   # venv directories under build-support.
-  "/build-support/virtualenvs/",
   "/build-support/*.venv/",
-  # An absolute symlink to the Pants Rust toolchain sources.
-  "/build-support/bin/native/src",
   # We shouldn't walk or watch the rust compiler artifacts because it is slow.
   "/src/rust/engine/target",
   # We want to .gitignore Java .class files, but pants should pay attention to them.
@@ -55,6 +67,7 @@ root_patterns = [
 [python-setup]
 requirement_constraints = "3rdparty/python/constraints.txt"
 resolve_all_constraints = "nondeployables"
+interpreter_constraints = [">=3.7,<3.9"]
 
 [black]
 config = "pyproject.toml"
@@ -71,11 +84,11 @@ extra_requirements.add = [
 
 [isort]
 version = "isort[pyproject,colors]>=5.5.1,<5.6"
-config = ["pyproject.toml", "examples/.isort.cfg"]
+config = ["pyproject.toml"]
 
 [mypy]
 config = "build-support/mypy/mypy.ini"
-source_plugins = ["pants-plugins/mypy_plugins:total_ordering"]
+source_plugins = ["pants-plugins/mypy_plugins"]
 
 [pants-releases]
 release_notes = """
@@ -113,6 +126,10 @@ release_notes = """
   '1.29.x': 'src/python/pants/notes/1.29.x.rst',
   '1.30.x': 'src/python/pants/notes/1.30.x.rst',
   '2.0.x': 'src/python/pants/notes/2.0.x.rst',
+  '2.1.x': 'src/python/pants/notes/2.1.x.rst',
+  '2.2.x': 'src/python/pants/notes/2.2.x.md',
+  '2.3.x': 'src/python/pants/notes/2.3.x.md',
+  '2.4.x': 'src/python/pants/notes/2.4.x.md',
 }
 """
 
@@ -125,5 +142,23 @@ pytest_plugins.add = [
 ]
 timeout_default = 60
 
+[test]
+extra_env_vars = [
+  # TODO: These are exposed to tests in order to allow for python interpreter discovery when
+  # Pants-tests-Pants: in particular, the [python-setup] subsystem consumes them.
+  #   see https://github.com/pantsbuild/pants/issues/11638
+  "PYENV_ROOT",
+  "HOME",
+  "PATH",
+  # We'd always like complete backtraces in tests.
+  "RUST_BACKTRACE=1",
+]
+
+[coverage-py]
+interpreter_constraints = [">=3.7,<3.9"]
+
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
+
+[toolchain-setup]
+repo = "pants"

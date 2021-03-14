@@ -9,7 +9,6 @@ from typing import List, Optional, Tuple, Type
 
 import pytest
 
-from pants.base.specs import AddressLiteralSpec
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -29,18 +28,25 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.addresses import Address
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    EMPTY_FILE_DIGEST,
+    CreateDigest,
+    Digest,
+    FileContent,
+    MergeDigests,
+    Workspace,
+)
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Sources,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
-    TargetWithOrigin,
 )
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockConsole, MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 
 
@@ -71,7 +77,9 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
         return EnrichedTestResult(
             exit_code=self.exit_code(self.address),
             stdout="",
+            stdout_digest=EMPTY_FILE_DIGEST,
             stderr="",
+            stderr_digest=EMPTY_FILE_DIGEST,
             address=self.address,
             coverage_data=MockCoverageData(self.address),
             output_setting=ShowOutput.ALL,
@@ -95,27 +103,23 @@ def rule_runner() -> RuleRunner:
     return RuleRunner()
 
 
-def make_target_with_origin(address: Optional[Address] = None) -> TargetWithOrigin:
+def make_target(address: Optional[Address] = None) -> Target:
     if address is None:
         address = Address("", target_name="tests")
-    return TargetWithOrigin(
-        MockTarget({}, address=address),
-        origin=AddressLiteralSpec(address.spec_path, address.target_name),
-    )
+    return MockTarget({}, address=address)
 
 
 def run_test_rule(
     rule_runner: RuleRunner,
     *,
     field_set: Type[TestFieldSet],
-    targets: List[TargetWithOrigin],
+    targets: List[Target],
     debug: bool = False,
     use_coverage: bool = False,
     output: ShowOutput = ShowOutput.ALL,
     include_sources: bool = True,
     valid_targets: bool = True,
 ) -> Tuple[int, str]:
-    console = MockConsole(use_colors=False)
     test_subsystem = create_goal_subsystem(
         TestSubsystem,
         debug=debug,
@@ -134,12 +138,7 @@ def run_test_rule(
     ) -> TargetRootsToFieldSets:
         if not valid_targets:
             return TargetRootsToFieldSets({})
-        return TargetRootsToFieldSets(
-            {
-                tgt_with_origin: [field_set.create(tgt_with_origin.target)]
-                for tgt_with_origin in targets
-            }
-        )
+        return TargetRootsToFieldSets({tgt: [field_set.create(tgt)] for tgt in targets})
 
     def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
         digest = rule_runner.request(
@@ -157,64 +156,67 @@ def run_test_rule(
         console_report = ConsoleCoverageReport(f"Ran coverage on {addresses}")
         return CoverageReports(reports=(console_report,))
 
-    result: Test = run_rule_with_mocks(
-        run_tests,
-        rule_args=[
-            console,
-            test_subsystem,
-            interactive_runner,
-            workspace,
-            union_membership,
-        ],
-        mock_gets=[
-            MockGet(
-                output_type=TargetRootsToFieldSets,
-                input_type=TargetRootsToFieldSetsRequest,
-                mock=mock_find_valid_field_sets,
-            ),
-            MockGet(
-                output_type=EnrichedTestResult,
-                input_type=TestFieldSet,
-                mock=lambda fs: fs.test_result,
-            ),
-            MockGet(
-                output_type=TestDebugRequest,
-                input_type=TestFieldSet,
-                mock=mock_debug_request,
-            ),
-            MockGet(
-                output_type=FieldSetsWithSources,
-                input_type=FieldSetsWithSourcesRequest,
-                mock=lambda field_sets: FieldSetsWithSources(field_sets if include_sources else ()),
-            ),
-            # Merge XML results.
-            MockGet(
-                output_type=Digest,
-                input_type=MergeDigests,
-                mock=lambda _: EMPTY_DIGEST,
-            ),
-            MockGet(
-                output_type=CoverageReports,
-                input_type=CoverageDataCollection,
-                mock=mock_coverage_report_generation,
-            ),
-            MockGet(
-                output_type=OpenFiles,
-                input_type=OpenFilesRequest,
-                mock=lambda _: OpenFiles(()),
-            ),
-        ],
-        union_membership=union_membership,
-    )
-    assert not console.stdout.getvalue()
-    return result.exit_code, console.stderr.getvalue()
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
+        result: Test = run_rule_with_mocks(
+            run_tests,
+            rule_args=[
+                console,
+                test_subsystem,
+                interactive_runner,
+                workspace,
+                union_membership,
+            ],
+            mock_gets=[
+                MockGet(
+                    output_type=TargetRootsToFieldSets,
+                    input_type=TargetRootsToFieldSetsRequest,
+                    mock=mock_find_valid_field_sets,
+                ),
+                MockGet(
+                    output_type=EnrichedTestResult,
+                    input_type=TestFieldSet,
+                    mock=lambda fs: fs.test_result,
+                ),
+                MockGet(
+                    output_type=TestDebugRequest,
+                    input_type=TestFieldSet,
+                    mock=mock_debug_request,
+                ),
+                MockGet(
+                    output_type=FieldSetsWithSources,
+                    input_type=FieldSetsWithSourcesRequest,
+                    mock=lambda field_sets: FieldSetsWithSources(
+                        field_sets if include_sources else ()
+                    ),
+                ),
+                # Merge XML results.
+                MockGet(
+                    output_type=Digest,
+                    input_type=MergeDigests,
+                    mock=lambda _: EMPTY_DIGEST,
+                ),
+                MockGet(
+                    output_type=CoverageReports,
+                    input_type=CoverageDataCollection,
+                    mock=mock_coverage_report_generation,
+                ),
+                MockGet(
+                    output_type=OpenFiles,
+                    input_type=OpenFilesRequest,
+                    mock=lambda _: OpenFiles(()),
+                ),
+            ],
+            union_membership=union_membership,
+        )
+        assert not stdio_reader.get_stdout()
+        return result.exit_code, stdio_reader.get_stderr()
 
 
 def test_empty_target_noops(rule_runner: RuleRunner) -> None:
     exit_code, stderr = run_test_rule(
         rule_runner,
         field_set=SuccessfulFieldSet,
-        targets=[make_target_with_origin()],
+        targets=[make_target()],
         include_sources=False,
     )
     assert exit_code == 0
@@ -225,7 +227,7 @@ def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
     exit_code, stderr = run_test_rule(
         rule_runner,
         field_set=SuccessfulFieldSet,
-        targets=[make_target_with_origin()],
+        targets=[make_target()],
         valid_targets=False,
     )
     assert exit_code == 0
@@ -239,7 +241,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
     exit_code, stderr = run_test_rule(
         rule_runner,
         field_set=ConditionallySucceedsFieldSet,
-        targets=[make_target_with_origin(good_address), make_target_with_origin(bad_address)],
+        targets=[make_target(good_address), make_target(bad_address)],
     )
     assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
     assert stderr == dedent(
@@ -255,7 +257,7 @@ def test_debug_target(rule_runner: RuleRunner) -> None:
     exit_code, _ = run_test_rule(
         rule_runner,
         field_set=SuccessfulFieldSet,
-        targets=[make_target_with_origin()],
+        targets=[make_target()],
         debug=True,
     )
     assert exit_code == 0
@@ -267,7 +269,7 @@ def test_coverage(rule_runner: RuleRunner) -> None:
     exit_code, stderr = run_test_rule(
         rule_runner,
         field_set=SuccessfulFieldSet,
-        targets=[make_target_with_origin(addr1), make_target_with_origin(addr2)],
+        targets=[make_target(addr1), make_target(addr2)],
         use_coverage=True,
     )
     assert exit_code == 0
@@ -276,7 +278,12 @@ def test_coverage(rule_runner: RuleRunner) -> None:
 
 def sort_results() -> None:
     create_test_result = partial(
-        EnrichedTestResult, stdout="", stderr="", output_setting=ShowOutput.ALL
+        EnrichedTestResult,
+        stdout="",
+        stdout_digest=EMPTY_FILE_DIGEST,
+        stderr="",
+        stderr_digest=EMPTY_FILE_DIGEST,
+        output_setting=ShowOutput.ALL,
     )
     skip1 = create_test_result(exit_code=None, address=Address("t1"))
     skip2 = create_test_result(exit_code=None, address=Address("t2"))
@@ -306,7 +313,9 @@ def assert_streaming_output(
     result = EnrichedTestResult(
         exit_code=exit_code,
         stdout=stdout,
+        stdout_digest=EMPTY_FILE_DIGEST,
         stderr=stderr,
+        stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
         address=Address("demo_test"),
     )

@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonLibrary
 from pants.core.goals.lint import LintResult, LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
@@ -40,7 +40,11 @@ def make_target(
     for source_file in source_files:
         rule_runner.create_file(source_file.path, source_file.content.decode())
     return PythonLibrary(
-        {PythonInterpreterCompatibility.alias: interpreter_constraints},
+        {
+            InterpreterConstraintsField.alias: [interpreter_constraints]
+            if interpreter_constraints
+            else None
+        },
         address=Address("", target_name="target"),
     )
 
@@ -64,7 +68,7 @@ def run_flake8(
         args.append("--flake8-skip")
     if additional_args:
         args.extend(additional_args)
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     results = rule_runner.request(
         LintResults,
         [

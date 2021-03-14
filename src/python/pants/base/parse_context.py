@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import functools
 import threading
 
 
@@ -19,14 +18,6 @@ class Storage(threading.local):
             # NB: `src/python/pants/engine/mapper.py` will detect an overwritten object later.
             self.objects_by_name[name] = obj
         self.objects.append(obj)
-
-    def add_if_not_exists(self, name, obj_creator):
-        if name is None:
-            raise ValueError("Method requires a `name`d object.")
-        obj = self.objects_by_name.get(name)
-        if obj is None:
-            obj = self.objects_by_name[name] = obj_creator()
-        return obj
 
 
 class ParseContext:
@@ -57,32 +48,14 @@ class ParseContext:
 
         :param alias: Either the type alias or the type itself.
         :type alias: string|type
-        :param *args: These pass through to the underlying callable object.
-        :param **kwargs: These pass through to the underlying callable object.
+        :param args: These pass through to the underlying callable object.
+        :param kwargs: These pass through to the underlying callable object.
         :returns: The created object.
         """
         object_type = self._type_aliases.get(alias)
         if object_type is None:
             raise KeyError("There is no type registered for alias {0}".format(alias))
         return object_type(*args, **kwargs)
-
-    def create_object_if_not_exists(self, alias, name=None, *args, **kwargs):
-        """Constructs the type with the given alias using the given args and kwargs.
-
-        NB: aliases may be the alias' object type itself if that type is known.
-
-        :API: public
-
-        :param alias: Either the type alias or the type itself.
-        :type alias: string|type
-        :param *args: These pass through to the underlying callable object.
-        :param **kwargs: These pass through to the underlying callable object.
-        :returns: The created object, or an existing object with the same `name`.
-        """
-        if name is None:
-            raise ValueError("Method requires an object `name`.")
-        obj_creator = functools.partial(self.create_object, alias, name=name, *args, **kwargs)
-        return self._storage.add_if_not_exists(name, obj_creator)
 
     @property
     def rel_path(self):

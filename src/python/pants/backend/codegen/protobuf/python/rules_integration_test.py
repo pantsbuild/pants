@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import dedent
-from typing import List
+from typing import List, Optional
 
 import pytest
 
@@ -16,6 +16,28 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.source.source_root import NoSourceRootError
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+
+GRPC_PROTO_STANZA = """
+syntax = "proto3";
+
+package dir1;
+
+// The greeter service definition.
+service Greeter {
+  // Sends a greeting
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+}
+
+// The request message containing the user's name.
+message HelloRequest {
+  string name = 1;
+}
+
+// The response message containing the greetings
+message HelloReply {
+  string message = 1;
+}
+"""
 
 
 @pytest.fixture
@@ -39,6 +61,7 @@ def assert_files_generated(
     expected_files: List[str],
     source_roots: List[str],
     mypy: bool = False,
+    mypy_plugin_version: Optional[str] = None,
 ) -> None:
     options = [
         "--backend-packages=pants.backend.codegen.protobuf.python",
@@ -46,7 +69,12 @@ def assert_files_generated(
     ]
     if mypy:
         options.append("--python-protobuf-mypy-plugin")
-    rule_runner.set_options(options)
+    if mypy_plugin_version:
+        options.append(f"--python-protobuf-mypy-plugin-version={mypy_plugin_version}")
+    rule_runner.set_options(
+        options,
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     tgt = rule_runner.get_target(Address(spec))
     protocol_sources = rule_runner.request(
         HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSources])]
@@ -237,29 +265,7 @@ def test_mypy_plugin(rule_runner: RuleRunner) -> None:
 def test_grpc(rule_runner: RuleRunner) -> None:
     rule_runner.create_file(
         "src/protobuf/dir1/f.proto",
-        dedent(
-            """\
-            syntax = "proto3";
-
-            package dir1;
-
-            // The greeter service definition.
-            service Greeter {
-              // Sends a greeting
-              rpc SayHello (HelloRequest) returns (HelloReply) {}
-            }
-
-            // The request message containing the user's name.
-            message HelloRequest {
-              string name = 1;
-            }
-
-            // The response message containing the greetings
-            message HelloReply {
-              string message = 1;
-            }
-            """
-        ),
+        dedent(GRPC_PROTO_STANZA),
     )
     rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library(grpc=True)")
     assert_files_generated(
@@ -267,4 +273,45 @@ def test_grpc(rule_runner: RuleRunner) -> None:
         "src/protobuf/dir1",
         source_roots=["src/protobuf"],
         expected_files=["src/protobuf/dir1/f_pb2.py", "src/protobuf/dir1/f_pb2_grpc.py"],
+    )
+
+
+def test_grpc_mypy_plugin(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file(
+        "src/protobuf/dir1/f.proto",
+        dedent(GRPC_PROTO_STANZA),
+    )
+    rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library(grpc=True)")
+    assert_files_generated(
+        rule_runner,
+        "src/protobuf/dir1",
+        source_roots=["src/protobuf"],
+        mypy=True,
+        expected_files=[
+            "src/protobuf/dir1/f_pb2.py",
+            "src/protobuf/dir1/f_pb2.pyi",
+            "src/protobuf/dir1/f_pb2_grpc.py",
+            "src/protobuf/dir1/f_pb2_grpc.pyi",
+        ],
+    )
+
+
+def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
+    rule_runner.create_file(
+        "src/protobuf/dir1/f.proto",
+        dedent(GRPC_PROTO_STANZA),
+    )
+    rule_runner.add_to_build_file("src/protobuf/dir1", "protobuf_library(grpc=True)")
+
+    assert_files_generated(
+        rule_runner,
+        "src/protobuf/dir1",
+        source_roots=["src/protobuf"],
+        mypy=True,
+        mypy_plugin_version="mypy-protobuf==1.24",
+        expected_files=[
+            "src/protobuf/dir1/f_pb2.py",
+            "src/protobuf/dir1/f_pb2.pyi",
+            "src/protobuf/dir1/f_pb2_grpc.py",
+        ],
     )

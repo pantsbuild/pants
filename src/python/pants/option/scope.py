@@ -36,7 +36,7 @@ class ScopeInfo:
 
     @property
     def description(self) -> str:
-        return cast(str, self._optionable_cls_attr("get_description", lambda: "")())
+        return cast(str, getattr(self.optionable_cls, "help"))
 
     @property
     def deprecated_scope(self) -> Optional[str]:

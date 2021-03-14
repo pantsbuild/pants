@@ -6,21 +6,21 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-boxfuture = { path = "../../boxfuture" }
-bytes = "0.4.5"
+bazel_protos = { path = "../../process_execution/bazel_protos" }
+bytes = "0.5"
 clap = "2"
 env_logger = "0.5.4"
+grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
 hashing = { path = "../../hashing" }
 parking_lot = "0.11"
-protobuf = { version = "2.0.6", features = ["with-bytes"] }
+prost = { git = "https://github.com/danburkert/prost", rev = "a1cccbcee343e2c444e1cd2738c7fba2599fc391" }
 rand = "0.6"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
-tokio = { version = "0.2.22", features = ["rt-threaded", "macros"] }
+tokio = { version = "0.2.23", features = ["rt-threaded", "macros"] }
 workunit_store = { path = "../../workunit_store" }

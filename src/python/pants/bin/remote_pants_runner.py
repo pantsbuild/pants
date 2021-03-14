@@ -2,21 +2,32 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import signal
 import sys
 import termios
 import time
 from contextlib import contextmanager
 from typing import List, Mapping
 
-from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import ExitCode
-from pants.nailgun.nailgun_client import NailgunClient
+from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.nailgun.nailgun_protocol import NailgunProtocol
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
-from pants.util.dirutil import maybe_read_file
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def interrupts_ignored():
+    """Disables Python's default interrupt handling."""
+    old_handler = signal.signal(signal.SIGINT, handler=lambda s, f: None)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGINT, old_handler)
 
 
 class STTYSettings:
@@ -52,36 +63,6 @@ class STTYSettings:
                 logger.debug("masking tcsetattr exception: {!r}".format(e))
 
 
-class PailgunClientSignalHandler(SignalHandler):
-    def __init__(self, pailgun_client: NailgunClient, pid: int, timeout: float = 1):
-        self._pailgun_client = pailgun_client
-        self._timeout = timeout
-        self.pid = pid
-        super().__init__(pantsd_instance=False)
-
-    def _forward_signal_with_timeout(self, signum, signame):
-        # TODO Consider not accessing the private function _maybe_last_pid here, or making it public.
-        logger.info(
-            "Sending {} to pantsd with pid {}, waiting up to {} seconds before sending SIGKILL...".format(
-                signame, self.pid, self._timeout
-            )
-        )
-        self._pailgun_client.set_exit_timeout(
-            timeout=self._timeout,
-            reason=KeyboardInterrupt("Sending user interrupt to pantsd"),
-        )
-        self._pailgun_client.maybe_send_signal(signum)
-
-    def handle_sigint(self, signum, _frame):
-        self._forward_signal_with_timeout(signum, "SIGINT")
-
-    def handle_sigquit(self, signum, _frame):
-        self._forward_signal_with_timeout(signum, "SIGQUIT")
-
-    def handle_sigterm(self, signum, _frame):
-        self._forward_signal_with_timeout(signum, "SIGTERM")
-
-
 class RemotePantsRunner:
     """A thin client variant of PantsRunner."""
 
@@ -90,11 +71,6 @@ class RemotePantsRunner:
 
     class Terminated(Exception):
         """Raised when an active run is terminated mid-flight."""
-
-    RECOVERABLE_EXCEPTIONS = (
-        NailgunClient.NailgunConnectionError,
-        NailgunClient.NailgunExecutionError,
-    )
 
     def __init__(
         self,
@@ -114,58 +90,23 @@ class RemotePantsRunner:
         self._bootstrap_options = options_bootstrapper.bootstrap_options
         self._client = PantsDaemonClient(self._bootstrap_options)
 
-    @staticmethod
-    def _backoff(attempt):
-        """Minimal backoff strategy for daemon restarts."""
-        time.sleep(attempt + (attempt - 1))
-
     def run(self) -> ExitCode:
-        """Runs pants remotely with retry and recovery for nascent executions."""
+        """Starts up a pantsd instance if one is not already running, then connects to it via
+        nailgun."""
 
         pantsd_handle = self._client.maybe_launch()
-        retries = 3
+        logger.debug(f"Connecting to pantsd on port {pantsd_handle.port}")
 
-        attempt = 1
-        while True:
-            logger.debug(
-                "connecting to pantsd on port {} (attempt {}/{})".format(
-                    pantsd_handle.port, attempt, retries
-                )
-            )
-            try:
-                return self._connect_and_execute(pantsd_handle)
-            except self.RECOVERABLE_EXCEPTIONS as e:
-                if attempt > retries:
-                    raise self.Fallback(e)
-
-                self._backoff(attempt)
-                logger.warning(
-                    "pantsd was unresponsive on port {}, retrying ({}/{})".format(
-                        pantsd_handle.port, attempt, retries
-                    )
-                )
-
-                # One possible cause of the daemon being non-responsive during an attempt might be if a
-                # another lifecycle operation is happening concurrently (incl teardown). To account for
-                # this, we won't begin attempting restarts until at least 1 second has passed (1 attempt).
-                if attempt > 1:
-                    pantsd_handle = self._client.restart()
-                attempt += 1
-            except NailgunClient.NailgunError as e:
-                # Ensure a newline.
-                logger.critical("")
-                logger.critical("lost active connection to pantsd!")
-                traceback = sys.exc_info()[2]
-                raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(traceback)
+        return self._connect_and_execute(pantsd_handle)
 
     def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
-        port = pantsd_handle.port
-        pid = pantsd_handle.pid
+        native = Native()
 
         global_options = self._bootstrap_options.for_global_scope()
+        executor = PyExecutor(*GlobalOptions.compute_executor_arguments(global_options))
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
-        ng_env = NailgunProtocol.ttynames_to_env(sys.stdin, sys.stdout.buffer, sys.stderr.buffer)
+        ng_env = NailgunProtocol.ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
         modified_env = {
             **self._env,
             **ng_env,
@@ -175,44 +116,39 @@ class RemotePantsRunner:
             ),
         }
 
-        # Instantiate a NailgunClient.
-        client = NailgunClient(
-            port=port,
-            remote_pid=pid,
-            ins=sys.stdin,
-            out=sys.stdout.buffer,
-            err=sys.stderr.buffer,
-            exit_on_broken_pipe=True,
-            metadata_base_dir=pantsd_handle.metadata_base_dir,
-        )
+        command = self._args[0]
+        args = self._args[1:]
 
-        timeout = global_options.pantsd_pailgun_quit_timeout
-        pantsd_signal_handler = PailgunClientSignalHandler(client, pid=pid, timeout=timeout)
-        with ExceptionSink.trapped_signals(pantsd_signal_handler), STTYSettings.preserved():
-            # Execute the command on the pailgun.
-            return client.execute(self._args[0], self._args[1:], modified_env)
+        retries = 3
+        attempt = 1
+        while True:
+            port = pantsd_handle.port
+            logger.debug(f"Connecting to pantsd on port {port} attempt {attempt}/{retries}")
 
-    def _extract_remote_exception(self, pantsd_pid, nailgun_error):
-        """Given a NailgunError, returns a Terminated exception with additional info (where
-        possible).
+            # We preserve TTY settings since the server might write directly to the TTY, and we'd like
+            # to clean up any side effects before exiting.
+            #
+            # We ignore keyboard interrupts because the nailgun client will handle them.
+            with STTYSettings.preserved(), interrupts_ignored():
+                try:
+                    return native.new_nailgun_client(executor=executor, port=port).execute(
+                        command, args, modified_env
+                    )
 
-        This method will include the entire exception log for either the `pid` in the NailgunError,
-        or failing that, the `pid` of the pantsd instance.
-        """
-        sources = [pantsd_pid]
+                # NailgunConnectionException represents a failure connecting to pantsd, so we retry
+                # up to the retry limit.
+                except native.lib.NailgunConnectionException as e:
+                    if attempt > retries:
+                        raise self.Fallback(e)
 
-        exception_text = None
-        for source in sources:
-            log_path = ExceptionSink.exceptions_log_path(for_pid=source)
-            exception_text = maybe_read_file(log_path)
-            if exception_text:
-                break
+                    # Wait one second before retrying
+                    logger.warning(f"Pantsd was unresponsive on port {port}, retrying.")
+                    time.sleep(1)
 
-        exception_suffix = (
-            "\nRemote exception:\n{}".format(exception_text) if exception_text else ""
-        )
-        return self.Terminated(
-            "abruptly lost active connection to pantsd runner: {!r}{}".format(
-                nailgun_error, exception_suffix
-            )
-        )
+                    # One possible cause of the daemon being non-responsive during an attempt might be if a
+                    # another lifecycle operation is happening concurrently (incl teardown). To account for
+                    # this, we won't begin attempting restarts until at least 1 attempt has passed.
+                    if attempt > 1:
+                        pantsd_handle = self._client.restart()
+
+                    attempt += 1

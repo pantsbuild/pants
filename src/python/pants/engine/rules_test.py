@@ -16,6 +16,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.engine_testutil import assert_equal_with_printing
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler
 from pants.engine.internals.selectors import GetConstraints, GetParseError
 from pants.engine.rules import (
@@ -32,9 +33,10 @@ from pants.engine.rules import (
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
-from pants.testutil.test_base import TestBase
 from pants.util.enums import match
 from pants.util.logging import LogLevel
+
+_EXECUTOR = PyExecutor(2, 4)
 
 
 def create_scheduler(rules, validate=True, native=None):
@@ -51,6 +53,7 @@ def create_scheduler(rules, validate=True, native=None):
         ca_certs_path=None,
         rules=rules,
         union_membership=UnionMembership({}),
+        executor=_EXECUTOR,
         execution_options=DEFAULT_EXECUTION_OPTIONS,
         validate_reachability=validate,
     )
@@ -392,7 +395,7 @@ async def a_goal_rule_generator(console: Console) -> Example:
     return Example(exit_code=0)
 
 
-class RuleTest(TestBase):
+class RuleTest(unittest.TestCase):
     def test_run_rule_goal_rule_generator(self):
         res = run_rule_with_mocks(
             a_goal_rule_generator,
@@ -532,7 +535,7 @@ def test_goal_rule_not_returning_a_goal() -> None:
     assert str(exc.value) == "An `@goal_rule` must return a subclass of `engine.goal.Goal`."
 
 
-class RuleGraphTest(TestBase):
+class RuleGraphTest(unittest.TestCase):
     maxDiff = None
 
     def test_ruleset_with_ambiguity(self):

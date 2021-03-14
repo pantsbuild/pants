@@ -152,6 +152,27 @@ def test_deprecated():
     assert "999.99.9" == ohi.removal_version
     assert "do not use this" == ohi.removal_hint
     assert ohi.deprecated_message is not None
+    assert ohi.deprecation_active
+
+
+def test_not_deprecated():
+    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], {})
+    assert ohi.removal_version is None
+    assert not ohi.deprecation_active
+
+
+def test_deprecation_start_version_past():
+    kwargs = {"deprecation_start_version": "1.0.0", "removal_version": "999.99.9"}
+    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    assert "999.99.9" == ohi.removal_version
+    assert ohi.deprecation_active
+
+
+def test_deprecation_start_version_future():
+    kwargs = {"deprecation_start_version": "999.99.8", "removal_version": "999.99.9"}
+    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    assert "999.99.9" == ohi.removal_version
+    assert not ohi.deprecation_active
 
 
 def test_passthrough():
@@ -205,18 +226,16 @@ def test_grouping():
 
 def test_get_all_help_info():
     class Global(Subsystem):
-        """Global options."""
-
         options_scope = GLOBAL_SCOPE
+        help = "Global options."
 
         @classmethod
         def register_options(cls, register):
             register("-o", "--opt1", type=int, default=42, help="Option 1")
 
     class Foo(Subsystem):
-        """A foo."""
-
         options_scope = "foo"
+        help = "A foo."
 
         @classmethod
         def register_options(cls, register):
@@ -224,32 +243,22 @@ def test_get_all_help_info():
             register("--opt3", advanced=True, choices=["a", "b", "c"])
 
     class Bar(GoalSubsystem):
-        """The bar goal."""
-
         name = "bar"
+        help = "The bar goal."
 
     class QuxField(StringField):
-        """A qux string."""
-
         alias = "qux"
         default = "blahblah"
+        help = "A qux string."
 
     class QuuxField(IntField):
-        """A quux int.
-
-        Must be non-zero. Or zero. Whatever you like really.
-        """
-
         alias = "quux"
         required = True
+        help = "A quux int.\n\nMust be non-zero. Or zero. Whatever you like really."
 
     class BazLibrary(Target):
-        """A library of baz-es.
-
-        Use it however you like.
-        """
-
         alias = "baz_library"
+        help = "A library of baz-es.\n\nUse it however you like."
 
         core_fields = [QuxField, QuuxField]
 
@@ -297,6 +306,7 @@ def test_get_all_help_info():
                         "typ": int,
                         "default": 42,
                         "help": "Option 1",
+                        "deprecation_active": False,
                         "deprecated_message": None,
                         "removal_version": None,
                         "removal_hint": None,
@@ -328,6 +338,7 @@ def test_get_all_help_info():
                         "typ": bool,
                         "default": True,
                         "help": "Option 2",
+                        "deprecation_active": False,
                         "deprecated_message": None,
                         "removal_version": None,
                         "removal_hint": None,
@@ -349,6 +360,7 @@ def test_get_all_help_info():
                         "typ": str,
                         "default": None,
                         "help": "No help available.",
+                        "deprecation_active": False,
                         "deprecated_message": None,
                         "removal_version": None,
                         "removal_hint": None,
@@ -391,7 +403,7 @@ def test_get_all_help_info():
                     {
                         "alias": "quux",
                         "default": None,
-                        "description": "A quux int. Must be non-zero. Or zero. "
+                        "description": "A quux int.\n\nMust be non-zero. Or zero. "
                         "Whatever you like really.",
                         "required": True,
                         "type_hint": "int",

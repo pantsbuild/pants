@@ -1,4 +1,4 @@
-use super::{EntryType, ShrinkBehavior, GIGABYTES};
+use super::{EntryType, ShrinkBehavior, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
 
 use std::collections::BinaryHeap;
 use std::path::Path;
@@ -11,6 +11,7 @@ use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint, DEFAULT_LEASE_TIME};
+use workunit_store::ObservationMetric;
 
 #[derive(Debug, Clone)]
 pub struct ByteStore {
@@ -45,20 +46,32 @@ impl ByteStore {
     let directories_root = root.join("directories");
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
-        // We want these stores to be allowed to grow very large, in case we are on a system with
-        // large disks which doesn't want to GC a lot.
-        // It doesn't reflect space allocated on disk, or RAM allocated (it may be reflected in
-        // VIRT but not RSS). There is no practical upper bound on this number, so we set them
-        // ridiculously high.
-        // However! We set them lower than we'd otherwise choose because sometimes we see tests on
-        // travis fail because they can't allocate virtual memory, if there are multiple Stores
-        // in memory at the same time. We don't know why they're not efficiently garbage collected
-        // by python, but they're not, so...
-        file_dbs: ShardedLmdb::new(files_root, 100 * GIGABYTES, executor.clone(), lease_time)
-          .map(Arc::new),
+        // The size value bounds the total size of all shards, but it also bounds the per item
+        // size to `max_size / ShardedLmdb::NUM_SHARDS`.
+        //
+        // We want these stores to be allowed to grow to a large multiple of the `StoreGCService`
+        // size target (see DEFAULT_LOCAL_STORE_GC_TARGET_BYTES), in case it is a very long time
+        // between GC runs. It doesn't reflect space allocated on disk, or RAM allocated (it may
+        // be reflected in VIRT but not RSS).
+        //
+        // However! We set them lower than we'd otherwise choose for a few reasons:
+        // 1. we see tests on travis fail because they can't allocate virtual memory if there
+        //    are too many open Stores at the same time.
+        // 2. macOS creates core dumps that apparently include MMAP'd pages, and setting this too
+        //    high will use up an unnecessary amount of disk if core dumps are enabled.
+        //
+        file_dbs: ShardedLmdb::new(
+          files_root,
+          // We set this larger than we do other stores in order to avoid applying too low a bound
+          // on the size of stored files.
+          16 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+          executor.clone(),
+          lease_time,
+        )
+        .map(Arc::new),
         directory_dbs: ShardedLmdb::new(
           directories_root,
-          5 * GIGABYTES,
+          2 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
           executor.clone(),
           lease_time,
         )
@@ -73,7 +86,7 @@ impl ByteStore {
   }
 
   pub async fn entry_type(&self, fingerprint: Fingerprint) -> Result<Option<EntryType>, String> {
-    if fingerprint == EMPTY_DIGEST.0 {
+    if fingerprint == EMPTY_DIGEST.hash {
       // Technically this is valid as both; choose Directory in case a caller is checking whether
       // it _can_ be a Directory.
       return Ok(Some(EntryType::Directory));
@@ -105,7 +118,7 @@ impl ByteStore {
         EntryType::Directory => self.inner.directory_dbs.clone(),
       };
       dbs?
-        .lease(digest.0)
+        .lease(digest.hash)
         .await
         .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
     }
@@ -155,10 +168,8 @@ impl ByteStore {
         env
           .begin_rw_txn()
           .and_then(|mut txn| {
-            let key = VersionedFingerprint::new(
-              aged_fingerprint.fingerprint,
-              ShardedLmdb::schema_version(),
-            );
+            let key =
+              VersionedFingerprint::new(aged_fingerprint.fingerprint, ShardedLmdb::SCHEMA_VERSION);
             txn.del(database, &key, None)?;
 
             txn
@@ -244,7 +255,7 @@ impl ByteStore {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     };
-    dbs?.remove(digest.0).await
+    dbs?.remove(digest.hash).await
   }
 
   pub async fn store_bytes(
@@ -263,7 +274,7 @@ impl ByteStore {
       .executor
       .spawn_blocking(move || Digest::of_bytes(&bytes))
       .await;
-    dbs?.store_bytes(digest.0, bytes2, initial_lease).await?;
+    dbs?.store_bytes(digest.hash, bytes2, initial_lease).await?;
     Ok(digest)
   }
 
@@ -289,13 +300,20 @@ impl ByteStore {
       return Ok(Some(self.executor().spawn_blocking(move || f(&[])).await));
     }
 
+    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+      workunit_store_handle.store.record_observation(
+        ObservationMetric::LocalStoreReadBlobSize,
+        digest.size_bytes as u64,
+      );
+    }
+
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     };
 
-    dbs?.load_bytes_with(digest.0, move |bytes| {
-        if bytes.len() == digest.1 {
+    dbs?.load_bytes_with(digest.hash, move |bytes| {
+        if bytes.len() == digest.size_bytes {
             Ok(f(bytes))
         } else {
             Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
@@ -319,7 +337,7 @@ impl ByteStore {
       for (key, bytes) in cursor.iter() {
         let v = VersionedFingerprint::from_bytes_unsafe(key);
         let fingerprint = v.get_fingerprint();
-        digests.push(Digest(fingerprint, bytes.len()));
+        digests.push(Digest::new(fingerprint, bytes.len()));
       }
     }
     Ok(digests)

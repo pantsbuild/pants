@@ -1,7 +1,8 @@
 {{#is_goal}}```
 ./pants {{scope}} [args]
 ```{{/is_goal}}
-{{description}}
+{{! Mark as a paragraph to render as plain text, rather than markdown. }}
+<p>{{description}}</p>
 
 Config section: <span style="color: purple"><code>[{{scope}}{{^scope}}GLOBAL{{/scope}}]</code></span>
 

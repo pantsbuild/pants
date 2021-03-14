@@ -2,40 +2,37 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use crate::PythonLogLevel;
 
-use colored::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::future::Future;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use colored::*;
 use lazy_static::lazy_static;
 use log::{debug, log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
-use tokio::task_local;
-use uuid::Uuid;
+use regex::Regex;
 
 const TIME_FORMAT_STR: &str = "%H:%M:%S";
-
-pub type StdioHandler = Box<dyn Fn(&str) -> Result<(), ()> + Send>;
 
 lazy_static! {
   pub static ref PANTS_LOGGER: PantsLogger = PantsLogger::new();
 }
 
+// TODO: The non-atomic portions of this struct should likely be composed into a single RwLock.
 pub struct PantsLogger {
   per_run_logs: Mutex<Option<File>>,
   log_file: Mutex<Option<File>>,
   global_level: Mutex<RefCell<LevelFilter>>,
   use_color: AtomicBool,
   show_rust_3rdparty_logs: AtomicBool,
-  stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
   show_target: AtomicBool,
   log_level_filters: Mutex<HashMap<String, log::LevelFilter>>,
+  message_regex_filters: Mutex<Vec<Regex>>,
 }
 
 impl PantsLogger {
@@ -46,9 +43,9 @@ impl PantsLogger {
       global_level: Mutex::new(RefCell::new(LevelFilter::Off)),
       show_rust_3rdparty_logs: AtomicBool::new(true),
       use_color: AtomicBool::new(false),
-      stderr_handlers: Mutex::new(HashMap::new()),
       show_target: AtomicBool::new(false),
       log_level_filters: Mutex::new(HashMap::new()),
+      message_regex_filters: Mutex::new(Vec::new()),
     }
   }
 
@@ -58,7 +55,9 @@ impl PantsLogger {
     use_color: bool,
     show_target: bool,
     log_levels_by_target: HashMap<String, u64>,
-  ) {
+    message_regex_filters: Vec<Regex>,
+    log_file_path: PathBuf,
+  ) -> Result<(), String> {
     let log_levels_by_target = log_levels_by_target
       .iter()
       .map(|(k, v)| {
@@ -70,29 +69,38 @@ impl PantsLogger {
       })
       .collect::<HashMap<_, _>>();
 
-    let max_python_level: Result<PythonLogLevel, _> = max_level.try_into();
-    match max_python_level {
-      Ok(python_level) => {
-        let level: LevelFilter = python_level.into();
-        // TODO this should be whatever the most verbose log level specified in log_domain_levels -
-        // but I'm not sure if it's actually much of a gain over just setting this to Trace.
-        set_max_level(LevelFilter::Trace);
-        PANTS_LOGGER.global_level.lock().replace(level);
+    let max_python_level: PythonLogLevel = max_level
+      .try_into()
+      .map_err(|e| format!("Unrecognised log level from Python: {}: {}", max_level, e))?;
+    let level: LevelFilter = max_python_level.into();
 
-        PANTS_LOGGER.use_color.store(use_color, Ordering::SeqCst);
-        PANTS_LOGGER
-          .show_rust_3rdparty_logs
-          .store(show_rust_3rdparty_logs, Ordering::SeqCst);
-        *PANTS_LOGGER.log_level_filters.lock() = log_levels_by_target;
-        PANTS_LOGGER
-          .show_target
-          .store(show_target, Ordering::SeqCst);
-        if set_logger(&*PANTS_LOGGER).is_err() {
-          debug!("Logging already initialized.");
-        }
-      }
-      Err(err) => panic!("Unrecognised log level from Python: {}: {}", max_level, err),
+    // TODO this should be whatever the most verbose log level specified in log_domain_levels -
+    // but I'm not sure if it's actually much of a gain over just setting this to Trace.
+    set_max_level(LevelFilter::Trace);
+    PANTS_LOGGER.global_level.lock().replace(level);
+
+    PANTS_LOGGER.use_color.store(use_color, Ordering::SeqCst);
+    PANTS_LOGGER
+      .show_rust_3rdparty_logs
+      .store(show_rust_3rdparty_logs, Ordering::SeqCst);
+    *PANTS_LOGGER.log_level_filters.lock() = log_levels_by_target;
+    *PANTS_LOGGER.message_regex_filters.lock() = message_regex_filters;
+    PANTS_LOGGER
+      .show_target
+      .store(show_target, Ordering::SeqCst);
+    *PANTS_LOGGER.log_file.lock() = {
+      let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_file_path)
+        .map_err(|err| format!("Error opening pantsd logfile: {}", err))?;
+      Some(log_file)
     };
+
+    if set_logger(&*PANTS_LOGGER).is_err() {
+      debug!("Logging already initialized.");
+    }
+    Ok(())
   }
 
   pub fn set_per_run_logs(&self, per_run_log_path: Option<PathBuf>) {
@@ -112,31 +120,6 @@ impl PantsLogger {
     };
   }
 
-  /// Set up a file logger to log_file_path. Returns the file descriptor of the log file.
-  #[cfg(unix)]
-  pub fn set_pantsd_logger(
-    &self,
-    log_file_path: PathBuf,
-  ) -> Result<std::os::unix::io::RawFd, String> {
-    use std::os::unix::io::AsRawFd;
-
-    {
-      // Maybe close open file by dropping the existing file handle
-      *self.log_file.lock() = None;
-    }
-
-    OpenOptions::new()
-      .create(true)
-      .append(true)
-      .open(log_file_path)
-      .map(|file| {
-        let raw_fd = file.as_raw_fd();
-        *self.log_file.lock() = Some(file);
-        raw_fd
-      })
-      .map_err(|err| format!("Error opening pantsd logfile: {}", err))
-  }
-
   /// log_from_python is only used in the Python FFI, which in turn is only called within the
   /// Python `NativeHandler` class. Every logging call from Python should get proxied through this
   /// function, which translates the log message into the Rust log paradigm provided by
@@ -145,18 +128,6 @@ impl PantsLogger {
     let level: PythonLogLevel = python_level.try_into().map_err(|err| format!("{}", err))?;
     log!(target: target, level.into(), "{}", message);
     Ok(())
-  }
-
-  pub fn register_stderr_handler(&self, callback: StdioHandler) -> Uuid {
-    let mut handlers = self.stderr_handlers.lock();
-    let unique_id = Uuid::new_v4();
-    handlers.insert(unique_id, callback);
-    unique_id
-  }
-
-  pub fn deregister_stderr_handler(&self, unique_id: Uuid) {
-    let mut handlers = self.stderr_handlers.lock();
-    handlers.remove(&unique_id);
   }
 }
 
@@ -198,7 +169,6 @@ impl Log for PantsLogger {
       return;
     }
 
-    let destination = get_destination();
     let cur_date = chrono::Local::now();
     let time_str = format!(
       "{}.{:02}",
@@ -208,11 +178,8 @@ impl Log for PantsLogger {
 
     let show_target = self.show_target.load(Ordering::SeqCst);
     let level = record.level();
-    let destination_is_file = match destination {
-      Destination::Pantsd => true,
-      Destination::Stderr => false,
-    };
-    let use_color = self.use_color.load(Ordering::SeqCst) && (!destination_is_file);
+    // TODO: Fix application of color for log-files: see https://github.com/pantsbuild/pants/issues/11020
+    let use_color = self.use_color.load(Ordering::SeqCst);
 
     let level_marker = match level {
       _ if !use_color => format!("[{}]", level).normal().clear(),
@@ -225,48 +192,48 @@ impl Log for PantsLogger {
 
     let log_string = if show_target {
       format!(
-        "{} {} ({}) {}",
+        "{} {} ({}) {}\n",
         time_str,
         level_marker,
         record.target(),
         record.args(),
       )
     } else {
-      format!("{} {} {}", time_str, level_marker, record.args())
+      format!("{} {} {}\n", time_str, level_marker, record.args())
     };
+
+    {
+      let message_regex_filters = self.message_regex_filters.lock();
+      if message_regex_filters
+        .iter()
+        .any(|re| re.is_match(&log_string))
+      {
+        return;
+      }
+    }
+
+    let log_bytes = log_string.as_bytes();
 
     {
       let mut maybe_per_run_file = self.per_run_logs.lock();
       if let Some(ref mut file) = *maybe_per_run_file {
         // deliberately ignore errors writing to per-run log file
-        let _ = writeln!(file, "{}", log_string);
+        let _ = file.write_all(log_bytes);
       }
     }
 
-    match destination {
-      Destination::Stderr => {
-        // We first try to output to all registered handlers. If there are none, or any of them
-        // fail, then we fallback to sending directly to stderr.
-        let handlers_map = self.stderr_handlers.lock();
-        let mut any_handler_failed = false;
-        for callback in handlers_map.values() {
-          let handler_res = callback(&log_string);
-          if handler_res.is_err() {
-            any_handler_failed = true;
-          }
-        }
-        if handlers_map.len() == 0 || any_handler_failed {
-          eprintln!("{}", log_string);
-        }
-      }
-      Destination::Pantsd => {
-        let mut maybe_file = self.log_file.lock();
-        if let Some(ref mut file) = *maybe_file {
-          match writeln!(file, "{}", log_string) {
-            Ok(()) => (),
-            Err(e) => {
-              eprintln!("Error writing to log file: {}", e);
-            }
+    // Attempt to write to stdio, and write to the pantsd log if we fail (either because we don't
+    // have a valid stdio instance, or because of an error).
+    let destination = stdio::get_destination();
+    if stdio::Destination::write_stderr_raw(&destination, log_bytes).is_err() {
+      let mut maybe_file = self.log_file.lock();
+      if let Some(ref mut file) = *maybe_file {
+        match file.write_all(log_bytes) {
+          Ok(()) => (),
+          Err(e) => {
+            // If we've failed to write to stdio, but also to our log file, our only recourse is to
+            // try to write to a different file.
+            debug_log!("fatal.log", "Failed to write to log file {:?}: {}", file, e);
           }
         }
       }
@@ -274,73 +241,4 @@ impl Log for PantsLogger {
   }
 
   fn flush(&self) {}
-}
-
-///
-/// Thread- or task-local context for where the Logger should send log statements.
-///
-/// We do this in a per-thread way because we find that Pants threads generally are either
-/// daemon-specific or user-facing. We make sure that every time we spawn a thread on the Python
-/// side, we set the thread-local information, and every time we submit a Future to a tokio Runtime
-/// on the rust side, we set the task-local information.
-///
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[repr(C)]
-pub enum Destination {
-  Pantsd,
-  Stderr,
-}
-
-impl TryFrom<&str> for Destination {
-  type Error = String;
-  fn try_from(dest: &str) -> Result<Self, Self::Error> {
-    match dest {
-      "pantsd" => Ok(Destination::Pantsd),
-      "stderr" => Ok(Destination::Stderr),
-      other => Err(format!("Unknown log destination: {:?}", other)),
-    }
-  }
-}
-
-thread_local! {
-  static THREAD_DESTINATION: RefCell<Destination> = RefCell::new(Destination::Stderr)
-}
-
-task_local! {
-  static TASK_DESTINATION: Destination;
-}
-
-///
-/// Set the current log destination for a Thread, but _not_ for a Task. Tasks must always be spawned
-/// by callers using the `scope_task_destination` helper (generally via task_executor::Executor.)
-///
-pub fn set_thread_destination(destination: Destination) {
-  THREAD_DESTINATION.with(|thread_destination| {
-    *thread_destination.borrow_mut() = destination;
-  })
-}
-
-///
-/// Propagate the current log destination to a Future representing a newly spawned Task. Usage of
-/// this method should mostly be contained to task_executor::Executor.
-///
-pub async fn scope_task_destination<F>(destination: Destination, f: F) -> F::Output
-where
-  F: Future,
-{
-  TASK_DESTINATION.scope(destination, f).await
-}
-
-///
-/// Get the current log destination, from either a Task or a Thread.
-///
-/// TODO: Having this return an Option and tracking down all cases where it has defaulted would be
-/// good.
-///
-pub fn get_destination() -> Destination {
-  if let Ok(destination) = TASK_DESTINATION.try_with(|destination| *destination) {
-    destination
-  } else {
-    THREAD_DESTINATION.with(|destination| *destination.borrow())
-  }
 }

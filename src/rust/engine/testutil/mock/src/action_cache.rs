@@ -18,9 +18,9 @@ clippy::unseparated_literal_suffix,
 #![allow(clippy::match_ref_pats)]
 // Subjective style.
 #![allow(
-clippy::len_without_is_empty,
-clippy::redundant_field_names,
-clippy::too_many_arguments
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
@@ -28,120 +28,155 @@ clippy::too_many_arguments
 #![allow(clippy::mutex_atomic)]
 
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
-use bazel_protos::remote_execution::{
-  ActionResult, GetActionResultRequest, UpdateActionResultRequest,
-};
-use grpcio::{RpcContext, UnarySink};
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
+use bazel_protos::require_digest;
+use futures::FutureExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
+use remexec::action_cache_server::{ActionCache, ActionCacheServer};
+use remexec::{ActionResult, GetActionResultRequest, UpdateActionResultRequest};
+use tokio::time::delay_for;
+use tonic::transport::Server;
+use tonic::{Request, Response, Status};
+
+use crate::tonic_util::AddrIncomingWithStream;
 
 pub struct StubActionCache {
-  server_transport: grpcio::Server,
   pub action_map: Arc<Mutex<HashMap<Fingerprint, ActionResult>>>,
   pub always_errors: Arc<AtomicBool>,
+  local_addr: SocketAddr,
+  shutdown_sender: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl Drop for StubActionCache {
+  fn drop(&mut self) {
+    self.shutdown_sender.take().unwrap().send(()).unwrap();
+  }
 }
 
 #[derive(Clone)]
 struct ActionCacheResponder {
   action_map: Arc<Mutex<HashMap<Fingerprint, ActionResult>>>,
   always_errors: Arc<AtomicBool>,
+  read_delay: Duration,
+  write_delay: Duration,
 }
 
-impl bazel_protos::remote_execution_grpc::ActionCache for ActionCacheResponder {
-  fn get_action_result(
+#[tonic::async_trait]
+impl ActionCache for ActionCacheResponder {
+  async fn get_action_result(
     &self,
-    _: RpcContext<'_>,
-    req: GetActionResultRequest,
-    sink: UnarySink<ActionResult>,
-  ) {
+    request: Request<GetActionResultRequest>,
+  ) -> Result<Response<ActionResult>, Status> {
+    delay_for(self.read_delay).await;
+
+    let request = request.into_inner();
+
     if self.always_errors.load(Ordering::SeqCst) {
-      sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::UNAVAILABLE,
-        Some("unavailable".to_owned()),
-      ));
-      return;
+      return Err(Status::unavailable("unavailable".to_owned()));
     }
 
-    let action_digest: Digest = match req.get_action_digest().try_into() {
+    let action_digest: Digest = match require_digest(request.action_digest.as_ref()) {
       Ok(digest) => digest,
       Err(_) => {
-        sink.fail(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::INTERNAL,
-          Some("Unable to extract action_digest.".to_owned()),
+        return Err(Status::internal(
+          "Unable to extract action_digest.".to_owned(),
         ));
-        return;
       }
     };
 
     let action_map = self.action_map.lock();
-    let action_result = match action_map.get(&action_digest.0) {
+    let action_result = match action_map.get(&action_digest.hash) {
       Some(ar) => ar.clone(),
       None => {
-        sink.fail(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::NOT_FOUND,
-          Some(format!(
-            "ActionResult for Action {:?} does not exist",
-            action_digest
-          )),
-        ));
-        return;
+        return Err(Status::not_found(format!(
+          "ActionResult for Action {:?} does not exist",
+          action_digest
+        )));
       }
     };
 
-    sink.success(action_result);
+    Ok(Response::new(action_result))
   }
 
-  fn update_action_result(
+  async fn update_action_result(
     &self,
-    _: RpcContext<'_>,
-    req: UpdateActionResultRequest,
-    sink: UnarySink<ActionResult>,
-  ) {
-    let action_digest: Digest = match req.get_action_digest().try_into() {
+    request: Request<UpdateActionResultRequest>,
+  ) -> Result<Response<ActionResult>, Status> {
+    delay_for(self.write_delay).await;
+
+    let request = request.into_inner();
+
+    let action_digest: Digest = match require_digest(request.action_digest.as_ref()) {
       Ok(digest) => digest,
       Err(_) => {
-        sink.fail(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::INTERNAL,
-          Some("Unable to extract action_digest.".to_owned()),
+        return Err(Status::internal(
+          "Unable to extract action_digest.".to_owned(),
         ));
-        return;
+      }
+    };
+
+    let action_result = match request.action_result {
+      Some(r) => r,
+      None => {
+        return Err(Status::invalid_argument(
+          "Must provide action result".to_owned(),
+        ))
       }
     };
 
     let mut action_map = self.action_map.lock();
-    action_map.insert(action_digest.0, req.get_action_result().clone());
+    action_map.insert(action_digest.hash, action_result.clone());
 
-    sink.success(req.get_action_result().clone());
+    Ok(Response::new(action_result))
   }
 }
 
 impl StubActionCache {
   pub fn new() -> Result<Self, String> {
+    Self::new_with_delays(0, 0)
+  }
+
+  pub fn new_with_delays(read_delay_ms: u64, write_delay_ms: u64) -> Result<Self, String> {
     let action_map = Arc::new(Mutex::new(HashMap::new()));
     let always_errors = Arc::new(AtomicBool::new(false));
     let responder = ActionCacheResponder {
       action_map: action_map.clone(),
       always_errors: always_errors.clone(),
+      read_delay: Duration::from_millis(read_delay_ms),
+      write_delay: Duration::from_millis(write_delay_ms),
     };
 
-    let env = Arc::new(grpcio::Environment::new(1));
-    let mut server_transport = grpcio::ServerBuilder::new(env)
-      .register_service(bazel_protos::remote_execution_grpc::create_action_cache(
-        responder,
-      ))
-      .bind("127.0.0.1", 0)
-      .build()
-      .unwrap();
-    server_transport.start();
+    let addr = "127.0.0.1:0"
+      .to_string()
+      .parse()
+      .expect("failed to parse IP address");
+    let incoming = hyper::server::conn::AddrIncoming::bind(&addr).expect("failed to bind port");
+    let local_addr = incoming.local_addr();
+    let incoming = AddrIncomingWithStream(incoming);
+
+    let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel();
+
+    tokio::spawn(async move {
+      let mut server = Server::builder();
+      let router = server.add_service(ActionCacheServer::new(responder.clone()));
+
+      router
+        .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+        .await
+        .unwrap();
+    });
 
     Ok(StubActionCache {
-      server_transport,
       action_map,
       always_errors,
+      local_addr,
+      shutdown_sender: Some(shutdown_sender),
     })
   }
 
@@ -149,7 +184,6 @@ impl StubActionCache {
   /// The address on which this server is listening over insecure HTTP transport.
   ///
   pub fn address(&self) -> String {
-    let bind_addr = self.server_transport.bind_addrs().next().unwrap();
-    format!("{}:{}", bind_addr.0, bind_addr.1)
+    format!("http://{}", self.local_addr)
   }
 }

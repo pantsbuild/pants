@@ -13,7 +13,7 @@ python_library(
 python_integration_tests(
   name = 'pantsd_integration',
   dependencies = [
-    'examples/src/python/example:hello_directory',
+    'testprojects/src/python:hello_directory',
     'testprojects/src/python:bad_requirements_directory',
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects/src/python:print_env_directory',

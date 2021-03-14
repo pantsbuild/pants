@@ -1,12 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import os
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
-from pkg_resources import Requirement
-
-from pants.backend.python.target_types import format_invalid_requirement_string_error
+from pants.backend.python.target_types import parse_requirements_file
 from pants.base.build_environment import get_buildroot
 
 
@@ -60,32 +58,17 @@ class PythonRequirements:
             requirement name as the default module, e.g. "Django" will default to
             `modules=["django"]`.
         """
+        req_file_tgt = self._parse_context.create_object(
+            "_python_requirements_file",
+            name=requirements_relpath.replace(os.path.sep, "_"),
+            sources=[requirements_relpath],
+        )
+        requirements_dep = f":{req_file_tgt.name}"
 
         req_file = Path(get_buildroot(), self._parse_context.rel_path, requirements_relpath)
-        requirements = []
-        for i, line in enumerate(req_file.read_text().splitlines()):
-            line = line.strip()
-            if not line or line.startswith("#") or line.startswith("-"):
-                continue
-            try:
-                req = Requirement.parse(line)
-            except Exception as e:
-                raise ValueError(
-                    format_invalid_requirement_string_error(
-                        line,
-                        e,
-                        description_of_origin=(
-                            f"{req_file.relative_to(get_buildroot())} at line {i + 1}"
-                        ),
-                    )
-                )
-            requirements.append(req)
-
-        self._parse_context.create_object(
-            "_python_requirements_file", name=requirements_relpath, sources=[requirements_relpath]
+        requirements = parse_requirements_file(
+            req_file.read_text(), rel_path=str(req_file.relative_to(get_buildroot()))
         )
-        requirements_dep = f":{requirements_relpath}"
-
         for parsed_req in requirements:
             req_module_mapping = (
                 {parsed_req.project_name: module_mapping[parsed_req.project_name]}

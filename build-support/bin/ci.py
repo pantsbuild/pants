@@ -6,11 +6,9 @@ import argparse
 import os
 import platform
 import subprocess
-import tempfile
-from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import Iterator, List, Optional
+from typing import List, Optional
 
 from common import banner, die, green, travis_section
 
@@ -21,38 +19,34 @@ def main() -> None:
     args = create_parser().parse_args()
     setup_environment(python_version=args.python_version)
 
-    with maybe_get_remote_execution_oauth_token_path(
-        remote_execution_enabled=args.remote_execution_enabled
-    ) as remote_execution_oauth_token_path:
+    if args.bootstrap:
+        bootstrap(
+            clean=args.bootstrap_clean,
+            try_to_skip_rust_compilation=args.bootstrap_try_to_skip_rust_compilation,
+            python_version=args.python_version,
+        )
+    set_run_from_pex()
 
-        if args.bootstrap:
-            bootstrap(
-                clean=args.bootstrap_clean,
-                try_to_skip_rust_compilation=args.bootstrap_try_to_skip_rust_compilation,
-                python_version=args.python_version,
-            )
-        set_run_from_pex()
-
-        if args.githooks:
-            run_githooks()
-        if args.smoke_tests:
-            run_smoke_tests()
-        if args.lint:
-            run_lint(oauth_token_path=remote_execution_oauth_token_path)
-        if args.clippy:
-            run_clippy()
-        if args.cargo_audit:
-            run_cargo_audit()
-        if args.unit_tests or args.integration_tests:
-            run_python_tests(
-                include_unit=args.unit_tests,
-                include_integration=args.integration_tests,
-                oauth_token_path=remote_execution_oauth_token_path,
-            )
-        if args.rust_tests:
-            run_rust_tests()
-        if args.platform_specific_tests:
-            run_platform_specific_tests()
+    if args.githooks:
+        run_githooks()
+    if args.smoke_tests:
+        run_smoke_tests()
+    if args.lint:
+        run_lint(remote_cache_enabled=args.remote_cache_enabled)
+    if args.clippy:
+        run_clippy()
+    if args.cargo_audit:
+        run_cargo_audit()
+    if args.unit_tests or args.integration_tests:
+        run_python_tests(
+            include_unit=args.unit_tests,
+            include_integration=args.integration_tests,
+            remote_cache_enabled=args.remote_cache_enabled,
+        )
+    if args.rust_tests:
+        run_rust_tests()
+    if args.platform_specific_tests:
+        run_platform_specific_tests()
 
     banner("CI ENDS")
     print()
@@ -65,8 +59,8 @@ def main() -> None:
 
 
 class PythonVersion(Enum):
-    py36 = "3.6"
     py37 = "3.7"
+    py38 = "3.8"
 
     def __str__(self) -> str:
         return str(self.value)
@@ -78,17 +72,18 @@ def create_parser() -> argparse.ArgumentParser:
         "--python-version",
         type=PythonVersion,
         choices=list(PythonVersion),
-        default=PythonVersion.py36,
-        help="Run Pants with this version (defaults to 3.6).",
+        default=PythonVersion.py37,
+        help="Run Pants with this version.",
     )
     parser.add_argument(
-        "--remote-execution-enabled",
+        "--remote-cache-enabled",
         action="store_true",
-        help="Pants will use remote build execution remote where possible (for now, the V2 unit tests). "
-        "If running locally, you must be logged in via the `gcloud` CLI to an account with remote "
-        "build execution permissions. If running in CI, the script will ping the secure token "
-        "generator at https://github.com/pantsbuild/rbe-token-server.",
+        help=(
+            "Enable remote caching via Toolchain. This requires enabling "
+            "`remote_auth_plugin` and `remote_ca_certs_path` in your environment."
+        ),
     )
+
     parser.add_argument(
         "--bootstrap", action="store_true", help="Bootstrap a pants.pex from local sources."
     )
@@ -106,6 +101,7 @@ def create_parser() -> argparse.ArgumentParser:
             "native_engine.so; this option should generally be avoided."
         ),
     )
+
     parser.add_argument("--githooks", action="store_true", help="Run pre-commit githook.")
     parser.add_argument(
         "--smoke-tests",
@@ -135,13 +131,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 def setup_environment(*, python_version: PythonVersion):
     set_cxx_compiler()
-    set_pants_dev()
     setup_python_interpreter(python_version)
-
-
-def set_pants_dev() -> None:
-    """We do this because we are running against a Pants clone."""
-    os.environ["PANTS_DEV"] = "1"
 
 
 def set_cxx_compiler() -> None:
@@ -159,34 +149,7 @@ def setup_python_interpreter(version: PythonVersion) -> None:
 
 
 def set_run_from_pex() -> None:
-    # Even though our Python integration tests and commands in this file directly invoke `pants.pex`,
-    # some places like the JVM tests may still directly call the script `./pants`. When this happens,
-    # we want to ensure that the script immediately breaks out to `./pants.pex` to avoid
-    # re-bootstrapping Pants in CI.
     os.environ["RUN_PANTS_FROM_PEX"] = "1"
-
-
-@contextmanager
-def maybe_get_remote_execution_oauth_token_path(
-    *, remote_execution_enabled: bool
-) -> Iterator[Optional[str]]:
-    if not remote_execution_enabled:
-        yield None
-        return
-    command = (
-        ["./pants.pex", "run", "build-support/bin:get_rbe_token"]
-        if os.getenv("CI")
-        else ["gcloud", "auth", "application-default", "print-access-token"]
-    )
-    token: str = subprocess.run(
-        command, encoding="utf-8", stdout=subprocess.PIPE, check=True
-    ).stdout
-    if not os.getenv("CI"):
-        token = token.splitlines()[0]
-    with tempfile.NamedTemporaryFile(mode="w+") as tf:
-        tf.write(token)
-        tf.seek(0)
-        yield tf.name
 
 
 # -------------------------------------------------------------------------
@@ -236,13 +199,6 @@ def check_pants_pex_exists() -> None:
 # -------------------------------------------------------------------------
 
 
-def _use_remote_execution(oauth_token_path: str) -> List[str]:
-    return [
-        "--pants-config-files=pants.remote.toml",
-        f"--remote-oauth-bearer-token-path={oauth_token_path}",
-    ]
-
-
 def _run_command(
     command: List[str],
     *,
@@ -260,15 +216,11 @@ def _run_command(
             die(die_message)
 
 
-def _test_command(
-    *, oauth_token_path: Optional[str] = None, extra_args: Optional[List[str]] = None
-) -> List[str]:
+def _test_command(*, extra_args: Optional[List[str]] = None) -> List[str]:
     targets = ["build-support::", "src::", "tests::", "pants-plugins::"]
     command = ["./pants.pex", "test", *targets]
     if extra_args:
         command.extend(extra_args)
-    if oauth_token_path:
-        command.extend(_use_remote_execution(oauth_token_path))
     return command
 
 
@@ -306,11 +258,11 @@ def run_smoke_tests() -> None:
             run_check(check)
 
 
-def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
-    targets = ["build-support::", "examples::", "src::", "tests::"]
+def run_lint(*, remote_cache_enabled: bool) -> None:
+    targets = ["build-support::", "src::", "tests::"]
     command = ["./pants.pex", "--tag=-nolint", "lint", "typecheck", *targets]
-    if oauth_token_path:
-        command.extend(_use_remote_execution(oauth_token_path))
+    if remote_cache_enabled:
+        command.append("--pants-config-files=pants.remote-cache.toml")
     _run_command(
         command,
         slug="Lint",
@@ -321,7 +273,7 @@ def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
 
 def run_clippy() -> None:
     _run_command(
-        ["build-support/bin/check_clippy.sh"],
+        ["./cargo", "clippy", "--all"],
         slug="RustClippy",
         start_message="Running Clippy on Rust code.",
         die_message="Clippy failure.",
@@ -332,29 +284,8 @@ def run_clippy() -> None:
 def run_cargo_audit() -> None:
     with travis_section("CargoAudit", "Running Cargo audit on Rust code"):
         try:
-            subprocess.run(
-                [
-                    "build-support/bin/native/cargo",
-                    "ensure-installed",
-                    "--package=cargo-audit",
-                    "--version=0.11.2",
-                ],
-                check=True,
-            )
-            subprocess.run(
-                [
-                    "build-support/bin/native/cargo",
-                    "audit",
-                    "-f",
-                    "src/rust/engine/Cargo.lock",
-                    # TODO(John Sirois): Kill --ignore RUSTSEC-2019-0003 when we can upgrade to an official
-                    # released version of protobuf with a fix.
-                    # See: https://github.com/pantsbuild/pants/issues/7760 for context.
-                    "--ignore",
-                    "RUSTSEC-2019-0003",
-                ],
-                check=True,
-            )
+            subprocess.run(["./cargo", "install", "--version", "0.13.1", "cargo-audit"], check=True)
+            subprocess.run(["./cargo", "audit"], check=True)
         except subprocess.CalledProcessError:
             die("Cargo audit failure")
 
@@ -362,13 +293,12 @@ def run_cargo_audit() -> None:
 def run_rust_tests() -> None:
     is_macos = platform.system() == "Darwin"
     command = [
-        "build-support/bin/native/cargo",
+        "./cargo",
         "test",
         "--all",
-        # We pass --tests to skip doc tests, because our generated protos contain invalid doc tests in
-        # their comments.
+        # We pass --tests to skip doc tests because our generated protos contain invalid doc tests
+        # in their comments.
         "--tests",
-        "--manifest-path=src/rust/engine/Cargo.toml",
         "--",
         "--nocapture",
     ]
@@ -384,20 +314,21 @@ def run_rust_tests() -> None:
 
 
 def run_python_tests(
-    *, include_unit: bool, include_integration: bool, oauth_token_path: Optional[str] = None
+    *, include_unit: bool, include_integration: bool, remote_cache_enabled: bool
 ) -> None:
-    if include_unit and include_integration:
-        extra_args = []
-    elif include_unit and not include_integration:
-        extra_args = ["--tag=-integration"]
-    elif not include_unit and include_integration:
-        extra_args = ["--tag=+integration"]
-    else:
+    extra_args = []
+    if remote_cache_enabled:
+        extra_args.append("--pants-config-files=pants.remote-cache.toml")
+    if not include_unit and not include_integration:
         raise ValueError(
             "Must specify True for at least one of `include_unit` and `include_integration`."
         )
+    elif include_unit and not include_integration:
+        extra_args.append("--tag=-integration")
+    elif not include_unit and include_integration:
+        extra_args.append("--tag=+integration")
     _run_command(
-        command=_test_command(oauth_token_path=oauth_token_path, extra_args=extra_args),
+        command=_test_command(extra_args=extra_args),
         slug="PythonTests",
         start_message="Running Python tests.",
         die_message="Python test failure.",

@@ -7,15 +7,16 @@ from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.python.grpc_python_plugin import GrpcPythonPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
-from pants.backend.codegen.protobuf.target_types import ProtobufGrcpToggle, ProtobufSources
+from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
 from pants.backend.python.target_types import PythonSources
-from pants.backend.python.util_rules import extract_pex, pex
-from pants.backend.python.util_rules.extract_pex import ExtractedPexDistributions
+from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
+    PexResolveInfo,
+    VenvPex,
+    VenvPexRequest,
 )
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -37,7 +38,7 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     Sources,
     TransitiveTargets,
-    TransitiveTargetsRequestLite,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -66,9 +67,8 @@ async def generate_python_from_protobuf(
     # Protoc needs all transitive dependencies on `protobuf_libraries` to work properly. It won't
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
-    # TODO(#10917): Use TransitiveTargets instead of TransitiveTargetsLite.
     transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequestLite([request.protocol_target.address])
+        TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])
     )
 
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
@@ -96,23 +96,47 @@ async def generate_python_from_protobuf(
         target_stripped_sources_request,
     )
 
-    # To run the MyPy Protobuf plugin, we first install it with Pex, then extract the wheels and
-    # point Protoc to the extracted wheels with its `--plugin` argument.
-    extracted_mypy_wheels = None
+    protoc_gen_mypy_script = "protoc-gen-mypy"
+    protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
+    mypy_pex = None
+    mypy_request = PexRequest(
+        output_filename="mypy_protobuf.pex",
+        internal_only=True,
+        requirements=PexRequirements([python_protobuf_subsystem.mypy_plugin_version]),
+        # TODO(John Sirois): Fix these interpreter constraints to track the actual
+        #  python requirement of the mypy_plugin_version or else plumb an option for
+        #  manually setting the constraint to track what mypy_plugin_version needs:
+        #  https://github.com/pantsbuild/pants/issues/11565
+        # Here we guess a constraint that will likely work with any mypy_plugin_version
+        # selected.
+        interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5"]),
+    )
+
     if python_protobuf_subsystem.mypy_plugin:
         mypy_pex = await Get(
-            Pex,
-            PexRequest(
-                output_filename="mypy_protobuf.pex",
-                internal_only=True,
-                requirements=PexRequirements([python_protobuf_subsystem.mypy_plugin_version]),
-                # This is solely to ensure that we use an appropriate interpreter when resolving
-                # the distribution. We don't actually run the distribution directly with Python,
-                # as we extract out its binary.
-                interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5"]),
+            VenvPex,
+            VenvPexRequest(
+                bin_names=[protoc_gen_mypy_script],
+                pex_request=mypy_request,
             ),
         )
-        extracted_mypy_wheels = await Get(ExtractedPexDistributions, Pex, mypy_pex)
+
+        if request.protocol_target.get(ProtobufGrpcToggle).value:
+            mypy_info = await Get(PexResolveInfo, VenvPex, mypy_pex)
+
+            # In order to generate stubs for gRPC code, we need mypy-protobuf 2.0 or above.
+            if any(
+                dist_info.project_name == "mypy-protobuf" and dist_info.version.major >= 2
+                for dist_info in mypy_info
+            ):
+                # TODO: Use `pex_path` once VenvPex stores a Pex field.
+                mypy_pex = await Get(
+                    VenvPex,
+                    VenvPexRequest(
+                        bin_names=[protoc_gen_mypy_script, protoc_gen_mypy_grpc_script],
+                        pex_request=mypy_request,
+                    ),
+                )
 
     downloaded_grpc_plugin = (
         await Get(
@@ -120,7 +144,7 @@ async def generate_python_from_protobuf(
             ExternalToolRequest,
             grpc_python_plugin.get_request(Platform.current),
         )
-        if request.protocol_target.get(ProtobufGrcpToggle).value
+        if request.protocol_target.get(ProtobufGrpcToggle).value
         else None
     )
 
@@ -129,22 +153,17 @@ async def generate_python_from_protobuf(
         downloaded_protoc_binary.digest,
         empty_output_dir,
     ]
-    if extracted_mypy_wheels:
-        unmerged_digests.append(extracted_mypy_wheels.digest)
+    if mypy_pex:
+        unmerged_digests.append(mypy_pex.digest)
     if downloaded_grpc_plugin:
         unmerged_digests.append(downloaded_grpc_plugin.digest)
     input_digest = await Get(Digest, MergeDigests(unmerged_digests))
 
     argv = [downloaded_protoc_binary.exe, "--python_out", output_dir]
-    if extracted_mypy_wheels:
-        mypy_plugin_path = next(
-            p
-            for p in extracted_mypy_wheels.wheel_directory_paths
-            if p.startswith(".deps/mypy_protobuf-")
-        )
+    if mypy_pex:
         argv.extend(
             [
-                f"--plugin=protoc-gen-mypy={mypy_plugin_path}/bin/protoc-gen-mypy",
+                f"--plugin=protoc-gen-mypy={mypy_pex.bin[protoc_gen_mypy_script].argv0}",
                 "--mypy_out",
                 output_dir,
             ]
@@ -153,17 +172,21 @@ async def generate_python_from_protobuf(
         argv.extend(
             [f"--plugin=protoc-gen-grpc={downloaded_grpc_plugin.exe}", "--grpc_out", output_dir]
         )
+
+        if mypy_pex and protoc_gen_mypy_grpc_script in mypy_pex.bin:
+            argv.extend(
+                [
+                    f"--plugin=protoc-gen-mypy_grpc={mypy_pex.bin[protoc_gen_mypy_grpc_script].argv0}",
+                    "--mypy_grpc_out",
+                    output_dir,
+                ]
+            )
+
     argv.extend(target_sources_stripped.snapshot.files)
-
-    env = {}
-    if extracted_mypy_wheels:
-        env["PYTHONPATH"] = ":".join(extracted_mypy_wheels.wheel_directory_paths)
-
     result = await Get(
         ProcessResult,
         Process(
             argv,
-            env=env,
             input_digest=input_digest,
             description=f"Generating Python sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
@@ -197,7 +220,6 @@ async def generate_python_from_protobuf(
 def rules():
     return [
         *collect_rules(),
-        *extract_pex.rules(),
         *pex.rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromProtobufRequest),
     ]

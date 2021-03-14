@@ -6,8 +6,9 @@ import zipfile
 from io import BytesIO
 from textwrap import dedent
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
-from pants.backend.python.target_types import PexBinary, resolve_pex_entry_point
+from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
@@ -159,13 +160,13 @@ def test_archive() -> None:
             *target_type_rules(),
             *pex_from_targets.rules(),
             *package_pex_binary.rules(),
-            resolve_pex_entry_point,
+            *target_types_rules.rules(),
             QueryRule(BuiltPackage, [ArchiveFieldSet]),
         ],
         target_types=[ArchiveTarget, Files, RelocatedFiles, PexBinary],
     )
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", "--no-pants-distdir-legacy-paths"]
+        ["--backend-packages=pants.backend.python"], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
     )
 
     rule_runner.create_file("resources/d1.json", "{'k': 1}")
@@ -187,7 +188,7 @@ def test_archive() -> None:
     )
 
     rule_runner.create_file("project/app.py", "print('hello world!')")
-    rule_runner.add_to_build_file("project", "pex_binary(sources=['app.py'])")
+    rule_runner.add_to_build_file("project", "pex_binary(entry_point='app.py')")
 
     rule_runner.add_to_build_file(
         "",

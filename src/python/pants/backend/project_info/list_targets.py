@@ -11,9 +11,8 @@ from pants.engine.target import DescriptionField, ProvidesField, UnexpandedTarge
 
 
 class ListSubsystem(LineOriented, GoalSubsystem):
-    """Lists all targets matching the file or target arguments."""
-
     name = "list"
+    help = "Lists all targets matching the file or target arguments."
 
     @classmethod
     def register_options(cls, register):
@@ -25,20 +24,6 @@ class ListSubsystem(LineOriented, GoalSubsystem):
             help=(
                 "List only targets that provide an artifact, displaying the columns specified by "
                 "--provides-columns."
-            ),
-        )
-        register(
-            "--provides-columns",
-            default="address,artifact_id",
-            help=(
-                "Display these columns when --provides is specified. Available columns are: "
-                "address, artifact_id, repo_name, repo_url, push_db_basedir"
-            ),
-            removal_version="2.0.1.dev0",
-            removal_hint=(
-                "The option `--provides-columns` no longer does anything. It was specific to the "
-                "JVM backend, so no longer makes sense with Pants 2.0 initially only supporting "
-                "Python."
             ),
         )
         register(

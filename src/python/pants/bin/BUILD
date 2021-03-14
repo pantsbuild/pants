@@ -2,20 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=["*.py", "!pants_exe.py", "!pants_loader.py"],
-)
-
-python_library(
-  name="pants_exe",
-  sources=["pants_exe.py"],
+  sources=["*.py", "!pants_loader.py"],
 )
 
 python_library(
   name="pants_loader",
   sources=["pants_loader.py"],
-  dependencies=[
-    ":pants_exe",  # NB: This is not inferred.
-  ],
 )
 
 # This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for
@@ -54,4 +46,9 @@ pex_binary(
   emit_warnings=False,
   # To allow for loading `native_engine.so` when built as a pex, we set zip_safe=False.
   zip_safe=False,
+)
+
+python_integration_tests(
+  name='integration',
+  uses_pants_run=True,
 )

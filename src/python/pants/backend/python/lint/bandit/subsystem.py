@@ -4,17 +4,18 @@
 from typing import Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
 from pants.option.custom_types import file_option, shell_str
 
 
 class Bandit(PythonToolBase):
-    """A tool for finding security issues in Python code (https://bandit.readthedocs.io)."""
-
     options_scope = "bandit"
+    help = """A tool for finding security issues in Python code (https://bandit.readthedocs.io)."""
+
     default_version = "bandit>=1.6.2,<1.7"
     # `setuptools<45` is for Python 2 support. `stevedore` is because the 3.0 release breaks Bandit.
     default_extra_requirements = ["setuptools<45", "stevedore<3"]
-    default_entry_point = "bandit"
+    default_main = ConsoleScript("bandit")
 
     @classmethod
     def register_options(cls, register):

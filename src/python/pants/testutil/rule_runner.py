@@ -1,39 +1,32 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+import multiprocessing
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    Mapping,
-    Optional,
-    Sequence,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence, Tuple, Type, TypeVar, cast
 
 from colors import blue, cyan, green, magenta, red, yellow
 
 from pants.base.build_root import BuildRoot
+from pants.base.deprecated import deprecated
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules import pants_environment
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.addresses import Address
 from pants.engine.console import Console
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Get, Params
 from pants.engine.internals.session import SessionValues
@@ -43,13 +36,20 @@ from pants.engine.rules import Rule
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
+from pants.init.logging import initialize_stdio, stdio_destination
 from pants.option.global_options import ExecutionOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import recursive_dirname, safe_file_dump, safe_mkdir, safe_open
+from pants.util.contextutil import temporary_dir, temporary_file
+from pants.util.dirutil import (
+    recursive_dirname,
+    safe_file_dump,
+    safe_mkdir,
+    safe_mkdtemp,
+    safe_open,
+)
 from pants.util.ordered_set import FrozenOrderedSet
 
 # -----------------------------------------------------------------------------------------------
@@ -60,6 +60,9 @@ from pants.util.ordered_set import FrozenOrderedSet
 _O = TypeVar("_O")
 
 
+_EXECUTOR = PyExecutor(multiprocessing.cpu_count(), multiprocessing.cpu_count() * 4)
+
+
 @dataclass(frozen=True)
 class GoalRuleResult:
     exit_code: int
@@ -67,7 +70,7 @@ class GoalRuleResult:
     stderr: str
 
     @staticmethod
-    def noop() -> "GoalRuleResult":
+    def noop() -> GoalRuleResult:
         return GoalRuleResult(0, stdout="", stderr="")
 
 
@@ -75,16 +78,19 @@ class GoalRuleResult:
 @dataclass
 class RuleRunner:
     build_root: str
+    options_bootstrapper: OptionsBootstrapper
     build_config: BuildConfiguration
     scheduler: SchedulerSession
 
     def __init__(
         self,
         *,
-        rules: Optional[Iterable] = None,
-        target_types: Optional[Iterable[Type[Target]]] = None,
-        objects: Optional[Dict[str, Any]] = None,
-        context_aware_object_factories: Optional[Dict[str, Any]] = None,
+        rules: Iterable | None = None,
+        target_types: Iterable[type[Target]] | None = None,
+        objects: dict[str, Any] | None = None,
+        context_aware_object_factories: dict[str, Any] | None = None,
+        isolated_local_store: bool = False,
+        ca_certs_path: str | None = None,
     ) -> None:
         self.build_root = os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
         safe_mkdir(self.build_root, clean=True)
@@ -96,8 +102,8 @@ class RuleRunner:
         all_rules = (
             *(rules or ()),
             *source_root.rules(),
-            *pants_environment.rules(),
-            QueryRule(WrappedTarget, (Address,)),
+            QueryRule(WrappedTarget, [Address]),
+            QueryRule(UnionMembership, []),
         )
         build_config_builder = BuildConfiguration.Builder()
         build_config_builder.register_aliases(
@@ -109,29 +115,41 @@ class RuleRunner:
         build_config_builder.register_target_types(target_types or ())
         self.build_config = build_config_builder.create()
 
-        options_bootstrapper = create_options_bootstrapper()
-        global_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        local_store_dir = global_options.local_store_dir
+        self.environment = CompleteEnvironment({})
+        self.options_bootstrapper = create_options_bootstrapper()
+        options = self.options_bootstrapper.full_options(self.build_config)
+        global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
+        local_store_dir = (
+            os.path.realpath(safe_mkdtemp())
+            if isolated_local_store
+            else global_options.local_store_dir
+        )
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
         graph_session = EngineInitializer.setup_graph_extended(
-            pants_ignore_patterns=[],
+            pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
+                self.build_root, global_options
+            ),
             use_gitignore=False,
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
             native=Native(),
-            options_bootstrapper=options_bootstrapper,
             build_root=self.build_root,
             build_configuration=self.build_config,
-            execution_options=ExecutionOptions.from_bootstrap_options(global_options),
+            executor=_EXECUTOR,
+            execution_options=ExecutionOptions.from_options(options, self.environment),
+            ca_certs_path=ca_certs_path,
+            native_engine_visualize_to=None,
         ).new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(
-                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment()}
+                {
+                    OptionsBootstrapper: self.options_bootstrapper,
+                    CompleteEnvironment: self.environment,
+                }
             ),
-            should_report_workunits=True,
         )
         self.scheduler = graph_session.scheduler_session
 
@@ -150,6 +168,15 @@ class RuleRunner:
     def target_types(self) -> FrozenOrderedSet[Type[Target]]:
         return self.build_config.target_types
 
+    @property
+    def union_membership(self) -> UnionMembership:
+        """An instance of `UnionMembership` with all the test's registered `UnionRule`s."""
+        return self.request(UnionMembership, [])
+
+    def new_session(self, build_id: str) -> None:
+        """Mutates this RuleRunner to begin a new Session with the same Scheduler."""
+        self.scheduler = self.scheduler.scheduler.new_session(build_id)
+
     def request(self, output_type: Type[_O], inputs: Iterable[Any]) -> _O:
         result = assert_single_element(
             self.scheduler.product_request(output_type, [Params(*inputs)])
@@ -160,15 +187,15 @@ class RuleRunner:
         self,
         goal: Type[Goal],
         *,
-        global_args: Optional[Iterable[str]] = None,
-        args: Optional[Iterable[str]] = None,
-        env: Optional[Mapping[str, str]] = None,
+        global_args: Iterable[str] | None = None,
+        args: Iterable[str] | None = None,
+        env: Mapping[str, str] | None = None,
+        env_inherit: set[str] | None = None,
     ) -> GoalRuleResult:
         merged_args = (*(global_args or []), goal.name, *(args or []))
-        self.set_options(merged_args, env=env)
-        options_bootstrapper = create_options_bootstrapper(args=merged_args, env=env)
+        self.set_options(merged_args, env=env, env_inherit=env_inherit)
 
-        raw_specs = options_bootstrapper.get_full_options(
+        raw_specs = self.options_bootstrapper.full_options_for_scopes(
             [*GlobalOptions.known_scope_infos(), *goal.subsystem_cls.known_scope_infos()]
         ).specs
         specs = SpecsParser(self.build_root).parse_specs(raw_specs)
@@ -189,22 +216,38 @@ class RuleRunner:
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
 
-    def set_options(self, args: Iterable[str], *, env: Optional[Mapping[str, str]] = None) -> None:
+    def set_options(
+        self,
+        args: Iterable[str],
+        *,
+        env: Mapping[str, str] | None = None,
+        env_inherit: set[str] | None = None,
+    ) -> None:
         """Update the engine session with new options and/or environment variables.
 
-        The environment variables will be used to set the `PantsEnvironment`, which is the
+        The environment variables will be used to set the `CompleteEnvironment`, which is the
         environment variables captured by the parent Pants process. Some rules use this to be able
         to read arbitrary env vars. Any options that start with `PANTS_` will also be used to set
         options.
 
+        Environment variables listed in `env_inherit` and not in `env` will be inherited from the test
+        runner's environment (os.environ)
+
         This will override any previously configured values.
         """
-        options_bootstrapper = create_options_bootstrapper(args=args, env=env)
+        env = {
+            **{k: os.environ[k] for k in (env_inherit or set()) if k in os.environ},
+            **(env or {}),
+        }
+        self.options_bootstrapper = create_options_bootstrapper(args=args, env=env)
+        self.environment = CompleteEnvironment(env)
         self.scheduler = self.scheduler.scheduler.new_session(
             build_id="buildid_for_test",
-            should_report_workunits=True,
             session_values=SessionValues(
-                {OptionsBootstrapper: options_bootstrapper, PantsEnvironment: PantsEnvironment(env)}
+                {
+                    OptionsBootstrapper: self.options_bootstrapper,
+                    CompleteEnvironment: self.environment,
+                }
             ),
         )
 
@@ -229,7 +272,7 @@ class RuleRunner:
         self._invalidate_for(relpath)
         return path
 
-    def create_file(self, relpath: str, contents: Union[bytes, str] = "", mode: str = "w") -> str:
+    def create_file(self, relpath: str, contents: bytes | str = "", mode: str = "w") -> str:
         """Writes to a file under the buildroot.
 
         :API: public
@@ -256,7 +299,7 @@ class RuleRunner:
             self.create_file(os.path.join(path, f), contents=f)
 
     def add_to_build_file(
-        self, relpath: Union[str, PurePath], target: str, *, overwrite: bool = False
+        self, relpath: str | PurePath, target: str, *, overwrite: bool = False
     ) -> str:
         """Adds the given target specification to the BUILD file at relpath.
 
@@ -272,18 +315,15 @@ class RuleRunner:
         mode = "w" if overwrite else "a"
         return self.create_file(str(build_path), target, mode=mode)
 
-    def make_snapshot(self, files: Mapping[str, Union[str, bytes]]) -> Snapshot:
+    def make_snapshot(self, files: Mapping[str, str | bytes]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content."""
         with temporary_dir() as temp_dir:
             for file_name, content in files.items():
                 mode = "wb" if isinstance(content, bytes) else "w"
                 safe_file_dump(os.path.join(temp_dir, file_name), content, mode=mode)
-            return cast(
-                Snapshot,
-                self.scheduler.capture_snapshots((PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),))[
-                    0
-                ],
-            )
+            return self.scheduler.capture_snapshots(
+                (PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),)
+            )[0]
 
     def make_snapshot_of_empty_files(self, files: Iterable[str]) -> Snapshot:
         """Makes a snapshot with empty content for each file.
@@ -320,9 +360,9 @@ class MockGet:
 def run_rule_with_mocks(
     rule: Callable,
     *,
-    rule_args: Optional[Sequence[Any]] = None,
-    mock_gets: Optional[Sequence[MockGet]] = None,
-    union_membership: Optional[UnionMembership] = None,
+    rule_args: Sequence[Any] | None = None,
+    mock_gets: Sequence[MockGet] | None = None,
+    union_membership: UnionMembership | None = None,
 ):
     """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
 
@@ -419,9 +459,46 @@ def run_rule_with_mocks(
                 return e.value
 
 
+@contextmanager
+def mock_console(
+    options_bootstrapper: OptionsBootstrapper,
+) -> Iterator[Tuple[Console, StdioReader]]:
+    global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+    with initialize_stdio(global_bootstrap_options), open(
+        "/dev/null", "r"
+    ) as stdin, temporary_file(binary_mode=False) as stdout, temporary_file(
+        binary_mode=False
+    ) as stderr, stdio_destination(
+        stdin_fileno=stdin.fileno(),
+        stdout_fileno=stdout.fileno(),
+        stderr_fileno=stderr.fileno(),
+    ):
+        # NB: We yield a Console without overriding the destination argument, because we have
+        # already done a sys.std* level replacement. The replacement is necessary in order for
+        # InteractiveProcess to have native file handles to interact with.
+        yield Console(use_colors=global_bootstrap_options.colors), StdioReader(
+            _stdout=Path(stdout.name), _stderr=Path(stderr.name)
+        )
+
+
+@dataclass
+class StdioReader:
+    _stdout: Path
+    _stderr: Path
+
+    def get_stdout(self) -> str:
+        """Return all data that has been flushed to stdout so far."""
+        return self._stdout.read_text()
+
+    def get_stderr(self) -> str:
+        """Return all data that has been flushed to stderr so far."""
+        return self._stderr.read_text()
+
+
 class MockConsole:
     """An implementation of pants.engine.console.Console which captures output."""
 
+    @deprecated("2.5.0.dev0", hint_message="Use the mock_console contextmanager instead.")
     def __init__(self, use_colors=True):
         self.stdout = StringIO()
         self.stderr = StringIO()

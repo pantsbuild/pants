@@ -6,6 +6,7 @@ from typing import Iterable, Type
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals.setup_py import (
     AmbiguousOwnerError,
     DependencyOwner,
@@ -40,7 +41,6 @@ from pants.backend.python.target_types import (
     PythonDistribution,
     PythonLibrary,
     PythonRequirementLibrary,
-    resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.target_types import Files, Resources
@@ -56,7 +56,7 @@ _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 
 
 def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=rules,
         target_types=[
             PexBinary,
@@ -68,6 +68,8 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
         ],
         objects={"setup_py": PythonArtifact},
     )
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    return rule_runner
 
 
 # We use a trivial test that our SetupKwargs plugin hook works.
@@ -95,8 +97,8 @@ def chroot_rule_runner() -> RuleRunner:
             get_owned_dependencies,
             get_exporting_owner,
             *python_sources.rules(),
+            *target_types_rules.rules(),
             setup_kwargs_plugin,
-            resolve_pex_entry_point,
             SubsystemRule(SetupPyGeneration),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
             QueryRule(SetupPyChroot, (SetupPyChrootRequest,)),
@@ -226,14 +228,14 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
 
 
 def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
-    chroot_rule_runner.create_file("src/python/invalid_binary/app.py")
+    chroot_rule_runner.create_files("src/python/invalid_binary", ["app1.py", "app2.py"])
     chroot_rule_runner.add_to_build_file(
         "src/python/invalid_binary",
         textwrap.dedent(
             """
             python_library(name='not_a_binary', sources=[])
-            pex_binary(name='no_explicit_entrypoint', sources=["app.py"])
-            pex_binary(name='malformed_entrypoint', entry_point='invalid_binary.app')
+            pex_binary(name='invalid_entrypoint_unowned1', entry_point='app1.py')
+            pex_binary(name='invalid_entrypoint_unowned2', entry_point='invalid_binary.app2')
             python_distribution(
                 name='invalid_bin1',
                 provides=setup_py(
@@ -244,13 +246,13 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
                 name='invalid_bin2',
                 provides=setup_py(
                     name='invalid_bin2', version='1.1.1'
-                ).with_binaries(foo=':no_explicit_entrypoint')
+                ).with_binaries(foo=':invalid_entrypoint_unowned1')
             )
             python_distribution(
                 name='invalid_bin3',
                 provides=setup_py(
                     name='invalid_bin3', version='1.1.1'
-                ).with_binaries(foo=':malformed_entrypoint')
+                ).with_binaries(foo=':invalid_entrypoint_unowned2')
             )
             """
         ),
@@ -270,6 +272,41 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
         chroot_rule_runner,
         Address("src/python/invalid_binary", target_name="invalid_bin3"),
         InvalidEntryPoint,
+    )
+
+
+def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
+    chroot_rule_runner.create_file("src/python/project/app.py")
+    chroot_rule_runner.add_to_build_file(
+        "src/python/project",
+        textwrap.dedent(
+            """
+            python_library()
+            pex_binary(name='bin', entry_point='app.py:func')
+            python_distribution(
+                name='dist',
+                provides=setup_py(
+                    name='bin', version='1.1.1'
+                ).with_binaries(foo=':bin')
+            )
+            """
+        ),
+    )
+    assert_chroot(
+        chroot_rule_runner,
+        ["src/project/app.py", "setup.py", "MANIFEST.in"],
+        {
+            "name": "bin",
+            "version": "1.1.1",
+            "plugin_demo": "hello world",
+            "package_dir": {"": "src"},
+            "packages": ("project",),
+            "namespace_packages": (),
+            "install_requires": (),
+            "package_data": {},
+            "entry_points": {"console_scripts": ["foo=project.app:func"]},
+        },
+        Address("src/python/project", target_name="dist"),
     )
 
 
@@ -466,7 +503,8 @@ def test_get_requirements() -> None:
         version_scheme: FirstPartyDependencyVersionScheme = FirstPartyDependencyVersionScheme.EXACT,
     ):
         rule_runner.set_options(
-            [f"--setup-py-generation-first-party-dependency-version-scheme={version_scheme.value}"]
+            [f"--setup-py-generation-first-party-dependency-version-scheme={version_scheme.value}"],
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
         tgt = rule_runner.get_target(addr)
         reqs = rule_runner.request(

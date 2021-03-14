@@ -51,7 +51,7 @@ pub fn as_byte_owned_vec(str: &str) -> Vec<u8> {
 }
 
 pub fn as_bytes(str: &str) -> Bytes {
-  Bytes::from(str.as_bytes())
+  Bytes::copy_from_slice(str.as_bytes())
 }
 
 pub fn make_file(path: &Path, contents: &[u8], mode: u32) {

@@ -116,30 +116,28 @@ impl TimeSpan {
     }
   }
 
-  fn std_duration_from_protobuf_timestamp(
-    t: &protobuf::well_known_types::Timestamp,
-  ) -> std::time::Duration {
+  fn std_duration_from_timestamp(t: &prost_types::Timestamp) -> std::time::Duration {
     std::time::Duration::new(t.seconds as u64, t.nanos as u32)
   }
 
-  /// Construct a `TimeSpan` given a start and an end `Timestamp` from protobuf
+  /// Construct a `TimeSpan` given a start and an end `Timestamp` from protobuf timestamp.
   pub fn from_start_and_end(
-    start: &protobuf::well_known_types::Timestamp,
-    end: &protobuf::well_known_types::Timestamp,
+    start: &prost_types::Timestamp,
+    end: &prost_types::Timestamp,
     time_span_description: &str,
   ) -> Result<Self, String> {
-    let start = Self::std_duration_from_protobuf_timestamp(start);
-    let end = Self::std_duration_from_protobuf_timestamp(end);
-    let time_span = end.checked_sub(start).map(|duration| TimeSpan {
-      start: start.into(),
-      duration: duration.into(),
-    });
-    time_span.ok_or_else(|| {
-      format!(
+    let start = Self::std_duration_from_timestamp(start);
+    let end = Self::std_duration_from_timestamp(end);
+    match end.checked_sub(start) {
+      Some(duration) => Ok(TimeSpan {
+        start: start.into(),
+        duration: duration.into(),
+      }),
+      None => Err(format!(
         "Got negative {} time: {:?} - {:?}",
         time_span_description, end, start
-      )
-    })
+      )),
+    }
   }
 }
 

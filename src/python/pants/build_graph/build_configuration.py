@@ -1,24 +1,24 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import typing
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, DefaultDict, Dict, Set, Type, Union, cast
+from typing import Any, DefaultDict, Dict, Set, Type, cast
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.goal.run_tracker import RunTracker
 from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
 from pants.option.scope import normalize_scope
-from pants.reporting.reporting import Reporting
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.vcs.changed import Changed
 
@@ -31,9 +31,7 @@ _RESERVED_NAMES = {"global", "targets", "goals"}
 
 
 # Subsystems used outside of any rule.
-_GLOBAL_SUBSYSTEMS: FrozenOrderedSet[Type[Optionable]] = FrozenOrderedSet(
-    {GlobalOptions, Reporting, RunTracker, Changed}
-)
+_GLOBAL_SUBSYSTEMS: FrozenOrderedSet[Type[Optionable]] = FrozenOrderedSet({GlobalOptions, Changed})
 
 
 @dataclass(frozen=True)
@@ -45,6 +43,7 @@ class BuildConfiguration:
     rules: FrozenOrderedSet[Rule]
     union_rules: FrozenOrderedSet[UnionRule]
     target_types: FrozenOrderedSet[Type[Target]]
+    allow_unknown_options: bool
 
     @property
     def all_optionables(self) -> FrozenOrderedSet[Type[Optionable]]:
@@ -95,6 +94,7 @@ class BuildConfiguration:
         _rules: OrderedSet = field(default_factory=OrderedSet)
         _union_rules: OrderedSet = field(default_factory=OrderedSet)
         _target_types: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
+        _allow_unknown_options: bool = False
 
         def registered_aliases(self) -> BuildFileAliases:
             """Return the registered aliases exposed in BUILD files.
@@ -158,7 +158,7 @@ class BuildConfiguration:
         # in this because we pass whatever people put in their `register.py`s to this function;
         # I.e., this is an impure function that reads from the outside world. So, we use the type
         # hint `Any` and perform runtime type checking.
-        def register_optionables(self, optionables: Union[typing.Iterable[Type[Optionable]], Any]):
+        def register_optionables(self, optionables: typing.Iterable[Type[Optionable]] | Any):
             """Registers the given subsystem types."""
             if not isinstance(optionables, Iterable):
                 raise TypeError("The optionables must be an iterable, given {}".format(optionables))
@@ -200,9 +200,7 @@ class BuildConfiguration:
         # this because we pass whatever people put in their `register.py`s to this function;
         # I.e., this is an impure function that reads from the outside world. So, we use the type
         # hint `Any` and perform runtime type checking.
-        def register_target_types(
-            self, target_types: Union[typing.Iterable[Type[Target]], Any]
-        ) -> None:
+        def register_target_types(self, target_types: typing.Iterable[Type[Target]] | Any) -> None:
             """Registers the given target types."""
             if not isinstance(target_types, Iterable):
                 raise TypeError(
@@ -221,7 +219,15 @@ class BuildConfiguration:
                 )
             self._target_types.update(target_types)
 
-        def create(self) -> "BuildConfiguration":
+        def allow_unknown_options(self, allow: bool = True) -> None:
+            """Allows overriding whether Options parsing will fail for unrecognized Options.
+
+            Used to defer options failures while bootstrapping BuildConfiguration until after the
+            complete set of plugins is known.
+            """
+            self._allow_unknown_options = True
+
+        def create(self) -> BuildConfiguration:
             registered_aliases = BuildFileAliases(
                 objects=self._exposed_object_by_alias.copy(),
                 context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy(),
@@ -232,4 +238,5 @@ class BuildConfiguration:
                 rules=FrozenOrderedSet(self._rules),
                 union_rules=FrozenOrderedSet(self._union_rules),
                 target_types=FrozenOrderedSet(self._target_types),
+                allow_unknown_options=self._allow_unknown_options,
             )

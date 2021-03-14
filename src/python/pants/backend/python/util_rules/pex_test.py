@@ -1,24 +1,36 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
 import os.path
 import textwrap
 import zipfile
 from dataclasses import dataclass
-from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, cast
+from typing import Dict, Iterable, Iterator, List, Mapping, Tuple, cast
 
 import pytest
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 from pkg_resources import Requirement
 
-from pants.backend.python.target_types import PythonInterpreterCompatibility
+from pants.backend.python.target_types import (
+    EntryPoint,
+    InterpreterConstraintsField,
+    MainSpecification,
+)
 from pants.backend.python.util_rules.pex import (
     Pex,
+    PexDistributionInfo,
     PexInterpreterConstraints,
     PexPlatforms,
     PexProcess,
     PexRequest,
     PexRequirements,
+    PexResolveInfo,
+    VenvPex,
+    VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.engine.addresses import Address
@@ -187,6 +199,7 @@ def test_interpreter_constraints_minimum_python_version(
         ["CPython==3.9.1"],
         ["CPython>=3.8"],
         ["CPython>=3.9"],
+        ["CPython>=3.10"],
         ["CPython==3.8.*", "CPython==3.9.*"],
         ["PyPy>=3.8"],
     ],
@@ -214,12 +227,15 @@ def test_interpreter_constraints_do_not_require_python38(constraints):
 
 @dataclass(frozen=True)
 class MockFieldSet(FieldSet):
-    compatibility: PythonInterpreterCompatibility
+    interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
-    def create_for_test(cls, address: Address, compat: Optional[str]) -> "MockFieldSet":
+    def create_for_test(cls, address: Address, compat: str | None) -> MockFieldSet:
         return cls(
-            address=address, compatibility=PythonInterpreterCompatibility(compat, address=address)
+            address=address,
+            interpreter_constraints=InterpreterConstraintsField(
+                [compat] if compat else None, address=address
+            ),
         )
 
 
@@ -280,7 +296,7 @@ class ExactRequirement:
     version: str
 
     @classmethod
-    def parse(cls, requirement: str) -> "ExactRequirement":
+    def parse(cls, requirement: str) -> ExactRequirement:
         req = Requirement.parse(requirement)
         assert len(req.specs) == 1, (
             f"Expected an exact requirement with only 1 specifier, given {requirement} with "
@@ -305,8 +321,11 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pex_rules(),
             QueryRule(Pex, (PexRequest,)),
+            QueryRule(VenvPex, (PexRequest,)),
             QueryRule(Process, (PexProcess,)),
+            QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
+            QueryRule(PexResolveInfo, (VenvPex,)),
         ]
     )
 
@@ -314,15 +333,16 @@ def rule_runner() -> RuleRunner:
 def create_pex_and_get_all_data(
     rule_runner: RuleRunner,
     *,
-    requirements=PexRequirements(),
-    entry_point=None,
-    interpreter_constraints=PexInterpreterConstraints(),
-    platforms=PexPlatforms(),
-    sources: Optional[Digest] = None,
-    additional_inputs: Optional[Digest] = None,
+    pex_type: type[Pex | VenvPex] = Pex,
+    requirements: PexRequirements = PexRequirements(),
+    main: MainSpecification | None = None,
+    interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints(),
+    platforms: PexPlatforms = PexPlatforms(),
+    sources: Digest | None = None,
+    additional_inputs: Digest | None = None,
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
-    env: Optional[Mapping[str, str]] = None,
+    env: Mapping[str, str] | None = None,
     internal_only: bool = True,
 ) -> Dict:
     request = PexRequest(
@@ -331,21 +351,45 @@ def create_pex_and_get_all_data(
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         platforms=platforms,
-        entry_point=entry_point,
+        main=main,
         sources=sources,
         additional_inputs=additional_inputs,
-        additional_args=additional_pex_args,
+        additional_args=("--include-tools", *additional_pex_args),
     )
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", *additional_pants_args], env=env
+        ["--backend-packages=pants.backend.python", *additional_pants_args],
+        env=env,
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    pex = rule_runner.request(Pex, [request])
-    rule_runner.scheduler.write_digest(pex.digest)
+    pex = rule_runner.request(pex_type, [request])
+    if isinstance(pex, Pex):
+        digest = pex.digest
+    elif isinstance(pex, VenvPex):
+        digest = pex.digest
+    else:
+        raise AssertionError(f"Expected a Pex or a VenvPex but got a {type(pex)}.")
+    rule_runner.scheduler.write_digest(digest)
     pex_path = os.path.join(rule_runner.build_root, "test.pex")
+
+    pex_process_type = PexProcess if isinstance(pex, Pex) else VenvPexProcess
+    process = rule_runner.request(
+        Process,
+        [
+            pex_process_type(
+                pex,
+                argv=["info"],
+                extra_env=dict(PEX_TOOLS="1"),
+                description="Extract PEX-INFO.",
+            ),
+        ],
+    )
+
+    result = rule_runner.request(ProcessResult, [process])
+    pex_info_content = result.stdout.decode()
+
     with zipfile.ZipFile(pex_path, "r") as zipfp:
-        with zipfp.open("PEX-INFO", "r") as pex_info:
-            pex_info_content = pex_info.readline().decode()
-            pex_list = zipfp.namelist()
+        pex_list = zipfp.namelist()
+
     return {
         "pex": pex,
         "local_path": pex_path,
@@ -357,11 +401,12 @@ def create_pex_and_get_all_data(
 def create_pex_and_get_pex_info(
     rule_runner: RuleRunner,
     *,
-    requirements=PexRequirements(),
-    entry_point=None,
-    interpreter_constraints=PexInterpreterConstraints(),
-    platforms=PexPlatforms(),
-    sources: Optional[Digest] = None,
+    pex_type: type[Pex | VenvPex] = Pex,
+    requirements: PexRequirements = PexRequirements(),
+    main: MainSpecification | None = None,
+    interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints(),
+    platforms: PexPlatforms = PexPlatforms(),
+    sources: Digest | None = None,
     additional_pants_args: Tuple[str, ...] = (),
     additional_pex_args: Tuple[str, ...] = (),
     internal_only: bool = True,
@@ -370,8 +415,9 @@ def create_pex_and_get_pex_info(
         Dict,
         create_pex_and_get_all_data(
             rule_runner,
+            pex_type=pex_type,
             requirements=requirements,
-            entry_point=entry_point,
+            main=main,
             interpreter_constraints=interpreter_constraints,
             platforms=platforms,
             sources=sources,
@@ -394,19 +440,18 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
             ),
         ],
     )
-    pex_output = create_pex_and_get_all_data(rule_runner, entry_point="main", sources=sources)
+    pex_output = create_pex_and_get_all_data(rule_runner, main=EntryPoint("main"), sources=sources)
 
     pex_files = pex_output["files"]
     assert "pex" not in pex_files
     assert "main.py" in pex_files
     assert "subdir/sub.py" in pex_files
 
-    # We reasonably expect there to be a python interpreter on the test-running process's path.
-    env = {"PATH": os.getenv("PATH", "")}
-
+    # This should run the Pex using the same interpreter used to create it. We must set the `PATH` so that the shebang
+    # works.
     process = Process(
-        argv=("python", "test.pex"),
-        env=env,
+        argv=("./test.pex",),
+        env={"PATH": os.getenv("PATH", "")},
         input_digest=pex_output["pex"].digest,
         description="Run the pex and make sure it works",
     )
@@ -414,7 +459,8 @@ def test_pex_execution(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"from main\n"
 
 
-def test_pex_environment(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("pex_type", [Pex, VenvPex])
+def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
     sources = rule_runner.request(
         Digest,
         [
@@ -424,10 +470,10 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
                         path="main.py",
                         content=textwrap.dedent(
                             """
-                        from os import environ
-                        print(f"LANG={environ.get('LANG')}")
-                        print(f"ftp_proxy={environ.get('ftp_proxy')}")
-                        """
+                            from os import environ
+                            print(f"LANG={environ.get('LANG')}")
+                            print(f"ftp_proxy={environ.get('ftp_proxy')}")
+                            """
                         ).encode(),
                     ),
                 )
@@ -436,22 +482,24 @@ def test_pex_environment(rule_runner: RuleRunner) -> None:
     )
     pex_output = create_pex_and_get_all_data(
         rule_runner,
-        entry_point="main",
+        pex_type=pex_type,
+        main=EntryPoint("main"),
         sources=sources,
         additional_pants_args=(
             "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
             "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
         ),
+        interpreter_constraints=PexInterpreterConstraints(["CPython>=3.6"]),
         env={"LANG": "es_PY.UTF-8"},
     )
 
+    pex = pex_output["pex"]
+    pex_process_type = PexProcess if isinstance(pex, Pex) else VenvPexProcess
     process = rule_runner.request(
         Process,
         [
-            PexProcess(
-                pex_output["pex"],
-                argv=["python", "test.pex"],
-                input_digest=pex_output["pex"].digest,
+            pex_process_type(
+                pex,
                 description="Run the pex and check its reported environment",
             ),
         ],
@@ -473,28 +521,43 @@ def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
 
 
 def test_requirement_constraints(rule_runner: RuleRunner) -> None:
-    # This is intentionally old; a constraint will resolve us to a more modern version.
-    direct_dep = "requests==1.0.0"
-    constraints = [
-        "requests==2.23.0",
-        "certifi==2019.6.16",
-        "chardet==3.0.2",
-        "idna==2.7",
-        "urllib3==1.25.6",
-    ]
-    rule_runner.create_file("constraints.txt", "\n".join(constraints))
+    direct_deps = ["requests>=1.0.0,<=2.23.0"]
 
-    pex_info = create_pex_and_get_pex_info(
+    def assert_direct_requirements(pex_info):
+        assert set(Requirement.parse(r) for r in pex_info["requirements"]) == set(
+            Requirement.parse(d) for d in direct_deps
+        )
+
+    # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
+    # the range is a transitive closure over universal wheels.
+    direct_pex_info = create_pex_and_get_pex_info(
+        rule_runner, requirements=PexRequirements(direct_deps)
+    )
+    assert_direct_requirements(direct_pex_info)
+    assert {
+        "certifi-2020.12.5-py2.py3-none-any.whl",
+        "chardet-3.0.4-py2.py3-none-any.whl",
+        "idna-2.10-py2.py3-none-any.whl",
+        "requests-2.23.0-py2.py3-none-any.whl",
+        "urllib3-1.25.11-py2.py3-none-any.whl",
+    } == set(direct_pex_info["distributions"].keys())
+
+    constraints = ["requests==2.0.0"]
+    rule_runner.create_file("constraints.txt", "\n".join(constraints))
+    constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
-        requirements=PexRequirements([direct_dep]),
+        requirements=PexRequirements(direct_deps),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )
-    assert set(parse_requirements(pex_info["requirements"])) == set(parse_requirements(constraints))
+    assert_direct_requirements(constrained_pex_info)
+    assert {"requests-2.0.0-py2.py3-none-any.whl"} == set(
+        constrained_pex_info["distributions"].keys()
+    )
 
 
 def test_entry_point(rule_runner: RuleRunner) -> None:
     entry_point = "pydoc"
-    pex_info = create_pex_and_get_pex_info(rule_runner, entry_point=entry_point)
+    pex_info = create_pex_and_get_pex_info(rule_runner, main=EntryPoint(entry_point))
     assert pex_info["entry_point"] == entry_point
 
 
@@ -549,3 +612,19 @@ def test_additional_inputs(rule_runner: RuleRunner) -> None:
         with zipfp.open("__main__.py", "r") as main:
             main_content = main.read().decode()
     assert main_content[: len(preamble)] == preamble
+
+
+def test_venv_pex_resolve_info(rule_runner: RuleRunner) -> None:
+    venv_pex = create_pex_and_get_all_data(
+        rule_runner, pex_type=VenvPex, requirements=PexRequirements(["requests==2.23.0"])
+    )["pex"]
+    dists = rule_runner.request(PexResolveInfo, [venv_pex])
+    assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), SpecifierSet(""), ())
+    assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), SpecifierSet(""), ())
+    assert dists[2] == PexDistributionInfo(
+        "idna", Version("2.10"), SpecifierSet("!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"), ()
+    )
+    assert dists[3].project_name == "requests"
+    assert dists[3].version == Version("2.23.0")
+    assert Requirement.parse('PySocks!=1.5.7,>=1.5.6; extra == "socks"') in dists[3].requires_dists
+    assert dists[4].project_name == "urllib3"

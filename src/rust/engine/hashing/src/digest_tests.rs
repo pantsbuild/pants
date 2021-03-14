@@ -5,7 +5,7 @@ use serde_test;
 
 #[test]
 fn serialize_and_deserialize() {
-  let digest = Digest(
+  let digest = Digest::new(
     Fingerprint::from_hex_string(
       "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
     )

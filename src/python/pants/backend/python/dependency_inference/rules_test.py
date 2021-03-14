@@ -3,14 +3,13 @@
 
 from textwrap import dedent
 
-from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.rules import (
     InferConftestDependencies,
     InferInitDependencies,
-    InferPythonDependencies,
-    PythonInference,
+    InferPythonImportDependencies,
+    PythonInferSubsystem,
+    import_rules,
     infer_python_conftest_dependencies,
-    infer_python_dependencies,
     infer_python_init_dependencies,
 )
 from pants.backend.python.target_types import (
@@ -20,7 +19,6 @@ from pants.backend.python.target_types import (
     PythonTests,
 )
 from pants.backend.python.util_rules import ancestor_files
-from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import SubsystemRule
 from pants.engine.target import InferredDependencies
@@ -29,13 +27,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 def test_infer_python_imports() -> None:
     rule_runner = RuleRunner(
-        rules=[
-            *stripped_source_files.rules(),
-            *module_mapper.rules(),
-            infer_python_dependencies,
-            SubsystemRule(PythonInference),
-            QueryRule(InferredDependencies, (InferPythonDependencies,)),
-        ],
+        rules=[*import_rules(), QueryRule(InferredDependencies, [InferPythonImportDependencies])],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )
     rule_runner.add_to_build_file(
@@ -63,6 +55,7 @@ def test_infer_python_imports() -> None:
         dedent(
             """\
             import django
+            import unrecognized.module
 
             from util.dep import Demo
             from util import dep
@@ -90,35 +83,30 @@ def test_infer_python_imports() -> None:
         args = ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"]
         if enable_string_imports:
             args.append("--python-infer-string-imports")
-        rule_runner.set_options(args)
+        rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
         target = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies,
-            [InferPythonDependencies(target[PythonSources])],
+            InferredDependencies, [InferPythonImportDependencies(target[PythonSources])]
         )
 
-    normal_address = Address("src/python")
-    assert run_dep_inference(normal_address) == InferredDependencies(
+    build_address = Address("src/python")
+    assert run_dep_inference(build_address) == InferredDependencies(
         [
             Address("3rdparty/python", target_name="Django"),
             Address("src/python", relative_file_path="app.py"),
-            Address("src/python/util", relative_file_path="dep.py", target_name="util"),
+            Address("src/python/util", relative_file_path="dep.py"),
         ],
         sibling_dependencies_inferrable=True,
     )
 
-    generated_subtarget_address = Address(
-        "src/python", relative_file_path="f2.py", target_name="python"
-    )
-    assert run_dep_inference(generated_subtarget_address) == InferredDependencies(
-        [Address("src/python", relative_file_path="app.py", target_name="python")],
+    file_address = Address("src/python", relative_file_path="f2.py")
+    assert run_dep_inference(file_address) == InferredDependencies(
+        [Address("src/python", relative_file_path="app.py")],
         sibling_dependencies_inferrable=True,
     )
-    assert run_dep_inference(
-        generated_subtarget_address, enable_string_imports=True
-    ) == InferredDependencies(
+    assert run_dep_inference(file_address, enable_string_imports=True) == InferredDependencies(
         [
-            Address("src/python", relative_file_path="app.py", target_name="python"),
+            Address("src/python", relative_file_path="app.py"),
             Address("src/python/str_import/subdir", relative_file_path="f.py"),
             Address("src/python/str_import/subdir", relative_file_path="f.pyi"),
         ],
@@ -131,7 +119,7 @@ def test_infer_python_inits() -> None:
         rules=[
             *ancestor_files.rules(),
             infer_python_init_dependencies,
-            SubsystemRule(PythonInference),
+            SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
         ],
         target_types=[PythonLibrary],
@@ -141,7 +129,8 @@ def test_infer_python_inits() -> None:
             "--backend-packages=pants.backend.python",
             "--python-infer-inits",
             "--source-root-patterns=src/python",
-        ]
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
     rule_runner.create_file("src/python/root/__init__.py")
@@ -174,13 +163,14 @@ def test_infer_python_conftests() -> None:
         rules=[
             *ancestor_files.rules(),
             infer_python_conftest_dependencies,
-            SubsystemRule(PythonInference),
+            SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
         target_types=[PythonTests],
     )
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"]
+        ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
     rule_runner.create_file("src/python/root/conftest.py")

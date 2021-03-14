@@ -21,13 +21,7 @@ def main() -> None:
     files = itertools.chain.from_iterable(
         [Path().glob(f"{d}/**/__init__.py") for d in DIRS_TO_CHECK]
     )
-    root_init = Path("src/python/pants/__init__.py")
-    if '__import__("pkg_resources").declare_namespace(__name__)' not in root_init.read_text():
-        die(
-            f"{root_init} must have the line "
-            '`__import__("pkg_resources").declare_namespace(__name__)` in it.'
-        )
-    non_empty_inits = [f for f in files if bool(f.read_text()) and f != root_init]
+    non_empty_inits = [f for f in files if bool(f.read_text())]
     if non_empty_inits:
         die(
             "All `__init__.py` file should be empty, but the following had content: "

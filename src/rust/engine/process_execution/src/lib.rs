@@ -31,19 +31,18 @@
 extern crate derivative;
 
 use async_trait::async_trait;
+use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 pub use log::Level;
+use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
-use std::ops::AddAssign;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
-use store::UploadSummary;
-use workunit_store::{with_workunit, WorkunitMetadata, WorkunitStore};
+use workunit_store::{with_workunit, UserMetadataItem, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
-use hashing::Digest;
+use hashing::{Digest, EMPTY_FINGERPRINT};
 
 pub mod cache;
 #[cfg(test)]
@@ -61,17 +60,12 @@ pub mod remote_cache;
 #[cfg(test)]
 mod remote_cache_tests;
 
-pub mod speculate;
-#[cfg(test)]
-mod speculate_tests;
-
-pub mod nailgun;
-
 pub mod named_caches;
 
 extern crate uname;
 
 pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
+use concrete_time::{Duration, TimeSpan};
 use fs::RelativePath;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -84,52 +78,10 @@ impl Platform {
   pub fn current() -> Result<Platform, String> {
     let platform_info =
       uname::uname().map_err(|_| "Failed to get local platform info!".to_string())?;
-
     match platform_info {
       uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => Ok(Platform::Darwin),
       uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => Ok(Platform::Linux),
       uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
-    }
-  }
-}
-
-#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum PlatformConstraint {
-  Darwin,
-  Linux,
-  None,
-}
-
-impl PlatformConstraint {
-  pub fn current_platform_constraint() -> Result<PlatformConstraint, String> {
-    Platform::current().map(|p: Platform| p.into())
-  }
-}
-
-impl From<Platform> for PlatformConstraint {
-  fn from(platform: Platform) -> PlatformConstraint {
-    match platform {
-      Platform::Linux => PlatformConstraint::Linux,
-      Platform::Darwin => PlatformConstraint::Darwin,
-    }
-  }
-}
-
-impl TryFrom<&String> for PlatformConstraint {
-  type Error = String;
-  ///
-  /// This is a helper method to convert values from the python/engine/platform.py::PlatformConstraint enum,
-  /// which have been serialized, into the rust PlatformConstraint enum.
-  ///
-  fn try_from(variant_candidate: &String) -> Result<Self, Self::Error> {
-    match variant_candidate.as_ref() {
-      "darwin" => Ok(PlatformConstraint::Darwin),
-      "linux" => Ok(PlatformConstraint::Linux),
-      "none" => Ok(PlatformConstraint::None),
-      other => Err(format!(
-        "Unknown, platform {:?} encountered in parsing",
-        other
-      )),
     }
   }
 }
@@ -143,12 +95,41 @@ impl From<Platform> for String {
   }
 }
 
-impl From<PlatformConstraint> for String {
-  fn from(platform: PlatformConstraint) -> String {
-    match platform {
-      PlatformConstraint::Linux => "linux".to_string(),
-      PlatformConstraint::Darwin => "darwin".to_string(),
-      PlatformConstraint::None => "none".to_string(),
+impl TryFrom<String> for Platform {
+  type Error = String;
+  fn try_from(variant_candidate: String) -> Result<Self, Self::Error> {
+    match variant_candidate.as_ref() {
+      "darwin" => Ok(Platform::Darwin),
+      "linux" => Ok(Platform::Linux),
+      other => Err(format!(
+        "Unknown platform {:?} encountered in parsing",
+        other
+      )),
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum ProcessCacheScope {
+  // Cached in all locations, regardless of success or failure.
+  Always,
+  // Cached in all locations, but only if the process exits successfully.
+  Successful,
+  // Cached only in memory (i.e. memoized in pantsd), but never persistently.
+  PerRestart,
+  // Never cached anywhere: will run once per Session (i.e. once per run of Pants).
+  Never,
+}
+
+impl TryFrom<String> for ProcessCacheScope {
+  type Error = String;
+  fn try_from(variant_candidate: String) -> Result<Self, Self::Error> {
+    match variant_candidate.to_lowercase().as_ref() {
+      "always" => Ok(ProcessCacheScope::Always),
+      "successful" => Ok(ProcessCacheScope::Successful),
+      "per_restart" => Ok(ProcessCacheScope::PerRestart),
+      "never" => Ok(ProcessCacheScope::Never),
+      other => Err(format!("Unknown Process cache scope: {:?}", other)),
     }
   }
 }
@@ -222,11 +203,12 @@ pub struct Process {
   /// see https://github.com/pantsbuild/pants/issues/6416.
   ///
   pub jdk_home: Option<PathBuf>,
-  pub target_platform: PlatformConstraint,
+
+  pub platform_constraint: Option<Platform>,
 
   pub is_nailgunnable: bool,
 
-  pub cache_failures: bool,
+  pub cache_scope: ProcessCacheScope,
 }
 
 impl Process {
@@ -253,10 +235,10 @@ impl Process {
       level: log::Level::Info,
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
-      target_platform: PlatformConstraint::None,
+      platform_constraint: None,
       is_nailgunnable: false,
       execution_slot_variable: None,
-      cache_failures: false,
+      cache_scope: ProcessCacheScope::Successful,
     }
   }
 
@@ -300,10 +282,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
   type Error = String;
 
   fn try_from(req: MultiPlatformProcess) -> Result<Self, Self::Error> {
-    match req
-      .0
-      .get(&(PlatformConstraint::None, PlatformConstraint::None))
-    {
+    match req.0.get(&None) {
       Some(crossplatform_req) => Ok(crossplatform_req.clone()),
       None => Err(String::from(
         "Cannot coerce to a simple Process, no cross platform request exists.",
@@ -316,7 +295,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
 /// A container of platform constrained processes.
 ///
 #[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MultiPlatformProcess(pub BTreeMap<(PlatformConstraint, PlatformConstraint), Process>);
+pub struct MultiPlatformProcess(pub BTreeMap<Option<Platform>, Process>);
 
 impl MultiPlatformProcess {
   pub fn user_facing_name(&self) -> String {
@@ -343,12 +322,8 @@ impl MultiPlatformProcess {
 }
 
 impl From<Process> for MultiPlatformProcess {
-  fn from(req: Process) -> Self {
-    MultiPlatformProcess(
-      vec![((PlatformConstraint::None, PlatformConstraint::None), req)]
-        .into_iter()
-        .collect(),
-    )
+  fn from(proc: Process) -> Self {
+    MultiPlatformProcess(vec![(None, proc)].into_iter().collect())
   }
 }
 
@@ -357,7 +332,7 @@ impl From<Process> for MultiPlatformProcess {
 /// externally from the engine graph (e.g. when using remote execution or an external process
 /// cache).
 ///
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ProcessMetadata {
   pub instance_name: Option<String>,
   pub cache_key_gen_version: Option<String>,
@@ -367,37 +342,96 @@ pub struct ProcessMetadata {
 ///
 /// The result of running a process.
 ///
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Derivative, Clone, Debug, Eq)]
+#[derivative(PartialEq, Hash)]
 pub struct FallibleProcessResultWithPlatform {
   pub stdout_digest: Digest,
   pub stderr_digest: Digest,
   pub exit_code: i32,
-  pub platform: Platform,
-
-  // It's unclear whether this should be a Snapshot or a digest of a Directory. A Directory digest
-  // is handy, so let's try that out for now.
   pub output_directory: hashing::Digest,
-
-  pub execution_attempts: Vec<ExecutionStats>,
+  pub platform: Platform,
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
+  pub metadata: ProcessResultMetadata,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct ExecutionStats {
-  uploaded_bytes: usize,
-  uploaded_file_count: usize,
-  upload: Duration,
-  remote_queue: Option<Duration>,
-  remote_input_fetch: Option<Duration>,
-  remote_execution: Option<Duration>,
-  remote_output_store: Option<Duration>,
-  was_cache_hit: bool,
+/// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
+/// conversion is lossy, but the interesting parts are preserved.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProcessResultMetadata {
+  /// The time from starting to completion, including preparing the chroot and cleanup.
+  /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
+  /// `ExecutedActionMetadata`.
+  pub total_elapsed: Option<Duration>,
 }
 
-impl AddAssign<UploadSummary> for ExecutionStats {
-  fn add_assign(&mut self, summary: UploadSummary) {
-    self.uploaded_file_count += summary.uploaded_file_count;
-    self.uploaded_bytes += summary.uploaded_file_bytes;
-    self.upload += summary.upload_wall_time;
+impl ProcessResultMetadata {
+  pub fn new(total_elapsed: Option<Duration>) -> Self {
+    ProcessResultMetadata { total_elapsed }
+  }
+
+  /// How much faster a cache hit was than running the process again.
+  ///
+  /// This includes the overhead of setting up and cleaning up the process for execution, and it
+  /// should include all overhead for the cache lookup.
+  ///
+  /// If the cache hit was slower than the original process, we return 0. Note that the cache hit
+  /// may still have been faster than rerunning the process a second time, e.g. if speculation
+  /// is used and the cache hit completed before the rerun; still, we cannot know how long the
+  /// second run would have taken, so the best we can do is report 0.
+  ///
+  /// If the original process's execution time was not recorded, we return None because we
+  /// cannot make a meaningful comparison.
+  pub fn time_saved_from_cache(
+    &self,
+    cache_lookup: std::time::Duration,
+  ) -> Option<std::time::Duration> {
+    self.total_elapsed.and_then(|original_process| {
+      let original_process: std::time::Duration = original_process.into();
+      original_process
+        .checked_sub(cache_lookup)
+        .or_else(|| Some(std::time::Duration::new(0, 0)))
+    })
+  }
+}
+
+impl From<ExecutedActionMetadata> for ProcessResultMetadata {
+  fn from(metadata: ExecutedActionMetadata) -> Self {
+    let total_elapsed = match (
+      metadata.worker_start_timestamp,
+      metadata.worker_completed_timestamp,
+    ) {
+      (Some(started), Some(completed)) => TimeSpan::from_start_and_end(&started, &completed, "")
+        .map(|span| span.duration)
+        .ok(),
+      _ => None,
+    };
+    Self { total_elapsed }
+  }
+}
+
+impl Into<ExecutedActionMetadata> for ProcessResultMetadata {
+  fn into(self) -> ExecutedActionMetadata {
+    let (total_start, total_end) = match self.total_elapsed {
+      Some(elapsed) => {
+        // Because we do not have the precise start time, we hardcode to starting at UNIX_EPOCH. We
+        // only care about accurately preserving the duration.
+        let start = prost_types::Timestamp {
+          seconds: 0,
+          nanos: 0,
+        };
+        let end = prost_types::Timestamp {
+          seconds: elapsed.secs as i64,
+          nanos: elapsed.nanos as i32,
+        };
+        (Some(start), Some(end))
+      }
+      None => (None, None),
+    };
+    ExecutedActionMetadata {
+      worker_start_timestamp: total_start,
+      worker_completed_timestamp: total_end,
+      ..ExecutedActionMetadata::default()
+    }
   }
 }
 
@@ -452,7 +486,11 @@ pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
     .0
     .values()
     .map(|ref process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
-    .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
+    .map(|(_a, _b, er)| {
+      er.action_digest
+        .map(|d| d.hash)
+        .unwrap_or_else(|| EMPTY_FINGERPRINT.to_hex())
+    })
     .collect();
   hashes.sort();
   Digest::of_bytes(
@@ -491,13 +529,16 @@ impl CommandRunner for BoundedCommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let name = format!("{}-waiting", req.workunit_name());
     let desc = req.user_facing_name();
-    let mut outer_metadata = WorkunitMetadata::with_level(Level::Debug);
+    let outer_metadata = WorkunitMetadata {
+      level: Level::Debug,
+      desc: Some(format!("(Waiting) {}", desc)),
+      // We don't want to display the workunit associated with processes waiting on a
+      // BoundedCommandRunner to show in the dynamic UI, so set the `blocked` flag
+      // on the workunit metadata in order to prevent this.
+      blocked: true,
+      ..WorkunitMetadata::default()
+    };
 
-    outer_metadata.desc = Some(format!("(Waiting) {}", desc));
-    // We don't want to display the workunit associated with processes waiting on a
-    // BoundedCommandRunner to show in the dynamic UI, so set the `blocked` flag
-    // on the workunit metadata in order to prevent this.
-    outer_metadata.blocked = true;
     let bounded_fut = {
       let inner = self.inner.clone();
       let semaphore = self.inner.1.clone();
@@ -510,8 +551,11 @@ impl CommandRunner for BoundedCommandRunner {
           desc,
           concurrency_id
         );
-        let mut metadata = WorkunitMetadata::with_level(req.workunit_level());
-        metadata.desc = Some(desc);
+        let metadata = WorkunitMetadata {
+          level: req.workunit_level(),
+          desc: Some(desc),
+          ..WorkunitMetadata::default()
+        };
 
         let metadata_updater = |result: &Result<FallibleProcessResultWithPlatform, String>,
                                 old_metadata| match result {
@@ -519,10 +563,15 @@ impl CommandRunner for BoundedCommandRunner {
           Ok(FallibleProcessResultWithPlatform {
             stdout_digest,
             stderr_digest,
+            exit_code,
             ..
           }) => WorkunitMetadata {
             stdout: Some(*stdout_digest),
             stderr: Some(*stderr_digest),
+            user_metadata: vec![(
+              "exit_code".to_string(),
+              UserMetadataItem::ImmediateId(*exit_code as i64),
+            )],
             ..old_metadata
           },
         };

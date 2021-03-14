@@ -23,15 +23,12 @@ source "${ROOT}/build-support/common.sh"
 
 # TODO: make this less hacky when porting to Python 3. Use proper `--python-version` flags, like
 #  those used by ci.py.
-if [[ "${USE_PY37:-false}" == "true" ]]; then
-  default_python=python3.7
-  interpreter_constraint="==3.7.*"
-elif [[ "${USE_PY38:-false}" == "true" ]]; then
+if [[ "${USE_PY38:-false}" == "true" ]]; then
   default_python=python3.8
   interpreter_constraint="==3.8.*"
 else
-  default_python=python3.6
-  interpreter_constraint="==3.6.*"
+  default_python=python3.7
+  interpreter_constraint="==3.7.*"
 fi
 
 export PY="${PY:-${default_python}}"
@@ -39,8 +36,8 @@ if ! command -v "${PY}" >/dev/null; then
   die "Python interpreter ${PY} not discoverable on your PATH."
 fi
 py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
-if [[ "${py_major_minor}" != "3.6"  && "${py_major_minor}" != "3.7" && "${py_major_minor}" != "3.8" ]]; then
-  die "Invalid interpreter. The release script requires Python 3.6, 3.7, or 3.8 (you are using ${py_major_minor})."
+if [[ "${py_major_minor}" != "3.7" && "${py_major_minor}" != "3.8" ]]; then
+  die "Invalid interpreter. The release script requires Python 3.7 or 3.8 (you are using ${py_major_minor})."
 fi
 
 # This influences what setuptools is run with, which determines the interpreter used for building
@@ -118,7 +115,7 @@ function pkg_testutil_install_test() {
   shift
   local PIP_ARGS=("$@")
   pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testutil==${version}" && \
-  python -c "import pants.testutil.option_util"
+  python -c "import pants.testutil.option_util, pants.testutil.rule_runner, pants.testutil.pants_integration_test"
 }
 
 #
@@ -337,7 +334,7 @@ function build_pex() {
       ;;
     fetch)
       local distribution_target_flags=()
-      abis=("cp-36-m" "cp-37-m" "cp-38-cp38")
+      abis=("cp-37-m" "cp-38-cp38")
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
           distribution_target_flags=("${distribution_target_flags[@]}" "--platform=${platform}-${abi}")
@@ -367,14 +364,11 @@ function build_pex() {
     requirements=("${requirements[@]}" "${pkg_name}==${PANTS_UNSTABLE_VERSION}")
   done
 
-  # Pants depends on twitter.common libraries that trigger pex warnings for not properly declaring
-  # their dependency on setuptools (for namespace package support). To prevent these known warnings
-  # from polluting stderr we pass `--no-emit-warnings`.
   execute_pex \
     -o "${dest}" \
-    --no-emit-warnings \
     --no-strip-pex-env \
     --script=pants \
+    --venv \
     "${distribution_target_flags[@]}" \
     "${requirements[@]}"
 

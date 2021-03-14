@@ -3,6 +3,7 @@
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from textwrap import dedent
 from typing import Mapping, Optional, Tuple, cast
 
@@ -10,21 +11,22 @@ from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine import process
 from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.process import BinaryPath, BinaryPathRequest, BinaryPaths, BinaryPathTest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.option.global_options import GlobalOptions
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var
 
 
 class PexRuntimeEnvironment(Subsystem):
-    """How Pants uses Pex to run Python subprocesses."""
-
     options_scope = "pex"
+    help = "How Pants uses Pex to run Python subprocesses."
 
     @classmethod
     def register_options(cls, register):
@@ -39,8 +41,8 @@ class PexRuntimeEnvironment(Subsystem):
             metavar="<binary-paths>",
             help=(
                 "The PATH value that will be used by the PEX subprocess and any subprocesses it "
-                'spawns. The special string "<PATH>" will expand to the contents of the PATH env '
-                "var."
+                'spawns.\n\nThe special string "<PATH>" will expand to the contents of the PATH '
+                "env var."
             ),
         )
         register(
@@ -50,9 +52,9 @@ class PexRuntimeEnvironment(Subsystem):
             default=["python", "python3", "python2"],
             metavar="<bootstrap-python-names>",
             help=(
-                "The names of Python binaries to search for to bootstrap PEX files with. This does "
-                "not impact which Python interpreter is used to run your code, only what is used "
-                "to run the PEX tool. See the `interpreter_search_paths` option in "
+                "The names of Python binaries to search for to bootstrap PEX files with.\n\nThis "
+                "does not impact which Python interpreter is used to run your code, only what is "
+                "used to run the PEX tool. See the `interpreter_search_paths` option in "
                 "`[python-setup]` to influence where interpreters are searched for."
             ),
         )
@@ -61,15 +63,17 @@ class PexRuntimeEnvironment(Subsystem):
             advanced=True,
             type=int,
             default=0,
-            help="Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging).",
+            help=(
+                "Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging)."
+            ),
         )
 
-    @memoized_property
-    def path(self) -> Tuple[str, ...]:
+    @memoized_method
+    def path(self, env: Environment) -> Tuple[str, ...]:
         def iter_path_entries():
             for entry in self.options.executable_search_paths:
                 if entry == "<PATH>":
-                    path = os.environ.get("PATH")
+                    path = env.get("PATH")
                     if path:
                         for path_entry in path.split(os.pathsep):
                             yield path_entry
@@ -102,16 +106,18 @@ class PexEnvironment(EngineAwareReturnType):
     path: Tuple[str, ...]
     interpreter_search_paths: Tuple[str, ...]
     subprocess_environment_dict: FrozenDict[str, str]
+    named_caches_dir: str
     bootstrap_python: Optional[PythonExecutable] = None
 
     def create_argv(
         self, pex_filepath: str, *args: str, python: Optional[PythonExecutable] = None
     ) -> Tuple[str, ...]:
         python = python or self.bootstrap_python
-        argv = [python.path] if python else []
-        argv.append(pex_filepath)
-        argv.extend(args)
-        return tuple(argv)
+        if python:
+            return (python.path, pex_filepath, *args)
+        if os.path.basename(pex_filepath) == pex_filepath:
+            return (f"./{pex_filepath}", *args)
+        return (pex_filepath, *args)
 
     def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
         """The environment to use for running anything with PEX.
@@ -123,6 +129,7 @@ class PexEnvironment(EngineAwareReturnType):
             PATH=create_path_env_var(self.path),
             PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
+            PEX_ROOT=os.path.join(self.named_caches_dir, "pex_root"),
             **self.subprocess_environment_dict,
         )
         # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
@@ -150,7 +157,11 @@ async def find_pex_python(
     python_setup: PythonSetup,
     pex_runtime_env: PexRuntimeEnvironment,
     subprocess_env_vars: SubprocessEnvironmentVars,
+    global_options: GlobalOptions,
 ) -> PexEnvironment:
+    pex_relevant_environment = await Get(
+        Environment, EnvironmentRequest(["PATH", "HOME", "PYENV_ROOT"])
+    )
     # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+. The bootstrap
     # code will then re-exec itself if the underlying PEX user code needs a more specific python
     # interpreter. As such, we look for many Pythons usable by the PEX bootstrap code here for
@@ -159,7 +170,7 @@ async def find_pex_python(
         Get(
             BinaryPaths,
             BinaryPathRequest(
-                search_path=python_setup.interpreter_search_paths,
+                search_path=python_setup.interpreter_search_paths(pex_relevant_environment),
                 binary_name=binary_name,
                 test=BinaryPathTest(
                     args=[
@@ -211,9 +222,14 @@ async def find_pex_python(
         return None
 
     return PexEnvironment(
-        path=pex_runtime_env.path,
-        interpreter_search_paths=tuple(python_setup.interpreter_search_paths),
+        path=pex_runtime_env.path(pex_relevant_environment),
+        interpreter_search_paths=tuple(
+            python_setup.interpreter_search_paths(pex_relevant_environment)
+        ),
         subprocess_environment_dict=subprocess_env_vars.vars,
+        # TODO: This path normalization is duplicated with `engine_initializer.py`. How can we do
+        #  the normalization only once, via the options system?
+        named_caches_dir=Path(global_options.options.named_caches_dir).resolve().as_posix(),
         bootstrap_python=first_python_binary(),
     )
 

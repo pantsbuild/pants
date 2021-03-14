@@ -1,5 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import dataclasses
 from textwrap import dedent
 from typing import List, Optional, Sequence, Tuple
@@ -15,7 +18,10 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.target import Target
-from pants.testutil.python_interpreter_selection import skip_unless_python38_present
+from pants.testutil.python_interpreter_selection import (
+    skip_unless_python38_present,
+    skip_unless_python39_present,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -50,18 +56,27 @@ def make_target(
     for source_file in source_files:
         rule_runner.create_file(source_file.path, source_file.content.decode())
     rule_runner.add_to_build_file(
-        "", f"python_library(name='{name}', compatibility={repr(interpreter_constraints)})\n"
+        "",
+        dedent(
+            f"""\
+            python_library(
+                name='{name}',
+                interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
+            )
+            """
+        ),
     )
     return rule_runner.get_target(Address("", target_name=name))
 
 
 def run_black(
     rule_runner: RuleRunner,
-    targets: List[Target],
+    targets: list[Target],
     *,
-    config: Optional[str] = None,
-    passthrough_args: Optional[str] = None,
+    config: str | None = None,
+    passthrough_args: str | None = None,
     skip: bool = False,
+    version: str | None = None,
 ) -> Tuple[Sequence[LintResult], FmtResult]:
     args = ["--backend-packages=pants.backend.python.lint.black"]
     if config is not None:
@@ -71,7 +86,9 @@ def run_black(
         args.append(f"--black-args='{passthrough_args}'")
     if skip:
         args.append("--black-skip")
-    rule_runner.set_options(args)
+    if version:
+        args.append(f"--black-version={version}")
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [BlackRequest(field_sets)])
     input_sources = rule_runner.request(
@@ -201,6 +218,36 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert "1 file would be left unchanged" in lint_results[0].stderr
     assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == get_digest(rule_runner, [py38_sources])
+    assert fmt_result.did_change is False
+
+
+@skip_unless_python39_present
+def test_works_with_python39(rule_runner: RuleRunner) -> None:
+    """Black's typed-ast dependency does not understand Python 3.9, so we must instead run Black
+    with Python 3.9 when relevant."""
+    py39_sources = FileContent(
+        "py39.py",
+        dedent(
+            """\
+            @lambda _: int
+            def replaced(x: bool) -> str:
+                return "42" if x is True else "1/137"
+            """
+        ).encode(),
+    )
+    target = make_target(rule_runner, [py39_sources], interpreter_constraints=">=3.9")
+    lint_results, fmt_result = run_black(
+        rule_runner,
+        [target],
+        # TODO: remove this and go back to using the default version once the new Black release
+        #  comes out.
+        version="Black@ git+https://github.com/psf/black.git@aebd3c37b28bbc0183a58d13b80e7595db3c09bb",
+    )
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 0
+    assert "1 file would be left unchanged" in lint_results[0].stderr
+    assert "1 file left unchanged" in fmt_result.stderr
+    assert fmt_result.output == get_digest(rule_runner, [py39_sources])
     assert fmt_result.did_change is False
 
 

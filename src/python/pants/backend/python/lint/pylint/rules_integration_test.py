@@ -7,7 +7,6 @@ from typing import Any, List, Optional, Sequence
 
 import pytest
 
-from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
@@ -26,7 +25,7 @@ def rule_runner() -> RuleRunner:
             *pylint_rules(),
             QueryRule(LintResults, (PylintRequest,)),
         ],
-        target_types=[PythonLibrary, PythonRequirementLibrary, PylintSourcePlugin],
+        target_types=[PythonLibrary, PythonRequirementLibrary],
     )
 
 
@@ -66,7 +65,7 @@ def make_target(
                 name={repr(name)},
                 sources={source_globs},
                 dependencies={[str(dep) for dep in dependencies or ()]},
-                compatibility={repr(interpreter_constraints)},
+                interpreter_constraints={[interpreter_constraints] if interpreter_constraints else None},
             )
             """
         ),
@@ -94,7 +93,7 @@ def run_pylint(
         args.append("--pylint-skip")
     if additional_args:
         args.extend(additional_args)
-    rule_runner.set_options(args)
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     results = rule_runner.request(
         LintResults,
         [PylintRequest(PylintFieldSet.create(tgt) for tgt in targets)],
@@ -412,15 +411,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     )
     rule_runner.add_to_build_file(
         "pants-plugins/plugins",
-        dedent(
-            """\
-            pylint_source_plugin(
-                name='print_plugin',
-                sources=['print_plugin.py'],
-                dependencies=['//:pylint', 'pants-plugins/plugins/subdir'],
-            )
-            """
-        ),
+        "python_library(dependencies=['//:pylint', 'pants-plugins/plugins/subdir'])",
     )
     config_content = dedent(
         """\
@@ -434,7 +425,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             rule_runner,
             [tgt],
             additional_args=[
-                "--pylint-source-plugins=['pants-plugins/plugins:print_plugin']",
+                "--pylint-source-plugins=['pants-plugins/plugins']",
                 f"--source-root-patterns=['pants-plugins/plugins', '{PACKAGE}']",
             ],
             config=config_content,
@@ -450,9 +441,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/source_plugin.py:2:0: C9871" in result.stdout
 
     # Ensure that running Pylint on the plugin itself still works.
-    plugin_tgt = rule_runner.get_target(
-        Address("pants-plugins/plugins", target_name="print_plugin")
-    )
+    plugin_tgt = rule_runner.get_target(Address("pants-plugins/plugins"))
     result = run_pylint_with_plugin(plugin_tgt)
     assert result.exit_code == 0
     assert "Your code has been rated at 10.00/10" in result.stdout

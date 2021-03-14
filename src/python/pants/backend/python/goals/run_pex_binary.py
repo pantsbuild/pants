@@ -33,11 +33,10 @@ async def create_pex_binary_run_request(
     entry_point, transitive_targets = await MultiGet(
         Get(
             ResolvedPexEntryPoint,
-            ResolvePexEntryPointRequest(field_set.entry_point, field_set.sources),
+            ResolvePexEntryPointRequest(field_set.entry_point),
         ),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
 
     # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
     # so that we can get the interpreter constraints for use in runner_pex_request.
@@ -63,7 +62,9 @@ async def create_pex_binary_run_request(
             internal_only=True,
             # Note that the entry point file is not in the PEX itself. It's loaded by setting
             # `PEX_EXTRA_SYS_PATH`.
-            entry_point=entry_point.val,
+            # TODO(John Sirois): Support ConsoleScript in PexBinary targets:
+            #  https://github.com/pantsbuild/pants/issues/11619
+            main=entry_point.val,
         ),
     )
 

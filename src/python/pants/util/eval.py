@@ -1,14 +1,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
-from typing import Any, Optional, Tuple, Type, Union
+from typing import Any, Type
 
 
 def parse_expression(
     val: str,
-    acceptable_types: Union[Type, Tuple[Type, ...]],
-    name: Optional[str] = None,
+    acceptable_types: type | tuple[type, ...],
+    name: str | None = None,
     raise_type: Type[BaseException] = ValueError,
 ) -> Any:
     """Attempts to parse the given `val` as a python expression of the specified `acceptable_types`.
