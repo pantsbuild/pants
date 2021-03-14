@@ -39,6 +39,13 @@ class PythonToolRequirementsBase(Subsystem):
             "tool allows you to install plugins or if you need to constrain a dependency to "
             "a certain version.",
         )
+        if cls.default_interpreter_constraints and not cls.register_interpreter_constraints:
+            raise ValueError(
+                f"`default_interpreter_constraints` are configured for `{cls.options_scope}`, but "
+                "`register_interpreter_constraints` is not set to `True`, so the "
+                "`--interpreter-constraints` option will not be registered. Did you mean to set "
+                "this?"
+            )
         if cls.register_interpreter_constraints:
             register(
                 "--interpreter-constraints",
