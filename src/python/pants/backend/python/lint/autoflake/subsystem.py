@@ -35,7 +35,7 @@ class Autoflake(PythonToolBase):
             member_type=shell_str,
             help=(
                 "Arguments to pass directly to autoflake, e.g. "
-                f'`--{cls.options_scope}-args=" --remove-unused-variables --remove-duplicate-keys"`.'
+                f'`--{cls.options_scope}-args="--remove-unused-variables --remove-duplicate-keys"`.'
             ),
         )
 

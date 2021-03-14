@@ -2,9 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+from textwrap import dedent
 from typing import List, Optional, Sequence, Tuple
 
 import pytest
+from pytest import mark
 
 from pants.backend.python.lint.autoflake.rules import AutoflakeFieldSet, AutoflakeRequest
 from pants.backend.python.lint.autoflake.rules import rules as autoflake_rules
@@ -126,15 +128,47 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is True
 
 
-# def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
-#     target = make_target(rule_runner, [NEEDS_CONFIG_SOURCE])
-#     lint_results, fmt_result = run_autoflake(rule_runner, [target], passthrough_args="--combine-as")
-#     assert len(lint_results) == 1
-#     assert lint_results[0].exit_code == 1
-#     assert "needs_config.py Imports are incorrectly sorted" in lint_results[0].stderr
-#     assert fmt_result.stdout == "Fixing needs_config.py\n"
-#     assert fmt_result.output == get_digest(rule_runner, [FIXED_NEEDS_CONFIG_SOURCE])
-#     assert fmt_result.did_change is True
+@mark.parametrize("args", ["--remove-all-unused-imports", "--imports=pandas"])
+def test_respects_passthrough_args(rule_runner: RuleRunner, args: str) -> None:
+    bad_file = FileContent(
+        "bad.py",
+        dedent(
+            """
+            from typing import List, cast
+
+            from pandas import DataFrame
+
+            x: List[float] = [1]
+
+            def f(x):  # useless pass
+                print(x)
+                pass
+            """
+        ).encode(),
+    )
+    fixed_file = FileContent(
+        "bad.py",
+        dedent(
+            """
+            from typing import List
+
+
+            x: List[float] = [1]
+
+            def f(x):  # useless pass
+                print(x)
+            """
+        ).encode(),
+    )
+    target = make_target(rule_runner, [bad_file])
+    lint_results, fmt_result = run_autoflake(rule_runner, [target], passthrough_args=args)
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 1
+    assert "bad.py: Unused" in lint_results[0].stdout
+    assert lint_results[0].stderr == ""
+    assert fmt_result.stdout == ""
+    assert fmt_result.output == get_digest(rule_runner, [fixed_file]), fmt_result.output
+    assert fmt_result.did_change is True
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
