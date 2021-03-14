@@ -10,8 +10,10 @@ from pants.option.custom_types import shell_str
 
 class Autoflake(PythonToolBase):
     options_scope = "autoflake"
-    help = "The Python tool for removing unused/useless statements (imports, variables, duplicate keys, pass-es) " \
-           "etc. (https://github.com/myint/autoflake)."
+    help = (
+        "The Python tool for removing unused/useless statements (imports, variables, duplicate keys, pass-es) "
+        "etc. (https://github.com/myint/autoflake)."
+    )
 
     default_version = "autoflake"
     default_main = ConsoleScript("autoflake")

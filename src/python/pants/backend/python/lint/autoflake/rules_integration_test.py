@@ -30,7 +30,9 @@ def rule_runner() -> RuleRunner:
     )
 
 
-GOOD_SOURCE = FileContent("good.py", b"from typing import List, cast\nx: List[float] = [cast(float, 1)]")
+GOOD_SOURCE = FileContent(
+    "good.py", b"from typing import List, cast\nx: List[float] = [cast(float, 1)]"
+)
 BAD_SOURCE = FileContent("bad.py", b"from typing import List, cast\nx: List[float] = [1]")
 FIXED_BAD_SOURCE = FileContent("bad.py", b"from typing import List\nx: List[float] = [1]")
 
@@ -81,6 +83,7 @@ def test_passing_source(rule_runner: RuleRunner) -> None:
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
     assert lint_results[0].stderr == ""
+    assert "No issues detected!" in lint_results[0].stdout
     assert fmt_result.stdout == ""
     assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE])
     assert fmt_result.did_change is False
@@ -91,8 +94,8 @@ def test_failing_source(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_autoflake(rule_runner, [target])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stderr
-    assert fmt_result.stdout == "Fixing bad.py\n"
+    assert "bad.py: Unused" in lint_results[0].stdout
+    assert fmt_result.stdout == ""
     assert fmt_result.output == get_digest(rule_runner, [FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
@@ -102,9 +105,9 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_autoflake(rule_runner, [target])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stderr
-    assert "good.py" not in lint_results[0].stderr
-    assert fmt_result.stdout == "Fixing bad.py\n"
+    assert "bad.py: Unused" in lint_results[0].stdout
+    assert "good.py" not in lint_results[0].stdout
+    assert fmt_result.stdout == ""
     assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
@@ -117,9 +120,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_autoflake(rule_runner, targets)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "bad.py Imports are incorrectly sorted" in lint_results[0].stderr
-    assert "good.py" not in lint_results[0].stderr
-    assert "Fixing bad.py\n" == fmt_result.stdout
+    assert "bad.py: Unused" in lint_results[0].stdout
+    assert "good.py" not in lint_results[0].stdout
     assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
@@ -152,15 +154,19 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, good_files)
     lint_results, fmt_result = run_autoflake(rule_runner, [target])
     assert len(lint_results) == 1 and lint_results[0].exit_code == 0
-    assert lint_results[0].stderr == "" and fmt_result.stdout == ""
+    assert (
+        lint_results[0].stderr == ""
+        and "No issues detected!" in lint_results[0].stdout
+        and fmt_result.stdout == ""
+    )
     assert fmt_result.output == get_digest(rule_runner, good_files)
     assert not fmt_result.did_change
 
     target = make_target(rule_runner, [BAD_SOURCE, bad_stub])
     lint_results, fmt_result = run_autoflake(rule_runner, [target])
     assert len(lint_results) == 1 and lint_results[0].exit_code == 1
-    assert "bad.pyi Imports are incorrectly sorted" in lint_results[0].stderr
-    assert fmt_result.stdout == "Fixing bad.py\nFixing bad.pyi\n"
+    assert "bad.pyi: Unused" in lint_results[0].stdout
+    assert fmt_result.stdout == ""
     fixed_bad_files = [FIXED_BAD_SOURCE, fixed_bad_stub]
     assert fmt_result.output == get_digest(rule_runner, [*fixed_bad_files, *good_files])
     assert fmt_result.did_change

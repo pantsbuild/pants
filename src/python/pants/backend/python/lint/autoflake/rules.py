@@ -19,9 +19,7 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import (
-    Digest,
-)
+from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
@@ -90,9 +88,7 @@ async def setup_autoflake(setup_request: SetupRequest, autoflake: Autoflake) -> 
         VenvPexProcess(
             autoflake_pex,
             argv=generate_args(
-                source_files=source_files,
-                autoflake=autoflake,
-                check_only=setup_request.check_only
+                source_files=source_files, autoflake=autoflake, check_only=setup_request.check_only
             ),
             input_digest=source_files_snapshot.digest,
             output_files=source_files_snapshot.files,

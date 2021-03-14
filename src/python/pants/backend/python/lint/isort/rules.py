@@ -2,10 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple, cast
-
-from packaging.specifiers import SpecifierSet
-from pkg_resources import Requirement
+from typing import Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
@@ -61,26 +58,9 @@ class Setup:
 
 
 def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool) -> Tuple[str, ...]:
-    # NB: isort auto-discovers config files in versions <5. Only isort>=5 we need to hardcode them via command line
-    # flags.
+    # NB: isort auto-discovers config files. There is no way to hardcode them via command line
+    # flags. So long as the files are in the Pex's input files, isort will use the config.
     args = []
-
-    old_releases = (  # Should this be a top level constant?
-        *[f'4.3.{i}' for i in range(22)],
-        *[f'4.2.{i}' for i in range(16)],
-        *[f'4.1.{i}' for i in range(3)],
-        '4.0.0',
-    )
-
-    if isort.config:
-        # We don't really expect users of isort<4
-        if isort.version is not None:
-            args.append(f"--settings-path={isort.config[0]}")  # TODO: which one to pick?
-        else:
-            requirement = Requirement.parse(isort.version)
-            specifier = cast(SpecifierSet, requirement.specifier)
-            if not list(specifier.filter(old_releases)):  # if isort>=5
-                args.append(f"--settings-path={isort.config[0]}")
     if check_only:
         args.append("--check-only")
     args.extend(isort.args)
