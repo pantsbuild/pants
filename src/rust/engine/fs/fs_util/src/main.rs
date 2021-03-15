@@ -421,21 +421,20 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           args.value_of("root").unwrap(),
         ));
         let store_copy = store.clone();
+        let path_globs = fs::PathGlobs::new(
+          args
+            .values_of("globs")
+            .unwrap()
+            .map(str::to_string)
+            .collect::<Vec<String>>(),
+          // By using `Ignore`, we say that we don't care if some globs fail to expand. Is
+          // that a valid assumption?
+          fs::StrictGlobMatching::Ignore,
+          fs::GlobExpansionConjunction::AllMatch,
+        )
+        .parse()?;
         let paths = posix_fs
-          .expand_globs(
-            fs::PathGlobs::new(
-              args
-                .values_of("globs")
-                .unwrap()
-                .map(str::to_string)
-                .collect::<Vec<String>>(),
-              // By using `Ignore`, we say that we don't care if some globs fail to expand. Is
-              // that a valid assumption?
-              fs::StrictGlobMatching::Ignore,
-              fs::GlobExpansionConjunction::AllMatch,
-            )
-            .parse()?,
-          )
+          .expand_globs(path_globs, None)
           .await
           .map_err(|e| format!("Error expanding globs: {:?}", e))?;
 

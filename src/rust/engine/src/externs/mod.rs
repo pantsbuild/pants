@@ -255,7 +255,6 @@ pub fn val_to_log_level(obj: &PyObject) -> Result<log::Level, String> {
   res.map(|py_level| py_level.into())
 }
 
-#[allow(dead_code)]
 /// Link to the Pants docs using the current version of Pants.
 pub fn docs_url(slug: &str) -> String {
   let gil = Python::acquire_gil();
