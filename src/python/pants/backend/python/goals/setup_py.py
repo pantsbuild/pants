@@ -889,7 +889,7 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
         if not isinstance(node, ast.Call):
             return False
         func = node.func
-        return (isinstance(func, ast.Attribute) and func.attr == func_name) or is_name(
+        return func.attr == func_name if isinstance(func, ast.Attribute) else is_name(
             func, func_name
         )
 
