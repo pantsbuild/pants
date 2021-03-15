@@ -481,7 +481,7 @@ class RuleIndex:
                 union_rules.add(entry)
             elif isinstance(entry, QueryRule):
                 queries.add(entry)
-            elif hasattr(entry, "__call__"):
+            elif callable(entry):
                 rule = getattr(entry, "rule", None)
                 if rule is None:
                     raise TypeError(f"Expected function {entry} to be decorated with @rule.")
