@@ -255,6 +255,22 @@ pub fn val_to_log_level(obj: &PyObject) -> Result<log::Level, String> {
   res.map(|py_level| py_level.into())
 }
 
+#[allow(dead_code)]
+/// Link to the Pants docs using the current version of Pants.
+pub fn docs_url(slug: &str) -> String {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  let docutil = py.import("pants.util.docutil").unwrap();
+  py.eval(
+    &format!("docs_url(\"{}\")", slug),
+    None,
+    Some(&docutil.dict(py)),
+  )
+  .unwrap()
+  .extract(py)
+  .unwrap()
+}
+
 pub fn create_exception(msg: &str) -> Value {
   Value::from(with_externs(|py, e| e.call_method(py, "create_exception", (msg,), None)).unwrap())
 }
