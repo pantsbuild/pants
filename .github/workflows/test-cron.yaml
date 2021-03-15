@@ -347,6 +347,8 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Expose Pythons
+      uses: ./.github/actions/expose-pythons
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
@@ -386,6 +388,8 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Expose Pythons
+      uses: ./.github/actions/expose-pythons
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:

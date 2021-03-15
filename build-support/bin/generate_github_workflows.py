@@ -136,6 +136,25 @@ def native_engine_so_download() -> Sequence[Step]:
     ]
 
 
+def setup_primary_python() -> Sequence[Step]:
+    return [
+        {
+            "name": "Set up Python ${{ matrix.python-version }}",
+            "uses": "actions/setup-python@v2",
+            "with": {"python-version": "${{ matrix.python-version }}"},
+        }
+    ]
+
+
+def expose_all_pythons() -> Sequence[Step]:
+    return [
+        {
+            "name": "Expose Pythons",
+            "uses": "./.github/actions/expose-pythons",
+        }
+    ]
+
+
 def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
     return {
         "bootstrap_pants_linux": {
@@ -145,11 +164,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "env": {"rust_version": "1.49.0"},
             "steps": [
                 *checkout(),
-                {
-                    "name": "Set up Python ${{ matrix.python-version }}",
-                    "uses": "actions/setup-python@v2",
-                    "with": {"python-version": "${{ matrix.python-version }}"},
-                },
+                *setup_primary_python(),
                 *bootstrap_caches(),
                 {
                     "name": "Set env vars",
@@ -175,11 +190,8 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "strategy": {"matrix": {"python-version": python_versions}},
             "steps": [
                 *checkout(),
-                {
-                    "name": "Set up Python ${{ matrix.python-version }}",
-                    "uses": "actions/setup-python@v2",
-                    "with": {"python-version": "${{ matrix.python-version }}"},
-                },
+                *setup_primary_python(),
+                *expose_all_pythons(),
                 *pants_virtualenv_cache(),
                 *native_engine_so_download(),
                 *pants_config_files(),
@@ -193,11 +205,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "strategy": {"matrix": {"python-version": python_versions}},
             "steps": [
                 *checkout(),
-                {
-                    "name": "Set up Python ${{ matrix.python-version }}",
-                    "uses": "actions/setup-python@v2",
-                    "with": {"python-version": "${{ matrix.python-version }}"},
-                },
+                *setup_primary_python(),
                 *pants_virtualenv_cache(),
                 *native_engine_so_download(),
                 *pants_config_files(),
@@ -214,11 +222,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "env": {"rust_version": "1.49.0"},
             "steps": [
                 *checkout(),
-                {
-                    "name": "Set up Python ${{ matrix.python-version }}",
-                    "uses": "actions/setup-python@v2",
-                    "with": {"python-version": "${{ matrix.python-version }}"},
-                },
+                *setup_primary_python(),
                 *bootstrap_caches(),
                 *pants_config_files(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
@@ -238,11 +242,8 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "strategy": {"matrix": {"python-version": python_versions}},
             "steps": [
                 {"name": "Check out code", "uses": "actions/checkout@v2"},
-                {
-                    "name": "Set up Python ${{ matrix.python-version }}",
-                    "uses": "actions/setup-python@v2",
-                    "with": {"python-version": "${{ matrix.python-version }}"},
-                },
+                *setup_primary_python(),
+                *expose_all_pythons(),
                 *pants_virtualenv_cache(),
                 *native_engine_so_download(),
                 *pants_config_files(),
