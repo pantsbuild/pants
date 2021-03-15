@@ -15,7 +15,7 @@ class Autoflake(PythonToolBase):
         "etc. (https://github.com/myint/autoflake)."
     )
 
-    default_version = "autoflake"
+    default_version = "autoflake>=1.3,<=1.4"
     default_main = ConsoleScript("autoflake")
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython==2.7.*", "CPython>=3.4,<3.9"]
