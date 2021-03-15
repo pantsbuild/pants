@@ -103,7 +103,6 @@ class RunTracker:
                 "path": get_buildroot(),
                 "version": VERSION,
                 "cmd_line": cmd_line,
-                "goals": self.goals,
                 "specs_from_command_line": specs,
             }
         )
