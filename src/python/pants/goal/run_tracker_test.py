@@ -76,7 +76,7 @@ def test_anonymous_telemetry(monkeypatch, **kwargs) -> None:
     with temporary_dir() as buildroot:
         with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
             opts = create_options_bootstrapper([]).bootstrap_options
-            monkeypatch.setattr(opts, "_goals", ["test", "lint"])
+            monkeypatch.setattr(opts, "_goals", ["test", "customgoal", "lint"])
             run_tracker = RunTracker(opts)
             run_tracker.start(run_start_time=time.time(), specs=[])
             kwargs["frozen_time"].tick(delta=datetime.timedelta(seconds=1))
@@ -97,7 +97,8 @@ def test_anonymous_telemetry(monkeypatch, **kwargs) -> None:
                 "repo_id",
                 "machine_id",
                 "user_id",
-                "goals",
+                "standard_goals",
+                "num_goals",
             ):
                 assert bool(telemetry.get(key))
 
@@ -105,6 +106,8 @@ def test_anonymous_telemetry(monkeypatch, **kwargs) -> None:
             assert telemetry["timestamp"] == "1578657601.0"
             assert telemetry["duration"] == "1.0"
             assert telemetry["outcome"] == "SUCCESS"
+            assert telemetry["standard_goals"] == ["test", "lint"]
+            assert telemetry["num_goals"] == "3"
 
 
 def test_anonymous_telemetry_with_no_repo_id() -> None:

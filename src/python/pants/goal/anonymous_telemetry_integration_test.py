@@ -11,7 +11,7 @@ _bad_repo_id_msg = "The repo_id must be between 30 and 60 characters long"
 
 
 def test_warn_if_no_explicit_setting() -> None:
-    result = run_pants(["roots"], config={})
+    result = run_pants(["roots"], config={}, use_pantsd=False)
     result.assert_success()
     assert _no_explicit_setting_msg in result.stderr
     assert _no_repo_id_msg not in result.stderr
@@ -19,16 +19,20 @@ def test_warn_if_no_explicit_setting() -> None:
 
 
 def test_warn_if_repo_id_unset() -> None:
-    result = run_pants(["roots"], config={"anonymous-telemetry": {"enabled": True}})
+    result = run_pants(
+        ["roots"], config={"anonymous-telemetry": {"enabled": True}}, use_pantsd=False
+    )
     result.assert_success()
     assert _no_explicit_setting_msg not in result.stderr
     assert _no_repo_id_msg in result.stderr
     assert _bad_repo_id_msg not in result.stderr
 
 
-def test_warn_if_repo_idinvalid() -> None:
+def test_warn_if_repo_id_invalid() -> None:
     result = run_pants(
-        ["roots"], config={"anonymous-telemetry": {"enabled": True, "repo_id": "tooshort"}}
+        ["roots"],
+        config={"anonymous-telemetry": {"enabled": True, "repo_id": "tooshort"}},
+        use_pantsd=False,
     )
     result.assert_success()
     assert _no_explicit_setting_msg not in result.stderr
@@ -38,7 +42,9 @@ def test_warn_if_repo_idinvalid() -> None:
 
 def test_no_warn_if_explicitly_on() -> None:
     result = run_pants(
-        ["roots"], config={"anonymous-telemetry": {"enabled": True, "repo_id": 36 * "a"}}
+        ["roots"],
+        config={"anonymous-telemetry": {"enabled": True, "repo_id": 36 * "a"}},
+        use_pantsd=False,
     )
     result.assert_success()
     assert _no_explicit_setting_msg not in result.stderr

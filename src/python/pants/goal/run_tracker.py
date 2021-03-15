@@ -107,7 +107,7 @@ class RunTracker:
             }
         )
 
-    def get_anonymous_telemetry_data(self, repo_id: str) -> Dict[str, str | List[str]]:
+    def get_anonymous_telemetry_data(self, repo_id: str) -> dict[str, str | list[str]]:
         # TODO: Find a way to know from a goal name whether it's a standard or a custom
         #  goal whose name could, in theory, reveal something proprietary. That's more work than
         #  we want to do at the moment, so we maintain this manual list for now.
@@ -153,7 +153,9 @@ class RunTracker:
             "machine_id": maybe_hash_with_repo_id_prefix(str(uuid.getnode())),
             "user_id": maybe_hash_with_repo_id_prefix(getpass.getuser()),
             # Note that we conserve the order in which the goals were specified on the cmd line.
-            "goals": [goal for goal in self.goals if goal in standard_goals],
+            "standard_goals": [goal for goal in self.goals if goal in standard_goals],
+            # Lets us know of any custom goals were used, without knowing their names.
+            "num_goals": str(len(self.goals)),
         }
 
     def set_pantsd_scheduler_metrics(self, metrics: Dict[str, int]) -> None:

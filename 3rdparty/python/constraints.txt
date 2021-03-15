@@ -9,7 +9,7 @@ chardet==4.0.0
 cryptography==3.4.6
 fasteners==0.15
 freezegun==1.0.0
-humbug==0.1.5
+humbug==0.1.9
 idna==2.10
 iniconfig==1.1.1
 monotonic==1.5

@@ -10,7 +10,7 @@ import uuid
 from typing import cast
 
 from humbug.consent import HumbugConsent  # type: ignore
-from humbug.report import Report, Reporter  # type: ignore
+from humbug.report import Modes, Report, Reporter  # type: ignore
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
@@ -35,10 +35,7 @@ _telemetry_docs_referral = f"See {_telemetry_docs_url} for details"
 
 class AnonymousTelemetry(Subsystem):
     options_scope = "anonymous-telemetry"
-    help = (
-        "Options related to sending anonymous stats to the Pants project, to aid development. "
-        "Repos that opt into this telemetry will be able to access to their own stats."
-    )
+    help = "Options related to sending anonymous stats to the Pants project, to aid development."
 
     @classmethod
     def register_options(cls, register):
@@ -46,22 +43,24 @@ class AnonymousTelemetry(Subsystem):
             "--enabled",
             advanced=True,
             type=bool,
+            default=False,
             help=(
-                f"Whether to send anonymous telemetry to the Pants project. Telemetry is sent "
+                f"Whether to send anonymous telemetry to the Pants project.\nTelemetry is sent "
                 f"asynchronously, with silent failure, and does not impact build times or "
-                f"outcomes. {_telemetry_docs_referral}."
+                f"outcomes.\n{_telemetry_docs_referral}."
             ),
         )
         register(
             "--repo-id",
             advanced=True,
             type=str,
+            default=None,
             help=(
-                f"An anonymized ID representing this repo.  For private repos, you likely want the "
+                f"An anonymized ID representing this repo.\nFor private repos, you likely want the "
                 f"ID to not be derived from, or algorithmically convertible to, anything "
-                f"identifying the repo.  For public repos the ID may be visible in that repo's "
+                f"identifying the repo.\nFor public repos the ID may be visible in that repo's "
                 f"config file, so anonymity of the repo is not guaranteed (although user anonymity "
-                f"is always guaranteed). {_telemetry_docs_referral}."
+                f"is always guaranteed).\n{_telemetry_docs_referral}."
             ),
         )
 
@@ -71,13 +70,18 @@ class AnonymousTelemetry(Subsystem):
 
     @property
     def repo_id(self) -> str | None:
-        return None if self.options.repo_id is None else cast(str, self.options.repo_id)
+        return cast("str | None", self.options.repo_id)
 
 
 class AnonymousTelemetryCallback(WorkunitsCallback):
     def __init__(self, anonymous_telemetry: AnonymousTelemetry) -> None:
         super().__init__()
         self._anonymous_telemetry = anonymous_telemetry
+
+    @property
+    def can_finish_async(self) -> bool:
+        # Because we don't log anything, it's safe to finish in the background.
+        return True
 
     @staticmethod
     def validate_repo_id(repo_id: str) -> bool:
@@ -121,7 +125,7 @@ class AnonymousTelemetryCallback(WorkunitsCallback):
             elif self.validate_repo_id(repo_id):
                 # Assemble and send the telemetry.
                 # Note that this method is called with finished=True only after the
-                # StreamingWorkunitHandler.session() ends, i.e., after end_run() has been called,
+                # StreamingWorkunitHandler context ends, i.e., after end_run() has been called,
                 # so the RunTracker will have had a chance to finalize its state.
                 telemetry_data = context.run_tracker.get_anonymous_telemetry_data(repo_id)
                 # TODO: Add information about any errors that occurred.
@@ -134,6 +138,9 @@ class AnonymousTelemetryCallback(WorkunitsCallback):
                     bugout_token=_bugout_access_token,
                     bugout_journal_id=_bugout_journal_id,
                     timeout_seconds=5,
+                    # We don't want to spawn a thread in the engine, and we're
+                    # already running in a background thread in pantsd.
+                    mode=Modes.SYNCHRONOUS,
                 )
 
                 # This is copied from humbug code, to ensure that future changes to humbug
