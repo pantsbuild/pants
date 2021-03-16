@@ -286,21 +286,6 @@ py_module_initializer!(native_engine, |py, m| {
       )
     ),
   )?;
-  m.add(
-    py,
-    "execution_set_poll",
-    py_fn!(py, execution_set_poll(a: PyExecutionRequest, b: bool)),
-  )?;
-  m.add(
-    py,
-    "execution_set_poll_delay",
-    py_fn!(py, execution_set_poll_delay(a: PyExecutionRequest, b: u64)),
-  )?;
-  m.add(
-    py,
-    "execution_set_timeout",
-    py_fn!(py, execution_set_timeout(a: PyExecutionRequest, b: u64)),
-  )?;
 
   m.add(
     py,
@@ -682,8 +667,19 @@ py_class!(class PyNailgunClient |py| {
 
 py_class!(class PyExecutionRequest |py| {
     data execution_request: RefCell<ExecutionRequest>;
-    def __new__(_cls) -> CPyResult<Self> {
-      Self::create_instance(py, RefCell::new(ExecutionRequest::new()))
+    def __new__(
+      _cls,
+      poll: bool,
+      poll_delay_in_ms: Option<u64>,
+      timeout_in_ms: Option<u64>,
+    ) -> CPyResult<Self> {
+      let request = ExecutionRequest {
+        poll,
+        poll_delay: poll_delay_in_ms.map(Duration::from_millis),
+        timeout: timeout_in_ms.map(Duration::from_millis),
+        ..ExecutionRequest::default()
+      };
+      Self::create_instance(py, RefCell::new(request))
     }
 });
 
@@ -1212,39 +1208,6 @@ fn execution_add_root_select(
         .map(|()| None)
     })
   })
-}
-
-fn execution_set_poll(
-  py: Python,
-  execution_request_ptr: PyExecutionRequest,
-  poll: bool,
-) -> PyUnitResult {
-  with_execution_request(py, execution_request_ptr, |execution_request| {
-    execution_request.poll = poll;
-  });
-  Ok(None)
-}
-
-fn execution_set_poll_delay(
-  py: Python,
-  execution_request_ptr: PyExecutionRequest,
-  poll_delay_in_ms: u64,
-) -> PyUnitResult {
-  with_execution_request(py, execution_request_ptr, |execution_request| {
-    execution_request.poll_delay = Some(Duration::from_millis(poll_delay_in_ms));
-  });
-  Ok(None)
-}
-
-fn execution_set_timeout(
-  py: Python,
-  execution_request_ptr: PyExecutionRequest,
-  timeout_in_ms: u64,
-) -> PyUnitResult {
-  with_execution_request(py, execution_request_ptr, |execution_request| {
-    execution_request.timeout = Some(Duration::from_millis(timeout_in_ms));
-  });
-  Ok(None)
 }
 
 fn tasks_task_begin(

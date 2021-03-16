@@ -32,7 +32,12 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch, PyTypes
+from pants.engine.internals.native_engine import (
+    PyExecutionRequest,
+    PyExecutor,
+    PySessionCancellationLatch,
+    PyTypes,
+)
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
@@ -66,13 +71,10 @@ class ExecutionRequest:
     """Holds the roots for an execution, which might have been requested by a user.
 
     To create an ExecutionRequest, see `SchedulerSession.execution_request`.
-
-    :param roots: Roots for this request.
-    :type roots: list of tuples of subject and product.
     """
 
-    roots: Any
-    native: Any
+    roots: tuple[Any, ...]
+    native: PyExecutionRequest
 
 
 class ExecutionError(Exception):
@@ -289,17 +291,6 @@ class Scheduler:
             self._scheduler, execution_request, params, product
         )
 
-    def execution_set_timeout(self, execution_request, timeout: float):
-        timeout_in_ms = int(timeout * 1000)
-        self._native.lib.execution_set_timeout(execution_request, timeout_in_ms)
-
-    def execution_set_poll(self, execution_request, poll: bool):
-        self._native.lib.execution_set_poll(execution_request, poll)
-
-    def execution_set_poll_delay(self, execution_request, poll_delay: float):
-        poll_delay_in_ms = int(poll_delay * 1000)
-        self._native.lib.execution_set_poll_delay(execution_request, poll_delay_in_ms)
-
     @property
     def visualize_to_dir(self):
         return self._visualize_to_dir
@@ -428,16 +419,17 @@ class SchedulerSession:
 
     def execution_request(
         self,
-        products: Sequence[Type],
-        subjects: Sequence[Union[Any, Params]],
+        products: Sequence[type],
+        subjects: Sequence[Any | Params],
         poll: bool = False,
-        poll_delay: Optional[float] = None,
-        timeout: Optional[float] = None,
+        poll_delay: float | None = None,
+        timeout: float | None = None,
     ) -> ExecutionRequest:
         """Create and return an ExecutionRequest for the given products and subjects.
 
-        The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
-        and so it will not be directly usable with other scheduler instances without being re-created.
+        The resulting ExecutionRequest object will contain keys tied to this scheduler's product
+        Graph, and so it will not be directly usable with other scheduler instances without being
+        re-created.
 
         NB: This method does a "cross product", mapping all subjects to all products.
 
@@ -452,14 +444,11 @@ class SchedulerSession:
         :returns: An ExecutionRequest for the given products and subjects.
         """
         request_specs = tuple((s, p) for s in subjects for p in products)
-        native_execution_request = self._scheduler._native.new_execution_request()
+        native_execution_request = native_engine.PyExecutionRequest(
+            poll=poll, poll_delay_in_ms=poll_delay, timeout_in_ms=timeout
+        )
         for subject, product in request_specs:
             self._scheduler.execution_add_root_select(native_execution_request, subject, product)
-        if timeout:
-            self._scheduler.execution_set_timeout(native_execution_request, timeout)
-        if poll_delay:
-            self._scheduler.execution_set_poll_delay(native_execution_request, poll_delay)
-        self._scheduler.execution_set_poll(native_execution_request, poll)
         return ExecutionRequest(request_specs, native_execution_request)
 
     def invalidate_files(self, direct_filenames):
@@ -575,10 +564,10 @@ class SchedulerSession:
 
     def product_request(
         self,
-        product: Type,
-        subjects: Sequence[Union[Any, Params]],
+        product: type,
+        subjects: Sequence[Any | Params],
         poll: bool = False,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
     ):
         """Executes a request for a single product for some subjects, and returns the products.
 
