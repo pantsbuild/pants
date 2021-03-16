@@ -288,11 +288,11 @@ pub fn call_function<T: AsRef<PyObject>>(func: T, args: &[Value]) -> Result<PyOb
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
   let gil = Python::acquire_gil();
   let py = gil.python();
-  let native = py.import("pants.engine.internals.native").unwrap();
-  let response = native
+  let selectors = py.import("pants.engine.internals.selectors").unwrap();
+  let response = selectors
     .call(
       py,
-      "generator_send",
+      "native_engine_generator_send",
       (generator as &PyObject, arg as &PyObject),
       None,
     )
@@ -317,7 +317,10 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))
   } else {
-    panic!("generator_send returned unrecognized type: {:?}", response);
+    panic!(
+      "native_engine_generator_send returned unrecognized type: {:?}",
+      response
+    );
   }
 }
 

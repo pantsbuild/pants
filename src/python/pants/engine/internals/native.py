@@ -14,9 +14,6 @@ from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import (
     PyExecutionStrategyOptions,
     PyExecutor,
-    PyGeneratorResponseBreak,
-    PyGeneratorResponseGet,
-    PyGeneratorResponseGetMulti,
     PyNailgunClient,
     PyNailgunServer,
     PyRemotingOptions,
@@ -24,46 +21,9 @@ from pants.engine.internals.native_engine import (
     PySessionCancellationLatch,
     PyTypes,
 )
-from pants.engine.rules import Get
 from pants.option.global_options import ExecutionOptions
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
-
-_RAISE_KEYBOARD_INTERRUPT = os.environ.get("_RAISE_KEYBOARD_INTERRUPT_FFI", None)
-
-
-def generator_send(
-    func, arg
-) -> PyGeneratorResponseGet | PyGeneratorResponseGetMulti | PyGeneratorResponseBreak:
-    if _RAISE_KEYBOARD_INTERRUPT:
-        raise KeyboardInterrupt("ctrl-c interrupted execution during FFI (for testing purposes).")
-    try:
-        res = func.send(arg)
-        if isinstance(res, Get):
-            return PyGeneratorResponseGet(
-                product=res.output_type,
-                declared_subject=res.input_type,
-                subject=res.input,
-            )
-        elif type(res) in (tuple, list):
-            return PyGeneratorResponseGetMulti(
-                gets=tuple(
-                    PyGeneratorResponseGet(
-                        product=get.output_type,
-                        declared_subject=get.input_type,
-                        subject=get.input,
-                    )
-                    for get in res
-                )
-            )
-        else:
-            raise ValueError(f"internal engine error: unrecognized coroutine result {res}")
-    except StopIteration as e:
-        if not e.args:
-            raise
-        # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
-        # by calling `next()` on an empty iterator.
-        return PyGeneratorResponseBreak(val=e.value)
 
 
 class RawFdRunner(Protocol):
