@@ -10,7 +10,6 @@ from pants.base.exiter import ExitCode
 from pants.engine.fs import PathGlobs
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import (
-    PyExecutionRequest,
     PyExecutionStrategyOptions,
     PyExecutor,
     PyGeneratorResponseBreak,
@@ -20,12 +19,9 @@ from pants.engine.internals.native_engine import (
     PyNailgunServer,
     PyRemotingOptions,
     PyScheduler,
-    PySession,
     PySessionCancellationLatch,
-    PyTasks,
     PyTypes,
 )
-from pants.engine.internals.session import SessionValues
 from pants.engine.rules import Get
 from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
@@ -130,13 +126,6 @@ class Native(metaclass=SingletonMetaclass):
         disables writing to any run-specific file if `None` is passed."""
         self.lib.set_per_run_log_path(path)
 
-    def write_log(self, msg: str, *, level: int, target: str):
-        """Proxy a log message to the Rust logging faculties."""
-        return self.lib.write_log(msg, level, target)
-
-    def flush_log(self):
-        return self.lib.flush_log()
-
     def match_path_globs(self, path_globs: PathGlobs, paths: Iterable[str]) -> Tuple[str, ...]:
         """Return all paths that match the PathGlobs."""
         return tuple(self.lib.match_path_globs(path_globs, tuple(paths)))
@@ -159,28 +148,6 @@ class Native(metaclass=SingletonMetaclass):
 
     def new_nailgun_client(self, executor: PyExecutor, port: int) -> PyNailgunClient:
         return cast(PyNailgunClient, self.lib.nailgun_client_create(executor, port))
-
-    def new_tasks(self) -> PyTasks:
-        return PyTasks()
-
-    def new_execution_request(self) -> PyExecutionRequest:
-        return PyExecutionRequest()
-
-    def new_session(
-        self,
-        scheduler,
-        dynamic_ui: bool,
-        build_id,
-        session_values: SessionValues,
-        cancellation_latch: PySessionCancellationLatch,
-    ) -> PySession:
-        return PySession(
-            scheduler=scheduler,
-            should_render_ui=dynamic_ui,
-            build_id=build_id,
-            session_values=session_values,
-            cancellation_latch=cancellation_latch,
-        )
 
     def new_scheduler(
         self,

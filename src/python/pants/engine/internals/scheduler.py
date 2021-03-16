@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Dict, Iterable, List, NoReturn, Optional, Sequence, Tuple, Type, Union, cast
+from typing import Any, Dict, Iterable, List, NoReturn, Optional, Sequence, Tuple, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -32,7 +32,14 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch, PyTypes
+from pants.engine.internals.native_engine import (
+    PyExecutionRequest,
+    PyExecutor,
+    PySession,
+    PySessionCancellationLatch,
+    PyTasks,
+    PyTypes,
+)
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
@@ -66,13 +73,10 @@ class ExecutionRequest:
     """Holds the roots for an execution, which might have been requested by a user.
 
     To create an ExecutionRequest, see `SchedulerSession.execution_request`.
-
-    :param roots: Roots for this request.
-    :type roots: list of tuples of subject and product.
     """
 
-    roots: Any
-    native: Any
+    roots: tuple[Any, ...]
+    native: PyExecutionRequest
 
 
 class ExecutionError(Exception):
@@ -127,10 +131,9 @@ class Scheduler:
         self._visualize_to_dir = visualize_to_dir
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
+        tasks = register_rules(rule_index, union_membership)
 
         # Create the native Scheduler and Session.
-        tasks = self._register_rules(rule_index, union_membership)
-
         types = PyTypes(
             file_digest=FileDigest,
             snapshot=Snapshot,
@@ -186,51 +189,6 @@ class Scheduler:
         if isinstance(subject_or_params, Params):
             return subject_or_params.params
         return [subject_or_params]
-
-    def _register_rules(self, rule_index: RuleIndex, union_membership: UnionMembership):
-        """Create a native Tasks object, and record the given RuleIndex on it."""
-
-        tasks = self._native.new_tasks()
-
-        for rule in rule_index.rules:
-            self._register_task(tasks, rule, union_membership)
-        for query in rule_index.queries:
-            self._native.lib.tasks_query_add(
-                tasks,
-                query.output_type,
-                query.input_types,
-            )
-        return tasks
-
-    def _register_task(self, tasks, rule: TaskRule, union_membership: UnionMembership) -> None:
-        """Register the given TaskRule with the native scheduler."""
-        self._native.lib.tasks_task_begin(
-            tasks,
-            rule.func,
-            rule.output_type,
-            issubclass(rule.output_type, EngineAwareReturnType),
-            rule.cacheable,
-            rule.canonical_name,
-            rule.desc or "",
-            rule.level.level,
-        )
-        for selector in rule.input_selectors:
-            self._native.lib.tasks_add_select(tasks, selector)
-
-        def add_get_edge(product, subject):
-            self._native.lib.tasks_add_get(tasks, product, subject)
-
-        for the_get in rule.input_gets:
-            if union.is_instance(the_get.input_type):
-                # If the registered subject type is a union, add Get edges to all registered
-                # union members.
-                for union_member in union_membership.get(the_get.input_type):
-                    add_get_edge(the_get.output_type, union_member)
-            else:
-                # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                add_get_edge(the_get.output_type, the_get.input_type)
-
-        self._native.lib.tasks_task_end(tasks)
 
     def visualize_graph_to_file(self, session, filename):
         self._native.lib.graph_visualize(self._scheduler, session, filename)
@@ -289,17 +247,6 @@ class Scheduler:
             self._scheduler, execution_request, params, product
         )
 
-    def execution_set_timeout(self, execution_request, timeout: float):
-        timeout_in_ms = int(timeout * 1000)
-        self._native.lib.execution_set_timeout(execution_request, timeout_in_ms)
-
-    def execution_set_poll(self, execution_request, poll: bool):
-        self._native.lib.execution_set_poll(execution_request, poll)
-
-    def execution_set_poll_delay(self, execution_request, poll_delay: float):
-        poll_delay_in_ms = int(poll_delay * 1000)
-        self._native.lib.execution_set_poll_delay(execution_request, poll_delay_in_ms)
-
     @property
     def visualize_to_dir(self):
         return self._visualize_to_dir
@@ -350,18 +297,18 @@ class Scheduler:
         self,
         build_id,
         dynamic_ui: bool = False,
-        session_values: Optional[SessionValues] = None,
-        cancellation_latch: Optional[PySessionCancellationLatch] = None,
+        session_values: SessionValues | None = None,
+        cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> SchedulerSession:
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
             self,
-            self._native.new_session(
-                self._scheduler,
-                dynamic_ui,
-                build_id,
-                session_values or SessionValues(),
-                cancellation_latch or PySessionCancellationLatch(),
+            PySession(
+                scheduler=self._scheduler,
+                should_render_ui=dynamic_ui,
+                build_id=build_id,
+                session_values=session_values or SessionValues(),
+                cancellation_latch=cancellation_latch or PySessionCancellationLatch(),
             ),
         )
 
@@ -428,16 +375,17 @@ class SchedulerSession:
 
     def execution_request(
         self,
-        products: Sequence[Type],
-        subjects: Sequence[Union[Any, Params]],
+        products: Sequence[type],
+        subjects: Sequence[Any | Params],
         poll: bool = False,
-        poll_delay: Optional[float] = None,
-        timeout: Optional[float] = None,
+        poll_delay: float | None = None,
+        timeout: float | None = None,
     ) -> ExecutionRequest:
         """Create and return an ExecutionRequest for the given products and subjects.
 
-        The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
-        and so it will not be directly usable with other scheduler instances without being re-created.
+        The resulting ExecutionRequest object will contain keys tied to this scheduler's product
+        Graph, and so it will not be directly usable with other scheduler instances without being
+        re-created.
 
         NB: This method does a "cross product", mapping all subjects to all products.
 
@@ -452,14 +400,13 @@ class SchedulerSession:
         :returns: An ExecutionRequest for the given products and subjects.
         """
         request_specs = tuple((s, p) for s in subjects for p in products)
-        native_execution_request = self._scheduler._native.new_execution_request()
+        native_execution_request = native_engine.PyExecutionRequest(
+            poll=poll,
+            poll_delay_in_ms=int(poll_delay * 1000) if poll_delay else None,
+            timeout_in_ms=int(timeout * 1000) if timeout else None,
+        )
         for subject, product in request_specs:
             self._scheduler.execution_add_root_select(native_execution_request, subject, product)
-        if timeout:
-            self._scheduler.execution_set_timeout(native_execution_request, timeout)
-        if poll_delay:
-            self._scheduler.execution_set_poll_delay(native_execution_request, poll_delay)
-        self._scheduler.execution_set_poll(native_execution_request, poll)
         return ExecutionRequest(request_specs, native_execution_request)
 
     def invalidate_files(self, direct_filenames):
@@ -575,10 +522,10 @@ class SchedulerSession:
 
     def product_request(
         self,
-        product: Type,
-        subjects: Sequence[Union[Any, Params]],
+        product: type,
+        subjects: Sequence[Any | Params],
         poll: bool = False,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
     ):
         """Executes a request for a single product for some subjects, and returns the products.
 
@@ -679,3 +626,48 @@ class SchedulerSession:
 
     def record_test_observation(self, value: int) -> None:
         self._scheduler.record_test_observation(self._session, value)
+
+
+def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> PyTasks:
+    """Create a native Tasks object loaded with given RuleIndex."""
+    tasks = PyTasks()
+
+    def register_task(rule: TaskRule) -> None:
+        native_engine.tasks_task_begin(
+            tasks,
+            rule.func,
+            rule.output_type,
+            issubclass(rule.output_type, EngineAwareReturnType),
+            rule.cacheable,
+            rule.canonical_name,
+            rule.desc or "",
+            rule.level.level,
+        )
+
+        for selector in rule.input_selectors:
+            native_engine.tasks_add_select(tasks, selector)
+
+        def add_get_edge(product: type, subject: type) -> None:
+            native_engine.tasks_add_get(tasks, product, subject)
+
+        for the_get in rule.input_gets:
+            if union.is_instance(the_get.input_type):
+                # If the registered subject type is a union, add Get edges to all registered
+                # union members.
+                for union_member in union_membership.get(the_get.input_type):
+                    add_get_edge(the_get.output_type, union_member)
+            else:
+                # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
+                add_get_edge(the_get.output_type, the_get.input_type)
+
+        native_engine.tasks_task_end(tasks)
+
+    for task_rule in rule_index.rules:
+        register_task(task_rule)
+    for query in rule_index.queries:
+        native_engine.tasks_add_query(
+            tasks,
+            query.output_type,
+            query.input_types,
+        )
+    return tasks
