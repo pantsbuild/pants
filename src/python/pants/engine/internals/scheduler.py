@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Dict, Iterable, List, NoReturn, Optional, Sequence, Tuple, Type, Union, cast
+from typing import Any, Dict, Iterable, List, NoReturn, Optional, Sequence, Tuple, Type, cast
 
 from typing_extensions import TypedDict
 
