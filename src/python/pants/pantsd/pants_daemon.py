@@ -16,6 +16,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.environment import CompleteEnvironment
+from pants.engine.internals import native_engine
 from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import GraphScheduler
@@ -180,7 +181,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             ExceptionSink.install(
                 log_location=init_workdir(global_bootstrap_options), pantsd_instance=True
             )
-            self._native.set_panic_handler()
+            native_engine.maybe_set_panic_handler()
 
             self._initialize_metadata()
 

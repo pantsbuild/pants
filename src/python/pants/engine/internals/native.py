@@ -212,9 +212,3 @@ class Native(metaclass=SingletonMetaclass):
                 exec_stategy_opts,
             ),
         )
-
-    def set_panic_handler(self):
-        if os.getenv("RUST_BACKTRACE", "0") == "0":
-            # The panic handler hides a lot of rust tracing which may be useful.
-            # Don't activate it when the user explicitly asks for rust backtraces.
-            self.lib.set_panic_handler()
