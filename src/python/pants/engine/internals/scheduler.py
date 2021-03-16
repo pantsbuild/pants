@@ -522,6 +522,12 @@ class SchedulerSession:
         :param timeout: See self.execution_request.
         :returns: A list of the requested products, with length match len(subjects).
         """
+        # NB: It's possible to have synchronous requests still running after the console has
+        # shutdown, and those will crash if they attempt to write to the dynamic UI.
+        #
+        # The only time we want to use the dynamic UI is possibly when running goal rules with the
+        # asynchronous Rules API. Here, it's safest to always ensure we are logging.
+        self.teardown_dynamic_ui()
         request = self.execution_request([product], subjects, poll=poll, timeout=timeout)
         returns, throws = self.execute(request)
 
