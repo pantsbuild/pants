@@ -1175,7 +1175,9 @@ class GlobalOptions(Subsystem):
             if bootstrap_options.rule_threads_max
             else 4 * bootstrap_options.rule_threads_core
         )
-        return PyExecutor(bootstrap_options.rule_threads_core, rule_threads_max)
+        return PyExecutor(
+            core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
+        )
 
     @staticmethod
     def compute_pants_ignore(buildroot, global_options):

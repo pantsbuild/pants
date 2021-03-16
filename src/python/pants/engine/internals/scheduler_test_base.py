@@ -17,7 +17,7 @@ class SchedulerTestBase:
     TODO: In the medium term, this should be part of pants_test.test_base.TestBase.
     """
 
-    _executor = PyExecutor(2, 4)
+    _executor = PyExecutor(core_threads=2, max_threads=4)
 
     def _create_work_dir(self):
         work_dir = safe_mkdtemp()

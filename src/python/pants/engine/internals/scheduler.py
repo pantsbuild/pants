@@ -374,7 +374,7 @@ class SchedulerSession:
         :returns: An ExecutionRequest for the given products and subjects.
         """
         request_specs = tuple((s, p) for s in subjects for p in products)
-        native_execution_request = native_engine.PyExecutionRequest(
+        native_execution_request = PyExecutionRequest(
             poll=poll,
             poll_delay_in_ms=int(poll_delay * 1000) if poll_delay else None,
             timeout_in_ms=int(timeout * 1000) if timeout else None,

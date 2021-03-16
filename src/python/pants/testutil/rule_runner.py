@@ -59,7 +59,9 @@ from pants.util.ordered_set import FrozenOrderedSet
 _O = TypeVar("_O")
 
 
-_EXECUTOR = PyExecutor(multiprocessing.cpu_count(), multiprocessing.cpu_count() * 4)
+_EXECUTOR = PyExecutor(
+    core_threads=multiprocessing.cpu_count(), max_threads=multiprocessing.cpu_count() * 4
+)
 
 
 @dataclass(frozen=True)

@@ -35,7 +35,7 @@ from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.util.enums import match
 from pants.util.logging import LogLevel
 
-_EXECUTOR = PyExecutor(2, 4)
+_EXECUTOR = PyExecutor(core_threads=2, max_threads=4)
 
 
 def create_scheduler(rules, validate=True):
