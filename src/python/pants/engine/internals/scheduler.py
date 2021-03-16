@@ -35,6 +35,7 @@ from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutor,
+    PySession,
     PySessionCancellationLatch,
     PyTasks,
     PyTypes,
@@ -296,18 +297,18 @@ class Scheduler:
         self,
         build_id,
         dynamic_ui: bool = False,
-        session_values: Optional[SessionValues] = None,
-        cancellation_latch: Optional[PySessionCancellationLatch] = None,
+        session_values: SessionValues | None = None,
+        cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> SchedulerSession:
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
             self,
-            self._native.new_session(
-                self._scheduler,
-                dynamic_ui,
-                build_id,
-                session_values or SessionValues(),
-                cancellation_latch or PySessionCancellationLatch(),
+            PySession(
+                scheduler=self._scheduler,
+                should_render_ui=dynamic_ui,
+                build_id=build_id,
+                session_values=session_values or SessionValues(),
+                cancellation_latch=cancellation_latch or PySessionCancellationLatch(),
             ),
         )
 

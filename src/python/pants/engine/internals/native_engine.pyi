@@ -87,7 +87,14 @@ class PyScheduler:
     def __init__(self, **kwargs: Any) -> None: ...
 
 class PySession:
-    def __init__(self, **kwargs: Any) -> None: ...
+    def __init__(
+        self,
+        scheduler: PyScheduler,
+        should_render_ui: bool,
+        build_id: str,
+        session_values: Any,
+        cancellation_latch: PySessionCancellationLatch,
+    ) -> None: ...
 
 class PySessionCancellationLatch:
     def __init__(self) -> None: ...
