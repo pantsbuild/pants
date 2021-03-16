@@ -36,6 +36,7 @@ from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutor,
     PySessionCancellationLatch,
+    PyTasks,
     PyTypes,
 )
 from pants.engine.internals.nodes import Return, Throw
@@ -129,10 +130,9 @@ class Scheduler:
         self._visualize_to_dir = visualize_to_dir
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
+        tasks = register_rules(rule_index, union_membership)
 
         # Create the native Scheduler and Session.
-        tasks = self._register_rules(rule_index, union_membership)
-
         types = PyTypes(
             file_digest=FileDigest,
             snapshot=Snapshot,
@@ -188,51 +188,6 @@ class Scheduler:
         if isinstance(subject_or_params, Params):
             return subject_or_params.params
         return [subject_or_params]
-
-    def _register_rules(self, rule_index: RuleIndex, union_membership: UnionMembership):
-        """Create a native Tasks object, and record the given RuleIndex on it."""
-
-        tasks = self._native.new_tasks()
-
-        for rule in rule_index.rules:
-            self._register_task(tasks, rule, union_membership)
-        for query in rule_index.queries:
-            self._native.lib.tasks_query_add(
-                tasks,
-                query.output_type,
-                query.input_types,
-            )
-        return tasks
-
-    def _register_task(self, tasks, rule: TaskRule, union_membership: UnionMembership) -> None:
-        """Register the given TaskRule with the native scheduler."""
-        self._native.lib.tasks_task_begin(
-            tasks,
-            rule.func,
-            rule.output_type,
-            issubclass(rule.output_type, EngineAwareReturnType),
-            rule.cacheable,
-            rule.canonical_name,
-            rule.desc or "",
-            rule.level.level,
-        )
-        for selector in rule.input_selectors:
-            self._native.lib.tasks_add_select(tasks, selector)
-
-        def add_get_edge(product, subject):
-            self._native.lib.tasks_add_get(tasks, product, subject)
-
-        for the_get in rule.input_gets:
-            if union.is_instance(the_get.input_type):
-                # If the registered subject type is a union, add Get edges to all registered
-                # union members.
-                for union_member in union_membership.get(the_get.input_type):
-                    add_get_edge(the_get.output_type, union_member)
-            else:
-                # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                add_get_edge(the_get.output_type, the_get.input_type)
-
-        self._native.lib.tasks_task_end(tasks)
 
     def visualize_graph_to_file(self, session, filename):
         self._native.lib.graph_visualize(self._scheduler, session, filename)
@@ -668,3 +623,48 @@ class SchedulerSession:
 
     def record_test_observation(self, value: int) -> None:
         self._scheduler.record_test_observation(self._session, value)
+
+
+def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> PyTasks:
+    """Create a native Tasks object loaded with given RuleIndex."""
+    tasks = PyTasks()
+
+    def register_task(rule: TaskRule) -> None:
+        native_engine.tasks_task_begin(
+            tasks,
+            rule.func,
+            rule.output_type,
+            issubclass(rule.output_type, EngineAwareReturnType),
+            rule.cacheable,
+            rule.canonical_name,
+            rule.desc or "",
+            rule.level.level,
+        )
+
+        for selector in rule.input_selectors:
+            native_engine.tasks_add_select(tasks, selector)
+
+        def add_get_edge(product: type, subject: type) -> None:
+            native_engine.tasks_add_get(tasks, product, subject)
+
+        for the_get in rule.input_gets:
+            if union.is_instance(the_get.input_type):
+                # If the registered subject type is a union, add Get edges to all registered
+                # union members.
+                for union_member in union_membership.get(the_get.input_type):
+                    add_get_edge(the_get.output_type, union_member)
+            else:
+                # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
+                add_get_edge(the_get.output_type, the_get.input_type)
+
+        native_engine.tasks_task_end(tasks)
+
+    for task_rule in rule_index.rules:
+        register_task(task_rule)
+    for query in rule_index.queries:
+        native_engine.tasks_add_query(
+            tasks,
+            query.output_type,
+            query.input_types,
+        )
+    return tasks

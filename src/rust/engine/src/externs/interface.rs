@@ -335,6 +335,7 @@ py_module_initializer!(native_engine, |py, m| {
       )
     ),
   )?;
+  m.add(py, "tasks_task_end", py_fn!(py, tasks_task_end(a: PyTasks)))?;
   m.add(
     py,
     "tasks_add_get",
@@ -345,11 +346,10 @@ py_module_initializer!(native_engine, |py, m| {
     "tasks_add_select",
     py_fn!(py, tasks_add_select(a: PyTasks, b: PyType)),
   )?;
-  m.add(py, "tasks_task_end", py_fn!(py, tasks_task_end(a: PyTasks)))?;
   m.add(
     py,
-    "tasks_query_add",
-    py_fn!(py, tasks_query_add(a: PyTasks, b: PyType, c: Vec<PyType>)),
+    "tasks_add_query",
+    py_fn!(py, tasks_add_query(a: PyTasks, b: PyType, c: Vec<PyType>)),
   )?;
 
   m.add(
@@ -1240,6 +1240,13 @@ fn tasks_task_begin(
   })
 }
 
+fn tasks_task_end(py: Python, tasks_ptr: PyTasks) -> PyUnitResult {
+  with_tasks(py, tasks_ptr, |tasks| {
+    tasks.task_end();
+    Ok(None)
+  })
+}
+
 fn tasks_add_get(py: Python, tasks_ptr: PyTasks, output: PyType, input: PyType) -> PyUnitResult {
   with_tasks(py, tasks_ptr, |tasks| {
     let output = externs::type_for(output);
@@ -1257,14 +1264,7 @@ fn tasks_add_select(py: Python, tasks_ptr: PyTasks, selector: PyType) -> PyUnitR
   })
 }
 
-fn tasks_task_end(py: Python, tasks_ptr: PyTasks) -> PyUnitResult {
-  with_tasks(py, tasks_ptr, |tasks| {
-    tasks.task_end();
-    Ok(None)
-  })
-}
-
-fn tasks_query_add(
+fn tasks_add_query(
   py: Python,
   tasks_ptr: PyTasks,
   output_type: PyType,

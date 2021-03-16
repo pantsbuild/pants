@@ -166,12 +166,6 @@ class Native(metaclass=SingletonMetaclass):
     def new_nailgun_client(self, executor: PyExecutor, port: int) -> PyNailgunClient:
         return cast(PyNailgunClient, self.lib.nailgun_client_create(executor, port))
 
-    def new_tasks(self) -> PyTasks:
-        return PyTasks()
-
-    def new_execution_request(self) -> PyExecutionRequest:
-        return PyExecutionRequest()
-
     def new_session(
         self,
         scheduler,
