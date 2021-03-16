@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 import os
 from typing import Dict, Iterable, List, Optional, Tuple, Union, cast
 
@@ -28,8 +27,6 @@ from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
-
-logger = logging.getLogger(__name__)
 
 
 class Externs:
@@ -128,9 +125,6 @@ class Native(metaclass=SingletonMetaclass):
         """Instructs the logging code to also write emitted logs to a run-specific log file; or
         disables writing to any run-specific file if `None` is passed."""
         self.lib.set_per_run_log_path(path)
-
-    def default_cache_path(self) -> str:
-        return cast(str, self.lib.default_cache_path())
 
     def match_path_globs(self, path_globs: PathGlobs, paths: Iterable[str]) -> Tuple[str, ...]:
         """Return all paths that match the PathGlobs."""

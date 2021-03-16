@@ -65,10 +65,9 @@ const XDG_CACHE_HOME: &str = "XDG_CACHE_HOME";
 
 /// Follows the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
 pub fn default_cache_path() -> PathBuf {
-  // TODO: Keep in alignment with `pants.base.build_environment.get_pants_cachedir`. This method
-  // is not used there directly because of a cycle.
   let cache_path = std::env::var(XDG_CACHE_HOME)
     .ok()
+    .filter(|v| !v.is_empty())
     .map(PathBuf::from)
     .or_else(|| dirs_next::home_dir().map(|home| home.join(".cache")))
     .unwrap_or_else(|| panic!("Could not find home dir or {}.", XDG_CACHE_HOME));
