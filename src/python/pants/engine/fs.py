@@ -271,7 +271,7 @@ class Workspace:
 
 
 _EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-EMPTY_DIGEST = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
+EMPTY_DIGEST: Digest = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
 EMPTY_FILE_DIGEST = FileDigest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
 EMPTY_SNAPSHOT = Snapshot()
 

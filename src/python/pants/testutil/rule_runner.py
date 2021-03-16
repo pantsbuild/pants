@@ -25,7 +25,6 @@ from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Get, Params
@@ -135,7 +134,6 @@ class RuleRunner:
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
-            native=Native(),
             build_root=self.build_root,
             build_configuration=self.build_config,
             executor=_EXECUTOR,
