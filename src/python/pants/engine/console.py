@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Callable, Optional, cast
+from typing import Callable, Optional, TextIO
 
 from colors import blue, cyan, green, magenta, red, yellow
 
@@ -19,9 +19,9 @@ class Console:
 
     def __init__(
         self,
-        stdin=None,
-        stdout=None,
-        stderr=None,
+        stdin: TextIO | None = None,
+        stdout: TextIO | None = None,
+        stderr: TextIO | None = None,
         use_colors: bool = True,
         session: Optional[SchedulerSession] = None,
     ):
@@ -35,19 +35,19 @@ class Console:
         self._session = session
 
     @property
-    def stdin(self):
+    def stdin(self) -> TextIO:
         if self._session:
             self._session.teardown_dynamic_ui()
         return self._stdin
 
     @property
-    def stdout(self):
+    def stdout(self) -> TextIO:
         if self._session:
             self._session.teardown_dynamic_ui()
         return self._stdout
 
     @property
-    def stderr(self):
+    def stderr(self) -> TextIO:
         if self._session:
             self._session.teardown_dynamic_ui()
         return self._stderr
@@ -56,7 +56,7 @@ class Console:
         """Equivalent to the `input` builtin, but clears any running UI before rendering."""
         if prompt is not None:
             self.write_stdout(prompt)
-        return cast(str, self.stdin.readline()).rstrip("\n")
+        return self.stdin.readline().rstrip("\n")
 
     def write_stdout(self, payload: str) -> None:
         self.stdout.write(payload)

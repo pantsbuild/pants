@@ -72,8 +72,8 @@ py_class!(pub class PyStdioRead |py| {
       let read = py.allow_threads(|| {
         stdio::get_destination().read_stdin(&mut buffer)
       }).map_err(|e| PyErr::new::<exc::Exception, _>(py, (e.to_string(),)))?;
-      // NB: copy_from_slice requires a buffer of equal length, so we are forced to copy in some
-      // trailing zeros.
+      // NB: `as_mut_slice` exposes a `&[Cell<u8>]`, which we can't use directly in `read`. We use
+      // `copy_from_slice` instead, which unfortunately involves some extra copying.
       py_buffer.copy_from_slice(py, &buffer)?;
       Ok(read)
     }

@@ -166,7 +166,11 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
             log_path,
         )
         sys.stdin = TextIOWrapper(
-            BufferedReader(raw_stdin), encoding=locale.getpreferredencoding(False)
+            BufferedReader(raw_stdin),
+            # NB: We set the default encoding explicitly to bypass logic in the TextIOWrapper
+            # constructor that would poke the underlying file (which is not valid until a
+            # `stdio_destination` is set).
+            encoding=locale.getpreferredencoding(False),
         )
 
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
