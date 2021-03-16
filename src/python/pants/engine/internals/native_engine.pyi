@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from io import RawIOBase
 from typing import Any, Sequence, TextIO
 
 from typing_extensions import Protocol
@@ -60,7 +61,7 @@ def stdio_initialize(
     log_levels_by_target: dict[str, int],
     message_regex_filters: tuple[str, ...],
     log_file: str,
-) -> tuple[TextIO, TextIO, TextIO]: ...
+) -> tuple[RawIOBase, TextIO, TextIO]: ...
 def stdio_thread_get_destination() -> PyStdioDestination: ...
 def stdio_thread_set_destination(destination: PyStdioDestination) -> None: ...
 def stdio_thread_console_set(stdin_fileno: int, stdout_fileno: int, stderr_fileno: int) -> None: ...
