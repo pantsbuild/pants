@@ -30,7 +30,7 @@ class _NativeHandler(StreamHandler):
     method) and proxies logs to the Rust logging infrastructure."""
 
     def emit(self, record: LogRecord) -> None:
-        native_engine.write_log(msg=self.format(record), level=record.levelno, target=record.name)
+        native_engine.write_log(self.format(record), record.levelno, record.name)
 
     def flush(self) -> None:
         native_engine.flush_log()

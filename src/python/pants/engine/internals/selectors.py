@@ -653,19 +653,11 @@ def native_engine_generator_send(
     try:
         res = func.send(arg)
         if isinstance(res, Get):
-            return PyGeneratorResponseGet(
-                product=res.output_type,
-                declared_subject=res.input_type,
-                subject=res.input,
-            )
+            return PyGeneratorResponseGet(res.output_type, res.input_type, res.input)
         elif type(res) in (tuple, list):
             return PyGeneratorResponseGetMulti(
-                gets=tuple(
-                    PyGeneratorResponseGet(
-                        product=get.output_type,
-                        declared_subject=get.input_type,
-                        subject=get.input,
-                    )
+                tuple(
+                    PyGeneratorResponseGet(get.output_type, get.input_type, get.input)
                     for get in res
                 )
             )
@@ -676,4 +668,4 @@ def native_engine_generator_send(
             raise
         # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
         # by calling `next()` on an empty iterator.
-        return PyGeneratorResponseBreak(val=e.value)
+        return PyGeneratorResponseBreak(e.value)
