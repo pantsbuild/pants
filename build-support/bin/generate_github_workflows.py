@@ -338,7 +338,7 @@ def generate() -> dict[Path, str]:
             "name": "Daily Extended Python Testing",
             # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
             "on": {"schedule": [{"cron": "45 8 * * *"}]},
-            "jobs": test_workflow_jobs(["3.8.3"]),
+            "jobs": test_workflow_jobs(["3.8.3", "3.9.2"]),
         },
         Dumper=NoAliasDumper,
     )
