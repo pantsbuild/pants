@@ -542,7 +542,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
           origin,
           unmatched_globs,
           excludes_portion,
-          unmatched_globs_additional_context.unwrap_or("".to_owned())
+          unmatched_globs_additional_context.unwrap_or_else(|| "".to_owned())
         );
         if strict_match_behavior.should_throw_on_error() {
           return Err(Self::mk_error(&msg));
