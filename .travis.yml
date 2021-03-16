@@ -21,6 +21,7 @@ env:
   - MACOS_PYENV_PY27_VERSION=2.7.18
   - MACOS_PYENV_PY37_VERSION=3.7.7
   - MACOS_PYENV_PY38_VERSION=3.8.3
+  - MACOS_PYENV_PY39_VERSION=3.9.2
   - PYENV_ROOT_OSX=${HOME}/.pants_pyenv
   - PYENV_ROOT="${PYENV_ROOT:-${PYENV_ROOT_OSX}}"
   - PATH="${PYENV_ROOT}/shims:${PATH}"
@@ -82,7 +83,8 @@ jobs:
       travis_ci:latest sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
       | sh -s -- -y --default-toolchain none && source /travis/home/.cargo/env &&
       ./build-support/bin/release.sh -n && USE_PY38=true ./build-support/bin/release.sh
-      -n && ./build-support/bin/release.sh -f"
+      -n && USE_PY39=true ./build-support/bin/release.sh -n && ./build-support/bin/release.sh
+      -f"
     services:
     - docker
     stage: Build Wheels
@@ -114,6 +116,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.osx
     if: commit_message !~ /\[ci skip-build-wheels\]/ OR type NOT IN (pull_request,
@@ -128,6 +131,7 @@ jobs:
     - source ${HOME}/.cargo/env
     - ./build-support/bin/release.sh -n
     - USE_PY38=true ./build-support/bin/release.sh -n
+    - USE_PY39=true ./build-support/bin/release.sh -n
     - ./build-support/bin/release.sh -f
     stage: Build Wheels
   - addons:

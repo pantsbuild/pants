@@ -68,6 +68,7 @@ GLOBAL_ENV_VARS = [
     "MACOS_PYENV_PY27_VERSION=2.7.18",
     "MACOS_PYENV_PY37_VERSION=3.7.7",
     "MACOS_PYENV_PY38_VERSION=3.8.3",
+    "MACOS_PYENV_PY39_VERSION=3.9.2",
     # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
     # override the default value because Linux pre-installs Python via Pyenv and we must keep their
     # $PYENV_ROOT for this to still work.
@@ -101,17 +102,14 @@ GLOBAL_ENV_VARS = [
 class PythonVersion(Enum):
     py37 = "py37"
     py38 = "py38"
+    py39 = "py39"
 
     def __str__(self) -> str:
         return str(self.value)
 
     @property
     def number(self) -> int:
-        return {self.py37: 37, self.py38: 38}[self]  # type: ignore[index]
-
-    @property
-    def decimal(self) -> float:
-        return {self.py37: 3.7, self.py38: 3.8}[self]  # type: ignore[index]
+        return {self.py37: 37, self.py38: 38, self.py39: 39}[self]  # type: ignore[index]
 
 
 # ----------------------------------------------------------------------
@@ -309,6 +307,7 @@ def _osx_env_with_pyenv() -> List[str]:
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY27_VERSION}/bin:${PATH}"',
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY37_VERSION}/bin:${PATH}"',
         'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY38_VERSION}/bin:${PATH}"',
+        'PATH="${PYENV_ROOT}/versions/${MACOS_PYENV_PY39_VERSION}/bin:${PATH}"',
     ]
 
 
@@ -345,6 +344,7 @@ def _build_wheels_command(homedir: str = "${HOME}") -> List[str]:
         *_install_rust(homedir=homedir),
         "./build-support/bin/release.sh -n",
         "USE_PY38=true ./build-support/bin/release.sh -n",
+        "USE_PY39=true ./build-support/bin/release.sh -n",
         # NB: We also build `fs_util` in this shard to leverage having had compiled the engine.
         "./build-support/bin/release.sh -f",
     ]
