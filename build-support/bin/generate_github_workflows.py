@@ -286,7 +286,7 @@ def generate() -> dict[Path, str]:
         {
             "name": test_workflow_name,
             "on": "pull_request",
-            "jobs": test_workflow_jobs(["3.7.10"]),
+            "jobs": test_workflow_jobs(["3.7.10", "3.9.2"]),
         },
         Dumper=NoAliasDumper,
     )
