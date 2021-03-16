@@ -401,7 +401,9 @@ class SchedulerSession:
         """
         request_specs = tuple((s, p) for s in subjects for p in products)
         native_execution_request = native_engine.PyExecutionRequest(
-            poll=poll, poll_delay_in_ms=poll_delay, timeout_in_ms=timeout
+            poll=poll,
+            poll_delay_in_ms=poll_delay * 1000 if poll_delay else None,
+            timeout_in_ms=timeout * 1000 if timeout else None,
         )
         for subject, product in request_specs:
             self._scheduler.execution_add_root_select(native_execution_request, subject, product)

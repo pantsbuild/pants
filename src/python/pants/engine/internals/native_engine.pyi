@@ -58,7 +58,7 @@ class PySnapshot:
 
 class PyExecutionRequest:
     def __init__(
-        self, poll: bool, poll_delay_in_ms: float | None, timeout_in_ms: float | None
+        self, poll: bool, poll_delay_in_ms: int | None, timeout_in_ms: int | None
     ) -> None: ...
 
 class PyExecutionStrategyOptions:
