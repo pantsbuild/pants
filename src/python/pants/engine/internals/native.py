@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import Dict, Iterable, List, Optional, Tuple, cast
 
 from typing_extensions import Protocol
