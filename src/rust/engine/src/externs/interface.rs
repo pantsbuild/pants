@@ -159,7 +159,11 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(py, teardown_dynamic_ui(a: PyScheduler, b: PySession)),
   )?;
 
-  m.add(py, "set_panic_handler", py_fn!(py, set_panic_handler()))?;
+  m.add(
+    py,
+    "maybe_set_panic_handler",
+    py_fn!(py, maybe_set_panic_handler()),
+  )?;
 
   m.add(
     py,
@@ -1480,7 +1484,11 @@ pub(crate) fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
   }
 }
 
-fn set_panic_handler(_: Python) -> PyUnitResult {
+/// Set up a panic handler, unless RUST_BACKTRACE is set.
+fn maybe_set_panic_handler(_: Python) -> PyUnitResult {
+  if std::env::var("RUST_BACKTRACE").unwrap_or_else(|_| "0".to_owned()) != "0" {
+    return Ok(None);
+  }
   panic::set_hook(Box::new(|panic_info| {
     let payload = panic_info.payload();
     let mut panic_str = generate_panic_string(payload);

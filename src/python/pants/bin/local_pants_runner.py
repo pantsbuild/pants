@@ -14,7 +14,7 @@ from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.environment import CompleteEnvironment
-from pants.engine.internals.native import Native
+from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
@@ -72,8 +72,7 @@ class LocalPantsRunner:
         scheduler: Optional[GraphScheduler] = None,
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> GraphSession:
-        native = Native()
-        native.set_panic_handler()
+        native_engine.maybe_set_panic_handler()
         graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(
             options_bootstrapper, build_config, env
         )
