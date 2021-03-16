@@ -19,7 +19,6 @@ use std::collections::BTreeMap;
 use std::convert::AsRef;
 use std::convert::TryInto;
 use std::fmt;
-use std::sync::atomic;
 
 use crate::core::{Failure, Key, TypeId, Value};
 use crate::interning::Interns;
@@ -45,14 +44,15 @@ pub fn get_type_for(val: &PyObject) -> TypeId {
 }
 
 pub fn is_union(ty: TypeId) -> bool {
-  with_externs(|py, e| {
-    let py_type = (&ty).as_py_type(py);
-    e.call_method(py, "is_union", (py_type,), None)
-      .unwrap()
-      .cast_as::<PyBool>(py)
-      .unwrap()
-      .is_true()
-  })
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  let py_type = (&ty).as_py_type(py);
+  let unions = py.import("pants.engine.unions").unwrap();
+  unions
+    .call(py, "is_union", (py_type,), None)
+    .unwrap()
+    .extract(py)
+    .unwrap()
 }
 
 pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
@@ -256,13 +256,14 @@ pub fn val_to_log_level(obj: &PyObject) -> Result<log::Level, String> {
 }
 
 pub fn create_exception(msg: &str) -> Value {
-  Value::from(with_externs(|py, e| e.call_method(py, "create_exception", (msg,), None)).unwrap())
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  Value::from(PyErr::new::<cpython::exc::Exception, _>(py, msg).instance(py))
 }
 
 pub fn check_for_python_none(value: PyObject) -> Option<PyObject> {
   let gil = Python::acquire_gil();
   let py = gil.python();
-
   if value == py.None() {
     return None;
   }
@@ -285,18 +286,18 @@ pub fn call_function<T: AsRef<PyObject>>(func: T, args: &[Value]) -> Result<PyOb
 }
 
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
-  let response = with_externs(|py, e| {
-    e.call_method(
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  let native = py.import("pants.engine.internals.native").unwrap();
+  let response = native
+    .call(
       py,
       "generator_send",
       (generator as &PyObject, arg as &PyObject),
       None,
     )
-    .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))
-  })?;
+    .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))?;
 
-  let gil = Python::acquire_gil();
-  let py = gil.python();
   if let Ok(b) = response.cast_as::<PyGeneratorResponseBreak>(py) {
     Ok(GeneratorResponse::Break(Value::new(
       b.val(py).clone_ref(py),
@@ -343,29 +344,7 @@ pub fn unsafe_call(type_id: TypeId, args: &[Value]) -> Value {
 }
 
 lazy_static! {
-  // See set_externs.
-  static ref EXTERNS: atomic::AtomicPtr<PyObject> = atomic::AtomicPtr::new(Box::into_raw(Box::new(none())));
-
   static ref INTERNS: Interns = Interns::new();
-}
-
-///
-/// Set the static Externs for this process. All other methods of this module will fail
-/// until this has been called.
-///
-pub fn set_externs(externs: PyObject) {
-  EXTERNS.store(Box::into_raw(Box::new(externs)), atomic::Ordering::Relaxed);
-}
-
-fn with_externs<F, T>(f: F) -> T
-where
-  F: FnOnce(Python, &PyObject) -> T,
-{
-  let gil = Python::acquire_gil();
-  let externs = unsafe { Box::from_raw(EXTERNS.load(atomic::Ordering::Relaxed)) };
-  let result = f(gil.python(), &externs);
-  std::mem::forget(externs);
-  result
 }
 
 py_class!(pub class PyGeneratorResponseBreak |py| {

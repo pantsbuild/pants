@@ -1,8 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
-from typing import Dict, Iterable, List, Optional, Tuple, Union, cast
+from typing import Dict, Iterable, List, Optional, Tuple, cast
 
 from typing_extensions import Protocol
 
@@ -23,72 +25,46 @@ from pants.engine.internals.native_engine import (
     PyTypes,
 )
 from pants.engine.rules import Get
-from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
 
 
-class Externs:
-    """Methods exposed from Python to Rust.
+_RAISE_KEYBOARD_INTERRUPT = os.environ.get("_RAISE_KEYBOARD_INTERRUPT_FFI", None)
 
-    TODO: These could be implemented in Rust in `externs.rs` via the cpython API.
-    """
 
-    def __init__(self, lib):
-        self.lib = lib
-
-    _do_raise_keyboardinterrupt_in = os.environ.get("_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS", None)
-
-    def is_union(self, input_type):
-        """Return whether or not a type is a member of a union."""
-        # NB: This check is exposed for testing error handling in CFFI methods. This code path should
-        # never be active in normal pants usage.
-        return union.is_instance(input_type)
-
-    def create_exception(self, msg):
-        """Given a utf8 message string, create an Exception object."""
-        return Exception(msg)
-
-    def generator_send(
-        self, func, arg
-    ) -> Union[PyGeneratorResponseGet, PyGeneratorResponseGetMulti, PyGeneratorResponseBreak]:
-        """Given a generator, send it the given value and return a response."""
-        if (
-            self._do_raise_keyboardinterrupt_in
-            and self._do_raise_keyboardinterrupt_in in func.__name__
-        ):
-            raise KeyboardInterrupt("ctrl-c interrupted execution of a ffi method!")
-        try:
-            res = func.send(arg)
-
-            if isinstance(res, Get):
-                # Get.
-                return PyGeneratorResponseGet(
-                    product=res.output_type,
-                    declared_subject=res.input_type,
-                    subject=res.input,
-                )
-            elif type(res) in (tuple, list):
-                # GetMulti.
-                return PyGeneratorResponseGetMulti(
-                    gets=tuple(
-                        PyGeneratorResponseGet(
-                            product=get.output_type,
-                            declared_subject=get.input_type,
-                            subject=get.input,
-                        )
-                        for get in res
+def generator_send(
+    func, arg
+) -> PyGeneratorResponseGet | PyGeneratorResponseGetMulti | PyGeneratorResponseBreak:
+    if _RAISE_KEYBOARD_INTERRUPT:
+        raise KeyboardInterrupt("ctrl-c interrupted execution during FFI (for testing purposes).")
+    try:
+        res = func.send(arg)
+        if isinstance(res, Get):
+            return PyGeneratorResponseGet(
+                product=res.output_type,
+                declared_subject=res.input_type,
+                subject=res.input,
+            )
+        elif type(res) in (tuple, list):
+            return PyGeneratorResponseGetMulti(
+                gets=tuple(
+                    PyGeneratorResponseGet(
+                        product=get.output_type,
+                        declared_subject=get.input_type,
+                        subject=get.input,
                     )
+                    for get in res
                 )
-            else:
-                raise ValueError(f"internal engine error: unrecognized coroutine result {res}")
-        except StopIteration as e:
-            if not e.args:
-                raise
-            # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
-            # by calling `next()` on an empty iterator.
-            return PyGeneratorResponseBreak(val=e.value)
+            )
+        else:
+            raise ValueError(f"internal engine error: unrecognized coroutine result {res}")
+    except StopIteration as e:
+        if not e.args:
+            raise
+        # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
+        # by calling `next()` on an empty iterator.
+        return PyGeneratorResponseBreak(val=e.value)
 
 
 class RawFdRunner(Protocol):
@@ -108,13 +84,6 @@ class RawFdRunner(Protocol):
 
 class Native(metaclass=SingletonMetaclass):
     """Encapsulates fetching a platform specific version of the native portion of the engine."""
-
-    def __init__(self):
-        self.externs = Externs(self.lib)
-        self.lib.externs_set(self.externs)
-
-    class BinaryLocationError(Exception):
-        pass
 
     @memoized_property
     def lib(self):
