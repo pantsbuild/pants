@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, List, Optional, Set, Tuple, Type, cast
+from typing import Any, ClassVar, Iterable, List, Optional, Tuple, Type, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
@@ -19,7 +19,6 @@ from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing
-from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
@@ -86,7 +85,7 @@ class GraphSession:
             sorted({typ.options_scope for typ in consumed_types if issubclass(typ, Subsystem)})  # type: ignore[misc]
         )
 
-    def goal_consumed_types(self, goal_product: Type) -> Set[Type]:
+    def goal_consumed_types(self, goal_product: type) -> set[type]:
         """Return the set of types that could possibly be consumed while running the given goal."""
         return set(
             self.scheduler_session.scheduler.rule_graph_consumed_types(
@@ -170,19 +169,15 @@ class EngineInitializer:
         executor: Optional[PyExecutor] = None,
         local_only: bool = False,
     ) -> GraphScheduler:
-        native = Native()
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         options = options_bootstrapper.full_options(build_configuration)
         assert bootstrap_options is not None
-        executor = executor or PyExecutor(
-            *GlobalOptions.compute_executor_arguments(bootstrap_options)
-        )
+        executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
         execution_options = ExecutionOptions.from_options(options, env, local_only=local_only)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
             execution_options,
-            native=native,
             executor=executor,
             pants_ignore_patterns=GlobalOptions.compute_pants_ignore(build_root, bootstrap_options),
             use_gitignore=bootstrap_options.pants_ignore_use_gitignore,
@@ -199,7 +194,6 @@ class EngineInitializer:
     def setup_graph_extended(
         build_configuration: BuildConfiguration,
         execution_options: ExecutionOptions,
-        native: Native,
         *,
         executor: PyExecutor,
         pants_ignore_patterns: List[str],
@@ -283,7 +277,6 @@ class EngineInitializer:
             return ensure_absolute_path(v)
 
         scheduler = Scheduler(
-            native=native,
             ignore_patterns=pants_ignore_patterns,
             use_gitignore=use_gitignore,
             build_root=build_root,

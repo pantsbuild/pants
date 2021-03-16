@@ -12,7 +12,6 @@ from typing import Dict, Tuple
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, ExitCode
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.engine.environment import CompleteEnvironment
-from pants.engine.internals.native import RawFdRunner
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.init.logging import stdio_destination
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -25,7 +24,7 @@ class ExclusiveRequestTimeout(Exception):
     """Represents a timeout while waiting for another request to complete."""
 
 
-class DaemonPantsRunner(RawFdRunner):
+class DaemonPantsRunner:
     """A RawFdRunner (callable) that will be called for each client request to Pantsd."""
 
     def __init__(self, core: PantsDaemonCore) -> None:

@@ -22,6 +22,7 @@ from pants.base.build_environment import (
     pants_version,
 )
 from pants.engine.environment import CompleteEnvironment
+from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
@@ -1103,6 +1104,11 @@ class GlobalOptions(Subsystem):
 
         Raises pants.option.errors.OptionsError on validation failure.
         """
+        if opts.rule_threads_core < 2:
+            # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
+            # at a time, and a `@goal_rule` will only block one thread.
+            raise OptionsError("--rule-threads-core values less than 2 are not supported.")
+
         if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
             raise OptionsError(
                 "`--remote-execution` cannot be set at the same time as either "
@@ -1163,21 +1169,13 @@ class GlobalOptions(Subsystem):
         validate_remote_headers("remote_store_headers")
 
     @staticmethod
-    def compute_executor_arguments(bootstrap_options: OptionValueContainer) -> Tuple[int, int]:
-        """Computes the arguments to construct a PyExecutor.
-
-        Does not directly construct a PyExecutor to avoid cycles.
-        """
-        if bootstrap_options.rule_threads_core < 2:
-            # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
-            # at a time, and a `@goal_rule` will only block one thread.
-            raise ValueError("--rule-threads-core values less than 2 are not supported.")
+    def create_py_executor(bootstrap_options: OptionValueContainer) -> PyExecutor:
         rule_threads_max = (
             bootstrap_options.rule_threads_max
             if bootstrap_options.rule_threads_max
             else 4 * bootstrap_options.rule_threads_core
         )
-        return bootstrap_options.rule_threads_core, rule_threads_max
+        return PyExecutor(bootstrap_options.rule_threads_core, rule_threads_max)
 
     @staticmethod
     def compute_pants_ignore(buildroot, global_options):

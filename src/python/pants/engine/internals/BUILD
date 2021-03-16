@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=['*.py', '!native.py', '!*_test.py']
+  sources=['*.py', '!*_test.py']
 )
 
 python_tests(
@@ -23,19 +23,13 @@ python_integration_tests(
 
 python_library(
   name='native',
-  sources=[
-    'native.py',
-    'native_engine.pyi',
-  ],
+  sources=['native_engine.pyi'],
   dependencies=[':native_engine'],
 )
 
 resources(
   name='native_engine',
-  sources=[
-    'native_engine.so',
-    'native_engine.so.metadata',
-  ],
+  sources=['native_engine.so', 'native_engine.so.metadata'],
 )
 
 resources(
