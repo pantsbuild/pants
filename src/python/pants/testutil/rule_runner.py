@@ -462,13 +462,24 @@ def run_rule_with_mocks(
 @contextmanager
 def mock_console(
     options_bootstrapper: OptionsBootstrapper,
+    *,
+    stdin_content: bytes | str | None = None,
 ) -> Iterator[Tuple[Console, StdioReader]]:
     global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-    with initialize_stdio(global_bootstrap_options), open(
-        "/dev/null", "r"
-    ) as stdin, temporary_file(binary_mode=False) as stdout, temporary_file(
+
+    @contextmanager
+    def stdin_context():
+        if stdin_content is None:
+            yield open("/dev/null", "r")
+        else:
+            with temporary_file(binary_mode=isinstance(stdin_content, bytes)) as stdin_file:
+                stdin_file.write(stdin_content)
+                stdin_file.close()
+                yield open(stdin_file.name, "r")
+
+    with initialize_stdio(global_bootstrap_options), stdin_context() as stdin, temporary_file(
         binary_mode=False
-    ) as stderr, stdio_destination(
+    ) as stdout, temporary_file(binary_mode=False) as stderr, stdio_destination(
         stdin_fileno=stdin.fileno(),
         stdout_fileno=stdout.fileno(),
         stderr_fileno=stderr.fileno(),

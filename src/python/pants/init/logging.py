@@ -2,10 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import http.client
+import locale
 import logging
 import os
 import sys
 from contextlib import contextmanager
+from io import BufferedReader, TextIOWrapper
 from logging import Formatter, LogRecord, StreamHandler
 from typing import Dict, Iterator
 
@@ -154,7 +156,7 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     # Initialize thread-local stdio, and replace sys.std* with proxies.
     original_stdin, original_stdout, original_stderr = sys.stdin, sys.stdout, sys.stderr
     try:
-        sys.stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
+        raw_stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
             global_level.level,
             log_show_rust_3rdparty,
             use_color,
@@ -163,6 +165,10 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
             tuple(message_regex_filters),
             log_path,
         )
+        sys.stdin = TextIOWrapper(
+            BufferedReader(raw_stdin), encoding=locale.getpreferredencoding(False)
+        )
+
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
         # Install a Python logger that will route through the Rust logger.
         with _python_logging_setup(global_level, print_stacktrace):

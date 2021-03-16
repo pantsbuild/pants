@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from io import RawIOBase
 from typing import Any, Dict, List, TextIO, Tuple
 
 # TODO: black and flake8 disagree about the content of this file:
@@ -19,7 +20,7 @@ def stdio_initialize(
     log_levels_by_target: Dict[str, int],
     message_regex_filters: Tuple[str, ...],
     log_file: str,
-) -> Tuple[TextIO, TextIO, TextIO]: ...
+) -> Tuple[RawIOBase, TextIO, TextIO]: ...
 def stdio_thread_get_destination() -> PyStdioDestination: ...
 def stdio_thread_set_destination(destination: PyStdioDestination) -> None: ...
 def stdio_thread_console_set(stdin_fileno: int, stdout_fileno: int, stderr_fileno: int) -> None: ...

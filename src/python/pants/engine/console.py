@@ -1,8 +1,9 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import sys
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
 from colors import blue, cyan, green, magenta, red, yellow
 
@@ -18,22 +19,26 @@ class Console:
 
     def __init__(
         self,
+        stdin=None,
         stdout=None,
         stderr=None,
         use_colors: bool = True,
         session: Optional[SchedulerSession] = None,
     ):
-        """`stdout` and `stderr` may be explicitly provided when Console is constructed.
+        """If a SchedulerSession is set, any running UI will be torn down before stdio is
+        rendered."""
 
-        We use this in tests to provide a mock we can write tests against, rather than writing to
-        the system stdout/stderr. If a SchedulerSession is set, any running UI will be torn down
-        before stdio is rendered.
-        """
-
+        self._stdin = stdin or sys.stdin
         self._stdout = stdout or sys.stdout
         self._stderr = stderr or sys.stderr
         self._use_colors = use_colors
         self._session = session
+
+    @property
+    def stdin(self):
+        if self._session:
+            self._session.teardown_dynamic_ui()
+        return self._stdin
 
     @property
     def stdout(self):
@@ -46,6 +51,12 @@ class Console:
         if self._session:
             self._session.teardown_dynamic_ui()
         return self._stderr
+
+    def input(self, prompt: str | None = None) -> str:
+        """Equivalent to the `input` builtin, but clears any running UI before rendering."""
+        if prompt is not None:
+            self.write_stdout(prompt)
+        return cast(str, self.stdin.readline()).rstrip("\n")
 
     def write_stdout(self, payload: str) -> None:
         self.stdout.write(payload)
