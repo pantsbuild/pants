@@ -161,8 +161,6 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(py, "set_panic_handler", py_fn!(py, set_panic_handler()))?;
 
-  m.add(py, "externs_set", py_fn!(py, externs_set(a: PyObject)))?;
-
   m.add(
     py,
     "match_path_globs",
@@ -751,11 +749,6 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> CPyResult<
 
 // TODO: It's not clear how to return "nothing" (None) in a CPyResult, so this is a placeholder.
 type PyUnitResult = CPyResult<Option<bool>>;
-
-fn externs_set(_: Python, externs: PyObject) -> PyUnitResult {
-  externs::set_externs(externs);
-  Ok(None)
-}
 
 fn nailgun_client_create(
   py: Python,

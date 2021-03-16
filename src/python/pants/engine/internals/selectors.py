@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import itertools
+import os
 from dataclasses import dataclass
 from functools import partial
 from textwrap import dedent
@@ -23,6 +24,11 @@ from typing import (
     overload,
 )
 
+from pants.engine.internals.native_engine import (
+    PyGeneratorResponseBreak,
+    PyGeneratorResponseGet,
+    PyGeneratorResponseGetMulti,
+)
 from pants.engine.unions import union
 from pants.util.meta import frozen_after_init
 
@@ -210,10 +216,9 @@ class Get(GetConstraints, Generic[_Output, _Input]):
     ) -> Generator[Get[_Output, _Input], None, _Output]:
         """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
-        The `yield`ed value `self` is interpreted by the engine within `extern_generator_send()` in
-        `native.py`. This class will yield a single Get instance, which is converted into
-        `PyGeneratorResponse::Get` from `externs.rs` via the python `cffi` library and the rust
-        `cbindgen` crate.
+        The `yield`ed value `self` is interpreted by the engine within
+        `native_engine_generator_send()`. This class will yield a single Get instance, which is
+        converted into `PyGeneratorResponse::Get`.
 
         This is how this method is eventually called:
         - When the engine calls an `async def` method decorated with `@rule`, an instance of
@@ -403,8 +408,8 @@ async def MultiGet(  # noqa: F811
     """Yield a tuple of Get instances all at once.
 
     The `yield`ed value `self.gets` is interpreted by the engine within
-    `extern_generator_send()` in `native.py`. This class will yield a tuple of Get instances,
-    which is converted into `PyGeneratorResponse::GetMulti` from `externs.rs`.
+    `native_engine_generator_send()`. This class will yield a tuple of Get instances,
+    which is converted into `PyGeneratorResponse::GetMulti`.
 
     The engine will fulfill these Get instances in parallel, and return a tuple of _Output
     instances to this method, which then returns this tuple to the `@rule` which called
@@ -635,3 +640,40 @@ class Params:
 
     def __init__(self, *args: Any) -> None:
         self.params = tuple(args)
+
+
+_RAISE_KEYBOARD_INTERRUPT = os.environ.get("_RAISE_KEYBOARD_INTERRUPT_FFI", None)
+
+
+def native_engine_generator_send(
+    func, arg
+) -> PyGeneratorResponseGet | PyGeneratorResponseGetMulti | PyGeneratorResponseBreak:
+    if _RAISE_KEYBOARD_INTERRUPT:
+        raise KeyboardInterrupt("ctrl-c interrupted execution during FFI (for testing purposes).")
+    try:
+        res = func.send(arg)
+        if isinstance(res, Get):
+            return PyGeneratorResponseGet(
+                product=res.output_type,
+                declared_subject=res.input_type,
+                subject=res.input,
+            )
+        elif type(res) in (tuple, list):
+            return PyGeneratorResponseGetMulti(
+                gets=tuple(
+                    PyGeneratorResponseGet(
+                        product=get.output_type,
+                        declared_subject=get.input_type,
+                        subject=get.input,
+                    )
+                    for get in res
+                )
+            )
+        else:
+            raise ValueError(f"internal engine error: unrecognized coroutine result {res}")
+    except StopIteration as e:
+        if not e.args:
+            raise
+        # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
+        # by calling `next()` on an empty iterator.
+        return PyGeneratorResponseBreak(val=e.value)

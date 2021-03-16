@@ -120,32 +120,23 @@ def test_fails_ctrl_c_on_import() -> None:
         )
 
         pid_specific_log_file, shared_log_file = get_log_file_paths(tmpdir, pants_run.pid)
-
         assert "" == read_file(pid_specific_log_file)
         assert "" == read_file(shared_log_file)
 
 
-def test_fails_ctrl_c_ffi_extern() -> None:
+def test_fails_ctrl_c_ffi() -> None:
     with temporary_dir() as tmpdir:
         pants_run = run_pants_with_workdir(
             command=lifecycle_stub_cmdline(),
             workdir=tmpdir,
-            extra_env={"_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS": "run_lifecycle_stubs"},
+            extra_env={"_RAISE_KEYBOARD_INTERRUPT_FFI": "1"},
         )
         pants_run.assert_failure()
-
-        assert (
-            "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!" in pants_run.stderr
-        )
+        assert "KeyboardInterrupt: ctrl-c interrupted execution during FFI" in pants_run.stderr
 
         pid_specific_log_file, shared_log_file = get_log_file_paths(tmpdir, pants_run.pid)
-
-        assert "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!" in read_file(
-            pid_specific_log_file
-        )
-        assert "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!" in read_file(
-            shared_log_file
-        )
+        assert "" == read_file(pid_specific_log_file)
+        assert "" == read_file(shared_log_file)
 
 
 class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
