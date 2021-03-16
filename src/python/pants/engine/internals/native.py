@@ -29,7 +29,6 @@ from pants.option.global_options import ExecutionOptions
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
 
-
 _RAISE_KEYBOARD_INTERRUPT = os.environ.get("_RAISE_KEYBOARD_INTERRUPT_FFI", None)
 
 
