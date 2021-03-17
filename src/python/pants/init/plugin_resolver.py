@@ -104,7 +104,7 @@ class PluginResolver:
             interpreter=self._interpreter,
             cache=self.plugin_cache_dir,
             allow_prereleases=PANTS_SEMVER.is_prerelease,
-            network_configuration=NetworkConfiguration.create(
+            network_configuration=NetworkConfiguration(
                 cert=self._global_options.options.ca_certs_path
             ),
         )
