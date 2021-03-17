@@ -19,7 +19,7 @@ from pants.backend.python.target_types import (
     EntryPoint,
     InterpreterConstraintsField,
     MainSpecification,
-    PythonRequirementConstraintsTarget,
+    PythonRequirementConstraints,
 )
 from pants.backend.python.util_rules.pex import (
     MaybeConstraintsFile,
@@ -302,7 +302,7 @@ def test_maybe_constraints_file() -> None:
             SubsystemRule(PythonSetup),
             QueryRule(MaybeConstraintsFile, []),
         ],
-        target_types=[PythonRequirementConstraintsTarget],
+        target_types=[PythonRequirementConstraints],
     )
     constraints = ["c1==1.1.1", "c2==2.2.2"]
     constraints_file = "\n".join(constraints)

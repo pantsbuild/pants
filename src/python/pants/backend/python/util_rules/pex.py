@@ -22,7 +22,10 @@ from typing_extensions import Protocol
 
 from pants.backend.python.target_types import InterpreterConstraintsField, MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import PythonRequirementConstraints, PythonRequirementsField
+from pants.backend.python.target_types import (
+    PythonRequirementConstraintsField,
+    PythonRequirementsField,
+)
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
@@ -516,12 +519,14 @@ async def resolve_requirements_constraints_file(python_setup: PythonSetup) -> Ma
             ),
         )
         tgt = targets.expect_single()
-        if not tgt.has_field(PythonRequirementConstraints):
+        if not tgt.has_field(PythonRequirementConstraintsField):
             raise ValueError(
                 "Invalid target type for `[python-setup].requirement_constraints_target`. Please "
                 f"use a `_python_constraints` target instead of a `{tgt.alias}` target."
             )
-        formatted_constraints = "\n".join(tgt[PythonRequirementConstraints].value)
+        formatted_constraints = "\n".join(
+            str(constraint) for constraint in tgt[PythonRequirementConstraintsField].value
+        )
         path = "constraints.generated.txt"
         digest = await Get(
             Digest, CreateDigest([FileContent(path, formatted_constraints.encode())])

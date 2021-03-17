@@ -507,7 +507,7 @@ class PythonLibrary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-def format_invalid_requirement_string_error(
+def _format_invalid_requirement_string_error(
     value: str, e: Exception, *, description_of_origin: str
 ) -> str:
     prefix = f"Invalid requirement '{value}' in {description_of_origin}: {e}"
@@ -538,20 +538,16 @@ def format_invalid_requirement_string_error(
     )
 
 
-class PythonRequirementsField(Field):
-    alias = "requirements"
-    required = True
-    value: Tuple[Requirement, ...]
-    help = (
-        "A sequence of pip-style requirement strings, e.g. ['foo==1.8', "
-        "'bar<=3 ; python_version<'3']."
-    )
+class _RequirementSequenceField(Field):
+    value: tuple[Requirement, ...]
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Tuple[Requirement, ...]:
         value = super().compute_value(raw_value, address=address)
+        if value is None:
+            return ()
         invalid_type_error = InvalidFieldTypeException(
             address,
             cls.alias,
@@ -571,7 +567,7 @@ class PythonRequirementsField(Field):
                     parsed = Requirement.parse(v)
                 except Exception as e:
                     raise InvalidFieldException(
-                        format_invalid_requirement_string_error(
+                        _format_invalid_requirement_string_error(
                             v,
                             e,
                             description_of_origin=(
@@ -583,6 +579,15 @@ class PythonRequirementsField(Field):
             else:
                 raise invalid_type_error
         return tuple(result)
+
+
+class PythonRequirementsField(_RequirementSequenceField):
+    alias = "requirements"
+    required = True
+    help = (
+        "A sequence of pip-style requirement strings, e.g. ['foo==1.8', "
+        "'bar<=3 ; python_version<'3']."
+    )
 
 
 class ModuleMappingField(DictStringToStringSequenceField):
@@ -634,7 +639,7 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirem
             yield Requirement.parse(line)
         except Exception as e:
             raise ValueError(
-                format_invalid_requirement_string_error(
+                _format_invalid_requirement_string_error(
                     line, e, description_of_origin=f"{rel_path} at line {i + 1}"
                 )
             )
@@ -656,16 +661,15 @@ class PythonRequirementsFile(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class PythonRequirementConstraints(StringSequenceField):
+class PythonRequirementConstraintsField(_RequirementSequenceField):
     alias = "constraints"
     required = True
-    value: tuple[str, ...]
     help = "A list of pip-style requirement strings, e.g. `my_dist==4.2.1`."
 
 
-class PythonRequirementConstraintsTarget(Target):
+class PythonRequirementConstraints(Target):
     alias = "_python_constraints"
-    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementConstraints)
+    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementConstraintsField)
     help = "A private helper target for inlined requirements constraints, used by macros."
 
 
