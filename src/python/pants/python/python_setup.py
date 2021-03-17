@@ -14,7 +14,7 @@ from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.environment import Environment
-from pants.option.custom_types import file_option
+from pants.option.custom_types import file_option, target_option
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -71,11 +71,27 @@ class PythonSetup(Subsystem):
             "--requirement-constraints",
             advanced=True,
             type=file_option,
+            mutually_exclusive_group="constraints",
             help=(
                 "When resolving third-party requirements, use this "
                 "constraints file to determine which versions to use.\n\nSee "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
                 "on the format of constraint files and how constraints are applied in Pex and pip."
+                "\n\nMutually exclusive with `--requirement-constraints-target`."
+            ),
+        )
+        register(
+            "--requirement-constraints-target",
+            advanced=True,
+            type=target_option,
+            mutually_exclusive_group="constraints",
+            help=(
+                "When resolving third-party requirements, use this "
+                "_python_constraints target to determine which versions to use.\n\nThis is "
+                "primarily intended for macros (for now). Normally, use "
+                "`--requirement-constraints` instead with a constraints file.\n\nSee "
+                "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
+                "on the format of constraints and how constraints are applied in Pex and pip."
             ),
         )
         register(
@@ -157,9 +173,14 @@ class PythonSetup(Subsystem):
         return tuple(self.options.interpreter_constraints)
 
     @property
-    def requirement_constraints(self) -> Optional[str]:
+    def requirement_constraints(self) -> str | None:
         """Path to constraint file."""
-        return cast(Optional[str], self.options.requirement_constraints)
+        return cast("str | None", self.options.requirement_constraints)
+
+    @property
+    def requirement_constraints_target(self) -> str | None:
+        """Address for a _python_constraints target."""
+        return cast("str | None", self.options.requirement_constraints_target)
 
     @property
     def resolve_all_constraints(self) -> ResolveAllConstraintsOption:

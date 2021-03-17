@@ -648,7 +648,25 @@ class PythonRequirementsFileSources(Sources):
 class PythonRequirementsFile(Target):
     alias = "_python_requirements_file"
     core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSources)
-    help = "A private, helper target type for requirements.txt files."
+    help = "A private helper target type for requirements.txt files."
+
+
+# -----------------------------------------------------------------------------------------------
+# `_python_constraints` target
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonRequirementConstraints(StringSequenceField):
+    alias = "constraints"
+    required = True
+    value: tuple[str, ...]
+    help = "A list of pip-style requirement strings, e.g. `my_dist==4.2.1`."
+
+
+class PythonRequirementConstraintsTarget(Target):
+    alias = "_python_constraints"
+    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementConstraints)
+    help = "A private helper target for inlined requirements constraints, used by macros."
 
 
 # -----------------------------------------------------------------------------------------------

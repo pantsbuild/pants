@@ -26,6 +26,7 @@ from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
     PythonLibrary,
+    PythonRequirementConstraintsTarget,
     PythonRequirementLibrary,
     PythonRequirementsFile,
     PythonTests,
@@ -80,5 +81,6 @@ def target_types():
         PythonLibrary,
         PythonRequirementLibrary,
         PythonRequirementsFile,
+        PythonRequirementConstraintsTarget,
         PythonTests,
     ]

@@ -18,6 +18,7 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.util_rules.pex import (
+    MaybeConstraintsFile,
     PexInterpreterConstraints,
     PexPlatforms,
     PexRequest,
@@ -31,14 +32,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import (
-    Digest,
-    DigestContents,
-    GlobExpansionConjunction,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
+from pants.engine.fs import Digest, DigestContents, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -185,7 +179,11 @@ class TwoStepPexFromTargetsRequest:
 
 
 @rule(level=LogLevel.DEBUG)
-async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonSetup) -> PexRequest:
+async def pex_from_targets(
+    request: PexFromTargetsRequest,
+    python_setup: PythonSetup,
+    constraints_file: MaybeConstraintsFile,
+) -> PexRequest:
     if request.direct_deps_only:
         targets = await Get(Targets, Addresses(request.addresses))
         direct_deps = await MultiGet(
@@ -232,37 +230,34 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     requirements = exact_reqs
     description = request.description
 
-    if python_setup.requirement_constraints:
-        # In requirement strings Foo_-Bar.BAZ and foo-bar-baz refer to the same project. We let
-        # packaging canonicalize for us.
-        # See: https://www.python.org/dev/peps/pep-0503/#normalized-names
-
-        exact_req_projects = {
-            canonicalize_project_name(Requirement.parse(req).project_name) for req in exact_reqs
-        }
-        constraints_file_contents = await Get(
-            DigestContents,
-            PathGlobs(
-                [python_setup.requirement_constraints],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                conjunction=GlobExpansionConjunction.all_match,
-                description_of_origin="the option `--python-setup-requirement-constraints`",
-            ),
-        )
+    if constraints_file.path:
+        constraints_file_contents = await Get(DigestContents, Digest, constraints_file.digest)
         constraints_file_reqs = set(
             parse_requirements_file(
                 constraints_file_contents[0].content.decode(),
-                rel_path=python_setup.requirement_constraints,
+                rel_path=constraints_file.path,
             )
         )
+
+        # In requirement strings, Foo_-Bar.BAZ and foo-bar-baz refer to the same project. We let
+        # packaging canonicalize for us.
+        # See: https://www.python.org/dev/peps/pep-0503/#normalized-names
+        exact_req_projects = {
+            canonicalize_project_name(Requirement.parse(req).project_name) for req in exact_reqs
+        }
         constraint_file_projects = {
             canonicalize_project_name(req.project_name) for req in constraints_file_reqs
         }
         unconstrained_projects = exact_req_projects - constraint_file_projects
         if unconstrained_projects:
+            constraints_descr = (
+                f"constraints file {constraints_file.path}"
+                if python_setup.requirement_constraints
+                else f"_python_constraints target {python_setup.requirement_constraints_target}"
+            )
             logger.warning(
-                f"The constraints file {python_setup.requirement_constraints} does not contain "
-                f"entries for the following requirements: {', '.join(unconstrained_projects)}"
+                f"The {constraints_descr} does not contain entries for the following "
+                f"requirements: {', '.join(unconstrained_projects)}"
             )
 
         if python_setup.resolve_all_constraints == ResolveAllConstraintsOption.ALWAYS or (
@@ -271,8 +266,8 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         ):
             if unconstrained_projects:
                 logger.warning(
-                    "Ignoring resolve_all_constraints setting in [python_setup] scope "
-                    "because constraints file does not cover all requirements."
+                    "Ignoring `[python_setup].resolve_all_constraints` option because constraints "
+                    "file does not cover all requirements."
                 )
             else:
                 requirements = PexRequirements(str(req) for req in constraints_file_reqs)
@@ -282,9 +277,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         and python_setup.resolve_all_constraints_was_set_explicitly()
     ):
         raise ValueError(
-            f"[python-setup].resolve_all_constraints is set to "
+            "[python-setup].resolve_all_constraints is set to "
             f"{python_setup.resolve_all_constraints.value}, so "
-            f"[python-setup].requirement_constraints must also be provided."
+            "either [python-setup].requirement_constraints or "
+            "[python-setup].requirement_constraints_target must also be provided."
         )
 
     return PexRequest(
