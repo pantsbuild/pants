@@ -106,12 +106,15 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
 
 def test_invalid_req(rule_runner: RuleRunner) -> None:
     """Test that we give a nice error message."""
+    fake_file_tgt = PythonRequirementsFile(
+        {"sources": ["doesnt matter"]}, address=Address("doesnt_matter")
+    )
     with pytest.raises(ExecutionError) as exc:
         assert_python_requirements(
             rule_runner,
             "python_requirements()",
             "\n\nNot A Valid Req == 3.7",
-            expected_file_dep=PythonRequirementsFile({}, address=Address("doesnt_matter")),
+            expected_file_dep=fake_file_tgt,
             expected_targets=[],
         )
     assert "Invalid requirement 'Not A Valid Req == 3.7' in requirements.txt at line 3" in str(
@@ -124,7 +127,7 @@ def test_invalid_req(rule_runner: RuleRunner) -> None:
             rule_runner,
             "python_requirements()",
             "git+https://github.com/pypa/pip.git#egg=pip",
-            expected_file_dep=PythonRequirementsFile({}, address=Address("doesnt_matter")),
+            expected_file_dep=fake_file_tgt,
             expected_targets=[],
         )
     assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)

@@ -3,7 +3,6 @@
 
 import os
 
-from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.unions import UnionMembership
@@ -18,8 +17,7 @@ class SchedulerTestBase:
     TODO: In the medium term, this should be part of pants_test.test_base.TestBase.
     """
 
-    _native = Native()
-    _executor = PyExecutor(2, 4)
+    _executor = PyExecutor(core_threads=2, max_threads=4)
 
     def _create_work_dir(self):
         work_dir = safe_mkdtemp()
@@ -41,7 +39,6 @@ class SchedulerTestBase:
         local_execution_root_dir = os.path.realpath(safe_mkdtemp())
         named_caches_dir = os.path.realpath(safe_mkdtemp())
         scheduler = Scheduler(
-            native=self._native,
             ignore_patterns=[],
             use_gitignore=False,
             build_root=build_root,

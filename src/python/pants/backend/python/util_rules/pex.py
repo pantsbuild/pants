@@ -13,7 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import FrozenSet, Iterable, List, Mapping, Sequence, Set, Tuple, TypeVar
+from typing import FrozenSet, Iterable, Iterator, List, Mapping, Sequence, Set, Tuple, TypeVar
 
 import packaging.specifiers
 import packaging.version
@@ -24,7 +24,7 @@ from pants.backend.python.target_types import InterpreterConstraintsField, MainS
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
-from pants.backend.python.util_rules.pex_cli import PexCliProcess
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
     PexEnvironment,
     PexRuntimeEnvironment,
@@ -1031,6 +1031,27 @@ class PexResolveInfo(Collection[PexDistributionInfo]):
     repository info -v`."""
 
 
+def parse_repository_info(repository_info: str) -> PexResolveInfo:
+    def iter_dist_info() -> Iterator[PexDistributionInfo]:
+        for line in repository_info.splitlines():
+            info = json.loads(line)
+            requires_python = info["requires_python"]
+            yield PexDistributionInfo(
+                project_name=info["project_name"],
+                version=packaging.version.Version(info["version"]),
+                requires_python=(
+                    packaging.specifiers.SpecifierSet(requires_python)
+                    if requires_python is not None
+                    else None
+                ),
+                requires_dists=tuple(
+                    Requirement.parse(req) for req in sorted(info["requires_dists"])
+                ),
+            )
+
+    return PexResolveInfo(sorted(iter_dist_info(), key=lambda dist: dist.project_name))
+
+
 @rule
 async def determine_venv_pex_resolve_info(venv_pex: VenvPex) -> PexResolveInfo:
     process_result = await Get(
@@ -1044,20 +1065,23 @@ async def determine_venv_pex_resolve_info(venv_pex: VenvPex) -> PexResolveInfo:
             level=LogLevel.DEBUG,
         ),
     )
-    dists = []
-    for line in process_result.stdout.decode().splitlines():
-        info = json.loads(line)
-        dists.append(
-            PexDistributionInfo(
-                project_name=info["project_name"],
-                version=packaging.version.Version(info["version"]),
-                requires_python=packaging.specifiers.SpecifierSet(info["requires_python"] or ""),
-                requires_dists=tuple(
-                    Requirement.parse(req) for req in sorted(info["requires_dists"])
-                ),
-            )
-        )
-    return PexResolveInfo(sorted(dists, key=lambda dist: dist.project_name))
+    return parse_repository_info(process_result.stdout.decode())
+
+
+@rule
+async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInfo:
+    process_result = await Get(
+        ProcessResult,
+        PexProcess(
+            pex=Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+            argv=[pex.name, "repository", "info", "-v"],
+            input_digest=pex.digest,
+            extra_env={"PEX_MODULE": "pex.tools"},
+            description=f"Determine distributions found in {pex.name}",
+            level=LogLevel.DEBUG,
+        ),
+    )
+    return parse_repository_info(process_result.stdout.decode())
 
 
 def rules():

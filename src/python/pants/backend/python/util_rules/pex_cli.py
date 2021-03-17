@@ -37,7 +37,7 @@ class PexBinary(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.33"
+    default_version = "v2.1.34"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
 
     @classproperty
@@ -47,8 +47,8 @@ class PexBinary(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "7f9f6168691fe83f38fbc248bd8629a152cf2a8833be1afdc06219f70fbb6064",
-                    "3596348",
+                    "9b1a959ccb61b3deb64ffeed43a735c7115e414f4de6f96e66adc9e7fc7a757f",
+                    "3597768",
                 )
             )
             for plat in ["darwin", "linux"]
@@ -97,20 +97,29 @@ class PexCliProcess:
             raise ValueError("`--pex-root` flag not allowed. We set its value for you.")
 
 
+class PexPEX(DownloadedExternalTool):
+    """The Pex PEX binary."""
+
+
+@rule
+async def download_pex_pex(pex_binary: PexBinary) -> PexPEX:
+    pex_pex = await Get(
+        DownloadedExternalTool, ExternalToolRequest, pex_binary.get_request(Platform.current)
+    )
+    return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
+
+
 @rule
 async def setup_pex_cli_process(
     request: PexCliProcess,
-    pex_binary: PexBinary,
+    pex_binary: PexPEX,
     pex_env: PexEnvironment,
     python_native_code: PythonNativeCode,
     global_options: GlobalOptions,
     pex_runtime_env: PexRuntimeEnvironment,
 ) -> Process:
     tmpdir = ".tmp"
-    gets: List[Get] = [
-        Get(DownloadedExternalTool, ExternalToolRequest, pex_binary.get_request(Platform.current)),
-        Get(Digest, CreateDigest([Directory(tmpdir)])),
-    ]
+    gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
     cert_args = []
 
     # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
@@ -127,15 +136,15 @@ async def setup_pex_cli_process(
         )
         cert_args = ["--cert", chrooted_ca_certs_path]
 
-    downloaded_pex_bin, *digests_to_merge = await MultiGet(gets)
-    digests_to_merge.append(downloaded_pex_bin.digest)
+    digests_to_merge = [pex_binary.digest]
+    digests_to_merge.extend(await MultiGet(gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
     pex_root_path = ".cache/pex_root"
     argv = [
-        downloaded_pex_bin.exe,
+        pex_binary.exe,
         *cert_args,
         "--python-path",
         create_path_env_var(pex_env.interpreter_search_paths),

@@ -16,8 +16,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.environment import CompleteEnvironment
-from pants.engine.internals.native import Native
-from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.internals import native_engine
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import initialize_stdio
 from pants.init.util import init_workdir
@@ -56,19 +55,16 @@ class PantsDaemon(PantsDaemonProcessManager):
             bootstrap_options = options_bootstrapper.bootstrap_options
             bootstrap_options_values = bootstrap_options.for_global_scope()
 
-        native = Native()
-
-        executor = PyExecutor(*GlobalOptions.compute_executor_arguments(bootstrap_options_values))
+        executor = GlobalOptions.create_py_executor(bootstrap_options_values)
         core = PantsDaemonCore(options_bootstrapper, env, executor, cls._setup_services)
 
-        server = native.new_nailgun_server(
+        server = native_engine.nailgun_server_create(
             executor,
             bootstrap_options_values.pantsd_pailgun_port,
             DaemonPantsRunner(core),
         )
 
         return PantsDaemon(
-            native=native,
             work_dir=bootstrap_options_values.pants_workdir,
             log_level=bootstrap_options_values.level,
             server=server,
@@ -109,7 +105,6 @@ class PantsDaemon(PantsDaemonProcessManager):
 
     def __init__(
         self,
-        native: Native,
         work_dir: str,
         log_level: LogLevel,
         server: Any,
@@ -120,7 +115,6 @@ class PantsDaemon(PantsDaemonProcessManager):
         """
         NB: A PantsDaemon instance is generally instantiated via `create`.
 
-        :param native: A `Native` instance.
         :param work_dir: The pants work directory.
         :param log_level: The log level to use for daemon logging.
         :param server: A native PyNailgunServer instance (not currently a nameable type).
@@ -129,7 +123,6 @@ class PantsDaemon(PantsDaemonProcessManager):
         :param bootstrap_options: The bootstrap options.
         """
         super().__init__(bootstrap_options, daemon_entrypoint=__name__)
-        self._native = native
         self._build_root = get_buildroot()
         self._work_dir = work_dir
         self._server = server
@@ -180,7 +173,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             ExceptionSink.install(
                 log_location=init_workdir(global_bootstrap_options), pantsd_instance=True
             )
-            self._native.set_panic_handler()
+            native_engine.maybe_set_panic_handler()
 
             self._initialize_metadata()
 
@@ -190,7 +183,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
             # We're exiting: join the server to avoid interrupting ongoing runs.
             self._logger.info("Waiting for ongoing runs to complete before exiting...")
-            self._native.nailgun_server_await_shutdown(self._server)
+            native_engine.nailgun_server_await_shutdown(self._server)
             self._logger.info("Exiting pantsd")
 
 

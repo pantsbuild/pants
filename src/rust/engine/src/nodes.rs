@@ -494,6 +494,15 @@ impl From<Scandir> for NodeKey {
   }
 }
 
+fn unmatched_globs_additional_context() -> Option<String> {
+  Some(format!(
+    "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
+    `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
+    they exist on disk. Refer to {}.",
+    externs::docs_url("troubleshooting#pants-cannot-find-a-file-in-your-project")
+  ))
+}
+
 ///
 /// A node that captures Vec<PathStat> for resolved files/dirs from PathGlobs.
 ///
@@ -511,7 +520,7 @@ impl Paths {
   }
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<Vec<PathStat>> {
     context
-      .expand_globs(path_globs)
+      .expand_globs(path_globs, unmatched_globs_additional_context())
       .map_err(|e| throw(&format!("{}", e)))
       .await
   }
@@ -588,7 +597,7 @@ impl Snapshot {
     // We rely on Context::expand_globs tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
     let path_stats = context
-      .expand_globs(path_globs)
+      .expand_globs(path_globs, unmatched_globs_additional_context())
       .map_err(|e| throw(&format!("{}", e)))
       .await?;
     store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)

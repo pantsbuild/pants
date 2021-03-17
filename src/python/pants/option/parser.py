@@ -278,23 +278,21 @@ class Parser:
                 # BooleanConversionError), hence we reference the original exception type as type(e).
                 args_str = ", ".join(args)
                 raise type(e)(
-                    f"Error computing value for {args_str} in {self._scope_str()} (may also be from PANTS_* environment variables).\nCaused by:\n{traceback.format_exc()}"
+                    f"Error computing value for {args_str} in {self._scope_str()} (may also be "
+                    f"from PANTS_* environment variables).\nCaused by:\n{traceback.format_exc()}"
                 )
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
             if val.rank > Rank.HARDCODED:
                 self._check_deprecated(dest, kwargs)
-
                 mutex_dest = kwargs.get("mutually_exclusive_group")
-                if mutex_dest:
-                    mutex_map[mutex_dest].append(dest)
-                    dest = mutex_dest
-                else:
-                    mutex_map[dest].append(dest)
-
-                if len(mutex_map[dest]) > 1:
+                mutex_map_key = mutex_dest or dest
+                mutex_map[mutex_map_key].append(dest)
+                if len(mutex_map[mutex_map_key]) > 1:
                     raise MutuallyExclusiveOptionError(
-                        f"Can only provide one of the mutually exclusive options {mutex_map[dest]}"
+                        "Can only provide one of these mutually exclusive options in "
+                        f"{self._scope_str()}, but multiple given: "
+                        f"{', '.join(mutex_map[mutex_map_key])}"
                     )
 
             setattr(namespace, dest, val)

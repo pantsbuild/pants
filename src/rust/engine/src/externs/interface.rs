@@ -159,9 +159,11 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(py, teardown_dynamic_ui(a: PyScheduler, b: PySession)),
   )?;
 
-  m.add(py, "set_panic_handler", py_fn!(py, set_panic_handler()))?;
-
-  m.add(py, "externs_set", py_fn!(py, externs_set(a: PyObject)))?;
+  m.add(
+    py,
+    "maybe_set_panic_handler",
+    py_fn!(py, maybe_set_panic_handler()),
+  )?;
 
   m.add(
     py,
@@ -286,21 +288,6 @@ py_module_initializer!(native_engine, |py, m| {
       )
     ),
   )?;
-  m.add(
-    py,
-    "execution_set_poll",
-    py_fn!(py, execution_set_poll(a: PyExecutionRequest, b: bool)),
-  )?;
-  m.add(
-    py,
-    "execution_set_poll_delay",
-    py_fn!(py, execution_set_poll_delay(a: PyExecutionRequest, b: u64)),
-  )?;
-  m.add(
-    py,
-    "execution_set_timeout",
-    py_fn!(py, execution_set_timeout(a: PyExecutionRequest, b: u64)),
-  )?;
 
   m.add(
     py,
@@ -350,6 +337,7 @@ py_module_initializer!(native_engine, |py, m| {
       )
     ),
   )?;
+  m.add(py, "tasks_task_end", py_fn!(py, tasks_task_end(a: PyTasks)))?;
   m.add(
     py,
     "tasks_add_get",
@@ -360,11 +348,10 @@ py_module_initializer!(native_engine, |py, m| {
     "tasks_add_select",
     py_fn!(py, tasks_add_select(a: PyTasks, b: PyType)),
   )?;
-  m.add(py, "tasks_task_end", py_fn!(py, tasks_task_end(a: PyTasks)))?;
   m.add(
     py,
-    "tasks_query_add",
-    py_fn!(py, tasks_query_add(a: PyTasks, b: PyType, c: Vec<PyType>)),
+    "tasks_add_query",
+    py_fn!(py, tasks_add_query(a: PyTasks, b: PyType, c: Vec<PyType>)),
   )?;
 
   m.add(
@@ -682,8 +669,19 @@ py_class!(class PyNailgunClient |py| {
 
 py_class!(class PyExecutionRequest |py| {
     data execution_request: RefCell<ExecutionRequest>;
-    def __new__(_cls) -> CPyResult<Self> {
-      Self::create_instance(py, RefCell::new(ExecutionRequest::new()))
+    def __new__(
+      _cls,
+      poll: bool,
+      poll_delay_in_ms: Option<u64>,
+      timeout_in_ms: Option<u64>,
+    ) -> CPyResult<Self> {
+      let request = ExecutionRequest {
+        poll,
+        poll_delay: poll_delay_in_ms.map(Duration::from_millis),
+        timeout: timeout_in_ms.map(Duration::from_millis),
+        ..ExecutionRequest::default()
+      };
+      Self::create_instance(py, RefCell::new(request))
     }
 });
 
@@ -755,11 +753,6 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> CPyResult<
 
 // TODO: It's not clear how to return "nothing" (None) in a CPyResult, so this is a placeholder.
 type PyUnitResult = CPyResult<Option<bool>>;
-
-fn externs_set(_: Python, externs: PyObject) -> PyUnitResult {
-  externs::set_externs(externs);
-  Ok(None)
-}
 
 fn nailgun_client_create(
   py: Python,
@@ -1214,39 +1207,6 @@ fn execution_add_root_select(
   })
 }
 
-fn execution_set_poll(
-  py: Python,
-  execution_request_ptr: PyExecutionRequest,
-  poll: bool,
-) -> PyUnitResult {
-  with_execution_request(py, execution_request_ptr, |execution_request| {
-    execution_request.poll = poll;
-  });
-  Ok(None)
-}
-
-fn execution_set_poll_delay(
-  py: Python,
-  execution_request_ptr: PyExecutionRequest,
-  poll_delay_in_ms: u64,
-) -> PyUnitResult {
-  with_execution_request(py, execution_request_ptr, |execution_request| {
-    execution_request.poll_delay = Some(Duration::from_millis(poll_delay_in_ms));
-  });
-  Ok(None)
-}
-
-fn execution_set_timeout(
-  py: Python,
-  execution_request_ptr: PyExecutionRequest,
-  timeout_in_ms: u64,
-) -> PyUnitResult {
-  with_execution_request(py, execution_request_ptr, |execution_request| {
-    execution_request.timeout = Some(Duration::from_millis(timeout_in_ms));
-  });
-  Ok(None)
-}
-
 fn tasks_task_begin(
   py: Python,
   tasks_ptr: PyTasks,
@@ -1277,6 +1237,13 @@ fn tasks_task_begin(
   })
 }
 
+fn tasks_task_end(py: Python, tasks_ptr: PyTasks) -> PyUnitResult {
+  with_tasks(py, tasks_ptr, |tasks| {
+    tasks.task_end();
+    Ok(None)
+  })
+}
+
 fn tasks_add_get(py: Python, tasks_ptr: PyTasks, output: PyType, input: PyType) -> PyUnitResult {
   with_tasks(py, tasks_ptr, |tasks| {
     let output = externs::type_for(output);
@@ -1294,14 +1261,7 @@ fn tasks_add_select(py: Python, tasks_ptr: PyTasks, selector: PyType) -> PyUnitR
   })
 }
 
-fn tasks_task_end(py: Python, tasks_ptr: PyTasks) -> PyUnitResult {
-  with_tasks(py, tasks_ptr, |tasks| {
-    tasks.task_end();
-    Ok(None)
-  })
-}
-
-fn tasks_query_add(
+fn tasks_add_query(
   py: Python,
   tasks_ptr: PyTasks,
   output_type: PyType,
@@ -1524,7 +1484,11 @@ pub(crate) fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
   }
 }
 
-fn set_panic_handler(_: Python) -> PyUnitResult {
+/// Set up a panic handler, unless RUST_BACKTRACE is set.
+fn maybe_set_panic_handler(_: Python) -> PyUnitResult {
+  if std::env::var("RUST_BACKTRACE").unwrap_or_else(|_| "0".to_owned()) != "0" {
+    return Ok(None);
+  }
   panic::set_hook(Box::new(|panic_info| {
     let payload = panic_info.payload();
     let mut panic_str = generate_panic_string(payload);

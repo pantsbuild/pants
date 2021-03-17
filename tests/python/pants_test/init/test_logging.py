@@ -7,6 +7,7 @@ from pathlib import Path
 from pants.engine.internals import native_engine
 from pants.init.logging import initialize_stdio
 from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.rule_runner import mock_console
 from pants.util.contextutil import temporary_dir
 from pants.util.logging import LogLevel
 
@@ -62,3 +63,16 @@ def test_log_filtering_by_rule() -> None:
             assert "[INFO] log msg one" in loglines[0]
             assert "[DEBUG] log msg three" in loglines[1]
             assert len(loglines) == 2
+
+
+def test_stdin_input() -> None:
+    ob = create_options_bootstrapper([])
+    expected_input = "my_input"
+    expected_output = "my_output"
+    with mock_console(ob, stdin_content=f"{expected_input}\n") as (_, stdio_reader):
+        assert expected_input == input(expected_output)
+        assert expected_output == stdio_reader.get_stdout()
+
+    with mock_console(ob, stdin_content=f"{expected_input}\n") as (console, stdio_reader):
+        assert expected_input == console.input(expected_output)
+        assert expected_output == stdio_reader.get_stdout()

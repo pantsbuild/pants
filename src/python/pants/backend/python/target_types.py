@@ -641,7 +641,8 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirem
 
 
 class PythonRequirementsFileSources(Sources):
-    pass
+    required = True
+    uses_source_roots = False
 
 
 class PythonRequirementsFile(Target):

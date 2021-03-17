@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
-from pants.engine.internals.native import Native
+from pants.engine.internals import native_engine
 from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
@@ -49,8 +49,6 @@ class RunTracker:
         """
         :API: public
         """
-        self.native = Native()
-
         self._has_started: bool = False
         self._has_ended: bool = False
 
@@ -70,7 +68,7 @@ class RunTracker:
 
         self.run_logs_file = Path(info_dir, self.run_id, "logs")
         safe_mkdir_for(str(self.run_logs_file))
-        self.native.set_per_run_log_path(str(self.run_logs_file))
+        native_engine.set_per_run_log_path(str(self.run_logs_file))
 
         # Initialized in `start()`.
         self._run_start_time: Optional[float] = None
@@ -191,7 +189,7 @@ class RunTracker:
         outcome_str = "SUCCESS" if exit_code == PANTS_SUCCEEDED_EXIT_CODE else "FAILURE"
         self._run_info["outcome"] = outcome_str
 
-        self.native.set_per_run_log_path(None)
+        native_engine.set_per_run_log_path(None)
 
     def get_cumulative_timings(self) -> List[Dict[str, Any]]:
         return [{"label": "main", "timing": self._run_total_duration}]
@@ -246,4 +244,4 @@ class RunTracker:
 
     @property
     def counter_names(self) -> tuple[str, ...]:
-        return tuple(self.native.lib.all_counter_names())
+        return tuple(native_engine.all_counter_names())

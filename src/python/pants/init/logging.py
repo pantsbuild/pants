@@ -2,10 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import http.client
+import locale
 import logging
 import os
 import sys
 from contextlib import contextmanager
+from io import BufferedReader, TextIOWrapper
 from logging import Formatter, LogRecord, StreamHandler
 from typing import Dict, Iterator
 
@@ -28,7 +30,7 @@ class _NativeHandler(StreamHandler):
     method) and proxies logs to the Rust logging infrastructure."""
 
     def emit(self, record: LogRecord) -> None:
-        native_engine.write_log(msg=self.format(record), level=record.levelno, target=record.name)
+        native_engine.write_log(self.format(record), record.levelno, record.name)
 
     def flush(self) -> None:
         native_engine.flush_log()
@@ -154,7 +156,7 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     # Initialize thread-local stdio, and replace sys.std* with proxies.
     original_stdin, original_stdout, original_stderr = sys.stdin, sys.stdout, sys.stderr
     try:
-        sys.stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
+        raw_stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
             global_level.level,
             log_show_rust_3rdparty,
             use_color,
@@ -163,6 +165,14 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
             tuple(message_regex_filters),
             log_path,
         )
+        sys.stdin = TextIOWrapper(
+            BufferedReader(raw_stdin),
+            # NB: We set the default encoding explicitly to bypass logic in the TextIOWrapper
+            # constructor that would poke the underlying file (which is not valid until a
+            # `stdio_destination` is set).
+            encoding=locale.getpreferredencoding(False),
+        )
+
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
         # Install a Python logger that will route through the Rust logger.
         with _python_logging_setup(global_level, print_stacktrace):

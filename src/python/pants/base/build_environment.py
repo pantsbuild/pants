@@ -6,6 +6,7 @@ import os
 from typing import Optional
 
 from pants.base.build_root import BuildRoot
+from pants.engine.internals import native_engine
 from pants.vcs.git import Git, GitException
 from pants.version import VERSION
 
@@ -26,14 +27,8 @@ def get_buildroot() -> str:
 
 
 def get_pants_cachedir() -> str:
-    """Return the pants global cache directory."""
-    # TODO: Keep in alignment with rust `fs::default_cache_path`. This method
-    # is not used there directly because it would create a cycle for native bootstrap via
-    # BinaryUtil being used to download tools needed to bootstrap.
-    cache_home = os.environ.get("XDG_CACHE_HOME")
-    if not cache_home:
-        cache_home = "~/.cache"
-    return os.path.expanduser(os.path.join(cache_home, "pants"))
+    """Return the Pants global cache directory."""
+    return native_engine.default_cache_path()
 
 
 def get_default_pants_config_file() -> str:

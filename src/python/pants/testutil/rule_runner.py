@@ -25,7 +25,6 @@ from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals.native import Native
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Get, Params
@@ -60,7 +59,9 @@ from pants.util.ordered_set import FrozenOrderedSet
 _O = TypeVar("_O")
 
 
-_EXECUTOR = PyExecutor(multiprocessing.cpu_count(), multiprocessing.cpu_count() * 4)
+_EXECUTOR = PyExecutor(
+    core_threads=multiprocessing.cpu_count(), max_threads=multiprocessing.cpu_count() * 4
+)
 
 
 @dataclass(frozen=True)
@@ -135,7 +136,6 @@ class RuleRunner:
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
-            native=Native(),
             build_root=self.build_root,
             build_configuration=self.build_config,
             executor=_EXECUTOR,
@@ -462,13 +462,24 @@ def run_rule_with_mocks(
 @contextmanager
 def mock_console(
     options_bootstrapper: OptionsBootstrapper,
+    *,
+    stdin_content: bytes | str | None = None,
 ) -> Iterator[Tuple[Console, StdioReader]]:
     global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-    with initialize_stdio(global_bootstrap_options), open(
-        "/dev/null", "r"
-    ) as stdin, temporary_file(binary_mode=False) as stdout, temporary_file(
+
+    @contextmanager
+    def stdin_context():
+        if stdin_content is None:
+            yield open("/dev/null", "r")
+        else:
+            with temporary_file(binary_mode=isinstance(stdin_content, bytes)) as stdin_file:
+                stdin_file.write(stdin_content)
+                stdin_file.close()
+                yield open(stdin_file.name, "r")
+
+    with initialize_stdio(global_bootstrap_options), stdin_context() as stdin, temporary_file(
         binary_mode=False
-    ) as stderr, stdio_destination(
+    ) as stdout, temporary_file(binary_mode=False) as stderr, stdio_destination(
         stdin_fileno=stdin.fileno(),
         stdout_fileno=stdout.fileno(),
         stderr_fileno=stderr.fileno(),

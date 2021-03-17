@@ -34,6 +34,7 @@ pub enum ExecutionTermination {
   Fatal(String),
 }
 
+#[derive(Default)]
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,
@@ -55,17 +56,6 @@ pub struct ExecutionRequest {
   // A timeout applied globally to the request. When a request times out, work is _not_ cancelled,
   // and will continue to completion in the background.
   pub timeout: Option<Duration>,
-}
-
-impl ExecutionRequest {
-  pub fn new() -> ExecutionRequest {
-    ExecutionRequest {
-      roots: Vec::new(),
-      poll: false,
-      poll_delay: None,
-      timeout: None,
-    }
-  }
 }
 
 ///

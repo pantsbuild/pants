@@ -9,7 +9,7 @@ from pants.testutil.pants_integration_test import run_pants
 
 
 def test_warns_on_remote_cache_errors():
-    executor = PyExecutor(2, 4)
+    executor = PyExecutor(core_threads=2, max_threads=4)
     builder = PyStubCAS.builder()
     builder.always_errors()
     cas = builder.build(executor)

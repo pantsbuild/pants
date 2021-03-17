@@ -1212,8 +1212,9 @@ class DictStringToStringSequenceField(Field):
 
 class Sources(StringSequenceField, AsyncFieldMixin):
     alias = "sources"
-    expected_file_extensions: ClassVar[Optional[Tuple[str, ...]]] = None
-    expected_num_files: ClassVar[Optional[Union[int, range]]] = None
+    expected_file_extensions: ClassVar[tuple[str, ...] | None] = None
+    expected_num_files: ClassVar[int | range | None] = None
+    uses_source_roots: ClassVar[bool] = True
     help = (
         "A list of files and globs that belong to this target.\n\nPaths are relative to the BUILD "
         "file's directory. You can ignore files/globs by prefixing them with `!`.\n\nExample: "
