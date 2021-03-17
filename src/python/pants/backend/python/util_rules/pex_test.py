@@ -478,23 +478,38 @@ def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
 
 
 def test_requirement_constraints(rule_runner: RuleRunner) -> None:
-    # This is intentionally old; a constraint will resolve us to a more modern version.
-    direct_dep = "requests==1.0.0"
-    constraints = [
-        "requests==2.23.0",
-        "certifi==2019.6.16",
-        "chardet==3.0.2",
-        "idna==2.7",
-        "urllib3==1.25.6",
-    ]
-    rule_runner.create_file("constraints.txt", "\n".join(constraints))
+    direct_deps = ["requests>=1.0.0,<=2.23.0"]
 
-    pex_info = create_pex_and_get_pex_info(
+    def assert_direct_requirements(pex_info):
+        assert set(Requirement.parse(r) for r in pex_info["requirements"]) == set(
+            Requirement.parse(d) for d in direct_deps
+        )
+
+    # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
+    # the range is a transitive closure over universal wheels.
+    direct_pex_info = create_pex_and_get_pex_info(
+        rule_runner, requirements=PexRequirements(direct_deps)
+    )
+    assert_direct_requirements(direct_pex_info)
+    assert {
+        "certifi-2020.12.5-py2.py3-none-any.whl",
+        "chardet-3.0.4-py2.py3-none-any.whl",
+        "idna-2.10-py2.py3-none-any.whl",
+        "requests-2.23.0-py2.py3-none-any.whl",
+        "urllib3-1.25.11-py2.py3-none-any.whl",
+    } == set(direct_pex_info["distributions"].keys())
+
+    constraints = ["requests==2.0.0"]
+    rule_runner.create_file("constraints.txt", "\n".join(constraints))
+    constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
-        requirements=PexRequirements([direct_dep]),
+        requirements=PexRequirements(direct_deps),
         additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
     )
-    assert set(parse_requirements(pex_info["requirements"])) == set(parse_requirements(constraints))
+    assert_direct_requirements(constrained_pex_info)
+    assert {"requests-2.0.0-py2.py3-none-any.whl"} == set(
+        constrained_pex_info["distributions"].keys()
+    )
 
 
 def test_entry_point(rule_runner: RuleRunner) -> None:
