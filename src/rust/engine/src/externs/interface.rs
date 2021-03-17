@@ -1319,8 +1319,8 @@ fn graph_visualize(
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       let path = PathBuf::from(path);
-      scheduler
-        .visualize(session, path.as_path())
+      // NB: See the note on with_scheduler re: allow_threads.
+      py.allow_threads(|| scheduler.visualize(session, path.as_path()))
         .map_err(|e| {
           let e = format!("Failed to visualize to {}: {:?}", path.display(), e);
           PyErr::new::<exc::Exception, _>(py, (e,))
@@ -1542,8 +1542,9 @@ fn lease_files_in_graph(
 ) -> PyUnitResult {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
-      let digests = scheduler.all_digests(session);
+      // NB: See the note on with_scheduler re: allow_threads.
       py.allow_threads(|| {
+        let digests = scheduler.all_digests(session);
         scheduler
           .core
           .executor
@@ -1948,6 +1949,11 @@ where
 /// Scheduler, Session, and nailgun::Server are intended to be shared between threads, and so their
 /// context methods provide immutable references. The remaining types are not intended to be shared
 /// between threads, so mutable access is provided.
+///
+/// TODO: The `Scheduler` and `Session` objects both have lots of internal locks: in general, the GIL
+/// should be released (using `py.allow_thread(|| ..)`) before any non-trivial interactions with
+/// them. In particular: methods that use the `Graph` should be called outside the GIL. We should
+/// make this less error prone: see https://github.com/pantsbuild/pants/issues/11722.
 ///
 fn with_scheduler<F, T>(py: Python, scheduler_ptr: PyScheduler, f: F) -> T
 where
