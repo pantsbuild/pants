@@ -348,8 +348,8 @@ class OptionsTest(unittest.TestCase):
         )
 
         # Test mutual exclusive options with a scope
-        options.register("stale", "--mutex-a", mutually_exclusive_group="crufty_mutex")
-        options.register("stale", "--mutex-b", mutually_exclusive_group="crufty_mutex")
+        options.register("stale", "--mutex-a", mutually_exclusive_group="scope_mutex")
+        options.register("stale", "--mutex-b", mutually_exclusive_group="scope_mutex")
         options.register("stale", "--crufty-old", mutually_exclusive_group="crufty_new")
         options.register("stale", "--crufty-new")
 
@@ -1313,42 +1313,19 @@ class OptionsTest(unittest.TestCase):
             scope="stale",
         )
 
-        def assert_other_option_also_set(
-            *,
-            flags: str = "",
-            other_option: str,
-            scope: str | None = None,
-            env: dict[str, str] | None = None,
-            config: dict[str, dict[str, str]] | None = None,
+        # Mutexes should not impact the `dest`. We spot check that here.
+        def assert_option_set(
+            flags: str,
+            option: str,
+            expected: str | None,
         ) -> None:
-            options = self._parse(flags=flags, env=env, config=config)
-            scoped_options = options.for_global_scope() if not scope else options.for_scope(scope)
-            assert getattr(scoped_options, other_option) == "orz"
+            options = self._parse(flags=flags).for_global_scope()
+            assert getattr(options, option) == expected
 
-        assert_other_option_also_set(flags="--mutex-foo=orz", other_option="mutex")
-        assert_other_option_also_set(flags="--old-name=orz", other_option="new_name")
-        assert_other_option_also_set(
-            flags="stale --mutex-a=orz",
-            other_option="crufty_mutex",
-            scope="stale",
-        )
-        assert_other_option_also_set(
-            flags="stale --crufty-old=orz",
-            other_option="crufty_new",
-            scope="stale",
-        )
-        assert_other_option_also_set(env={"PANTS_GLOBAL_MUTEX_BAZ": "orz"}, other_option="mutex")
-        assert_other_option_also_set(env={"PANTS_OLD_NAME": "orz"}, other_option="new_name")
-        assert_other_option_also_set(
-            env={"PANTS_STALE_MUTEX_B": "orz"},
-            other_option="crufty_mutex",
-            scope="stale",
-        )
-        assert_other_option_also_set(
-            config={"stale": {"crufty_old": "orz"}},
-            other_option="crufty_new",
-            scope="stale",
-        )
+        assert_option_set("--mutex-foo=orz", "mutex_foo", "orz")
+        assert_option_set("--mutex-foo=orz", "mutex_bar", None)
+        assert_option_set("--mutex-foo=orz", "mutex_baz", None)
+        assert_option_set("--mutex-bar=orz", "mutex_bar", "orz")
 
     def test_middle_scoped_options(self) -> None:
         """Make sure the rules for inheriting from a hierarchy of scopes.
