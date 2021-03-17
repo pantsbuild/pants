@@ -130,6 +130,7 @@ class Scheduler:
         """
         self.include_trace_on_error = include_trace_on_error
         self._visualize_to_dir = visualize_to_dir
+        self._visualize_run_count = 0
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
         tasks = register_rules(rule_index, union_membership)
@@ -311,7 +312,6 @@ class SchedulerSession:
     def __init__(self, scheduler: Scheduler, session: PySession) -> None:
         self._scheduler = scheduler
         self._py_session = session
-        self._run_count = 0
 
     @property
     def scheduler(self) -> Scheduler:
@@ -324,6 +324,11 @@ class SchedulerSession:
     @property
     def py_session(self) -> PySession:
         return self._py_session
+
+    def isolated_shallow_clone(self) -> SchedulerSession:
+        return SchedulerSession(
+            self._scheduler, native_engine.session_isolated_shallow_clone(self._py_session)
+        )
 
     def poll_workunits(self, max_log_verbosity: LogLevel) -> PolledWorkunits:
         result = native_engine.session_poll_workunits(
@@ -401,8 +406,9 @@ class SchedulerSession:
 
     def _maybe_visualize(self) -> None:
         if self._scheduler.visualize_to_dir is not None:
-            name = f"graph.{self._run_count:03d}.dot"
-            self._run_count += 1
+            # TODO: This increment-and-get is racey.
+            name = f"graph.{self._scheduler._visualize_run_count:03d}.dot"
+            self._scheduler._visualize_run_count += 1
             self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir, name))
 
     def teardown_dynamic_ui(self) -> None:
