@@ -90,9 +90,19 @@ def test_address_specs(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_file_sources(rule_runner: RuleRunner) -> None:
+def test_unrooted_sources(rule_runner: RuleRunner) -> None:
+    """Any Sources field with `uses_source_roots=False`, such as `FilesSources`, should be marked as
+    unrooted sources."""
     sources = TargetSources("src/python", ["README.md"])
     field = mock_sources_field(rule_runner, sources, sources_field_cls=FilesSources)
+    assert_sources_resolved(
+        rule_runner, [field], expected=[sources], expected_unrooted=sources.full_paths
+    )
+
+    class CustomSources(SourcesField):
+        uses_source_roots = False
+
+    field = mock_sources_field(rule_runner, sources, sources_field_cls=CustomSources)
     assert_sources_resolved(
         rule_runner, [field], expected=[sources], expected_unrooted=sources.full_paths
     )
