@@ -40,6 +40,7 @@ from pants.util.logging import LogLevel
 
 class FilesSources(Sources):
     required = True
+    uses_source_roots = False
 
 
 class Files(Target):
