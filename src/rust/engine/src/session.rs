@@ -47,16 +47,10 @@ enum SessionDisplay {
 }
 
 ///
-/// A Session represents a related series of requests (generally: one run of the pants CLI) on an
-/// underlying Scheduler, and is a useful scope for metrics.
+/// The portion of a Session that uniquely identifies it and holds metrics and the history of
+/// requests made on it.
 ///
-/// Both Scheduler and Session are exposed to python and expected to be used by multiple threads, so
-/// they use internal mutability in order to avoid exposing locks to callers.
-///
-struct InnerSession {
-  // Whether or not this Session has been cancelled. If a Session has been cancelled, all work that
-  // it started should attempt to exit in an orderly fashion.
-  cancelled: AsyncLatch,
+struct SessionState {
   // The Core that this Session is running on.
   core: Arc<Core>,
   // The total size of the graph at Session-creation time.
@@ -64,8 +58,6 @@ struct InnerSession {
   // The set of roots that have been requested within this session, with associated LastObserved
   // times if they were polled.
   roots: Mutex<HashMap<Root, Option<LastObserved>>>,
-  // The display mechanism to use in this Session.
-  display: Mutex<SessionDisplay>,
   // A place to store info about workunits in rust part
   workunit_store: WorkunitStore,
   // The unique id for this Session: used for metrics gathering purposes.
@@ -76,14 +68,25 @@ struct InnerSession {
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
   //
-  // TODO: Figure out how the `--loop` interplays with metrics. It's possible that for metrics
+  // TODO: Figure out how the `--loop` flag interplays with metrics. It's possible that for metrics
   // purposes, each iteration of a loop should be considered to be a new Session, but for now the
   // Session/build_id would be stable.
   run_id: Mutex<Uuid>,
   workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
 }
 
-impl InnerSession {
+///
+/// A cancellable handle to a Session, with an optional associated UI.
+///
+struct SessionHandle {
+  // Whether or not this Session has been cancelled. If a Session has been cancelled, all work that
+  // it started should attempt to exit in an orderly fashion.
+  cancelled: AsyncLatch,
+  // The display mechanism to use in this Session.
+  display: Mutex<SessionDisplay>,
+}
+
+impl SessionHandle {
   ///
   /// Cancels this Session.
   ///
@@ -92,8 +95,22 @@ impl InnerSession {
   }
 }
 
+///
+/// A Session represents a related series of requests (generally: one run of the pants CLI) on an
+/// underlying Scheduler, and is a useful scope for metrics.
+///
+/// Both Scheduler and Session are exposed to python and expected to be used by multiple threads, so
+/// they use internal mutability in order to avoid exposing locks to callers.
+///
+/// NB: The `SessionState` and `SessionHandle` structs are independent in order to allow for a
+/// shallow clone of a Session with independent cancellation and display properties, but which
+/// shares the same metrics and identity.
+///
 #[derive(Clone)]
-pub struct Session(Arc<InnerSession>);
+pub struct Session {
+  handle: Arc<SessionHandle>,
+  state: Arc<SessionState>,
+}
 
 impl Session {
   pub fn new(
@@ -118,54 +135,55 @@ impl Session {
       }
     });
 
-    let inner_session = Arc::new(InnerSession {
-      cancelled,
-      core: scheduler.core.clone(),
-      preceding_graph_size: scheduler.core.graph.len(),
-      roots: Mutex::new(HashMap::new()),
-      display,
-      workunit_store,
-      build_id,
-      session_values: Mutex::new(session_values),
-      run_id: Mutex::new(Uuid::new_v4()),
-      workunit_metadata_map: RwLock::new(HashMap::new()),
-    });
-    scheduler.core.sessions.add(&inner_session);
-    Session(inner_session)
+    let handle = Arc::new(SessionHandle { cancelled, display });
+    scheduler.core.sessions.add(&handle);
+    Session {
+      handle,
+      state: Arc::new(SessionState {
+        core: scheduler.core.clone(),
+        preceding_graph_size: scheduler.core.graph.len(),
+        roots: Mutex::new(HashMap::new()),
+        workunit_store,
+        build_id,
+        session_values: Mutex::new(session_values),
+        run_id: Mutex::new(Uuid::new_v4()),
+        workunit_metadata_map: RwLock::new(HashMap::new()),
+      }),
+    }
   }
 
   pub fn core(&self) -> &Arc<Core> {
-    &self.0.core
+    &self.state.core
   }
 
   ///
   /// Cancels this Session.
   ///
   pub fn cancel(&self) {
-    self.0.cancel();
+    self.handle.cancel();
   }
 
   ///
   /// Returns only if this Session has been cancelled.
   ///
   pub async fn cancelled(&self) {
-    self.0.cancelled.triggered().await;
+    self.handle.cancelled.triggered().await;
   }
 
   pub fn with_metadata_map<F, T>(&self, f: F) -> T
   where
     F: Fn(&mut HashMap<UserMetadataPyValue, Value>) -> T,
   {
-    f(&mut self.0.workunit_metadata_map.write())
+    f(&mut self.state.workunit_metadata_map.write())
   }
 
   pub fn roots_extend(&self, new_roots: Vec<(Root, Option<LastObserved>)>) {
-    let mut roots = self.0.roots.lock();
+    let mut roots = self.state.roots.lock();
     roots.extend(new_roots);
   }
 
   pub fn roots_zip_last_observed(&self, inputs: &[Root]) -> Vec<(Root, Option<LastObserved>)> {
-    let roots = self.0.roots.lock();
+    let roots = self.state.roots.lock();
     inputs
       .iter()
       .map(|root| {
@@ -176,45 +194,45 @@ impl Session {
   }
 
   pub fn roots_nodes(&self) -> Vec<NodeKey> {
-    let roots = self.0.roots.lock();
+    let roots = self.state.roots.lock();
     roots.keys().map(|r| r.clone().into()).collect()
   }
 
   pub fn session_values(&self) -> Value {
-    self.0.session_values.lock().clone()
+    self.state.session_values.lock().clone()
   }
 
   pub fn preceding_graph_size(&self) -> usize {
-    self.0.preceding_graph_size
+    self.state.preceding_graph_size
   }
 
   pub fn workunit_store(&self) -> WorkunitStore {
-    self.0.workunit_store.clone()
+    self.state.workunit_store.clone()
   }
 
   pub fn build_id(&self) -> &String {
-    &self.0.build_id
+    &self.state.build_id
   }
 
   pub fn run_id(&self) -> Uuid {
-    let run_id = self.0.run_id.lock();
+    let run_id = self.state.run_id.lock();
     *run_id
   }
 
   pub fn new_run_id(&self) {
-    let mut run_id = self.0.run_id.lock();
+    let mut run_id = self.state.run_id.lock();
     *run_id = Uuid::new_v4();
   }
 
   pub async fn with_console_ui_disabled<T>(&self, f: impl Future<Output = T>) -> T {
-    match *self.0.display.lock() {
+    match *self.handle.display.lock() {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.with_console_ui_disabled(f).await,
       SessionDisplay::Logging { .. } => f.await,
     }
   }
 
   pub fn maybe_display_initialize(&self, executor: &Executor) {
-    let result = match *self.0.display.lock() {
+    let result = match *self.handle.display.lock() {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.initialize(executor.clone()),
       SessionDisplay::Logging {
         ref mut straggler_deadline,
@@ -230,7 +248,7 @@ impl Session {
   }
 
   pub async fn maybe_display_teardown(&self) {
-    let teardown = match *self.0.display.lock() {
+    let teardown = match *self.handle.display.lock() {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().boxed(),
       SessionDisplay::Logging {
         ref mut straggler_deadline,
@@ -246,7 +264,7 @@ impl Session {
   }
 
   pub fn maybe_display_render(&self) {
-    match *self.0.display.lock() {
+    match *self.handle.display.lock() {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.render(),
       SessionDisplay::Logging {
         straggler_threshold,
@@ -258,7 +276,7 @@ impl Session {
         {
           *straggler_deadline = Some(Instant::now() + STRAGGLER_LOGGING_INTERVAL);
           self
-            .0
+            .state
             .workunit_store
             .log_straggling_workunits(straggler_threshold);
         }
@@ -276,14 +294,14 @@ impl Session {
 pub struct Sessions {
   /// Live sessions. Completed Sessions (i.e., those for which the Weak reference is dead) are
   /// removed from this collection on a best effort when new Sessions are created.
-  sessions: Arc<Mutex<Vec<Weak<InnerSession>>>>,
+  sessions: Arc<Mutex<Vec<Weak<SessionHandle>>>>,
   /// Handle to kill the signal monitoring task when this object is killed.
   signal_task_abort_handle: AbortHandle,
 }
 
 impl Sessions {
   pub fn new(executor: &Executor) -> Result<Sessions, String> {
-    let sessions: Arc<Mutex<Vec<Weak<InnerSession>>>> = Arc::default();
+    let sessions: Arc<Mutex<Vec<Weak<SessionHandle>>>> = Arc::default();
     let signal_task_abort_handle = {
       let mut signal_stream = signal(SignalKind::interrupt())
         .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
@@ -310,7 +328,7 @@ impl Sessions {
     })
   }
 
-  fn add(&self, session: &Arc<InnerSession>) {
+  fn add(&self, session: &Arc<SessionHandle>) {
     let mut sessions = self.sessions.lock();
     sessions.retain(|weak_session| weak_session.upgrade().is_some());
     sessions.push(Arc::downgrade(session));
