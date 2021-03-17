@@ -185,6 +185,7 @@ class StreamingWorkunitHandler:
         pantsd: bool,
         max_workunit_verbosity: LogLevel = LogLevel.TRACE,
     ) -> None:
+        scheduler = scheduler.isolated_shallow_clone()
         self.callbacks = callbacks
         self.context = StreamingWorkunitContext(
             _scheduler=scheduler,

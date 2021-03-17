@@ -318,6 +318,12 @@ py_module_initializer!(native_engine, |py, m| {
       session_record_test_observation(a: PyScheduler, b: PySession, c: u64)
     ),
   )?;
+  m.add(
+    py,
+    "session_isolated_shallow_clone",
+    py_fn!(py, session_isolated_shallow_clone(a: PySession)),
+  )?;
+
   m.add(py, "all_counter_names", py_fn!(py, all_counter_names()))?;
 
   m.add(
@@ -1386,6 +1392,12 @@ fn session_record_test_observation(
         .record_observation(ObservationMetric::TestObservation, value);
       Ok(py.None())
     })
+  })
+}
+
+fn session_isolated_shallow_clone(py: Python, session_ptr: PySession) -> CPyResult<PySession> {
+  with_session(py, session_ptr, |session| {
+    PySession::create_instance(py, session.isolated_shallow_clone())
   })
 }
 

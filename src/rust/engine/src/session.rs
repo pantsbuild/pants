@@ -46,6 +46,25 @@ enum SessionDisplay {
   },
 }
 
+impl SessionDisplay {
+  fn new(
+    workunit_store: &WorkunitStore,
+    parallelism: usize,
+    should_render_ui: bool,
+  ) -> SessionDisplay {
+    if should_render_ui {
+      SessionDisplay::ConsoleUI(ConsoleUI::new(workunit_store.clone(), parallelism))
+    } else {
+      SessionDisplay::Logging {
+        // TODO: This threshold should likely be configurable, but the interval we render at
+        // probably does not need to be.
+        straggler_threshold: Duration::from_secs(60),
+        straggler_deadline: None,
+      }
+    }
+  }
+}
+
 ///
 /// The portion of a Session that uniquely identifies it and holds metrics and the history of
 /// requests made on it.
@@ -121,19 +140,11 @@ impl Session {
     cancelled: AsyncLatch,
   ) -> Session {
     let workunit_store = WorkunitStore::new(!should_render_ui);
-    let display = Mutex::new(if should_render_ui {
-      SessionDisplay::ConsoleUI(ConsoleUI::new(
-        workunit_store.clone(),
-        scheduler.core.local_parallelism,
-      ))
-    } else {
-      SessionDisplay::Logging {
-        // TODO: This threshold should likely be configurable, but the interval we render at
-        // probably does not need to be.
-        straggler_threshold: Duration::from_secs(60),
-        straggler_deadline: None,
-      }
-    });
+    let display = Mutex::new(SessionDisplay::new(
+      &workunit_store,
+      scheduler.core.local_parallelism,
+      should_render_ui,
+    ));
 
     let handle = Arc::new(SessionHandle { cancelled, display });
     scheduler.core.sessions.add(&handle);
@@ -149,6 +160,30 @@ impl Session {
         run_id: Mutex::new(Uuid::new_v4()),
         workunit_metadata_map: RwLock::new(HashMap::new()),
       }),
+    }
+  }
+
+  ///
+  /// Creates a shallow clone of this Session which is independently cancellable, but which shares
+  /// metrics, identity, and state with the original.
+  ///
+  /// Useful when executing background work "on behalf of a Session" which should not be torn down
+  /// when a client disconnects.
+  ///
+  pub fn isolated_shallow_clone(&self) -> Session {
+    let display = Mutex::new(SessionDisplay::new(
+      &self.state.workunit_store,
+      self.state.core.local_parallelism,
+      false,
+    ));
+    let handle = Arc::new(SessionHandle {
+      cancelled: AsyncLatch::new(),
+      display,
+    });
+    self.state.core.sessions.add(&handle);
+    Session {
+      handle,
+      state: self.state.clone(),
     }
   }
 
