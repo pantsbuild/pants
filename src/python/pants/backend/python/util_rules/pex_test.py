@@ -19,8 +19,10 @@ from pants.backend.python.target_types import (
     EntryPoint,
     InterpreterConstraintsField,
     MainSpecification,
+    PythonRequirementConstraints,
 )
 from pants.backend.python.util_rules.pex import (
+    MaybeConstraintsFile,
     Pex,
     PexDistributionInfo,
     PexInterpreterConstraints,
@@ -31,12 +33,14 @@ from pants.backend.python.util_rules.pex import (
     PexResolveInfo,
     VenvPex,
     VenvPexProcess,
+    resolve_requirements_constraints_file,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
+from pants.engine.rules import SubsystemRule
 from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
 from pants.testutil.option_util import create_subsystem
@@ -289,6 +293,40 @@ def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
             Address("src/python/c_dir/path.py", target_name="test"), "==3.6.*"
         ),
     )
+
+
+def test_maybe_constraints_file() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            resolve_requirements_constraints_file,
+            SubsystemRule(PythonSetup),
+            QueryRule(MaybeConstraintsFile, []),
+        ],
+        target_types=[PythonRequirementConstraints],
+    )
+    constraints = ["c1==1.1.1", "c2==2.2.2"]
+    constraints_file = "\n".join(constraints)
+    rule_runner.create_file("constraints.txt", constraints_file)
+    rule_runner.add_to_build_file(
+        "", f"_python_constraints(name='constraints', constraints={repr(constraints)})"
+    )
+
+    def get_constraints(arg: str | None) -> MaybeConstraintsFile:
+        if arg:
+            rule_runner.set_options([arg])
+        return rule_runner.request(MaybeConstraintsFile, [])
+
+    assert get_constraints(None) == MaybeConstraintsFile(None, EMPTY_DIGEST)
+    expected_digest = rule_runner.make_snapshot({"constraints.txt": constraints_file}).digest
+    assert get_constraints(
+        "--python-setup-requirement-constraints=constraints.txt"
+    ) == MaybeConstraintsFile("constraints.txt", expected_digest)
+    expected_digest = rule_runner.make_snapshot(
+        {"constraints.generated.txt": constraints_file}
+    ).digest
+    assert get_constraints(
+        "--python-setup-requirement-constraints-target=//:constraints"
+    ) == MaybeConstraintsFile("constraints.generated.txt", expected_digest)
 
 
 @dataclass(frozen=True)

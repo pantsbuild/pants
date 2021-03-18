@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 from textwrap import dedent
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -22,6 +24,7 @@ from pants.backend.python.target_types import (
     PythonDistribution,
     PythonDistributionDependencies,
     PythonLibrary,
+    PythonRequirementConstraintsField,
     PythonRequirementLibrary,
     PythonRequirementsField,
     PythonTestsTimeout,
@@ -39,6 +42,7 @@ from pants.backend.python.target_types_rules import (
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
+    Field,
     InjectedDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -235,7 +239,8 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
     assert_injected(Address("project", target_name="first_party"), expected=None)
 
 
-def test_requirements_field() -> None:
+@pytest.mark.parametrize("field", [PythonRequirementsField, PythonRequirementConstraintsField])
+def test_requirements_and_constraints_fields(field: type[Field]) -> None:
     raw_value = (
         "argparse==1.2.1",
         "configparser ; python_version<'3'",
@@ -243,30 +248,28 @@ def test_requirements_field() -> None:
     )
     parsed_value = tuple(Requirement.parse(v) for v in raw_value)
 
-    assert PythonRequirementsField(raw_value, address=Address("demo")).value == parsed_value
+    assert field(raw_value, address=Address("demo")).value == parsed_value
 
     # Macros can pass pre-parsed Requirement objects.
-    assert PythonRequirementsField(parsed_value, address=Address("demo")).value == parsed_value
+    assert field(parsed_value, address=Address("demo")).value == parsed_value
 
     # Reject invalid types.
     with pytest.raises(InvalidFieldTypeException):
-        PythonRequirementsField("sneaky_str", address=Address("demo"))
+        field("sneaky_str", address=Address("demo"))
     with pytest.raises(InvalidFieldTypeException):
-        PythonRequirementsField([1, 2], address=Address("demo"))
+        field([1, 2], address=Address("demo"))
 
     # Give a nice error message if the requirement can't be parsed.
     with pytest.raises(InvalidFieldException) as exc:
-        PythonRequirementsField(["not valid! === 3.1"], address=Address("demo"))
+        field(["not valid! === 3.1"], address=Address("demo"))
     assert (
-        "Invalid requirement 'not valid! === 3.1' in the 'requirements' field for the "
+        f"Invalid requirement 'not valid! === 3.1' in the '{field.alias}' field for the "
         "target demo:"
     ) in str(exc.value)
 
     # Give a nice error message if it looks like they're trying to use pip VCS-style requirements.
     with pytest.raises(InvalidFieldException) as exc:
-        PythonRequirementsField(
-            ["git+https://github.com/pypa/pip.git#egg=pip"], address=Address("demo")
-        )
+        field(["git+https://github.com/pypa/pip.git#egg=pip"], address=Address("demo"))
     assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
 
 

@@ -110,7 +110,8 @@ def test_constraints_validation(rule_runner: RuleRunner) -> None:
     assert isinstance(err.value.wrapped_exceptions[0], ValueError)
     assert (
         "[python-setup].resolve_all_constraints is set to always, so "
-        "[python-setup].requirement_constraints must also be provided."
+        "either [python-setup].requirement_constraints or "
+        "[python-setup].requirement_constraints_target must also be provided."
     ) in str(err.value)
 
     # Shouldn't error, as we don't explicitly set --resolve-all-constraints.
