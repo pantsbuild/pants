@@ -281,12 +281,12 @@ def check_clean_git_branch() -> None:
             "Uncommitted changes detected when running `git status`. You must be on a clean branch "
             "to release."
         )
-    valid_branch_pattern = r"^(master)|([0-9]+\.[0-9]+\.x)$"
+    valid_branch_pattern = r"^(main)|([0-9]+\.[0-9]+\.x)$"
     git_branch = get_git_branch()
     if not re.match(valid_branch_pattern, git_branch):
         die(
-            "On an invalid branch. You must either be on `master` or a release branch like "
-            f"`1.27.x`. Detected: {git_branch}"
+            "On an invalid branch. You must either be on `main` or a release branch like "
+            f"`2.4.x`. Detected: {git_branch}"
         )
 
 

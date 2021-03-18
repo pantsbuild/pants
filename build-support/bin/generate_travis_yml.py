@@ -398,7 +398,7 @@ DEPLOY_SETTINGS = {
     "skip_cleanup": True,
     "on": {
         "condition": "$PREPARE_DEPLOY = 1",
-        # NB: We mainly want deploys for `master` commits; but we also need new binaries for stable
+        # NB: We mainly want deploys for `main` commits; but we also need new binaries for stable
         # release branches; eg `1.3.x`
         "all_branches": True,
         "repo": _DEPLOY_REPO,
