@@ -9,6 +9,7 @@ import sys
 from contextlib import contextmanager
 from io import BufferedReader, TextIOWrapper
 from logging import Formatter, LogRecord, StreamHandler
+from pathlib import PurePath
 from typing import Dict, Iterator
 
 import pants.util.logging as pants_logging
@@ -139,7 +140,7 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     deprecated_log_path = os.path.join(
         global_bootstrap_options.pants_workdir, "pantsd", "pantsd.log"
     )
-    log_path = os.path.join(global_bootstrap_options.pants_workdir, "pants.log")
+    log_path = str(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
     safe_mkdir_for(deprecated_log_path)
     safe_mkdir_for(log_path)
     # NB: We append to the deprecated log location with a deprecated conditional that never
@@ -180,6 +181,11 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     finally:
         sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
+
+
+def pants_log_path(workdir: PurePath) -> PurePath:
+    """Given the path of the workdir, returns the `pants.log` path."""
+    return workdir / "pants.log"
 
 
 def _get_log_levels_by_target(

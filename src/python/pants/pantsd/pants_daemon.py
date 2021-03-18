@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import warnings
+from pathlib import PurePath
 from typing import Any
 
 from setproctitle import setproctitle as set_process_title
@@ -18,7 +19,7 @@ from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals import native_engine
 from pants.init.engine_initializer import GraphScheduler
-from pants.init.logging import initialize_stdio
+from pants.init.logging import initialize_stdio, pants_log_path
 from pants.init.util import init_workdir
 from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
@@ -30,6 +31,7 @@ from pants.pantsd.service.pants_service import PantsServices
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.util.contextutil import argv_as, hermetic_environment_as
+from pants.util.dirutil import safe_open
 from pants.util.logging import LogLevel
 from pants.util.strutil import ensure_text
 
@@ -131,14 +133,29 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         self._logger = logging.getLogger(__name__)
 
-    @staticmethod
-    def _close_stdio():
-        """Close stdio streams to avoid output in the tty that launched pantsd."""
-        for fd in (sys.stdin, sys.stdout, sys.stderr):
-            file_no = fd.fileno()
+    def _close_stdio(self, log_path: PurePath):
+        """Close stdio and append to a log path instead.
+
+        The vast majority of Python-level IO will be re-routed to thread-local destinations by
+        `initialize_stdio`, but we close stdio to avoid any stray output in the tty that launched
+        pantsd.
+
+        Rather than leaving 0, 1, 2 dangling though, we open replacements as a backstop for fatal
+        errors or unmodified code (such as Rust panic handlers) that might expect them to be valid
+        file handles.
+        """
+        for attr, writable in (("stdin", False), ("stdout", True), ("stderr", True)):
+            # Close the old.
+            fd = getattr(sys, attr)
+            fileno = fd.fileno()
             fd.flush()
             fd.close()
-            os.close(file_no)
+
+            # Open the new.
+            temp_fd = safe_open(log_path, "w") if writable else open(os.devnull)
+            os.dup2(temp_fd.fileno(), fileno)
+            setattr(sys, attr, os.fdopen(fileno, mode=("w" if writable else "r")))
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
 
     def _initialize_metadata(self) -> None:
         """Writes out our pid and other metadata.
@@ -165,7 +182,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         # Switch log output to the daemon's log stream, and empty `env` and `argv` to encourage all
         # further usage of those variables to happen via engine APIs and options.
-        self._close_stdio()
+        self._close_stdio(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
         with initialize_stdio(global_bootstrap_options), argv_as(
             tuple()
         ), hermetic_environment_as():
