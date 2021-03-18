@@ -8,7 +8,7 @@ import os
 import sys
 import time
 import warnings
-from pathlib import Path
+from pathlib import PurePath
 from typing import Any
 
 from setproctitle import setproctitle as set_process_title
@@ -133,7 +133,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         self._logger = logging.getLogger(__name__)
 
-    def _close_stdio(self, log_path: Path):
+    def _close_stdio(self, log_path: PurePath):
         """Close stdio and append to a log path instead.
 
         The vast majority of Python-level IO will be re-routed to thread-local destinations by
@@ -147,17 +147,15 @@ class PantsDaemon(PantsDaemonProcessManager):
         for attr, writable in (("stdin", False), ("stdout", True), ("stderr", True)):
             # Close the old.
             fd = getattr(sys, attr)
-            file_no = fd.fileno()
+            fileno = fd.fileno()
             fd.flush()
             fd.close()
-            os.close(file_no)
 
             # Open the new.
-            new_fd = safe_open(log_path, "w") if writable else open("/dev/null")
-            assert (
-                file_no == new_fd.fileno()
-            ), f"Reopening {attr} resulted in a mismatched file number: {new_fd.fileno()}"
-            setattr(sys, attr, new_fd)
+            temp_fd = safe_open(log_path, "w") if writable else open(os.devnull)
+            os.dup2(temp_fd.fileno(), fileno)
+            setattr(sys, attr, os.fdopen(fileno, mode=("w" if writable else "r")))
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
 
     def _initialize_metadata(self) -> None:
         """Writes out our pid and other metadata.
@@ -184,7 +182,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         # Switch log output to the daemon's log stream, and empty `env` and `argv` to encourage all
         # further usage of those variables to happen via engine APIs and options.
-        self._close_stdio(pants_log_path(Path(global_bootstrap_options.pants_workdir)))
+        self._close_stdio(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
         with initialize_stdio(global_bootstrap_options), argv_as(
             tuple()
         ), hermetic_environment_as():
