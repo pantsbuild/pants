@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:cryptography',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:setproctitle',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
