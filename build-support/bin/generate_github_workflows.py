@@ -150,7 +150,7 @@ def expose_all_pythons() -> Sequence[Step]:
     return [
         {
             "name": "Expose Pythons",
-            "uses": "./.github/actions/expose-pythons",
+            "uses": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
         }
     ]
 
