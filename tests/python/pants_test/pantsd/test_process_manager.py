@@ -11,7 +11,7 @@ from contextlib import contextmanager
 import psutil
 import pytest
 
-from pants.pantsd.process_manager import ProcessManager, ProcessMetadataManager
+from pants.pantsd.process_manager import ProcessManager
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdtemp
 
@@ -25,7 +25,7 @@ def fake_process(**kwargs):
     return proc
 
 
-class TestProcessMetadataManager(unittest.TestCase):
+class TestProcessManager(unittest.TestCase):
     NAME = "_test_"
     TEST_KEY = "TEST"
     TEST_VALUE = "300"
@@ -35,7 +35,8 @@ class TestProcessMetadataManager(unittest.TestCase):
 
     def setUp(self):
         super().setUp()
-        self.pmm = ProcessMetadataManager(metadata_base_dir=self.SUBPROCESS_DIR)
+        self.pm = ProcessManager(self.NAME, metadata_base_dir=safe_mkdtemp())
+        self.pmm = self.pm
 
     def test_maybe_cast(self):
         self.assertIsNone(self.pmm._maybe_cast(None, int))
@@ -43,27 +44,25 @@ class TestProcessMetadataManager(unittest.TestCase):
         self.assertEqual(self.pmm._maybe_cast("ssss", int), "ssss")
 
     def test_get_metadata_dir_by_name(self):
-        self.pmm = ProcessMetadataManager(metadata_base_dir=self.BUILDROOT)
+        pm = ProcessManager(self.NAME, metadata_base_dir=self.BUILDROOT)
         self.assertEqual(
-            self.pmm._get_metadata_dir_by_name(self.NAME, self.BUILDROOT),
-            os.path.join(self.BUILDROOT, self.pmm.host_fingerprint, self.NAME),
+            ProcessManager._get_metadata_dir_by_name(self.NAME, self.BUILDROOT),
+            os.path.join(self.BUILDROOT, pm.host_fingerprint, self.NAME),
         )
 
     def test_readwrite_metadata_by_name(self):
         with temporary_dir() as tmpdir, unittest.mock.patch(
             "pants.pantsd.process_manager.get_buildroot", return_value=tmpdir
         ):
-            self.pmm.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
+            self.pmm.write_metadata_by_name(self.TEST_KEY, self.TEST_VALUE)
+            self.assertEqual(self.pmm.read_metadata_by_name(self.TEST_KEY), self.TEST_VALUE)
             self.assertEqual(
-                self.pmm.read_metadata_by_name(self.NAME, self.TEST_KEY), self.TEST_VALUE
-            )
-            self.assertEqual(
-                self.pmm.read_metadata_by_name(self.NAME, self.TEST_KEY, int), self.TEST_VALUE_INT
+                self.pmm.read_metadata_by_name(self.TEST_KEY, int), self.TEST_VALUE_INT
             )
 
     @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6836")
     def test_deadline_until(self):
-        with self.assertRaises(ProcessMetadataManager.Timeout):
+        with self.assertRaises(ProcessManager.Timeout):
             with self.captured_logging(logging.INFO) as captured:
                 self.pmm._deadline_until(
                     lambda: False, "the impossible", timeout=0.5, info_interval=0.1
@@ -83,7 +82,7 @@ class TestProcessMetadataManager(unittest.TestCase):
 
     def test_wait_for_file_timeout(self):
         with temporary_dir() as td:
-            with self.assertRaises(ProcessMetadataManager.Timeout):
+            with self.assertRaises(ProcessManager.Timeout):
                 self.pmm._wait_for_file(
                     os.path.join(td, "non_existent_file"),
                     "file to be created",
@@ -95,11 +94,11 @@ class TestProcessMetadataManager(unittest.TestCase):
         with temporary_dir() as tmpdir, unittest.mock.patch(
             "pants.pantsd.process_manager.get_buildroot", return_value=tmpdir
         ):
-            self.pmm.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
+            self.pmm.write_metadata_by_name(self.TEST_KEY, self.TEST_VALUE)
 
             self.assertEqual(
                 self.pmm.await_metadata_by_name(
-                    self.NAME, self.TEST_KEY, "metadata to be created", "metadata was created", 0.1
+                    self.TEST_KEY, "metadata to be created", "metadata was created", 0.1
                 ),
                 self.TEST_VALUE,
             )
@@ -112,31 +111,24 @@ class TestProcessMetadataManager(unittest.TestCase):
     def test_purge_metadata_error(self):
         with unittest.mock.patch("pants.pantsd.process_manager.rm_rf") as mock_rm:
             mock_rm.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
-            with self.assertRaises(ProcessMetadataManager.MetadataError):
+            with self.assertRaises(ProcessManager.MetadataError):
                 self.pmm.purge_metadata_by_name(self.NAME)
         self.assertGreater(mock_rm.call_count, 0)
-
-
-class TestProcessManager(unittest.TestCase):
-    def setUp(self):
-        super().setUp()
-        self.pm = ProcessManager("test", metadata_base_dir=safe_mkdtemp())
 
     def test_await_pid(self):
         with unittest.mock.patch.object(ProcessManager, "await_metadata_by_name") as mock_await:
             self.pm.await_pid(5)
         mock_await.assert_called_once_with(
-            self.pm.name, "pid", "test to start", "test started", 5, caster=unittest.mock.ANY
+            "pid", f"{self.NAME} to start", f"{self.NAME} started", 5, caster=unittest.mock.ANY
         )
 
     def test_await_socket(self):
         with unittest.mock.patch.object(ProcessManager, "await_metadata_by_name") as mock_await:
             self.pm.await_socket(5)
         mock_await.assert_called_once_with(
-            self.pm.name,
             "socket",
-            "test socket to be opened",
-            "test socket opened",
+            f"{self.NAME} socket to be opened",
+            f"{self.NAME} socket opened",
             5,
             caster=unittest.mock.ANY,
         )
@@ -144,12 +136,12 @@ class TestProcessManager(unittest.TestCase):
     def test_write_pid(self):
         with unittest.mock.patch.object(ProcessManager, "write_metadata_by_name") as mock_write:
             self.pm.write_pid(31337)
-        mock_write.assert_called_once_with(self.pm.name, "pid", "31337")
+        mock_write.assert_called_once_with("pid", "31337")
 
     def test_write_socket(self):
         with unittest.mock.patch.object(ProcessManager, "write_metadata_by_name") as mock_write:
             self.pm.write_socket("/path/to/unix/socket")
-        mock_write.assert_called_once_with(self.pm.name, "socket", "/path/to/unix/socket")
+        mock_write.assert_called_once_with("socket", "/path/to/unix/socket")
 
     def test_as_process(self):
         sentinel = 3333
