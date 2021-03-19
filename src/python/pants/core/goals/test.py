@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import itertools
 import logging
-import os
 from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
@@ -429,7 +428,7 @@ async def run_tests(
         if result.extra_output and result.extra_output.files:
             workspace.write_digest(
                 result.extra_output.digest,
-                path_prefix=os.path.join(dist_dir.relpath, "test", result.address.path_safe_spec),
+                path_prefix=str(dist_dir.relpath / "test" / result.address.path_safe_spec),
             )
 
     merged_xml_results = await Get(
