@@ -131,6 +131,7 @@ release_notes = """
 args = ["--no-header"]
 pytest_plugins.add = [
   "ipdb",
+  "pytest-html",
   "pytest-icdiff",
   "pygments",
 ]
