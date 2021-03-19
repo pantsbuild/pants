@@ -35,10 +35,15 @@ def test_warns_on_remote_cache_errors():
     )
 
     pants_run.assert_success()
-    assert "Failed to read from remote cache: Unimplemented" in pants_run.stderr
+    assert (
+        "Failed to read from remote cache (1 occurrences so far): Unimplemented" in pants_run.stderr
+    )
     assert (
         re.search(
-            "Failed to write to remote cache:.*StubCAS is configured to always fail",
+            (
+                r"Failed to write to remote cache \(1 occurrences so far\):.*StubCAS is configured "
+                r"to always fail"
+            ),
             pants_run.stderr,
             re.MULTILINE,
         )
