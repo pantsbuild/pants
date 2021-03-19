@@ -159,6 +159,10 @@ def native_engine_so_download() -> Sequence[Step]:
     ]
 
 
+PYTHON37_VERSION = "3.7.10"
+PYTHON38_VERSION = "3.8.3"
+
+
 def setup_primary_python() -> Sequence[Step]:
     return [
         {
@@ -178,12 +182,12 @@ def expose_all_pythons() -> Sequence[Step]:
     ]
 
 
-def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
+def test_workflow_jobs(primary_python_version: str) -> Jobs:
     return {
         "bootstrap_pants_linux": {
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
             "runs-on": "ubuntu-20.04",
-            "strategy": {"matrix": {"python-version": python_versions}},
+            "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
@@ -222,7 +226,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "name": "Test Python (Linux)",
             "runs-on": "ubuntu-20.04",
             "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": python_versions}},
+            "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
@@ -233,11 +237,11 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
             ],
         },
-        "lint_python_linux": {
-            "name": "Lint Python (Linux)",
+        "lint_python": {
+            "name": "Lint Python",
             "runs-on": "ubuntu-20.04",
             "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": python_versions}},
+            "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
@@ -253,7 +257,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
         "bootstrap_pants_macos": {
             "name": "Bootstrap Pants, test Rust (MacOS)",
             "runs-on": "macos-10.15",
-            "strategy": {"matrix": {"python-version": python_versions}},
+            "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
@@ -276,7 +280,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "name": "Test Python (MacOS)",
             "runs-on": "macos-10.15",
             "needs": "bootstrap_pants_macos",
-            "strategy": {"matrix": {"python-version": python_versions}},
+            "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": {
                 # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
                 # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
@@ -328,7 +332,7 @@ def generate() -> dict[Path, str]:
         {
             "name": test_workflow_name,
             "on": "pull_request",
-            "jobs": test_workflow_jobs(["3.7.10"]),
+            "jobs": test_workflow_jobs(PYTHON37_VERSION),
         },
         Dumper=NoAliasDumper,
     )
@@ -380,7 +384,7 @@ def generate() -> dict[Path, str]:
             "name": "Daily Extended Python Testing",
             # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
             "on": {"schedule": [{"cron": "45 8 * * *"}]},
-            "jobs": test_workflow_jobs(["3.8.3"]),
+            "jobs": test_workflow_jobs(PYTHON38_VERSION),
         },
         Dumper=NoAliasDumper,
     )

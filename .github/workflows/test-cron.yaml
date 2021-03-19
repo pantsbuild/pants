@@ -226,10 +226,10 @@ jobs:
       matrix:
         python-version:
         - 3.8.3
-  lint_python_linux:
+  lint_python:
     env:
       PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
-    name: Lint Python (Linux)
+    name: Lint Python
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
     steps:
