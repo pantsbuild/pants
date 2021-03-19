@@ -5,6 +5,11 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.4 (3/19/2021)
+------------------
+
+The fifth stable release of the `1.30.x` series, with no changes since the previous rc.
+
 1.30.4rc0 (3/9/2021)
 --------------------
 
