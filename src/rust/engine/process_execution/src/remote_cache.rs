@@ -24,6 +24,14 @@ use crate::{
   ProcessMetadata,
 };
 
+/// Every n times, log a particular remote cache error at warning level instead of debug level. We
+/// don't log at warn level every time to avoid flooding the console.
+///
+/// Every 5 times is arbitrary and can be changed. It's based on running the `lint` goal with a
+/// fake store address resulting in 5 read errors and 18 write errors; 5 seems like a
+/// reasonable increment.
+const LOG_ERRORS_INCREMENT: usize = 5;
+
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.
 ///
@@ -468,7 +476,7 @@ impl crate::CommandRunner for CommandRunner {
               "Failed to read from remote cache ({} occurrences so far): {}",
               err_count, err
             );
-            if err_count == 1 || err_count % 5 == 0 {
+            if err_count == 1 || err_count % LOG_ERRORS_INCREMENT == 0 {
               log::warn!("{}", log_msg);
             } else {
               log::debug!("{}", log_msg);
@@ -547,7 +555,7 @@ impl crate::CommandRunner for CommandRunner {
             "Failed to write to remote cache ({} occurrences so far): {}",
             err_count, err
           );
-          if err_count == 1 || err_count % 5 == 0 {
+          if err_count == 1 || err_count % LOG_ERRORS_INCREMENT == 0 {
             log::warn!("{}", log_msg);
           } else {
             log::debug!("{}", log_msg);
