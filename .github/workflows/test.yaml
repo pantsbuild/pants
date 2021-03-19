@@ -103,6 +103,13 @@ jobs:
         ./pants help subsystems
 
         '
+    - name: Upload native_engine.so
+      uses: actions/upload-artifact@v2
+      with:
+        name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
+        path: 'src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
     - if: '!contains(env.COMMIT_MESSAGE, ''[ci skip-rust]'')'
       name: Test and Lint Rust
       run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
@@ -112,13 +119,6 @@ jobs:
         ./cargo test --all --tests -- --nocapture
 
         '
-    - name: Upload native_engine.so
-      uses: actions/upload-artifact@v2
-      with:
-        name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
-        path: 'src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine.so.metadata'
     strategy:
       matrix:
         python-version:
@@ -352,6 +352,26 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@v2
+      with:
+        fetch-depth: 10
+    - if: github.event_name == 'push'
+      name: Get commit message for branch builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'pull_request'
+      name: Get commit message for PR builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:

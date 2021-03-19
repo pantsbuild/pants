@@ -28,6 +28,7 @@ Env = Dict[str, str]
 
 
 def checkout() -> Sequence[Step]:
+    """Get prior commits and the commit message."""
     return [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
         # for details on how we get the commit message here.
@@ -201,6 +202,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                         """
                     ),
                 },
+                *native_engine_so_upload(),
                 {
                     "name": "Test and Lint Rust",
                     # We pass --tests to skip doc tests because our generated protos contain
@@ -214,7 +216,6 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                     ),
                     "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
                 },
-                *native_engine_so_upload(),
             ],
         },
         "test_python_linux": {
@@ -283,7 +284,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                 **pants_config_files(),
             },
             "steps": [
-                {"name": "Check out code", "uses": "actions/checkout@v2"},
+                *checkout(),
                 *setup_primary_python(),
                 *expose_all_pythons(),
                 *pants_virtualenv_cache(),
