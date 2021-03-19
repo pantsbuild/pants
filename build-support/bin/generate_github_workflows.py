@@ -42,14 +42,26 @@ def checkout() -> Sequence[Step]:
         {
             "name": "Get commit message for branch builds",
             "if": "github.event_name == 'push'",
-            "run": 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV\necho "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV\necho "EOF" >> $GITHUB_ENV\n',
+            "run": dedent(
+                """\
+                echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+                echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+                echo "EOF" >> $GITHUB_ENV
+                """
+            ),
         },
-        # For a pull_request event, the commit we care about is the second parent of the merge commit.
-        # This CI currently only runs on PRs, so this is future-proofing.
+        # For a pull_request event, the commit we care about is the second parent of the merge
+        # commit. This CI currently only runs on PRs, so this is future-proofing.
         {
             "name": "Get commit message for PR builds",
             "if": "github.event_name == 'pull_request'",
-            "run": 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV\necho "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV\necho "EOF" >> $GITHUB_ENV\n',
+            "run": dedent(
+                """\
+                echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+                echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+                echo "EOF" >> $GITHUB_ENV
+                """
+            ),
         },
     ]
 
@@ -75,6 +87,12 @@ def rust_channel() -> str:
     with open("rust-toolchain") as fp:
         rust_toolchain = toml.load(fp)
     return cast(str, rust_toolchain["toolchain"]["channel"])
+
+
+NATIVE_ENGINE_SO_FILES = [
+    "src/python/pants/engine/internals/native_engine.so",
+    "src/python/pants/engine/internals/native_engine.so.metadata",
+]
 
 
 def bootstrap_caches() -> Sequence[Step]:
@@ -107,7 +125,7 @@ def bootstrap_caches() -> Sequence[Step]:
             "name": "Cache Native Engine",
             "uses": "actions/cache@v2",
             "with": {
-                "path": "src/python/pants/engine/internals/native_engine.so\nsrc/python/pants/engine/internals/native_engine.so.metadata\n",
+                "path": "\n".join(NATIVE_ENGINE_SO_FILES),
                 "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}\n",
             },
         },
@@ -121,7 +139,7 @@ def native_engine_so_upload() -> Sequence[Step]:
             "uses": "actions/upload-artifact@v2",
             "with": {
                 "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
-                "path": "src/python/pants/engine/internals/native_engine.so\nsrc/python/pants/engine/internals/native_engine.so.metadata\n",
+                "path": "\n".join(NATIVE_ENGINE_SO_FILES),
             },
         },
     ]
@@ -173,11 +191,27 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 {
                     "name": "Run smoke tests",
-                    "run": "./pants help goals\n./pants list ::\n./pants roots\n./pants help targets\n",
+                    "run": dedent(
+                        """\
+                        ./pants help goals
+                        ./pants list ::
+                        ./pants roots
+                        ./pants help targets
+                        ./pants help subsystems
+                        """
+                    ),
                 },
                 {
                     "name": "Test and Lint Rust",
-                    "run": "sudo apt-get install -y pkg-config fuse libfuse-dev\n./cargo clippy --all\n# We pass --tests to skip doc tests because our generated protos contain invalid\n# doc tests in their comments.\n./cargo test --all --tests -- --nocapture\n",
+                    # We pass --tests to skip doc tests because our generated protos contain
+                    # invalid doc tests in their comments.
+                    "run": dedent(
+                        """\
+                        sudo apt-get install -y pkg-config fuse libfuse-dev
+                        ./cargo clippy --all
+                        ./cargo test --all --tests -- --nocapture
+                        """
+                    ),
                     "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
                 },
                 *native_engine_so_upload(),
@@ -228,7 +262,10 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                 *native_engine_so_upload(),
                 {
                     "name": "Test Rust",
-                    "run": "# We pass --tests to skip doc tests because our generated protos contain invalid\n# doc tests in their comments.\n# We do not pass --all as BRFS tests don't pass on GHA MacOS containers.\n./cargo test --tests -- --nocapture\n",
+                    # We pass --tests to skip doc tests because our generated protos contain
+                    # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
+                    # pass on GHA MacOS containers.
+                    "run": "./cargo test --tests -- --nocapture",
                     "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
                     "env": {"TMPDIR": "${{ runner.temp }}"},
                 },
@@ -328,7 +365,7 @@ def generate() -> dict[Path, str]:
                     "steps": [
                         *checkout(),
                         {
-                            "name": "Test and Lint Rust",
+                            "name": "Cargo audit (for security vulnerabilities)",
                             "run": "./cargo install --version 0.13.1 cargo-audit\n./cargo audit\n",
                         },
                     ],
