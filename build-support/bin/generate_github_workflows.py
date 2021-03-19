@@ -28,6 +28,7 @@ Env = Dict[str, str]
 
 
 def checkout() -> Sequence[Step]:
+    """Get prior commits and the commit message."""
     return [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
         # for details on how we get the commit message here.
@@ -42,14 +43,26 @@ def checkout() -> Sequence[Step]:
         {
             "name": "Get commit message for branch builds",
             "if": "github.event_name == 'push'",
-            "run": 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV\necho "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV\necho "EOF" >> $GITHUB_ENV\n',
+            "run": dedent(
+                """\
+                echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+                echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+                echo "EOF" >> $GITHUB_ENV
+                """
+            ),
         },
-        # For a pull_request event, the commit we care about is the second parent of the merge commit.
-        # This CI currently only runs on PRs, so this is future-proofing.
+        # For a pull_request event, the commit we care about is the second parent of the merge
+        # commit. This CI currently only runs on PRs, so this is future-proofing.
         {
             "name": "Get commit message for PR builds",
             "if": "github.event_name == 'pull_request'",
-            "run": 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV\necho "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV\necho "EOF" >> $GITHUB_ENV\n',
+            "run": dedent(
+                """\
+                echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+                echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+                echo "EOF" >> $GITHUB_ENV
+                """
+            ),
         },
     ]
 
@@ -75,6 +88,12 @@ def rust_channel() -> str:
     with open("rust-toolchain") as fp:
         rust_toolchain = toml.load(fp)
     return cast(str, rust_toolchain["toolchain"]["channel"])
+
+
+NATIVE_ENGINE_SO_FILES = [
+    "src/python/pants/engine/internals/native_engine.so",
+    "src/python/pants/engine/internals/native_engine.so.metadata",
+]
 
 
 def bootstrap_caches() -> Sequence[Step]:
@@ -107,7 +126,7 @@ def bootstrap_caches() -> Sequence[Step]:
             "name": "Cache Native Engine",
             "uses": "actions/cache@v2",
             "with": {
-                "path": "src/python/pants/engine/internals/native_engine.so\nsrc/python/pants/engine/internals/native_engine.so.metadata\n",
+                "path": "\n".join(NATIVE_ENGINE_SO_FILES),
                 "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}\n",
             },
         },
@@ -121,7 +140,7 @@ def native_engine_so_upload() -> Sequence[Step]:
             "uses": "actions/upload-artifact@v2",
             "with": {
                 "name": "native_engine.so.${{ matrix.python-version }}.${{ runner.os }}",
-                "path": "src/python/pants/engine/internals/native_engine.so\nsrc/python/pants/engine/internals/native_engine.so.metadata\n",
+                "path": "\n".join(NATIVE_ENGINE_SO_FILES),
             },
         },
     ]
@@ -138,6 +157,10 @@ def native_engine_so_download() -> Sequence[Step]:
             },
         },
     ]
+
+
+PYTHON37_VERSION = "3.7.10"
+PYTHON38_VERSION = "3.8.3"
 
 
 def setup_primary_python() -> Sequence[Step]:
@@ -159,12 +182,12 @@ def expose_all_pythons() -> Sequence[Step]:
     ]
 
 
-def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
+def test_workflow_jobs(primary_python_version: str) -> Jobs:
     return {
         "bootstrap_pants_linux": {
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
             "runs-on": "ubuntu-20.04",
-            "strategy": {"matrix": {"python-version": python_versions}},
+            "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
@@ -173,21 +196,37 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 {
                     "name": "Run smoke tests",
-                    "run": "./pants help goals\n./pants list ::\n./pants roots\n./pants help targets\n",
-                },
-                {
-                    "name": "Test and Lint Rust",
-                    "run": "sudo apt-get install -y pkg-config fuse libfuse-dev\n./cargo clippy --all\n# We pass --tests to skip doc tests because our generated protos contain invalid\n# doc tests in their comments.\n./cargo test --all --tests -- --nocapture\n",
-                    "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
+                    "run": dedent(
+                        """\
+                        ./pants help goals
+                        ./pants list ::
+                        ./pants roots
+                        ./pants help targets
+                        ./pants help subsystems
+                        """
+                    ),
                 },
                 *native_engine_so_upload(),
+                {
+                    "name": "Test and Lint Rust",
+                    # We pass --tests to skip doc tests because our generated protos contain
+                    # invalid doc tests in their comments.
+                    "run": dedent(
+                        """\
+                        sudo apt-get install -y pkg-config fuse libfuse-dev
+                        ./cargo clippy --all
+                        ./cargo test --all --tests -- --nocapture
+                        """
+                    ),
+                    "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
+                },
             ],
         },
         "test_python_linux": {
             "name": "Test Python (Linux)",
             "runs-on": "ubuntu-20.04",
             "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": python_versions}},
+            "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
@@ -198,11 +237,11 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
             ],
         },
-        "lint_python_linux": {
-            "name": "Lint Python (Linux)",
+        "lint_python": {
+            "name": "Lint Python",
             "runs-on": "ubuntu-20.04",
             "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": python_versions}},
+            "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
@@ -218,7 +257,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
         "bootstrap_pants_macos": {
             "name": "Bootstrap Pants, test Rust (MacOS)",
             "runs-on": "macos-10.15",
-            "strategy": {"matrix": {"python-version": python_versions}},
+            "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
@@ -228,7 +267,10 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                 *native_engine_so_upload(),
                 {
                     "name": "Test Rust",
-                    "run": "# We pass --tests to skip doc tests because our generated protos contain invalid\n# doc tests in their comments.\n# We do not pass --all as BRFS tests don't pass on GHA MacOS containers.\n./cargo test --tests -- --nocapture\n",
+                    # We pass --tests to skip doc tests because our generated protos contain
+                    # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
+                    # pass on GHA MacOS containers.
+                    "run": "./cargo test --tests -- --nocapture",
                     "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
                     "env": {"TMPDIR": "${{ runner.temp }}"},
                 },
@@ -238,7 +280,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "name": "Test Python (MacOS)",
             "runs-on": "macos-10.15",
             "needs": "bootstrap_pants_macos",
-            "strategy": {"matrix": {"python-version": python_versions}},
+            "strategy": {"matrix": {"python-version": [primary_python_version]}},
             "env": {
                 # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
                 # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
@@ -246,7 +288,7 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                 **pants_config_files(),
             },
             "steps": [
-                {"name": "Check out code", "uses": "actions/checkout@v2"},
+                *checkout(),
                 *setup_primary_python(),
                 *expose_all_pythons(),
                 *pants_virtualenv_cache(),
@@ -289,11 +331,21 @@ def generate() -> dict[Path, str]:
     test_yaml = yaml.dump(
         {
             "name": test_workflow_name,
-            "on": "pull_request",
-            "jobs": test_workflow_jobs(["3.7.10"]),
+            "on": ["push", "pull_request"],
+            "jobs": test_workflow_jobs(PYTHON37_VERSION),
         },
         Dumper=NoAliasDumper,
     )
+    test_cron_yaml = yaml.dump(
+        {
+            "name": "Daily Extended Python Testing",
+            # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
+            "on": {"schedule": [{"cron": "45 8 * * *"}]},
+            "jobs": test_workflow_jobs(PYTHON38_VERSION),
+        },
+        Dumper=NoAliasDumper,
+    )
+
     cancel_yaml = yaml.dump(
         {
             # Note that this job runs in the context of the default branch, so its token
@@ -328,23 +380,13 @@ def generate() -> dict[Path, str]:
                     "steps": [
                         *checkout(),
                         {
-                            "name": "Test and Lint Rust",
+                            "name": "Cargo audit (for security vulnerabilities)",
                             "run": "./cargo install --version 0.13.1 cargo-audit\n./cargo audit\n",
                         },
                     ],
                 }
             },
         }
-    )
-
-    test_cron_yaml = yaml.dump(
-        {
-            "name": "Daily Extended Python Testing",
-            # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
-            "on": {"schedule": [{"cron": "45 8 * * *"}]},
-            "jobs": test_workflow_jobs(["3.8.3"]),
-        },
-        Dumper=NoAliasDumper,
     )
 
     return {
