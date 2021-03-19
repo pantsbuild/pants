@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import logging
 import multiprocessing
 import os
 import sys
@@ -52,8 +51,6 @@ from pants.util.dirutil import (
     safe_open,
 )
 from pants.util.ordered_set import FrozenOrderedSet
-
-logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
 # `RuleRunner`
