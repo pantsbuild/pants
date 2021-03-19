@@ -53,6 +53,10 @@ pants_ignore.add = [
   "!/pants.pex",
 ]
 
+[anonymous-telemetry]
+enabled = true
+repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
+
 [source]
 root_patterns = [
   "src/*",
