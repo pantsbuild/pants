@@ -6,7 +6,7 @@
 jobs:
   bootstrap_pants_linux:
     env:
-      rust_version: 1.49.0
+      PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
     name: Bootstrap Pants, test+lint Rust (Linux)
     runs-on: ubuntu-20.04
     steps:
@@ -40,7 +40,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/${{ env.rust_version }}-*
+        path: '~/.rustup/toolchains/1.49.0-*
 
           ~/.rustup/update-hashes
 
@@ -89,11 +89,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata
 
           '
-    - name: Set env vars
-      run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
-        github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
-
-        '
     - name: Bootstrap Pants
       run: './pants --version
 
@@ -136,7 +131,7 @@ jobs:
         - 3.8.3
   bootstrap_pants_macos:
     env:
-      rust_version: 1.49.0
+      PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
     name: Bootstrap Pants, test Rust (MacOS)
     runs-on: macos-10.15
     steps:
@@ -170,7 +165,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/${{ env.rust_version }}-*
+        path: '~/.rustup/toolchains/1.49.0-*
 
           ~/.rustup/update-hashes
 
@@ -219,11 +214,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata
 
           '
-    - name: Set pants config files
-      run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
-        github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
-
-        '
     - name: Bootstrap Pants
       run: './pants --version
 
@@ -256,6 +246,8 @@ jobs:
         python-version:
         - 3.8.3
   lint_python_linux:
+    env:
+      PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
     name: Lint Python (Linux)
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
@@ -301,11 +293,6 @@ jobs:
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: src/python/pants/engine/internals/
-    - name: Set pants config files
-      run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
-        github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
-
-        '
     - name: Lint
       run: './pants validate ''**''
 
@@ -317,6 +304,8 @@ jobs:
         python-version:
         - 3.8.3
   test_python_linux:
+    env:
+      PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
     name: Test Python (Linux)
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
@@ -364,11 +353,6 @@ jobs:
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: src/python/pants/engine/internals/
-    - name: Set pants config files
-      run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
-        github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
-
-        '
     - name: Run Python tests
       run: './pants test ::
 
@@ -378,6 +362,8 @@ jobs:
         python-version:
         - 3.8.3
   test_python_macos:
+    env:
+      PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
     name: Test Python (MacOS)
     needs: bootstrap_pants_macos
     runs-on: macos-10.15
@@ -405,11 +391,6 @@ jobs:
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: src/python/pants/engine/internals/
-    - name: Set pants config files
-      run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
-        github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
-
-        '
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test ::
 

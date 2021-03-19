@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Sequence, cast
 
+import toml
 import yaml
 from common import die
 
@@ -22,6 +24,7 @@ HEADER = dedent(
 
 Step = Dict[str, Any]
 Jobs = Dict[str, Any]
+Env = Dict[str, str]
 
 
 def checkout() -> Sequence[Step]:
@@ -64,13 +67,14 @@ def pants_virtualenv_cache() -> Sequence[Step]:
     ]
 
 
-def pants_config_files() -> Sequence[Step]:
-    return [
-        {
-            "name": "Set pants config files",
-            "run": 'echo \'PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{ github.workspace }}/pants.remote-cache.toml"]\' >> ${GITHUB_ENV}\n',
-        },
-    ]
+def pants_config_files() -> Env:
+    return {"PANTS_CONFIG_FILES": "+['pants.ci.toml', 'pants.remote-cache.toml']"}
+
+
+def rust_channel() -> str:
+    with open("rust-toolchain") as fp:
+        rust_toolchain = toml.load(fp)
+    return cast(str, rust_toolchain["toolchain"]["channel"])
 
 
 def bootstrap_caches() -> Sequence[Step]:
@@ -79,7 +83,7 @@ def bootstrap_caches() -> Sequence[Step]:
             "name": "Cache Rust toolchain",
             "uses": "actions/cache@v2",
             "with": {
-                "path": "~/.rustup/toolchains/${{ env.rust_version }}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
+                "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
                 "key": "${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}",
             },
         },
@@ -161,15 +165,11 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
             "runs-on": "ubuntu-20.04",
             "strategy": {"matrix": {"python-version": python_versions}},
-            "env": {"rust_version": "1.49.0"},
+            "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
-                {
-                    "name": "Set env vars",
-                    "run": 'echo \'PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{ github.workspace }}/pants.remote-cache.toml"]\' >> ${GITHUB_ENV}\n',
-                },
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 {
                     "name": "Run smoke tests",
@@ -188,13 +188,13 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "runs-on": "ubuntu-20.04",
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": python_versions}},
+            "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
                 *expose_all_pythons(),
                 *pants_virtualenv_cache(),
                 *native_engine_so_download(),
-                *pants_config_files(),
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
             ],
         },
@@ -203,12 +203,12 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "runs-on": "ubuntu-20.04",
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": python_versions}},
+            "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
                 *pants_virtualenv_cache(),
                 *native_engine_so_download(),
-                *pants_config_files(),
                 {
                     "name": "Lint",
                     "run": "./pants validate '**'\n./pants lint typecheck ::\n",
@@ -219,12 +219,11 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "name": "Bootstrap Pants, test Rust (MacOS)",
             "runs-on": "macos-10.15",
             "strategy": {"matrix": {"python-version": python_versions}},
-            "env": {"rust_version": "1.49.0"},
+            "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
-                *pants_config_files(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 *native_engine_so_upload(),
                 {
@@ -240,13 +239,13 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "runs-on": "macos-10.15",
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": python_versions}},
+            "env": {**pants_config_files()},
             "steps": [
                 {"name": "Check out code", "uses": "actions/checkout@v2"},
                 *setup_primary_python(),
                 *expose_all_pythons(),
                 *pants_virtualenv_cache(),
                 *native_engine_so_download(),
-                *pants_config_files(),
                 {
                     "name": "Run Python tests",
                     "run": "./pants --tag=+platform_specific_behavior test ::\n",
@@ -357,7 +356,16 @@ def main() -> None:
     if args.check:
         for path, content in generated_yaml.items():
             if path.read_text() != content:
-                die(f"Error: Generated path mismatched: {path}")
+                die(
+                    dedent(
+                        f"""\
+                        Error: Generated path mismatched: {path}
+                        To re-generate, run: `./pants run build-support/bin/{
+                            os.path.basename(__file__)
+                        }`
+                        """
+                    )
+                )
     else:
         for path, content in generated_yaml.items():
             path.write_text(content)
