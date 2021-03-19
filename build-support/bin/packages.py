@@ -14,13 +14,14 @@ from contextlib import contextmanager
 from functools import total_ordering
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Dict, Iterable, Iterator, List, NamedTuple, Set, cast
+from typing import Iterable, Iterator, NamedTuple, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
 import requests
 from bs4 import BeautifulSoup
 from common import banner, die, green, travis_section
+from reversion import reversion
 
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
@@ -52,7 +53,7 @@ class Package:
     def __repr__(self):
         return f"Package<name={self.name}>"
 
-    def find_locally(self, *, version: str, search_dir: str) -> List[Path]:
+    def find_locally(self, *, version: str, search_dir: str) -> list[Path]:
         return list(Path(search_dir).rglob(f"{self.name}-{version}-*.whl"))
 
     def exists_on_pypi(self) -> bool:  # type: ignore[return]
@@ -67,7 +68,7 @@ class Package:
         json_data = requests.get(f"https://pypi.org/pypi/{self.name}/json").json()
         return cast(str, json_data["info"]["version"])
 
-    def owners(self) -> Set[str]:
+    def owners(self) -> set[str]:
         url_content = requests.get(
             f"https://pypi.org/project/{self.name}/{self.latest_published_version()}/"
         ).text
@@ -310,27 +311,27 @@ def check_ownership(users, minimum_owner_count: int = 3) -> None:
     banner(f"Checking package ownership for {len(PACKAGES)} packages")
     users = {user.lower() for user in users}
     insufficient = set()
-    unowned: Dict[str, Set[Package]] = dict()
+    unowned: dict[str, set[Package]] = dict()
 
-    def check_ownership(i: int, package: Package) -> None:
+    def check(i: int, pkg: Package) -> None:
         banner(
-            f"[{i}/{len(PACKAGES)}] checking ownership for {package}: > {minimum_owner_count} "
+            f"[{i}/{len(PACKAGES)}] checking ownership for {pkg}: > {minimum_owner_count} "
             f"releasers including {', '.join(users)}"
         )
-        if not package.exists_on_pypi():
-            print(f"The {package.name} package is new! There are no owners yet.")
+        if not pkg.exists_on_pypi():
+            print(f"The {pkg.name} package is new! There are no owners yet.")
             return
 
-        owners = package.owners()
+        owners = pkg.owners()
         if len(owners) <= minimum_owner_count:
-            insufficient.add(package)
+            insufficient.add(pkg)
 
         difference = users.difference(owners)
         for d in difference:
-            unowned.setdefault(d, set()).add(package)
+            unowned.setdefault(d, set()).add(pkg)
 
     for i, package in enumerate(PACKAGES):
-        check_ownership(i, package)
+        check(i, package)
 
     if unowned:
         for user, unowned_packages in sorted(unowned.items()):
@@ -379,8 +380,8 @@ class PrebuiltWheel(NamedTuple):
         return cls(path, quote_plus(path))
 
 
-def determine_prebuilt_wheels() -> List[PrebuiltWheel]:
-    def determine_wheels(wheel_path: str) -> List[PrebuiltWheel]:
+def determine_prebuilt_wheels() -> list[PrebuiltWheel]:
+    def determine_wheels(wheel_path: str) -> list[PrebuiltWheel]:
         response = requests.get(f"{CONSTANTS.binary_base_url}/?prefix={wheel_path}")
         xml_root = ElementTree.fromstring(response.text)
         return [
@@ -445,6 +446,27 @@ def check_prebuilt_wheels(check_dir: str) -> None:
     green(f"All {len(PACKAGES)} pantsbuild.pants packages were fetched and are valid.")
 
 
+def reversion_prebuilt_wheels() -> None:
+    # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We build on
+    # Centos7, so use manylinux2014.
+    source_platform = "linux_x86_64"
+    dest_platform = "manylinux2014_x86_64"
+    unstable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version
+    for whl in unstable_wheel_dir.glob(f"*{source_platform}.whl"):
+        whl.rename(str(whl).replace(source_platform, dest_platform))
+
+    # Now, reversion to use the STABLE_VERSION.
+    stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
+    stable_wheel_dir.mkdir(parents=True, exist_ok=True)
+    for whl in unstable_wheel_dir.glob("*.whl"):
+        reversion(
+            whl_file=str(whl),
+            dest_dir=str(stable_wheel_dir),
+            target_version=CONSTANTS.pants_stable_version,
+            extra_globs=["pants/VERSION"],
+        )
+
+
 def tag_release() -> None:
     tag_name = f"release_{CONSTANTS.pants_stable_version}"
     subprocess.run(
@@ -479,6 +501,14 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser_fetch_prebuilt_wheels = subparsers.add_parser("fetch-and-check-prebuilt-wheels")
     parser_fetch_prebuilt_wheels.add_argument("--wheels-dest")
+    parser_fetch_prebuilt_wheels.add_argument(
+        "--reversion",
+        action="store_true",
+        help=(
+            "Adjust the fetched wheels to be manylinux and to use STABLE_VERSION instead of "
+            "UNSTABLE_VERSION."
+        ),
+    )
 
     return parser
 
@@ -504,6 +534,8 @@ def main() -> None:
             dest = args.wheels_dest or tempdir
             fetch_prebuilt_wheels(dest)
             check_prebuilt_wheels(dest)
+            if args.reversion:
+                reversion_prebuilt_wheels()
 
 
 if __name__ == "__main__":
