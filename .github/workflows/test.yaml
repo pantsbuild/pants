@@ -402,4 +402,6 @@ jobs:
         python-version:
         - 3.7.10
 name: Pull Request CI
-'on': pull_request
+'on':
+- push
+- pull_request

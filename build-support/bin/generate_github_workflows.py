@@ -331,11 +331,21 @@ def generate() -> dict[Path, str]:
     test_yaml = yaml.dump(
         {
             "name": test_workflow_name,
-            "on": "pull_request",
+            "on": ["push", "pull_request"],
             "jobs": test_workflow_jobs(PYTHON37_VERSION),
         },
         Dumper=NoAliasDumper,
     )
+    test_cron_yaml = yaml.dump(
+        {
+            "name": "Daily Extended Python Testing",
+            # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
+            "on": {"schedule": [{"cron": "45 8 * * *"}]},
+            "jobs": test_workflow_jobs(PYTHON38_VERSION),
+        },
+        Dumper=NoAliasDumper,
+    )
+
     cancel_yaml = yaml.dump(
         {
             # Note that this job runs in the context of the default branch, so its token
@@ -377,16 +387,6 @@ def generate() -> dict[Path, str]:
                 }
             },
         }
-    )
-
-    test_cron_yaml = yaml.dump(
-        {
-            "name": "Daily Extended Python Testing",
-            # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
-            "on": {"schedule": [{"cron": "45 8 * * *"}]},
-            "jobs": test_workflow_jobs(PYTHON38_VERSION),
-        },
-        Dumper=NoAliasDumper,
     )
 
     return {
