@@ -147,12 +147,17 @@ def run_pytest(
     config: Optional[str] = None,
     force: bool = False,
 ) -> TestResult:
+    # pytest-html==1.22.1 has an undeclared dep on setuptools. This, unfortunately,
+    # is the most recent version of pytest-html that works with the low version of
+    # pytest that we pin to.
+    plugins = ["zipp==1.0.0", "pytest-cov>=2.8.1,<2.9", "pytest-html==1.22.1", "setuptools"]
+    plugins_str = "['" + "', '".join(plugins) + "']"
     args = [
         "--backend-packages=pants.backend.python",
         f"--source-root-patterns={SOURCE_ROOT}",
         # pin to lower versions so that we can run Python 2 tests
         "--pytest-version=pytest>=4.6.6,<4.7",
-        "--pytest-pytest-plugins=['zipp==1.0.0', 'pytest-cov>=2.8.1,<2.9']",
+        f"--pytest-pytest-plugins={plugins_str}",
     ]
     if passthrough_args:
         args.append(f"--pytest-args='{passthrough_args}'")
@@ -399,6 +404,17 @@ def test_junit(rule_runner: RuleRunner) -> None:
     file = digest_contents[0]
     assert file.path.startswith("dist/test-results")
     assert b"pants_test.test_good" in file.content
+
+
+def test_extra_output(rule_runner: RuleRunner) -> None:
+    tgt = create_test_target(rule_runner, [GOOD_SOURCE])
+    result = run_pytest(rule_runner, tgt, passthrough_args="--html=extra-output/report.html")
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/test_good.py ." in result.stdout
+    assert result.extra_output is not None
+    digest_contents = rule_runner.request(DigestContents, [result.extra_output.digest])
+    paths = {dc.path for dc in digest_contents}
+    assert {"assets/style.css", "report.html"} == paths
 
 
 def test_coverage(rule_runner: RuleRunner) -> None:

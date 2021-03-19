@@ -11,6 +11,7 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
+from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
@@ -49,6 +50,8 @@ class TestResult:
     address: Address
     coverage_data: Optional[CoverageData] = None
     xml_results: Optional[Snapshot] = None
+    # Any extra output (such as from plugins) that the test runner was configured to output.
+    extra_output: Optional[Snapshot] = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -72,6 +75,7 @@ class TestResult:
         *,
         coverage_data: Optional[CoverageData] = None,
         xml_results: Optional[Snapshot] = None,
+        extra_output: Optional[Snapshot] = None,
     ) -> TestResult:
         return cls(
             exit_code=process_result.exit_code,
@@ -82,6 +86,7 @@ class TestResult:
             address=address,
             coverage_data=coverage_data,
             xml_results=xml_results,
+            extra_output=extra_output,
         )
 
     @property
@@ -365,6 +370,7 @@ async def run_tests(
     interactive_runner: InteractiveRunner,
     workspace: Workspace,
     union_membership: UnionMembership,
+    dist_dir: DistDir,
 ) -> Test:
     if test_subsystem.debug:
         targets_to_valid_field_sets = await Get(
@@ -419,6 +425,11 @@ async def run_tests(
             status = "failed"
             exit_code = cast(int, result.exit_code)
         console.print_stderr(f"{sigil} {result.address} {status}.")
+        if result.extra_output and result.extra_output.files:
+            workspace.write_digest(
+                result.extra_output.digest,
+                path_prefix=str(dist_dir.relpath / "test" / result.address.path_safe_spec),
+            )
 
     merged_xml_results = await Get(
         Digest,
@@ -497,6 +508,7 @@ def enrich_test_result(
         address=test_result.address,
         coverage_data=test_result.coverage_data,
         xml_results=test_result.xml_results,
+        extra_output=test_result.extra_output,
         output_setting=test_subsystem.output,
     )
 

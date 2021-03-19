@@ -4,6 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from functools import partial
+from pathlib import Path
 from textwrap import dedent
 from typing import List, Optional, Tuple, Type
 
@@ -22,6 +23,7 @@ from pants.core.goals.test import (
     TestSubsystem,
     run_tests,
 )
+from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
@@ -165,6 +167,7 @@ def run_test_rule(
                 interactive_runner,
                 workspace,
                 union_membership,
+                DistDir(relpath=Path("dist")),
             ],
             mock_gets=[
                 MockGet(
