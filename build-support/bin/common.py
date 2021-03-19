@@ -65,7 +65,7 @@ def git_merge_base() -> str:
     process = subprocess.run(
         get_tracking_branch, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8"
     )
-    return str(process.stdout.rstrip()) if process.stdout else "master"
+    return str(process.stdout.rstrip()) if process.stdout else "main"
 
 
 @contextmanager

@@ -21,7 +21,7 @@ We release to [PyPI](https://pypi.org/pypi)
 [![license](https://img.shields.io/pypi/l/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
 
 We use [Travis CI](https://travis-ci.org) to verify the build
-[![Build Status](https://travis-ci.com/pantsbuild/pants.svg?branch=master)](https://travis-ci.com/pantsbuild/pants/branches).
+[![Build Status](https://travis-ci.com/pantsbuild/pants.svg?branch=main)](https://travis-ci.com/pantsbuild/pants/branches).
 
 # Requirements
 

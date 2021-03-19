@@ -22,7 +22,7 @@ NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versio
 [ "${NUM_VERSIONS}" == "1" ] || die "Multiple copies of pants.pex found at" \
    "${BOOTSTRAPPED_PEX_URL}. This is not allowed as a security precaution. This likely happened" \
    "from restarting the bootstrap shards in the same Travis build. Instead, initiate a new build" \
-   "by either pulling from master or pushing an empty commit (\`git commit --allow-empty\`)."
+   "by either pulling from main or pushing an empty commit (\`git commit --allow-empty\`)."
 
 
 # Now fetch the pre-bootstrapped pex, so that the ./pants wrapper script can use it
