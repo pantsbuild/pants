@@ -583,16 +583,14 @@ async def build_pex(
         #  constraints.
         argv.extend(request.platforms.generate_pex_arg_list())
     else:
+        argv.extend(request.interpreter_constraints.generate_pex_arg_list())
         # NB: If it's an internal_only PEX, we do our own lookup of the interpreter based on the
         # interpreter constraints, and then will run the PEX with that specific interpreter. We
         # will have already validated that there were no platforms.
-        # Otherwise, we let Pex resolve the constraints.
         if request.internal_only:
             python = await Get(
                 PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints
             )
-        else:
-            argv.extend(request.interpreter_constraints.generate_pex_arg_list())
 
     argv.append("--no-emit-warnings")
 

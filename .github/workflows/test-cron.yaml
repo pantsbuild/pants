@@ -363,6 +363,7 @@ jobs:
         - 3.8.3
   test_python_macos:
     env:
+      ARCHFLAGS: -arch x86_64
       PANTS_CONFIG_FILES: +['pants.ci.toml', 'pants.remote-cache.toml']
     name: Test Python (MacOS)
     needs: bootstrap_pants_macos

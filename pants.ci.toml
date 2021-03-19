@@ -26,3 +26,10 @@ ci_env_variables = [
 
 [buildsense]
 enable = true
+
+[subprocess-environment]
+env_vars.add = [
+  # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on intel
+  # machines. See: https://github.com/giampaolo/psutil/issues/1832
+  "ARCHFLAGS",
+]
