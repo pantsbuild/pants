@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import logging
 import multiprocessing
 import os
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
@@ -51,6 +53,8 @@ from pants.util.dirutil import (
 )
 from pants.util.ordered_set import FrozenOrderedSet
 
+logger = logging.getLogger(__name__)
+
 # -----------------------------------------------------------------------------------------------
 # `RuleRunner`
 # -----------------------------------------------------------------------------------------------
@@ -91,10 +95,29 @@ class RuleRunner:
         objects: dict[str, Any] | None = None,
         context_aware_object_factories: dict[str, Any] | None = None,
         isolated_local_store: bool = False,
+        preserve_tmpdirs: bool = False,
         ca_certs_path: str | None = None,
+        bootstrap_args: Iterable[str] = (),
     ) -> None:
-        self.build_root = os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
-        safe_mkdir(self.build_root, clean=True)
+
+        bootstrap_args = [*bootstrap_args]
+
+        root_dir: Path | None = None
+        if preserve_tmpdirs:
+            root_dir = Path(mkdtemp(prefix="RuleRunner."))
+            print(f"Preserving rule runner temporary directories at {root_dir}.", file=sys.stderr)
+            bootstrap_args.extend(
+                [
+                    "--no-process-execution-cleanup-local-dirs",
+                    f"--local-execution-root-dir={root_dir}",
+                ]
+            )
+            build_root = (root_dir / "BUILD_ROOT").resolve()
+            build_root.mkdir()
+            self.build_root = str(build_root)
+        else:
+            self.build_root = os.path.realpath(safe_mkdtemp(prefix="_BUILD_ROOT"))
+
         safe_mkdir(self.pants_workdir)
         BuildRoot().path = self.build_root
 
@@ -117,14 +140,19 @@ class RuleRunner:
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironment({})
-        self.options_bootstrapper = create_options_bootstrapper()
+        self.options_bootstrapper = create_options_bootstrapper(args=bootstrap_args)
         options = self.options_bootstrapper.full_options(self.build_config)
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
-        local_store_dir = (
-            os.path.realpath(safe_mkdtemp())
-            if isolated_local_store
-            else global_options.local_store_dir
-        )
+
+        local_store_dir = global_options.local_store_dir
+        if isolated_local_store:
+            if root_dir:
+                lmdb_store_dir = root_dir / "lmdb_store"
+                lmdb_store_dir.mkdir()
+                local_store_dir = str(lmdb_store_dir)
+            else:
+                local_store_dir = safe_mkdtemp(prefix="lmdb_store.")
+
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
