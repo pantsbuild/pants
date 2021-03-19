@@ -12,6 +12,7 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
+from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
@@ -370,6 +371,7 @@ async def run_tests(
     interactive_runner: InteractiveRunner,
     workspace: Workspace,
     union_membership: UnionMembership,
+    dist_dir: DistDir,
 ) -> Test:
     if test_subsystem.debug:
         targets_to_valid_field_sets = await Get(
@@ -427,7 +429,7 @@ async def run_tests(
         if result.extra_output and result.extra_output.files:
             workspace.write_digest(
                 result.extra_output.digest,
-                path_prefix=os.path.join("dist", result.address.path_safe_spec),
+                path_prefix=os.path.join(dist_dir.relpath, "test", result.address.path_safe_spec),
             )
 
     merged_xml_results = await Get(

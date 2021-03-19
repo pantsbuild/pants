@@ -147,7 +147,9 @@ def run_pytest(
     config: Optional[str] = None,
     force: bool = False,
 ) -> TestResult:
-    # For some reason we need to explicitly request setuptools to get pytest-html to work.
+    # pytest-html==1.22.1 has an undeclared dep on setuptools. This, unfortunately,
+    # is the most recent version of pytest-html that works with the low version of
+    # pytest that we pin to.
     plugins = ["zipp==1.0.0", "pytest-cov>=2.8.1,<2.9", "pytest-html==1.22.1", "setuptools"]
     plugins_str = "['" + "', '".join(plugins) + "']"
     args = [
