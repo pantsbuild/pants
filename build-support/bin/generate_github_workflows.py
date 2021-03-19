@@ -239,7 +239,12 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
             "runs-on": "macos-10.15",
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": python_versions}},
-            "env": {**pants_config_files()},
+            "env": {
+                # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
+                # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
+                "ARCHFLAGS": "-arch x86_64",
+                **pants_config_files(),
+            },
             "steps": [
                 {"name": "Check out code", "uses": "actions/checkout@v2"},
                 *setup_primary_python(),
