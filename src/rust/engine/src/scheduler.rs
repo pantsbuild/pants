@@ -15,9 +15,9 @@ use crate::nodes::{Select, Visualizer};
 use crate::session::{ObservedValueResult, Root, Session};
 
 use futures::{future, FutureExt};
-use graph::{InvalidationResult, LastObserved};
+use graph::LastObserved;
 use hashing::{Digest, EMPTY_DIGEST};
-use log::{debug, info, warn};
+use log::{debug, warn};
 use stdio::TryCloneAsFile;
 use tempfile::TempDir;
 use tokio::process;
@@ -109,15 +109,7 @@ impl Scheduler {
   /// Invalidate all filesystem dependencies in the graph.
   ///
   pub fn invalidate_all_paths(&self) -> usize {
-    let InvalidationResult { cleared, dirtied } = self
-      .core
-      .graph
-      .invalidate_from_roots(|node| node.fs_subject().is_some());
-    info!(
-      "invalidation: cleared {} and dirtied {} nodes for all paths",
-      cleared, dirtied
-    );
-    cleared + dirtied
+    self.core.graph.invalidate_all("external")
   }
 
   ///

@@ -399,6 +399,16 @@ impl Invalidatable for InvalidatableGraph {
     );
     cleared + dirtied
   }
+
+  fn invalidate_all(&self, caller: &str) -> usize {
+    let InvalidationResult { cleared, dirtied } =
+      self.invalidate_from_roots(|node| node.fs_subject().is_some());
+    info!(
+      "{} invalidation: cleared {} and dirtied {} nodes for all paths",
+      caller, cleared, dirtied
+    );
+    cleared + dirtied
+  }
 }
 
 impl Deref for InvalidatableGraph {
