@@ -20,5 +20,5 @@ shlex = "0.1.1"
 store = { path = "../fs/store" }
 structopt = "0.3.20"
 task_executor = { path = "../task_executor" }
-tokio = { version = "^1.4", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.4", features = ["rt-multi-thread", "macros"] }
 workunit_store = { path = "../workunit_store"}

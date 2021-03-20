@@ -26,7 +26,7 @@ store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
-tokio = { version = "^1.4", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.4", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = "0.22"
 tokio-util = { version = "0.6", features = ["codec"] }
 uname = "0.1.1"
@@ -53,4 +53,4 @@ parking_lot = "0.11"
 spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
-tokio = { version = "^1.4", features = ["macros"] }
+tokio = { version = "1.4", features = ["macros"] }

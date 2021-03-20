@@ -132,7 +132,7 @@ task_executor = { path = "task_executor" }
 tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.1.40"
-tokio = { version = "^1.4", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.4", features = ["macros", "rt-multi-thread"] }
 tokio-util = { version = "0.6", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }

@@ -39,7 +39,7 @@ maplit = "*"
 mock = { path = "../../testutil/mock" }
 num_cpus = "1"
 testutil = { path = "../../testutil" }
-tokio = { version = "^1.4", features = ["rt", "macros"] }
+tokio = { version = "1.4", features = ["rt", "macros"] }
 walkdir = "2"
 
 [[bench]]
