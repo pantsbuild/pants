@@ -43,8 +43,9 @@ use log::{debug, error, warn};
 use parking_lot::Mutex;
 use store::Store;
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::stream::StreamExt;
 use tokio::task;
+use tokio_stream::wrappers::SignalStream;
+use tokio_stream::StreamExt;
 
 const TTL: time::Timespec = time::Timespec { sec: 0, nsec: 0 };
 
@@ -760,9 +761,10 @@ async fn main() {
   where
     F: Fn() -> SignalKind,
   {
-    signal(install_fn())
-      .unwrap_or_else(|_| panic!("Failed to install SIG{:?} handler", sig))
-      .map(move |_| Some(sig))
+    SignalStream::new(
+      signal(install_fn()).unwrap_or_else(|_| panic!("Failed to install SIG{:?} handler", sig)),
+    )
+    .map(move |_| Some(sig))
   }
 
   let sigint = install_handler(SignalKind::interrupt, Sig::INT);

@@ -589,7 +589,7 @@ impl CommandRunner {
         let sleep_time = self.retry_interval_duration * multiplier;
         let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
         debug!("delaying {:?} before retry", sleep_time);
-        tokio::time::delay_for(sleep_time).await;
+        tokio::time::sleep(sleep_time).await;
       }
 
       let rpc_result = match current_operation_name {

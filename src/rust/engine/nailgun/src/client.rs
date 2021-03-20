@@ -27,17 +27,16 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use nails::execution::{stream_for, ChildInput, ChildOutput, ExitCode};
-use nails::Config;
-use tokio::net::TcpStream;
-use tokio::signal::unix::{signal, Signal, SignalKind};
-
 use std::io;
 use std::net::Ipv4Addr;
-use tokio::io::AsyncWriteExt;
 
 use futures::channel::mpsc;
 use futures::{try_join, SinkExt, Stream, StreamExt};
+use nails::execution::{stream_for, ChildInput, ChildOutput, ExitCode};
+use nails::Config;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+use tokio::signal::unix::{signal, Signal, SignalKind};
 
 pub enum NailgunClientError {
   PreConnect(String),

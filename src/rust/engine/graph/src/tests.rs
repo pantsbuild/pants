@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use futures::future;
 use parking_lot::Mutex;
 use rand::{self, Rng};
-use tokio::time::{delay_for, timeout, Elapsed};
+use tokio::time::{error::Elapsed, sleep, timeout};
 
 use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError, Stats};
 
@@ -321,9 +321,9 @@ async fn uncacheable_node_only_runs_once() {
   let context = {
     let mut uncacheable = HashSet::new();
     uncacheable.insert(TNode::new(1));
-    let delay_for_root = Duration::from_millis(1000);
+    let sleep_root = Duration::from_millis(1000);
     let mut delays = HashMap::new();
-    delays.insert(TNode::new(0), delay_for_root);
+    delays.insert(TNode::new(0), sleep_root);
     TContext::new(graph.clone())
       .with_uncacheable(uncacheable)
       .with_delays(delays)
@@ -451,9 +451,9 @@ async fn retries() {
   let graph = Arc::new(Graph::new());
 
   let context = {
-    let delay_for_root = Duration::from_millis(100);
+    let sleep_root = Duration::from_millis(100);
     let mut delays = HashMap::new();
-    delays.insert(TNode::new(0), delay_for_root);
+    delays.insert(TNode::new(0), sleep_root);
     TContext::new(graph.clone()).with_delays(delays)
   };
 
@@ -483,11 +483,11 @@ async fn canceled_on_invalidation() {
   let invalidation_delay = Duration::from_millis(10);
   let graph = Arc::new(Graph::new_with_invalidation_delay(invalidation_delay));
 
-  let delay_for_middle = Duration::from_millis(2000);
+  let sleep_middle = Duration::from_millis(2000);
   let start_time = Instant::now();
   let context = {
     let mut delays = HashMap::new();
-    delays.insert(TNode::new(1), delay_for_middle);
+    delays.insert(TNode::new(1), sleep_middle);
     TContext::new(graph.clone()).with_delays(delays)
   };
 
@@ -496,7 +496,7 @@ async fn canceled_on_invalidation() {
   // invalidation to ensure that work actually starts before being invalidated.
   let iterations = 3;
   let sleep_per_invalidation = invalidation_delay * 10;
-  assert!(delay_for_middle > sleep_per_invalidation * 3);
+  assert!(sleep_middle > sleep_per_invalidation * 3);
   let graph2 = graph.clone();
   let _join = thread::spawn(move || {
     for _ in 0..iterations {
@@ -510,7 +510,7 @@ async fn canceled_on_invalidation() {
   );
 
   // We should have waited much less than the time it would have taken to complete three times.
-  assert!(Instant::now() < start_time + (delay_for_middle * iterations));
+  assert!(Instant::now() < start_time + (sleep_middle * iterations));
 
   // And the top nodes should have seen three aborts.
   assert_eq!(
@@ -531,17 +531,17 @@ async fn canceled_on_loss_of_interest() {
   let _logger = env_logger::try_init();
   let graph = Arc::new(Graph::new());
 
-  let delay_for_middle = Duration::from_millis(2000);
+  let sleep_middle = Duration::from_millis(2000);
   let start_time = Instant::now();
   let context = {
     let mut delays = HashMap::new();
-    delays.insert(TNode::new(1), delay_for_middle);
+    delays.insert(TNode::new(1), sleep_middle);
     TContext::new(graph.clone()).with_delays(delays)
   };
 
   // Start a run, but cancel it well before the delayed middle node can complete.
   tokio::select! {
-    _ = delay_for(Duration::from_millis(100)) => {},
+    _ = sleep(Duration::from_millis(100)) => {},
     _ = graph.create(TNode::new(2), &context) => { panic!("Should have timed out.") }
   }
 
@@ -553,8 +553,8 @@ async fn canceled_on_loss_of_interest() {
 
   // We should have waited more than the delay, but less than the time it would have taken to
   // run twice.
-  assert!(Instant::now() >= start_time + delay_for_middle);
-  assert!(Instant::now() < start_time + (delay_for_middle * 2));
+  assert!(Instant::now() >= start_time + sleep_middle);
+  assert!(Instant::now() < start_time + (sleep_middle * 2));
 
   // And the top nodes should have seen one abort each.
   assert_eq!(vec![TNode::new(2), TNode::new(1),], context.aborts(),);
@@ -1005,7 +1005,7 @@ impl TContext {
 
   async fn maybe_delay(&self, node: &TNode) {
     if let Some(delay) = self.delays.get(node) {
-      delay_for(*delay).await;
+      sleep(*delay).await;
     }
   }
 
