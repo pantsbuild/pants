@@ -12,7 +12,7 @@ from common import die
 def main() -> None:
     if shutil.which("aws") is None:
         install_aws_cli()
-    setup_authentication()
+    validate_authentication()
     deploy()
 
 
@@ -20,13 +20,13 @@ def install_aws_cli() -> None:
     subprocess.run(["./build-support/bin/install_aws_cli_for_ci.sh"], check=True)
 
 
-def setup_authentication() -> None:
-    access_key_id = "AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS"
+def validate_authentication() -> None:
+    access_key_id = "AWS_ACCESS_KEY_ID"
+    if access_key_id not in os.environ:
+        die(f"Must set {access_key_id}.")
     secret_access_key = "AWS_SECRET_ACCESS_KEY"
-    if access_key_id not in os.environ or secret_access_key not in os.environ:
-        die(f"Caller of the script must set both {access_key_id} and {secret_access_key}.")
-    # Properly export the value so that AWS picks it up.
-    os.environ["AWS_ACCESS_KEY_ID"] = os.environ[access_key_id]
+    if secret_access_key not in os.environ:
+        die(f"Must set {secret_access_key}.")
 
 
 def deploy() -> None:
@@ -37,9 +37,9 @@ def deploy() -> None:
             "aws",
             "s3",
             "sync",
-            # This instructs the sync command to ignore timestamps, which we must do to allow distinct
-            # shards—which may finish building their wheels at different times—to not overwrite
-            # otherwise-identical wheels.
+            # This instructs the sync command to ignore timestamps, which we must do to allow
+            # distinct shards—which may finish building their wheels at different times—to not
+            # overwrite otherwise-identical wheels.
             "--size-only",
             "--acl",
             "public-read",

@@ -245,14 +245,14 @@ def build_pants_wheels() -> None:
 
 
 def build_fs_util() -> None:
-    # See https://www.pantsbuild.org/docs/contributions-rust for a description of fs_util. We include
-    # it in our releases because it can be a useful standalone tool.
+    # See https://www.pantsbuild.org/docs/contributions-rust for a description of fs_util. We
+    # include it in our releases because it can be a useful standalone tool.
     with travis_section("fs_util", "Building fs_util"):
-        subprocess.run(
-            ["./cargo", "build", "--release", "-p", "fs_util"],
-            check=True,
-            env={**os.environ, "RUST_BACKTRACE": "1"},
-        )
+        command = ["./cargo", "build", "-p", "fs_util"]
+        release_mode = os.environ.get("MODE", "") != "debug"
+        if release_mode:
+            command.append("--release")
+        subprocess.run(command, check=True, env={**os.environ, "RUST_BACKTRACE": "1"})
         current_os = (
             subprocess.run(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
             .stdout.decode()
@@ -266,7 +266,10 @@ def build_fs_util() -> None:
             / CONSTANTS.pants_unstable_version
         )
         dest_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy("src/rust/engine/target/release/fs_util", dest_dir)
+        shutil.copy(
+            f"src/rust/engine/target/{'release' if release_mode else 'debug'}/fs_util",
+            dest_dir,
+        )
         green(f"Built fs_util at {dest_dir / 'fs_util'}.")
 
 

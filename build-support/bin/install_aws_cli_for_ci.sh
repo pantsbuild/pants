@@ -11,10 +11,7 @@ set -euo pipefail
 
 source build-support/common.sh
 
-if [[ -z "${AWS_CLI_ROOT:+''}" ]]; then
-  die "Caller of the script must set the env var AWS_CLI_ROOT."
-fi
-
+AWS_CLI_ROOT="${HOME}/.aws_cli"
 AWS_CLI_BIN="${AWS_CLI_ROOT}/bin/aws"
 
 # We first check if AWS CLI is already installed thanks to Travis's cache.
@@ -32,10 +29,18 @@ if [[ ! -x "${AWS_CLI_BIN}" ]]; then
 
 fi
 
-# We symlink so that `aws` is discoverable on the $PATH.
+# We symlink so that `aws` is discoverable on the $PATH. Our Docker image does not have `sudo`, whereas
+# we need it for macOS to symlink into /usr/local/bin.
 symlink="/usr/local/bin/aws"
 if [[ ! -L "${symlink}" ]]; then
-  sudo ln -s "${AWS_CLI_BIN}" "${symlink}"
+  case "$(uname)" in
+    "Darwin")
+      sudo ln -s "${AWS_CLI_BIN}" "${symlink}"
+      ;;
+    *)
+      ln -s "${AWS_CLI_BIN}" "${symlink}"
+      ;;
+  esac
 fi
 
 # Multipart operations aren't supported for anonymous users, so we set the
