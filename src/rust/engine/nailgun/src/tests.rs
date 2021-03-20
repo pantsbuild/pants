@@ -47,11 +47,7 @@ async fn shutdown_awaits_ongoing() {
     let should_complete_connection = should_complete_connection.clone();
     move |_| {
       connection_accepted.notify_one();
-      loop {
-        if let Some(_) = should_complete_connection.notified().now_or_never() {
-          break;
-        }
-      }
+      tokio::runtime::Handle::current().block_on(should_complete_connection.notified());
       exit_code
     }
   })
