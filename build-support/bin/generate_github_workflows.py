@@ -351,7 +351,14 @@ def generate() -> dict[Path, str]:
             # Note that this job runs in the context of the default branch, so its token
             # has permission to cancel workflows (i.e., it is not the PR's read-only token).
             "name": "Cancel",
-            "on": {"workflow_run": {"workflows": [test_workflow_name], "types": ["requested"]}},
+            "on": {
+                "workflow_run": {
+                    "workflows": [test_workflow_name],
+                    "types": ["requested"],
+                    # Never cancel branch builds for `main` and release branches.
+                    "branches-ignore": ["main", "2.*.x"],
+                }
+            },
             "jobs": {
                 "cancel": {
                     "runs-on": "ubuntu-latest",

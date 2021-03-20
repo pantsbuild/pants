@@ -14,6 +14,9 @@ jobs:
 name: Cancel
 'on':
   workflow_run:
+    branches-ignore:
+    - main
+    - 2.*.x
     types:
     - requested
     workflows:
