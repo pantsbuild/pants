@@ -15,3 +15,5 @@ tokio-rustls = "0.22"
 tokio-util = { version = "0.6", features = ["codec"] }
 tonic = { version = "0.4", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 
+[dev-dependencies]
+prost-types = "0.7"

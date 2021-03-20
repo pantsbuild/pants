@@ -1070,6 +1070,7 @@ dependencies = [
  "bytes 1.0.1",
  "futures",
  "prost",
+ "prost-types",
  "rustls-native-certs",
  "tokio",
  "tokio-rustls",
