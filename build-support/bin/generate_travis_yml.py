@@ -24,9 +24,9 @@ def safe_append(d: Dict, key: str, value: Any) -> None:
     safe_extend(d, key, [value])
 
 
-def safe_extend(d: Dict, key: str, values: List[Any]) -> None:
+def safe_extend(d: Dict, key: str, values: List[Any], insert: bool = False) -> None:
     prior = d.get(key, [])
-    d[key] = [*prior, *values]
+    d[key] = [*values, *prior] if insert else [*prior, *values]
 
 
 # ----------------------------------------------------------------------
@@ -408,11 +408,7 @@ DEPLOY_SETTINGS = {
 
 def _deploy_base() -> Dict:
     shard = {**linux_shard(), "script": ["./build-support/bin/release.sh -p"]}
-    safe_extend(
-        shard,
-        "before_install",
-        ["curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"],
-    )
+    safe_extend(shard, "script", _install_rust(), insert=True)
     return shard
 
 
