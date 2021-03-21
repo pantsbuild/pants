@@ -585,7 +585,7 @@ impl CommandRunner {
           .workunit_store
           .increment_counter(Metric::RemoteExecutionRPCRetries, 1);
 
-        let multiplier = thread_rng().gen_range(0, 2_u32.pow(num_retries) + 1);
+        let multiplier = thread_rng().gen_range(0..2_u32.pow(num_retries) + 1);
         let sleep_time = self.retry_interval_duration * multiplier;
         let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
         debug!("delaying {:?} before retry", sleep_time);
