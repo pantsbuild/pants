@@ -11,7 +11,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use sharded_lmdb::ShardedLmdb;
 use store::Store;
-use workunit_store::{with_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
+use workunit_store::{in_workunit, Level, Metric, ObservationMetric, WorkunitMetadata};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
@@ -127,15 +127,14 @@ impl crate::CommandRunner for CommandRunner {
       Ok(result)
     }
     .boxed();
-    with_workunit(
+    in_workunit!(
       context2.workunit_store,
       "local_cache_read".to_owned(),
       WorkunitMetadata {
         level: Level::Trace,
         ..WorkunitMetadata::default()
       },
-      cache_read_future,
-      |_, md| md,
+      |_workunit| async move { cache_read_future.await }
     )
     .await
   }

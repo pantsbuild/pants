@@ -599,21 +599,21 @@ impl WorkunitStore {
     let span_id = workunit.span_id;
     let new_metadata = Some(workunit.metadata.clone());
 
-    let workunit_counters = {
+    {
+      // If the workunit used the legacy increment_counters API, replace the workunit's counters.
       let mut counters = self.metrics_data.counters.lock();
       match counters.entry(span_id) {
-        Entry::Vacant(_) => HashMap::new(),
-        Entry::Occupied(entry) => entry.remove(),
+        Entry::Vacant(_) => {}
+        Entry::Occupied(entry) => workunit.counters = entry.remove(),
       }
-    };
-    workunit.counters = workunit_counters.clone();
+    }
 
     let tx = self.streaming_workunit_data.msg_tx.lock();
     tx.send(StoreMsg::Completed(
       span_id,
       new_metadata.clone(),
       end_time,
-      workunit_counters.clone(),
+      workunit.counters.clone(),
     ))
     .unwrap();
 
@@ -625,7 +625,7 @@ impl WorkunitStore {
         span_id,
         new_metadata,
         end_time,
-        workunit_counters,
+        workunit.counters.clone(),
       ))
       .unwrap();
 
@@ -807,7 +807,10 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
   get_workunit_store_handle().expect("A WorkunitStore has not been set for this thread.")
 }
 
-fn _start_workunit(
+///
+/// NB: Public for macro usage: prefer using `in_workunit!`.
+///
+pub fn _start_workunit(
   workunit_store: WorkunitStore,
   name: String,
   initial_metadata: WorkunitMetadata,
@@ -817,6 +820,23 @@ fn _start_workunit(
   let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
   let workunit = workunit_store.start_workunit(span_id, name, parent_id, initial_metadata);
   (store_handle, RunningWorkunit::new(workunit_store, workunit))
+}
+
+#[macro_export]
+macro_rules! in_workunit {
+    ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| async move { $( $body:tt )* }) => (
+      {
+        let (store_handle, mut $workunit) = $crate::_start_workunit($workunit_store, $workunit_name, $workunit_metadata);
+        $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
+          let result = {
+            let $workunit = &mut $workunit;
+            async move { $( $body )* }
+          }.await;
+          $workunit.complete(None);
+          result
+        })
+      }
+    );
 }
 
 pub async fn with_workunit<F, M>(
@@ -840,7 +860,7 @@ where
   .await
 }
 
-struct RunningWorkunit {
+pub struct RunningWorkunit {
   store: WorkunitStore,
   workunit: Option<Workunit>,
 }
@@ -850,6 +870,16 @@ impl RunningWorkunit {
     RunningWorkunit {
       store,
       workunit: Some(workunit),
+    }
+  }
+
+  pub fn increment_counter(&mut self, counter_name: Metric, change: u64) {
+    if let Some(ref mut workunit) = self.workunit {
+      workunit
+        .counters
+        .entry(counter_name)
+        .and_modify(|e| *e += change)
+        .or_insert(change);
     }
   }
 
