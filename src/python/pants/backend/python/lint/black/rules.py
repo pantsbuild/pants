@@ -1,9 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import re
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
@@ -62,13 +60,7 @@ def generate_args(*, source_files: SourceFiles, black: Black, check_only: bool) 
     if black.config:
         args.extend(["--config", black.config])
     args.extend(black.args)
-    # NB: For some reason, Black's --exclude option only works on recursive invocations, meaning
-    # calling Black on a directory(s) and letting it auto-discover files. However, we don't want
-    # Black to run over everything recursively under the directory of our target, as Black should
-    # only touch files directly specified. We can use `--include` to ensure that Black only
-    # operates on the files we actually care about.
-    args.extend(["--include", "|".join(re.escape(f) for f in source_files.files)])
-    args.extend(PurePath(f).parent.as_posix() for f in source_files.files)
+    args.extend(source_files.files)
     return tuple(args)
 
 
