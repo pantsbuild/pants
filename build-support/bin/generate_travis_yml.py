@@ -407,7 +407,13 @@ DEPLOY_SETTINGS = {
 
 
 def _deploy_base() -> Dict:
-    return {**linux_shard(), "script": ["./build-support/bin/release.sh -p"]}
+    shard = {**linux_shard(), "script": ["./build-support/bin/release.sh -p"]}
+    safe_extend(
+        shard,
+        "before_install",
+        ["curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"],
+    )
+    return shard
 
 
 def deploy_stable() -> Dict:
