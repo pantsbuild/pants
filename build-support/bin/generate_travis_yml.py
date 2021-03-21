@@ -406,55 +406,6 @@ DEPLOY_SETTINGS = {
 }
 
 
-def _deploy_base() -> Dict:
-    shard = {**linux_shard(), "script": ["./build-support/bin/release.sh -p"]}
-    safe_extend(shard, "script", _install_rust(), insert=True)
-    return shard
-
-
-def deploy_stable() -> Dict:
-    shard = {
-        **_deploy_base(),
-        "name": "Deploy stable pants.pex",
-        "stage": Stage.build_stable.value,
-        "deploy": {
-            # See https://docs.travis-ci.com/user/deployment/releases/
-            "provider": "releases",
-            # The pantsbuild-ci-bot OAuth token, see the pantsbuild vault for details.
-            "api_key": {
-                "secure": (
-                    "u0aCsiuVGOg28YxG0sQUovuUm29kKwQfFgHbNz2TT5L+cGoHxGl4aoVOCtuwWYEtbNGmYc8/3WRS3C"
-                    "/jOiqQj6JEgHUzWOsnfKUObEqNhisAmXbzBbKc0wPQTL8WNK+DKFh32sD3yPYcw+a5PTLO56+o7rql"
-                    "I25LK7A17WesHC4="
-                )
-            },
-            "file_glob": True,
-            "file": "dist/deploy/pex/*",
-            "skip_cleanup": True,
-            "on": {
-                # We only release a pex for Pants releases, which are tagged.
-                "tags": True,
-                "repo": _DEPLOY_REPO,
-            },
-        },
-    }
-    safe_extend(shard, "env", ["PANTS_PEX_RELEASE=stable", "CACHE_NAME=deploy.stable"])
-    return shard
-
-
-def deploy_unstable() -> Dict:
-    shard = {
-        **_deploy_base(),
-        "name": "Deploy unstable pants.pex",
-        "stage": Stage.build_unstable.value,
-    }
-    safe_extend(
-        shard, "script", ["mkdir -p dist/deploy/pex/", "mv dist/pants*.pex dist/deploy/pex/"]
-    )
-    safe_extend(shard, "env", ["PREPARE_DEPLOY=1", "CACHE_NAME=deploy.unstable"])
-    return shard
-
-
 # ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
@@ -484,8 +435,6 @@ def main() -> None:
                 "include": [
                     build_wheels_linux(),
                     build_wheels_osx(),
-                    deploy_stable(),
-                    deploy_unstable(),
                 ]
             },
         },
