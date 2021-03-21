@@ -133,14 +133,11 @@ async def setup_pex_cli_process(
         digests_to_merge.append(request.additional_input_digest)
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
-    pex_root_path = ".cache/pex_root"
     argv = [
         downloaded_pex_bin.exe,
         *cert_args,
         "--python-path",
         create_path_env_var(pex_env.interpreter_search_paths),
-        "--pex-root",
-        pex_root_path,
         # Ensure Pex and its subprocesses create temporary files in the the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we
         # have known use cases where /tmp is too small to hold large wheel downloads Pex is asked to
@@ -173,7 +170,7 @@ async def setup_pex_cli_process(
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches={"pex_root": pex_root_path},
+        append_only_caches=pex_env.append_only_caches(),
         level=request.level,
         cache_scope=request.cache_scope,
     )
