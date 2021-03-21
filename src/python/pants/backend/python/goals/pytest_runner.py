@@ -44,8 +44,10 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
+    CreateDigest,
     Digest,
     DigestSubset,
+    Directory,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
@@ -157,6 +159,10 @@ async def setup_pytest_for_target(
         ),
     )
 
+    extra_output_directory_digest_request = Get(
+        Digest, CreateDigest([Directory(_EXTRA_OUTPUT_DIR)])
+    )
+
     prepared_sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
@@ -191,12 +197,14 @@ async def setup_pytest_for_target(
         prepared_sources,
         field_set_source_files,
         config_digest,
+        extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
         prepared_sources_request,
         field_set_source_files_request,
         config_digest_request,
+        extra_output_directory_digest_request,
     )
 
     pytest_runner_pex = await Get(
@@ -217,6 +225,7 @@ async def setup_pytest_for_target(
                 coverage_config.digest,
                 prepared_sources.source_files.snapshot.digest,
                 config_digest,
+                extra_output_directory_digest,
                 *(binary.digest for binary in assets),
             )
         ),
