@@ -5,7 +5,7 @@ authors = ["Daniel Wagner-Hall <dwagnerhall@twitter.com>"]
 edition = "2018"
 
 [dependencies]
-async-stream = "0.2"
+async-stream = "0.3"
 async-trait = "0.1"
 bazel_protos = { path = "../../process_execution/bazel_protos" }
 bytes = "1.0"
