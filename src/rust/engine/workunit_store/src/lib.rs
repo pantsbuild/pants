@@ -585,7 +585,7 @@ impl WorkunitStore {
     self.complete_workunit_impl(workunit, time)
   }
 
-  fn cancel_workunit(&self, workunit: &Workunit) {
+  fn cancel_workunit(&self, workunit: Workunit) {
     workunit.log_workunit_state(true);
     self
       .heavy_hitters_data
@@ -807,6 +807,18 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
   get_workunit_store_handle().expect("A WorkunitStore has not been set for this thread.")
 }
 
+fn _start_workunit(
+  workunit_store: WorkunitStore,
+  name: String,
+  initial_metadata: WorkunitMetadata,
+) -> (WorkunitStoreHandle, RunningWorkunit) {
+  let mut store_handle = expect_workunit_store_handle();
+  let span_id = SpanId::new();
+  let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
+  let workunit = workunit_store.start_workunit(span_id, name, parent_id, initial_metadata);
+  (store_handle, RunningWorkunit::new(workunit_store, workunit))
+}
+
 pub async fn with_workunit<F, M>(
   workunit_store: WorkunitStore,
   name: String,
@@ -818,44 +830,42 @@ where
   F: Future,
   M: for<'a> FnOnce(&'a F::Output, WorkunitMetadata) -> WorkunitMetadata,
 {
-  let mut store_handle = expect_workunit_store_handle();
-  let span_id = SpanId::new();
-  let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
-  let mut workunit =
-    workunit_store.start_workunit(span_id, name, parent_id, initial_metadata.clone());
-  let mut guard = CanceledWorkunitGuard::new(&workunit_store, workunit.clone());
+  let (store_handle, mut running) = _start_workunit(workunit_store, name, initial_metadata.clone());
   scope_task_workunit_store_handle(Some(store_handle), async move {
     let result = f.await;
     let final_metadata = final_metadata_fn(&result, initial_metadata);
-    workunit.metadata = final_metadata;
-    workunit_store.complete_workunit(workunit);
-    guard.not_canceled();
+    running.complete(Some(final_metadata));
     result
   })
   .await
 }
 
-struct CanceledWorkunitGuard {
+struct RunningWorkunit {
   store: WorkunitStore,
   workunit: Option<Workunit>,
 }
 
-impl CanceledWorkunitGuard {
-  fn new(store: &WorkunitStore, workunit: Workunit) -> CanceledWorkunitGuard {
-    CanceledWorkunitGuard {
-      store: store.clone(),
+impl RunningWorkunit {
+  fn new(store: WorkunitStore, workunit: Workunit) -> RunningWorkunit {
+    RunningWorkunit {
+      store,
       workunit: Some(workunit),
     }
   }
 
-  fn not_canceled(&mut self) {
-    self.workunit = None;
+  pub fn complete(&mut self, final_metadata: Option<WorkunitMetadata>) {
+    if let Some(mut workunit) = self.workunit.take() {
+      if let Some(final_metadata) = final_metadata {
+        workunit.metadata = final_metadata;
+      }
+      self.store.complete_workunit(workunit);
+    }
   }
 }
 
-impl Drop for CanceledWorkunitGuard {
+impl Drop for RunningWorkunit {
   fn drop(&mut self) {
-    if let Some(workunit) = &self.workunit {
+    if let Some(workunit) = self.workunit.take() {
       self.store.cancel_workunit(workunit);
     }
   }
