@@ -8,6 +8,8 @@ import functools
 import itertools
 import json
 import logging
+import os
+import re
 import shlex
 from collections import defaultdict
 from dataclasses import dataclass
@@ -842,12 +844,33 @@ async def create_venv_pex(
     seeded_venv_request = dataclasses.replace(
         pex_request, additional_args=pex_request.additional_args + ("--venv", "--seed")
     )
-    result = await Get(BuildPexResult, PexRequest, seeded_venv_request)
+    venv_pex_result = await Get(BuildPexResult, PexRequest, seeded_venv_request)
     # Pex --seed mode outputs the path of the PEX executable. In the --venv case this is the `pex`
     # script in the venv root directory.
-    venv_dir = PurePath(result.result.stdout.decode().strip()).parent
+    abs_venv_dir = PurePath(venv_pex_result.result.stdout.decode().strip()).parent
 
-    venv_script_writer = VenvScriptWriter(pex=result.create_pex(), venv_dir=venv_dir)
+    # TODO(John Sirois): Instead of performing this calculation, which uses knowledge of the
+    #  PEX_ROOT layout (It assumes a `venvs` dir), rely on verbose seeding or a pex tool to get
+    #  the relevant PEX_ROOT / venv pex directory combination in a single Process execution so
+    #  we can relpath them.
+
+    pex_root = pex_environment.pex_root
+    if pex_root.is_absolute():
+        if not os.path.commonprefix([pex_root, abs_venv_dir]) == str(pex_root):
+            raise AssertionError(
+                f"The PEX_ROOT is absolute {pex_root} but does not match the venv pex "
+                f"{abs_venv_dir}."
+            )
+        venv_dir = abs_venv_dir.relative_to(pex_root)
+    else:
+        match = re.search(r"/(?P<venv_dir>venvs/.*)$", str(abs_venv_dir))
+        if match is None:
+            raise AssertionError(
+                f"Failed to find PEX_ROOT {pex_root} in venv_pex path {abs_venv_dir}."
+            )
+        venv_dir = pex_root / match["venv_dir"]
+
+    venv_script_writer = VenvScriptWriter(pex=venv_pex_result.create_pex(), venv_dir=venv_dir)
     pex = venv_script_writer.exe(bash, pex_environment)
     python = venv_script_writer.python(bash, pex_environment)
     scripts = {
@@ -868,7 +891,7 @@ async def create_venv_pex(
 
     return VenvPex(
         digest=input_digest,
-        pex_filename=result.pex_filename,
+        pex_filename=venv_pex_result.pex_filename,
         pex=pex.script,
         python=python.script,
         bin=FrozenDict((bin_name, venv_script.script) for bin_name, venv_script in scripts.items()),
@@ -982,6 +1005,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
+        append_only_caches=pex_environment.append_only_caches(),
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,
@@ -1032,7 +1056,9 @@ class VenvPexProcess:
 
 
 @rule
-async def setup_venv_pex_process(request: VenvPexProcess) -> Process:
+async def setup_venv_pex_process(
+    request: VenvPexProcess, pex_environment: PexEnvironment
+) -> Process:
     venv_pex = request.venv_pex
     argv = (venv_pex.pex.argv0, *request.argv)
     input_digest = (
@@ -1048,6 +1074,7 @@ async def setup_venv_pex_process(request: VenvPexProcess) -> Process:
         env=request.extra_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
+        append_only_caches=pex_environment.append_only_caches(),
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,
