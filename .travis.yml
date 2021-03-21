@@ -148,6 +148,7 @@ jobs:
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     deploy:
       api_key:
         secure: u0aCsiuVGOg28YxG0sQUovuUm29kKwQfFgHbNz2TT5L+cGoHxGl4aoVOCtuwWYEtbNGmYc8/3WRS3C/jOiqQj6JEgHUzWOsnfKUObEqNhisAmXbzBbKc0wPQTL8WNK+DKFh32sD3yPYcw+a5PTLO56+o7rqlI25LK7A17WesHC4=
@@ -190,6 +191,7 @@ jobs:
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.17 3.6.10 3.7.6 3.8.1
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     dist: bionic
     env:
     - PREPARE_DEPLOY=1
