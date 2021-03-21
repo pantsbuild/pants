@@ -21,6 +21,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexRequest,
 )
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -60,6 +61,7 @@ async def generate_python_from_protobuf(
     grpc_python_plugin: GrpcPythonPlugin,
     python_protobuf_subsystem: PythonProtobufSubsystem,
     python_protobuf_mypy_plugin: PythonProtobufMypyPlugin,
+    pex_environment: PexEnvironment,
 ) -> GeneratedSources:
     download_protoc_request = Get(
         DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)
@@ -193,6 +195,7 @@ async def generate_python_from_protobuf(
             description=f"Generating Python sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
+            append_only_caches=pex_environment.append_only_caches(),
         ),
     )
 
