@@ -35,8 +35,6 @@ NUM_RELEASE_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
 
 # To avoid putting skip labels multiple times, check if the labels already exist
 # in the commit message.
-grep "\[ci skip\]" "${COMMIT_MSG_FILEPATH}" > /dev/null
-HAS_CI_SKIP=$?
 grep "\[ci skip-rust\]" "${COMMIT_MSG_FILEPATH}" > /dev/null
 HAS_RUST_SKIP=$?
 grep "\[ci skip-build-wheels\]" "${COMMIT_MSG_FILEPATH}" > /dev/null
