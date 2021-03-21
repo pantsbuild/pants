@@ -11,7 +11,7 @@ concrete_time = { path = "../concrete_time" }
 hashing = { path = "../hashing" }
 hdrhistogram = "7.2"
 parking_lot = "0.11"
-rand = "0.6"
+rand = "0.8"
 tokio = { version = "1.4", features = ["rt"] }
 petgraph = "0.4.5"
 log = "0.4"

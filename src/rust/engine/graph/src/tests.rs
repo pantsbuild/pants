@@ -153,7 +153,7 @@ async fn invalidate_randomly() {
       invalidations -= 1;
 
       // Invalidate a random node in the graph.
-      let candidate = rng.gen_range(0, range);
+      let candidate = rng.gen_range(0..range);
       graph2.invalidate_from_roots(|&TNode(n, _)| n == candidate);
 
       thread::sleep(sleep_per_invalidation);
