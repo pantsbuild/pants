@@ -6,7 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-async-stream = "0.2"
+async-stream = "0.3"
 bazel_protos = { path = "../../process_execution/bazel_protos" }
 bytes = "1.0"
 futures = "0.3"

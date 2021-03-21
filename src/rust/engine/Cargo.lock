@@ -50,33 +50,12 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
 name = "async-stream"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22068c0c19514942eefcfd4daf8976ef1aad84e61539f95cd200c35202f80af5"
-dependencies = [
- "async-stream-impl 0.2.1",
- "futures-core",
-]
-
-[[package]]
-name = "async-stream"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3670df70cbc01729f901f94c887814b3c68db038aad1329a418bae178bc5295c"
 dependencies = [
- "async-stream-impl 0.3.0",
+ "async-stream-impl",
  "futures-core",
-]
-
-[[package]]
-name = "async-stream-impl"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25f9db3b38af870bf7e5cc649167533b493928e50744e2c30ae350230b414670"
-dependencies = [
- "proc-macro2 1.0.24",
- "quote 1.0.8",
- "syn 1.0.55",
 ]
 
 [[package]]
@@ -1621,7 +1600,7 @@ dependencies = [
 name = "mock"
 version = "0.0.1"
 dependencies = [
- "async-stream 0.2.1",
+ "async-stream",
  "bazel_protos",
  "bytes 1.0.1",
  "futures",
@@ -2908,7 +2887,7 @@ dependencies = [
 name = "store"
 version = "0.1.0"
 dependencies = [
- "async-stream 0.2.1",
+ "async-stream",
  "async-trait",
  "bazel_protos",
  "bytes 1.0.1",
@@ -3091,7 +3070,7 @@ dependencies = [
 name = "testutil"
 version = "0.0.1"
 dependencies = [
- "async-stream 0.2.1",
+ "async-stream",
  "bazel_protos",
  "bytes 1.0.1",
  "fs",
@@ -3261,7 +3240,7 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91491e5f15431f2189ec8c1f9dcbadac949450399c22c912ceae9570eb472f61"
 dependencies = [
- "async-stream 0.3.0",
+ "async-stream",
  "async-trait",
  "base64",
  "bytes 1.0.1",
