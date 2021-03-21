@@ -93,7 +93,7 @@ jobs:
       run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
         github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
 
-        '
+        echo ''TOOLCHAIN_AUTH_TOKEN={{ secrets.TOOLCHAIN_AUTH_TOKEN }} >> ${GITHUB_ENV}'
     - name: Bootstrap Pants
       run: './pants --version
 

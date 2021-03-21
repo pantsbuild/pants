@@ -168,7 +168,8 @@ def test_workflow_jobs(python_versions: Sequence[str]) -> Jobs:
                 *bootstrap_caches(),
                 {
                     "name": "Set env vars",
-                    "run": 'echo \'PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{ github.workspace }}/pants.remote-cache.toml"]\' >> ${GITHUB_ENV}\n',
+                    "run": 'echo \'PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{ github.workspace }}/pants.remote-cache.toml"]\' >> ${GITHUB_ENV}\n'
+                    "echo 'TOOLCHAIN_AUTH_TOKEN={{ secrets.TOOLCHAIN_AUTH_TOKEN }} >> ${GITHUB_ENV}",
                 },
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
                 {
