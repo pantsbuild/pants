@@ -104,11 +104,13 @@ impl CommandRunner {
   /// merged final output directory to find the specific path to extract. (REAPI requires
   /// output directories to be stored as `Tree` protos that contain all of the `Directory`
   /// protos that constitute the directory tree.)
+  ///
+  /// If the output directory does not exist, then returns Ok(None).
   pub(crate) async fn make_tree_for_output_directory(
     root_directory_digest: Digest,
     directory_path: RelativePath,
     store: &Store,
-  ) -> Result<Tree, String> {
+  ) -> Result<Option<Tree>, String> {
     // Traverse down from the root directory digest to find the directory digest for
     // the output directory.
     let mut current_directory_digest = root_directory_digest;
@@ -117,18 +119,13 @@ impl CommandRunner {
         Component::Normal(name) => name
           .to_str()
           .ok_or_else(|| format!("unable to convert '{:?}' to string", name))?,
-        _ => return Err("illegal state: unexpected path component in relative path".into()),
+        _ => return Ok(None),
       };
 
       // Load the Directory proto corresponding to `current_directory_digest`.
       let current_directory = match store.load_directory(current_directory_digest).await? {
         Some((dir, _)) => dir,
-        None => {
-          return Err(format!(
-            "illegal state: directory for digest {:?} did not exist locally",
-            &current_directory_digest
-          ))
-        }
+        None => return Ok(None),
       };
 
       // Scan the current directory for the current path component.
@@ -138,12 +135,7 @@ impl CommandRunner {
         .find(|dn| dn.name == next_name)
       {
         Some(dn) => dn,
-        None => {
-          return Err(format!(
-            "unable to find path component {:?} in directory",
-            next_name
-          ))
-        }
+        None => return Ok(None),
       };
 
       // Set the current directory digest to be the digest in the DirectoryNode just found.
@@ -185,7 +177,7 @@ impl CommandRunner {
       }
     }
 
-    Ok(tree)
+    Ok(Some(tree))
   }
 
   pub(crate) async fn extract_output_file(
@@ -295,12 +287,16 @@ impl CommandRunner {
     digests.insert(result.stderr_digest);
 
     for output_directory in &command.output_directories {
-      let tree = Self::make_tree_for_output_directory(
+      let tree = match Self::make_tree_for_output_directory(
         result.output_directory,
         RelativePath::new(output_directory).unwrap(),
         store,
       )
-      .await?;
+      .await?
+      {
+        Some(t) => t,
+        None => continue,
+      };
 
       let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
       digests.insert(tree_digest);

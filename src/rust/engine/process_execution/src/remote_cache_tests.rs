@@ -420,6 +420,7 @@ async fn make_tree_from_directory() {
     &store,
   )
   .await
+  .unwrap()
   .unwrap();
 
   let root_dir = tree.root.unwrap();
@@ -440,13 +441,14 @@ async fn make_tree_from_directory() {
   assert_eq!(file_digest, TestData::roland().digest());
 
   // Test that extracting a non-existent output directory fails.
-  crate::remote_cache::CommandRunner::make_tree_for_output_directory(
+  let result = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
     directory_digest,
     RelativePath::new("animals").unwrap(),
     &store,
   )
   .await
-  .unwrap_err();
+  .unwrap();
+  assert!(result.is_none());
 }
 
 #[tokio::test]
