@@ -67,20 +67,6 @@ def checkout() -> Sequence[Step]:
     ]
 
 
-def setup_toolchain_auth() -> Sequence[Step]:
-    return [
-        {
-            "name": "Setup toolchain auth",
-            "if": "github.event_name == 'push'",
-            "run": dedent(
-                """\
-                echo TOOLCHAIN_AUTH_TOKEN={{ secrets.TOOLCHAIN_AUTH_TOKEN }} >> $GITHUB_ENV
-                """
-            ),
-        }
-    ]
-
-
 def pants_virtualenv_cache() -> Sequence[Step]:
     return [
         {
@@ -205,7 +191,6 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
-                *setup_toolchain_auth(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
                 {"name": "Bootstrap Pants", "run": "./pants --version\n"},
@@ -245,7 +230,6 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
-                *setup_toolchain_auth(),
                 *setup_primary_python(),
                 *expose_all_pythons(),
                 *pants_virtualenv_cache(),
@@ -261,7 +245,6 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
             "env": {**pants_config_files()},
             "steps": [
                 *checkout(),
-                *setup_toolchain_auth(),
                 *setup_primary_python(),
                 *pants_virtualenv_cache(),
                 *native_engine_so_download(),
@@ -306,7 +289,6 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
             },
             "steps": [
                 *checkout(),
-                *setup_toolchain_auth(),
                 *setup_primary_python(),
                 *expose_all_pythons(),
                 *pants_virtualenv_cache(),

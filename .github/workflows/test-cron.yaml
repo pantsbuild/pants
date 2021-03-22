@@ -32,11 +32,6 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN={{ secrets.TOOLCHAIN_AUTH_TOKEN }} >> $GITHUB_ENV
-
-        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -260,11 +255,6 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN={{ secrets.TOOLCHAIN_AUTH_TOKEN }} >> $GITHUB_ENV
-
-        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -321,11 +311,6 @@ jobs:
         echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
 
         echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'push'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN={{ secrets.TOOLCHAIN_AUTH_TOKEN }} >> $GITHUB_ENV
 
         '
     - name: Set up Python ${{ matrix.python-version }}
@@ -385,11 +370,6 @@ jobs:
         echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
 
         echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'push'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN={{ secrets.TOOLCHAIN_AUTH_TOKEN }} >> $GITHUB_ENV
 
         '
     - name: Set up Python ${{ matrix.python-version }}
