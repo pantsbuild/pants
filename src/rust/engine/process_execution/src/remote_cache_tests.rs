@@ -455,8 +455,8 @@ async fn make_tree_from_directory() {
     RelativePath::new("pets/xyzzy").unwrap(),
     &store,
   )
-    .await
-    .unwrap();
+  .await
+  .unwrap();
   assert!(result.is_none());
 }
 
@@ -516,8 +516,8 @@ async fn extract_output_file() {
     RelativePath::new("cats/xyzzy").unwrap(),
     &store,
   )
-      .await
-      .unwrap();
+  .await
+  .unwrap();
   assert!(file_node_opt.is_none());
 }
 
