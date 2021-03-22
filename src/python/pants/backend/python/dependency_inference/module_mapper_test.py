@@ -20,6 +20,7 @@ from pants.backend.python.target_types import PythonLibrary, PythonRequirementLi
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.mark.parametrize(
@@ -42,7 +43,8 @@ def test_first_party_modules_mapping() -> None:
     util_addr = Address("src/python/util", relative_file_path="strutil.py")
     test_addr = Address("tests/python/project_test", relative_file_path="test.py")
     mapping = FirstPartyPythonModuleMapping(
-        {"util.strutil": (util_addr,), "project_test.test": (test_addr,)}
+        mapping=FrozenDict({"util.strutil": (util_addr,), "project_test.test": (test_addr,)}),
+        ambiguous_modules=FrozenDict({}),
     )
     assert mapping.addresses_for_module("util.strutil") == (util_addr,)
     assert mapping.addresses_for_module("util.strutil.ensure_text") == (util_addr,)
@@ -57,7 +59,9 @@ def test_first_party_modules_mapping() -> None:
 def test_third_party_modules_mapping() -> None:
     colors_addr = Address("", target_name="ansicolors")
     pants_addr = Address("", target_name="pantsbuild")
-    mapping = ThirdPartyPythonModuleMapping({"colors": colors_addr, "pants": pants_addr})
+    mapping = ThirdPartyPythonModuleMapping(
+        FrozenDict({"colors": colors_addr, "pants": pants_addr}), FrozenDict({})
+    )
     assert mapping.address_for_module("colors") == colors_addr
     assert mapping.address_for_module("colors.red") == colors_addr
     assert mapping.address_for_module("pants") == pants_addr
@@ -101,7 +105,8 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     rule_runner.create_file("tests/python/project_test/demo_test/__init__.py")
     rule_runner.add_to_build_file("tests/python/project_test/demo_test", "python_library()")
 
-    # A module with both an implementation and a type stub.
+    # A module with both an implementation and a type stub. Even though the module is the same, we
+    # special-case it to be legal for both file targets to be inferred.
     rule_runner.create_files("src/python/stubs", ["stub.py", "stub.pyi"])
     rule_runner.add_to_build_file("src/python/stubs", "python_library()")
 
@@ -118,26 +123,80 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         ),
     )
 
+    # If a module is ambiguous within a particular implementation, which means that it's not used
+    # in that implementation's final mapping, it should still trigger ambiguity with another
+    # implementation. Here, we have ambiguity with the Protobuf targets, but the Python file has
+    # no ambiguity with other Python files; the Protobuf ambiguity needs to result in Python
+    # being ambiguous.
+    rule_runner.create_files("src/python/protos_ambiguous", ["f.proto", "f_pb2.py"])
+    rule_runner.add_to_build_file(
+        "src/python/protos_ambiguous",
+        dedent(
+            """\
+            protobuf_library(name='protos1')
+            protobuf_library(name='protos2')
+            python_library(name='py')
+            """
+        ),
+    )
+
     result = rule_runner.request(FirstPartyPythonModuleMapping, [])
     assert result == FirstPartyPythonModuleMapping(
-        {
-            "project.util.dirutil": (
-                Address("src/python/project/util", relative_file_path="dirutil.py"),
-            ),
-            "project.util.tarutil": (
-                Address("src/python/project/util", relative_file_path="tarutil.py"),
-            ),
-            "project_test.demo_test": (
-                Address("tests/python/project_test/demo_test", relative_file_path="__init__.py"),
-            ),
-            "protos.f1_pb2": (
-                Address("src/python/protos", relative_file_path="f1.proto", target_name="protos"),
-            ),
-            "stubs.stub": (
-                Address("src/python/stubs", relative_file_path="stub.py"),
-                Address("src/python/stubs", relative_file_path="stub.pyi"),
-            ),
-        }
+        mapping=FrozenDict(
+            {
+                "project.util.dirutil": (
+                    Address("src/python/project/util", relative_file_path="dirutil.py"),
+                ),
+                "project.util.tarutil": (
+                    Address("src/python/project/util", relative_file_path="tarutil.py"),
+                ),
+                "project_test.demo_test": (
+                    Address(
+                        "tests/python/project_test/demo_test", relative_file_path="__init__.py"
+                    ),
+                ),
+                "protos.f1_pb2": (
+                    Address(
+                        "src/python/protos", relative_file_path="f1.proto", target_name="protos"
+                    ),
+                ),
+                "stubs.stub": (
+                    Address("src/python/stubs", relative_file_path="stub.py"),
+                    Address("src/python/stubs", relative_file_path="stub.pyi"),
+                ),
+            }
+        ),
+        ambiguous_modules=FrozenDict(
+            {
+                "protos.f2_pb2": (
+                    Address(
+                        "src/python/protos", relative_file_path="f2.proto", target_name="protos"
+                    ),
+                    Address("src/python/protos", relative_file_path="f2_pb2.py", target_name="py"),
+                ),
+                "protos_ambiguous.f_pb2": (
+                    Address(
+                        "src/python/protos_ambiguous",
+                        relative_file_path="f.proto",
+                        target_name="protos1",
+                    ),
+                    Address(
+                        "src/python/protos_ambiguous",
+                        relative_file_path="f.proto",
+                        target_name="protos2",
+                    ),
+                    Address(
+                        "src/python/protos_ambiguous",
+                        relative_file_path="f_pb2.py",
+                        target_name="py",
+                    ),
+                ),
+                "two_owners": (
+                    Address("build-support", relative_file_path="two_owners.py"),
+                    Address("src/python", relative_file_path="two_owners.py"),
+                ),
+            }
+        ),
     )
 
 
@@ -173,13 +232,23 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     )
     result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
     assert result == ThirdPartyPythonModuleMapping(
-        {
-            "colors": Address("3rdparty/python", target_name="ansicolors"),
-            "local_dist": Address("3rdparty/python", target_name="direct_references"),
-            "pip": Address("3rdparty/python", target_name="direct_references"),
-            "req1": Address("3rdparty/python", target_name="req1"),
-            "un_normalized_project": Address("3rdparty/python", target_name="un_normalized"),
-        }
+        mapping=FrozenDict(
+            {
+                "colors": Address("3rdparty/python", target_name="ansicolors"),
+                "local_dist": Address("3rdparty/python", target_name="direct_references"),
+                "pip": Address("3rdparty/python", target_name="direct_references"),
+                "req1": Address("3rdparty/python", target_name="req1"),
+                "un_normalized_project": Address("3rdparty/python", target_name="un_normalized"),
+            }
+        ),
+        ambiguous_modules=FrozenDict(
+            {
+                "two_owners": (
+                    Address("3rdparty/python", target_name="req1"),
+                    Address("3rdparty/python", target_name="un_normalized"),
+                ),
+            }
+        ),
     )
 
 

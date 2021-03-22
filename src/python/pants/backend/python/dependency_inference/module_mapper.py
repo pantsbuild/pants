@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Dict, List, Set, Tuple, cast
+from typing import DefaultDict, Tuple, cast
 
 from pants.backend.python.target_types import (
     ModuleMappingField,
@@ -41,13 +41,17 @@ class PythonModule:
 # -----------------------------------------------------------------------------------------------
 
 
-class FirstPartyPythonMappingImpl(FrozenDict[str, Tuple[Address, ...]]):
+@dataclass(frozen=True)
+class FirstPartyPythonMappingImpl:
     """A mapping of module names to owning addresses that a specific implementation adds for Python
     import dependency inference.
 
     For almost every implementation, there should only be one address per module to avoid ambiguity.
     However, the built-in implementation allows for 2 addresses when `.pyi` type stubs are used.
     """
+
+    mapping: FrozenDict[str, tuple[Address, ...]]
+    ambiguous_modules: FrozenDict[str, tuple[Address, ...]]
 
 
 @union
@@ -62,15 +66,19 @@ class FirstPartyPythonMappingImplMarker:
     """
 
 
-class FirstPartyPythonModuleMapping(FrozenDict[str, Tuple[Address, ...]]):
+@dataclass(frozen=True)
+class FirstPartyPythonModuleMapping:
     """A merged mapping of module names to owning addresses.
 
     This mapping may have been constructed from multiple distinct implementations, e.g.
     implementations for each codegen backends.
     """
 
-    def addresses_for_module(self, module: str) -> Tuple[Address, ...]:
-        addresses = self.get(module)
+    mapping: FrozenDict[str, tuple[Address, ...]]
+    ambiguous_modules: FrozenDict[str, tuple[Address, ...]]
+
+    def addresses_for_module(self, module: str) -> tuple[Address, ...]:
+        addresses = self.mapping.get(module)
         if addresses:
             return addresses
         # If the module is not found, try the parent, if any. This is to accommodate `from`
@@ -83,7 +91,7 @@ class FirstPartyPythonModuleMapping(FrozenDict[str, Tuple[Address, ...]]):
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return self.get(parent_module, ())
+        return self.mapping.get(parent_module, ())
 
 
 @rule(level=LogLevel.DEBUG)
@@ -98,17 +106,39 @@ async def merge_first_party_module_mappings(
         )
         for marker_cls in union_membership.get(FirstPartyPythonMappingImplMarker)
     )
-    modules_to_addresses: Dict[str, Tuple[Address, ...]] = {}
-    modules_with_multiple_implementations: Set[str] = set()
-    for mapping in all_mappings:
-        for module, addresses in mapping.items():
-            if module in modules_to_addresses:
-                modules_with_multiple_implementations.add(module)
+
+    # First, record all known ambiguous modules. We will need to check that an implementation's
+    # module is not ambiguous within another implementation.
+    modules_with_multiple_implementations: DefaultDict[str, set[Address]] = defaultdict(set)
+    for mapping_impl in all_mappings:
+        for module, addresses in mapping_impl.ambiguous_modules.items():
+            modules_with_multiple_implementations[module].update(addresses)
+
+    # Then, merge the unambiguous modules within each MappingImpls while checking for ambiguity
+    # across the other implementations.
+    modules_to_addresses: dict[str, tuple[Address, ...]] = {}
+    for mapping_impl in all_mappings:
+        for module, addresses in mapping_impl.mapping.items():
+            if module in modules_with_multiple_implementations:
+                modules_with_multiple_implementations[module].update(addresses)
+            elif module in modules_to_addresses:
+                modules_with_multiple_implementations[module].update(
+                    {*modules_to_addresses[module], *addresses}
+                )
             else:
                 modules_to_addresses[module] = addresses
+
+    # Finally, remove any newly ambiguous modules from the previous step.
     for module in modules_with_multiple_implementations:
-        modules_to_addresses.pop(module)
-    return FirstPartyPythonModuleMapping(sorted(modules_to_addresses.items()))
+        if module in modules_to_addresses:
+            modules_to_addresses.pop(module)
+
+    return FirstPartyPythonModuleMapping(
+        mapping=FrozenDict(sorted(modules_to_addresses.items())),
+        ambiguous_modules=FrozenDict(
+            (k, tuple(sorted(v))) for k, v in sorted(modules_with_multiple_implementations.items())
+        ),
+    )
 
 
 # This is only used to register our implementation with the plugin hook via unions. Note that we
@@ -128,8 +158,8 @@ async def map_first_party_python_targets_to_modules(
         for tgt in python_targets
     )
 
-    modules_to_addresses: DefaultDict[str, List[Address]] = defaultdict(list)
-    modules_with_multiple_implementations: Set[str] = set()
+    modules_to_addresses: DefaultDict[str, list[Address]] = defaultdict(list)
+    modules_with_multiple_implementations: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt, stripped_sources in zip(python_targets, stripped_sources_per_target):
         for stripped_f in stripped_sources:
             module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
@@ -143,7 +173,9 @@ async def map_first_party_python_targets_to_modules(
                 if either_targets_are_type_stubs:
                     modules_to_addresses[module].append(tgt.address)
                 else:
-                    modules_with_multiple_implementations.add(module)
+                    modules_with_multiple_implementations[module].update(
+                        {*modules_to_addresses[module], tgt.address}
+                    )
             else:
                 modules_to_addresses[module].append(tgt.address)
 
@@ -152,7 +184,10 @@ async def map_first_party_python_targets_to_modules(
         modules_to_addresses.pop(module)
 
     return FirstPartyPythonMappingImpl(
-        {k: tuple(sorted(v)) for k, v in modules_to_addresses.items()}
+        mapping=FrozenDict((k, tuple(sorted(v))) for k, v in sorted(modules_to_addresses.items())),
+        ambiguous_modules=FrozenDict(
+            (k, tuple(sorted(v))) for k, v in sorted(modules_with_multiple_implementations.items())
+        ),
     )
 
 
@@ -161,9 +196,13 @@ async def map_first_party_python_targets_to_modules(
 # -----------------------------------------------------------------------------------------------
 
 
-class ThirdPartyPythonModuleMapping(FrozenDict[str, Address]):
+@dataclass(frozen=True)
+class ThirdPartyPythonModuleMapping:
+    mapping: FrozenDict[str, Address]
+    ambiguous_modules: FrozenDict[str, tuple[Address, ...]]
+
     def address_for_module(self, module: str) -> Address | None:
-        address = self.get(module)
+        address = self.mapping.get(module)
         if address is not None:
             return address
         # If the module is not found, recursively try the ancestor modules, if any. For example,
@@ -177,8 +216,8 @@ class ThirdPartyPythonModuleMapping(FrozenDict[str, Address]):
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
 async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMapping:
     all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    modules_to_addresses: Dict[str, Address] = {}
-    modules_with_multiple_owners: Set[str] = set()
+    modules_to_addresses: dict[str, Address] = {}
+    modules_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt in all_targets:
         if not tgt.has_field(PythonRequirementsField):
             continue
@@ -190,13 +229,20 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
             )
             for module in modules:
                 if module in modules_to_addresses:
-                    modules_with_multiple_owners.add(module)
+                    modules_with_multiple_owners[module].update(
+                        {modules_to_addresses[module], tgt.address}
+                    )
                 else:
                     modules_to_addresses[module] = tgt.address
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_owners:
         modules_to_addresses.pop(module)
-    return ThirdPartyPythonModuleMapping(sorted(modules_to_addresses.items()))
+    return ThirdPartyPythonModuleMapping(
+        mapping=FrozenDict(sorted(modules_to_addresses.items())),
+        ambiguous_modules=FrozenDict(
+            (k, tuple(sorted(v))) for k, v in sorted(modules_with_multiple_owners.items())
+        ),
+    )
 
 
 # -----------------------------------------------------------------------------------------------
