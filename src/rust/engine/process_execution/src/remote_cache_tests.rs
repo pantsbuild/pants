@@ -449,6 +449,15 @@ async fn make_tree_from_directory() {
   .await
   .unwrap();
   assert!(result.is_none());
+
+  let result = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
+    directory_digest,
+    RelativePath::new("pets/xyzzy").unwrap(),
+    &store,
+  )
+    .await
+    .unwrap();
+  assert!(result.is_none());
 }
 
 #[tokio::test]
