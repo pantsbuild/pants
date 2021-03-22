@@ -57,7 +57,11 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, union
-from pants.option.global_options import ExecutionOptions
+from pants.option.global_options import (
+    LOCAL_STORE_LEASE_TIME_SECS,
+    ExecutionOptions,
+    LocalStoreOptions,
+)
 from pants.util.contextutil import temporary_file_path
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -101,13 +105,13 @@ class Scheduler:
         ignore_patterns: List[str],
         use_gitignore: bool,
         build_root: str,
-        local_store_dir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
         ca_certs_path: Optional[str],
         rules: Iterable[Rule],
         union_membership: UnionMembership,
         execution_options: ExecutionOptions,
+        local_store_options: LocalStoreOptions,
         executor: PyExecutor,
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
@@ -117,13 +121,13 @@ class Scheduler:
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
         :param use_gitignore: If set, pay attention to .gitignore files.
         :param build_root: The build root as a string.
-        :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param local_execution_root_dir: The directory to use for local execution sandboxes.
         :param named_caches_dir: The directory to use as the root for named mutable caches.
         :param ca_certs_path: Path to pem file for custom CA, if needed.
         :param rules: A set of Rules which is used to compute values in the graph.
         :param union_membership: All the registered and normalized union rules.
         :param execution_options: Execution options for (remote) processes.
+        :param local_store_options: Options for the engine's LMDB store(s).
         :param include_trace_on_error: Include the trace through the graph upon encountering errors.
         :param validate_reachability: True to assert that all rules in an otherwise successfully
           constructed rule graph are reachable: if a graph cannot be successfully constructed, it
@@ -177,13 +181,12 @@ class Scheduler:
             execution_headers=tuple(execution_options.remote_execution_headers.items()),
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
         )
-        # TODO: Expose options.
-        local_store_options = PyLocalStoreOptions(
-            store_dir=local_store_dir,
-            process_cache_max_size_bytes=(2 * 4 * 1000000000),
-            files_max_size_bytes=(16 * 4 * 1000000000),
-            directories_max_size_bytes=(2 * 4 * 1000000000),
-            lease_time_millis=(2 * 60 * 60 * 1000),
+        py_local_store_options = PyLocalStoreOptions(
+            store_dir=local_store_options.store_dir,
+            process_cache_max_size_bytes=local_store_options.processes_max_size_bytes,
+            files_max_size_bytes=local_store_options.files_max_size_bytes,
+            directories_max_size_bytes=local_store_options.directories_max_size_bytes,
+            lease_time_millis=LOCAL_STORE_LEASE_TIME_SECS * 1000,
         )
         exec_stategy_opts = PyExecutionStrategyOptions(
             local_parallelism=execution_options.process_execution_local_parallelism,
@@ -205,7 +208,7 @@ class Scheduler:
             ignore_patterns,
             use_gitignore,
             remoting_options,
-            local_store_options,
+            py_local_store_options,
             exec_stategy_opts,
         )
 

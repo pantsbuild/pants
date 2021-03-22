@@ -21,7 +21,7 @@ from pants.engine.internals import native_engine
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import initialize_stdio, pants_log_path
 from pants.init.util import init_workdir
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, LocalStoreOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -102,7 +102,10 @@ class PantsDaemon(PantsDaemonProcessManager):
             max_memory_usage_in_bytes=bootstrap_options.pantsd_max_memory_usage,
         )
 
-        store_gc_service = StoreGCService(graph_scheduler.scheduler)
+        store_gc_service = StoreGCService(
+            graph_scheduler.scheduler,
+            local_store_options=LocalStoreOptions.from_options(bootstrap_options),
+        )
         return PantsServices(services=(scheduler_service, store_gc_service))
 
     def __init__(
