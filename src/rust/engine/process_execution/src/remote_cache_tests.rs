@@ -457,9 +457,6 @@ async fn extract_output_file() {
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
-  // Prepare the store to contain /pets/cats/roland. We will then extract varios pieces of it
-  // into Tree protos.
-
   store
     .store_file_bytes(TestData::roland().bytes(), false)
     .await
@@ -479,11 +476,40 @@ async fn extract_output_file() {
     &store,
   )
   .await
+  .unwrap()
   .unwrap();
 
   assert_eq!(file_node.name, "roland");
   let file_digest: Digest = file_node.digest.unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
+
+  // Extract non-existent files to make sure that Ok(None) is returned.
+  let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
+    directory_digest,
+    RelativePath::new("animals").unwrap(),
+    &store,
+  )
+  .await
+  .unwrap();
+  assert!(file_node_opt.is_none());
+
+  let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
+    directory_digest,
+    RelativePath::new("cats").unwrap(),
+    &store,
+  )
+  .await
+  .unwrap();
+  assert!(file_node_opt.is_none());
+
+  let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
+    directory_digest,
+    RelativePath::new("cats/xyzzy").unwrap(),
+    &store,
+  )
+      .await
+      .unwrap();
+  assert!(file_node_opt.is_none());
 }
 
 #[tokio::test]

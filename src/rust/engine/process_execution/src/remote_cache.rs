@@ -184,7 +184,7 @@ impl CommandRunner {
     root_directory_digest: Digest,
     file_path: RelativePath,
     store: &Store,
-  ) -> Result<FileNode, String> {
+  ) -> Result<Option<FileNode>, String> {
     // Traverse down from the root directory digest to find the directory digest for
     // the output directory.
     let mut current_directory_digest = root_directory_digest;
@@ -196,22 +196,13 @@ impl CommandRunner {
           Component::Normal(name) => name
             .to_str()
             .ok_or_else(|| format!("unable to convert '{:?}' to string", name))?,
-          _ => {
-            return Err(
-              "Illegal state: Found an unexpected path component in relative path.".into(),
-            )
-          }
+          _ => return Ok(None),
         };
 
         // Load the Directory proto corresponding to `current_directory_digest`.
         let current_directory = match store.load_directory(current_directory_digest).await? {
           Some((dir, _)) => dir,
-          None => {
-            return Err(format!(
-              "Illegal state: The directory for digest {:?} did not exist locally.",
-              &current_directory_digest
-            ))
-          }
+          None => return Ok(None),
         };
 
         // Scan the current directory for the current path component.
@@ -221,12 +212,7 @@ impl CommandRunner {
           .find(|dn| dn.name == next_name)
         {
           Some(dn) => dn,
-          None => {
-            return Err(format!(
-              "Unable to find path component {:?} in directory.",
-              next_name
-            ))
-          }
+          None => return Ok(None),
         };
 
         // Set the current directory digest to be the digest in the DirectoryNode just found.
@@ -239,25 +225,21 @@ impl CommandRunner {
     // Load the final directory.
     let directory = match store.load_directory(current_directory_digest).await? {
       Some((dir, _)) => dir,
-      None => {
-        return Err(format!(
-          "Illegal state: The directory for digest {:?} did not exist locally.",
-          &current_directory_digest
-        ))
-      }
+      None => return Ok(None),
     };
 
     // Search for the file.
     let file_base_name = file_path.as_ref().file_name().unwrap();
-    directory
-      .files
-      .iter()
-      .find(|node| {
-        let name = OsString::from(&node.name);
-        name == file_base_name
-      })
-      .cloned()
-      .ok_or_else(|| format!("File {:?} did not exist locally.", file_path))
+    Ok(
+      directory
+        .files
+        .iter()
+        .find(|node| {
+          let name = OsString::from(&node.name);
+          name == file_base_name
+        })
+        .cloned(),
+    )
   }
 
   /// Converts a REAPI `Command` and a `FallibleProcessResultWithPlatform` produced from executing
@@ -310,12 +292,16 @@ impl CommandRunner {
     }
 
     for output_file in &command.output_files {
-      let file_node = Self::extract_output_file(
+      let file_node = match Self::extract_output_file(
         result.output_directory,
         RelativePath::new(output_file).unwrap(),
         store,
       )
-      .await?;
+      .await?
+      {
+        Some(node) => node,
+        None => continue,
+      };
 
       let digest = require_digest(file_node.digest.as_ref())?;
 
