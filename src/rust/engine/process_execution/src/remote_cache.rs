@@ -125,7 +125,12 @@ impl CommandRunner {
       // Load the Directory proto corresponding to `current_directory_digest`.
       let current_directory = match store.load_directory(current_directory_digest).await? {
         Some((dir, _)) => dir,
-        None => return Ok(None),
+        None => {
+          return Err(format!(
+            "Directory digest {:?} was referenced in output, but was not found in store.",
+            current_directory_digest
+          ))
+        }
       };
 
       // Scan the current directory for the current path component.
@@ -202,7 +207,12 @@ impl CommandRunner {
         // Load the Directory proto corresponding to `current_directory_digest`.
         let current_directory = match store.load_directory(current_directory_digest).await? {
           Some((dir, _)) => dir,
-          None => return Ok(None),
+          None => {
+            return Err(format!(
+              "Directory digest {:?} was referenced in output, but was not found in store.",
+              current_directory_digest
+            ))
+          }
         };
 
         // Scan the current directory for the current path component.
