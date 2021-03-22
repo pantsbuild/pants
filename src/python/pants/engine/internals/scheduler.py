@@ -37,6 +37,7 @@ from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutionStrategyOptions,
     PyExecutor,
+    PyLocalStoreOptions,
     PyRemotingOptions,
     PyScheduler,
     PySession,
@@ -176,6 +177,14 @@ class Scheduler:
             execution_headers=tuple(execution_options.remote_execution_headers.items()),
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
         )
+        # TODO: Expose options.
+        local_store_options = PyLocalStoreOptions(
+            store_dir=local_store_dir,
+            process_cache_max_size_bytes=(2 * 4 * 1000000000),
+            files_max_size_bytes=(16 * 4 * 1000000000),
+            directories_max_size_bytes=(2 * 4 * 1000000000),
+            lease_time_millis=(2 * 60 * 60 * 1000),
+        )
         exec_stategy_opts = PyExecutionStrategyOptions(
             local_parallelism=execution_options.process_execution_local_parallelism,
             remote_parallelism=execution_options.process_execution_remote_parallelism,
@@ -190,13 +199,13 @@ class Scheduler:
             tasks,
             types,
             build_root,
-            local_store_dir,
             local_execution_root_dir,
             named_caches_dir,
             ca_certs_path,
             ignore_patterns,
             use_gitignore,
             remoting_options,
+            local_store_options,
             exec_stategy_opts,
         )
 

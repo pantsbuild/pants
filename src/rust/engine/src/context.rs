@@ -26,8 +26,8 @@ use process_execution::{
 };
 use regex::Regex;
 use rule_graph::RuleGraph;
-use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
-use store::{Store, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
+use sharded_lmdb::ShardedLmdb;
+use store::{self, Store};
 use task_executor::Executor;
 use uuid::Uuid;
 use watch::{Invalidatable, InvalidationWatcher};
@@ -93,22 +93,44 @@ pub struct ExecutionStrategyOptions {
   pub remote_cache_write: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct LocalStoreOptions {
+  pub store_dir: PathBuf,
+  pub process_cache_max_size_bytes: usize,
+  pub files_max_size_bytes: usize,
+  pub directories_max_size_bytes: usize,
+  pub lease_time: Duration,
+}
+
+impl From<&LocalStoreOptions> for store::LocalOptions {
+  fn from(lso: &LocalStoreOptions) -> Self {
+    Self {
+      files_max_size_bytes: lso.files_max_size_bytes,
+      directories_max_size_bytes: lso.directories_max_size_bytes,
+      lease_time: lso.lease_time,
+    }
+  }
+}
+
 impl Core {
   fn make_store(
     executor: &Executor,
-    local_store_dir: &Path,
+    local_store_options: &LocalStoreOptions,
     enable_remote: bool,
     remoting_opts: &RemotingOptions,
     remote_store_address: &Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
   ) -> Result<Store, String> {
+    let local_only = Store::local_only_with_options(
+      executor.clone(),
+      local_store_options.store_dir.clone(),
+      local_store_options.into(),
+    )?;
     if enable_remote {
       let remote_store_address = remote_store_address
         .as_ref()
         .ok_or("Remote store required, but none configured")?;
-      Store::with_remote(
-        executor.clone(),
-        local_store_dir,
+      local_only.into_with_remote(
         remote_store_address,
         remoting_opts.instance_name.clone(),
         root_ca_certs.clone(),
@@ -118,7 +140,7 @@ impl Core {
         remoting_opts.store_rpc_retries,
       )
     } else {
-      Store::local_only(executor.clone(), local_store_dir.to_path_buf())
+      Ok(local_only)
     }
   }
 
@@ -128,7 +150,7 @@ impl Core {
     executor: &Executor,
     local_execution_root_dir: &Path,
     named_caches_dir: &Path,
-    local_store_dir: &Path,
+    local_store_options: &LocalStoreOptions,
     process_execution_metadata: &ProcessMetadata,
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
@@ -198,10 +220,10 @@ impl Core {
     // Possibly use the local cache runner, regardless of remote execution/caching.
     let maybe_local_cached_command_runner = if exec_strategy_opts.use_local_cache {
       let process_execution_store = ShardedLmdb::new(
-        local_store_dir.join("processes"),
-        2 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+        local_store_options.store_dir.join("processes"),
+        local_store_options.process_cache_max_size_bytes,
         executor.clone(),
-        DEFAULT_LEASE_TIME,
+        local_store_options.lease_time,
       )
       .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       Box::new(process_execution::cache::CommandRunner::new(
@@ -258,10 +280,10 @@ impl Core {
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
     use_gitignore: bool,
-    local_store_dir: PathBuf,
     local_execution_root_dir: PathBuf,
     named_caches_dir: PathBuf,
     ca_certs_path: Option<PathBuf>,
+    local_store_options: LocalStoreOptions,
     remoting_opts: RemotingOptions,
     exec_strategy_opts: ExecutionStrategyOptions,
   ) -> Result<Core, String> {
@@ -279,11 +301,15 @@ impl Core {
       || exec_strategy_opts.remote_cache_read
       || exec_strategy_opts.remote_cache_write;
 
-    safe_create_dir_all_ioerror(&local_store_dir)
-      .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))?;
+    safe_create_dir_all_ioerror(&local_store_options.store_dir).map_err(|e| {
+      format!(
+        "Error making directory {:?}: {:?}",
+        local_store_options.store_dir, e
+      )
+    })?;
     let full_store = Self::make_store(
       &executor,
-      &local_store_dir,
+      &local_store_options,
       need_remote_store,
       &remoting_opts,
       &remoting_opts.store_address,
@@ -315,7 +341,7 @@ impl Core {
       &executor,
       &local_execution_root_dir,
       &named_caches_dir,
-      &local_store_dir,
+      &local_store_options,
       &process_execution_metadata,
       &root_ca_certs,
       &exec_strategy_opts,

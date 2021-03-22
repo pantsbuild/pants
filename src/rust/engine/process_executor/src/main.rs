@@ -206,6 +206,8 @@ async fn main() {
     .clone()
     .unwrap_or_else(Store::default_path);
 
+  let local_only_store =
+    Store::local_only(executor.clone(), local_store_path).expect("Error making local store");
   let store = match (&args.server, &args.cas_server) {
     (_, Some(cas_server)) => {
       let root_ca_certs = if let Some(ref path) = args.cas_root_ca_cert_file {
@@ -224,9 +226,7 @@ async fn main() {
         );
       }
 
-      Store::with_remote(
-        executor.clone(),
-        local_store_path,
+      local_only_store.into_with_remote(
         &cas_server,
         args.remote_instance_name.clone(),
         root_ca_certs,
@@ -237,10 +237,10 @@ async fn main() {
         3,
       )
     }
-    (None, None) => Store::local_only(executor.clone(), local_store_path),
+    (None, None) => Ok(local_only_store),
     _ => panic!("Can't specify --server without --cas-server"),
   }
-  .expect("Error making store");
+  .expect("Error making remote store");
 
   let (mut request, process_metadata) = make_request(&store, &args)
     .await

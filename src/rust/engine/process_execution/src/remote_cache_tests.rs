@@ -83,18 +83,18 @@ impl StoreSetup {
     let executor = task_executor::Executor::new();
     let cas = StubCAS::builder().build();
     let store_dir = TempDir::new().unwrap().path().join("store_dir");
-    let store = Store::with_remote(
-      executor.clone(),
-      store_dir.clone(),
-      &cas.address(),
-      None,
-      None,
-      BTreeMap::new(),
-      10 * 1024 * 1024,
-      Duration::from_secs(1),
-      1,
-    )
-    .unwrap();
+    let store = Store::local_only(executor.clone(), store_dir.clone())
+      .unwrap()
+      .into_with_remote(
+        &cas.address(),
+        None,
+        None,
+        BTreeMap::new(),
+        10 * 1024 * 1024,
+        Duration::from_secs(1),
+        1,
+      )
+      .unwrap();
     StoreSetup {
       store,
       store_dir,

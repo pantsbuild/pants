@@ -99,13 +99,13 @@ def scheduler_create(
     tasks: PyTasks,
     types: PyTypes,
     build_root: str,
-    local_store_dir: str,
     local_execution_root_dir: str,
     named_caches_dir: str,
     ca_certs_path: str | None,
     ignore_patterns: Sequence[str],
     use_gitignore: bool,
     remoting_options: PyRemotingOptions,
+    local_store_options: PyLocalStoreOptions,
     exec_strategy_opts: PyExecutionStrategyOptions,
 ) -> PyScheduler: ...
 def scheduler_execute(
@@ -181,6 +181,9 @@ class PyNailgunClient:
     def execute(self, command: str, args: list[str], env: dict[str, str]) -> int: ...
 
 class PyRemotingOptions:
+    def __init__(self, **kwargs: Any) -> None: ...
+
+class PyLocalStoreOptions:
     def __init__(self, **kwargs: Any) -> None: ...
 
 class PyScheduler:
