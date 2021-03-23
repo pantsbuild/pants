@@ -785,14 +785,16 @@ class GlobalOptions(Subsystem):
             type=int,
             advanced=True,
             help=(
-                "The number of LMDB shards created for the local store."
+                "The number of LMDB shards created for the local store. This setting also impacts "
+                f"the maximum size of stored files: see `{local_store_files_max_size_bytes_flag}` "
+                "for more information."
                 "\n\n"
                 "Because LMDB allows only one simultaneous writer per database, the store is split "
                 "into multiple shards to allow for more concurrent writers. The faster your disks "
                 "are, the fewer shards you are likely to need for performance."
                 "\n\n"
-                "The shard count also impacts the maximum size of stored files: see "
-                f"`{local_store_files_max_size_bytes_flag}` for more information."
+                "NB: After changing this value, you will likely want to manually clear the "
+                f"`{local_store_dir_flag}` directory to clear the space used by old shard layouts."
             ),
             default=DEFAULT_LOCAL_STORE_OPTIONS.shard_count,
         )
