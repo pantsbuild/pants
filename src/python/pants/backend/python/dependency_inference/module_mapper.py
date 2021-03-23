@@ -81,8 +81,8 @@ class FirstPartyPythonModuleMapping:
     def addresses_for_module(self, module: str) -> tuple[tuple[Address, ...], tuple[Address, ...]]:
         """Return all unambiguous and ambiguous addresses.
 
-        The unambiguous addresses should be 0-2, but not more. We only expect 2 if there is both
-        an implementation (.py) and type stub (.pyi) with the same module name.
+        The unambiguous addresses should be 0-2, but not more. We only expect 2 if there is both an
+        implementation (.py) and type stub (.pyi) with the same module name.
         """
         unambiguous = self.mapping.get(module, ())
         ambiguous = self.ambiguous_modules.get(module, ())
