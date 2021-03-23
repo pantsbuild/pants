@@ -192,7 +192,7 @@ class Scheduler:
             local_parallelism=execution_options.process_execution_local_parallelism,
             remote_parallelism=execution_options.process_execution_remote_parallelism,
             cleanup_local_dirs=execution_options.process_execution_cleanup_local_dirs,
-            use_local_cache=execution_options.process_execution_use_local_cache,
+            local_cache=execution_options.process_execution_local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
         )

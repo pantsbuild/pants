@@ -21,6 +21,7 @@ from pants.base.build_environment import (
     get_pants_cachedir,
     pants_version,
 )
+from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import dir_option
@@ -127,11 +128,11 @@ class ExecutionOptions:
     remote_instance_name: Optional[str]
     remote_ca_certs_path: Optional[str]
 
+    process_execution_local_cache: bool
     process_execution_local_parallelism: int
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: Optional[str]
     process_execution_cleanup_local_dirs: bool
-    process_execution_use_local_cache: bool
 
     remote_store_address: str | None
     remote_store_headers: dict[str, str]
@@ -244,10 +245,17 @@ class ExecutionOptions:
             remote_instance_name=remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             # Process execution setup.
+            process_execution_local_cache=resolve_conflicting_options(
+                old_option="process_execution_use_local_cache",
+                new_option="process_execution_local_cache",
+                old_scope=GLOBAL_SCOPE,
+                new_scope=GLOBAL_SCOPE,
+                old_container=bootstrap_options,
+                new_container=bootstrap_options,
+            ),
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
             process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
-            process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             # Remote store setup.
             remote_store_address=remote_store_address,
@@ -317,7 +325,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
     process_execution_cleanup_local_dirs=True,
-    process_execution_use_local_cache=True,
+    process_execution_local_cache=True,
     # Remote store setup.
     remote_store_address=None,
     remote_store_headers={},
@@ -824,11 +832,22 @@ class GlobalOptions(Subsystem):
             default=tempfile.gettempdir(),
         )
         register(
-            "--process-execution-use-local-cache",
+            "--process-execution-local-cache",
             type=bool,
-            default=True,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cache,
             advanced=True,
             help="Whether to keep process executions in a local cache persisted to disk.",
+        )
+        register(
+            "--process-execution-use-local-cache",
+            type=bool,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cache,
+            advanced=True,
+            help="Whether to keep process executions in a local cache persisted to disk.",
+            removal_version="2.5.0.dev0",
+            removal_hint=(
+                "Use the shorter `--process-execution-local-cache`, which behaves the same."
+            ),
         )
         register(
             "--process-execution-cleanup-local-dirs",
