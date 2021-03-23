@@ -391,7 +391,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             python_library(name="firstparty1", sources=["f1.py"])
             python_library(name="firstparty2", sources=["f1.py"])
 
-            # Ambiguity within third-party, which should result in ambiguity for first-party too. 
+            # Ambiguity within third-party, which should result in ambiguity for first-party too.
             # These all share the module `ambiguous.f2`.
             python_requirement_library(
                 name='thirdparty3', requirements=['bar'], module_mapping={'bar': ['ambiguous.f2']}
