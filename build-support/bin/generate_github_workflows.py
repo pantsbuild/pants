@@ -94,8 +94,12 @@ def pants_virtualenv_cache() -> Sequence[Step]:
     ]
 
 
-def pants_config_files() -> Env:
-    return {"PANTS_CONFIG_FILES": "+['pants.ci.toml', 'pants.remote-cache.toml']"}
+def global_env() -> Env:
+    return {
+        "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
+        "PANTS_REMOTE_CACHE_READ": "true",
+        "PANTS_REMOTE_CACHE_WRITE": "true",
+    }
 
 
 def rust_channel() -> str:
@@ -202,7 +206,7 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
             "runs-on": "ubuntu-20.04",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**pants_config_files()},
+            "env": {**global_env()},
             "steps": [
                 *checkout(),
                 *setup_toolchain_auth(),
@@ -242,7 +246,7 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
             "runs-on": "ubuntu-20.04",
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**pants_config_files()},
+            "env": {**global_env()},
             "steps": [
                 *checkout(),
                 *setup_toolchain_auth(),
@@ -258,7 +262,7 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
             "runs-on": "ubuntu-20.04",
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**pants_config_files()},
+            "env": {**global_env()},
             "steps": [
                 *checkout(),
                 *setup_toolchain_auth(),
@@ -275,7 +279,7 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
             "name": "Bootstrap Pants, test Rust (MacOS)",
             "runs-on": "macos-10.15",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**pants_config_files()},
+            "env": {**global_env()},
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
@@ -302,7 +306,7 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
                 # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
                 # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
                 "ARCHFLAGS": "-arch x86_64",
-                **pants_config_files(),
+                **global_env(),
             },
             "steps": [
                 *checkout(),
