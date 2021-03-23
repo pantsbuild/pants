@@ -38,7 +38,6 @@ from pants.engine.internals.graph import (
     OwnersRequest,
     TooManyTargetsException,
     TransitiveExcludesNotSupportedError,
-    parse_dependencies_field,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
@@ -46,6 +45,7 @@ from pants.engine.target import (
     AsyncFieldMixin,
     Dependencies,
     DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
@@ -1224,28 +1224,6 @@ def test_transitive_excludes_error() -> None:
     assert "work with these target types: ['valid1', 'valid2']" in exc.args[0]
 
 
-def test_parse_dependencies_field() -> None:
-    """Ensure that we correctly handle `!` and `!!` ignores.
-
-    We leave the rest of the parsing to AddressInput and Address.
-    """
-    result = parse_dependencies_field(
-        MockDependencies(
-            ["a/b/c", "!a/b/c", "f.txt", "!f.txt", "!!transitive_exclude.txt"],
-            address=Address("demo/subdir"),
-        ),
-        subproject_roots=[],
-        registered_target_types=[],
-        union_membership=UnionMembership({}),
-    )
-    expected_addresses = {AddressInput("a/b/c"), AddressInput("f.txt")}
-    assert set(result.addresses) == expected_addresses
-    assert set(result.ignored_addresses) == {
-        *expected_addresses,
-        AddressInput("transitive_exclude.txt"),
-    }
-
-
 class SmalltalkDependencies(Dependencies):
     supports_transitive_excludes = True
 
@@ -1312,7 +1290,8 @@ def dependencies_rule_runner() -> RuleRunner:
             inject_smalltalk_deps,
             inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
-            QueryRule(Addresses, (DependenciesRequest,)),
+            QueryRule(Addresses, [DependenciesRequest]),
+            QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
@@ -1330,6 +1309,42 @@ def assert_dependencies_resolved(
     target = rule_runner.get_target(requested_address)
     result = rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
     assert sorted(result) == sorted(expected)
+
+
+def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) -> None:
+    """Ensure that we correctly handle `!` and `!!` ignores.
+
+    We leave the rest of the parsing to AddressInput and Address.
+    """
+    dependencies_rule_runner.create_files("files", ["f.txt", "transitive_exclude.txt"])
+    dependencies_rule_runner.add_to_build_file("files", "smalltalk(sources=['*.txt'])")
+    dependencies_rule_runner.add_to_build_file("a/b/c", "smalltalk()")
+    dependencies_rule_runner.add_to_build_file(
+        "demo/subdir",
+        dedent(
+            """\
+            smalltalk(
+                dependencies=[
+                    'a/b/c',
+                    '!a/b/c',
+                    'files/f.txt',
+                    '!files/f.txt',
+                    '!!files/transitive_exclude.txt',
+                ],
+            )
+            """
+        ),
+    )
+    target = dependencies_rule_runner.get_target(Address("demo/subdir"))
+    result = dependencies_rule_runner.request(
+        ExplicitlyProvidedDependencies, [DependenciesRequest(target[Dependencies])]
+    )
+    expected_addresses = {Address("a/b/c"), Address("files", relative_file_path="f.txt")}
+    assert set(result.includes) == expected_addresses
+    assert set(result.ignored) == {
+        *expected_addresses,
+        Address("files", relative_file_path="transitive_exclude.txt"),
+    }
 
 
 def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:

@@ -1574,6 +1574,25 @@ class DependenciesRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
+@dataclass(frozen=True)
+class ExplicitlyProvidedDependencies:
+    """The literal addresses from a BUILD file `dependencies` field.
+
+    Almost always, you should use `await Get(Addresses, DependenciesRequest)` instead, which will
+    consider dependency injection and inference and apply ignores. However, this type can be
+    useful particularly within inference/injection rules to see if a user already explicitly
+    provided a dependency.
+
+    Resolve using `await Get(ExplicitlyProvidedDependencies, DependenciesRequest)`.
+
+    Note that the `includes` are not filtered based on the `ignores`: this type preserves exactly
+    what was in the BUILD file.
+    """
+
+    includes: FrozenOrderedSet[Address]
+    ignored: FrozenOrderedSet[Address]
+
+
 @union
 @dataclass(frozen=True)
 class InjectDependenciesRequest(EngineAwareParameter, ABC):
