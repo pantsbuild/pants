@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Tuple, cast
+from typing import DefaultDict
 
 from pants.backend.python.target_types import (
     ModuleMappingField,
@@ -16,7 +16,6 @@ from pants.backend.python.target_types import (
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address
-from pants.engine.collection import Collection
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesPathsRequest, Targets
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -77,10 +76,13 @@ class FirstPartyPythonModuleMapping:
     mapping: FrozenDict[str, tuple[Address, ...]]
     ambiguous_modules: FrozenDict[str, tuple[Address, ...]]
 
-    def addresses_for_module(self, module: str) -> tuple[Address, ...]:
-        addresses = self.mapping.get(module)
-        if addresses:
-            return addresses
+    def addresses_for_module(self, module: str) -> tuple[tuple[Address, ...], tuple[Address, ...]]:
+        """Return all unambiguous and ambiguous addresses."""
+        unambiguous = self.mapping.get(module, ())
+        ambiguous = self.ambiguous_modules.get(module, ())
+        if unambiguous or ambiguous:
+            return unambiguous, ambiguous
+
         # If the module is not found, try the parent, if any. This is to accommodate `from`
         # imports, where we don't care about the specific symbol, but only the module. For example,
         # with `from my_project.app import App`, we only care about the `my_project.app` part.
@@ -89,9 +91,11 @@ class FirstPartyPythonModuleMapping:
         # be resolved. This contrasts with the third-party module mapping, which will try every
         # ancestor.
         if "." not in module:
-            return ()
+            return (), ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return self.mapping.get(parent_module, ())
+        unambiguous = self.mapping.get(parent_module, ())
+        ambiguous = self.ambiguous_modules.get(parent_module, ())
+        return unambiguous, ambiguous
 
 
 @rule(level=LogLevel.DEBUG)
@@ -201,14 +205,17 @@ class ThirdPartyPythonModuleMapping:
     mapping: FrozenDict[str, Address]
     ambiguous_modules: FrozenDict[str, tuple[Address, ...]]
 
-    def address_for_module(self, module: str) -> Address | None:
-        address = self.mapping.get(module)
-        if address is not None:
-            return address
+    def address_for_module(self, module: str) -> tuple[Address | None, tuple[Address, ...]]:
+        """Return the unambiguous owner (if any) and all ambiguous addresses."""
+        unambiguous = self.mapping.get(module)
+        ambiguous = self.ambiguous_modules.get(module, ())
+        if unambiguous or ambiguous:
+            return unambiguous, ambiguous
+
         # If the module is not found, recursively try the ancestor modules, if any. For example,
         # pants.task.task.Task -> pants.task.task -> pants.task -> pants
         if "." not in module:
-            return None
+            return None, ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
         return self.address_for_module(parent_module)
 
@@ -250,12 +257,16 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
 # -----------------------------------------------------------------------------------------------
 
 
-class PythonModuleOwners(Collection[Address]):
+@dataclass(frozen=True)
+class PythonModuleOwners:
     """The target(s) that own a Python module.
 
     If >1 targets own the same module, and they're implementations (vs .pyi type stubs), the
     collection should be empty. The collection should never be > 2.
     """
+
+    unambiguous: tuple[Address, ...]
+    ambiguous: tuple[Address, ...] = ()
 
 
 @rule
@@ -264,32 +275,44 @@ async def map_module_to_address(
     first_party_mapping: FirstPartyPythonModuleMapping,
     third_party_mapping: ThirdPartyPythonModuleMapping,
 ) -> PythonModuleOwners:
-    third_party_address = third_party_mapping.address_for_module(module.module)
-    first_party_addresses = first_party_mapping.addresses_for_module(module.module)
+    third_party_address, third_party_ambiguous = third_party_mapping.address_for_module(
+        module.module
+    )
+    first_party_addresses, first_party_ambiguous = first_party_mapping.addresses_for_module(
+        module.module
+    )
+
+    # First, check if there was any ambiguity within the first-party or third-party mappings. Note
+    # that even if there's ambiguity purely within either third-party or first-party, all targets
+    # with that module become ambiguous.
+    if third_party_ambiguous or first_party_ambiguous:
+        ambiguous = {*third_party_ambiguous, *first_party_ambiguous, *first_party_addresses}
+        if third_party_address:
+            ambiguous.add(third_party_address)
+        return PythonModuleOwners((), ambiguous=tuple(sorted(ambiguous)))
 
     # It's possible for a user to write type stubs (`.pyi` files) for their third-party
     # dependencies. We check if that happened, but we're strict in validating that there is only a
     # single third party address and a single first-party address referring to a `.pyi` file;
-    # otherwise, we have ambiguous implementations, so no-op.
-    third_party_resolved_only = third_party_address and not first_party_addresses
-    third_party_resolved_with_type_stub = (
-        third_party_address
-        and len(first_party_addresses) == 1
-        and first_party_addresses[0].filename.endswith(".pyi")
-    )
-
-    if third_party_resolved_only:
-        return PythonModuleOwners([cast(Address, third_party_address)])
-    if third_party_resolved_with_type_stub:
-        return PythonModuleOwners([cast(Address, third_party_address), first_party_addresses[0]])
+    # otherwise, we have ambiguous implementations.
+    if third_party_address and not first_party_addresses:
+        return PythonModuleOwners((third_party_address,))
+    first_party_is_type_stub = len(first_party_addresses) == 1 and first_party_addresses[
+        0
+    ].filename.endswith(".pyi")
+    if third_party_address and first_party_is_type_stub:
+        return PythonModuleOwners((third_party_address, *first_party_addresses))
     # Else, we have ambiguity between the third-party and first-party addresses.
     if third_party_address and first_party_addresses:
-        return PythonModuleOwners()
+        return PythonModuleOwners(
+            (), ambiguous=tuple(sorted((third_party_address, *first_party_addresses)))
+        )
 
-    # We're done with looking at third-party addresses, and now solely look at first-party.
+    # We're done with looking at third-party addresses, and now solely look at first-party, which
+    # was already validated for ambiguity.
     if first_party_addresses:
         return PythonModuleOwners(first_party_addresses)
-    return PythonModuleOwners()
+    return PythonModuleOwners(())
 
 
 def rules():

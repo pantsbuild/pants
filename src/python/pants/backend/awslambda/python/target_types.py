@@ -135,7 +135,7 @@ async def inject_lambda_handler_dependency(
     )
     module, _, _func = handler.val.partition(":")
     owners = await Get(PythonModuleOwners, PythonModule(module))
-    return InjectedDependencies(owners)
+    return InjectedDependencies(owners.unambiguous)
 
 
 class PythonAwsLambdaRuntime(StringField):

@@ -120,7 +120,7 @@ async def inject_pex_binary_entry_point_dependency(
     if entry_point.val is None:
         return InjectedDependencies()
     owners = await Get(PythonModuleOwners, PythonModule(entry_point.val.module))
-    return InjectedDependencies(owners)
+    return InjectedDependencies(owners.unambiguous)
 
 
 # -----------------------------------------------------------------------------------------------
