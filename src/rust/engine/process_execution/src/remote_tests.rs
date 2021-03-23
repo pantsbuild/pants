@@ -856,18 +856,18 @@ async fn sends_headers() {
   let cas = mock::StubCAS::empty();
   let runtime = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
-  let store = Store::with_remote(
-    runtime.clone(),
-    store_dir,
-    &cas.address(),
-    None,
-    None,
-    BTreeMap::new(),
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    1,
-  )
-  .expect("Failed to make store");
+  let store = Store::local_only(runtime.clone(), store_dir)
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      None,
+      None,
+      BTreeMap::new(),
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   let command_runner = CommandRunner::new(
     &mock_server.address(),
@@ -1051,18 +1051,18 @@ async fn ensure_inline_stdio_is_stored() {
   let store_dir_path = store_dir.path();
 
   let cas = mock::StubCAS::empty();
-  let store = Store::with_remote(
-    runtime.clone(),
-    &store_dir_path,
-    &cas.address(),
-    None,
-    None,
-    BTreeMap::new(),
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    1,
-  )
-  .expect("Failed to make store");
+  let store = Store::local_only(runtime.clone(), &store_dir_path)
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      None,
+      None,
+      BTreeMap::new(),
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
@@ -1428,18 +1428,18 @@ async fn execute_missing_file_uploads_if_known() {
   let cas = mock::StubCAS::builder()
     .directory(&TestDirectory::containing_roland())
     .build();
-  let store = Store::with_remote(
-    runtime.clone(),
-    store_dir,
-    &cas.address(),
-    None,
-    None,
-    BTreeMap::new(),
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    1,
-  )
-  .expect("Failed to make store");
+  let store = Store::local_only(runtime.clone(), store_dir)
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      None,
+      None,
+      BTreeMap::new(),
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
   store
     .store_file_bytes(roland.bytes(), false)
     .await
@@ -1503,18 +1503,18 @@ async fn execute_missing_file_errors_if_unknown() {
     .directory(&TestDirectory::containing_roland())
     .build();
   let runtime = task_executor::Executor::new();
-  let store = Store::with_remote(
-    runtime.clone(),
-    store_dir,
-    &cas.address(),
-    None,
-    None,
-    BTreeMap::new(),
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    1,
-  )
-  .expect("Failed to make store");
+  let store = Store::local_only(runtime.clone(), store_dir)
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      None,
+      None,
+      BTreeMap::new(),
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   let runner = CommandRunner::new(
     &mock_server.address(),
@@ -2264,18 +2264,18 @@ pub(crate) fn make_store(
   cas: &mock::StubCAS,
   executor: task_executor::Executor,
 ) -> Store {
-  Store::with_remote(
-    executor,
-    store_dir,
-    &cas.address(),
-    None,
-    None,
-    BTreeMap::new(),
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    1,
-  )
-  .expect("Failed to make store")
+  Store::local_only(executor, store_dir)
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      None,
+      None,
+      BTreeMap::new(),
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap()
 }
 
 async fn extract_execute_response(

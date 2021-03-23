@@ -37,6 +37,20 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
+_CPU_COUNT = (
+    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+) or 2
+
+
+# The time that leases are acquired for in the local store. Configured on the Python side
+# in order to ease interaction with the StoreGCService, which needs to be aware of its value.
+LOCAL_STORE_LEASE_TIME_SECS = 2 * 60 * 60
+
+
+MEGABYTES = 1_000_000
+GIGABYTES = 1_000 * MEGABYTES
+
+
 class GlobMatchErrorBehavior(Enum):
     """Describe the action to perform when matching globs in BUILD files to source files.
 
@@ -251,9 +265,43 @@ class ExecutionOptions:
         )
 
 
-_CPU_COUNT = (
-    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
-) or 2
+@dataclass(frozen=True)
+class LocalStoreOptions:
+    """A collection of all options related to the local store.
+
+    TODO: These options should move to a Subsystem once we add support for "bootstrap" Subsystems (ie,
+    allowing Subsystems to be consumed before the Scheduler has been created).
+    """
+
+    store_dir: str = os.path.join(get_pants_cachedir(), "lmdb_store")
+    processes_max_size_bytes: int = 16 * GIGABYTES
+    files_max_size_bytes: int = 256 * GIGABYTES
+    directories_max_size_bytes: int = 16 * GIGABYTES
+
+    def target_total_size_bytes(self) -> int:
+        """Returns the target total size of all of the stores.
+
+        The `max_size` values are caps on the total size of each store: the "target" size
+        is the size that garbage collection will attempt to shrink the stores to each time
+        it runs.
+
+        NB: This value is not currently configurable, but that could be desirable in the future.
+        """
+        max_total_size_bytes = (
+            self.processes_max_size_bytes
+            + self.files_max_size_bytes
+            + self.directories_max_size_bytes
+        )
+        return max_total_size_bytes // 10
+
+    @classmethod
+    def from_options(cls, options: OptionValueContainer) -> LocalStoreOptions:
+        return cls(
+            store_dir=str(Path(options.local_store_dir).resolve()),
+            processes_max_size_bytes=options.local_store_processes_max_size_bytes,
+            files_max_size_bytes=options.local_store_files_max_size_bytes,
+            directories_max_size_bytes=options.local_store_directories_max_size_bytes,
+        )
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
@@ -284,6 +332,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_headers={},
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
 )
+
+DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
 
 
 class GlobalOptions(Subsystem):
@@ -701,12 +751,13 @@ class GlobalOptions(Subsystem):
             ),
         )
 
+        local_store_dir_flag = "--local-store-dir"
         cache_instructions = (
             "The path may be absolute or relative. If the directory is within the build root, be "
             "sure to include it in `--pants-ignore`."
         )
         register(
-            "--local-store-dir",
+            local_store_dir_flag,
             advanced=True,
             help=(
                 f"Directory to use for the local file store, which stores the results of "
@@ -715,7 +766,46 @@ class GlobalOptions(Subsystem):
             # This default is also hard-coded into the engine's rust code in
             # fs::Store::default_path so that tools using a Store outside of pants
             # are likely to be able to use the same storage location.
-            default=os.path.join(get_pants_cachedir(), "lmdb_store"),
+            default=DEFAULT_LOCAL_STORE_OPTIONS.store_dir,
+        )
+        register(
+            "--local-store-processes-max-size-bytes",
+            type=int,
+            advanced=True,
+            help=(
+                "The maximum size in bytes of the local store containing process cache entries. "
+                f"Stored below `{local_store_dir_flag}`."
+            ),
+            default=DEFAULT_LOCAL_STORE_OPTIONS.processes_max_size_bytes,
+        )
+        register(
+            "--local-store-files-max-size-bytes",
+            type=int,
+            advanced=True,
+            help=(
+                "The maximum size in bytes of the local store containing files. "
+                f"Stored below `{local_store_dir_flag}`."
+                "\n\n"
+                "NB: This size value bounds the total size of all files, but (due to sharding of the "
+                "store on disk) it also bounds the per-file size to (VALUE / 16)."
+                "\n\n"
+                "This value doesn't reflect space allocated on disk, or RAM allocated (it "
+                "may be reflected in VIRT but not RSS). However, the default is lower than you "
+                "might otherwise choose because macOS creates core dumps that include MMAP'd "
+                "pages, and setting this too high might cause core dumps to use an unreasonable "
+                "amount of disk if they are enabled."
+            ),
+            default=DEFAULT_LOCAL_STORE_OPTIONS.files_max_size_bytes,
+        )
+        register(
+            "--local-store-directories-max-size-bytes",
+            type=int,
+            advanced=True,
+            help=(
+                "The maximum size in bytes of the local store containing directories. "
+                f"Stored below `{local_store_dir_flag}`."
+            ),
+            default=DEFAULT_LOCAL_STORE_OPTIONS.directories_max_size_bytes,
         )
         register(
             "--named-caches-dir",

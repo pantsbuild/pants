@@ -1,4 +1,4 @@
-use super::{EntryType, ShrinkBehavior, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
+use super::{EntryType, ShrinkBehavior};
 
 use std::collections::BinaryHeap;
 use std::path::Path;
@@ -10,7 +10,7 @@ use futures::future;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
-use sharded_lmdb::{ShardedLmdb, VersionedFingerprint, DEFAULT_LEASE_TIME};
+use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
 use workunit_store::ObservationMetric;
 
 #[derive(Debug, Clone)]
@@ -33,47 +33,31 @@ impl ByteStore {
     executor: task_executor::Executor,
     path: P,
   ) -> Result<ByteStore, String> {
-    Self::new_with_lease_time(executor, path, DEFAULT_LEASE_TIME)
+    Self::new_with_options(executor, path, super::LocalOptions::default())
   }
 
-  pub fn new_with_lease_time<P: AsRef<Path>>(
+  pub fn new_with_options<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
-    lease_time: Duration,
+    options: super::LocalOptions,
   ) -> Result<ByteStore, String> {
     let root = path.as_ref();
     let files_root = root.join("files");
     let directories_root = root.join("directories");
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
-        // The size value bounds the total size of all shards, but it also bounds the per item
-        // size to `max_size / ShardedLmdb::NUM_SHARDS`.
-        //
-        // We want these stores to be allowed to grow to a large multiple of the `StoreGCService`
-        // size target (see DEFAULT_LOCAL_STORE_GC_TARGET_BYTES), in case it is a very long time
-        // between GC runs. It doesn't reflect space allocated on disk, or RAM allocated (it may
-        // be reflected in VIRT but not RSS).
-        //
-        // However! We set them lower than we'd otherwise choose for a few reasons:
-        // 1. we see tests on travis fail because they can't allocate virtual memory if there
-        //    are too many open Stores at the same time.
-        // 2. macOS creates core dumps that apparently include MMAP'd pages, and setting this too
-        //    high will use up an unnecessary amount of disk if core dumps are enabled.
-        //
         file_dbs: ShardedLmdb::new(
           files_root,
-          // We set this larger than we do other stores in order to avoid applying too low a bound
-          // on the size of stored files.
-          16 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+          options.files_max_size_bytes,
           executor.clone(),
-          lease_time,
+          options.lease_time,
         )
         .map(Arc::new),
         directory_dbs: ShardedLmdb::new(
           directories_root,
-          2 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+          options.directories_max_size_bytes,
           executor.clone(),
-          lease_time,
+          options.lease_time,
         )
         .map(Arc::new),
         executor,

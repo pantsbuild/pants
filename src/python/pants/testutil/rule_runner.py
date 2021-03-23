@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import multiprocessing
 import os
 import sys
@@ -37,7 +38,7 @@ from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, stdio_destination
-from pants.option.global_options import ExecutionOptions, GlobalOptions
+from pants.option.global_options import ExecutionOptions, GlobalOptions, LocalStoreOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
@@ -141,14 +142,15 @@ class RuleRunner:
         options = self.options_bootstrapper.full_options(self.build_config)
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
-        local_store_dir = global_options.local_store_dir
+        local_store_options = LocalStoreOptions.from_options(global_options)
         if isolated_local_store:
             if root_dir:
                 lmdb_store_dir = root_dir / "lmdb_store"
                 lmdb_store_dir.mkdir()
-                local_store_dir = str(lmdb_store_dir)
+                store_dir = str(lmdb_store_dir)
             else:
-                local_store_dir = safe_mkdtemp(prefix="lmdb_store.")
+                store_dir = safe_mkdtemp(prefix="lmdb_store.")
+            local_store_options = dataclasses.replace(local_store_options, store_dir=store_dir)
 
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
@@ -158,7 +160,7 @@ class RuleRunner:
                 self.build_root, global_options
             ),
             use_gitignore=False,
-            local_store_dir=local_store_dir,
+            local_store_options=local_store_options,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
             build_root=self.build_root,

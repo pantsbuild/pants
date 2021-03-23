@@ -30,7 +30,12 @@ from pants.engine.streaming_workunit_handler import rules as streaming_workunit_
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions, GlobalOptions
+from pants.option.global_options import (
+    DEFAULT_EXECUTION_OPTIONS,
+    ExecutionOptions,
+    GlobalOptions,
+    LocalStoreOptions,
+)
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
@@ -175,13 +180,14 @@ class EngineInitializer:
         assert bootstrap_options is not None
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
         execution_options = ExecutionOptions.from_options(options, env, local_only=local_only)
+        local_store_options = LocalStoreOptions.from_options(bootstrap_options)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
             execution_options,
             executor=executor,
             pants_ignore_patterns=GlobalOptions.compute_pants_ignore(build_root, bootstrap_options),
             use_gitignore=bootstrap_options.pants_ignore_use_gitignore,
-            local_store_dir=bootstrap_options.local_store_dir,
+            local_store_options=local_store_options,
             local_execution_root_dir=bootstrap_options.local_execution_root_dir,
             named_caches_dir=bootstrap_options.named_caches_dir,
             ca_certs_path=bootstrap_options.ca_certs_path,
@@ -198,7 +204,7 @@ class EngineInitializer:
         executor: PyExecutor,
         pants_ignore_patterns: List[str],
         use_gitignore: bool,
-        local_store_dir: str,
+        local_store_options: LocalStoreOptions,
         local_execution_root_dir: str,
         named_caches_dir: str,
         ca_certs_path: Optional[str] = None,
@@ -280,7 +286,6 @@ class EngineInitializer:
             ignore_patterns=pants_ignore_patterns,
             use_gitignore=use_gitignore,
             build_root=build_root,
-            local_store_dir=ensure_absolute_path(local_store_dir),
             local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
             named_caches_dir=ensure_absolute_path(named_caches_dir),
             ca_certs_path=ensure_optional_absolute_path(ca_certs_path),
@@ -288,6 +293,7 @@ class EngineInitializer:
             union_membership=union_membership,
             executor=executor,
             execution_options=execution_options,
+            local_store_options=local_store_options,
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=native_engine_visualize_to,
         )

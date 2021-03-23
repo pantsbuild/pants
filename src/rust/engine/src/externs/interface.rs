@@ -75,7 +75,8 @@ use workunit_store::{
 
 use crate::{
   externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
-  Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
+  Function, Intrinsics, LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session,
+  Tasks, Types, Value,
 };
 
 mod testutil;
@@ -383,13 +384,13 @@ py_module_initializer!(native_engine, |py, m| {
         tasks_ptr: PyTasks,
         types_ptr: PyTypes,
         build_root_buf: String,
-        local_store_dir_buf: String,
         local_execution_root_dir_buf: String,
         named_caches_dir_buf: String,
         ca_certs_path: Option<String>,
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
         remoting_options: PyRemotingOptions,
+        local_store_options: PyLocalStoreOptions,
         exec_strategy_opts: PyExecutionStrategyOptions
       )
     ),
@@ -413,6 +414,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<PyNailgunServer>(py)?;
   m.add_class::<PyNailgunClient>(py)?;
   m.add_class::<PyRemotingOptions>(py)?;
+  m.add_class::<PyLocalStoreOptions>(py)?;
   m.add_class::<PyResult>(py)?;
   m.add_class::<PyScheduler>(py)?;
   m.add_class::<PySession>(py)?;
@@ -542,9 +544,6 @@ py_class!(class PyExecutionStrategyOptions |py| {
 });
 
 // Represents configuration related to remote execution and caching.
-//
-// The data stored by PyRemotingOptions originally was passed directly into scheduler_create
-// but has been broken out separately because the large number of options became unwieldy.
 py_class!(class PyRemotingOptions |py| {
   data options: RemotingOptions;
 
@@ -581,6 +580,29 @@ py_class!(class PyRemotingOptions |py| {
         execution_extra_platform_properties,
         execution_headers: execution_headers.into_iter().collect(),
         execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
+      }
+    )
+  }
+});
+
+py_class!(class PyLocalStoreOptions |py| {
+  data options: LocalStoreOptions;
+
+  def __new__(
+    _cls,
+    store_dir: String,
+    process_cache_max_size_bytes: usize,
+    files_max_size_bytes: usize,
+    directories_max_size_bytes: usize,
+    lease_time_millis: u64,
+  ) -> CPyResult<Self> {
+    Self::create_instance(py,
+      LocalStoreOptions {
+        store_dir: PathBuf::from(store_dir),
+        process_cache_max_size_bytes,
+        files_max_size_bytes,
+        directories_max_size_bytes,
+        lease_time: Duration::from_millis(lease_time_millis),
       }
     )
   }
@@ -866,13 +888,13 @@ fn scheduler_create(
   tasks_ptr: PyTasks,
   types_ptr: PyTypes,
   build_root_buf: String,
-  local_store_dir_buf: String,
   local_execution_root_dir_buf: String,
   named_caches_dir_buf: String,
   ca_certs_path_buf: Option<String>,
   ignore_patterns: Vec<String>,
   use_gitignore: bool,
   remoting_options: PyRemotingOptions,
+  local_store_options: PyLocalStoreOptions,
   exec_strategy_opts: PyExecutionStrategyOptions,
 ) -> CPyResult<PyScheduler> {
   match fs::increase_limits() {
@@ -901,10 +923,10 @@ fn scheduler_create(
         PathBuf::from(build_root_buf),
         ignore_patterns,
         use_gitignore,
-        PathBuf::from(local_store_dir_buf),
         PathBuf::from(local_execution_root_dir_buf),
         PathBuf::from(named_caches_dir_buf),
         ca_certs_path_buf.map(PathBuf::from),
+        local_store_options.options(py).clone(),
         remoting_options.options(py).clone(),
         exec_strategy_opts.options(py).clone(),
       )

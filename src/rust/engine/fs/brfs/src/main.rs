@@ -734,21 +734,22 @@ async fn main() {
 
   let runtime = task_executor::Executor::new();
 
+  let local_only_store =
+    Store::local_only(runtime.clone(), &store_path).expect("Error making local store.");
   let store = match args.value_of("server-address") {
-    Some(address) => Store::with_remote(
-      runtime.clone(),
-      &store_path,
-      address,
-      args.value_of("remote-instance-name").map(str::to_owned),
-      root_ca_certs,
-      headers,
-      4 * 1024 * 1024,
-      std::time::Duration::from_secs(5 * 60),
-      1,
-    ),
-    None => Store::local_only(runtime.clone(), &store_path),
-  }
-  .expect("Error making store");
+    Some(address) => local_only_store
+      .into_with_remote(
+        address,
+        args.value_of("remote-instance-name").map(str::to_owned),
+        root_ca_certs,
+        headers,
+        4 * 1024 * 1024,
+        std::time::Duration::from_secs(5 * 60),
+        1,
+      )
+      .expect("Error making remote store"),
+    None => local_only_store,
+  };
 
   #[derive(Clone, Copy, Debug)]
   enum Sig {
