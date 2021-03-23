@@ -37,6 +37,20 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
+_CPU_COUNT = (
+    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+) or 2
+
+
+# The time that leases are acquired for in the local store. Configured on the Python side
+# in order to ease interaction with the StoreGCService, which needs to be aware of its value.
+LOCAL_STORE_LEASE_TIME_SECS = 2 * 60 * 60
+
+
+MEGABYTES = 1_000_000
+GIGABYTES = 1_000 * MEGABYTES
+
+
 class GlobMatchErrorBehavior(Enum):
     """Describe the action to perform when matching globs in BUILD files to source files.
 
@@ -259,10 +273,10 @@ class LocalStoreOptions:
     allowing Subsystems to be consumed before the Scheduler has been created).
     """
 
-    store_dir: str
-    processes_max_size_bytes: int
-    files_max_size_bytes: int
-    directories_max_size_bytes: int
+    store_dir: str = os.path.join(get_pants_cachedir(), "lmdb_store")
+    processes_max_size_bytes: int = 16 * GIGABYTES
+    files_max_size_bytes: int = 256 * GIGABYTES
+    directories_max_size_bytes: int = 16 * GIGABYTES
 
     def target_total_size_bytes(self) -> int:
         """Returns the target total size of all of the stores.
@@ -283,25 +297,11 @@ class LocalStoreOptions:
     @classmethod
     def from_options(cls, options: OptionValueContainer) -> LocalStoreOptions:
         return cls(
-            store_dir=Path(options.local_store_dir).resolve().as_posix(),
+            store_dir=str(Path(options.local_store_dir).resolve()),
             processes_max_size_bytes=options.local_store_processes_max_size_bytes,
             files_max_size_bytes=options.local_store_files_max_size_bytes,
             directories_max_size_bytes=options.local_store_directories_max_size_bytes,
         )
-
-
-_CPU_COUNT = (
-    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
-) or 2
-
-
-# The time that leases are acquired for in the local store. Configured on the Python side
-# in order to ease interaction with the StoreGCService, which needs to be aware of its value.
-LOCAL_STORE_LEASE_TIME_SECS = 2 * 60 * 60
-
-
-MEGABYTES = 1000000
-GIGABYTES = 1000 * MEGABYTES
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
@@ -333,12 +333,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
 )
 
-DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions(
-    store_dir=os.path.join(get_pants_cachedir(), "lmdb_store"),
-    processes_max_size_bytes=(4 * GIGABYTES),
-    files_max_size_bytes=(128 * GIGABYTES),
-    directories_max_size_bytes=(4 * GIGABYTES),
-)
+DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
 
 
 class GlobalOptions(Subsystem):
