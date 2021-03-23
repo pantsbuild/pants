@@ -47,6 +47,8 @@ class FirstPartyPythonMappingImpl:
 
     For almost every implementation, there should only be one address per module to avoid ambiguity.
     However, the built-in implementation allows for 2 addresses when `.pyi` type stubs are used.
+
+    All ambiguous modules must be added to `ambiguous_modules` and not be included in `mapping`.
     """
 
     mapping: FrozenDict[str, tuple[Address, ...]]
@@ -58,8 +60,8 @@ class FirstPartyPythonMappingImplMarker:
     """An entry point for a specific implementation of mapping module names to owning targets for
     Python import dependency inference.
 
-    All implementations will be merged together. Any conflicting modules will be removed due to
-    ambiguity.
+    All implementations will be merged together. Any modules that show up in multiple
+    implementations will be marked ambiguous.
 
     The addresses should all be file addresses, rather than BUILD addresses.
     """
@@ -77,7 +79,11 @@ class FirstPartyPythonModuleMapping:
     ambiguous_modules: FrozenDict[str, tuple[Address, ...]]
 
     def addresses_for_module(self, module: str) -> tuple[tuple[Address, ...], tuple[Address, ...]]:
-        """Return all unambiguous and ambiguous addresses."""
+        """Return all unambiguous and ambiguous addresses.
+
+        The unambiguous addresses should be 0-2, but not more. We only expect 2 if there is both
+        an implementation (.py) and type stub (.pyi) with the same module name.
+        """
         unambiguous = self.mapping.get(module, ())
         ambiguous = self.ambiguous_modules.get(module, ())
         if unambiguous or ambiguous:
@@ -261,8 +267,8 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyPythonModuleMappin
 class PythonModuleOwners:
     """The target(s) that own a Python module.
 
-    If >1 targets own the same module, and they're implementations (vs .pyi type stubs), the
-    collection should be empty. The collection should never be > 2.
+    If >1 targets own the same module, and they're implementations (vs .pyi type stubs), they will
+    be put into `ambiguous` instead of `unambiguous`. `unambiguous` should never be > 2.
     """
 
     unambiguous: tuple[Address, ...]
