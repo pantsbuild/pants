@@ -30,7 +30,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
-from pants.util.docutil import docs_url
 
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` rules
@@ -40,28 +39,14 @@ from pants.util.docutil import docs_url
 @rule(desc="Determining the entry point for a `pex_binary` target")
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
     ep_val = request.entry_point_field.value
-    ep_alias = request.entry_point_field.alias
     address = request.entry_point_field.address
 
-    # TODO: factor up some of this code between python_awslambda and pex_binary once `sources` is
-    #  removed.
-
-    # This code is tricky, as we support several different schemes:
+    # We support several different schemes:
     #  1) `<none>` or `<None>` => set to `None`.
     #  2) `path.to.module` => preserve exactly.
     #  3) `path.to.module:func` => preserve exactly.
     #  4) `app.py` => convert into `path.to.app`.
     #  5) `app.py:func` => convert into `path.to.app:func`.
-
-    if ep_val is None:
-        instructions_url = docs_url(
-            "python-package-goal#creating-a-pex-file-from-a-pex_binary-target"
-        )
-        raise InvalidFieldException(
-            f"The `{ep_alias}` field is not set for the target {address}. Run "
-            f"`./pants help pex_binary` for more information on how to set the field or "
-            f"see {instructions_url}."
-        )
 
     # Case #1.
     if ep_val.module in ("<none>", "<None>"):
@@ -86,9 +71,10 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
     if len(entry_point_paths.files) != 1:
         raise InvalidFieldException(
-            f"Multiple files matched for the `{ep_alias}` {ep_val.spec!r} for the target "
-            f"{address}, but only one file expected. Are you using a glob, rather than a file "
-            f"name?\n\nAll matching files: {list(entry_point_paths.files)}."
+            f"Multiple files matched for the `{request.entry_point_field.alias}` "
+            f"{ep_val.spec!r} for the target {address}, but only one file expected. Are you using "
+            f"a glob, rather than a file name?\n\n"
+            f"All matching files: {list(entry_point_paths.files)}."
         )
     entry_point_path = entry_point_paths.files[0]
     source_root = await Get(

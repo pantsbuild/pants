@@ -196,25 +196,20 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
         "arguments to work with this target.\n\nTo leave off an entry point, set to '<none>'."
     )
     required = True
+    value: EntryPoint
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[EntryPoint]:
-        ep = super().compute_value(raw_value, address=address)
-        if ep is None:
-            raise InvalidFieldException(
-                f"An entry point must be specified for {address}. It must indicate a Python module "
-                "by name or path and an optional nullary function in that module separated by a "
-                "colon, i.e.: module_name_or_path(':'function_name)?"
-            )
+    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> EntryPoint:
+        value = super().compute_value(raw_value, address=address)
+        if not isinstance(value, str):
+            raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
         try:
-            return EntryPoint.parse(ep, provenance=f"for {address}")
+            return EntryPoint.parse(value, provenance=f"for {address}")
         except ValueError as e:
             raise InvalidFieldException(str(e))
 
     @property
     def filespec(self) -> Filespec:
-        if not self.value:
-            return {"includes": []}
         if not self.value.module.endswith(".py"):
             return {"includes": []}
         full_glob = os.path.join(self.address.spec_path, self.value.module)
