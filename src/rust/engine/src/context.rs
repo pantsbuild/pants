@@ -88,7 +88,7 @@ pub struct ExecutionStrategyOptions {
   pub local_parallelism: usize,
   pub remote_parallelism: usize,
   pub cleanup_local_dirs: bool,
-  pub use_local_cache: bool,
+  pub local_cache: bool,
   pub remote_cache_read: bool,
   pub remote_cache_write: bool,
 }
@@ -196,7 +196,7 @@ impl Core {
       };
 
     // Possibly use the local cache runner, regardless of remote execution/caching.
-    let maybe_local_cached_command_runner = if exec_strategy_opts.use_local_cache {
+    let maybe_local_cached_command_runner = if exec_strategy_opts.local_cache {
       let process_execution_store = ShardedLmdb::new(
         local_store_dir.join("processes"),
         2 * DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
