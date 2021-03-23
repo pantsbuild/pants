@@ -757,7 +757,7 @@ class GlobalOptions(Subsystem):
             removal_version="2.5.0.dev0",
             removal_hint=(
                 "Use the shorter `--process-execution-local-cache`, which behaves the same."
-            )
+            ),
         )
         register(
             "--process-execution-cleanup-local-dirs",
