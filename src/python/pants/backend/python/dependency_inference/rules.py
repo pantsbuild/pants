@@ -144,7 +144,9 @@ async def infer_python_dependencies_via_imports(
         for imported_module in relevant_imports
         if imported_module not in combined_stdlib
     )
-    merged_result = sorted(set(itertools.chain.from_iterable(owners_per_import)))
+    merged_result = sorted(
+        set(itertools.chain.from_iterable(owners.unambiguous for owners in owners_per_import))
+    )
     return InferredDependencies(merged_result, sibling_dependencies_inferrable=True)
 
 
