@@ -2763,6 +2763,7 @@ dependencies = [
  "log 0.4.11",
  "task_executor",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]

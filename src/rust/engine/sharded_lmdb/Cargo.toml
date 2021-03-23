@@ -13,3 +13,6 @@ lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f
 log = "0.4"
 task_executor = { path = "../task_executor" }
 tempfile = "3"
+
+[dev-dependencies]
+tokio = { version = "1.4", features = ["macros"] }
