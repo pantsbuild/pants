@@ -525,7 +525,7 @@ py_class!(class PyExecutionStrategyOptions |py| {
     _cls,
     local_parallelism: u64,
     remote_parallelism: u64,
-    cleanup_local_dirs: bool,
+    local_cleanup: bool,
     local_cache: bool,
     remote_cache_read: bool,
     remote_cache_write: bool
@@ -534,7 +534,7 @@ py_class!(class PyExecutionStrategyOptions |py| {
       ExecutionStrategyOptions {
         local_parallelism: local_parallelism as usize,
         remote_parallelism: remote_parallelism as usize,
-        cleanup_local_dirs,
+        local_cleanup,
         local_cache,
         remote_cache_read,
         remote_cache_write,

@@ -189,12 +189,12 @@ class Scheduler:
             lease_time_millis=LOCAL_STORE_LEASE_TIME_SECS * 1000,
         )
         exec_stategy_opts = PyExecutionStrategyOptions(
-            local_parallelism=execution_options.process_execution_local_parallelism,
-            remote_parallelism=execution_options.process_execution_remote_parallelism,
-            cleanup_local_dirs=execution_options.process_execution_cleanup_local_dirs,
             local_cache=execution_options.process_execution_local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
+            local_cleanup=execution_options.process_execution_local_cleanup,
+            local_parallelism=execution_options.process_execution_local_parallelism,
+            remote_parallelism=execution_options.process_execution_remote_parallelism,
         )
 
         self._py_scheduler = native_engine.scheduler_create(

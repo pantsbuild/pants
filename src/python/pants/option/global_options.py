@@ -125,14 +125,14 @@ class ExecutionOptions:
     remote_cache_read: bool
     remote_cache_write: bool
 
-    remote_instance_name: Optional[str]
-    remote_ca_certs_path: Optional[str]
+    remote_instance_name: str | None
+    remote_ca_certs_path: str | None
 
     process_execution_local_cache: bool
+    process_execution_local_cleanup: bool
     process_execution_local_parallelism: int
     process_execution_remote_parallelism: int
-    process_execution_cache_namespace: Optional[str]
-    process_execution_cleanup_local_dirs: bool
+    process_execution_cache_namespace: str | None
 
     remote_store_address: str | None
     remote_store_headers: dict[str, str]
@@ -255,7 +255,14 @@ class ExecutionOptions:
             ),
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
-            process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
+            process_execution_local_cleanup=resolve_conflicting_options(
+                old_option="process_execution_cleanup_local_dirs",
+                new_option="process_execution_local_cleanup",
+                old_scope=GLOBAL_SCOPE,
+                new_scope=GLOBAL_SCOPE,
+                old_container=bootstrap_options,
+                new_container=bootstrap_options,
+            ),
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             # Remote store setup.
             remote_store_address=remote_store_address,
@@ -324,7 +331,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_parallelism=_CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
-    process_execution_cleanup_local_dirs=True,
+    process_execution_local_cleanup=True,
     process_execution_local_cache=True,
     # Remote store setup.
     remote_store_address=None,
@@ -836,7 +843,10 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cache,
             advanced=True,
-            help="Whether to keep process executions in a local cache persisted to disk.",
+            help=(
+                "Whether to cache process executions in a local cache persisted to disk at "
+                "`--local-store-dir`."
+            ),
         )
         register(
             "--process-execution-use-local-cache",
@@ -850,12 +860,28 @@ class GlobalOptions(Subsystem):
             ),
         )
         register(
+            "--process-execution-local-cleanup",
+            type=bool,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cleanup,
+            advanced=True,
+            help=(
+                "If false, Pants will not clean up local directories used as chroots for running "
+                "processes. Pants will log their location so that you can inspect the chroot, and "
+                "run the `__run.sh` script to recreate the process using the same argv and "
+                "environment variables used by Pants. This option is useful for debugging."
+            ),
+        )
+        register(
             "--process-execution-cleanup-local-dirs",
             type=bool,
-            default=True,
+            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cleanup,
             advanced=True,
             help="Whether or not to cleanup directories used for local process execution "
             "(primarily useful for e.g. debugging).",
+            removal_version="2.5.0.dev0",
+            removal_hint=(
+                "Use the shorter `--process-execution-local-cleanup`, which behaves the same."
+            ),
         )
 
         register(
