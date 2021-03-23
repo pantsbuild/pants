@@ -51,6 +51,7 @@ impl ByteStore {
           options.files_max_size_bytes,
           executor.clone(),
           options.lease_time,
+          options.shard_count,
         )
         .map(Arc::new),
         directory_dbs: ShardedLmdb::new(
@@ -58,6 +59,7 @@ impl ByteStore {
           options.directories_max_size_bytes,
           executor.clone(),
           options.lease_time,
+          options.shard_count,
         )
         .map(Arc::new),
         executor,

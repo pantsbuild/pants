@@ -187,6 +187,7 @@ class Scheduler:
             files_max_size_bytes=local_store_options.files_max_size_bytes,
             directories_max_size_bytes=local_store_options.directories_max_size_bytes,
             lease_time_millis=LOCAL_STORE_LEASE_TIME_SECS * 1000,
+            shard_count=local_store_options.shard_count,
         )
         exec_stategy_opts = PyExecutionStrategyOptions(
             local_parallelism=execution_options.process_execution_local_parallelism,

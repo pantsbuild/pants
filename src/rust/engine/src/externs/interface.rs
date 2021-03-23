@@ -595,7 +595,12 @@ py_class!(class PyLocalStoreOptions |py| {
     files_max_size_bytes: usize,
     directories_max_size_bytes: usize,
     lease_time_millis: u64,
+    shard_count: u8,
   ) -> CPyResult<Self> {
+    if shard_count.count_ones() != 1 {
+        let err_string = format!("The local store shard count must be a power of two: got {}", shard_count);
+        return Err(PyErr::new::<exc::ValueError, _>(py, (err_string,)));
+    }
     Self::create_instance(py,
       LocalStoreOptions {
         store_dir: PathBuf::from(store_dir),
@@ -603,6 +608,7 @@ py_class!(class PyLocalStoreOptions |py| {
         files_max_size_bytes,
         directories_max_size_bytes,
         lease_time: Duration::from_millis(lease_time_millis),
+        shard_count,
       }
     )
   }

@@ -100,6 +100,7 @@ pub struct LocalStoreOptions {
   pub files_max_size_bytes: usize,
   pub directories_max_size_bytes: usize,
   pub lease_time: Duration,
+  pub shard_count: u8,
 }
 
 impl From<&LocalStoreOptions> for store::LocalOptions {
@@ -108,6 +109,7 @@ impl From<&LocalStoreOptions> for store::LocalOptions {
       files_max_size_bytes: lso.files_max_size_bytes,
       directories_max_size_bytes: lso.directories_max_size_bytes,
       lease_time: lso.lease_time,
+      shard_count: lso.shard_count,
     }
   }
 }
@@ -224,6 +226,7 @@ impl Core {
         local_store_options.process_cache_max_size_bytes,
         executor.clone(),
         local_store_options.lease_time,
+        local_store_options.shard_count,
       )
       .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       Box::new(process_execution::cache::CommandRunner::new(

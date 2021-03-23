@@ -285,6 +285,7 @@ class LocalStoreOptions:
     processes_max_size_bytes: int = 16 * GIGABYTES
     files_max_size_bytes: int = 256 * GIGABYTES
     directories_max_size_bytes: int = 16 * GIGABYTES
+    shard_count: int = 16
 
     def target_total_size_bytes(self) -> int:
         """Returns the target total size of all of the stores.
@@ -309,6 +310,7 @@ class LocalStoreOptions:
             processes_max_size_bytes=options.local_store_processes_max_size_bytes,
             files_max_size_bytes=options.local_store_files_max_size_bytes,
             directories_max_size_bytes=options.local_store_directories_max_size_bytes,
+            shard_count=options.local_store_shard_count,
         )
 
 
@@ -760,6 +762,8 @@ class GlobalOptions(Subsystem):
         )
 
         local_store_dir_flag = "--local-store-dir"
+        local_store_shard_count_flag = "--local-store-shard-count"
+        local_store_files_max_size_bytes_flag = "--local-store-files-max-size-bytes"
         cache_instructions = (
             "The path may be absolute or relative. If the directory is within the build root, be "
             "sure to include it in `--pants-ignore`."
@@ -777,6 +781,22 @@ class GlobalOptions(Subsystem):
             default=DEFAULT_LOCAL_STORE_OPTIONS.store_dir,
         )
         register(
+            "--local-store-shard-count",
+            type=int,
+            advanced=True,
+            help=(
+                "The number of LMDB shards created for the local store."
+                "\n\n"
+                "Because LMDB allows only one simultaneous writer per database, the store is split "
+                "into multiple shards to allow for more concurrent writers. The faster your disks "
+                "are, the fewer shards you are likely to need for performance."
+                "\n\n"
+                "The shard count also impacts the maximum size of stored files: see "
+                f"`{local_store_files_max_size_bytes_flag}` for more information."
+            ),
+            default=DEFAULT_LOCAL_STORE_OPTIONS.shard_count,
+        )
+        register(
             "--local-store-processes-max-size-bytes",
             type=int,
             advanced=True,
@@ -787,7 +807,7 @@ class GlobalOptions(Subsystem):
             default=DEFAULT_LOCAL_STORE_OPTIONS.processes_max_size_bytes,
         )
         register(
-            "--local-store-files-max-size-bytes",
+            local_store_files_max_size_bytes_flag,
             type=int,
             advanced=True,
             help=(
@@ -795,7 +815,8 @@ class GlobalOptions(Subsystem):
                 f"Stored below `{local_store_dir_flag}`."
                 "\n\n"
                 "NB: This size value bounds the total size of all files, but (due to sharding of the "
-                "store on disk) it also bounds the per-file size to (VALUE / 16)."
+                "store on disk) it also bounds the per-file size to (VALUE / "
+                f"`{local_store_shard_count_flag}`)."
                 "\n\n"
                 "This value doesn't reflect space allocated on disk, or RAM allocated (it "
                 "may be reflected in VIRT but not RSS). However, the default is lower than you "
