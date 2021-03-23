@@ -335,9 +335,9 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 
 DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions(
     store_dir=os.path.join(get_pants_cachedir(), "lmdb_store"),
-    processes_max_size_bytes=(2 * 4 * GIGABYTES),
-    files_max_size_bytes=(16 * 4 * GIGABYTES),
-    directories_max_size_bytes=(2 * 4 * GIGABYTES),
+    processes_max_size_bytes=(4 * GIGABYTES),
+    files_max_size_bytes=(128 * GIGABYTES),
+    directories_max_size_bytes=(4 * GIGABYTES),
 )
 
 
