@@ -1,5 +1,5 @@
 use crate::local::ByteStore;
-use crate::{EntryType, ShrinkBehavior};
+use crate::{EntryType, LocalOptions, ShrinkBehavior};
 
 use std::path::Path;
 use std::time::Duration;
@@ -568,7 +568,15 @@ pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
 }
 
 pub fn new_store_with_lease_time<P: AsRef<Path>>(dir: P, lease_time: Duration) -> ByteStore {
-  ByteStore::new_with_lease_time(task_executor::Executor::new(), dir, lease_time).unwrap()
+  ByteStore::new_with_options(
+    task_executor::Executor::new(),
+    dir,
+    LocalOptions {
+      lease_time,
+      ..LocalOptions::default()
+    },
+  )
+  .unwrap()
 }
 
 pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
