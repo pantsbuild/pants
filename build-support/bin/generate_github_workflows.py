@@ -81,7 +81,7 @@ def pants_virtualenv_cache() -> Sequence[Step]:
 
 
 def pants_config_files() -> Env:
-    return {"PANTS_CONFIG_FILES": "+['pants.ci.toml', 'pants.remote-cache.toml']"}
+    return {"PANTS_CONFIG_FILES": "+['pants.ci.toml']"}
 
 
 def rust_channel() -> str:

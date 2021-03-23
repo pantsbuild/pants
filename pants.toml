@@ -18,19 +18,17 @@ backend_packages.add = [
   "toolchain.pants.buildsense",
   "toolchain.pants.common",
 ]
-
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
   # TODO: Remove the relevant `ignore_pants_warning` entry when this is bumped.
   "toolchain.pants.plugin==0.7.0",
 ]
+build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
 
 ignore_pants_warnings = [
   # TODO: Remove when `toolchain.pants.plugin` is bumped past `0.7.0`.
   "DeprecationWarning: DEPRECATED: pants.core.util_rules.pants_environment",
 ]
-
-build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
 # path but not consumed by python, and additionally add the rust code.
@@ -52,6 +50,13 @@ pants_ignore.add = [
   # We also want to override the .gitignore'd pants.pex file
   "!/pants.pex",
 ]
+
+# NB: If the Toolchain auth plugin fails, it will automatically disable remote caching.
+remote_cache_read = true
+remote_cache_write = true
+remote_store_address = "grpcs://build.toolchain.com:443"
+remote_instance_name = "main"
+remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 
 [anonymous-telemetry]
 enabled = true
