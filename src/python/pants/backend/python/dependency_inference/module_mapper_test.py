@@ -20,8 +20,10 @@ from pants.backend.python.dependency_inference.module_mapper import rules as mod
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
+from pants.engine.target import ExplicitlyProvidedDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @pytest.mark.parametrize(
@@ -455,3 +457,20 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             ),
         ],
     )
+
+
+def test_module_owners_disambiguated_via_ignores() -> None:
+    def get_disambiguated(*, ambiguous: list[Address], ignores: list[Address]) -> Address | None:
+        owners = PythonModuleOwners((), ambiguous=tuple(ambiguous))
+        explicitly_provided = ExplicitlyProvidedDependencies(
+            includes=FrozenOrderedSet(), ignores=FrozenOrderedSet(ignores)
+        )
+        return owners.disambiguated_via_ignores(explicitly_provided)
+
+    ambiguous = [Address("t1"), Address("t2"), Address("t3")]
+    assert get_disambiguated(
+        ambiguous=ambiguous, ignores=[Address("t2"), Address("t3")]
+    ) == Address("t1")
+    assert get_disambiguated(ambiguous=ambiguous, ignores=[Address("t2")]) is None
+    assert get_disambiguated(ambiguous=ambiguous, ignores=ambiguous) is None
+    assert get_disambiguated(ambiguous=[], ignores=[]) is None

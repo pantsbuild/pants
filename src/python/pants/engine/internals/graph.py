@@ -808,7 +808,7 @@ async def resolve_dependencies(
             *itertools.chain.from_iterable(inferred),
             *special_cased,
         )
-        if addr not in explicitly_provided.ignored
+        if addr not in explicitly_provided.ignores
     }
     return Addresses(sorted(result))
 

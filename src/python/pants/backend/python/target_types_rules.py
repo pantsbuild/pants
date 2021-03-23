@@ -21,8 +21,11 @@ from pants.backend.python.target_types import (
 )
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldException,
@@ -99,14 +102,21 @@ async def inject_pex_binary_entry_point_dependency(
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    entry_point = await Get(
-        ResolvedPexEntryPoint,
-        ResolvePexEntryPointRequest(original_tgt.target[PexEntryPointField]),
+    explicitly_provided_deps, entry_point = await MultiGet(
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
+        Get(
+            ResolvedPexEntryPoint,
+            ResolvePexEntryPointRequest(original_tgt.target[PexEntryPointField]),
+        ),
     )
     if entry_point.val is None:
         return InjectedDependencies()
     owners = await Get(PythonModuleOwners, PythonModule(entry_point.val.module))
-    return InjectedDependencies(owners.unambiguous)
+    maybe_disambiguated = owners.disambiguated_via_ignores(explicitly_provided_deps)
+    unambiguous_owners = owners.unambiguous or (
+        (maybe_disambiguated,) if maybe_disambiguated else ()
+    )
+    return InjectedDependencies(unambiguous_owners)
 
 
 # -----------------------------------------------------------------------------------------------

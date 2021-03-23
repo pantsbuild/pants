@@ -113,6 +113,39 @@ def test_infer_python_imports() -> None:
         sibling_dependencies_inferrable=True,
     )
 
+    # Test handling of ambiguous imports.
+    rule_runner.create_files("src/python/ambiguous", ["dep.py", "disambiguated_via_ignores.py"])
+    rule_runner.create_file(
+        "src/python/ambiguous/main.py",
+        "import ambiguous.dep\nimport ambiguous.disambiguated_via_ignores\n",
+    )
+    rule_runner.add_to_build_file(
+        "src/python/ambiguous",
+        dedent(
+            """\
+            python_library(name='dep1', sources=['dep.py', 'disambiguated_via_ignores.py'])
+            python_library(name='dep2', sources=['dep.py', 'disambiguated_via_ignores.py'])
+            python_library(
+                name='main',
+                sources=['main.py'],
+                dependencies=['!./disambiguated_via_ignores.py:dep2'],
+            )
+            """
+        ),
+    )
+    assert run_dep_inference(
+        Address("src/python/ambiguous", target_name="main")
+    ) == InferredDependencies(
+        [
+            Address(
+                "src/python/ambiguous",
+                target_name="dep1",
+                relative_file_path="disambiguated_via_ignores.py",
+            )
+        ],
+        sibling_dependencies_inferrable=True,
+    )
+
 
 def test_infer_python_inits() -> None:
     rule_runner = RuleRunner(
