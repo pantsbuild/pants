@@ -51,9 +51,7 @@ pants_ignore.add = [
   "!/pants.pex",
 ]
 
-# NB: If the Toolchain auth plugin fails, it will automatically disable remote caching.
-remote_cache_read = true
-remote_cache_write = true
+# NB: Users must still set `--remote-cache-read --remote-cache-write` to enable this all.
 remote_store_address = "grpcs://build.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
