@@ -87,7 +87,7 @@ pub struct RemotingOptions {
 pub struct ExecutionStrategyOptions {
   pub local_parallelism: usize,
   pub remote_parallelism: usize,
-  pub cleanup_local_dirs: bool,
+  pub local_cleanup: bool,
   pub local_cache: bool,
   pub remote_cache_read: bool,
   pub remote_cache_write: bool,
@@ -173,7 +173,7 @@ impl Core {
         executor.clone(),
         local_execution_root_dir.to_path_buf(),
         NamedCaches::new(named_caches_dir.to_path_buf()),
-        exec_strategy_opts.cleanup_local_dirs,
+        exec_strategy_opts.local_cleanup,
       )),
       exec_strategy_opts.local_parallelism,
     ));
