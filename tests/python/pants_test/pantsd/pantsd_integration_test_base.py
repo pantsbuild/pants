@@ -1,13 +1,15 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import functools
 import os
 import time
 import unittest
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterator, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, Mapping, Optional, Tuple
 
 from colors import bold, cyan, magenta
 
@@ -23,6 +25,7 @@ from pants.testutil.pants_integration_test import (
 )
 from pants.util.collections import recursively_update
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import maybe_read_file
 
 
 def banner(s):
@@ -35,7 +38,7 @@ def attempts(
     msg: str,
     *,
     delay: float = 0.5,
-    timeout: float = 60,
+    timeout: float = 30,
     backoff: float = 1.2,
 ) -> Iterator[None]:
     """A generator that yields a number of times before failing.
@@ -50,6 +53,34 @@ def attempts(
         time.sleep(delay)
         delay *= backoff
     raise AssertionError(f"After {count} attempts in {timeout} seconds: {msg}")
+
+
+def launch_waiter(
+    *, workdir: str, config: Mapping | None = None
+) -> Tuple[PantsJoinHandle, int, str]:
+    """Launch a process via pantsd that will wait forever for a file to be created.
+
+    Returns the pid of the pantsd client, the pid of the waiting child process, and the file to
+    create to cause the waiting child to exit.
+    """
+    file_to_make = os.path.join(workdir, "some_magic_file")
+    waiter_pid_file = os.path.join(workdir, "pid_file")
+
+    argv = [
+        "run",
+        "testprojects/src/python/coordinated_runs:waiter",
+        "--",
+        file_to_make,
+        waiter_pid_file,
+    ]
+    client_handle = run_pants_with_workdir_without_waiting(argv, workdir=workdir, config=config)
+    waiter_pid = -1
+    for _ in attempts("The waiter process should have written its pid."):
+        waiter_pid_str = maybe_read_file(waiter_pid_file)
+        if waiter_pid_str:
+            waiter_pid = int(waiter_pid_str)
+            break
+    return client_handle, waiter_pid, file_to_make
 
 
 class PantsDaemonMonitor(ProcessManager):

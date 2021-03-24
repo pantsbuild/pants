@@ -8,6 +8,9 @@ python_tests(
 
 python_library(
   name = 'pantsd_integration_test_base',
+  dependencies = [
+    'testprojects/src/python:coordinated_runs_directory',
+  ],
 )
 
 python_integration_tests(
@@ -15,7 +18,6 @@ python_integration_tests(
   dependencies = [
     'testprojects/src/python:hello_directory',
     'testprojects/src/python:bad_requirements_directory',
-    'testprojects/src/python:coordinated_runs_directory',
     'testprojects/src/python:print_env_directory',
   ],
   uses_pants_run=True,

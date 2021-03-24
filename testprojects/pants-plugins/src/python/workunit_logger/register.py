@@ -1,18 +1,25 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 from dataclasses import dataclass
 from typing import Tuple
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
 from pants.engine.streaming_workunit_handler import (
+    StreamingWorkunitContext,
     WorkunitsCallback,
     WorkunitsCallbackFactory,
     WorkunitsCallbackFactoryRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
+
+logger = logging.getLogger(__name__)
+
+
+FINISHED_SUCCESSFULLY = "$Finished Successfully$"
 
 
 class WorkunitsLoggerOptions(Subsystem):
@@ -34,12 +41,21 @@ class WorkunitsLogger(WorkunitsCallback):
 
     @property
     def can_finish_async(self) -> bool:
-        # Because we don't write to the console, it's safe to finalize in the background.
-        return True
+        # We'd like to synchronously fail the run on the final call if need be.
+        return False
 
-    def __call__(self, *, completed_workunits: Tuple[Workunit, ...], **kwargs) -> None:
+    def __call__(
+        self,
+        *,
+        completed_workunits: Tuple[Workunit, ...],
+        finished: bool,
+        context: StreamingWorkunitContext,
+        **kwargs
+    ) -> None:
         with open(self.dest, "a") as dest:
             print(str(completed_workunits), file=dest)
+            if finished and context.run_tracker.has_ended():
+                print(FINISHED_SUCCESSFULLY, file=dest)
 
 
 @rule
