@@ -183,7 +183,7 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
             """
         ),
     )
-    rule_runner.create_files("project", ["app.py", "self.py"])
+    rule_runner.create_file("project/app.py")
     rule_runner.add_to_build_file(
         "project",
         dedent(
@@ -191,7 +191,7 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
             python_library(sources=['app.py'])
             pex_binary(name='first_party', entry_point='project.app')
             pex_binary(name='first_party_func', entry_point='project.app:func')
-            pex_binary(name='first_party_shorthand', entry_point='app.py:func')
+            pex_binary(name='first_party_shorthand', entry_point='app.py')
             pex_binary(name='first_party_shorthand_func', entry_point='app.py:func')
             pex_binary(name='third_party', entry_point='colors')
             pex_binary(name='third_party_func', entry_point='colors:func')
@@ -237,6 +237,28 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
     assert_injected(Address("project", target_name="first_party"), expected=None)
+    rule_runner.set_options([])
+
+    # Test that ignores can disambiguate an otherwise ambiguous entry point.
+    rule_runner.create_file("project/ambiguous.py")
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
+            python_library(name="ambiguous1", sources=["ambiguous.py"])
+            python_library(name="ambiguous2", sources=["ambiguous.py"])
+            pex_binary(
+                name="disambiguated",
+                entry_point="ambiguous.py",
+                dependencies=["!./ambiguous.py:ambiguous2"],
+            )
+            """
+        ),
+    )
+    assert_injected(
+        Address("project", target_name="disambiguated"),
+        expected=Address("project", target_name="ambiguous1", relative_file_path="ambiguous.py"),
+    )
 
 
 @pytest.mark.parametrize("field", [PythonRequirementsField, PythonRequirementConstraintsField])

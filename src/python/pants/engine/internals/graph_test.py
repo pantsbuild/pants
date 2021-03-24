@@ -1341,7 +1341,7 @@ def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) 
     )
     expected_addresses = {Address("a/b/c"), Address("files", relative_file_path="f.txt")}
     assert set(result.includes) == expected_addresses
-    assert set(result.ignored) == {
+    assert set(result.ignores) == {
         *expected_addresses,
         Address("files", relative_file_path="transitive_exclude.txt"),
     }

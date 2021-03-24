@@ -1590,7 +1590,7 @@ class ExplicitlyProvidedDependencies:
     """
 
     includes: FrozenOrderedSet[Address]
-    ignored: FrozenOrderedSet[Address]
+    ignores: FrozenOrderedSet[Address]
 
 
 @union

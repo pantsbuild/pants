@@ -17,7 +17,7 @@ from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesPathsRequest, Targets
+from pants.engine.target import ExplicitlyProvidedDependencies, SourcesPathsRequest, Targets
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -273,6 +273,24 @@ class PythonModuleOwners:
 
     unambiguous: tuple[Address, ...]
     ambiguous: tuple[Address, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.unambiguous and self.ambiguous:
+            raise AssertionError(
+                "A module has both unambiguous and ambiguous owners, which is a bug in the "
+                "dependency inference code. Please file a bug report at "
+                "https://github.com/pantsbuild/pants/issues/new."
+            )
+
+    def disambiguated_via_ignores(
+        self, explicitly_provided_deps: ExplicitlyProvidedDependencies
+    ) -> Address | None:
+        """If ignores in the `dependencies` field ignore all but one of the ambiguous owners, the
+        remaining owner becomes unambiguous."""
+        if not self.ambiguous:
+            return None
+        disambiguated = set(self.ambiguous) - explicitly_provided_deps.ignores
+        return list(disambiguated)[0] if len(disambiguated) == 1 else None
 
 
 @rule

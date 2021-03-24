@@ -20,6 +20,9 @@ from pants.engine.addresses import Address
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, SubsystemRule, rule
 from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
@@ -126,28 +129,39 @@ async def infer_python_dependencies_via_imports(
         return InferredDependencies([], sibling_dependencies_inferrable=False)
 
     wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
-    detected_imports = await Get(
-        ParsedPythonImports,
-        ParsePythonImportsRequest(
-            request.sources_field,
-            PexInterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
+    explicitly_provided_deps, detected_imports = await MultiGet(
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
+        Get(
+            ParsedPythonImports,
+            ParsePythonImportsRequest(
+                request.sources_field,
+                PexInterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
+            ),
         ),
     )
-    relevant_imports = (
-        detected_imports.all_imports
-        if python_infer_subsystem.string_imports
-        else detected_imports.explicit_imports
+
+    relevant_imports = tuple(
+        imp
+        for imp in (
+            detected_imports.all_imports
+            if python_infer_subsystem.string_imports
+            else detected_imports.explicit_imports
+        )
+        if imp not in combined_stdlib
     )
 
     owners_per_import = await MultiGet(
         Get(PythonModuleOwners, PythonModule(imported_module))
         for imported_module in relevant_imports
-        if imported_module not in combined_stdlib
     )
-    merged_result = sorted(
-        set(itertools.chain.from_iterable(owners.unambiguous for owners in owners_per_import))
-    )
-    return InferredDependencies(merged_result, sibling_dependencies_inferrable=True)
+    merged_result: set[Address] = set()
+    for owners in owners_per_import:
+        merged_result.update(owners.unambiguous)
+        maybe_disambiguated = owners.disambiguated_via_ignores(explicitly_provided_deps)
+        if maybe_disambiguated:
+            merged_result.add(maybe_disambiguated)
+
+    return InferredDependencies(sorted(merged_result), sibling_dependencies_inferrable=True)
 
 
 class InferInitDependencies(InferDependenciesRequest):
