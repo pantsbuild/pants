@@ -78,6 +78,7 @@ pub struct LocalOptions {
   pub files_max_size_bytes: usize,
   pub directories_max_size_bytes: usize,
   pub lease_time: Duration,
+  pub shard_count: u8,
 }
 
 ///
@@ -90,6 +91,7 @@ impl Default for LocalOptions {
       files_max_size_bytes: 16 * 4 * GIGABYTES,
       directories_max_size_bytes: 2 * 4 * GIGABYTES,
       lease_time: DEFAULT_LEASE_TIME,
+      shard_count: 16,
     }
   }
 }
