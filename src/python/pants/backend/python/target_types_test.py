@@ -161,7 +161,7 @@ def test_resolve_pex_binary_entry_point() -> None:
         assert_resolved(entry_point="*.py", expected=EntryPoint("doesnt matter"))
 
 
-def test_inject_pex_binary_entry_point_dependency() -> None:
+def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     rule_runner = RuleRunner(
         rules=[
             inject_pex_binary_entry_point_dependency,
@@ -239,26 +239,50 @@ def test_inject_pex_binary_entry_point_dependency() -> None:
     assert_injected(Address("project", target_name="first_party"), expected=None)
     rule_runner.set_options([])
 
-    # Test that ignores can disambiguate an otherwise ambiguous entry point.
+    # Warn if there's ambiguity, meaning we cannot infer.
+    caplog.clear()
     rule_runner.create_file("project/ambiguous.py")
     rule_runner.add_to_build_file(
         "project",
         dedent(
             """\
-            python_library(name="ambiguous1", sources=["ambiguous.py"])
-            python_library(name="ambiguous2", sources=["ambiguous.py"])
+            python_library(name="dep1", sources=["ambiguous.py"])
+            python_library(name="dep2", sources=["ambiguous.py"])
+            pex_binary(name="ambiguous", entry_point="ambiguous.py")
+            """
+        ),
+    )
+    assert_injected(
+        Address("project", target_name="ambiguous"),
+        expected=None,
+    )
+    assert len(caplog.records) == 1
+    assert (
+        "project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python "
+        "module `project.ambiguous`"
+    ) in caplog.text
+    assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
+
+    # Test that ignores can disambiguate an otherwise ambiguous handler. Ensure we don't log a
+    # warning about ambiguity.
+    caplog.clear()
+    rule_runner.add_to_build_file(
+        "project",
+        dedent(
+            """\
             pex_binary(
                 name="disambiguated",
                 entry_point="ambiguous.py",
-                dependencies=["!./ambiguous.py:ambiguous2"],
+                dependencies=["!./ambiguous.py:dep2"],
             )
             """
         ),
     )
     assert_injected(
         Address("project", target_name="disambiguated"),
-        expected=Address("project", target_name="ambiguous1", relative_file_path="ambiguous.py"),
+        expected=Address("project", target_name="dep1", relative_file_path="ambiguous.py"),
     )
+    assert not caplog.records
 
 
 @pytest.mark.parametrize("field", [PythonRequirementsField, PythonRequirementConstraintsField])

@@ -484,3 +484,41 @@ def test_module_owners_disambiguated_via_ignores() -> None:
         )
         is None
     )
+
+
+def test_module_owners_maybe_warn_of_ambiguity(caplog) -> None:
+    def maybe_warn(
+        *,
+        ambiguous: list[Address],
+        ignores: list[Address] | None = None,
+        includes: list[Address] | None = None
+    ) -> None:
+        caplog.clear()
+        owners = PythonModuleOwners((), ambiguous=tuple(ambiguous))
+        explicitly_provided = ExplicitlyProvidedDependencies(
+            includes=FrozenOrderedSet(includes or []), ignores=FrozenOrderedSet(ignores or [])
+        )
+        owners.maybe_warn_of_ambiguity(
+            explicitly_provided, context="foo", original_address=Address("some_dir")
+        )
+
+    maybe_warn(ambiguous=[])
+    assert not caplog.records
+
+    all_tgts = [Address("t1"), Address("t2"), Address("t3")]
+    maybe_warn(ambiguous=all_tgts)
+    assert len(caplog.records) == 1
+    assert "['t1', 't2', 't3']" in caplog.text
+
+    # Ignored addresses do not show up in the list of ambiguous owners.
+    maybe_warn(ambiguous=all_tgts, ignores=[Address("t3")])
+    assert len(caplog.records)
+    assert "['t1', 't2']" in caplog.text
+
+    # Disambiguating via ignores turns off the warning.
+    maybe_warn(ambiguous=all_tgts, ignores=[Address("t1"), Address("t2")])
+    assert not caplog.records
+
+    # Including a target turns off the warning.
+    maybe_warn(ambiguous=all_tgts, includes=[Address("t1")])
+    assert not caplog.records
