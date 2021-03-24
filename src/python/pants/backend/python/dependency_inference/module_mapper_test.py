@@ -460,10 +460,12 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
 
 
 def test_module_owners_disambiguated_via_ignores() -> None:
-    def get_disambiguated(*, ambiguous: list[Address], ignores: list[Address]) -> Address | None:
+    def get_disambiguated(
+        *, ambiguous: list[Address], ignores: list[Address], includes: list[Address] | None = None
+    ) -> Address | None:
         owners = PythonModuleOwners((), ambiguous=tuple(ambiguous))
         explicitly_provided = ExplicitlyProvidedDependencies(
-            includes=FrozenOrderedSet(), ignores=FrozenOrderedSet(ignores)
+            includes=FrozenOrderedSet(includes or []), ignores=FrozenOrderedSet(ignores)
         )
         return owners.disambiguated_via_ignores(explicitly_provided)
 
@@ -474,3 +476,11 @@ def test_module_owners_disambiguated_via_ignores() -> None:
     assert get_disambiguated(ambiguous=ambiguous, ignores=[Address("t2")]) is None
     assert get_disambiguated(ambiguous=ambiguous, ignores=ambiguous) is None
     assert get_disambiguated(ambiguous=[], ignores=[]) is None
+    # If any includes would disambiguate the ambiguous module, we don't consider disambiguating
+    # via excludes as the user has already explicitly disambiguated the module.
+    assert (
+        get_disambiguated(
+            ambiguous=ambiguous, ignores=[Address("t2"), Address("t3")], includes=ambiguous
+        )
+        is None
+    )

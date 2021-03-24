@@ -282,12 +282,17 @@ class PythonModuleOwners:
                 "https://github.com/pantsbuild/pants/issues/new."
             )
 
+    def _unambiguous_via_includes(
+        self, explicitly_provided: ExplicitlyProvidedDependencies
+    ) -> bool:
+        return bool(set(self.ambiguous).intersection(explicitly_provided.includes))
+
     def disambiguated_via_ignores(
         self, explicitly_provided_deps: ExplicitlyProvidedDependencies
     ) -> Address | None:
         """If ignores in the `dependencies` field ignore all but one of the ambiguous owners, the
         remaining owner becomes unambiguous."""
-        if not self.ambiguous:
+        if not self.ambiguous or self._unambiguous_via_includes(explicitly_provided_deps):
             return None
         disambiguated = set(self.ambiguous) - explicitly_provided_deps.ignores
         return list(disambiguated)[0] if len(disambiguated) == 1 else None
