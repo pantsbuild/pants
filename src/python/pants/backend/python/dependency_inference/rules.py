@@ -34,7 +34,6 @@ from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
-from pants.util.docutil import docs_url
 
 logger = logging.getLogger(__name__)
 
