@@ -573,7 +573,7 @@ pub trait CapturedWorkdir {
         let _background_cleanup = executor.spawn_blocking(|| std::mem::drop(workdir));
       }
       None => {
-        setup_run_sh_script(&req.env, &req.argv, &workdir_path)?;
+        setup_run_sh_script(&req.env, &req.working_directory, &req.argv, &workdir_path)?;
       }
     }
 
@@ -646,9 +646,10 @@ pub trait CapturedWorkdir {
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }
 
-/// Create a file called __run.sh with the env and argv used by Pants to facilitate debugging.
+/// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.
 fn setup_run_sh_script(
   env: &BTreeMap<String, String>,
+  working_directory: &Option<RelativePath>,
   argv: &[String],
   workdir_path: &PathBuf,
 ) -> Result<(), String> {
@@ -673,15 +674,27 @@ fn setup_run_sh_script(
     full_command_line.push(arg_str);
   }
 
+  let stringified_cwd = {
+    let cwd = if let Some(ref working_directory) = working_directory {
+      workdir_path.join(working_directory)
+    } else {
+      workdir_path.to_owned()
+    };
+    let quoted_cwd = bash::escape(&cwd);
+    str::from_utf8(&quoted_cwd)
+      .map_err(|e| format!("{:?}", e))?
+      .to_string()
+  };
+
   let stringified_command_line: String = full_command_line.join(" ");
   let full_script = format!(
     "#!/bin/bash
 # This command line should execute the same process as pants did internally.
 export {}
-
+cd {}
 {}
 ",
-    stringified_env_vars, stringified_command_line,
+    stringified_env_vars, stringified_cwd, stringified_command_line,
   );
 
   let full_file_path = workdir_path.join("__run.sh");
