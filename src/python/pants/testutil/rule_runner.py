@@ -106,7 +106,7 @@ class RuleRunner:
             print(f"Preserving rule runner temporary directories at {root_dir}.", file=sys.stderr)
             bootstrap_args.extend(
                 [
-                    "--no-process-execution-cleanup-local-dirs",
+                    "--no-process-execution-local-cleanup",
                     f"--local-execution-root-dir={root_dir}",
                 ]
             )
