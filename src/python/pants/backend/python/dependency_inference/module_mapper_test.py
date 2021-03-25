@@ -469,18 +469,62 @@ def test_module_owners_disambiguated_via_ignores() -> None:
         )
         return owners.disambiguated_via_ignores(explicitly_provided)
 
-    ambiguous = [Address("t1"), Address("t2"), Address("t3")]
-    assert get_disambiguated(
-        ambiguous=ambiguous, ignores=[Address("t2"), Address("t3")]
-    ) == Address("t1")
-    assert get_disambiguated(ambiguous=ambiguous, ignores=[Address("t2")]) is None
-    assert get_disambiguated(ambiguous=ambiguous, ignores=ambiguous) is None
+    all_tgts = [
+        Address("dir", target_name="a", relative_file_path="f"),
+        Address("dir", target_name="b", relative_file_path="f"),
+        Address("dir", target_name="c", relative_file_path="f"),
+    ]
+
+    # If 1 target remains after ignores, it's disambiguated. Note that the ignores can be file
+    # targets or BUILD targets.
+    assert (
+        get_disambiguated(
+            ambiguous=all_tgts,
+            ignores=[
+                Address("dir", target_name="b", relative_file_path="f"),
+                Address("dir", target_name="c", relative_file_path="f"),
+            ],
+        )
+        == Address("dir", target_name="a", relative_file_path="f")
+    )
+    assert (
+        get_disambiguated(
+            ambiguous=all_tgts,
+            ignores=[Address("dir", target_name="b"), Address("dir", target_name="c")],
+        )
+        == Address("dir", target_name="a", relative_file_path="f")
+    )
+
+    assert (
+        get_disambiguated(
+            ambiguous=all_tgts, ignores=[Address("dir", target_name="a", relative_file_path="f")]
+        )
+        is None
+    )
+    assert get_disambiguated(ambiguous=all_tgts, ignores=[Address("dir", target_name="a")]) is None
+    assert get_disambiguated(ambiguous=all_tgts, ignores=all_tgts) is None
     assert get_disambiguated(ambiguous=[], ignores=[]) is None
     # If any includes would disambiguate the ambiguous module, we don't consider disambiguating
     # via excludes as the user has already explicitly disambiguated the module.
     assert (
         get_disambiguated(
-            ambiguous=ambiguous, ignores=[Address("t2"), Address("t3")], includes=ambiguous
+            ambiguous=all_tgts,
+            ignores=[
+                Address("dir", target_name="a", relative_file_path="f"),
+                Address("dir", target_name="b", relative_file_path="f"),
+            ],
+            includes=[Address("dir", target_name="a", relative_file_path="f")],
+        )
+        is None
+    )
+    assert (
+        get_disambiguated(
+            ambiguous=all_tgts,
+            ignores=[
+                Address("dir", target_name="a", relative_file_path="f"),
+                Address("dir", target_name="b", relative_file_path="f"),
+            ],
+            includes=[Address("dir", target_name="a")],
         )
         is None
     )
@@ -505,20 +549,47 @@ def test_module_owners_maybe_warn_of_ambiguity(caplog) -> None:
     maybe_warn(ambiguous=[])
     assert not caplog.records
 
-    all_tgts = [Address("t1"), Address("t2"), Address("t3")]
+    all_tgts = [
+        Address("dir", target_name="a", relative_file_path="f"),
+        Address("dir", target_name="b", relative_file_path="f"),
+        Address("dir", target_name="c", relative_file_path="f"),
+    ]
     maybe_warn(ambiguous=all_tgts)
     assert len(caplog.records) == 1
-    assert "['t1', 't2', 't3']" in caplog.text
+    assert "['dir/f:a', 'dir/f:b', 'dir/f:c']" in caplog.text
 
-    # Ignored addresses do not show up in the list of ambiguous owners.
-    maybe_warn(ambiguous=all_tgts, ignores=[Address("t3")])
+    # Ignored addresses do not show up in the list of ambiguous owners, including for ignores of
+    # both file and BUILD targets.
+    maybe_warn(
+        ambiguous=all_tgts, ignores=[Address("dir", target_name="c", relative_file_path="f")]
+    )
     assert len(caplog.records)
-    assert "['t1', 't2']" in caplog.text
+    assert "['dir/f:a', 'dir/f:b']" in caplog.text
+    maybe_warn(ambiguous=all_tgts, ignores=[Address("dir", target_name="c")])
+    assert len(caplog.records)
+    assert "['dir/f:a', 'dir/f:b']" in caplog.text
 
-    # Disambiguating via ignores turns off the warning.
-    maybe_warn(ambiguous=all_tgts, ignores=[Address("t1"), Address("t2")])
+    # Disambiguating via ignores turns off the warning, including for ignores of both file and
+    # BUILD targets.
+    maybe_warn(
+        ambiguous=all_tgts,
+        ignores=[
+            Address("dir", target_name="a", relative_file_path="f"),
+            Address("dir", target_name="b", relative_file_path="f"),
+        ],
+    )
+    assert not caplog.records
+    maybe_warn(
+        ambiguous=all_tgts,
+        ignores=[Address("dir", target_name="a"), Address("dir", target_name="b")],
+    )
     assert not caplog.records
 
-    # Including a target turns off the warning.
-    maybe_warn(ambiguous=all_tgts, includes=[Address("t1")])
+    # Including a target turns off the warning, including for includes of both file and
+    # BUILD targets.
+    maybe_warn(
+        ambiguous=all_tgts, includes=[Address("dir", target_name="a", relative_file_path="f")]
+    )
+    assert not caplog.records
+    maybe_warn(ambiguous=all_tgts, includes=[Address("dir", target_name="a")])
     assert not caplog.records
