@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -19,8 +20,12 @@ from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import ExplicitlyProvidedDependencies, SourcesPathsRequest, Targets
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.util.docutil import docs_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_method
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -282,10 +287,37 @@ class PythonModuleOwners:
                 "https://github.com/pantsbuild/pants/issues/new."
             )
 
+    @memoized_method
     def _unambiguous_via_includes(
         self, explicitly_provided: ExplicitlyProvidedDependencies
     ) -> bool:
         return bool(set(self.ambiguous).intersection(explicitly_provided.includes))
+
+    def maybe_warn_of_ambiguity(
+        self,
+        explicitly_provided_deps: ExplicitlyProvidedDependencies,
+        original_address: Address,
+        *,
+        context: str,
+    ) -> None:
+        """If the module is ambiguous and the user did not disambiguate via explicitly provided
+        dependencies, warn that dependency inference will not be used."""
+        if not self.ambiguous or self._unambiguous_via_includes(explicitly_provided_deps):
+            return
+        remaining_after_ignores = set(self.ambiguous) - explicitly_provided_deps.ignores
+        if len(remaining_after_ignores) <= 1:
+            return
+        logger.warning(
+            f"{context}, but Pants cannot safely infer a dependency because >1 target exports "
+            f"this module, so it is ambiguous which to use: "
+            f"{sorted(addr.spec for addr in remaining_after_ignores)}."
+            f"\n\nPlease explicitly include the dependency you want in the `dependencies` "
+            f"field of {original_address}, or ignore the ones you do not want by prefixing "
+            f"with `!` or `!!` so that <=1 targets are left."
+            f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
+            f"targets so that only 1 target exports this module. Refer to "
+            f"{docs_url('troubleshooting#import-errors-and-missing-dependencies')}."
+        )
 
     def disambiguated_via_ignores(
         self, explicitly_provided_deps: ExplicitlyProvidedDependencies
@@ -294,8 +326,8 @@ class PythonModuleOwners:
         remaining owner becomes unambiguous."""
         if not self.ambiguous or self._unambiguous_via_includes(explicitly_provided_deps):
             return None
-        disambiguated = set(self.ambiguous) - explicitly_provided_deps.ignores
-        return list(disambiguated)[0] if len(disambiguated) == 1 else None
+        remaining_after_ignores = set(self.ambiguous) - explicitly_provided_deps.ignores
+        return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
 
 
 @rule

@@ -140,6 +140,16 @@ async def inject_lambda_handler_dependency(
     )
     module, _, _func = handler.val.partition(":")
     owners = await Get(PythonModuleOwners, PythonModule(module))
+    address = original_tgt.target.address
+    owners.maybe_warn_of_ambiguity(
+        explicitly_provided_deps,
+        address,
+        context=(
+            f"The python_awslambda target {address} has the field "
+            f"`handler={repr(original_tgt.target[PythonAwsLambdaHandlerField].value)}`, which maps "
+            f"to the Python module `{module}`"
+        ),
+    )
     maybe_disambiguated = owners.disambiguated_via_ignores(explicitly_provided_deps)
     unambiguous_owners = owners.unambiguous or (
         (maybe_disambiguated,) if maybe_disambiguated else ()

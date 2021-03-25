@@ -25,7 +25,7 @@ from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-def test_infer_python_imports() -> None:
+def test_infer_python_imports(caplog) -> None:
     rule_runner = RuleRunner(
         rules=[*import_rules(), QueryRule(InferredDependencies, [InferPythonImportDependencies])],
         target_types=[PythonLibrary, PythonRequirementLibrary],
@@ -113,7 +113,9 @@ def test_infer_python_imports() -> None:
         sibling_dependencies_inferrable=True,
     )
 
-    # Test handling of ambiguous imports.
+    # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but not warn
+    # on the disambiguated one and should infer a dep.
+    caplog.clear()
     rule_runner.create_files("src/python/ambiguous", ["dep.py", "disambiguated_via_ignores.py"])
     rule_runner.create_file(
         "src/python/ambiguous/main.py",
@@ -145,6 +147,10 @@ def test_infer_python_imports() -> None:
         ],
         sibling_dependencies_inferrable=True,
     )
+    assert len(caplog.records) == 1
+    assert "The target src/python/ambiguous:main imports `ambiguous.dep`" in caplog.text
+    assert "['src/python/ambiguous/dep.py:dep1', 'src/python/ambiguous/dep.py:dep2']" in caplog.text
+    assert "disambiguated_via_ignores.py" not in caplog.text
 
 
 def test_infer_python_inits() -> None:

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import logging
 from typing import cast
 
 from pants.backend.python.dependency_inference import import_parser, module_mapper
@@ -33,6 +34,8 @@ from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
+
+logger = logging.getLogger(__name__)
 
 
 class PythonInferSubsystem(Subsystem):
@@ -155,8 +158,14 @@ async def infer_python_dependencies_via_imports(
         for imported_module in relevant_imports
     )
     merged_result: set[Address] = set()
-    for owners in owners_per_import:
+    for owners, imp in zip(owners_per_import, relevant_imports):
         merged_result.update(owners.unambiguous)
+        address = wrapped_tgt.target.address
+        owners.maybe_warn_of_ambiguity(
+            explicitly_provided_deps,
+            address,
+            context=f"The target {address} imports `{imp}`",
+        )
         maybe_disambiguated = owners.disambiguated_via_ignores(explicitly_provided_deps)
         if maybe_disambiguated:
             merged_result.add(maybe_disambiguated)

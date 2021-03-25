@@ -112,6 +112,16 @@ async def inject_pex_binary_entry_point_dependency(
     if entry_point.val is None:
         return InjectedDependencies()
     owners = await Get(PythonModuleOwners, PythonModule(entry_point.val.module))
+    address = original_tgt.target.address
+    owners.maybe_warn_of_ambiguity(
+        explicitly_provided_deps,
+        address,
+        context=(
+            f"The pex_binary target {address} has the field "
+            f"`entry_point={repr(original_tgt.target[PexEntryPointField].value.spec)}`, which "
+            f"maps to the Python module `{entry_point.val.module}`"
+        ),
+    )
     maybe_disambiguated = owners.disambiguated_via_ignores(explicitly_provided_deps)
     unambiguous_owners = owners.unambiguous or (
         (maybe_disambiguated,) if maybe_disambiguated else ()
