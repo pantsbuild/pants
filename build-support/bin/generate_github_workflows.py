@@ -27,6 +27,30 @@ Jobs = Dict[str, Any]
 Env = Dict[str, str]
 
 
+# ----------------------------------------------------------------------
+# Constants
+# ----------------------------------------------------------------------
+
+
+NATIVE_ENGINE_SO_FILES = [
+    "src/python/pants/engine/internals/native_engine.so",
+    "src/python/pants/engine/internals/native_engine.so.metadata",
+]
+
+PYTHON37_VERSION = "3.7.10"
+PYTHON38_VERSION = "3.8.3"
+
+LINUX_VERSION = "ubuntu-20.04"
+MACOS_VERSION = "macos-10.15"
+
+DONT_SKIP_RUST = "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
+
+
+# ----------------------------------------------------------------------
+# Actions
+# ----------------------------------------------------------------------
+
+
 def checkout() -> Sequence[Step]:
     """Get prior commits and the commit message."""
     return [
@@ -108,12 +132,6 @@ def rust_channel() -> str:
     return cast(str, rust_toolchain["toolchain"]["channel"])
 
 
-NATIVE_ENGINE_SO_FILES = [
-    "src/python/pants/engine/internals/native_engine.so",
-    "src/python/pants/engine/internals/native_engine.so.metadata",
-]
-
-
 def bootstrap_caches() -> Sequence[Step]:
     return [
         {
@@ -177,10 +195,6 @@ def native_engine_so_download() -> Sequence[Step]:
     ]
 
 
-PYTHON37_VERSION = "3.7.10"
-PYTHON38_VERSION = "3.8.3"
-
-
 def setup_primary_python() -> Sequence[Step]:
     return [
         {
@@ -204,9 +218,8 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
     return {
         "bootstrap_pants_linux": {
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
-            "runs-on": "ubuntu-20.04",
+            "runs-on": LINUX_VERSION,
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**global_env()},
             "steps": [
                 *checkout(),
                 *setup_toolchain_auth(),
@@ -217,9 +230,9 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
                     "name": "Run smoke tests",
                     "run": dedent(
                         """\
-                        ./pants help goals
                         ./pants list ::
                         ./pants roots
+                        ./pants help goals
                         ./pants help targets
                         ./pants help subsystems
                         """
@@ -237,16 +250,15 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
                         ./cargo test --all --tests -- --nocapture
                         """
                     ),
-                    "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
+                    "if": DONT_SKIP_RUST,
                 },
             ],
         },
         "test_python_linux": {
             "name": "Test Python (Linux)",
-            "runs-on": "ubuntu-20.04",
+            "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**global_env()},
             "steps": [
                 *checkout(),
                 *setup_toolchain_auth(),
@@ -259,10 +271,9 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
         },
         "lint_python": {
             "name": "Lint Python",
-            "runs-on": "ubuntu-20.04",
+            "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**global_env()},
             "steps": [
                 *checkout(),
                 *setup_toolchain_auth(),
@@ -277,9 +288,8 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
         },
         "bootstrap_pants_macos": {
             "name": "Bootstrap Pants, test Rust (MacOS)",
-            "runs-on": "macos-10.15",
+            "runs-on": MACOS_VERSION,
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {**global_env()},
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
@@ -292,22 +302,19 @@ def test_workflow_jobs(primary_python_version: str) -> Jobs:
                     # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
                     # pass on GHA MacOS containers.
                     "run": "./cargo test --tests -- --nocapture",
-                    "if": "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')",
+                    "if": DONT_SKIP_RUST,
                     "env": {"TMPDIR": "${{ runner.temp }}"},
                 },
             ],
         },
         "test_python_macos": {
             "name": "Test Python (MacOS)",
-            "runs-on": "macos-10.15",
+            "runs-on": MACOS_VERSION,
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},
-            "env": {
-                # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
-                # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
-                "ARCHFLAGS": "-arch x86_64",
-                **global_env(),
-            },
+            # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
+            # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
+            "env": {"ARCHFLAGS": "-arch x86_64"},
             "steps": [
                 *checkout(),
                 *setup_toolchain_auth(),
@@ -355,6 +362,7 @@ def generate() -> dict[Path, str]:
             "name": test_workflow_name,
             "on": ["push", "pull_request"],
             "jobs": test_workflow_jobs(PYTHON37_VERSION),
+            "env": global_env(),
         },
         Dumper=NoAliasDumper,
     )
@@ -364,6 +372,7 @@ def generate() -> dict[Path, str]:
             # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
             "on": {"schedule": [{"cron": "45 8 * * *"}]},
             "jobs": test_workflow_jobs(PYTHON38_VERSION),
+            "env": global_env(),
         },
         Dumper=NoAliasDumper,
     )

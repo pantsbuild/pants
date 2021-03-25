@@ -3,12 +3,12 @@
 #   ./pants run build-support/bin/generate_github_workflows.py
 
 
+env:
+  PANTS_CONFIG_FILES: +['pants.ci.toml']
+  PANTS_REMOTE_CACHE_READ: 'true'
+  PANTS_REMOTE_CACHE_WRITE: 'true'
 jobs:
   bootstrap_pants_linux:
-    env:
-      PANTS_CONFIG_FILES: +['pants.ci.toml']
-      PANTS_REMOTE_CACHE_READ: 'true'
-      PANTS_REMOTE_CACHE_WRITE: 'true'
     name: Bootstrap Pants, test+lint Rust (Linux)
     runs-on: ubuntu-20.04
     steps:
@@ -99,11 +99,11 @@ jobs:
 
         '
     - name: Run smoke tests
-      run: './pants help goals
-
-        ./pants list ::
+      run: './pants list ::
 
         ./pants roots
+
+        ./pants help goals
 
         ./pants help targets
 
@@ -131,10 +131,6 @@ jobs:
         python-version:
         - 3.8.3
   bootstrap_pants_macos:
-    env:
-      PANTS_CONFIG_FILES: +['pants.ci.toml']
-      PANTS_REMOTE_CACHE_READ: 'true'
-      PANTS_REMOTE_CACHE_WRITE: 'true'
     name: Bootstrap Pants, test Rust (MacOS)
     runs-on: macos-10.15
     steps:
@@ -236,10 +232,6 @@ jobs:
         python-version:
         - 3.8.3
   lint_python:
-    env:
-      PANTS_CONFIG_FILES: +['pants.ci.toml']
-      PANTS_REMOTE_CACHE_READ: 'true'
-      PANTS_REMOTE_CACHE_WRITE: 'true'
     name: Lint Python
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
@@ -301,10 +293,6 @@ jobs:
         python-version:
         - 3.8.3
   test_python_linux:
-    env:
-      PANTS_CONFIG_FILES: +['pants.ci.toml']
-      PANTS_REMOTE_CACHE_READ: 'true'
-      PANTS_REMOTE_CACHE_WRITE: 'true'
     name: Test Python (Linux)
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
@@ -368,9 +356,6 @@ jobs:
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
-      PANTS_CONFIG_FILES: +['pants.ci.toml']
-      PANTS_REMOTE_CACHE_READ: 'true'
-      PANTS_REMOTE_CACHE_WRITE: 'true'
     name: Test Python (MacOS)
     needs: bootstrap_pants_macos
     runs-on: macos-10.15
