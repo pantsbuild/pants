@@ -291,7 +291,26 @@ class PythonModuleOwners:
     def _unambiguous_via_includes(
         self, explicitly_provided: ExplicitlyProvidedDependencies
     ) -> bool:
-        return bool(set(self.ambiguous).intersection(explicitly_provided.includes))
+        # NB: `self.ambiguous` is always file addresses, but we allow for their original BUILD
+        # targets to disambiguate them.
+        disambiguation_candidates = {
+            *(addr.maybe_convert_to_build_target() for addr in self.ambiguous),
+            *self.ambiguous,
+        }
+        return bool(disambiguation_candidates.intersection(explicitly_provided.includes))
+
+    @memoized_method
+    def _remaining_after_ignores(
+        self, explicitly_provided: ExplicitlyProvidedDependencies
+    ) -> set[Address]:
+        # NB: `self.ambiguous` is always file addresses, but we allow for their original BUILD
+        # targets to disambiguate them.
+        return {
+            addr
+            for addr in self.ambiguous
+            if addr not in explicitly_provided.ignores
+            and addr.maybe_convert_to_build_target() not in explicitly_provided.ignores
+        }
 
     def maybe_warn_of_ambiguity(
         self,
@@ -304,7 +323,7 @@ class PythonModuleOwners:
         dependencies, warn that dependency inference will not be used."""
         if not self.ambiguous or self._unambiguous_via_includes(explicitly_provided_deps):
             return
-        remaining_after_ignores = set(self.ambiguous) - explicitly_provided_deps.ignores
+        remaining_after_ignores = self._remaining_after_ignores(explicitly_provided_deps)
         if len(remaining_after_ignores) <= 1:
             return
         logger.warning(
@@ -326,7 +345,7 @@ class PythonModuleOwners:
         remaining owner becomes unambiguous."""
         if not self.ambiguous or self._unambiguous_via_includes(explicitly_provided_deps):
             return None
-        remaining_after_ignores = set(self.ambiguous) - explicitly_provided_deps.ignores
+        remaining_after_ignores = self._remaining_after_ignores(explicitly_provided_deps)
         return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
 
 
