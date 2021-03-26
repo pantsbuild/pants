@@ -20,7 +20,7 @@ from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import ExplicitlyProvidedDependencies, SourcesPathsRequest, Targets
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -335,7 +335,7 @@ class PythonModuleOwners:
             f"with `!` or `!!` so that <=1 targets are left."
             f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
             f"targets so that only 1 target exports this module. Refer to "
-            f"{docs_url('troubleshooting#import-errors-and-missing-dependencies')}."
+            f"{bracketed_docs_url('troubleshooting#import-errors-and-missing-dependencies')}."
         )
 
     def disambiguated_via_ignores(

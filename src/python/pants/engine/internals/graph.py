@@ -77,7 +77,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -410,7 +410,7 @@ def _log_or_raise_unmatched_owners(
         msgs.append(
             f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
             f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` "
-            f"field includes `{file_path}`. See {docs_url('targets')} for more "
+            f"field includes `{file_path}`. See {bracketed_docs_url('targets')} for more "
             f"information on target definitions.{option_msg}"
         )
 
