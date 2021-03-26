@@ -12,6 +12,10 @@ def terminal_width(*, fallback: int = 96, padding: int = 2) -> int:
     return shutil.get_terminal_size(fallback=(fallback, 24)).columns - padding
 
 
-def docs_url(slug: str) -> str:
-    """Link to the Pants docs using the current version of Pants."""
-    return f"https://www.pantsbuild.org/v{MAJOR_MINOR}/docs/{slug}"
+def bracketed_docs_url(slug: str) -> str:
+    """Link to the Pants docs using the current version of Pants.
+
+    Returned URL is surrounded by square brackets, to prevent linkifiers from considering any
+    adjacent punctuation (such as a period at the end of a sentence) as part of the URL.
+    """
+    return f"[https://www.pantsbuild.org/v{MAJOR_MINOR}/docs/{slug}]"

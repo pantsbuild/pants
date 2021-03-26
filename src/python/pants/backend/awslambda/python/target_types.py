@@ -29,7 +29,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 
 
 class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
@@ -195,7 +195,7 @@ class PythonAWSLambda(Target):
     )
     help = (
         "A self-contained Python function suitable for uploading to AWS Lambda.\n\nSee "
-        f"{docs_url('awslambda-python')}."
+        f"{bracketed_docs_url('awslambda-python')}."
     )
 
 
