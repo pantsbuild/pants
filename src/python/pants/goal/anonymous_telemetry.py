@@ -162,8 +162,12 @@ class AnonymousTelemetryCallback(WorkunitsCallback):
                     system_tags
                     + [
                         f"pants_version:{telemetry_data.get('pants_version')}",
+                        f"repo:{repo_id}",
+                        f"user:{telemetry_data.get('user_id', 'UNKNOWN')}",
+                        f"machine:{telemetry_data.get('machine_id', 'UNKNOWN')}",
+                        f"duration:{telemetry_data.get('duration', '0')}",
                     ]
-                    + [f"goal:{goal}" for goal in telemetry_data.get("goals", [])]
+                    + [f"goal:{goal}" for goal in telemetry_data.get("standard_goals", [])]
                 )
 
                 report = Report(
