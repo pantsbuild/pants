@@ -427,7 +427,7 @@ class PythonRuntimePackageDependencies(SpecialCasedDependencies):
 class PythonTestsTimeout(IntField):
     alias = "timeout"
     help = (
-        "A timeout (in seconds) which covers the total runtime of all tests in this target.\n\n"
+        "A timeout (in seconds) used by each test file belonging to this target.\n\n"
         "This only applies if the option `--pytest-timeouts` is set to True."
     )
 
