@@ -299,14 +299,16 @@ class RuleRunner:
         self._invalidate_for(relpath)
         return path
 
-    def create_file(self, relpath: str, contents: bytes | str = "", mode: str = "w") -> str:
+    def create_file(
+        self, relpath: str | PurePath, contents: bytes | str = "", mode: str = "w"
+    ) -> str:
         """Writes to a file under the buildroot.
 
         :API: public
 
-        relpath:  The relative path to the file from the build root.
+        relpath: The relative path to the file from the build root.
         contents: A string containing the contents of the file - '' by default..
-        mode:     The mode to write to the file in - over-write by default.
+        mode: The mode to write to the file in - over-write by default.
         """
         path = os.path.join(self.build_root, relpath)
         with safe_open(path, mode=mode) as fp:
@@ -314,12 +316,12 @@ class RuleRunner:
         self._invalidate_for(relpath)
         return path
 
-    def create_files(self, path: str, files: Iterable[str]) -> None:
+    def create_files(self, path: str | PurePath, files: Iterable[str]) -> None:
         """Writes to a file under the buildroot with contents same as file name.
 
         :API: public
 
-         path:  The relative path to the file from the build root.
+         path: The relative path to the file from the build root.
          files: List of file names.
         """
         for f in files:
@@ -342,8 +344,19 @@ class RuleRunner:
         mode = "w" if overwrite else "a"
         return self.create_file(str(build_path), target, mode=mode)
 
+    def write_files(self, files: Mapping[str, str]) -> None:
+        """Write the files to the build root.
+
+        :API: public
+        """
+        for path, content in files.items():
+            self.create_file(path, content)
+
     def make_snapshot(self, files: Mapping[str, str | bytes]) -> Snapshot:
-        """Makes a snapshot from a map of file name to file content."""
+        """Makes a snapshot from a map of file name to file content.
+
+        :API: public
+        """
         with temporary_dir() as temp_dir:
             for file_name, content in files.items():
                 mode = "wb" if isinstance(content, bytes) else "w"
@@ -357,14 +370,17 @@ class RuleRunner:
 
         This is a convenience around `TestBase.make_snapshot`, which allows specifying the content
         for each file.
+
+        :API: public
         """
         return self.make_snapshot({fp: "" for fp in files})
 
     def get_target(self, address: Address) -> Target:
         """Find the target for a given address.
 
-        This requires that the target actually exists, i.e. that you called
-        `rule_runner.add_to_build_file()`.
+        This requires that the target actually exists, i.e. that you set up its BUILD file.
+
+        :API: public
         """
         return self.request(WrappedTarget, [address]).target
 
