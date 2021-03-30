@@ -54,7 +54,7 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
             ),
             "src/py/project/__init__.py": "",
             "src/py/project/app.py": "print('hello')",
-            "src/py/pyroject/BUILD": dedent(
+            "src/py/project/BUILD": dedent(
                 """\
                 pex_binary(
                     dependencies=['assets:files', 'assets:relocated', 'assets:resources'],
