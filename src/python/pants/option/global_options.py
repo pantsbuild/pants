@@ -21,7 +21,6 @@ from pants.base.build_environment import (
     get_pants_cachedir,
     pants_version,
 )
-from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import dir_option
@@ -245,24 +244,10 @@ class ExecutionOptions:
             remote_instance_name=remote_instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             # Process execution setup.
-            process_execution_local_cache=resolve_conflicting_options(
-                old_option="process_execution_use_local_cache",
-                new_option="process_execution_local_cache",
-                old_scope=GLOBAL_SCOPE,
-                new_scope=GLOBAL_SCOPE,
-                old_container=bootstrap_options,
-                new_container=bootstrap_options,
-            ),
+            process_execution_local_cache=bootstrap_options.process_execution_local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
-            process_execution_local_cleanup=resolve_conflicting_options(
-                old_option="process_execution_cleanup_local_dirs",
-                new_option="process_execution_local_cleanup",
-                old_scope=GLOBAL_SCOPE,
-                new_scope=GLOBAL_SCOPE,
-                old_container=bootstrap_options,
-                new_container=bootstrap_options,
-            ),
+            process_execution_local_cleanup=bootstrap_options.process_execution_local_cleanup,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             # Remote store setup.
             remote_store_address=remote_store_address,
@@ -872,17 +857,6 @@ class GlobalOptions(Subsystem):
             ),
         )
         register(
-            "--process-execution-use-local-cache",
-            type=bool,
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cache,
-            advanced=True,
-            help="Whether to keep process executions in a local cache persisted to disk.",
-            removal_version="2.5.0.dev0",
-            removal_hint=(
-                "Use the shorter `--process-execution-local-cache`, which behaves the same."
-            ),
-        )
-        register(
             "--process-execution-local-cleanup",
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cleanup,
@@ -892,18 +866,6 @@ class GlobalOptions(Subsystem):
                 "processes. Pants will log their location so that you can inspect the chroot, and "
                 "run the `__run.sh` script to recreate the process using the same argv and "
                 "environment variables used by Pants. This option is useful for debugging."
-            ),
-        )
-        register(
-            "--process-execution-cleanup-local-dirs",
-            type=bool,
-            default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_cleanup,
-            advanced=True,
-            help="Whether or not to cleanup directories used for local process execution "
-            "(primarily useful for e.g. debugging).",
-            removal_version="2.5.0.dev0",
-            removal_hint=(
-                "Use the shorter `--process-execution-local-cleanup`, which behaves the same."
             ),
         )
 
@@ -940,15 +902,6 @@ class GlobalOptions(Subsystem):
                 "Change this value to invalidate every artifact's execution, or to prevent "
                 "process cache entries from being (re)used for different usecases or users."
             ),
-        )
-        register(
-            "--process-execution-local-enable-nailgun",
-            type=bool,
-            default=False,
-            help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
-            advanced=True,
-            removal_version="2.5.0.dev0",
-            removal_hint="This option no-ops as Pants does not yet support the JVM.",
         )
 
         register(
