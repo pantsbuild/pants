@@ -416,11 +416,7 @@ async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSet
             output_filename="setuptools.pex",
             internal_only=True,
             requirements=PexRequirements(setuptools.all_requirements),
-            interpreter_constraints=(
-                req.interpreter_constraints
-                if setuptools.options.is_default("interpreter_constraints")
-                else PexInterpreterConstraints(setuptools.interpreter_constraints)
-            ),
+            interpreter_constraints=req.interpreter_constraints,
         ),
     )
     # The setuptools dist dir, created by it under the chroot (not to be confused with
