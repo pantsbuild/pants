@@ -569,7 +569,7 @@ async def build_pex(
         *(f"--index={index}" for index in python_repos.indexes),
         *(f"--repo={repo}" for repo in python_repos.repos),
         "--resolver-version",
-        python_setup.resolver_version.value,
+        "pip-2020-resolver",
         *request.additional_args,
     ]
 
