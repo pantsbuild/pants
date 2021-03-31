@@ -39,13 +39,6 @@ class ResolveAllConstraintsOption(Enum):
     ALWAYS = "always"
 
 
-class ResolverVersion(Enum):
-    """The resolver implementation to use when resolving Python requirements."""
-
-    PIP_LEGACY = "pip-legacy-resolver"
-    PIP_2020 = "pip-2020-resolver"
-
-
 class PythonSetup(Subsystem):
     options_scope = "python-setup"
     help = "Options for Pants's Python support."
@@ -132,20 +125,6 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
-            "--resolver-version",
-            advanced=True,
-            type=ResolverVersion,
-            default=ResolverVersion.PIP_2020,
-            help="The resolver implementation to use when resolving Python requirements.",
-            removal_version="2.5.0.dev0",
-            removal_hint=(
-                "Support for configuring --resolver-version and selecting pip's legacy resolver "
-                "will be removed in Pants 2.5. Refer to https://pip.pypa.io/en/latest/user_guide/"
-                "#changes-to-the-pip-dependency-resolver-in-20-2-2020 for more information on the "
-                "new resolver."
-            ),
-        )
-        register(
             "--resolver-manylinux",
             advanced=True,
             type=str,
@@ -192,10 +171,6 @@ class PythonSetup(Subsystem):
     @memoized_method
     def interpreter_search_paths(self, env: Environment):
         return self.expand_interpreter_search_paths(self.options.interpreter_search_paths, env)
-
-    @property
-    def resolver_version(self) -> ResolverVersion:
-        return cast(ResolverVersion, self.options.resolver_version)
 
     @property
     def manylinux(self) -> Optional[str]:
