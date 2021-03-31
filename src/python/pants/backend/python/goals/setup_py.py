@@ -363,10 +363,7 @@ async def package_python_dist(
     field_set: PythonDistributionFieldSet,
     python_setup: PythonSetup,
 ) -> BuiltPackage:
-    transitive_targets = await Get(
-        TransitiveTargets,
-        TransitiveTargetsRequest([field_set.address], include_special_cased_deps=True),
-    )
+    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
     interpreter_constraints = PexInterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
@@ -478,13 +475,12 @@ async def determine_setup_kwargs(
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     exported_target = request.exported_target
     exported_addr = exported_target.target.address
+
     owned_deps, transitive_targets = await MultiGet(
         Get(OwnedDependencies, DependencyOwner(exported_target)),
         Get(
             TransitiveTargets,
-            TransitiveTargetsRequest(
-                [exported_target.target.address], include_special_cased_deps=True
-            ),
+            TransitiveTargetsRequest([exported_target.target.address]),
         ),
     )
     # files() targets aren't owned by a single exported target - they aren't code, so
@@ -624,9 +620,7 @@ async def get_requirements(
 ) -> ExportedTargetRequirements:
     transitive_targets = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest(
-            [dep_owner.exported_target.target.address], include_special_cased_deps=True
-        ),
+        TransitiveTargetsRequest([dep_owner.exported_target.target.address]),
     )
     ownable_tgts = [
         tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
@@ -645,15 +639,10 @@ async def get_requirements(
     # then it's owned by an exported target ET, and so R will be in the requirements for ET, and we
     # will require ET.
     direct_deps_tgts = await MultiGet(
-        Get(
-            Targets,
-            DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True),
-        )
-        for tgt in owned_by_us
+        Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
 
     transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
-
     uneval_trans_excl = [
         tgt.get(Dependencies).unevaluated_transitive_excludes for tgt in transitive_targets.closure
     ]
@@ -696,9 +685,7 @@ async def get_owned_dependencies(
     """
     transitive_targets = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest(
-            [dependency_owner.exported_target.target.address], include_special_cased_deps=True
-        ),
+        TransitiveTargetsRequest([dependency_owner.exported_target.target.address]),
     )
     ownable_targets = [
         tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
