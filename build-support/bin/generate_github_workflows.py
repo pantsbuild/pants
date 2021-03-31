@@ -409,34 +409,6 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                         deploy_to_s3_step,
                     ],
                 },
-                "deploy_pex": {
-                    "name": "Build and deploy pants.pex",
-                    "runs-on": LINUX_VERSION,
-                    # NB: We need the bootstrapped Pants to run our release script, and we also need
-                    # the built wheels to bundle into the PEX.
-                    "needs": ["bootstrap_pants_linux", "build_wheels_linux", "build_wheels_macos"],
-                    "strategy": {"matrix": {"python-version": [PYTHON37_VERSION]}},
-                    # TODO: add stable release logic.
-                    "steps": [
-                        *checkout(),
-                        *setup_toolchain_auth(),
-                        *setup_primary_python(),
-                        *pants_virtualenv_cache(),
-                        *native_engine_so_download(),
-                        {
-                            "name": "Build pants.pex",
-                            "run": dedent(
-                                """\
-                                ./build-support/bin/release.sh -p
-                                mkdir -p dist/deploy/pex/
-                                mv dist/pants*.pex dist/deploy/pex/
-                                """
-                            ),
-                        },
-                        deploy_to_s3_step,
-                    ],
-                    "if": "github.event_name == 'push'",
-                },
             }
         )
     return jobs
