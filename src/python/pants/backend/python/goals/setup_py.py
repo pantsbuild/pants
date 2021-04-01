@@ -70,6 +70,7 @@ from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
 
 logger = logging.getLogger(__name__)
@@ -473,9 +474,11 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     owned_deps, transitive_targets = await MultiGet(
         Get(OwnedDependencies, DependencyOwner(exported_target)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([exported_target.target.address])),
+        Get(
+            TransitiveTargets,
+            TransitiveTargetsRequest([exported_target.target.address]),
+        ),
     )
-
     # files() targets aren't owned by a single exported target - they aren't code, so
     # we allow them to be in multiple dists. This is helpful for, e.g., embedding
     # a standard license file in a dist.
@@ -486,7 +489,6 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2)),
         Get(ExportedTargetRequirements, DependencyOwner(exported_target)),
     )
-
     # Generate the kwargs for the setup() call. In addition to using the kwargs that are either
     # explicitly provided or generated via a user's plugin, we add additional kwargs based on the
     # resolved requirements and sources.
@@ -613,9 +615,9 @@ async def get_requirements(
     setup_py_generation: SetupPyGeneration,
 ) -> ExportedTargetRequirements:
     transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([dep_owner.exported_target.target.address])
+        TransitiveTargets,
+        TransitiveTargetsRequest([dep_owner.exported_target.target.address]),
     )
-
     ownable_tgts = [
         tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
     ]
@@ -635,9 +637,25 @@ async def get_requirements(
     direct_deps_tgts = await MultiGet(
         Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
+
+    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
+    uneval_trans_excl = [
+        tgt.get(Dependencies).unevaluated_transitive_excludes for tgt in transitive_targets.closure
+    ]
+    if uneval_trans_excl:
+        nested_trans_excl = await MultiGet(
+            Get(Targets, UnparsedAddressInputs, unparsed) for unparsed in uneval_trans_excl
+        )
+        transitive_excludes = FrozenOrderedSet(
+            itertools.chain.from_iterable(excludes for excludes in nested_trans_excl)
+        )
+
+    direct_deps_chained = FrozenOrderedSet(itertools.chain.from_iterable(direct_deps_tgts))
+    direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
+
     reqs = PexRequirements.create_from_requirement_fields(
         tgt[PythonRequirementsField]
-        for tgt in itertools.chain.from_iterable(direct_deps_tgts)
+        for tgt in direct_deps_with_excl
         if tgt.has_field(PythonRequirementsField)
     )
     req_strs = list(reqs)
@@ -650,7 +668,6 @@ async def get_requirements(
         f"{kwargs.name}{setup_py_generation.first_party_dependency_version(kwargs.version)}"
         for kwargs in set(kwargs_for_exported_targets_we_depend_on)
     )
-
     return ExportedTargetRequirements(req_strs)
 
 
