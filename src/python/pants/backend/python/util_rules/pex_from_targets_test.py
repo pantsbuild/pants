@@ -131,8 +131,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
             """
             # Comment.
             --find-links=https://duckduckgo.com
-            # TODO(John Sirois): XXX: File Pex issue and restore `.` in `Foo._-BAR` project name.
-            Foo_-BAR==1.0.0  # Inline comment.
+            Foo._-BAR==1.0.0  # Inline comment.
             bar==5.5.5
             baz==2.2.2
             qux==3.4.5
@@ -176,7 +175,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     assert pex_req2.requirements == PexRequirements(["foo-bar>=0.1.2", "bar==5.5.5", "baz"])
     assert pex_req2.repository_pex is not None
     repository_pex = pex_req2.repository_pex
-    assert ["Foo_-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "qux==3.4.5"] == requirements(
+    assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "qux==3.4.5"] == requirements(
         rule_runner, repository_pex
     )
 
