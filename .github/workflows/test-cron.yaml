@@ -7,6 +7,7 @@ env:
   PANTS_CONFIG_FILES: +['pants.ci.toml']
   PANTS_REMOTE_CACHE_READ: 'true'
   PANTS_REMOTE_CACHE_WRITE: 'true'
+  RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux:
     name: Bootstrap Pants, test+lint Rust (Linux)
@@ -131,7 +132,7 @@ jobs:
         python-version:
         - 3.8.3
   bootstrap_pants_macos:
-    name: Bootstrap Pants, test Rust (MacOS)
+    name: Bootstrap Pants, test Rust (macOS)
     runs-on: macos-10.15
     steps:
     - name: Check out code
@@ -356,7 +357,7 @@ jobs:
   test_python_macos:
     env:
       ARCHFLAGS: -arch x86_64
-    name: Test Python (MacOS)
+    name: Test Python (macOS)
     needs: bootstrap_pants_macos
     runs-on: macos-10.15
     steps:
