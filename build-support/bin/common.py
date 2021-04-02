@@ -12,9 +12,7 @@ We want to allow direct invocation of scripts for these reasons:
 1) Consistency with how we invoke Bash scripts, which notably may _not_ be ran via `./pants run`.
 2) More ergonomic command line arguments, e.g. `./build-support/bin/generate_travis_yaml.py [args]`,
    rather than `./pants run build-support/bin:generate_travis_yaml -- [args]`.
-3) Avoid undesired dependencies on Pants for certain scripts. For example, `shellcheck.py`
-   lints the `./pants` script, and we would like the script to still work even if `./pants`
-   breaks. If we had to rely on invoking via `./pants run`, this would not be possible.
+3) Avoid undesired dependencies on Pants for certain scripts.
 
 Callers of this file, however, are free to dogfood Pants as they'd like, and any script
 may be called via `./pants run` instead of direct invocation if desired.

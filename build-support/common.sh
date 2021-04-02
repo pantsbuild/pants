@@ -1,6 +1,7 @@
-# NB: shellcheck complains this is unused, but it's used by callers. See https://github.com/koalaman/shellcheck/wiki/SC2034.
-# shellcheck disable=SC2034
-CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+# shellcheck shell=bash
 
 TRAVIS_FOLD_STATE="/tmp/.travis_fold_current"
 

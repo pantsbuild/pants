@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Run this script in this dir to generate the certs and keys needed for this test.
 # Note that on MacOS you will need a recent-ish homebrewed openssl, not the system one.

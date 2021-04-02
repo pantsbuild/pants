@@ -37,7 +37,7 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking MyPy"
   ./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive --tag='-nolint' typecheck || exit 1
 
-  echo "* Checking Flake8 and formatting"
+  echo "* Checking linters and formatters"
   ./pants --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
     die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
@@ -50,15 +50,12 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   fi
 
   if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
-    echo "* Checking github workflows generation"
+    echo "* Checking GitHub workflows generation"
     ./pants run build-support/bin/generate_github_workflows.py -- --check
   fi
 else
   echo "* Skipping import/lint checks in partial working copy."
 fi
-
-echo "* Checking shell scripts via shellcheck"
-./build-support/bin/shellcheck.py || exit 1
 
 echo "* Checking shell scripts via our custom linter"
 ./build-support/bin/check_shell.sh || exit 1
