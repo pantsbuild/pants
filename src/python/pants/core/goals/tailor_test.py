@@ -26,7 +26,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Sources, Target
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockConsole, MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 
 
 class MockPutativeTargetsRequest(PutativeTargetsRequest):
@@ -286,76 +286,76 @@ def test_group_by_dir() -> None:
 
 
 def test_tailor_rule(rule_runner: RuleRunner) -> None:
-    console = MockConsole(use_colors=False)
-    workspace = Workspace(rule_runner.scheduler)
-    union_membership = UnionMembership({PutativeTargetsRequest: [MockPutativeTargetsRequest]})
-    run_rule_with_mocks(
-        tailor.tailor,
-        rule_args=[
-            create_goal_subsystem(TailorSubsystem, build_file_indent="    "),
-            console,
-            workspace,
-            union_membership,
-        ],
-        mock_gets=[
-            MockGet(
-                output_type=PutativeTargets,
-                input_type=PutativeTargetsRequest,
-                mock=lambda req: PutativeTargets(
-                    [
-                        PutativeTarget.for_target_type(
-                            FortranTests, "src/fortran/foo", "tests", ["bar1_test.f90"]
-                        ),
-                        PutativeTarget.for_target_type(
-                            FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
-                        ),
-                        PutativeTarget.for_target_type(
-                            FortranLibrary,
-                            "src/fortran/conflict",
-                            "conflict",
-                            ["conflict1.f90", "conflict2.f90"],
-                        ),
-                    ]
-                ),
-            ),
-            MockGet(
-                output_type=UniquelyNamedPutativeTargets,
-                input_type=PutativeTargets,
-                mock=lambda pts: UniquelyNamedPutativeTargets(
-                    PutativeTargets(
-                        [pt.rename("conflict0") if pt.name == "conflict" else pt for pt in pts]
-                    )
-                ),
-            ),
-            MockGet(
-                output_type=DisjointSourcePutativeTarget,
-                input_type=PutativeTarget,
-                # This test exists to test the console output, which isn't affected by
-                # whether the sources of a putative target were modified due to conflict,
-                # so we don't bother to inject such modifications. The BUILD file content
-                # generation, which is so affected, is tested separately above.
-                mock=lambda pt: DisjointSourcePutativeTarget(pt),
-            ),
-            MockGet(
-                output_type=EditedBuildFiles,
-                input_type=EditBuildFilesRequest,
-                mock=lambda _: EditedBuildFiles(
-                    # We test that the created digest contains what we expect above, and we
-                    # don't need to test here that writing digests to the Workspace works.
-                    # So the empty digest is sufficient.
-                    digest=EMPTY_DIGEST,
-                    created_paths=("src/fortran/baz/BUILD",),
-                    updated_paths=(
-                        "src/fortran/foo/BUILD",
-                        "src/fortran/conflict/BUILD",
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
+        workspace = Workspace(rule_runner.scheduler)
+        union_membership = UnionMembership({PutativeTargetsRequest: [MockPutativeTargetsRequest]})
+        run_rule_with_mocks(
+            tailor.tailor,
+            rule_args=[
+                create_goal_subsystem(TailorSubsystem, build_file_indent="    "),
+                console,
+                workspace,
+                union_membership,
+            ],
+            mock_gets=[
+                MockGet(
+                    output_type=PutativeTargets,
+                    input_type=PutativeTargetsRequest,
+                    mock=lambda req: PutativeTargets(
+                        [
+                            PutativeTarget.for_target_type(
+                                FortranTests, "src/fortran/foo", "tests", ["bar1_test.f90"]
+                            ),
+                            PutativeTarget.for_target_type(
+                                FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
+                            ),
+                            PutativeTarget.for_target_type(
+                                FortranLibrary,
+                                "src/fortran/conflict",
+                                "conflict",
+                                ["conflict1.f90", "conflict2.f90"],
+                            ),
+                        ]
                     ),
                 ),
-            ),
-        ],
-        union_membership=union_membership,
-    )
+                MockGet(
+                    output_type=UniquelyNamedPutativeTargets,
+                    input_type=PutativeTargets,
+                    mock=lambda pts: UniquelyNamedPutativeTargets(
+                        PutativeTargets(
+                            [pt.rename("conflict0") if pt.name == "conflict" else pt for pt in pts]
+                        )
+                    ),
+                ),
+                MockGet(
+                    output_type=DisjointSourcePutativeTarget,
+                    input_type=PutativeTarget,
+                    # This test exists to test the console output, which isn't affected by
+                    # whether the sources of a putative target were modified due to conflict,
+                    # so we don't bother to inject such modifications. The BUILD file content
+                    # generation, which is so affected, is tested separately above.
+                    mock=lambda pt: DisjointSourcePutativeTarget(pt),
+                ),
+                MockGet(
+                    output_type=EditedBuildFiles,
+                    input_type=EditBuildFilesRequest,
+                    mock=lambda _: EditedBuildFiles(
+                        # We test that the created digest contains what we expect above, and we
+                        # don't need to test here that writing digests to the Workspace works.
+                        # So the empty digest is sufficient.
+                        digest=EMPTY_DIGEST,
+                        created_paths=("src/fortran/baz/BUILD",),
+                        updated_paths=(
+                            "src/fortran/foo/BUILD",
+                            "src/fortran/conflict/BUILD",
+                        ),
+                    ),
+                ),
+            ],
+            union_membership=union_membership,
+        )
 
-    stdout_str = console.stdout.getvalue()
+        stdout_str = stdio_reader.get_stdout()
 
     assert (
         "Created src/fortran/baz/BUILD:\n  - Added fortran_library target src/fortran/baz"
