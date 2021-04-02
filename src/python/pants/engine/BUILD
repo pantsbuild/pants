@@ -6,15 +6,15 @@ python_library()
 python_tests(
   name='tests',
   dependencies=['src/python/pants/engine/internals:fs_test_data'],
-  sources=["*_test.py", "!*_integration_test.py"],
+  sources=["*_test.py", "!streaming_workunit_handler_integration_test"],
   timeout=90,
 )
 
-python_integration_tests(
-  name='integration_tests',
-  uses_pants_run=True,
+python_tests(
+  name="streaming_workunit_handler_integration_test",
+  sources=["streaming_workunit_handler_integration_test.py"],
   dependencies=[
       # Loaded reflectively as a backend in `streaming_workunit_handler_integration_test.py`.
-      'testprojects/pants-plugins/src/python/workunit_logger',
+      "testprojects/pants-plugins/src/python/workunit_logger",
   ],
 )

@@ -7,13 +7,13 @@ python_library(
 
 python_tests(
   name='tests',
-  sources=['*_test.py', '!*_integration_test.py'],
+  sources=['*_test.py', '!scheduler_integration_test'],
   timeout=90,
 )
 
-python_integration_tests(
-  name='integration',
-  uses_pants_run=True,
+python_tests(
+  name="scheduler_integration_test",
+  sources=["scheduler_integration_test.py"],
   dependencies=[
     'pants-plugins/internal_plugins/rules_for_testing',
     'testprojects/src/python:hello_directory',
