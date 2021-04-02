@@ -1697,7 +1697,7 @@ class Tags(StringSequenceField):
     alias = "tags"
     help = (
         "Arbitrary strings to describe a target.\n\nFor example, you may tag some test targets "
-        "with 'integration_test' so that you could run `./pants --tags='integration_test' test ::` "
+        "with 'integration_test' so that you could run `./pants --tag='integration_test' test ::` "
         "to only run on targets with that tag."
     )
 
