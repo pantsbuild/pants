@@ -102,7 +102,8 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
               - `platform` is one of [{','.join(Platform.__members__.keys())}],
               - `sha256` is the 64-character hex representation of the expected sha256
                 digest of the download file, as emitted by `shasum -a 256`
-              - `length` is the expected length of the download file in bytes
+              - `length` is the expected length of the download file in bytes, as emmitted by 
+                `wc -c`
 
             E.g., `3.1.2|darwin|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
 
