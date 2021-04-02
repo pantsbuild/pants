@@ -173,6 +173,7 @@ class ExecutionOptions:
             remote_store_headers.update(token_header)
         if (
             not local_only
+            and bootstrap_options.remote_auth_plugin
             and bootstrap_options.remote_auth_plugin.strip()
             and (remote_execution or remote_cache_read or remote_cache_write)
         ):
