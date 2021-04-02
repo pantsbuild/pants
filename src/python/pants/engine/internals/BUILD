@@ -7,7 +7,7 @@ python_library(
 
 python_tests(
   name='tests',
-  sources=['*_test.py', '!scheduler_integration_test'],
+  sources=['*_test.py', '!scheduler_integration_test.py'],
   timeout=90,
 )
 

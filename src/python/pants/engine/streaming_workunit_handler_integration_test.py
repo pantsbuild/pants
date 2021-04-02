@@ -28,7 +28,9 @@ def workunit_logger_config(log_dest: str) -> Mapping:
     }
 
 
-def run(args: list[str], success: bool = True, *, files: dict[str, str] | None = None) -> tuple[PantsResult, str | None]:
+def run(
+    args: list[str], success: bool = True, *, files: dict[str, str] | None = None
+) -> tuple[PantsResult, str | None]:
     with setup_tmpdir(files or {}) as tmpdir:
         dest = os.path.join(tmpdir, "dest.log")
         normalized_args = [arg.format(tmpdir=tmpdir) for arg in args]
