@@ -25,30 +25,4 @@ pex_binary(
   emit_warnings=False,
 )
 
-# This binary is for internal use only. It adds deps on internal_plugins and build-support config
-# files, both of which are not meant for publishing in the `pantsbuild.pants` sdist.
-pex_binary(
-  name='pants_local_binary',
-  entry_point='pants.bin.pants_loader:main',
-  dependencies=[
-    ':pants_loader',
-    '//:build_root',
-    '//:pants_toml',
-    '//:3rdparty_directory',
-    '//:pyproject',
-    'build-support/flake8',
-    'build-support/mypy',
-    'build-support/regexes',
-    'pants-plugins/internal_plugins/releases',
-  ],
-  # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
-  # dependency on setuptools (for namespace package support).
-  emit_warnings=False,
-  # To allow for loading `native_engine.so` when built as a pex, we set zip_safe=False.
-  zip_safe=False,
-)
-
-python_integration_tests(
-  name='integration',
-  uses_pants_run=True,
-)
+python_tests(name="tests")

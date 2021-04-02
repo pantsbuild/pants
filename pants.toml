@@ -23,7 +23,6 @@ plugins = [
   # TODO: Remove the relevant `ignore_pants_warning` entry when this is bumped.
   "toolchain.pants.plugin==0.7.0",
 ]
-build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
 
 ignore_pants_warnings = [
   # TODO: Remove when `toolchain.pants.plugin` is bumped past `0.7.0`.

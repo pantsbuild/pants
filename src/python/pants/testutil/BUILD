@@ -5,7 +5,7 @@ python_distribution(
   name='testutil_wheel',
   dependencies=[
     ':testutil',
-    ':int-test-for-export',
+    ':pants_integration_test',
     ':rule_runner',
   ],
   setup_py_commands=["bdist_wheel", "--python-tag", "py37.py38", "sdist"],
@@ -35,21 +35,11 @@ python_library(
 )
 
 python_library(
-  name = 'int-test-for-export',
+  name = 'pants_integration_test',
   sources = ['pants_integration_test.py'],
   dependencies = [
     '//:build_root',
     'src/python/pants:entry_point'
-  ],
-)
-
-target(
-  name = 'int-test',
-  dependencies=[
-    ':int-test-for-export',
-    # NB: 'pants_integration_test.py' runs ./pants in a subprocess using the PYTHONPATH
-    # of the testrunner. We include the pants binary itself to fully populate the path.
-    'src/python/pants/bin:pants_local_binary',
   ],
 )
 
