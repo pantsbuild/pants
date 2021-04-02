@@ -4,7 +4,6 @@
 import http.client
 import locale
 import logging
-import os
 import sys
 from contextlib import contextmanager
 from io import BufferedReader, TextIOWrapper
@@ -13,7 +12,6 @@ from pathlib import PurePath
 from typing import Dict, Iterator
 
 import pants.util.logging as pants_logging
-from pants.base.deprecated import deprecated_conditional
 from pants.engine.internals import native_engine
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir_for
@@ -137,22 +135,8 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     print_stacktrace = global_bootstrap_options.print_stacktrace
 
     # Set the pants log destination.
-    deprecated_log_path = os.path.join(
-        global_bootstrap_options.pants_workdir, "pantsd", "pantsd.log"
-    )
     log_path = str(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
-    safe_mkdir_for(deprecated_log_path)
     safe_mkdir_for(log_path)
-    # NB: We append to the deprecated log location with a deprecated conditional that never
-    # triggers, because there is nothing that the user can do about the deprecation.
-    deprecated_conditional(
-        predicate=lambda: False,
-        removal_version="2.5.0.dev0",
-        entity_description=f"Logging to {deprecated_log_path}",
-        hint_message=f"Refer to {log_path} instead.",
-    )
-    with open(deprecated_log_path, "a") as a:
-        a.write(f"This log location is deprecated: please refer to {log_path} instead.\n")
 
     # Initialize thread-local stdio, and replace sys.std* with proxies.
     original_stdin, original_stdout, original_stderr = sys.stdin, sys.stdout, sys.stderr
