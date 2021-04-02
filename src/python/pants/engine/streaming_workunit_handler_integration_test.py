@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 import signal
-from typing import List, Mapping, Tuple
+from typing import Mapping
 
 from workunit_logger.register import FINISHED_SUCCESSFULLY
 
@@ -28,10 +28,11 @@ def workunit_logger_config(log_dest: str) -> Mapping:
     }
 
 
-def run(args: List[str], success: bool = True) -> Tuple[PantsResult, str | None]:
-    with setup_tmpdir({}) as tmpdir:
+def run(args: list[str], success: bool = True, *, files: dict[str, str] | None = None) -> tuple[PantsResult, str | None]:
+    with setup_tmpdir(files or {}) as tmpdir:
         dest = os.path.join(tmpdir, "dest.log")
-        pants_run = run_pants(args, config=workunit_logger_config(dest))
+        normalized_args = [arg.format(tmpdir=tmpdir) for arg in args]
+        pants_run = run_pants(normalized_args, config=workunit_logger_config(dest))
         log_content = maybe_read_file(dest)
         if success:
             pants_run.assert_success()
@@ -43,7 +44,7 @@ def run(args: List[str], success: bool = True) -> Tuple[PantsResult, str | None]
 
 
 def test_list() -> None:
-    run(["list", "3rdparty::"])
+    run(["list", "{tmpdir}/foo::"], files={"foo/BUILD": "files(sources=[])"})
 
 
 def test_help() -> None:
