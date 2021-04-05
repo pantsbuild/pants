@@ -73,8 +73,10 @@ class BaseZincCompile(JvmCompile):
         while arg_index < len(args):
             arg_index += validate(arg_index)
 
-    def _get_zinc_arguments(self, settings):
-        distribution = self._get_jvm_distribution()
+    def _get_javac_arguments_for_platform(self, settings):
+        distribution = (
+            self._get_jvm_distribution()
+        )  # theoretically, we could pass a settings here, or something
         return self._format_zinc_arguments(settings, distribution)
 
     @staticmethod
@@ -87,23 +89,7 @@ class BaseZincCompile(JvmCompile):
         :param settings: The jvm platform settings from which to extract the arguments.
         :type settings: :class:`JvmPlatformSettings`
         """
-        zinc_args = [
-            "-C-source",
-            f"-C{settings.source_level}",
-            "-C-target",
-            f"-C{settings.target_level}",
-        ]
-        if settings.args:
-            settings_args = settings.args
-            if any("$JAVA_HOME" in a for a in settings.args):
-                logger.debug(
-                    'Substituting "$JAVA_HOME" with "{}" in jvm-platform args.'.format(
-                        distribution.home
-                    )
-                )
-                settings_args = (a.replace("$JAVA_HOME", distribution.home) for a in settings.args)
-            zinc_args.extend(settings_args)
-        return zinc_args
+        return [f"-C{arg}" for arg in distribution.generate_javac_args(settings)]
 
     @classmethod
     def implementation_version(cls):
@@ -470,7 +456,7 @@ class BaseZincCompile(JvmCompile):
             )
 
         zinc_args.extend(args)
-        zinc_args.extend(self._get_zinc_arguments(settings))
+        zinc_args.extend(self._get_javac_arguments_for_platform(settings))
         zinc_args.append("-transactional")
 
         compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(

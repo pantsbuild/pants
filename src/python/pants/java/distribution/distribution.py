@@ -111,6 +111,9 @@ class Distribution:
         """
         return self._get_version(self.java)
 
+    def generate_javac_args(self, settings):
+        return settings.javac_args(self.home)
+
     def find_libs(self, names):
         """Looks for jars in the distribution lib folder(s).
 
