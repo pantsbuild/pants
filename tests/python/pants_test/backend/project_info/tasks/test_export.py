@@ -67,7 +67,7 @@ class ExportTest(ConsoleTaskTestBase):
         )
 
         # NB: `test_has_python_requirements` will attempt to inject every possible scala compiler target
-        # spec, for versions 2.10, 2.11, 2.12, and custom, and will error out if they are not
+        # spec, for versions 2.10, 2.11, 2.12, 2.13, and custom, and will error out if they are not
         # available. This isn't a problem when running pants on the command line, but in unit testing
         # there's probably some task or subsystem that needs to be initialized to avoid this.
         for empty_target in [
@@ -77,7 +77,7 @@ class ExportTest(ConsoleTaskTestBase):
             "scala-reflect",
             "scalastyle",
         ]:
-            for unused_scala_version in ["2_10", "2_11"]:
+            for unused_scala_version in ["2_10", "2_11", "2_13"]:
                 self.make_target(
                     f":{empty_target}_{unused_scala_version}", Target,
                 )
