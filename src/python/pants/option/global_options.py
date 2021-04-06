@@ -174,6 +174,7 @@ class ExecutionOptions:
         if (
             not local_only
             and bootstrap_options.remote_auth_plugin
+            and bootstrap_options.remote_auth_plugin.strip()
             and (remote_execution or remote_cache_read or remote_cache_write)
         ):
             if ":" not in bootstrap_options.remote_auth_plugin:
@@ -387,16 +388,6 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=False,
             help="Re-resolve plugins, even if previously resolved.",
-        )
-        register(
-            "--plugin-cache-dir",
-            advanced=True,
-            default=os.path.join(get_pants_cachedir(), "plugins"),
-            help="Cache resolved plugin requirements here.",
-            removal_version="2.5.0.dev0",
-            removal_hint=(
-                "This option now no-ops, the plugins cache is now housed in the named caches."
-            ),
         )
 
         register(

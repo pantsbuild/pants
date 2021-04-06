@@ -5,13 +5,11 @@ from typing import cast
 
 from pants.backend.codegen.protobuf.target_types import ProtobufDependencies
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
-from pants.base.deprecated import deprecated_conditional
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import target_option
-from pants.option.ranked_value import Rank
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bracketed_docs_url
 
@@ -45,15 +43,6 @@ class PythonProtobufSubsystem(Subsystem):
                 "also generate .pyi type stubs."
             ),
         )
-        register(
-            "--mypy-plugin-version",
-            type=str,
-            advanced=True,
-            help=(
-                "The pip-style requirement string for `mypy-protobuf`. You must still set "
-                "`--mypy-plugin` for this option to be used."
-            ),
-        )
 
     @property
     def runtime_dependencies(self) -> UnparsedAddressInputs:
@@ -74,31 +63,6 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_version = "mypy-protobuf==2.4"
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
-
-    def plugin_requirement(self, python_protobuf_subsystem: PythonProtobufSubsystem) -> str:
-        deprecated_key = "mypy_plugin_version"
-        mypy_plugin_requirement = python_protobuf_subsystem.options.get(deprecated_key)
-        if mypy_plugin_requirement:
-            # TODO(John Sirois): When removing this deprecation, its safe to remove the
-            #  `--mypy-plugin-version` option registration in PythonProtobufSubsystem above since
-            #  the `version` option registered by this subsystem is in a subscope picked to shadow
-            #  the deprecated option in flag and environment variable namespaces; i.e.: both
-            #  --python-protobuf-mypy-plugin-version and PANTS_PYTHON_PROTOBUF_MYPY_PLUGIN_VERSION
-            #  will continue to work."
-            deprecated_conditional(
-                predicate=lambda: (
-                    python_protobuf_subsystem.options.get_rank(deprecated_key) == Rank.CONFIG
-                ),
-                removal_version="2.5.0.dev0",
-                entity_description=f"[{PythonProtobufSubsystem.options_scope}] {deprecated_key}",
-                hint_message=(
-                    f"Instead of configuring the `{deprecated_key}` in the "
-                    f"`[{PythonProtobufSubsystem.options_scope}]` options section, configure the "
-                    f"`version` in the `[{self.options_scope}]` options section."
-                ),
-            )
-            return cast(str, mypy_plugin_requirement)
-        return self.requirement
 
 
 class InjectPythonProtobufDependencies(InjectDependenciesRequest):

@@ -58,11 +58,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     def test_pantsd_run(self):
         with self.pantsd_successful_run_context(log_level="debug") as ctx:
-            ctx.runner(["list", "3rdparty::"])
-            ctx.checker.assert_started()
+            with setup_tmpdir({"foo/BUILD": "files(sources=[])"}) as tmpdir:
+                ctx.runner(["list", f"{tmpdir}/foo::"])
+                ctx.checker.assert_started()
 
-            ctx.runner(["list", "3rdparty::"])
-            ctx.checker.assert_running()
+                ctx.runner(["list", f"{tmpdir}/foo::"])
+                ctx.checker.assert_running()
 
     def test_pantsd_broken_pipe(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):

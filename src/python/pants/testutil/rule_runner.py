@@ -552,7 +552,7 @@ class StdioReader:
 class MockConsole:
     """An implementation of pants.engine.console.Console which captures output."""
 
-    @deprecated("2.5.0.dev0", hint_message="Use the mock_console contextmanager instead.")
+    @deprecated("2.5.0.dev1", hint_message="Use the mock_console contextmanager instead.")
     def __init__(self, use_colors=True):
         self.stdout = StringIO()
         self.stderr = StringIO()

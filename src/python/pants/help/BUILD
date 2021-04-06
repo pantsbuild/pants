@@ -9,8 +9,4 @@ python_tests(
   dependencies=["//:build_root"],
 )
 
-python_integration_tests(
-  name='integration',
-  uses_pants_run=True,
-  timeout=360,
-)
+python_tests(name="integration", sources=["*_integration_test.py"], timeout=360)
