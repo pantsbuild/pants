@@ -442,7 +442,24 @@ class GlobalOptions(Subsystem):
             ),
         )
 
-        # TODO(#7203): make a regexp option type!
+        register(
+            "--ignore-warnings",
+            type=list,
+            member_type=str,
+            default=[],
+            daemon=True,
+            advanced=True,
+            help=(
+                "Ignore logs and warnings matching these strings.\n\n"
+                "Normally, Pants will look for literal matches from the start of the log/warning "
+                "message, but you can prefix the ignore with `$regex$` for Pants to instead treat "
+                "your string as a regex pattern. For example:\n\n"
+                "  ignore_warnings = [\n"
+                "    'The option `[isort.config]` is not configured',\n"
+                "    '$regex$DeprecationWarning: DEPRECATED:\\s*'\n"
+                "  ]"
+            ),
+        )
         register(
             "--ignore-pants-warnings",
             type=list,
@@ -453,6 +470,13 @@ class GlobalOptions(Subsystem):
             help="Regexps matching warning strings to ignore, e.g. "
             '["DEPRECATED: the option `--my-opt` will be removed"]. The regex patterns will be '
             "matched from the start of the warning string, and are case-insensitive.",
+            removal_version="2.6.0.dev0",
+            removal_hint=(
+                "Use the global option `--ignore-warnings` instead.\n\nUnlike this option, "
+                "`--ignore-warnings` uses literal string matches instead of regex patterns by "
+                "default. If you would still like to use a regex pattern, prefix the string with "
+                "`$regex$`."
+            ),
         )
 
         register(

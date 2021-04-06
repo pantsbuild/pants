@@ -9,13 +9,14 @@ from contextlib import contextmanager
 from io import BufferedReader, TextIOWrapper
 from logging import Formatter, LogRecord, StreamHandler
 from pathlib import PurePath
-from typing import Dict, Iterator
+from typing import Dict, Iterator, cast
 
 import pants.util.logging as pants_logging
 from pants.engine.internals import native_engine
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.logging import LogLevel
+from pants.util.strutil import strip_prefix
 
 # Although logging supports the WARN level, its not documented and could conceivably be yanked.
 # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
@@ -131,8 +132,15 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     use_color = global_bootstrap_options.colors
     show_target = global_bootstrap_options.show_log_target
     log_levels_by_target = _get_log_levels_by_target(global_bootstrap_options)
-    message_regex_filters = global_bootstrap_options.ignore_pants_warnings
     print_stacktrace = global_bootstrap_options.print_stacktrace
+
+    literal_filters = []
+    regex_filters = cast("list[str]", global_bootstrap_options.ignore_pants_warnings)
+    for filt in cast("list[str]", global_bootstrap_options.ignore_warnings):
+        if filt.startswith("$regex$"):
+            regex_filters.append(strip_prefix(filt, "$regex$"))
+        else:
+            literal_filters.append(filt)
 
     # Set the pants log destination.
     log_path = str(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
@@ -147,7 +155,8 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
             use_color,
             show_target,
             {k: v.level for k, v in log_levels_by_target.items()},
-            tuple(message_regex_filters),
+            tuple(literal_filters),
+            tuple(regex_filters),
             log_path,
         )
         sys.stdin = TextIOWrapper(

@@ -59,7 +59,8 @@ def stdio_initialize(
     use_color: bool,
     show_target: bool,
     log_levels_by_target: dict[str, int],
-    message_regex_filters: tuple[str, ...],
+    literal_filters: tuple[str, ...],
+    regex_filters: tuple[str, ...],
     log_file: str,
 ) -> tuple[RawIOBase, TextIO, TextIO]: ...
 def stdio_thread_get_destination() -> PyStdioDestination: ...
