@@ -12,16 +12,6 @@ python_library(
 )
 
 python_library(
-  name = 'fs_event_service',
-  sources = ['fs_event_service.py'],
-  dependencies = [
-    ':pants_service',
-    'src/python/pants/pantsd:watchman'
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
   name = 'scheduler_service',
   sources = ['scheduler_service.py'],
   dependencies = [
