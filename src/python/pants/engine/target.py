@@ -6,6 +6,7 @@ from __future__ import annotations
 import collections.abc
 import dataclasses
 import itertools
+import logging
 import os.path
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
@@ -45,11 +46,14 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
+from pants.util.docutil import bracketed_docs_url
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
 # Core Field abstractions
@@ -1591,6 +1595,69 @@ class ExplicitlyProvidedDependencies:
 
     includes: FrozenOrderedSet[Address]
     ignores: FrozenOrderedSet[Address]
+
+    @memoized_method
+    def any_are_covered_by_includes(self, addresses: tuple[Address, ...]) -> bool:
+        """Return True if every address is in the explicitly provided includes.
+
+        Note that if the input addresses are file addresses, they will still be marked as covered if
+        their original BUILD target is in the explicitly provided includes.
+        """
+        return any(
+            addr in self.includes or addr.maybe_convert_to_build_target() in self.includes
+            for addr in addresses
+        )
+
+    @memoized_method
+    def remaining_after_ignores(self, addresses: tuple[Address, ...]) -> set[Address]:
+        """All addresses that are not covered by the explicitly provided ignores.
+
+        Note that if the input addresses are file addresses, they will still be marked as covered if
+        their original BUILD target is in the explicitly provided ignores.
+        """
+        return {
+            addr
+            for addr in addresses
+            if (
+                addr not in self.ignores
+                and addr.maybe_convert_to_build_target() not in self.ignores
+            )
+        }
+
+    def maybe_warn_of_ambiguous_dependency_inference(
+        self,
+        ambiguous_addresses: tuple[Address, ...],
+        original_address: Address,
+        *,
+        context: str,
+        import_reference: str,
+    ) -> None:
+        """If the module is ambiguous and the user did not disambiguate via explicitly provided
+        dependencies, warn that dependency inference will not be used."""
+        if not ambiguous_addresses or self.any_are_covered_by_includes(ambiguous_addresses):
+            return
+        remaining_after_ignores = self.remaining_after_ignores(ambiguous_addresses)
+        if len(remaining_after_ignores) <= 1:
+            return
+        logger.warning(
+            f"{context}, but Pants cannot safely infer a dependency because >1 target owns "
+            f"this {import_reference}, so it is ambiguous which to use: "
+            f"{sorted(addr.spec for addr in remaining_after_ignores)}."
+            f"\n\nPlease explicitly include the dependency you want in the `dependencies` "
+            f"field of {original_address}, or ignore the ones you do not want by prefixing "
+            f"with `!` or `!!` so that <=1 targets are left."
+            f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
+            f"targets so that only 1 target owns this {import_reference}. Refer to "
+            f"{bracketed_docs_url('troubleshooting#import-errors-and-missing-dependencies')}."
+        )
+
+    def disambiguated_via_ignores(self, ambiguous_addresses: tuple[Address, ...]) -> Address | None:
+        """If exactly one of the input addresses remains after considering the explicitly provided
+        ignores, return it because it is disambiguated."""
+        if not ambiguous_addresses or self.any_are_covered_by_includes(ambiguous_addresses):
+            return None
+        remaining_after_ignores = self.remaining_after_ignores(ambiguous_addresses)
+        return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
 
 
 @union
