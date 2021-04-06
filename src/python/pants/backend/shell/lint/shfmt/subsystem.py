@@ -16,8 +16,8 @@ class Shfmt(TemplatedExternalTool):
 
     default_version = "v3.2.4"
     default_known_versions = [
-        "v3.2.4|darwin|43a0461a1b54070ddc04fbbf1b78f7861ee39a65a61f5466d15a39c4aba4f917|2980208",
-        "v3.2.4|linux|3f5a47f8fec27fae3e06d611559a2063f5d27e4b9501171dde9959b8c60a3538|2797568",
+        f"{default_version}|darwin|43a0461a1b54070ddc04fbbf1b78f7861ee39a65a61f5466d15a39c4aba4f917|2980208",
+        f"{default_version}|linux|3f5a47f8fec27fae3e06d611559a2063f5d27e4b9501171dde9959b8c60a3538|2797568",
     ]
 
     default_url_template = (
@@ -45,8 +45,9 @@ class Shfmt(TemplatedExternalTool):
             type=file_option,
             advanced=True,
             help=(
-                "Path to `.editorconfig` file.\n\nThis should normally be located at the build "
-                "root of your project for shfmt's config auto-discovery to work properly."
+                "Path to `.editorconfig` file.\n\nBecause shfmt does not have a config file "
+                "option, you must locate this file somewhere shfmt can auto-discover it, usually "
+                "in your build root. See https://editorconfig.org."
             ),
         )
 

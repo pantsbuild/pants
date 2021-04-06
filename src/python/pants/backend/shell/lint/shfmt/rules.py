@@ -65,16 +65,12 @@ async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
         download_shfmt_get, config_digest_get, source_files_get
     )
 
-    # If we were given an input digest from a previous formatter for the source files, then we
-    # should use that input digest instead of the one we read from the filesystem.
     source_files_snapshot = (
         source_files.snapshot
         if setup_request.request.prior_formatter_result is None
         else setup_request.request.prior_formatter_result
     )
 
-    # The Process needs one single `Digest`, so we merge everything together. See
-    # https://www.pantsbuild.org/v2.0/docs/rules-api-file-system.
     input_digest = await Get(
         Digest,
         MergeDigests((source_files_snapshot.digest, downloaded_shfmt.digest, config_digest)),

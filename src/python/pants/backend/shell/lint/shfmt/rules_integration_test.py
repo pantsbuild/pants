@@ -73,7 +73,7 @@ def run_shfmt(
 ) -> tuple[tuple[LintResult, ...], FmtResult]:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.shell.lint.shfmt", *(extra_args or ())],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        env_inherit={"PATH"},
     )
     field_sets = [ShfmtFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [ShfmtRequest(field_sets)])
@@ -162,9 +162,7 @@ def test_respects_config_file(rule_runner: RuleRunner) -> None:
 def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.sh": NEEDS_CONFIG_FILE, "BUILD": "shell_library(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
-    lint_results, fmt_result = run_shfmt(
-        rule_runner, [tgt], extra_args=["--shfmt-args=-ci"]
-    )
+    lint_results, fmt_result = run_shfmt(rule_runner, [tgt], extra_args=["--shfmt-args=-ci"])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
     assert "f.sh.orig" in lint_results[0].stdout

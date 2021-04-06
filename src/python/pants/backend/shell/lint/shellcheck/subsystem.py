@@ -16,8 +16,8 @@ class Shellcheck(TemplatedExternalTool):
 
     default_version = "v0.7.1"
     default_known_versions = [
-        "v0.7.1|darwin|b080c3b659f7286e27004aa33759664d91e15ef2498ac709a452445d47e3ac23|1348272",
-        "v0.7.1|linux|64f17152d96d7ec261ad3086ed42d18232fcb65148b44571b564d688269d36c8|1443836",
+        f"{default_version}|darwin|b080c3b659f7286e27004aa33759664d91e15ef2498ac709a452445d47e3ac23|1348272",
+        f"{default_version}|linux|64f17152d96d7ec261ad3086ed42d18232fcb65148b44571b564d688269d36c8|1443836",
     ]
 
     default_url_template = (

@@ -81,6 +81,7 @@ class ShellNotConfigured(Exception):
 def validate_source_shunit2_not_included(fc: FileContent, address: Address) -> None:
     lines = fc.content.splitlines()
     for i, line in enumerate(lines):
+        # Note that we use ` ` instead of `\s` to avoid matching newlines and tabs.
         if re.search(rb"(?:source|\.) +[.${}/'\"\w]*shunit2\b", line):
             raise Shunit2AlreadySourced(
                 f"The test file {fc.path} sources shunit2 on line {i + 1} with: "

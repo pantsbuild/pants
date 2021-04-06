@@ -39,7 +39,7 @@ def run_shellcheck(
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.shell.lint.shellcheck", *(extra_args or ())],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        env_inherit={"PATH"},
     )
     results = rule_runner.request(
         LintResults,
