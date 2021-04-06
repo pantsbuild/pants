@@ -117,8 +117,9 @@ class Shunit2Tests(Target):
         f"to run with by either setting the field `{Shunit2ShellField.alias}` or including a "
         f"shebang. To test the same file with multiple shells, create multiple `shunit2_tests` "
         f"targets, one for each shell.\n\n"
-        f"Do not include `source ./shunit2`, as Pants will download the script and source it for "
-        "you."
+        f"Pants will automatically download the `shunit2` bash script and add "
+        f"`source ./shunit2` to your test for you. If you already have `source ./shunit2`, "
+        f"Pants will overwrite it to use the correct relative path."
     )
 
 

@@ -70,25 +70,30 @@ class TestSetup:
     process: Process
 
 
-class Shunit2AlreadySourced(Exception):
-    pass
-
-
 class ShellNotConfigured(Exception):
     pass
 
 
-def validate_source_shunit2_not_included(fc: FileContent, address: Address) -> None:
-    lines = fc.content.splitlines()
-    for i, line in enumerate(lines):
-        # Note that we use ` ` instead of `\s` to avoid matching newlines and tabs.
-        if re.search(rb"(?:source|\.) +[.${}/'\"\w]*shunit2\b", line):
-            raise Shunit2AlreadySourced(
-                f"The test file {fc.path} sources shunit2 on line {i + 1} with: "
-                f"{line.decode()}\n\n"
-                f"Please remove this line so that Pants can run shunit2 for the target {address}, "
-                "as Pants will download the shunit2 script and source it for you automatically."
-            )
+SOURCE_SHUNIT2_REGEX = re.compile(rb"(?:source|\.)\s+[.${}/'\"\w]*shunit2\b['\"]?")
+
+
+def add_source_shunit2(fc: FileContent) -> FileContent:
+    # NB: We always run tests from the build root, so we source `shunit2` relative to there.
+    source_line = b"source ./shunit2"
+
+    lines = []
+    already_had_source = False
+    for line in fc.content.splitlines():
+        if SOURCE_SHUNIT2_REGEX.search(line):
+            lines.append(SOURCE_SHUNIT2_REGEX.sub(source_line, line))
+            already_had_source = True
+        else:
+            lines.append(line)
+
+    if not already_had_source:
+        lines.append(source_line)
+
+    return FileContent(fc.path, b"\n".join(lines))
 
 
 @dataclass(frozen=True)
@@ -177,13 +182,7 @@ async def setup_shunit2_for_target(
             "https://github.com/pantsbuild/pants/issues/new with this error message copied."
         )
     original_test_file_content = field_set_digest_content[0]
-
-    validate_source_shunit2_not_included(original_test_file_content, request.field_set.address)
-    updated_test_file_content = FileContent(
-        original_test_file_content.path,
-        # NB: We always run tests from the build root, so we source `shunit2` relative to there.
-        original_test_file_content.content + "\nsource ./shunit2\n".encode(),
-    )
+    updated_test_file_content = add_source_shunit2(original_test_file_content)
 
     updated_test_digest, runner = await MultiGet(
         Get(Digest, CreateDigest([updated_test_file_content])),
