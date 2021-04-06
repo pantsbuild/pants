@@ -26,6 +26,11 @@ class DependencyType(Enum):
     SOURCE_AND_THIRD_PARTY = "source-and-3rdparty"
 
 
+class DependenciesOutputFormat(Enum):
+    text = "text"
+    json = "json"
+
+
 class DependenciesSubsystem(LineOriented, GoalSubsystem):
     name = "dependencies"
     help = "List the dependencies of the input files/targets."

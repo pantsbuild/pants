@@ -7,7 +7,9 @@ from typing import List, Optional
 
 import pytest
 
-from pants.backend.project_info.dependencies import Dependencies, DependencyType, rules
+from pants.backend.project_info.dependencies import Dependencies
+from pants.backend.project_info.dependencies import DependenciesOutputFormat as OutputFormat
+from pants.backend.project_info.dependencies import DependencyType, rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.engine.target import SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
@@ -57,6 +59,7 @@ def assert_dependencies(
     rule_runner: RuleRunner,
     *,
     specs: List[str],
+    output_format: OutputFormat = OutputFormat.text,
     expected: List[str],
     transitive: bool = False,
     dependency_type: DependencyType = DependencyType.SOURCE,
@@ -71,12 +74,26 @@ def assert_dependencies(
 def test_no_target(rule_runner: RuleRunner) -> None:
     assert_dependencies(rule_runner, specs=[], expected=[])
     assert_dependencies(rule_runner, specs=[], expected=[], transitive=True)
+    assert_dependencies(rule_runner, specs=[], output_format=OutputFormat.json, expected=["{}"])
+    assert_dependencies(
+        rule_runner, specs=[], output_format=OutputFormat.json, expected=["{}"], transitive=True
+    )
 
 
 def test_no_dependencies(rule_runner: RuleRunner) -> None:
     create_python_library(rule_runner, path="some/target")
     assert_dependencies(rule_runner, specs=["some/target"], expected=[])
     assert_dependencies(rule_runner, specs=["some/target"], expected=[], transitive=True)
+    assert_dependencies(
+        rule_runner, specs=["some/target"], output_format=OutputFormat.json, expected=["{}"]
+    )
+    assert_dependencies(
+        rule_runner,
+        specs=["some/target"],
+        output_format=OutputFormat.json,
+        expected=["{}"],
+        transitive=True,
+    )
 
 
 def test_special_cased_dependencies(rule_runner: RuleRunner) -> None:
@@ -92,6 +109,34 @@ def test_special_cased_dependencies(rule_runner: RuleRunner) -> None:
     )
     assert_dependencies(rule_runner, specs=["//:t3"], expected=["//:t2"])
     assert_dependencies(rule_runner, specs=["//:t3"], expected=["//:t1", "//:t2"], transitive=True)
+    assert_dependencies(
+        rule_runner,
+        specs=["//:t3"],
+        output_format=OutputFormat.json,
+        expected=dedent(
+            """\
+            {
+                "base": [
+                    "//:t2"
+                ]
+            }"""
+        ).splitlines(),
+    )
+    assert_dependencies(
+        rule_runner,
+        specs=["//:t3"],
+        output_format=OutputFormat.json,
+        expected=dedent(
+            """\
+            {
+               "base": [
+                   "//:t1",
+                   "//:t2"
+                ]
+            }"""
+        ).splitlines(),
+        transitive=True,
+    )
 
 
 def test_python_dependencies(rule_runner: RuleRunner) -> None:
