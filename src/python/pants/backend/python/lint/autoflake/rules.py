@@ -1,4 +1,4 @@
-# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
@@ -17,7 +17,6 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
@@ -59,7 +58,7 @@ def generate_args(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_autoflake(setup_request: SetupRequest, autoflake: Autoflake) -> Setup:
-    autoflake_pex_request = Get(
+    autoflake_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="autoflake.pex",
@@ -70,12 +69,12 @@ async def setup_autoflake(setup_request: SetupRequest, autoflake: Autoflake) -> 
         ),
     )
 
-    source_files_request = Get(
+    source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
 
-    source_files, autoflake_pex = await MultiGet(source_files_request, autoflake_pex_request)
+    source_files, autoflake_pex = await MultiGet(source_files_get, autoflake_pex_get)
 
     source_files_snapshot = (
         source_files.snapshot
@@ -130,5 +129,4 @@ def rules():
         UnionRule(PythonFmtRequest, AutoflakeRequest),
         UnionRule(LintRequest, AutoflakeRequest),
         *pex.rules(),
-        *stripped_source_files.rules(),
     ]

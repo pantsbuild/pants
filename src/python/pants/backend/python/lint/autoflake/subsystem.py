@@ -1,7 +1,9 @@
-# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple, cast
+from __future__ import annotations
+
+from typing import cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -44,5 +46,5 @@ class Autoflake(PythonToolBase):
         return cast(bool, self.options.skip)
 
     @property
-    def args(self) -> Tuple[str, ...]:
+    def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
