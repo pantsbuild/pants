@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import json
 from enum import Enum
 from typing import Set, cast
 
@@ -55,6 +56,16 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
                 "dependencies and `3rdparty` means third-party requirement strings."
             ),
         )
+        register(
+            "--output-format",
+            type=DependenciesOutputFormat,
+            default=DependenciesOutputFormat.text,
+            help=(
+                "Use `text` for a flattened list of target addresses; use `json` for each key to be "
+                "the address of one of the specified targets, with its value being "
+                "a list of that target's dependencies, e.g. `{':example': [':dep1', ':dep2']}`."
+            ),
+        )
 
     @property
     def transitive(self) -> bool:
@@ -64,13 +75,17 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
     def type(self) -> DependencyType:
         return cast(DependencyType, self.options.type)
 
+    @property
+    def output_format(self) -> DependenciesOutputFormat:
+        return cast(DependenciesOutputFormat, self.options.output_format)
+
 
 class Dependencies(Goal):
     subsystem_cls = DependenciesSubsystem
 
 
 @goal_rule
-async def dependencies(
+async def dependencies_goal(
     console: Console, addresses: Addresses, dependencies_subsystem: DependenciesSubsystem
 ) -> Dependencies:
     if dependencies_subsystem.transitive:
@@ -110,10 +125,14 @@ async def dependencies(
                 )
 
     with dependencies_subsystem.line_oriented(console) as print_stdout:
-        for address in sorted(address_strings):
-            print_stdout(address)
-        for requirement_string in sorted(third_party_requirements):
-            print_stdout(requirement_string)
+        if dependencies_subsystem.output_format == DependenciesOutputFormat.json:
+            json_result = {"base": "moo"}
+            print_stdout(json.dumps(json_result, indent=4, separators=(",", ": "), sort_keys=True))
+        else:
+            for address in sorted(address_strings):
+                print_stdout(address)
+                for requirement_string in sorted(third_party_requirements):
+                    print_stdout(requirement_string)
 
     return Dependencies(exit_code=0)
 
