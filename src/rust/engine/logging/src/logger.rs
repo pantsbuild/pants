@@ -32,7 +32,8 @@ pub struct PantsLogger {
   show_rust_3rdparty_logs: AtomicBool,
   show_target: AtomicBool,
   log_level_filters: Mutex<HashMap<String, log::LevelFilter>>,
-  message_regex_filters: Mutex<Vec<Regex>>,
+  literal_filters: Mutex<Vec<String>>,
+  regex_filters: Mutex<Vec<Regex>>,
 }
 
 impl PantsLogger {
@@ -45,7 +46,8 @@ impl PantsLogger {
       use_color: AtomicBool::new(false),
       show_target: AtomicBool::new(false),
       log_level_filters: Mutex::new(HashMap::new()),
-      message_regex_filters: Mutex::new(Vec::new()),
+      literal_filters: Mutex::new(Vec::new()),
+      regex_filters: Mutex::new(Vec::new()),
     }
   }
 
@@ -55,7 +57,8 @@ impl PantsLogger {
     use_color: bool,
     show_target: bool,
     log_levels_by_target: HashMap<String, u64>,
-    message_regex_filters: Vec<Regex>,
+    literal_filters: Vec<String>,
+    regex_filters: Vec<Regex>,
     log_file_path: PathBuf,
   ) -> Result<(), String> {
     let log_levels_by_target = log_levels_by_target
@@ -84,7 +87,8 @@ impl PantsLogger {
       .show_rust_3rdparty_logs
       .store(show_rust_3rdparty_logs, Ordering::SeqCst);
     *PANTS_LOGGER.log_level_filters.lock() = log_levels_by_target;
-    *PANTS_LOGGER.message_regex_filters.lock() = message_regex_filters;
+    *PANTS_LOGGER.literal_filters.lock() = literal_filters;
+    *PANTS_LOGGER.regex_filters.lock() = regex_filters;
     PANTS_LOGGER
       .show_target
       .store(show_target, Ordering::SeqCst);
@@ -169,6 +173,19 @@ impl Log for PantsLogger {
       return;
     }
 
+    let log_msg = format!("{}", record.args());
+    {
+      let literal_filters = self.literal_filters.lock();
+      if literal_filters.iter().any(|filt| log_msg.starts_with(filt)) {
+        return;
+      }
+
+      let regex_filters = self.regex_filters.lock();
+      if regex_filters.iter().any(|re| re.is_match(&log_msg)) {
+        return;
+      }
+    }
+
     let cur_date = chrono::Local::now();
     let time_str = format!(
       "{}.{:02}",
@@ -196,22 +213,11 @@ impl Log for PantsLogger {
         time_str,
         level_marker,
         record.target(),
-        record.args(),
+        log_msg,
       )
     } else {
-      format!("{} {} {}\n", time_str, level_marker, record.args())
+      format!("{} {} {}\n", time_str, level_marker, log_msg)
     };
-
-    {
-      let message_regex_filters = self.message_regex_filters.lock();
-      if message_regex_filters
-        .iter()
-        .any(|re| re.is_match(&log_string))
-      {
-        return;
-      }
-    }
-
     let log_bytes = log_string.as_bytes();
 
     {
