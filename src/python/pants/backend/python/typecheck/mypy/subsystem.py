@@ -77,7 +77,7 @@ class MyPy(PythonToolBase):
     @property
     def config_request(self) -> ConfigFilesRequest:
         return ConfigFilesRequest(
-            specified=self.options,
+            specified=self.config,
             check_existence=["mypy.ini", ".mypy.ini"],
             check_content={"setup.cfg": b"[mypy"},
             option_name="[mypy].config",

@@ -26,15 +26,7 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
@@ -108,14 +100,6 @@ def check_and_warn_if_python_version_configured(
             "code and Python 3-only code at the same time. This feature may no longer work.)"
         )
     return bool(configured)
-
-
-def config_path_globs(mypy: MyPy) -> PathGlobs:
-    return PathGlobs(
-        globs=[mypy.config] if mypy.config else [],
-        glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        description_of_origin="the option `[mypy].config`",
-    )
 
 
 def determine_python_files(files: Iterable[str]) -> Tuple[str, ...]:
