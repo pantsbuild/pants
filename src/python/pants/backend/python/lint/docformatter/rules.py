@@ -17,7 +17,6 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
@@ -133,5 +132,4 @@ def rules():
         UnionRule(PythonFmtRequest, DocformatterRequest),
         UnionRule(LintRequest, DocformatterRequest),
         *pex.rules(),
-        *stripped_source_files.rules(),
     ]

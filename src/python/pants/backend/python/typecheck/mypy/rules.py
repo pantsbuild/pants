@@ -24,17 +24,9 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
-from pants.core.util_rules import pants_bin
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
@@ -110,14 +102,6 @@ def check_and_warn_if_python_version_configured(
     return bool(configured)
 
 
-def config_path_globs(mypy: MyPy) -> PathGlobs:
-    return PathGlobs(
-        globs=[mypy.config] if mypy.config else [],
-        glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        description_of_origin="the option `--mypy-config`",
-    )
-
-
 def determine_python_files(files: Iterable[str]) -> Tuple[str, ...]:
     """We run over all .py and .pyi files, but .pyi files take precedence.
 
@@ -172,14 +156,12 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
         else PexInterpreterConstraints(mypy.interpreter_constraints)
     )
 
-    plugin_sources_request = Get(
+    plugin_sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(plugin_transitive_targets.closure)
     )
-    typechecked_sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(partition.closure)
-    )
+    typechecked_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
 
-    requirements_pex_request = Get(
+    requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements(
@@ -191,7 +173,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
     # TODO(John Sirois): Scope the extra requirements to the partition.
     #  Right now we just use a global set of extra requirements and these might not be compatible
     #  with all partitions. See: https://github.com/pantsbuild/pants/issues/11556
-    mypy_extra_requirements_pex_request = Get(
+    mypy_extra_requirements_pex_get = Get(
         Pex,
         PexRequest(
             output_filename="mypy_extra_requirements.pex",
@@ -200,7 +182,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )
-    mypy_pex_request = Get(
+    mypy_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="mypy.pex",
@@ -211,7 +193,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
         ),
     )
 
-    config_digest_request = Get(Digest, PathGlobs, config_path_globs(mypy))
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, mypy.config_request)
 
     (
         plugin_sources,
@@ -219,14 +201,14 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
         mypy_pex,
         requirements_pex,
         mypy_extra_requirements_pex,
-        config_digest,
+        config_files,
     ) = await MultiGet(
-        plugin_sources_request,
-        typechecked_sources_request,
-        mypy_pex_request,
-        requirements_pex_request,
-        mypy_extra_requirements_pex_request,
-        config_digest_request,
+        plugin_sources_get,
+        typechecked_sources_get,
+        mypy_pex_get,
+        requirements_pex_get,
+        mypy_extra_requirements_pex_get,
+        config_files_get,
     )
 
     typechecked_srcs_snapshot = typechecked_sources.source_files.snapshot
@@ -261,7 +243,7 @@ async def mypy_typecheck_partition(partition: MyPyPartition, mypy: MyPy) -> Type
                 plugin_sources.source_files.snapshot.digest,
                 typechecked_srcs_snapshot.digest,
                 typechecked_venv_pex.digest,
-                config_digest,
+                config_files.snapshot.digest,
             ]
         ),
     )
@@ -306,7 +288,8 @@ async def mypy_typecheck(
     # targets run together and all Python 3 targets run together. We can only do this by setting
     # the `--python-version` option, but we allow the user to set it as a safety valve. We warn if
     # they've set the option.
-    config_content = await Get(DigestContents, PathGlobs, config_path_globs(mypy))
+    config_files = await Get(ConfigFiles, ConfigFilesRequest, mypy.config_request)
+    config_content = await Get(DigestContents, Digest, config_files.snapshot.digest)
     python_version_configured = check_and_warn_if_python_version_configured(
         config=next(iter(config_content), None), args=mypy.args
     )
@@ -356,6 +339,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(TypecheckRequest, MyPyRequest),
-        *pants_bin.rules(),
         *pex_from_targets.rules(),
     ]

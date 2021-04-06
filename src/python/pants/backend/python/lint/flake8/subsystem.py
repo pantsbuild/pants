@@ -5,6 +5,7 @@ from typing import Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.custom_types import file_option, shell_str
 
 
@@ -56,3 +57,12 @@ class Flake8(PythonToolBase):
     @property
     def config(self) -> Optional[str]:
         return cast(Optional[str], self.options.config)
+
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=self.config,
+            check_existence=["flake8", ".flake8"],
+            check_content={"setup.cfg": b"[flake8]", "tox.ini": b"[flake8]"},
+            option_name=f"[{self.options_scope}].config",
+        )
