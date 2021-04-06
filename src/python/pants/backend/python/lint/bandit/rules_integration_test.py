@@ -12,6 +12,7 @@ from pants.backend.python.lint.bandit.rules import BanditFieldSet, BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.lint import LintResult, LintResults
+from pants.core.util_rules import source_files, warn_config_files_not_setup
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.target import Target
@@ -24,6 +25,8 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *bandit_rules(),
+            *source_files.rules(),
+            *warn_config_files_not_setup.rules(),
             QueryRule(LintResults, (BanditRequest,)),
         ],
         target_types=[PythonLibrary],

@@ -18,6 +18,7 @@ from pants.core.util_rules import (
     source_files,
     stripped_source_files,
     subprocess_environment,
+    warn_config_files_not_setup,
 )
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
@@ -47,6 +48,7 @@ def rules():
         *target_type_rules(),
         *anonymous_telemetry.rules(),
         *stats_aggregator.rules(),
+        *warn_config_files_not_setup.rules(),
     ]
 
 

@@ -15,7 +15,6 @@ from pants.backend.python.util_rules.pex import (
     VenvPexProcess,
 )
 from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
-from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, DigestSubset, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult
@@ -73,12 +72,14 @@ async def bandit_lint_partition(
         ),
     )
 
+    # Note that there is no standard Bandit config file path, so we do not use
+    # `WarnConfigFileNotSetup` like we do with other tools.
     config_digest_request = Get(
         Digest,
         PathGlobs(
             globs=[bandit.config] if bandit.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--bandit-config`",
+            description_of_origin="the option `[bandit].config`",
         ),
     )
 
@@ -152,9 +153,4 @@ async def bandit_lint(
 
 
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(LintRequest, BanditRequest),
-        *pex.rules(),
-        *stripped_source_files.rules(),
-    ]
+    return [*collect_rules(), UnionRule(LintRequest, BanditRequest), *pex.rules()]

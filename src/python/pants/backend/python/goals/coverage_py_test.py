@@ -7,6 +7,10 @@ from typing import List, Optional
 import pytest
 
 from pants.backend.python.goals.coverage_py import CoverageSubsystem, create_coverage_config
+from pants.core.util_rules.warn_config_files_not_setup import (
+    WarnConfigFilesNotSetup,
+    WarnConfigFilesNotSetupResult,
+)
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -41,6 +45,11 @@ def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
     mock_gets = [
         MockGet(output_type=DigestContents, input_type=PathGlobs, mock=mock_read_config),
         MockGet(output_type=Digest, input_type=CreateDigest, mock=mock_handle_config),
+        MockGet(
+            output_type=WarnConfigFilesNotSetupResult,
+            input_type=WarnConfigFilesNotSetup,
+            mock=lambda _: WarnConfigFilesNotSetupResult(),
+        ),
     ]
 
     result = run_rule_with_mocks(create_coverage_config, rule_args=[coverage], mock_gets=mock_gets)

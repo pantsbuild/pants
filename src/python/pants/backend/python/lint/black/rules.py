@@ -17,8 +17,11 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.warn_config_files_not_setup import (
+    WarnConfigFilesNotSetup,
+    WarnConfigFilesNotSetupResult,
+)
 from pants.engine.fs import Digest, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -102,9 +105,17 @@ async def setup_black(
         PathGlobs(
             globs=[black.config] if black.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--black-config`",
+            description_of_origin="the option `[black].config`",
         ),
     )
+    if not black.config:
+        await Get(
+            WarnConfigFilesNotSetupResult,
+            WarnConfigFilesNotSetup(
+                check_content={"pyproject.toml": b"[tool.black]"},
+                option_name="[black].config",
+            ),
+        )
 
     source_files_request = Get(
         SourceFiles,
@@ -170,5 +181,4 @@ def rules():
         UnionRule(PythonFmtRequest, BlackRequest),
         UnionRule(LintRequest, BlackRequest),
         *pex.rules(),
-        *stripped_source_files.rules(),
     ]

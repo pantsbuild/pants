@@ -28,6 +28,10 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.warn_config_files_not_setup import (
+    WarnConfigFilesNotSetup,
+    WarnConfigFilesNotSetupResult,
+)
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -144,9 +148,18 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         PathGlobs(
             globs=[pylint.config] if pylint.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--pylint-config`",
+            description_of_origin="the option `[pylint].config`",
         ),
     )
+    if not pylint.config:
+        await Get(
+            WarnConfigFilesNotSetupResult,
+            WarnConfigFilesNotSetup(
+                check_existence=["pylintrc", ".pylinrc"],
+                check_content={"pyproject.toml": b"[tool.pylint]", "setup.cfg": b"[pylint."},
+                option_name="[pylint].config",
+            ),
+        )
 
     prepare_plugin_sources_request = Get(
         StrippedPythonSourceFiles, PythonSourceFilesRequest(partition.plugin_targets)

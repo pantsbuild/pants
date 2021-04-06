@@ -31,6 +31,10 @@ from pants.core.goals.test import (
     CoverageReports,
     FilesystemCoverageReport,
 )
+from pants.core.util_rules.warn_config_files_not_setup import (
+    WarnConfigFilesNotSetup,
+    WarnConfigFilesNotSetupResult,
+)
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
     AddPrefix,
@@ -203,10 +207,20 @@ async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
             PathGlobs(
                 globs=(coverage.config,),
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"the option `--{coverage.options_scope}-config`",
+                description_of_origin=f"the option `[{coverage.options_scope}].config`",
             ),
         )
         coverage_config.read_string(config_contents[0].content.decode())
+    else:
+        await Get(
+            WarnConfigFilesNotSetupResult,
+            WarnConfigFilesNotSetup(
+                check_existence=[".coveragerc"],
+                check_content={"setup.cfg": b"[coverage:"},
+                option_name=f"[{coverage.options_scope}].config",
+            ),
+        )
+
     _validate_and_update_config(coverage_config, coverage.config)
     config_stream = StringIO()
     coverage_config.write(config_stream)

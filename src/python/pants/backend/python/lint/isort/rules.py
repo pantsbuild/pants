@@ -17,8 +17,11 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.warn_config_files_not_setup import (
+    WarnConfigFilesNotSetup,
+    WarnConfigFilesNotSetupResult,
+)
 from pants.engine.fs import (
     Digest,
     GlobExpansionConjunction,
@@ -87,9 +90,18 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
             globs=isort.config,
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             conjunction=GlobExpansionConjunction.all_match,
-            description_of_origin="the option `--isort-config`",
+            description_of_origin="the option `[isort].config`",
         ),
     )
+    if not isort.config:
+        await Get(
+            WarnConfigFilesNotSetupResult,
+            WarnConfigFilesNotSetup(
+                check_existence=[".isort.cfg"],
+                check_content={"pyproject.toml": b"[tool.isort]"},
+                option_name="[isort].config",
+            ),
+        )
 
     source_files_request = Get(
         SourceFiles,
@@ -155,5 +167,4 @@ def rules():
         UnionRule(PythonFmtRequest, IsortRequest),
         UnionRule(LintRequest, IsortRequest),
         *pex.rules(),
-        *stripped_source_files.rules(),
     ]

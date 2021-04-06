@@ -19,6 +19,7 @@ from pants.backend.python.typecheck.mypy.rules import (
 )
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
+from pants.core.util_rules import pants_bin, warn_config_files_not_setup
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import QueryRule
@@ -38,6 +39,8 @@ def rule_runner() -> RuleRunner:
         rules=[
             *mypy_rules(),
             *dependency_inference_rules.rules(),  # Used for import inference.
+            *pants_bin.rules(),
+            *warn_config_files_not_setup.rules(),
             QueryRule(TypecheckResults, (MyPyRequest,)),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],

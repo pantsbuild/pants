@@ -41,6 +41,10 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.warn_config_files_not_setup import (
+    WarnConfigFilesNotSetup,
+    WarnConfigFilesNotSetupResult,
+)
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
@@ -155,9 +159,22 @@ async def setup_pytest_for_target(
         PathGlobs(
             globs=[pytest.config] if pytest.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--pytest-config`",
+            description_of_origin="the option `[pytest]config`",
         ),
     )
+    if not pytest.config:
+        await Get(
+            WarnConfigFilesNotSetupResult,
+            WarnConfigFilesNotSetup(
+                check_existence=["pytest.ini"],
+                check_content={
+                    "pyproject.toml": b"[tool.pytest.ini_options]",
+                    "tox.ini": b"[pytest]",
+                    "setup.cfg": b"[tool:pytest]",
+                },
+                option_name="[pytest].config",
+            ),
+        )
 
     extra_output_directory_digest_request = Get(
         Digest, CreateDigest([Directory(_EXTRA_OUTPUT_DIR)])
@@ -254,9 +271,8 @@ async def setup_pytest_for_target(
     extra_env = {
         "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
+        **test_extra_env.env,
     }
-
-    extra_env.update(test_extra_env.env)
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
     cache_scope = ProcessCacheScope.NEVER if test_subsystem.force else ProcessCacheScope.SUCCESSFUL

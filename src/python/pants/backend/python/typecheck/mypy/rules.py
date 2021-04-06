@@ -24,7 +24,10 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
-from pants.core.util_rules import pants_bin
+from pants.core.util_rules.warn_config_files_not_setup import (
+    WarnConfigFilesNotSetup,
+    WarnConfigFilesNotSetupResult,
+)
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
     CreateDigest,
@@ -114,7 +117,7 @@ def config_path_globs(mypy: MyPy) -> PathGlobs:
     return PathGlobs(
         globs=[mypy.config] if mypy.config else [],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        description_of_origin="the option `--mypy-config`",
+        description_of_origin="the option `[mypy].config`",
     )
 
 
@@ -311,6 +314,16 @@ async def mypy_typecheck(
         config=next(iter(config_content), None), args=mypy.args
     )
 
+    if not mypy.config:
+        await Get(
+            WarnConfigFilesNotSetupResult,
+            WarnConfigFilesNotSetup(
+                check_existence=["mypy.ini", ".mypy.ini"],
+                check_content={"setup.cfg": b"[mypy"},
+                option_name="[mypy].config",
+            ),
+        )
+
     # When determining how to batch by interpreter constraints, we must consider the entire
     # transitive closure to get the final resulting constraints.
     # TODO(#10863): Improve the performance of this.
@@ -356,6 +369,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(TypecheckRequest, MyPyRequest),
-        *pants_bin.rules(),
         *pex_from_targets.rules(),
     ]
