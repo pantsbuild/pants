@@ -26,7 +26,7 @@ plugins = [
   "toolchain.pants.plugin==0.7.0",
 ]
 
-ignore_pants_warnings = [
+ignore_warnings = [
   # TODO: Remove when `toolchain.pants.plugin` is bumped past `0.7.0`.
   "DeprecationWarning: DEPRECATED: pants.core.util_rules.pants_environment",
 ]
