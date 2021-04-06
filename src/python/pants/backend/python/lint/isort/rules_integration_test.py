@@ -10,6 +10,7 @@ from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
+from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -22,6 +23,8 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *isort_rules(),
+            *source_files.rules(),
+            *config_files.rules(),
             QueryRule(LintResults, (IsortRequest,)),
             QueryRule(FmtResult, (IsortRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),

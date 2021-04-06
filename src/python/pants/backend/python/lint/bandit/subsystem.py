@@ -5,6 +5,7 @@ from typing import Optional, Tuple, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.custom_types import file_option, shell_str
 
 
@@ -54,3 +55,8 @@ class Bandit(PythonToolBase):
     @property
     def config(self) -> Optional[str]:
         return cast(Optional[str], self.options.config)
+
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        # Note that there are no default locations for Bandit config files.
+        return ConfigFilesRequest(specified=self.config, option_name=f"{self.options_scope}.config")

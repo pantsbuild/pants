@@ -15,7 +15,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPexProcess,
 )
 from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
-from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, DigestSubset, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult
@@ -62,7 +62,7 @@ def generate_args(
 async def bandit_lint_partition(
     partition: BanditPartition, bandit: Bandit, lint_subsystem: LintSubsystem
 ) -> LintResult:
-    bandit_pex_request = Get(
+    bandit_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="bandit.pex",
@@ -73,24 +73,18 @@ async def bandit_lint_partition(
         ),
     )
 
-    config_digest_request = Get(
-        Digest,
-        PathGlobs(
-            globs=[bandit.config] if bandit.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--bandit-config`",
-        ),
-    )
-
-    source_files_request = Get(
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, bandit.config_request)
+    source_files_get = Get(
         SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
 
-    bandit_pex, config_digest, source_files = await MultiGet(
-        bandit_pex_request, config_digest_request, source_files_request
+    bandit_pex, config_files, source_files = await MultiGet(
+        bandit_pex_get, config_files_get, source_files_get
     )
 
-    input_digest = await Get(Digest, MergeDigests((source_files.snapshot.digest, config_digest)))
+    input_digest = await Get(
+        Digest, MergeDigests((source_files.snapshot.digest, config_files.snapshot.digest))
+    )
 
     report_file_name = "bandit_report.txt" if lint_subsystem.reports_dir else None
 
@@ -152,9 +146,4 @@ async def bandit_lint(
 
 
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(LintRequest, BanditRequest),
-        *pex.rules(),
-        *stripped_source_files.rules(),
-    ]
+    return [*collect_rules(), UnionRule(LintRequest, BanditRequest), *pex.rules()]

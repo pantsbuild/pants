@@ -22,7 +22,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
-from pants.core.util_rules import distdir
+from pants.core.util_rules import config_files, distdir
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.process import InteractiveRunner
@@ -40,6 +40,7 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *dependency_inference_rules.rules(),
             *distdir.rules(),
+            *config_files.rules(),
             *package_pex_binary.rules(),
             get_filtered_environment,
             *target_types_rules.rules(),

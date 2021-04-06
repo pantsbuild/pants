@@ -27,16 +27,10 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    Digest,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -110,7 +104,7 @@ def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ..
 
 @rule(level=LogLevel.DEBUG)
 async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> LintResult:
-    requirements_pex_request = Get(
+    requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements(
@@ -129,7 +123,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         for plugin_tgt in partition.plugin_targets
         if plugin_tgt.has_field(PythonRequirementsField)
     )
-    pylint_pex_request = Get(
+    pylint_pex_get = Get(
         Pex,
         PexRequest(
             output_filename="pylint.pex",
@@ -139,39 +133,31 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         ),
     )
 
-    config_digest_request = Get(
-        Digest,
-        PathGlobs(
-            globs=[pylint.config] if pylint.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--pylint-config`",
-        ),
-    )
-
-    prepare_plugin_sources_request = Get(
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, pylint.config_request)
+    prepare_plugin_sources_get = Get(
         StrippedPythonSourceFiles, PythonSourceFilesRequest(partition.plugin_targets)
     )
-    prepare_python_sources_request = Get(
+    prepare_python_sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(partition.targets_with_dependencies)
     )
-    field_set_sources_request = Get(
+    field_set_sources_get = Get(
         SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
 
     (
         pylint_pex,
         requirements_pex,
-        config_digest,
+        config_files,
         prepared_plugin_sources,
         prepared_python_sources,
         field_set_sources,
     ) = await MultiGet(
-        pylint_pex_request,
-        requirements_pex_request,
-        config_digest_request,
-        prepare_plugin_sources_request,
-        prepare_python_sources_request,
-        field_set_sources_request,
+        pylint_pex_get,
+        requirements_pex_get,
+        config_files_get,
+        prepare_plugin_sources_get,
+        prepare_python_sources_get,
+        field_set_sources_get,
     )
 
     pylint_runner_pex = await Get(
@@ -207,7 +193,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         Digest,
         MergeDigests(
             (
-                config_digest,
+                config_files.snapshot.digest,
                 prefixed_plugin_sources,
                 prepared_python_sources.source_files.snapshot.digest,
             )
