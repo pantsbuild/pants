@@ -154,8 +154,10 @@ class ExecutionOptions:
             token_header = {"authorization": f"Bearer {oauth_token}"}
             remote_execution_headers.update(token_header)
             remote_store_headers.update(token_header)
-        if bootstrap_options.remote_auth_plugin and bootstrap_options.remote_auth_plugin.strip() and (
-            remote_execution or remote_cache_read or remote_cache_write
+        if (
+            bootstrap_options.remote_auth_plugin
+            and bootstrap_options.remote_auth_plugin.strip()
+            and (remote_execution or remote_cache_read or remote_cache_write)
         ):
             if ":" not in bootstrap_options.remote_auth_plugin:
                 raise OptionsError(
