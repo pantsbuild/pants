@@ -31,10 +31,7 @@ from pants.core.goals.test import (
     CoverageReports,
     FilesystemCoverageReport,
 )
-from pants.core.util_rules.warn_config_files_not_setup import (
-    WarnConfigFilesNotSetup,
-    WarnConfigFilesNotSetupResult,
-)
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
     AddPrefix,
@@ -42,9 +39,7 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     FileContent,
-    GlobMatchErrorBehavior,
     MergeDigests,
-    PathGlobs,
     Snapshot,
 )
 from pants.engine.process import ProcessResult
@@ -164,6 +159,15 @@ class CoverageSubsystem(PythonToolBase):
     def config(self) -> Optional[str]:
         return cast(Optional[str], self.options.config)
 
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=self.config,
+            check_existence=[".coveragerc"],
+            check_content={"setup.cfg": b"[coverage:"},
+            option_name=f"[{self.options_scope}].config",
+        )
+
 
 @dataclass(frozen=True)
 class PytestCoverageData(CoverageData):
@@ -201,25 +205,11 @@ def _validate_and_update_config(
 @rule
 async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
     coverage_config = configparser.ConfigParser()
-    if coverage.config:
-        config_contents = await Get(
-            DigestContents,
-            PathGlobs(
-                globs=(coverage.config,),
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"the option `[{coverage.options_scope}].config`",
-            ),
-        )
+
+    config_files = await Get(ConfigFiles, ConfigFilesRequest, coverage.config_request)
+    if config_files.snapshot.files:
+        config_contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
         coverage_config.read_string(config_contents[0].content.decode())
-    else:
-        await Get(
-            WarnConfigFilesNotSetupResult,
-            WarnConfigFilesNotSetup(
-                check_existence=[".coveragerc"],
-                check_content={"setup.cfg": b"[coverage:"},
-                option_name=f"[{coverage.options_scope}].config",
-            ),
-        )
 
     _validate_and_update_config(coverage_config, coverage.config)
     config_stream = StringIO()

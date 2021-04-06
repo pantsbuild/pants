@@ -11,7 +11,7 @@ from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules import source_files, warn_config_files_not_setup
+from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.target import Target
@@ -24,9 +24,9 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *flake8_rules(),
-            QueryRule(LintResults, [Flake8Request]),
             *source_files.rules(),
-            *warn_config_files_not_setup.rules(),
+            *config_files.rules(),
+            QueryRule(LintResults, [Flake8Request]),
         ],
         target_types=[PythonLibrary],
     )

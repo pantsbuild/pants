@@ -15,11 +15,8 @@ from pants.backend.python.util_rules.pex import (
     VenvPexProcess,
 )
 from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.warn_config_files_not_setup import (
-    WarnConfigFilesNotSetup,
-    WarnConfigFilesNotSetupResult,
-)
 from pants.engine.fs import Digest, DigestSubset, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -65,7 +62,7 @@ def generate_args(
 async def flake8_lint_partition(
     partition: Flake8Partition, flake8: Flake8, lint_subsystem: LintSubsystem
 ) -> LintResult:
-    flake8_pex_request = Get(
+    flake8_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="flake8.pex",
@@ -75,34 +72,17 @@ async def flake8_lint_partition(
             main=flake8.main,
         ),
     )
-
-    config_digest_request = Get(
-        Digest,
-        PathGlobs(
-            globs=[flake8.config] if flake8.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `[flake8].config`",
-        ),
-    )
-    if not flake8.config:
-        await Get(
-            WarnConfigFilesNotSetupResult,
-            WarnConfigFilesNotSetup(
-                check_existence=["flake8", ".flake8"],
-                check_content={"setup.cfg": b"[flake8]", "tox.ini": b"[flake8]"},
-                option_name="[flake8].config",
-            ),
-        )
-
-    source_files_request = Get(
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, flake8.config_request)
+    source_files_get = Get(
         SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
-
-    flake8_pex, config_digest, source_files = await MultiGet(
-        flake8_pex_request, config_digest_request, source_files_request
+    flake8_pex, config_files, source_files = await MultiGet(
+        flake8_pex_get, config_files_get, source_files_get
     )
 
-    input_digest = await Get(Digest, MergeDigests((source_files.snapshot.digest, config_digest)))
+    input_digest = await Get(
+        Digest, MergeDigests((source_files.snapshot.digest, config_files.snapshot.digest))
+    )
 
     report_file_name = "flake8_report.txt" if lint_subsystem.reports_dir else None
 

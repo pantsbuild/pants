@@ -3,29 +3,49 @@
 
 from __future__ import annotations
 
-from pants.core.util_rules import warn_config_files_not_setup
-from pants.core.util_rules.warn_config_files_not_setup import (
-    WarnConfigFilesNotSetup,
-    WarnConfigFilesNotSetupResult,
-)
+import pytest
+
+from pants.core.util_rules import config_files
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-def test_warn_if_config_file_not_setup(caplog) -> None:
-    rule_runner = RuleRunner(
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
         rules=[
-            *warn_config_files_not_setup.rules(),
-            QueryRule(WarnConfigFilesNotSetupResult, [WarnConfigFilesNotSetup]),
+            *config_files.rules(),
+            QueryRule(ConfigFiles, [ConfigFilesRequest]),
         ],
     )
+
+
+def test_resolve_if_specified(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"c1": "", "c2": ""})
+
+    def resolve(specified: list[str]) -> ConfigFiles:
+        return rule_runner.request(
+            ConfigFiles, [ConfigFilesRequest(specified=specified, option_name="[subsystem].config")]
+        )
+
+    assert resolve(["c1", "c2"]).snapshot.files == ("c1", "c2")
+    assert resolve(["c1"]).snapshot.files == ("c1",)
+    with pytest.raises(ExecutionError) as exc:
+        resolve(["fake"])
+    assert "fake" in str(exc.value)
+
+
+def test_warn_if_not_specified(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.write_files({"c1": "", "c2": "", "c3": "foo", "c4": "bar"})
 
     def warn(existence: list[str], content: dict[str, bytes]) -> None:
         caplog.clear()
         rule_runner.request(
-            WarnConfigFilesNotSetupResult,
+            ConfigFiles,
             [
-                WarnConfigFilesNotSetup(
+                ConfigFilesRequest(
+                    specified=None,
                     check_existence=existence,
                     check_content=content,
                     option_name="[subsystem].config",

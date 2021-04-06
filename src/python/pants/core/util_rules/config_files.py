@@ -7,8 +7,16 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
-from pants.engine.fs import DigestContents, PathGlobs, Paths
+from pants.engine.fs import (
+    EMPTY_SNAPSHOT,
+    DigestContents,
+    GlobMatchErrorBehavior,
+    PathGlobs,
+    Paths,
+    Snapshot,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -17,22 +25,23 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class WarnConfigFilesNotSetupResult:
-    pass
+class ConfigFiles:
+    """Config files used by a tool run by Pants."""
+
+    snapshot: Snapshot
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class WarnConfigFilesNotSetup:
-    """Warn if any of the specified locations are found in the build root by suggesting that the
-    user configure the corresponding option.
+class ConfigFilesRequest:
+    """Resolve the specified config files if given, else look for candidate config files and warn if
+    they exist but are not hooked up to Pants.
 
-    Files in `check_existence` only need to exist, whereas files in `check_content` both must
-    exist and contain the bytes snippet in the file.
-
-    Use with `Get(WarnConfigFilesNotSetupResult, WarnConfigFilesNotSetupResult).
+    Files in `check_existence` only need to exist, whereas files in `check_content` both must exist
+    and contain the bytes snippet in the file.
     """
 
+    specified: tuple[str, ...]
     check_existence: tuple[str, ...]
     check_content: FrozenDict[str, bytes]
     option_name: str
@@ -40,19 +49,31 @@ class WarnConfigFilesNotSetup:
     def __init__(
         self,
         *,
+        specified: str | Iterable[str] | None = None,
         option_name: str,
         check_existence: Iterable[str] = (),
         check_content: Mapping[str, bytes] = FrozenDict(),
     ) -> None:
+        self.specified = tuple(ensure_str_list(specified or (), allow_single_str=True))
         self.check_existence = tuple(sorted(check_existence))
         self.check_content = FrozenDict(check_content)
         self.option_name = option_name
 
 
-@rule(desc="Check if config files not yet set up", level=LogLevel.DEBUG)
-async def warn_if_config_file_not_setup(
-    request: WarnConfigFilesNotSetup,
-) -> WarnConfigFilesNotSetupResult:
+@rule(desc="Find config files", level=LogLevel.DEBUG)
+async def warn_if_config_file_not_setup(request: ConfigFilesRequest) -> ConfigFiles:
+    if request.specified:
+        config_snapshot = await Get(
+            Snapshot,
+            PathGlobs(
+                globs=request.specified,
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"the option `{request.option_name}`",
+            ),
+        )
+        return ConfigFiles(config_snapshot)
+
+    # Else, warn if there are config files but they're not hooked up to Pants.
     existence_paths, content_digest_contents = await MultiGet(
         Get(Paths, PathGlobs(request.check_existence)),
         Get(DigestContents, PathGlobs(request.check_content)),
@@ -82,7 +103,8 @@ async def warn_if_config_file_not_setup(
             f'`ignore_warnings = ["{warning_prefix}"]` to `pants.toml` in the `GLOBAL` '
             f"section.)"
         )
-    return WarnConfigFilesNotSetupResult()
+
+    return ConfigFiles(EMPTY_SNAPSHOT)
 
 
 def rules():

@@ -40,11 +40,8 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.warn_config_files_not_setup import (
-    WarnConfigFilesNotSetup,
-    WarnConfigFilesNotSetupResult,
-)
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
@@ -52,7 +49,6 @@ from pants.engine.fs import (
     Digest,
     DigestSubset,
     Directory,
-    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
@@ -138,13 +134,12 @@ async def setup_pytest_for_target(
         all_targets, python_setup
     )
 
-    requirements_pex_request = Get(
+    requirements_pex_get = Get(
         Pex,
         PexFromTargetsRequest,
         PexFromTargetsRequest.for_requirements([request.field_set.address], internal_only=True),
     )
-
-    pytest_pex_request = Get(
+    pytest_pex_get = Get(
         Pex,
         PexRequest(
             output_filename="pytest.pex",
@@ -154,33 +149,11 @@ async def setup_pytest_for_target(
         ),
     )
 
-    config_digest_request = Get(
-        Digest,
-        PathGlobs(
-            globs=[pytest.config] if pytest.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `[pytest]config`",
-        ),
-    )
-    if not pytest.config:
-        await Get(
-            WarnConfigFilesNotSetupResult,
-            WarnConfigFilesNotSetup(
-                check_existence=["pytest.ini"],
-                check_content={
-                    "pyproject.toml": b"[tool.pytest.ini_options]",
-                    "tox.ini": b"[pytest]",
-                    "setup.cfg": b"[tool:pytest]",
-                },
-                option_name="[pytest].config",
-            ),
-        )
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, pytest.config_request)
 
-    extra_output_directory_digest_request = Get(
-        Digest, CreateDigest([Directory(_EXTRA_OUTPUT_DIR)])
-    )
+    extra_output_directory_digest_get = Get(Digest, CreateDigest([Directory(_EXTRA_OUTPUT_DIR)]))
 
-    prepared_sources_request = Get(
+    prepared_sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
 
@@ -204,24 +177,22 @@ async def setup_pytest_for_target(
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    field_set_source_files_request = Get(
-        SourceFiles, SourceFilesRequest([request.field_set.sources])
-    )
+    field_set_source_files_get = Get(SourceFiles, SourceFilesRequest([request.field_set.sources]))
 
     (
         pytest_pex,
         requirements_pex,
         prepared_sources,
         field_set_source_files,
-        config_digest,
+        config_files,
         extra_output_directory_digest,
     ) = await MultiGet(
-        pytest_pex_request,
-        requirements_pex_request,
-        prepared_sources_request,
-        field_set_source_files_request,
-        config_digest_request,
-        extra_output_directory_digest_request,
+        pytest_pex_get,
+        requirements_pex_get,
+        prepared_sources_get,
+        field_set_source_files_get,
+        config_files_get,
+        extra_output_directory_digest_get,
     )
 
     pytest_runner_pex = await Get(
@@ -241,7 +212,7 @@ async def setup_pytest_for_target(
             (
                 coverage_config.digest,
                 prepared_sources.source_files.snapshot.digest,
-                config_digest,
+                config_files.snapshot.digest,
                 extra_output_directory_digest,
                 *(binary.digest for binary in assets),
             )

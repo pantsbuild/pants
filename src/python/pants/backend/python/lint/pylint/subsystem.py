@@ -7,6 +7,7 @@ from typing import List, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.option.custom_types import file_option, shell_str, target_option
 from pants.util.docutil import bracketed_docs_url
@@ -76,6 +77,15 @@ class Pylint(PythonToolBase):
     @property
     def config(self) -> str | None:
         return cast("str | None", self.options.config)
+
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=self.config,
+            check_existence=["pylintrc", ".pylinrc"],
+            check_content={"pyproject.toml": b"[tool.pylint]", "setup.cfg": b"[pylint."},
+            option_name=f"[{self.options_scope}].config",
+        )
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:

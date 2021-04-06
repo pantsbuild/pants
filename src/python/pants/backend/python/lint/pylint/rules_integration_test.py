@@ -11,7 +11,7 @@ from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules import warn_config_files_not_setup
+from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
@@ -24,7 +24,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pylint_rules(),
             QueryRule(LintResults, [PylintRequest]),
-            *warn_config_files_not_setup.rules(),
+            *config_files.rules(),
         ],
         target_types=[PythonLibrary, PythonRequirementLibrary],
     )

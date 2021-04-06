@@ -17,18 +17,9 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.warn_config_files_not_setup import (
-    WarnConfigFilesNotSetup,
-    WarnConfigFilesNotSetupResult,
-)
-from pants.engine.fs import (
-    Digest,
-    GlobExpansionConjunction,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
@@ -73,7 +64,7 @@ def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool) 
 
 @rule(level=LogLevel.DEBUG)
 async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
-    isort_pex_request = Get(
+    isort_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="isort.pex",
@@ -84,32 +75,14 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
         ),
     )
 
-    config_digest_request = Get(
-        Digest,
-        PathGlobs(
-            globs=isort.config,
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            conjunction=GlobExpansionConjunction.all_match,
-            description_of_origin="the option `[isort].config`",
-        ),
-    )
-    if not isort.config:
-        await Get(
-            WarnConfigFilesNotSetupResult,
-            WarnConfigFilesNotSetup(
-                check_existence=[".isort.cfg"],
-                check_content={"pyproject.toml": b"[tool.isort]"},
-                option_name="[isort].config",
-            ),
-        )
-
-    source_files_request = Get(
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, isort.config_request)
+    source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
 
-    source_files, isort_pex, config_digest = await MultiGet(
-        source_files_request, isort_pex_request, config_digest_request
+    source_files, isort_pex, config_files = await MultiGet(
+        source_files_get, isort_pex_get, config_files_get
     )
     source_files_snapshot = (
         source_files.snapshot
@@ -117,7 +90,9 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
         else setup_request.request.prior_formatter_result
     )
 
-    input_digest = await Get(Digest, MergeDigests((source_files_snapshot.digest, config_digest)))
+    input_digest = await Get(
+        Digest, MergeDigests((source_files_snapshot.digest, config_files.snapshot.digest))
+    )
 
     process = await Get(
         Process,

@@ -3,6 +3,7 @@
 
 from typing import Optional, Tuple, cast
 
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.custom_types import file_option, shell_str
 from pants.option.subsystem import Subsystem
 
@@ -125,3 +126,16 @@ class PyTest(Subsystem):
     @property
     def config(self) -> Optional[str]:
         return cast(Optional[str], self.options.config)
+
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=self.config,
+            check_existence=["pytest.ini"],
+            check_content={
+                "pyproject.toml": b"[tool.pytest.ini_options]",
+                "tox.ini": b"[pytest]",
+                "setup.cfg": b"[tool:pytest]",
+            },
+            option_name=f"[{self.options_scope}].config",
+        )
