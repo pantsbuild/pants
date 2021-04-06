@@ -242,21 +242,13 @@ def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
 
 
 def test_type_stubs(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            f"{PACKAGE}/f.py": GOOD_FILE,
-            f"{PACKAGE}/f.pyi": BAD_FILE,
-            f"{PACKAGE}/BUILD": "python_library()",
-        }
-    )
-    tgts = [
-        rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py")),
-        rule_runner.get_target(Address(PACKAGE, relative_file_path="f.pyi")),
-    ]
-    result = run_pylint(rule_runner, tgts)
+    # If an implementation file shares the same name as a type stub, Pylint will only check the
+    # implementation file. So, here, we only check running directly on a type stub.
+    rule_runner.write_files({f"{PACKAGE}/f.pyi": BAD_FILE, f"{PACKAGE}/BUILD": "python_library()"})
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.pyi"))
+    result = run_pylint(rule_runner, [tgt])
     assert len(result) == 1
     assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
-    assert f"{PACKAGE}/f.py:" not in result[0].stdout
     assert f"{PACKAGE}/f.pyi:2:0: C0103" in result[0].stdout
 
 
