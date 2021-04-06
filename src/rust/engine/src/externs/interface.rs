@@ -114,7 +114,8 @@ py_module_initializer!(native_engine, |py, m| {
         d: bool,
         e: PyDict,
         f: Vec<String>,
-        g: String
+        g: Vec<String>,
+        h: String
       )
     ),
   )?;
@@ -1843,7 +1844,8 @@ fn stdio_initialize(
   use_color: bool,
   show_target: bool,
   log_levels_by_target: PyDict,
-  message_regex_filters: Vec<String>,
+  literal_filters: Vec<String>,
+  regex_filters: Vec<String>,
   log_file: String,
 ) -> CPyResult<PyTuple> {
   let log_levels_by_target = log_levels_by_target
@@ -1855,21 +1857,29 @@ fn stdio_initialize(
       (k, v)
     })
     .collect::<HashMap<_, _>>();
-  let message_regex_filters = message_regex_filters
+  let regex_filters = regex_filters
     .iter()
     .map(|re| {
       Regex::new(re).map_err(|e| {
-        PyErr::new::<exc::Exception, _>(py, (format!("Failed to parse warning filter: {}", e),))
+        PyErr::new::<exc::Exception, _>(
+          py,
+          format!(
+            "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{}",
+            e,
+          )
+        )
       })
     })
     .collect::<Result<Vec<Regex>, _>>()?;
+
   Logger::init(
     level,
     show_rust_3rdparty_logs,
     use_color,
     show_target,
     log_levels_by_target,
-    message_regex_filters,
+    literal_filters,
+    regex_filters,
     PathBuf::from(log_file),
   )
   .map_err(|s| {

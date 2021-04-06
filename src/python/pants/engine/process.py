@@ -11,7 +11,6 @@ from enum import Enum
 from textwrap import dedent
 from typing import TYPE_CHECKING, Iterable, Mapping, Tuple
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -289,7 +288,6 @@ class InteractiveProcess:
         env: Mapping[str, str] | None = None,
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
-        hermetic_env: bool | None = None,
         forward_signals_to_process: bool = True,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
@@ -309,14 +307,6 @@ class InteractiveProcess:
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
 
-        deprecated_conditional(
-            predicate=lambda: hermetic_env is not None,
-            removal_version="2.5.0.dev0",
-            entity_description="The hermetic_env flag",
-            hint_message=(
-                "@rules should request and pass either a CompleteEnvironment or Environment as the `env`."
-            ),
-        )
         self.__post_init__()
 
     def __post_init__(self):
@@ -331,14 +321,12 @@ class InteractiveProcess:
         cls,
         process: Process,
         *,
-        hermetic_env: bool | None = None,
         forward_signals_to_process: bool = True,
     ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
             input_digest=process.input_digest,
-            hermetic_env=hermetic_env,
             forward_signals_to_process=forward_signals_to_process,
         )
 

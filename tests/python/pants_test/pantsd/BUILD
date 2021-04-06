@@ -13,13 +13,13 @@ python_library(
   ],
 )
 
-python_integration_tests(
-  name = 'pantsd_integration',
+python_tests(
+  name='pantsd_integration',
+  sources=["pantsd_integration_test.py"],
   dependencies = [
     'testprojects/src/python:hello_directory',
     'testprojects/src/python:bad_requirements_directory',
     'testprojects/src/python:print_env_directory',
   ],
-  uses_pants_run=True,
   timeout = 2100
 )

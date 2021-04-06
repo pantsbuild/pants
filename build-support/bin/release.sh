@@ -141,6 +141,8 @@ REQUIREMENTS_3RDPARTY_FILES=(
 function execute_packaged_pants_with_internal_backends() {
   pants \
     --no-verify-config \
+    --no-remote-cache-read \
+    --no-remote-cache-write \
     --no-pantsd \
     --pythonpath="['pants-plugins']" \
     --backend-packages="[\
@@ -227,11 +229,6 @@ function install_and_test_packages() {
 
   pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
 
-  # Avoid caching plugin installs.
-  PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
-  export PANTS_PLUGIN_CACHE_DIR
-  trap 'rm -rf "${PANTS_PLUGIN_CACHE_DIR}"' EXIT
-
   # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   packages=(
@@ -298,7 +295,7 @@ function build_pex() {
   local mode="$1"
 
   local linux_platform_noabi="linux_x86_64"
-  local osx_platform_noabi="macosx_10.11_x86_64"
+  local osx_platform_noabi="macosx_10.15_x86_64"
 
   case "${mode}" in
     build)

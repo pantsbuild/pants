@@ -325,6 +325,7 @@ class PexRequest(EngineAwareParameter):
     sources: Digest | None
     additional_inputs: Digest | None
     main: MainSpecification | None
+    repository_pex: Pex | None
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
     apply_requirement_constraints: bool
@@ -341,6 +342,7 @@ class PexRequest(EngineAwareParameter):
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         main: MainSpecification | None = None,
+        repository_pex: Pex | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
         apply_requirement_constraints: bool = True,
@@ -364,6 +366,8 @@ class PexRequest(EngineAwareParameter):
             directly in the Pex, but should be present in the environment when building the Pex.
         :param main: The main for the built Pex, equivalent to Pex's `-e` or '-c' flag. If
             left off, the Pex will open up as a REPL.
+        :param repository_pex: An optional PEX to resolve requirements from via the Pex CLI
+            `--pex-repository` option.
         :param additional_args: Any additional Pex flags.
         :param pex_path: Pex files to add to the PEX_PATH.
         :param apply_requirement_constraints: Whether to apply any configured
@@ -379,6 +383,7 @@ class PexRequest(EngineAwareParameter):
         self.sources = sources
         self.additional_inputs = additional_inputs
         self.main = main
+        self.repository_pex = repository_pex
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
         self.apply_requirement_constraints = apply_requirement_constraints
@@ -561,17 +566,25 @@ async def build_pex(
     argv = [
         "--output-file",
         request.output_filename,
+        *request.additional_args,
+    ]
+
+    if request.repository_pex:
+        argv.extend(["--pex-repository", request.repository_pex.name])
+    else:
         # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
         # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
         # case. Why set `--no-pypi`, then? We need to do this so that
         # `--python-repos-repos=['custom_url']` will only point to that index and not include PyPI.
-        "--no-pypi",
-        *(f"--index={index}" for index in python_repos.indexes),
-        *(f"--repo={repo}" for repo in python_repos.repos),
-        "--resolver-version",
-        python_setup.resolver_version.value,
-        *request.additional_args,
-    ]
+        argv.extend(
+            [
+                "--no-pypi",
+                *(f"--index={index}" for index in python_repos.indexes),
+                *(f"--repo={repo}" for repo in python_repos.repos),
+                "--resolver-version",
+                "pip-2020-resolver",
+            ]
+        )
 
     python: PythonExecutable | None = None
 
@@ -619,6 +632,9 @@ async def build_pex(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
     additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
+    repository_pex_digest = (
+        request.repository_pex.digest if request.repository_pex else EMPTY_DIGEST
+    )
 
     merged_digest = await Get(
         Digest,
@@ -627,6 +643,7 @@ async def build_pex(
                 sources_digest_as_subdir,
                 additional_inputs_digest,
                 constraint_file_digest,
+                repository_pex_digest,
                 *(pex.digest for pex in request.pex_path),
             )
         ),
@@ -886,39 +903,31 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
     request = two_step_pex_request.pex_request
     req_pex_name = "__requirements.pex"
 
-    additional_inputs: Digest | None
+    repository_pex: Pex | None = None
 
     # Create a pex containing just the requirements.
     if request.requirements:
-        requirements_pex_request = PexRequest(
-            output_filename=req_pex_name,
-            internal_only=request.internal_only,
-            requirements=request.requirements,
-            interpreter_constraints=request.interpreter_constraints,
-            platforms=request.platforms,
-            # TODO: Do we need to pass all the additional args to the requirements pex creation?
-            #  Some of them may affect resolution behavior, but others may be irrelevant.
-            #  For now we err on the side of caution.
-            additional_args=request.additional_args,
-            description=(
-                f"Resolving {pluralize(len(request.requirements), 'requirement')}: "
-                f"{', '.join(request.requirements)}"
+        repository_pex = await Get(
+            Pex,
+            PexRequest(
+                output_filename=req_pex_name,
+                internal_only=request.internal_only,
+                requirements=request.requirements,
+                interpreter_constraints=request.interpreter_constraints,
+                platforms=request.platforms,
+                # TODO: Do we need to pass all the additional args to the requirements pex creation?
+                #  Some of them may affect resolution behavior, but others may be irrelevant.
+                #  For now we err on the side of caution.
+                additional_args=request.additional_args,
+                description=(
+                    f"Resolving {pluralize(len(request.requirements), 'requirement')}: "
+                    f"{', '.join(request.requirements)}"
+                ),
             ),
         )
-        requirements_pex = await Get(Pex, PexRequest, requirements_pex_request)
-        additional_inputs = requirements_pex.digest
-        additional_args = (*request.additional_args, f"--requirements-pex={req_pex_name}")
-    else:
-        additional_inputs = None
-        additional_args = request.additional_args
 
     # Now create a full PEX on top of the requirements PEX.
-    full_pex_request = dataclasses.replace(
-        request,
-        requirements=PexRequirements(),
-        additional_inputs=additional_inputs,
-        additional_args=additional_args,
-    )
+    full_pex_request = dataclasses.replace(request, repository_pex=repository_pex)
     full_pex = await Get(Pex, PexRequest, full_pex_request)
     return TwoStepPex(pex=full_pex)
 

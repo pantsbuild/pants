@@ -25,7 +25,7 @@ class PantsEnvironment:
     env: FrozenDict[str, str]
 
     @deprecated(
-        "2.5.0.dev0",
+        "2.5.0.dev1",
         hint_message="Request a subset Environment (using EnvironmentRequest) or the CompleteEnvironment.",
     )
     def __init__(self, env: Optional[Mapping[str, str]] = None) -> None:
