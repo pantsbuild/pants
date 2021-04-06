@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -14,7 +15,7 @@ from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.environment import CompleteEnvironment
-from pants.engine.internals.native import Native
+from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
@@ -72,8 +73,7 @@ class LocalPantsRunner:
         scheduler: Optional[GraphScheduler] = None,
         cancellation_latch: Optional[PySessionCancellationLatch] = None,
     ) -> GraphSession:
-        native = Native()
-        native.set_panic_handler()
+        native_engine.maybe_set_panic_handler()
         graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(
             options_bootstrapper, build_config, env
         )
@@ -218,14 +218,28 @@ class LocalPantsRunner:
         )
         return tuple(wcf.callback_factory() for wcf in workunits_callback_factories)
 
-    def run(self, start_time: float) -> ExitCode:
-        spec_parser = SpecsParser(get_buildroot())
-        specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
-        self.run_tracker.start(run_start_time=start_time, specs=specs)
+    def _run_inner(self) -> ExitCode:
+        goals = tuple(self.options.goals)
+        if self.options.help_request:
+            return self._print_help(self.options.help_request)
+        if not goals:
+            return PANTS_SUCCEEDED_EXIT_CODE
 
+        try:
+            return self._perform_run(goals)
+        except Exception as e:
+            ExceptionSink.log_exception(e)
+            return PANTS_FAILED_EXIT_CODE
+        except KeyboardInterrupt:
+            print("Interrupted by user.\n", file=sys.stderr)
+            return PANTS_FAILED_EXIT_CODE
+
+    def run(self, start_time: float) -> ExitCode:
         with maybe_profiled(self.profile_path):
+            spec_parser = SpecsParser(get_buildroot())
+            specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
+            self.run_tracker.start(run_start_time=start_time, specs=specs)
             global_options = self.options.for_global_scope()
-            goals = tuple(self.options.goals)
 
             streaming_reporter = StreamingWorkunitHandler(
                 self.graph_session.scheduler_session,
@@ -237,19 +251,12 @@ class LocalPantsRunner:
                 pantsd=global_options.pantsd,
             )
             with streaming_reporter:
-                if self.options.help_request:
-                    return self._print_help(self.options.help_request)
-                if not goals:
-                    return PANTS_SUCCEEDED_EXIT_CODE
-
+                engine_result = PANTS_FAILED_EXIT_CODE
                 try:
-                    engine_result = self._perform_run(goals)
-                except Exception as e:
-                    ExceptionSink.log_exception(e)
-                    engine_result = PANTS_FAILED_EXIT_CODE
+                    engine_result = self._run_inner()
+                finally:
+                    metrics = self.graph_session.scheduler_session.metrics()
+                    self.run_tracker.set_pantsd_scheduler_metrics(metrics)
+                    self.run_tracker.end_run(engine_result)
 
-                metrics = self.graph_session.scheduler_session.metrics()
-                self.run_tracker.set_pantsd_scheduler_metrics(metrics)
-                self.run_tracker.end_run(engine_result)
-
-            return engine_result
+                return engine_result

@@ -16,14 +16,13 @@ MERGE_BASE="$(git_merge_base)"
 # new build.
 CHANGED_FILES="$(git diff --name-only "${MERGE_BASE}")"
 
-NUM_NON_MD_FILES=$(echo "${CHANGED_FILES})" | grep -c -v ".\md$")
-
 # Ensure that this stays in sync with `build-support/bin/rust/calculate_engine_hash.sh`.
 NUM_RUST_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^src/rust/engine" \
   -e "^rust-toolchain" \
   -e "^build-support/bin/rust" \
-  -e "^build-support/bin/generate_travis_yml.py")
+  -e "^build-support/bin/generate_travis_yml.py" \
+  -e "^build-support/bin/generate_github_workflows.py")
 
 NUM_RELEASE_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^src/python/pants/VERSION" \
@@ -31,24 +30,15 @@ NUM_RELEASE_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^src/rust/engine/fs/fs_util" \
   -e "^build-support/bin/release.sh" \
   -e "^build-support/bin/packages.py" \
-  -e "^build-support/bin/generate_travis_yml.py")
+  -e "^build-support/bin/generate_travis_yml.py" \
+  -e "^build-support/bin/generate_github_workflows.py")
 
 # To avoid putting skip labels multiple times, check if the labels already exist
 # in the commit message.
-grep "\[ci skip\]" "${COMMIT_MSG_FILEPATH}" > /dev/null
-HAS_CI_SKIP=$?
 grep "\[ci skip-rust\]" "${COMMIT_MSG_FILEPATH}" > /dev/null
 HAS_RUST_SKIP=$?
 grep "\[ci skip-build-wheels\]" "${COMMIT_MSG_FILEPATH}" > /dev/null
 HAS_WHEELS_SKIP=$?
-
-if [[ "${HAS_CI_SKIP}" -eq 1 ]] && [ "${NUM_NON_MD_FILES}" -eq 0 ]; then
-cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
-
-# All CI will be skipped. Delete if not intended.
-[ci skip]
-EOF
-fi
 
 if [[ "${HAS_RUST_SKIP}" -eq 1 ]] && [ "${NUM_RUST_FILES}" -eq 0 ]; then
 cat <<EOF >> "${COMMIT_MSG_FILEPATH}"

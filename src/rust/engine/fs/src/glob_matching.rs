@@ -370,8 +370,13 @@ pub trait GlobMatching<E: Display + Send + Sync + 'static>: VFS<E> {
   ///
   /// Recursively expands PathGlobs into PathStats while applying excludes.
   ///
-  async fn expand_globs(&self, path_globs: PreparedPathGlobs) -> Result<Vec<PathStat>, E> {
-    GlobMatchingImplementation::expand_globs(self, path_globs).await
+  async fn expand_globs(
+    &self,
+    path_globs: PreparedPathGlobs,
+    unmatched_globs_additional_context: Option<String>,
+  ) -> Result<Vec<PathStat>, E> {
+    GlobMatchingImplementation::expand_globs(self, path_globs, unmatched_globs_additional_context)
+      .await
   }
 }
 
@@ -442,7 +447,11 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
     Ok(path_stats.into_iter().filter_map(|pso| pso).collect())
   }
 
-  async fn expand_globs(&self, path_globs: PreparedPathGlobs) -> Result<Vec<PathStat>, E> {
+  async fn expand_globs(
+    &self,
+    path_globs: PreparedPathGlobs,
+    unmatched_globs_additional_context: Option<String>,
+  ) -> Result<Vec<PathStat>, E> {
     let PreparedPathGlobs {
       include,
       exclude,
@@ -528,8 +537,12 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
           }
         };
         let msg = format!(
-          "{}{}{}{}",
-          prefix, origin, unmatched_globs, excludes_portion
+          "{}{}{}{}{}",
+          prefix,
+          origin,
+          unmatched_globs,
+          excludes_portion,
+          unmatched_globs_additional_context.unwrap_or_else(|| "".to_owned())
         );
         if strict_match_behavior.should_throw_on_error() {
           return Err(Self::mk_error(&msg));
@@ -661,7 +674,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
     let path_globs =
       PreparedPathGlobs::from_globs(link_globs).map_err(|e| Self::mk_error(e.as_str()))?;
     let mut path_stats = context
-      .expand_globs(path_globs)
+      .expand_globs(path_globs, None)
       .map_err(move |e| Self::mk_error(&format!("While expanding link {:?}: {}", link.0, e)))
       .await?;
 

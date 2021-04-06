@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import warnings
+from pathlib import PurePath
 from typing import Any
 
 from setproctitle import setproctitle as set_process_title
@@ -16,12 +17,11 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.environment import CompleteEnvironment
-from pants.engine.internals.native import Native
-from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.internals import native_engine
 from pants.init.engine_initializer import GraphScheduler
-from pants.init.logging import initialize_stdio
+from pants.init.logging import initialize_stdio, pants_log_path
 from pants.init.util import init_workdir
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, LocalStoreOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -31,6 +31,7 @@ from pants.pantsd.service.pants_service import PantsServices
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.util.contextutil import argv_as, hermetic_environment_as
+from pants.util.dirutil import safe_open
 from pants.util.logging import LogLevel
 from pants.util.strutil import ensure_text
 
@@ -56,19 +57,16 @@ class PantsDaemon(PantsDaemonProcessManager):
             bootstrap_options = options_bootstrapper.bootstrap_options
             bootstrap_options_values = bootstrap_options.for_global_scope()
 
-        native = Native()
-
-        executor = PyExecutor(*GlobalOptions.compute_executor_arguments(bootstrap_options_values))
+        executor = GlobalOptions.create_py_executor(bootstrap_options_values)
         core = PantsDaemonCore(options_bootstrapper, env, executor, cls._setup_services)
 
-        server = native.new_nailgun_server(
+        server = native_engine.nailgun_server_create(
             executor,
             bootstrap_options_values.pantsd_pailgun_port,
             DaemonPantsRunner(core),
         )
 
         return PantsDaemon(
-            native=native,
             work_dir=bootstrap_options_values.pants_workdir,
             log_level=bootstrap_options_values.level,
             server=server,
@@ -104,12 +102,14 @@ class PantsDaemon(PantsDaemonProcessManager):
             max_memory_usage_in_bytes=bootstrap_options.pantsd_max_memory_usage,
         )
 
-        store_gc_service = StoreGCService(graph_scheduler.scheduler)
+        store_gc_service = StoreGCService(
+            graph_scheduler.scheduler,
+            local_store_options=LocalStoreOptions.from_options(bootstrap_options),
+        )
         return PantsServices(services=(scheduler_service, store_gc_service))
 
     def __init__(
         self,
-        native: Native,
         work_dir: str,
         log_level: LogLevel,
         server: Any,
@@ -120,7 +120,6 @@ class PantsDaemon(PantsDaemonProcessManager):
         """
         NB: A PantsDaemon instance is generally instantiated via `create`.
 
-        :param native: A `Native` instance.
         :param work_dir: The pants work directory.
         :param log_level: The log level to use for daemon logging.
         :param server: A native PyNailgunServer instance (not currently a nameable type).
@@ -129,7 +128,6 @@ class PantsDaemon(PantsDaemonProcessManager):
         :param bootstrap_options: The bootstrap options.
         """
         super().__init__(bootstrap_options, daemon_entrypoint=__name__)
-        self._native = native
         self._build_root = get_buildroot()
         self._work_dir = work_dir
         self._server = server
@@ -138,14 +136,29 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         self._logger = logging.getLogger(__name__)
 
-    @staticmethod
-    def _close_stdio():
-        """Close stdio streams to avoid output in the tty that launched pantsd."""
-        for fd in (sys.stdin, sys.stdout, sys.stderr):
-            file_no = fd.fileno()
+    def _close_stdio(self, log_path: PurePath):
+        """Close stdio and append to a log path instead.
+
+        The vast majority of Python-level IO will be re-routed to thread-local destinations by
+        `initialize_stdio`, but we close stdio to avoid any stray output in the tty that launched
+        pantsd.
+
+        Rather than leaving 0, 1, 2 dangling though, we open replacements as a backstop for fatal
+        errors or unmodified code (such as Rust panic handlers) that might expect them to be valid
+        file handles.
+        """
+        for attr, writable in (("stdin", False), ("stdout", True), ("stderr", True)):
+            # Close the old.
+            fd = getattr(sys, attr)
+            fileno = fd.fileno()
             fd.flush()
             fd.close()
-            os.close(file_no)
+
+            # Open the new.
+            temp_fd = safe_open(log_path, "w") if writable else open(os.devnull)
+            os.dup2(temp_fd.fileno(), fileno)
+            setattr(sys, attr, os.fdopen(fileno, mode=("w" if writable else "r")))
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
 
     def _initialize_metadata(self) -> None:
         """Writes out our pid and other metadata.
@@ -172,7 +185,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         # Switch log output to the daemon's log stream, and empty `env` and `argv` to encourage all
         # further usage of those variables to happen via engine APIs and options.
-        self._close_stdio()
+        self._close_stdio(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
         with initialize_stdio(global_bootstrap_options), argv_as(
             tuple()
         ), hermetic_environment_as():
@@ -180,7 +193,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             ExceptionSink.install(
                 log_location=init_workdir(global_bootstrap_options), pantsd_instance=True
             )
-            self._native.set_panic_handler()
+            native_engine.maybe_set_panic_handler()
 
             self._initialize_metadata()
 
@@ -190,7 +203,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
             # We're exiting: join the server to avoid interrupting ongoing runs.
             self._logger.info("Waiting for ongoing runs to complete before exiting...")
-            self._native.nailgun_server_await_shutdown(self._server)
+            native_engine.nailgun_server_await_shutdown(self._server)
             self._logger.info("Exiting pantsd")
 
 

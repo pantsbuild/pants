@@ -17,7 +17,7 @@ from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -42,7 +42,9 @@ class SourceRootError(Exception):
     """An error related to SourceRoot computation."""
 
     def __init__(self, msg: str):
-        super().__init__(f"{msg}See {docs_url('source-roots')} for how to define source roots.")
+        super().__init__(
+            f"{msg}See {bracketed_docs_url('source-roots')} for how to define source roots."
+        )
 
 
 class InvalidSourceRootPatternError(SourceRootError):
@@ -111,7 +113,7 @@ class SourceRootConfig(Subsystem):
             "`<buildroot>/project1/src/python`. A `*` wildcard will match a single path segment, "
             "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
             "Use `/` to signify that the buildroot itself is a source root. "
-            f"See {docs_url('source-roots')}",
+            f"See {bracketed_docs_url('source-roots')}",
         )
         register(
             "--marker-filenames",

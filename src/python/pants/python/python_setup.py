@@ -14,7 +14,7 @@ from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.environment import Environment
-from pants.option.custom_types import file_option
+from pants.option.custom_types import file_option, target_option
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -37,13 +37,6 @@ class ResolveAllConstraintsOption(Enum):
     NONDEPLOYABLES = "nondeployables"
     # Always use the entire constraints file.
     ALWAYS = "always"
-
-
-class ResolverVersion(Enum):
-    """The resolver implementation to use when resolving Python requirements."""
-
-    PIP_LEGACY = "pip-legacy-resolver"
-    PIP_2020 = "pip-2020-resolver"
 
 
 class PythonSetup(Subsystem):
@@ -71,11 +64,27 @@ class PythonSetup(Subsystem):
             "--requirement-constraints",
             advanced=True,
             type=file_option,
+            mutually_exclusive_group="constraints",
             help=(
                 "When resolving third-party requirements, use this "
                 "constraints file to determine which versions to use.\n\nSee "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
                 "on the format of constraint files and how constraints are applied in Pex and pip."
+                "\n\nMutually exclusive with `--requirement-constraints-target`."
+            ),
+        )
+        register(
+            "--requirement-constraints-target",
+            advanced=True,
+            type=target_option,
+            mutually_exclusive_group="constraints",
+            help=(
+                "When resolving third-party requirements, use this "
+                "_python_constraints target to determine which versions to use.\n\nThis is "
+                "primarily intended for macros (for now). Normally, use "
+                "`--requirement-constraints` instead with a constraints file.\n\nSee "
+                "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
+                "on the format of constraints and how constraints are applied in Pex and pip."
             ),
         )
         register(
@@ -116,20 +125,6 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
-            "--resolver-version",
-            advanced=True,
-            type=ResolverVersion,
-            default=ResolverVersion.PIP_2020,
-            help="The resolver implementation to use when resolving Python requirements.",
-            removal_version="2.5.0.dev0",
-            removal_hint=(
-                "Support for configuring --resolver-version and selecting pip's legacy resolver "
-                "will be removed in Pants 2.5. Refer to https://pip.pypa.io/en/latest/user_guide/"
-                "#changes-to-the-pip-dependency-resolver-in-20-2-2020 for more information on the "
-                "new resolver."
-            ),
-        )
-        register(
             "--resolver-manylinux",
             advanced=True,
             type=str,
@@ -157,9 +152,14 @@ class PythonSetup(Subsystem):
         return tuple(self.options.interpreter_constraints)
 
     @property
-    def requirement_constraints(self) -> Optional[str]:
+    def requirement_constraints(self) -> str | None:
         """Path to constraint file."""
-        return cast(Optional[str], self.options.requirement_constraints)
+        return cast("str | None", self.options.requirement_constraints)
+
+    @property
+    def requirement_constraints_target(self) -> str | None:
+        """Address for a _python_constraints target."""
+        return cast("str | None", self.options.requirement_constraints_target)
 
     @property
     def resolve_all_constraints(self) -> ResolveAllConstraintsOption:
@@ -171,10 +171,6 @@ class PythonSetup(Subsystem):
     @memoized_method
     def interpreter_search_paths(self, env: Environment):
         return self.expand_interpreter_search_paths(self.options.interpreter_search_paths, env)
-
-    @property
-    def resolver_version(self) -> ResolverVersion:
-        return cast(ResolverVersion, self.options.resolver_version)
 
     @property
     def manylinux(self) -> Optional[str]:

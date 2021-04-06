@@ -265,7 +265,7 @@ impl Snapshot {
       )?);
 
       let path_stats = posix_fs
-        .expand_globs(path_globs)
+        .expand_globs(path_globs, None)
         .await
         .map_err(|err| format!("Error expanding globs: {}", err))?;
       Snapshot::from_path_stats(

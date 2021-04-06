@@ -2,19 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import http.client
+import locale
 import logging
-import os
 import sys
 from contextlib import contextmanager
+from io import BufferedReader, TextIOWrapper
 from logging import Formatter, LogRecord, StreamHandler
-from typing import Dict, Iterator
+from pathlib import PurePath
+from typing import Dict, Iterator, cast
 
 import pants.util.logging as pants_logging
-from pants.base.deprecated import deprecated_conditional
 from pants.engine.internals import native_engine
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.logging import LogLevel
+from pants.util.strutil import strip_prefix
 
 # Although logging supports the WARN level, its not documented and could conceivably be yanked.
 # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
@@ -28,7 +30,7 @@ class _NativeHandler(StreamHandler):
     method) and proxies logs to the Rust logging infrastructure."""
 
     def emit(self, record: LogRecord) -> None:
-        native_engine.write_log(msg=self.format(record), level=record.levelno, target=record.name)
+        native_engine.write_log(self.format(record), record.levelno, record.name)
 
     def flush(self) -> None:
         native_engine.flush_log()
@@ -130,39 +132,41 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     use_color = global_bootstrap_options.colors
     show_target = global_bootstrap_options.show_log_target
     log_levels_by_target = _get_log_levels_by_target(global_bootstrap_options)
-    message_regex_filters = global_bootstrap_options.ignore_pants_warnings
     print_stacktrace = global_bootstrap_options.print_stacktrace
 
+    literal_filters = []
+    regex_filters = cast("list[str]", global_bootstrap_options.ignore_pants_warnings)
+    for filt in cast("list[str]", global_bootstrap_options.ignore_warnings):
+        if filt.startswith("$regex$"):
+            regex_filters.append(strip_prefix(filt, "$regex$"))
+        else:
+            literal_filters.append(filt)
+
     # Set the pants log destination.
-    deprecated_log_path = os.path.join(
-        global_bootstrap_options.pants_workdir, "pantsd", "pantsd.log"
-    )
-    log_path = os.path.join(global_bootstrap_options.pants_workdir, "pants.log")
-    safe_mkdir_for(deprecated_log_path)
+    log_path = str(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
     safe_mkdir_for(log_path)
-    # NB: We append to the deprecated log location with a deprecated conditional that never
-    # triggers, because there is nothing that the user can do about the deprecation.
-    deprecated_conditional(
-        predicate=lambda: False,
-        removal_version="2.5.0.dev0",
-        entity_description=f"Logging to {deprecated_log_path}",
-        hint_message=f"Refer to {log_path} instead.",
-    )
-    with open(deprecated_log_path, "a") as a:
-        a.write(f"This log location is deprecated: please refer to {log_path} instead.\n")
 
     # Initialize thread-local stdio, and replace sys.std* with proxies.
     original_stdin, original_stdout, original_stderr = sys.stdin, sys.stdout, sys.stderr
     try:
-        sys.stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
+        raw_stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
             global_level.level,
             log_show_rust_3rdparty,
             use_color,
             show_target,
             {k: v.level for k, v in log_levels_by_target.items()},
-            tuple(message_regex_filters),
+            tuple(literal_filters),
+            tuple(regex_filters),
             log_path,
         )
+        sys.stdin = TextIOWrapper(
+            BufferedReader(raw_stdin),
+            # NB: We set the default encoding explicitly to bypass logic in the TextIOWrapper
+            # constructor that would poke the underlying file (which is not valid until a
+            # `stdio_destination` is set).
+            encoding=locale.getpreferredencoding(False),
+        )
+
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
         # Install a Python logger that will route through the Rust logger.
         with _python_logging_setup(global_level, print_stacktrace):
@@ -170,6 +174,11 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     finally:
         sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
+
+
+def pants_log_path(workdir: PurePath) -> PurePath:
+    """Given the path of the workdir, returns the `pants.log` path."""
+    return workdir / "pants.log"
 
 
 def _get_log_levels_by_target(

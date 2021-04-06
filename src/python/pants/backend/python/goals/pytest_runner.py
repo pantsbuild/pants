@@ -44,11 +44,14 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
+    CreateDigest,
     Digest,
     DigestSubset,
+    Directory,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
+    RemovePrefix,
     Snapshot,
 )
 from pants.engine.process import (
@@ -71,6 +74,12 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger()
+
+
+# If a user wants extra pytest output (e.g., plugin output) to show up in dist/
+# they must ensure that output goes under this directory. E.g.,
+# ./pants test <target> -- --html=extra-output/report.html
+_EXTRA_OUTPUT_DIR = "extra-output"
 
 
 @dataclass(frozen=True)
@@ -150,6 +159,10 @@ async def setup_pytest_for_target(
         ),
     )
 
+    extra_output_directory_digest_request = Get(
+        Digest, CreateDigest([Directory(_EXTRA_OUTPUT_DIR)])
+    )
+
     prepared_sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
@@ -184,12 +197,14 @@ async def setup_pytest_for_target(
         prepared_sources,
         field_set_source_files,
         config_digest,
+        extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
         prepared_sources_request,
         field_set_source_files_request,
         config_digest_request,
+        extra_output_directory_digest_request,
     )
 
     pytest_runner_pex = await Get(
@@ -210,6 +225,7 @@ async def setup_pytest_for_target(
                 coverage_config.digest,
                 prepared_sources.source_files.snapshot.digest,
                 config_digest,
+                extra_output_directory_digest,
                 *(binary.digest for binary in assets),
             )
         ),
@@ -251,6 +267,7 @@ async def setup_pytest_for_target(
             argv=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
             extra_env=extra_env,
             input_digest=input_digest,
+            output_directories=(_EXTRA_OUTPUT_DIR,),
             output_files=output_files,
             timeout_seconds=request.field_set.timeout.calculate_from_global_options(pytest),
             execution_slot_variable=pytest.options.execution_slot_var,
@@ -294,12 +311,19 @@ async def run_python_test(
             )
         else:
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
+    extra_output_snapshot = await Get(
+        Snapshot, DigestSubset(result.output_digest, PathGlobs([f"{_EXTRA_OUTPUT_DIR}/**"]))
+    )
+    extra_output_snapshot = await Get(
+        Snapshot, RemovePrefix(extra_output_snapshot.digest, _EXTRA_OUTPUT_DIR)
+    )
 
     return TestResult.from_fallible_process_result(
         result,
         address=field_set.address,
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
+        extra_output=extra_output_snapshot,
     )
 
 

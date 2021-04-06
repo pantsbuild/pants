@@ -6,7 +6,10 @@ from pathlib import PurePath
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.python.grpc_python_plugin import GrpcPythonPlugin
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    PythonProtobufMypyPlugin,
+    PythonProtobufSubsystem,
+)
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.util_rules import pex
@@ -18,6 +21,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexRequest,
 )
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -56,6 +60,8 @@ async def generate_python_from_protobuf(
     protoc: Protoc,
     grpc_python_plugin: GrpcPythonPlugin,
     python_protobuf_subsystem: PythonProtobufSubsystem,
+    python_protobuf_mypy_plugin: PythonProtobufMypyPlugin,
+    pex_environment: PexEnvironment,
 ) -> GeneratedSources:
     download_protoc_request = Get(
         DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)
@@ -102,14 +108,10 @@ async def generate_python_from_protobuf(
     mypy_request = PexRequest(
         output_filename="mypy_protobuf.pex",
         internal_only=True,
-        requirements=PexRequirements([python_protobuf_subsystem.mypy_plugin_version]),
-        # TODO(John Sirois): Fix these interpreter constraints to track the actual
-        #  python requirement of the mypy_plugin_version or else plumb an option for
-        #  manually setting the constraint to track what mypy_plugin_version needs:
-        #  https://github.com/pantsbuild/pants/issues/11565
-        # Here we guess a constraint that will likely work with any mypy_plugin_version
-        # selected.
-        interpreter_constraints=PexInterpreterConstraints(["CPython>=3.5"]),
+        requirements=PexRequirements([python_protobuf_mypy_plugin.requirement]),
+        interpreter_constraints=PexInterpreterConstraints(
+            python_protobuf_mypy_plugin.interpreter_constraints
+        ),
     )
 
     if python_protobuf_subsystem.mypy_plugin:
@@ -191,6 +193,7 @@ async def generate_python_from_protobuf(
             description=f"Generating Python sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
+            append_only_caches=pex_environment.append_only_caches(),
         ),
     )
 

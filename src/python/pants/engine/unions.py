@@ -32,6 +32,11 @@ def union(cls):
     return union.define_instance_of(cls)
 
 
+def is_union(input_type: type) -> bool:
+    """Return whether or not a type has been annotated with `@union`."""
+    return union.is_instance(input_type)
+
+
 @dataclass(frozen=True)
 class UnionRule:
     """Specify that an instance of `union_member` can be substituted wherever `union_base` is

@@ -6,7 +6,7 @@ import shutil
 
 import requests
 from pex.bin import pex as pex_main
-from reversion import create_parser, reversion
+from reversion import reversion
 
 from pants.util.contextutil import temporary_dir
 
@@ -29,8 +29,7 @@ def test_reversion() -> None:
         output_name = name_template.format(output_version)
         output_whl_file = os.path.join(dest_dir, output_name)
 
-        args = create_parser().parse_args([input_whl_file, dest_dir, output_version])
-        reversion(args)
+        reversion(whl_file=input_whl_file, dest_dir=dest_dir, target_version=output_version)
 
         assert os.path.isfile(output_whl_file) is True
 

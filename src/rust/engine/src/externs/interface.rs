@@ -75,7 +75,8 @@ use workunit_store::{
 
 use crate::{
   externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
-  Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
+  Function, Intrinsics, LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session,
+  Tasks, Types, Value,
 };
 
 mod testutil;
@@ -113,7 +114,8 @@ py_module_initializer!(native_engine, |py, m| {
         d: bool,
         e: PyDict,
         f: Vec<String>,
-        g: String
+        g: Vec<String>,
+        h: String
       )
     ),
   )?;
@@ -159,9 +161,11 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(py, teardown_dynamic_ui(a: PyScheduler, b: PySession)),
   )?;
 
-  m.add(py, "set_panic_handler", py_fn!(py, set_panic_handler()))?;
-
-  m.add(py, "externs_set", py_fn!(py, externs_set(a: PyObject)))?;
+  m.add(
+    py,
+    "maybe_set_panic_handler",
+    py_fn!(py, maybe_set_panic_handler()),
+  )?;
 
   m.add(
     py,
@@ -286,21 +290,6 @@ py_module_initializer!(native_engine, |py, m| {
       )
     ),
   )?;
-  m.add(
-    py,
-    "execution_set_poll",
-    py_fn!(py, execution_set_poll(a: PyExecutionRequest, b: bool)),
-  )?;
-  m.add(
-    py,
-    "execution_set_poll_delay",
-    py_fn!(py, execution_set_poll_delay(a: PyExecutionRequest, b: u64)),
-  )?;
-  m.add(
-    py,
-    "execution_set_timeout",
-    py_fn!(py, execution_set_timeout(a: PyExecutionRequest, b: u64)),
-  )?;
 
   m.add(
     py,
@@ -331,6 +320,12 @@ py_module_initializer!(native_engine, |py, m| {
       session_record_test_observation(a: PyScheduler, b: PySession, c: u64)
     ),
   )?;
+  m.add(
+    py,
+    "session_isolated_shallow_clone",
+    py_fn!(py, session_isolated_shallow_clone(a: PySession)),
+  )?;
+
   m.add(py, "all_counter_names", py_fn!(py, all_counter_names()))?;
 
   m.add(
@@ -350,6 +345,7 @@ py_module_initializer!(native_engine, |py, m| {
       )
     ),
   )?;
+  m.add(py, "tasks_task_end", py_fn!(py, tasks_task_end(a: PyTasks)))?;
   m.add(
     py,
     "tasks_add_get",
@@ -360,11 +356,10 @@ py_module_initializer!(native_engine, |py, m| {
     "tasks_add_select",
     py_fn!(py, tasks_add_select(a: PyTasks, b: PyType)),
   )?;
-  m.add(py, "tasks_task_end", py_fn!(py, tasks_task_end(a: PyTasks)))?;
   m.add(
     py,
-    "tasks_query_add",
-    py_fn!(py, tasks_query_add(a: PyTasks, b: PyType, c: Vec<PyType>)),
+    "tasks_add_query",
+    py_fn!(py, tasks_add_query(a: PyTasks, b: PyType, c: Vec<PyType>)),
   )?;
 
   m.add(
@@ -390,13 +385,13 @@ py_module_initializer!(native_engine, |py, m| {
         tasks_ptr: PyTasks,
         types_ptr: PyTypes,
         build_root_buf: String,
-        local_store_dir_buf: String,
         local_execution_root_dir_buf: String,
         named_caches_dir_buf: String,
         ca_certs_path: Option<String>,
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
         remoting_options: PyRemotingOptions,
+        local_store_options: PyLocalStoreOptions,
         exec_strategy_opts: PyExecutionStrategyOptions
       )
     ),
@@ -420,6 +415,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<PyNailgunServer>(py)?;
   m.add_class::<PyNailgunClient>(py)?;
   m.add_class::<PyRemotingOptions>(py)?;
+  m.add_class::<PyLocalStoreOptions>(py)?;
   m.add_class::<PyResult>(py)?;
   m.add_class::<PyScheduler>(py)?;
   m.add_class::<PySession>(py)?;
@@ -530,8 +526,8 @@ py_class!(class PyExecutionStrategyOptions |py| {
     _cls,
     local_parallelism: u64,
     remote_parallelism: u64,
-    cleanup_local_dirs: bool,
-    use_local_cache: bool,
+    local_cleanup: bool,
+    local_cache: bool,
     remote_cache_read: bool,
     remote_cache_write: bool
   ) -> CPyResult<Self> {
@@ -539,8 +535,8 @@ py_class!(class PyExecutionStrategyOptions |py| {
       ExecutionStrategyOptions {
         local_parallelism: local_parallelism as usize,
         remote_parallelism: remote_parallelism as usize,
-        cleanup_local_dirs,
-        use_local_cache,
+        local_cleanup,
+        local_cache,
         remote_cache_read,
         remote_cache_write,
       }
@@ -549,9 +545,6 @@ py_class!(class PyExecutionStrategyOptions |py| {
 });
 
 // Represents configuration related to remote execution and caching.
-//
-// The data stored by PyRemotingOptions originally was passed directly into scheduler_create
-// but has been broken out separately because the large number of options became unwieldy.
 py_class!(class PyRemotingOptions |py| {
   data options: RemotingOptions;
 
@@ -588,6 +581,35 @@ py_class!(class PyRemotingOptions |py| {
         execution_extra_platform_properties,
         execution_headers: execution_headers.into_iter().collect(),
         execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
+      }
+    )
+  }
+});
+
+py_class!(class PyLocalStoreOptions |py| {
+  data options: LocalStoreOptions;
+
+  def __new__(
+    _cls,
+    store_dir: String,
+    process_cache_max_size_bytes: usize,
+    files_max_size_bytes: usize,
+    directories_max_size_bytes: usize,
+    lease_time_millis: u64,
+    shard_count: u8,
+  ) -> CPyResult<Self> {
+    if shard_count.count_ones() != 1 {
+        let err_string = format!("The local store shard count must be a power of two: got {}", shard_count);
+        return Err(PyErr::new::<exc::ValueError, _>(py, (err_string,)));
+    }
+    Self::create_instance(py,
+      LocalStoreOptions {
+        store_dir: PathBuf::from(store_dir),
+        process_cache_max_size_bytes,
+        files_max_size_bytes,
+        directories_max_size_bytes,
+        lease_time: Duration::from_millis(lease_time_millis),
+        shard_count,
       }
     )
   }
@@ -682,8 +704,19 @@ py_class!(class PyNailgunClient |py| {
 
 py_class!(class PyExecutionRequest |py| {
     data execution_request: RefCell<ExecutionRequest>;
-    def __new__(_cls) -> CPyResult<Self> {
-      Self::create_instance(py, RefCell::new(ExecutionRequest::new()))
+    def __new__(
+      _cls,
+      poll: bool,
+      poll_delay_in_ms: Option<u64>,
+      timeout_in_ms: Option<u64>,
+    ) -> CPyResult<Self> {
+      let request = ExecutionRequest {
+        poll,
+        poll_delay: poll_delay_in_ms.map(Duration::from_millis),
+        timeout: timeout_in_ms.map(Duration::from_millis),
+        ..ExecutionRequest::default()
+      };
+      Self::create_instance(py, RefCell::new(request))
     }
 });
 
@@ -755,11 +788,6 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> CPyResult<
 
 // TODO: It's not clear how to return "nothing" (None) in a CPyResult, so this is a placeholder.
 type PyUnitResult = CPyResult<Option<bool>>;
-
-fn externs_set(_: Python, externs: PyObject) -> PyUnitResult {
-  externs::set_externs(externs);
-  Ok(None)
-}
 
 fn nailgun_client_create(
   py: Python,
@@ -867,13 +895,13 @@ fn scheduler_create(
   tasks_ptr: PyTasks,
   types_ptr: PyTypes,
   build_root_buf: String,
-  local_store_dir_buf: String,
   local_execution_root_dir_buf: String,
   named_caches_dir_buf: String,
   ca_certs_path_buf: Option<String>,
   ignore_patterns: Vec<String>,
   use_gitignore: bool,
   remoting_options: PyRemotingOptions,
+  local_store_options: PyLocalStoreOptions,
   exec_strategy_opts: PyExecutionStrategyOptions,
 ) -> CPyResult<PyScheduler> {
   match fs::increase_limits() {
@@ -902,10 +930,10 @@ fn scheduler_create(
         PathBuf::from(build_root_buf),
         ignore_patterns,
         use_gitignore,
-        PathBuf::from(local_store_dir_buf),
         PathBuf::from(local_execution_root_dir_buf),
         PathBuf::from(named_caches_dir_buf),
         ca_certs_path_buf.map(PathBuf::from),
+        local_store_options.options(py).clone(),
         remoting_options.options(py).clone(),
         exec_strategy_opts.options(py).clone(),
       )
@@ -1214,39 +1242,6 @@ fn execution_add_root_select(
   })
 }
 
-fn execution_set_poll(
-  py: Python,
-  execution_request_ptr: PyExecutionRequest,
-  poll: bool,
-) -> PyUnitResult {
-  with_execution_request(py, execution_request_ptr, |execution_request| {
-    execution_request.poll = poll;
-  });
-  Ok(None)
-}
-
-fn execution_set_poll_delay(
-  py: Python,
-  execution_request_ptr: PyExecutionRequest,
-  poll_delay_in_ms: u64,
-) -> PyUnitResult {
-  with_execution_request(py, execution_request_ptr, |execution_request| {
-    execution_request.poll_delay = Some(Duration::from_millis(poll_delay_in_ms));
-  });
-  Ok(None)
-}
-
-fn execution_set_timeout(
-  py: Python,
-  execution_request_ptr: PyExecutionRequest,
-  timeout_in_ms: u64,
-) -> PyUnitResult {
-  with_execution_request(py, execution_request_ptr, |execution_request| {
-    execution_request.timeout = Some(Duration::from_millis(timeout_in_ms));
-  });
-  Ok(None)
-}
-
 fn tasks_task_begin(
   py: Python,
   tasks_ptr: PyTasks,
@@ -1277,6 +1272,13 @@ fn tasks_task_begin(
   })
 }
 
+fn tasks_task_end(py: Python, tasks_ptr: PyTasks) -> PyUnitResult {
+  with_tasks(py, tasks_ptr, |tasks| {
+    tasks.task_end();
+    Ok(None)
+  })
+}
+
 fn tasks_add_get(py: Python, tasks_ptr: PyTasks, output: PyType, input: PyType) -> PyUnitResult {
   with_tasks(py, tasks_ptr, |tasks| {
     let output = externs::type_for(output);
@@ -1294,14 +1296,7 @@ fn tasks_add_select(py: Python, tasks_ptr: PyTasks, selector: PyType) -> PyUnitR
   })
 }
 
-fn tasks_task_end(py: Python, tasks_ptr: PyTasks) -> PyUnitResult {
-  with_tasks(py, tasks_ptr, |tasks| {
-    tasks.task_end();
-    Ok(None)
-  })
-}
-
-fn tasks_query_add(
+fn tasks_add_query(
   py: Python,
   tasks_ptr: PyTasks,
   output_type: PyType,
@@ -1353,8 +1348,8 @@ fn graph_visualize(
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       let path = PathBuf::from(path);
-      scheduler
-        .visualize(session, path.as_path())
+      // NB: See the note on with_scheduler re: allow_threads.
+      py.allow_threads(|| scheduler.visualize(session, path.as_path()))
         .map_err(|e| {
           let e = format!("Failed to visualize to {}: {:?}", path.display(), e);
           PyErr::new::<exc::Exception, _>(py, (e,))
@@ -1426,6 +1421,12 @@ fn session_record_test_observation(
         .record_observation(ObservationMetric::TestObservation, value);
       Ok(py.None())
     })
+  })
+}
+
+fn session_isolated_shallow_clone(py: Python, session_ptr: PySession) -> CPyResult<PySession> {
+  with_session(py, session_ptr, |session| {
+    PySession::create_instance(py, session.isolated_shallow_clone())
   })
 }
 
@@ -1524,7 +1525,11 @@ pub(crate) fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
   }
 }
 
-fn set_panic_handler(_: Python) -> PyUnitResult {
+/// Set up a panic handler, unless RUST_BACKTRACE is set.
+fn maybe_set_panic_handler(_: Python) -> PyUnitResult {
+  if std::env::var("RUST_BACKTRACE").unwrap_or_else(|_| "0".to_owned()) != "0" {
+    return Ok(None);
+  }
   panic::set_hook(Box::new(|panic_info| {
     let payload = panic_info.payload();
     let mut panic_str = generate_panic_string(payload);
@@ -1566,8 +1571,9 @@ fn lease_files_in_graph(
 ) -> PyUnitResult {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
-      let digests = scheduler.all_digests(session);
+      // NB: See the note on with_scheduler re: allow_threads.
       py.allow_threads(|| {
+        let digests = scheduler.all_digests(session);
         scheduler
           .core
           .executor
@@ -1838,7 +1844,8 @@ fn stdio_initialize(
   use_color: bool,
   show_target: bool,
   log_levels_by_target: PyDict,
-  message_regex_filters: Vec<String>,
+  literal_filters: Vec<String>,
+  regex_filters: Vec<String>,
   log_file: String,
 ) -> CPyResult<PyTuple> {
   let log_levels_by_target = log_levels_by_target
@@ -1850,21 +1857,29 @@ fn stdio_initialize(
       (k, v)
     })
     .collect::<HashMap<_, _>>();
-  let message_regex_filters = message_regex_filters
+  let regex_filters = regex_filters
     .iter()
     .map(|re| {
       Regex::new(re).map_err(|e| {
-        PyErr::new::<exc::Exception, _>(py, (format!("Failed to parse warning filter: {}", e),))
+        PyErr::new::<exc::Exception, _>(
+          py,
+          format!(
+            "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{}",
+            e,
+          )
+        )
       })
     })
     .collect::<Result<Vec<Regex>, _>>()?;
+
   Logger::init(
     level,
     show_rust_3rdparty_logs,
     use_color,
     show_target,
     log_levels_by_target,
-    message_regex_filters,
+    literal_filters,
+    regex_filters,
     PathBuf::from(log_file),
   )
   .map_err(|s| {
@@ -1972,6 +1987,11 @@ where
 /// Scheduler, Session, and nailgun::Server are intended to be shared between threads, and so their
 /// context methods provide immutable references. The remaining types are not intended to be shared
 /// between threads, so mutable access is provided.
+///
+/// TODO: The `Scheduler` and `Session` objects both have lots of internal locks: in general, the GIL
+/// should be released (using `py.allow_thread(|| ..)`) before any non-trivial interactions with
+/// them. In particular: methods that use the `Graph` should be called outside the GIL. We should
+/// make this less error prone: see https://github.com/pantsbuild/pants/issues/11722.
 ///
 fn with_scheduler<F, T>(py: Python, scheduler_ptr: PyScheduler, f: F) -> T
 where

@@ -11,6 +11,7 @@ use fs::RelativePath;
 use futures::FutureExt;
 use grpc_util::headers_to_interceptor_fn;
 use hashing::Digest;
+use parking_lot::Mutex;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;
@@ -22,6 +23,14 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessMetadata,
 };
+
+/// Every n times, log a particular remote cache error at warning level instead of debug level. We
+/// don't log at warn level every time to avoid flooding the console.
+///
+/// Every 5 times is arbitrary and can be changed. It's based on running the `lint` goal with a
+/// fake store address resulting in 5 read errors and 18 write errors; 5 seems like a
+/// reasonable increment.
+const LOG_ERRORS_INCREMENT: usize = 5;
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.
@@ -43,6 +52,8 @@ pub struct CommandRunner {
   cache_read: bool,
   cache_write: bool,
   eager_fetch: bool,
+  read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
+  write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
 }
 
 impl CommandRunner {
@@ -84,6 +95,8 @@ impl CommandRunner {
       cache_read,
       cache_write,
       eager_fetch,
+      read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
+      write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
     })
   }
 
@@ -91,11 +104,13 @@ impl CommandRunner {
   /// merged final output directory to find the specific path to extract. (REAPI requires
   /// output directories to be stored as `Tree` protos that contain all of the `Directory`
   /// protos that constitute the directory tree.)
+  ///
+  /// If the output directory does not exist, then returns Ok(None).
   pub(crate) async fn make_tree_for_output_directory(
     root_directory_digest: Digest,
     directory_path: RelativePath,
     store: &Store,
-  ) -> Result<Tree, String> {
+  ) -> Result<Option<Tree>, String> {
     // Traverse down from the root directory digest to find the directory digest for
     // the output directory.
     let mut current_directory_digest = root_directory_digest;
@@ -104,7 +119,7 @@ impl CommandRunner {
         Component::Normal(name) => name
           .to_str()
           .ok_or_else(|| format!("unable to convert '{:?}' to string", name))?,
-        _ => return Err("illegal state: unexpected path component in relative path".into()),
+        _ => return Ok(None),
       };
 
       // Load the Directory proto corresponding to `current_directory_digest`.
@@ -112,8 +127,8 @@ impl CommandRunner {
         Some((dir, _)) => dir,
         None => {
           return Err(format!(
-            "illegal state: directory for digest {:?} did not exist locally",
-            &current_directory_digest
+            "Directory digest {:?} was referenced in output, but was not found in store.",
+            current_directory_digest
           ))
         }
       };
@@ -125,12 +140,7 @@ impl CommandRunner {
         .find(|dn| dn.name == next_name)
       {
         Some(dn) => dn,
-        None => {
-          return Err(format!(
-            "unable to find path component {:?} in directory",
-            next_name
-          ))
-        }
+        None => return Ok(None),
       };
 
       // Set the current directory digest to be the digest in the DirectoryNode just found.
@@ -172,14 +182,14 @@ impl CommandRunner {
       }
     }
 
-    Ok(tree)
+    Ok(Some(tree))
   }
 
   pub(crate) async fn extract_output_file(
     root_directory_digest: Digest,
     file_path: RelativePath,
     store: &Store,
-  ) -> Result<FileNode, String> {
+  ) -> Result<Option<FileNode>, String> {
     // Traverse down from the root directory digest to find the directory digest for
     // the output directory.
     let mut current_directory_digest = root_directory_digest;
@@ -191,11 +201,7 @@ impl CommandRunner {
           Component::Normal(name) => name
             .to_str()
             .ok_or_else(|| format!("unable to convert '{:?}' to string", name))?,
-          _ => {
-            return Err(
-              "Illegal state: Found an unexpected path component in relative path.".into(),
-            )
-          }
+          _ => return Ok(None),
         };
 
         // Load the Directory proto corresponding to `current_directory_digest`.
@@ -203,8 +209,8 @@ impl CommandRunner {
           Some((dir, _)) => dir,
           None => {
             return Err(format!(
-              "Illegal state: The directory for digest {:?} did not exist locally.",
-              &current_directory_digest
+              "Directory digest {:?} was referenced in output, but was not found in store.",
+              current_directory_digest
             ))
           }
         };
@@ -216,12 +222,7 @@ impl CommandRunner {
           .find(|dn| dn.name == next_name)
         {
           Some(dn) => dn,
-          None => {
-            return Err(format!(
-              "Unable to find path component {:?} in directory.",
-              next_name
-            ))
-          }
+          None => return Ok(None),
         };
 
         // Set the current directory digest to be the digest in the DirectoryNode just found.
@@ -234,25 +235,21 @@ impl CommandRunner {
     // Load the final directory.
     let directory = match store.load_directory(current_directory_digest).await? {
       Some((dir, _)) => dir,
-      None => {
-        return Err(format!(
-          "Illegal state: The directory for digest {:?} did not exist locally.",
-          &current_directory_digest
-        ))
-      }
+      None => return Ok(None),
     };
 
     // Search for the file.
     let file_base_name = file_path.as_ref().file_name().unwrap();
-    directory
-      .files
-      .iter()
-      .find(|node| {
-        let name = OsString::from(&node.name);
-        name == file_base_name
-      })
-      .cloned()
-      .ok_or_else(|| format!("File {:?} did not exist locally.", file_path))
+    Ok(
+      directory
+        .files
+        .iter()
+        .find(|node| {
+          let name = OsString::from(&node.name);
+          name == file_base_name
+        })
+        .cloned(),
+    )
   }
 
   /// Converts a REAPI `Command` and a `FallibleProcessResultWithPlatform` produced from executing
@@ -282,12 +279,16 @@ impl CommandRunner {
     digests.insert(result.stderr_digest);
 
     for output_directory in &command.output_directories {
-      let tree = Self::make_tree_for_output_directory(
+      let tree = match Self::make_tree_for_output_directory(
         result.output_directory,
         RelativePath::new(output_directory).unwrap(),
         store,
       )
-      .await?;
+      .await?
+      {
+        Some(t) => t,
+        None => continue,
+      };
 
       let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
       digests.insert(tree_digest);
@@ -301,12 +302,16 @@ impl CommandRunner {
     }
 
     for output_file in &command.output_files {
-      let file_node = Self::extract_output_file(
+      let file_node = match Self::extract_output_file(
         result.output_directory,
         RelativePath::new(output_file).unwrap(),
         store,
       )
-      .await?;
+      .await?
+      {
+        Some(node) => node,
+        None => continue,
+      };
 
       let digest = require_digest(file_node.digest.as_ref())?;
 
@@ -453,7 +458,21 @@ impl crate::CommandRunner for CommandRunner {
             cached_response_opt
           }
           Err(err) => {
-            log::warn!("Failed to read from remote cache: {}", err);
+            let err_count = {
+              let mut errors_counter = self.read_errors_counter.lock();
+              let count = errors_counter.entry(err.clone()).or_insert(0);
+              *count += 1;
+              *count
+            };
+            let log_msg = format!(
+              "Failed to read from remote cache ({} occurrences so far): {}",
+              err_count, err
+            );
+            if err_count == 1 || err_count % LOG_ERRORS_INCREMENT == 0 {
+              log::warn!("{}", log_msg);
+            } else {
+              log::debug!("{}", log_msg);
+            }
             None
           }
         }
@@ -518,7 +537,21 @@ impl crate::CommandRunner for CommandRunner {
           .workunit_store
           .increment_counter(Metric::RemoteCacheWriteFinished, 1);
         if let Err(err) = write_result {
-          log::warn!("Failed to write to remote cache: {}", err);
+          let err_count = {
+            let mut errors_counter = command_runner.write_errors_counter.lock();
+            let count = errors_counter.entry(err.clone()).or_insert(0);
+            *count += 1;
+            *count
+          };
+          let log_msg = format!(
+            "Failed to write to remote cache ({} occurrences so far): {}",
+            err_count, err
+          );
+          if err_count == 1 || err_count % LOG_ERRORS_INCREMENT == 0 {
+            log::warn!("{}", log_msg);
+          } else {
+            log::debug!("{}", log_msg);
+          }
           context2
             .workunit_store
             .increment_counter(Metric::RemoteCacheWriteErrors, 1);

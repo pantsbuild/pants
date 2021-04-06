@@ -39,6 +39,8 @@ impl fmt::Debug for ByteStore {
 }
 
 impl ByteStore {
+  // TODO: Consider extracting these options to a struct with `impl Default`, similar to
+  // `super::LocalOptions`.
   pub fn new(
     cas_address: &str,
     instance_name: Option<String>,

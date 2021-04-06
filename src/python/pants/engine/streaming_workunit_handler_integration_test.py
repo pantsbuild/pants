@@ -1,23 +1,70 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
+import signal
+from typing import Mapping
 
-from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
+from workunit_logger.register import FINISHED_SUCCESSFULLY
+
+from pants.testutil.pants_integration_test import (
+    PantsResult,
+    run_pants,
+    setup_tmpdir,
+    temporary_workdir,
+)
 from pants.util.dirutil import maybe_read_file
+from pants_test.pantsd.pantsd_integration_test_base import attempts, launch_waiter
 
 
-def test_workunits_logger() -> None:
-    with setup_tmpdir({}) as tmpdir:
+def workunit_logger_config(log_dest: str) -> Mapping:
+    return {
+        "GLOBAL": {
+            "backend_packages.add": ["workunit_logger", "pants.backend.python"],
+        },
+        "workunit-logger": {"dest": log_dest},
+    }
+
+
+def run(
+    args: list[str], success: bool = True, *, files: dict[str, str] | None = None
+) -> tuple[PantsResult, str | None]:
+    with setup_tmpdir(files or {}) as tmpdir:
         dest = os.path.join(tmpdir, "dest.log")
-        pants_run = run_pants(
-            [
-                "--backend-packages=+['workunit_logger','pants.backend.python']",
-                f"--workunit-logger-dest={dest}",
-                "list",
-                "3rdparty::",
-            ]
-        )
-        pants_run.assert_success()
-        # Assert that the file was created and non-empty.
-        assert maybe_read_file(dest)
+        normalized_args = [arg.format(tmpdir=tmpdir) for arg in args]
+        pants_run = run_pants(normalized_args, config=workunit_logger_config(dest))
+        log_content = maybe_read_file(dest)
+        if success:
+            pants_run.assert_success()
+            assert log_content
+            assert FINISHED_SUCCESSFULLY in log_content
+        else:
+            pants_run.assert_failure()
+        return pants_run, log_content
+
+
+def test_list() -> None:
+    run(["list", "{tmpdir}/foo::"], files={"foo/BUILD": "files(sources=[])"})
+
+
+def test_help() -> None:
+    run(["help"])
+    run(["--version"])
+
+
+def test_ctrl_c() -> None:
+    with temporary_workdir() as workdir:
+        dest = os.path.join(workdir, "dest.log")
+
+        # Start a pantsd run that will wait forever, then kill the pantsd client.
+        client_handle, _, _ = launch_waiter(workdir=workdir, config=workunit_logger_config(dest))
+        client_pid = client_handle.process.pid
+        os.kill(client_pid, signal.SIGINT)
+
+        # Confirm that finish is still called (even though it may be backgrounded in the server).
+        for _ in attempts("The log should eventually show that the SWH shut down."):
+            content = maybe_read_file(dest)
+            if content and FINISHED_SUCCESSFULLY in content:
+                break

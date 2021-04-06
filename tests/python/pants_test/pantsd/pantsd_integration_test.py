@@ -8,28 +8,18 @@ import threading
 import time
 import unittest
 from textwrap import dedent
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import psutil
 import pytest
 
-from pants.testutil.pants_integration_test import (
-    PantsJoinHandle,
-    read_pants_log,
-    setup_tmpdir,
-    temporary_workdir,
-)
+from pants.testutil.pants_integration_test import read_pants_log, setup_tmpdir, temporary_workdir
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
-from pants.util.dirutil import (
-    maybe_read_file,
-    rm_rf,
-    safe_file_dump,
-    safe_mkdir,
-    safe_open,
-    safe_rmtree,
-    touch,
+from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, safe_rmtree, touch
+from pants_test.pantsd.pantsd_integration_test_base import (
+    PantsDaemonIntegrationTestBase,
+    launch_waiter,
 )
-from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase, attempts
 
 
 def launch_file_toucher(f):
@@ -68,11 +58,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     def test_pantsd_run(self):
         with self.pantsd_successful_run_context(log_level="debug") as ctx:
-            ctx.runner(["list", "3rdparty::"])
-            ctx.checker.assert_started()
+            with setup_tmpdir({"foo/BUILD": "files(sources=[])"}) as tmpdir:
+                ctx.runner(["list", f"{tmpdir}/foo::"])
+                ctx.checker.assert_started()
 
-            ctx.runner(["list", "3rdparty::"])
-            ctx.checker.assert_running()
+                ctx.runner(["list", f"{tmpdir}/foo::"])
+                ctx.checker.assert_running()
 
     def test_pantsd_broken_pipe(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -440,55 +431,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         finally:
             rm_rf(test_path)
 
-    @unittest.skip("TODO https://github.com/pantsbuild/pants/issues/7654")
-    def test_pantsd_multiple_parallel_runs(self):
-        with self.pantsd_test_context() as (workdir, config, checker):
-            file_to_make = os.path.join(workdir, "some_magic_file")
-            waiter_handle = self.run_pants_with_workdir_without_waiting(
-                ["run", "testprojects/src/python/coordinated_runs:waiter", "--", file_to_make],
-                workdir=workdir,
-                config=config,
-            )
-
-            checker.assert_started()
-
-            creator_handle = self.run_pants_with_workdir_without_waiting(
-                ["run", "testprojects/src/python/coordinated_runs:creator", "--", file_to_make],
-                workdir=workdir,
-                config=config,
-            )
-
-            creator_handle.join().assert_success()
-            waiter_handle.join().assert_success()
-
-    @classmethod
-    def _launch_waiter(cls, workdir: str, config) -> Tuple[PantsJoinHandle, int, str]:
-        """Launch a process via pantsd that will wait forever for the a file to be created.
-
-        Returns the pid of the pantsd client, the pid of the waiting child process, and the file to
-        create to cause the waiting child to exit.
-        """
-        file_to_make = os.path.join(workdir, "some_magic_file")
-        waiter_pid_file = os.path.join(workdir, "pid_file")
-
-        argv = [
-            "run",
-            "testprojects/src/python/coordinated_runs:waiter",
-            "--",
-            file_to_make,
-            waiter_pid_file,
-        ]
-        client_handle = cls.run_pants_with_workdir_without_waiting(
-            argv, workdir=workdir, config=config
-        )
-        waiter_pid = -1
-        for _ in attempts("The waiter process should have written its pid."):
-            waiter_pid_str = maybe_read_file(waiter_pid_file)
-            if waiter_pid_str:
-                waiter_pid = int(waiter_pid_str)
-                break
-        return client_handle, waiter_pid, file_to_make
-
     def _assert_pantsd_keyboardinterrupt_signal(
         self, signum: int, regexps: Optional[List[str]] = None
     ):
@@ -498,7 +440,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         :param regexps: Assert that all of these regexps match somewhere in stderr.
         """
         with self.pantsd_test_context() as (workdir, config, checker):
-            client_handle, waiter_process_pid, _ = self._launch_waiter(workdir, config)
+            client_handle, waiter_process_pid, _ = launch_waiter(workdir=workdir, config=config)
             client_pid = client_handle.process.pid
             waiter_process = psutil.Process(waiter_process_pid)
 
@@ -531,7 +473,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": -1, "level": "debug"}}
         with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
             # Run a process that will wait forever.
-            first_run_handle, _, file_to_create = self._launch_waiter(workdir, config)
+            first_run_handle, _, file_to_create = launch_waiter(workdir=workdir, config=config)
 
             checker.assert_started()
             checker.assert_running()

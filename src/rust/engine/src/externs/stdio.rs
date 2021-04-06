@@ -35,6 +35,7 @@
   clippy::zero_ptr
 )]
 
+use cpython::buffer::PyBuffer;
 use cpython::{exc, py_class, PyErr, PyObject, PyResult, Python};
 
 ///
@@ -63,6 +64,31 @@ py_class!(pub class PyStdioRead |py| {
 
     def fileno(&self) -> PyResult<i32> {
       stdio::get_destination().stdin_as_raw_fd().map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
+    }
+
+    def readinto(&self, obj: PyObject) -> PyResult<usize> {
+      let py_buffer = PyBuffer::get(py, &obj)?;
+      let mut buffer = vec![0; py_buffer.len_bytes() as usize];
+      let read = py.allow_threads(|| {
+        stdio::get_destination().read_stdin(&mut buffer)
+      }).map_err(|e| PyErr::new::<exc::Exception, _>(py, (e.to_string(),)))?;
+      // NB: `as_mut_slice` exposes a `&[Cell<u8>]`, which we can't use directly in `read`. We use
+      // `copy_from_slice` instead, which unfortunately involves some extra copying.
+      py_buffer.copy_from_slice(py, &buffer)?;
+      Ok(read)
+    }
+
+    @property
+    def closed(&self) -> PyResult<bool> {
+      Ok(false)
+    }
+
+    def readable(&self) -> PyResult<bool> {
+      Ok(true)
+    }
+
+    def seekable(&self) -> PyResult<bool> {
+      Ok(false)
     }
 });
 

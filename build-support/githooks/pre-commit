@@ -17,7 +17,7 @@ set -e
 
 MERGE_BASE="$(git_merge_base)"
 
-# When travis builds a tag, it does so in a shallow clone without master fetched, which
+# When travis builds a tag, it does so in a shallow clone without main fetched, which
 # fails in pants changed.
 if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then

@@ -4,18 +4,21 @@
 from typing import cast
 
 from pants.backend.codegen.protobuf.target_types import ProtobufDependencies
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import target_option
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 
 
 class PythonProtobufSubsystem(Subsystem):
     options_scope = "python-protobuf"
-    help = f"Options related to the Protobuf Python backend.\n\nSee {docs_url('protobuf')}."
+    help = (
+        f"Options related to the Protobuf Python backend.\n\nSee {bracketed_docs_url('protobuf')}."
+    )
 
     @classmethod
     def register_options(cls, register):
@@ -40,16 +43,6 @@ class PythonProtobufSubsystem(Subsystem):
                 "also generate .pyi type stubs."
             ),
         )
-        register(
-            "--mypy-plugin-version",
-            type=str,
-            default="mypy-protobuf==2.4",
-            advanced=True,
-            help=(
-                "The pip-style requirement string for `mypy-protobuf`. You must still set "
-                "`--mypy-plugin` for this option to be used."
-            ),
-        )
 
     @property
     def runtime_dependencies(self) -> UnparsedAddressInputs:
@@ -59,9 +52,17 @@ class PythonProtobufSubsystem(Subsystem):
     def mypy_plugin(self) -> bool:
         return cast(bool, self.options.mypy_plugin)
 
-    @property
-    def mypy_plugin_version(self) -> str:
-        return cast(str, self.options.mypy_plugin_version)
+
+class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
+    options_scope = PythonProtobufSubsystem.subscope("mypy-plugin")
+    help = (
+        "Configuration of the mypy-protobuf type stub generation plugin for the Protobuf Python "
+        "backend."
+    )
+
+    default_version = "mypy-protobuf==2.4"
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.6"]
 
 
 class InjectPythonProtobufDependencies(InjectDependenciesRequest):

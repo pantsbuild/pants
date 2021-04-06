@@ -97,18 +97,18 @@ fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
 /// Create a new store with a remote CAS.
 ///
 fn new_store<P: AsRef<Path>>(dir: P, cas_address: &str) -> Store {
-  Store::with_remote(
-    task_executor::Executor::new(),
-    dir,
-    cas_address,
-    None,
-    None,
-    BTreeMap::new(),
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap()
+  Store::local_only(task_executor::Executor::new(), dir)
+    .unwrap()
+    .into_with_remote(
+      cas_address,
+      None,
+      None,
+      BTreeMap::new(),
+      10 * MEGABYTES,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap()
 }
 
 #[tokio::test]
@@ -837,18 +837,18 @@ async fn instance_name_upload() {
     .await
     .expect("Error storing catnip locally");
 
-  let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(),
-    dir.path(),
-    &cas.address(),
-    Some("dark-tower".to_owned()),
-    None,
-    BTreeMap::new(),
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap();
+  let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      Some("dark-tower".to_owned()),
+      None,
+      BTreeMap::new(),
+      10 * MEGABYTES,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   store_with_remote
     .ensure_remote_has_recursive(vec![testdir.digest()])
@@ -864,18 +864,18 @@ async fn instance_name_download() {
     .file(&TestData::roland())
     .build();
 
-  let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(),
-    dir.path(),
-    &cas.address(),
-    Some("dark-tower".to_owned()),
-    None,
-    BTreeMap::new(),
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap();
+  let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      Some("dark-tower".to_owned()),
+      None,
+      BTreeMap::new(),
+      10 * MEGABYTES,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   assert_eq!(
     store_with_remote
@@ -913,18 +913,18 @@ async fn auth_upload() {
 
   let mut headers = BTreeMap::new();
   headers.insert("authorization".to_owned(), "Bearer Armory.Key".to_owned());
-  let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(),
-    dir.path(),
-    &cas.address(),
-    None,
-    None,
-    headers,
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap();
+  let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      None,
+      None,
+      headers,
+      10 * MEGABYTES,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   store_with_remote
     .ensure_remote_has_recursive(vec![testdir.digest()])
@@ -942,18 +942,18 @@ async fn auth_download() {
 
   let mut headers = BTreeMap::new();
   headers.insert("authorization".to_owned(), "Bearer Armory.Key".to_owned());
-  let store_with_remote = Store::with_remote(
-    task_executor::Executor::new(),
-    dir.path(),
-    &cas.address(),
-    None,
-    None,
-    headers,
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-  )
-  .unwrap();
+  let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
+    .unwrap()
+    .into_with_remote(
+      &cas.address(),
+      None,
+      None,
+      headers,
+      10 * MEGABYTES,
+      Duration::from_secs(1),
+      1,
+    )
+    .unwrap();
 
   assert_eq!(
     store_with_remote

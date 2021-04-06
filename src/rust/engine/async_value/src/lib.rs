@@ -91,13 +91,12 @@ impl<T: Clone + Send + Sync + 'static> AsyncValueReceiver<T> {
   pub async fn recv(&self) -> Option<T> {
     let mut item_receiver = (*self.item_receiver).clone();
     loop {
-      match item_receiver.recv().await {
-        Some(None) => {
-          // Observing the initial value of the channel.
-          continue;
-        }
-        Some(t) => break t,
-        None => break None,
+      if let Some(ref value) = *item_receiver.borrow() {
+        return Some(value.clone());
+      }
+
+      if item_receiver.changed().await.is_err() {
+        return None;
       }
     }
   }
@@ -110,7 +109,7 @@ pub struct AsyncValueSender<T: Clone + Send + Sync + 'static> {
 
 impl<T: Clone + Send + Sync + 'static> AsyncValueSender<T> {
   pub fn send(self, item: T) {
-    let _ = self.item_sender.broadcast(Some(item));
+    let _ = self.item_sender.send(Some(item));
   }
 
   pub async fn closed(&mut self) {

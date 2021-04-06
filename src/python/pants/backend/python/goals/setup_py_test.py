@@ -496,40 +496,109 @@ def test_get_requirements() -> None:
         ),
     )
 
-    def assert_requirements(
-        expected_req_strs,
-        addr: Address,
-        *,
-        version_scheme: FirstPartyDependencyVersionScheme = FirstPartyDependencyVersionScheme.EXACT,
-    ):
-        rule_runner.set_options(
-            [f"--setup-py-generation-first-party-dependency-version-scheme={version_scheme.value}"],
-            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-        )
-        tgt = rule_runner.get_target(addr)
-        reqs = rule_runner.request(
-            ExportedTargetRequirements,
-            [DependencyOwner(ExportedTarget(tgt))],
-        )
-        assert sorted(expected_req_strs) == list(reqs)
-
     assert_requirements(
-        ["ext1==1.22.333", "ext2==4.5.6"], Address("src/python/foo/bar", target_name="bar-dist")
+        rule_runner,
+        ["ext1==1.22.333", "ext2==4.5.6"],
+        Address("src/python/foo/bar", target_name="bar-dist"),
     )
     assert_requirements(
-        ["ext3==0.0.1", "bar==9.8.7"], Address("src/python/foo/corge", target_name="corge-dist")
+        rule_runner,
+        ["ext3==0.0.1", "bar==9.8.7"],
+        Address("src/python/foo/corge", target_name="corge-dist"),
     )
 
     assert_requirements(
+        rule_runner,
         ["ext3==0.0.1", "bar~=9.8.7"],
         Address("src/python/foo/corge", target_name="corge-dist"),
         version_scheme=FirstPartyDependencyVersionScheme.COMPATIBLE,
     )
     assert_requirements(
+        rule_runner,
         ["ext3==0.0.1", "bar"],
         Address("src/python/foo/corge", target_name="corge-dist"),
         version_scheme=FirstPartyDependencyVersionScheme.ANY,
     )
+
+
+def test_get_requirements_with_exclude() -> None:
+    rule_runner = create_setup_py_rule_runner(
+        rules=[
+            determine_setup_kwargs,
+            get_requirements,
+            get_owned_dependencies,
+            get_exporting_owner,
+            SubsystemRule(SetupPyGeneration),
+            QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
+        ]
+    )
+    rule_runner.add_to_build_file(
+        "3rdparty",
+        textwrap.dedent(
+            """
+            python_requirement_library(
+                name='ext1',
+                requirements=['ext1==1.22.333'],
+            )
+            python_requirement_library(
+                name='ext2',
+                requirements=['ext2==4.5.6'],
+            )
+            python_requirement_library(
+                name='ext3',
+                requirements=['ext3==0.0.1'],
+            )
+            """
+        ),
+    )
+    rule_runner.add_to_build_file(
+        "src/python/foo/bar/baz",
+        "python_library(dependencies=['3rdparty:ext1'], sources=[])",
+    )
+    rule_runner.add_to_build_file(
+        "src/python/foo/bar/qux",
+        "python_library(dependencies=['3rdparty:ext2', 'src/python/foo/bar/baz'], sources=[])",
+    )
+    rule_runner.add_to_build_file(
+        "src/python/foo/bar",
+        textwrap.dedent(
+            """
+            python_distribution(
+                name='bar-dist',
+                dependencies=['!!3rdparty:ext2',':bar'],
+                provides=setup_py(name='bar', version='9.8.7'),
+            )
+
+            python_library(
+                sources=[],
+                dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'],
+            )
+          """
+        ),
+    )
+
+    assert_requirements(
+        rule_runner, ["ext1==1.22.333"], Address("src/python/foo/bar", target_name="bar-dist")
+    )
+
+
+def assert_requirements(
+    rule_runner,
+    expected_req_strs,
+    addr: Address,
+    *,
+    version_scheme: FirstPartyDependencyVersionScheme = FirstPartyDependencyVersionScheme.EXACT,
+):
+    rule_runner.set_options(
+        [f"--setup-py-generation-first-party-dependency-version-scheme={version_scheme.value}"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+    tgt = rule_runner.get_target(addr)
+    reqs = rule_runner.request(
+        ExportedTargetRequirements,
+        [DependencyOwner(ExportedTarget(tgt))],
+    )
+    assert sorted(expected_req_strs) == list(reqs)
 
 
 def test_owned_dependencies() -> None:

@@ -41,7 +41,7 @@ from pants.engine.target import (
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ class InterpreterConstraintsField(StringSequenceField):
         "more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']` "
         "means either PyPy 3.7 _or_ CPython 3.7.\n\nIf the field is not set, it will default to "
         "the option `[python-setup].interpreter_constraints`.\n\nSee "
-        f"{docs_url('python-interpreter-compatibility')}."
+        f"{bracketed_docs_url('python-interpreter-compatibility')}."
     )
 
     def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
@@ -196,25 +196,20 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
         "arguments to work with this target.\n\nTo leave off an entry point, set to '<none>'."
     )
     required = True
+    value: EntryPoint
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[EntryPoint]:
-        ep = super().compute_value(raw_value, address=address)
-        if ep is None:
-            raise InvalidFieldException(
-                f"An entry point must be specified for {address}. It must indicate a Python module "
-                "by name or path and an optional nullary function in that module separated by a "
-                "colon, i.e.: module_name_or_path(':'function_name)?"
-            )
+    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> EntryPoint:
+        value = super().compute_value(raw_value, address=address)
+        if not isinstance(value, str):
+            raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
         try:
-            return EntryPoint.parse(ep, provenance=f"for {address}")
+            return EntryPoint.parse(value, provenance=f"for {address}")
         except ValueError as e:
             raise InvalidFieldException(str(e))
 
     @property
     def filespec(self) -> Filespec:
-        if not self.value:
-            return {"includes": []}
         if not self.value.module.endswith(".py"):
             return {"includes": []}
         full_glob = os.path.join(self.address.spec_path, self.value.module)
@@ -392,7 +387,7 @@ class PexBinary(Target):
     help = (
         "A Python target that can be converted into an executable PEX file.\n\nPEX files are "
         "self-contained executable files that contain a complete Python environment capable of "
-        f"running the target. For more information, see {docs_url('pex-files')}."
+        f"running the target. For more information, see {bracketed_docs_url('pex-files')}."
     )
 
 
@@ -474,7 +469,7 @@ class PythonTests(Target):
     help = (
         "Python tests, written in either Pytest style or unittest style.\n\nAll test util code, "
         "other than `conftest.py`, should go into a dedicated `python_library()` target and then "
-        f"be included in the `dependencies` field.\n\nSee {docs_url('python-test-goal')}."
+        f"be included in the `dependencies` field.\n\nSee {bracketed_docs_url('python-test-goal')}."
     )
 
 
@@ -507,7 +502,7 @@ class PythonLibrary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-def format_invalid_requirement_string_error(
+def _format_invalid_requirement_string_error(
     value: str, e: Exception, *, description_of_origin: str
 ) -> str:
     prefix = f"Invalid requirement '{value}' in {description_of_origin}: {e}"
@@ -538,20 +533,16 @@ def format_invalid_requirement_string_error(
     )
 
 
-class PythonRequirementsField(Field):
-    alias = "requirements"
-    required = True
-    value: Tuple[Requirement, ...]
-    help = (
-        "A sequence of pip-style requirement strings, e.g. ['foo==1.8', "
-        "'bar<=3 ; python_version<'3']."
-    )
+class _RequirementSequenceField(Field):
+    value: tuple[Requirement, ...]
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Tuple[Requirement, ...]:
         value = super().compute_value(raw_value, address=address)
+        if value is None:
+            return ()
         invalid_type_error = InvalidFieldTypeException(
             address,
             cls.alias,
@@ -571,7 +562,7 @@ class PythonRequirementsField(Field):
                     parsed = Requirement.parse(v)
                 except Exception as e:
                     raise InvalidFieldException(
-                        format_invalid_requirement_string_error(
+                        _format_invalid_requirement_string_error(
                             v,
                             e,
                             description_of_origin=(
@@ -583,6 +574,15 @@ class PythonRequirementsField(Field):
             else:
                 raise invalid_type_error
         return tuple(result)
+
+
+class PythonRequirementsField(_RequirementSequenceField):
+    alias = "requirements"
+    required = True
+    help = (
+        "A sequence of pip-style requirement strings, e.g. ['foo==1.8', "
+        "'bar<=3 ; python_version<'3']."
+    )
 
 
 class ModuleMappingField(DictStringToStringSequenceField):
@@ -611,7 +611,7 @@ class PythonRequirementLibrary(Target):
         "Python requirements inline in a BUILD file. If you have a `requirements.txt` file "
         "already, you can instead use the macro `python_requirements()` to convert each "
         "requirement into a `python_requirement_library()` target automatically.\n\nSee "
-        f"{docs_url('python-third-party-dependencies')}."
+        f"{bracketed_docs_url('python-third-party-dependencies')}."
     )
 
 
@@ -634,20 +634,38 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirem
             yield Requirement.parse(line)
         except Exception as e:
             raise ValueError(
-                format_invalid_requirement_string_error(
+                _format_invalid_requirement_string_error(
                     line, e, description_of_origin=f"{rel_path} at line {i + 1}"
                 )
             )
 
 
 class PythonRequirementsFileSources(Sources):
-    pass
+    required = True
+    uses_source_roots = False
 
 
 class PythonRequirementsFile(Target):
     alias = "_python_requirements_file"
     core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSources)
-    help = "A private, helper target type for requirements.txt files."
+    help = "A private helper target type for requirements.txt files."
+
+
+# -----------------------------------------------------------------------------------------------
+# `_python_constraints` target
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonRequirementConstraintsField(_RequirementSequenceField):
+    alias = "constraints"
+    required = True
+    help = "A list of pip-style requirement strings, e.g. `my_dist==4.2.1`."
+
+
+class PythonRequirementConstraints(Target):
+    alias = "_python_constraints"
+    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementConstraintsField)
+    help = "A private helper target for inlined requirements constraints, used by macros."
 
 
 # -----------------------------------------------------------------------------------------------
@@ -667,7 +685,7 @@ class PythonProvidesField(ScalarField, ProvidesField):
     required = True
     help = (
         "The setup.py kwargs for the external artifact built from this target.\n\nSee "
-        f"{docs_url('python-distributions')}."
+        f"{bracketed_docs_url('python-distributions')}."
     )
 
     @classmethod
@@ -687,7 +705,7 @@ class SetupPyCommandsField(StringSequenceField):
         "The runtime commands to invoke setup.py with to create the distribution, e.g. "
         '["bdist_wheel", "--python-tag=py36.py37", "sdist"].\n\nIf empty or unspecified, '
         "will just create a chroot with a setup() function.\n\nSee "
-        f"{docs_url('python-distributions')}."
+        f"{bracketed_docs_url('python-distributions')}."
     )
 
 

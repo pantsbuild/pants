@@ -30,7 +30,7 @@ class MyPy(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=f"Don't use MyPy when running `{register.bootstrap.pants_bin_name} lint`.",
+            help=f"Don't use MyPy when running `{register.bootstrap.pants_bin_name} typecheck`.",
         )
         register(
             "--args",

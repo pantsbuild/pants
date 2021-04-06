@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import logging
 from typing import cast
 
 from pants.backend.python.dependency_inference import import_parser, module_mapper
@@ -20,6 +21,9 @@ from pants.engine.addresses import Address
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, SubsystemRule, rule
 from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
@@ -30,6 +34,8 @@ from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
+
+logger = logging.getLogger(__name__)
 
 
 class PythonInferSubsystem(Subsystem):
@@ -126,26 +132,45 @@ async def infer_python_dependencies_via_imports(
         return InferredDependencies([], sibling_dependencies_inferrable=False)
 
     wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
-    detected_imports = await Get(
-        ParsedPythonImports,
-        ParsePythonImportsRequest(
-            request.sources_field,
-            PexInterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
+    explicitly_provided_deps, detected_imports = await MultiGet(
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
+        Get(
+            ParsedPythonImports,
+            ParsePythonImportsRequest(
+                request.sources_field,
+                PexInterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
+            ),
         ),
     )
-    relevant_imports = (
-        detected_imports.all_imports
-        if python_infer_subsystem.string_imports
-        else detected_imports.explicit_imports
+
+    relevant_imports = tuple(
+        imp
+        for imp in (
+            detected_imports.all_imports
+            if python_infer_subsystem.string_imports
+            else detected_imports.explicit_imports
+        )
+        if imp not in combined_stdlib
     )
 
     owners_per_import = await MultiGet(
         Get(PythonModuleOwners, PythonModule(imported_module))
         for imported_module in relevant_imports
-        if imported_module not in combined_stdlib
     )
-    merged_result = sorted(set(itertools.chain.from_iterable(owners_per_import)))
-    return InferredDependencies(merged_result, sibling_dependencies_inferrable=True)
+    merged_result: set[Address] = set()
+    for owners, imp in zip(owners_per_import, relevant_imports):
+        merged_result.update(owners.unambiguous)
+        address = wrapped_tgt.target.address
+        owners.maybe_warn_of_ambiguity(
+            explicitly_provided_deps,
+            address,
+            context=f"The target {address} imports `{imp}`",
+        )
+        maybe_disambiguated = owners.disambiguated_via_ignores(explicitly_provided_deps)
+        if maybe_disambiguated:
+            merged_result.add(maybe_disambiguated)
+
+    return InferredDependencies(sorted(merged_result), sibling_dependencies_inferrable=True)
 
 
 class InferInitDependencies(InferDependenciesRequest):

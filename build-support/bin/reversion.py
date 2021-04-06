@@ -1,6 +1,8 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import argparse
 import base64
 import fnmatch
@@ -97,10 +99,13 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
 _version_re = re.compile(r"Version: (?P<version>\S+)")
 
 
-def reversion(args):
+def reversion(
+    *, whl_file: str, dest_dir: str, target_version: str, extra_globs: list[str] | None = None
+) -> None:
+    all_globs = ["*.dist-info/*", "*-nspkg.pth", *(extra_globs or ())]
     with temporary_dir() as workspace:
         # Extract the input.
-        with open_zip(args.whl_file, "r") as whl:
+        with open_zip(whl_file, "r") as whl:
             src_filenames = whl.namelist()
             whl.extractall(workspace)
 
@@ -128,10 +133,8 @@ def reversion(args):
             if os.path.isdir(os.path.join(workspace, src_filename)):
                 continue
             dst_filename = src_filename
-            if any_match(args.glob, src_filename):
-                rewritten = replace_in_file(
-                    workspace, src_filename, input_version, args.target_version
-                )
+            if any_match(all_globs, src_filename):
+                rewritten = replace_in_file(workspace, src_filename, input_version, target_version)
                 if rewritten is not None:
                     dst_filename = rewritten
                     refingerprint.append((src_filename, dst_filename))
@@ -141,15 +144,13 @@ def reversion(args):
         rewrite_record_file(workspace, record_file, refingerprint)
 
         # Create a new output whl in the destination.
-        dst_whl_filename = os.path.basename(args.whl_file).replace(
-            input_version, args.target_version
-        )
-        dst_whl_file = os.path.join(args.dest_dir, dst_whl_filename)
+        dst_whl_filename = os.path.basename(whl_file).replace(input_version, target_version)
+        dst_whl_file = os.path.join(dest_dir, dst_whl_filename)
         with open_zip(dst_whl_file, "w", zipfile.ZIP_DEFLATED) as whl:
             for dst_filename in dst_filenames:
                 whl.write(os.path.join(workspace, dst_filename), dst_filename)
 
-        print("Wrote whl with version {} to {}.\n".format(args.target_version, dst_whl_file))
+        print("Wrote whl with version {} to {}.\n".format(target_version, dst_whl_file))
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -158,10 +159,10 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("dest_dir", help="The destination directory for the output whl.")
     parser.add_argument("target_version", help="The target version of the output whl.")
     parser.add_argument(
-        "--glob",
+        "--extra-globs",
         action="append",
-        default=["*.dist-info/*", "*-nspkg.pth"],
-        help="Globs (fnmatch) to rewrite within the whl: may be specified multiple times.",
+        default=[],
+        help="Extra globs (fnmatch) to rewrite within the whl: may be specified multiple times.",
     )
     return parser
 
@@ -173,7 +174,12 @@ def main():
     `--glob` argument to add additional globs: ie  `--glob='thing-to-match*.txt'`.
     """
     args = create_parser().parse_args()
-    reversion(args)
+    reversion(
+        whl_file=args.whl_file,
+        dest_dir=args.dest_dir,
+        target_version=args.target_version,
+        extra_globs=args.extra_globs,
+    )
 
 
 if __name__ == "__main__":

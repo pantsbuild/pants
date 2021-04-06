@@ -3,10 +3,13 @@
 #   ./pants run build-support/bin/generate_github_workflows.py
 
 
+env:
+  PANTS_CONFIG_FILES: +['pants.ci.toml']
+  PANTS_REMOTE_CACHE_READ: 'true'
+  PANTS_REMOTE_CACHE_WRITE: 'true'
+  RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux:
-    env:
-      rust_version: 1.49.0
     name: Bootstrap Pants, test+lint Rust (Linux)
     runs-on: ubuntu-20.04
     steps:
@@ -32,6 +35,11 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - if: github.event_name == 'push'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -40,7 +48,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/${{ env.rust_version }}-*
+        path: '~/.rustup/toolchains/1.49.0-*
 
           ~/.rustup/update-hashes
 
@@ -86,39 +94,21 @@ jobs:
           '
         path: 'src/python/pants/engine/internals/native_engine.so
 
-          src/python/pants/engine/internals/native_engine.so.metadata
-
-          '
-    - name: Set env vars
-      run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
-        github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
-
-        '
+          src/python/pants/engine/internals/native_engine.so.metadata'
     - name: Bootstrap Pants
       run: './pants --version
 
         '
     - name: Run smoke tests
-      run: './pants help goals
-
-        ./pants list ::
+      run: './pants list ::
 
         ./pants roots
 
+        ./pants help goals
+
         ./pants help targets
 
-        '
-    - if: '!contains(env.COMMIT_MESSAGE, ''[ci skip-rust]'')'
-      name: Test and Lint Rust
-      run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
-
-        ./cargo clippy --all
-
-        # We pass --tests to skip doc tests because our generated protos contain invalid
-
-        # doc tests in their comments.
-
-        ./cargo test --all --tests -- --nocapture
+        ./pants help subsystems
 
         '
     - name: Upload native_engine.so
@@ -127,17 +117,22 @@ jobs:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: 'src/python/pants/engine/internals/native_engine.so
 
-          src/python/pants/engine/internals/native_engine.so.metadata
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - if: '!contains(env.COMMIT_MESSAGE, ''[ci skip-rust]'')'
+      name: Test and Lint Rust
+      run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
 
-          '
+        ./cargo clippy --all
+
+        ./cargo test --all --tests -- --nocapture
+
+        '
     strategy:
       matrix:
         python-version:
         - 3.8.3
   bootstrap_pants_macos:
-    env:
-      rust_version: 1.49.0
-    name: Bootstrap Pants, test Rust (MacOS)
+    name: Bootstrap Pants, test Rust (macOS)
     runs-on: macos-10.15
     steps:
     - name: Check out code
@@ -170,7 +165,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/${{ env.rust_version }}-*
+        path: '~/.rustup/toolchains/1.49.0-*
 
           ~/.rustup/update-hashes
 
@@ -216,14 +211,7 @@ jobs:
           '
         path: 'src/python/pants/engine/internals/native_engine.so
 
-          src/python/pants/engine/internals/native_engine.so.metadata
-
-          '
-    - name: Set pants config files
-      run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
-        github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
-
-        '
+          src/python/pants/engine/internals/native_engine.so.metadata'
     - name: Bootstrap Pants
       run: './pants --version
 
@@ -234,29 +222,18 @@ jobs:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: 'src/python/pants/engine/internals/native_engine.so
 
-          src/python/pants/engine/internals/native_engine.so.metadata
-
-          '
+          src/python/pants/engine/internals/native_engine.so.metadata'
     - env:
         TMPDIR: ${{ runner.temp }}
       if: '!contains(env.COMMIT_MESSAGE, ''[ci skip-rust]'')'
       name: Test Rust
-      run: '# We pass --tests to skip doc tests because our generated protos contain
-        invalid
-
-        # doc tests in their comments.
-
-        # We do not pass --all as BRFS tests don''t pass on GHA MacOS containers.
-
-        ./cargo test --tests -- --nocapture
-
-        '
+      run: ./cargo test --tests -- --nocapture
     strategy:
       matrix:
         python-version:
         - 3.8.3
-  lint_python_linux:
-    name: Lint Python (Linux)
+  lint_python:
+    name: Lint Python
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
     steps:
@@ -282,6 +259,11 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - if: github.event_name == 'push'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -301,11 +283,6 @@ jobs:
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: src/python/pants/engine/internals/
-    - name: Set pants config files
-      run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
-        github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
-
-        '
     - name: Lint
       run: './pants validate ''**''
 
@@ -343,10 +320,17 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - if: github.event_name == 'push'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
@@ -362,11 +346,6 @@ jobs:
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: src/python/pants/engine/internals/
-    - name: Set pants config files
-      run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
-        github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
-
-        '
     - name: Run Python tests
       run: './pants test ::
 
@@ -376,16 +355,45 @@ jobs:
         python-version:
         - 3.8.3
   test_python_macos:
-    name: Test Python (MacOS)
+    env:
+      ARCHFLAGS: -arch x86_64
+    name: Test Python (macOS)
     needs: bootstrap_pants_macos
     runs-on: macos-10.15
     steps:
     - name: Check out code
       uses: actions/checkout@v2
+      with:
+        fetch-depth: 10
+    - if: github.event_name == 'push'
+      name: Get commit message for branch builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'pull_request'
+      name: Get commit message for PR builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'push'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
@@ -401,11 +409,6 @@ jobs:
       with:
         name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
         path: src/python/pants/engine/internals/
-    - name: Set pants config files
-      run: 'echo ''PANTS_CONFIG_FILES=+["${{ github.workspace }}/pants.ci.toml", "${{
-        github.workspace }}/pants.remote-cache.toml"]'' >> ${GITHUB_ENV}
-
-        '
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test ::
 

@@ -13,7 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import FrozenSet, Iterable, List, Mapping, Sequence, Set, Tuple, TypeVar
+from typing import FrozenSet, Iterable, Iterator, List, Mapping, Sequence, Set, Tuple, TypeVar
 
 import packaging.specifiers
 import packaging.version
@@ -22,15 +22,18 @@ from typing_extensions import Protocol
 
 from pants.backend.python.target_types import InterpreterConstraintsField, MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import PythonRequirementsField
+from pants.backend.python.target_types import (
+    PythonRequirementConstraintsField,
+    PythonRequirementsField,
+)
 from pants.backend.python.util_rules import pex_cli
-from pants.backend.python.util_rules.pex_cli import PexCliProcess
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
     PexEnvironment,
     PexRuntimeEnvironment,
     PythonExecutable,
 )
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -53,7 +56,7 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import Target
+from pants.engine.target import Target, Targets
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
@@ -322,6 +325,7 @@ class PexRequest(EngineAwareParameter):
     sources: Digest | None
     additional_inputs: Digest | None
     main: MainSpecification | None
+    repository_pex: Pex | None
     additional_args: Tuple[str, ...]
     pex_path: Tuple[Pex, ...]
     apply_requirement_constraints: bool
@@ -338,6 +342,7 @@ class PexRequest(EngineAwareParameter):
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         main: MainSpecification | None = None,
+        repository_pex: Pex | None = None,
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
         apply_requirement_constraints: bool = True,
@@ -361,6 +366,8 @@ class PexRequest(EngineAwareParameter):
             directly in the Pex, but should be present in the environment when building the Pex.
         :param main: The main for the built Pex, equivalent to Pex's `-e` or '-c' flag. If
             left off, the Pex will open up as a REPL.
+        :param repository_pex: An optional PEX to resolve requirements from via the Pex CLI
+            `--pex-repository` option.
         :param additional_args: Any additional Pex flags.
         :param pex_path: Pex files to add to the PEX_PATH.
         :param apply_requirement_constraints: Whether to apply any configured
@@ -376,6 +383,7 @@ class PexRequest(EngineAwareParameter):
         self.sources = sources
         self.additional_inputs = additional_inputs
         self.main = main
+        self.repository_pex = repository_pex
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
         self.apply_requirement_constraints = apply_requirement_constraints
@@ -489,6 +497,51 @@ async def find_interpreter(
 
 
 @dataclass(frozen=True)
+class MaybeConstraintsFile:
+    path: str | None
+    digest: Digest
+
+
+@rule(desc="Resolve requirements constraints file")
+async def resolve_requirements_constraints_file(python_setup: PythonSetup) -> MaybeConstraintsFile:
+    if python_setup.requirement_constraints:
+        digest = await Get(
+            Digest,
+            PathGlobs(
+                [python_setup.requirement_constraints],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                conjunction=GlobExpansionConjunction.all_match,
+                description_of_origin="the option `[python-setup].requirement_constraints`",
+            ),
+        )
+        return MaybeConstraintsFile(python_setup.requirement_constraints, digest)
+
+    if python_setup.requirement_constraints_target:
+        targets = await Get(
+            Targets,
+            UnparsedAddressInputs(
+                [python_setup.requirement_constraints_target], owning_address=None
+            ),
+        )
+        tgt = targets.expect_single()
+        if not tgt.has_field(PythonRequirementConstraintsField):
+            raise ValueError(
+                "Invalid target type for `[python-setup].requirement_constraints_target`. Please "
+                f"use a `_python_constraints` target instead of a `{tgt.alias}` target."
+            )
+        formatted_constraints = "\n".join(
+            str(constraint) for constraint in tgt[PythonRequirementConstraintsField].value
+        )
+        path = "constraints.generated.txt"
+        digest = await Get(
+            Digest, CreateDigest([FileContent(path, formatted_constraints.encode())])
+        )
+        return MaybeConstraintsFile(path, digest)
+
+    return MaybeConstraintsFile(None, EMPTY_DIGEST)
+
+
+@dataclass(frozen=True)
 class BuildPexResult:
     result: ProcessResult
     pex_filename: str
@@ -506,23 +559,32 @@ async def build_pex(
     python_repos: PythonRepos,
     platform: Platform,
     pex_runtime_env: PexRuntimeEnvironment,
+    constraints_file: MaybeConstraintsFile,
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
 
     argv = [
         "--output-file",
         request.output_filename,
+        *request.additional_args,
+    ]
+
+    if request.repository_pex:
+        argv.extend(["--pex-repository", request.repository_pex.name])
+    else:
         # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
         # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
         # case. Why set `--no-pypi`, then? We need to do this so that
         # `--python-repos-repos=['custom_url']` will only point to that index and not include PyPI.
-        "--no-pypi",
-        *(f"--index={index}" for index in python_repos.indexes),
-        *(f"--repo={repo}" for repo in python_repos.repos),
-        "--resolver-version",
-        python_setup.resolver_version.value,
-        *request.additional_args,
-    ]
+        argv.extend(
+            [
+                "--no-pypi",
+                *(f"--index={index}" for index in python_repos.indexes),
+                *(f"--repo={repo}" for repo in python_repos.repos),
+                "--resolver-version",
+                "pip-2020-resolver",
+            ]
+        )
 
     python: PythonExecutable | None = None
 
@@ -534,16 +596,14 @@ async def build_pex(
         #  constraints.
         argv.extend(request.platforms.generate_pex_arg_list())
     else:
+        argv.extend(request.interpreter_constraints.generate_pex_arg_list())
         # NB: If it's an internal_only PEX, we do our own lookup of the interpreter based on the
         # interpreter constraints, and then will run the PEX with that specific interpreter. We
         # will have already validated that there were no platforms.
-        # Otherwise, we let Pex resolve the constraints.
         if request.internal_only:
             python = await Get(
                 PythonExecutable, PexInterpreterConstraints, request.interpreter_constraints
             )
-        else:
-            argv.extend(request.interpreter_constraints.generate_pex_arg_list())
 
     argv.append("--no-emit-warnings")
 
@@ -564,22 +624,17 @@ async def build_pex(
     argv.extend(request.requirements)
 
     constraint_file_digest = EMPTY_DIGEST
-    if request.apply_requirement_constraints and python_setup.requirement_constraints is not None:
-        argv.extend(["--constraints", python_setup.requirement_constraints])
-        constraint_file_digest = await Get(
-            Digest,
-            PathGlobs(
-                [python_setup.requirement_constraints],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                conjunction=GlobExpansionConjunction.all_match,
-                description_of_origin="the option `--python-setup-requirement-constraints`",
-            ),
-        )
+    if request.apply_requirement_constraints and constraints_file.path is not None:
+        argv.extend(["--constraints", constraints_file.path])
+        constraint_file_digest = constraints_file.digest
 
     sources_digest_as_subdir = await Get(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
     additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
+    repository_pex_digest = (
+        request.repository_pex.digest if request.repository_pex else EMPTY_DIGEST
+    )
 
     merged_digest = await Get(
         Digest,
@@ -588,6 +643,7 @@ async def build_pex(
                 sources_digest_as_subdir,
                 additional_inputs_digest,
                 constraint_file_digest,
+                repository_pex_digest,
                 *(pex.digest for pex in request.pex_path),
             )
         ),
@@ -801,14 +857,19 @@ async def create_venv_pex(
 
     pex_request = request.pex_request
     seeded_venv_request = dataclasses.replace(
-        pex_request, additional_args=pex_request.additional_args + ("--venv", "--seed")
+        pex_request, additional_args=pex_request.additional_args + ("--venv", "--seed", "verbose")
     )
-    result = await Get(BuildPexResult, PexRequest, seeded_venv_request)
-    # Pex --seed mode outputs the path of the PEX executable. In the --venv case this is the `pex`
-    # script in the venv root directory.
-    venv_dir = PurePath(result.result.stdout.decode().strip()).parent
+    venv_pex_result = await Get(BuildPexResult, PexRequest, seeded_venv_request)
+    # Pex verbose --seed mode outputs the absolute path of the PEX executable as well as the
+    # absolute path of the PEX_ROOT.  In the --venv case this is the `pex` script in the venv root
+    # directory.
+    seed_info = json.loads(venv_pex_result.result.stdout.decode())
+    abs_pex_root = PurePath(seed_info["pex_root"])
+    abs_pex_path = PurePath(seed_info["pex"])
+    venv_rel_dir = abs_pex_path.relative_to(abs_pex_root).parent
+    venv_dir = pex_environment.pex_root / venv_rel_dir
 
-    venv_script_writer = VenvScriptWriter(pex=result.create_pex(), venv_dir=venv_dir)
+    venv_script_writer = VenvScriptWriter(pex=venv_pex_result.create_pex(), venv_dir=venv_dir)
     pex = venv_script_writer.exe(bash, pex_environment)
     python = venv_script_writer.python(bash, pex_environment)
     scripts = {
@@ -829,7 +890,7 @@ async def create_venv_pex(
 
     return VenvPex(
         digest=input_digest,
-        pex_filename=result.pex_filename,
+        pex_filename=venv_pex_result.pex_filename,
         pex=pex.script,
         python=python.script,
         bin=FrozenDict((bin_name, venv_script.script) for bin_name, venv_script in scripts.items()),
@@ -842,39 +903,31 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
     request = two_step_pex_request.pex_request
     req_pex_name = "__requirements.pex"
 
-    additional_inputs: Digest | None
+    repository_pex: Pex | None = None
 
     # Create a pex containing just the requirements.
     if request.requirements:
-        requirements_pex_request = PexRequest(
-            output_filename=req_pex_name,
-            internal_only=request.internal_only,
-            requirements=request.requirements,
-            interpreter_constraints=request.interpreter_constraints,
-            platforms=request.platforms,
-            # TODO: Do we need to pass all the additional args to the requirements pex creation?
-            #  Some of them may affect resolution behavior, but others may be irrelevant.
-            #  For now we err on the side of caution.
-            additional_args=request.additional_args,
-            description=(
-                f"Resolving {pluralize(len(request.requirements), 'requirement')}: "
-                f"{', '.join(request.requirements)}"
+        repository_pex = await Get(
+            Pex,
+            PexRequest(
+                output_filename=req_pex_name,
+                internal_only=request.internal_only,
+                requirements=request.requirements,
+                interpreter_constraints=request.interpreter_constraints,
+                platforms=request.platforms,
+                # TODO: Do we need to pass all the additional args to the requirements pex creation?
+                #  Some of them may affect resolution behavior, but others may be irrelevant.
+                #  For now we err on the side of caution.
+                additional_args=request.additional_args,
+                description=(
+                    f"Resolving {pluralize(len(request.requirements), 'requirement')}: "
+                    f"{', '.join(request.requirements)}"
+                ),
             ),
         )
-        requirements_pex = await Get(Pex, PexRequest, requirements_pex_request)
-        additional_inputs = requirements_pex.digest
-        additional_args = (*request.additional_args, f"--requirements-pex={req_pex_name}")
-    else:
-        additional_inputs = None
-        additional_args = request.additional_args
 
     # Now create a full PEX on top of the requirements PEX.
-    full_pex_request = dataclasses.replace(
-        request,
-        requirements=PexRequirements(),
-        additional_inputs=additional_inputs,
-        additional_args=additional_args,
-    )
+    full_pex_request = dataclasses.replace(request, repository_pex=repository_pex)
     full_pex = await Get(Pex, PexRequest, full_pex_request)
     return TwoStepPex(pex=full_pex)
 
@@ -943,6 +996,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
+        append_only_caches=pex_environment.append_only_caches(),
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,
@@ -993,7 +1047,9 @@ class VenvPexProcess:
 
 
 @rule
-async def setup_venv_pex_process(request: VenvPexProcess) -> Process:
+async def setup_venv_pex_process(
+    request: VenvPexProcess, pex_environment: PexEnvironment
+) -> Process:
     venv_pex = request.venv_pex
     argv = (venv_pex.pex.argv0, *request.argv)
     input_digest = (
@@ -1009,6 +1065,7 @@ async def setup_venv_pex_process(request: VenvPexProcess) -> Process:
         env=request.extra_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
+        append_only_caches=pex_environment.append_only_caches(),
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         cache_scope=request.cache_scope,
@@ -1031,6 +1088,27 @@ class PexResolveInfo(Collection[PexDistributionInfo]):
     repository info -v`."""
 
 
+def parse_repository_info(repository_info: str) -> PexResolveInfo:
+    def iter_dist_info() -> Iterator[PexDistributionInfo]:
+        for line in repository_info.splitlines():
+            info = json.loads(line)
+            requires_python = info["requires_python"]
+            yield PexDistributionInfo(
+                project_name=info["project_name"],
+                version=packaging.version.Version(info["version"]),
+                requires_python=(
+                    packaging.specifiers.SpecifierSet(requires_python)
+                    if requires_python is not None
+                    else None
+                ),
+                requires_dists=tuple(
+                    Requirement.parse(req) for req in sorted(info["requires_dists"])
+                ),
+            )
+
+    return PexResolveInfo(sorted(iter_dist_info(), key=lambda dist: dist.project_name))
+
+
 @rule
 async def determine_venv_pex_resolve_info(venv_pex: VenvPex) -> PexResolveInfo:
     process_result = await Get(
@@ -1044,20 +1122,23 @@ async def determine_venv_pex_resolve_info(venv_pex: VenvPex) -> PexResolveInfo:
             level=LogLevel.DEBUG,
         ),
     )
-    dists = []
-    for line in process_result.stdout.decode().splitlines():
-        info = json.loads(line)
-        dists.append(
-            PexDistributionInfo(
-                project_name=info["project_name"],
-                version=packaging.version.Version(info["version"]),
-                requires_python=packaging.specifiers.SpecifierSet(info["requires_python"] or ""),
-                requires_dists=tuple(
-                    Requirement.parse(req) for req in sorted(info["requires_dists"])
-                ),
-            )
-        )
-    return PexResolveInfo(sorted(dists, key=lambda dist: dist.project_name))
+    return parse_repository_info(process_result.stdout.decode())
+
+
+@rule
+async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInfo:
+    process_result = await Get(
+        ProcessResult,
+        PexProcess(
+            pex=Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+            argv=[pex.name, "repository", "info", "-v"],
+            input_digest=pex.digest,
+            extra_env={"PEX_MODULE": "pex.tools"},
+            description=f"Determine distributions found in {pex.name}",
+            level=LogLevel.DEBUG,
+        ),
+    )
+    return parse_repository_info(process_result.stdout.decode())
 
 
 def rules():

@@ -24,7 +24,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockConsole, MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 
 
@@ -125,37 +125,39 @@ def run_lint_rule(
     per_file_caching: bool,
     include_sources: bool = True,
 ) -> Tuple[int, str]:
-    console = MockConsole(use_colors=False)
-    workspace = Workspace(rule_runner.scheduler)
-    union_membership = UnionMembership({LintRequest: lint_request_types})
-    result: Lint = run_rule_with_mocks(
-        lint,
-        rule_args=[
-            console,
-            workspace,
-            Targets(targets),
-            create_goal_subsystem(
-                LintSubsystem, per_file_caching=per_file_caching, per_target_caching=False
-            ),
-            union_membership,
-        ],
-        mock_gets=[
-            MockGet(
-                output_type=EnrichedLintResults,
-                input_type=LintRequest,
-                mock=lambda field_set_collection: field_set_collection.lint_results,
-            ),
-            MockGet(
-                output_type=FieldSetsWithSources,
-                input_type=FieldSetsWithSourcesRequest,
-                mock=lambda field_sets: FieldSetsWithSources(field_sets if include_sources else ()),
-            ),
-            MockGet(output_type=Digest, input_type=MergeDigests, mock=lambda _: EMPTY_DIGEST),
-        ],
-        union_membership=union_membership,
-    )
-    assert not console.stdout.getvalue()
-    return result.exit_code, console.stderr.getvalue()
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
+        workspace = Workspace(rule_runner.scheduler)
+        union_membership = UnionMembership({LintRequest: lint_request_types})
+        result: Lint = run_rule_with_mocks(
+            lint,
+            rule_args=[
+                console,
+                workspace,
+                Targets(targets),
+                create_goal_subsystem(
+                    LintSubsystem, per_file_caching=per_file_caching, per_target_caching=False
+                ),
+                union_membership,
+            ],
+            mock_gets=[
+                MockGet(
+                    output_type=EnrichedLintResults,
+                    input_type=LintRequest,
+                    mock=lambda field_set_collection: field_set_collection.lint_results,
+                ),
+                MockGet(
+                    output_type=FieldSetsWithSources,
+                    input_type=FieldSetsWithSourcesRequest,
+                    mock=lambda field_sets: FieldSetsWithSources(
+                        field_sets if include_sources else ()
+                    ),
+                ),
+                MockGet(output_type=Digest, input_type=MergeDigests, mock=lambda _: EMPTY_DIGEST),
+            ],
+            union_membership=union_membership,
+        )
+        assert not stdio_reader.get_stdout()
+        return result.exit_code, stdio_reader.get_stderr()
 
 
 def test_empty_target_noops(rule_runner: RuleRunner) -> None:

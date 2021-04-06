@@ -15,7 +15,7 @@ use remexec::ActionResult;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 use workunit_store::WorkunitStore;
 
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
@@ -60,7 +60,7 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
     _req: MultiPlatformProcess,
     _context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    delay_for(self.delay).await;
+    sleep(self.delay).await;
     self.call_counter.fetch_add(1, Ordering::SeqCst);
     self.result.clone()
   }
@@ -83,18 +83,18 @@ impl StoreSetup {
     let executor = task_executor::Executor::new();
     let cas = StubCAS::builder().build();
     let store_dir = TempDir::new().unwrap().path().join("store_dir");
-    let store = Store::with_remote(
-      executor.clone(),
-      store_dir.clone(),
-      &cas.address(),
-      None,
-      None,
-      BTreeMap::new(),
-      10 * 1024 * 1024,
-      Duration::from_secs(1),
-      1,
-    )
-    .unwrap();
+    let store = Store::local_only(executor.clone(), store_dir.clone())
+      .unwrap()
+      .into_with_remote(
+        &cas.address(),
+        None,
+        None,
+        BTreeMap::new(),
+        10 * 1024 * 1024,
+        Duration::from_secs(1),
+        1,
+      )
+      .unwrap();
     StoreSetup {
       store,
       store_dir,
@@ -317,7 +317,7 @@ async fn cache_write_success() {
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 
   // Wait for the cache write block to finish.
-  delay_for(Duration::from_secs(1)).await;
+  sleep(Duration::from_secs(1)).await;
   assert_eq!(action_cache.action_map.lock().len(), 1);
   let action_map_mutex_guard = action_cache.action_map.lock();
   assert_eq!(
@@ -348,7 +348,7 @@ async fn cache_write_not_for_failures() {
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 
   // Wait for the cache write block to finish.
-  delay_for(Duration::from_millis(100)).await;
+  sleep(Duration::from_millis(100)).await;
   assert!(action_cache.action_map.lock().is_empty());
 }
 
@@ -376,7 +376,7 @@ async fn cache_write_does_not_block() {
   // CommandRunner::run().
   assert!(action_cache.action_map.lock().is_empty());
 
-  delay_for(Duration::from_secs(1)).await;
+  sleep(Duration::from_secs(1)).await;
   assert_eq!(action_cache.action_map.lock().len(), 1);
   let action_map_mutex_guard = action_cache.action_map.lock();
   assert_eq!(
@@ -420,6 +420,7 @@ async fn make_tree_from_directory() {
     &store,
   )
   .await
+  .unwrap()
   .unwrap();
 
   let root_dir = tree.root.unwrap();
@@ -440,13 +441,23 @@ async fn make_tree_from_directory() {
   assert_eq!(file_digest, TestData::roland().digest());
 
   // Test that extracting a non-existent output directory fails.
-  crate::remote_cache::CommandRunner::make_tree_for_output_directory(
+  let result = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
     directory_digest,
     RelativePath::new("animals").unwrap(),
     &store,
   )
   .await
-  .unwrap_err();
+  .unwrap();
+  assert!(result.is_none());
+
+  let result = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
+    directory_digest,
+    RelativePath::new("pets/xyzzy").unwrap(),
+    &store,
+  )
+  .await
+  .unwrap();
+  assert!(result.is_none());
 }
 
 #[tokio::test]
@@ -454,9 +465,6 @@ async fn extract_output_file() {
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-
-  // Prepare the store to contain /pets/cats/roland. We will then extract varios pieces of it
-  // into Tree protos.
 
   store
     .store_file_bytes(TestData::roland().bytes(), false)
@@ -477,11 +485,40 @@ async fn extract_output_file() {
     &store,
   )
   .await
+  .unwrap()
   .unwrap();
 
   assert_eq!(file_node.name, "roland");
   let file_digest: Digest = file_node.digest.unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
+
+  // Extract non-existent files to make sure that Ok(None) is returned.
+  let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
+    directory_digest,
+    RelativePath::new("animals").unwrap(),
+    &store,
+  )
+  .await
+  .unwrap();
+  assert!(file_node_opt.is_none());
+
+  let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
+    directory_digest,
+    RelativePath::new("cats").unwrap(),
+    &store,
+  )
+  .await
+  .unwrap();
+  assert!(file_node_opt.is_none());
+
+  let file_node_opt = crate::remote_cache::CommandRunner::extract_output_file(
+    directory_digest,
+    RelativePath::new("cats/xyzzy").unwrap(),
+    &store,
+  )
+  .await
+  .unwrap();
+  assert!(file_node_opt.is_none());
 }
 
 #[tokio::test]

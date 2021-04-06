@@ -22,7 +22,7 @@ use crate::externs::engine_aware::{self, EngineAwareInformation};
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
-use bytes::buf::BufMutExt;
+use bytes::BufMut;
 use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
@@ -494,6 +494,15 @@ impl From<Scandir> for NodeKey {
   }
 }
 
+fn unmatched_globs_additional_context() -> Option<String> {
+  Some(format!(
+    "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
+    `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
+    they exist on disk. Refer to {}.",
+    externs::bracketed_docs_url("troubleshooting#pants-cannot-find-a-file-in-your-project")
+  ))
+}
+
 ///
 /// A node that captures Vec<PathStat> for resolved files/dirs from PathGlobs.
 ///
@@ -511,7 +520,7 @@ impl Paths {
   }
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<Vec<PathStat>> {
     context
-      .expand_globs(path_globs)
+      .expand_globs(path_globs, unmatched_globs_additional_context())
       .map_err(|e| throw(&format!("{}", e)))
       .await
   }
@@ -588,7 +597,7 @@ impl Snapshot {
     // We rely on Context::expand_globs tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
     let path_stats = context
-      .expand_globs(path_globs)
+      .expand_globs(path_globs, unmatched_globs_additional_context())
       .map_err(|e| throw(&format!("{}", e)))
       .await?;
     store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
@@ -749,7 +758,7 @@ impl StreamingDownload for NetDownload {
 }
 
 struct FileDownload {
-  stream: tokio::io::ReaderStream<tokio::fs::File>,
+  stream: tokio_util::io::ReaderStream<tokio::fs::File>,
 }
 
 impl FileDownload {
@@ -760,7 +769,7 @@ impl FileDownload {
         e, path, file_name
       )
     })?;
-    let stream = tokio::io::reader_stream(file);
+    let stream = tokio_util::io::ReaderStream::new(file);
     Ok(FileDownload { stream })
   }
 }

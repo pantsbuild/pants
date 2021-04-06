@@ -41,6 +41,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
@@ -76,7 +77,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
-from pants.util.docutil import docs_url
+from pants.util.docutil import bracketed_docs_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -409,7 +410,7 @@ def _log_or_raise_unmatched_owners(
         msgs.append(
             f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
             f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` "
-            f"field includes `{file_path}`. See {docs_url('targets')} for more "
+            f"field includes `{file_path}`. See {bracketed_docs_url('targets')} for more "
             f"information on target definitions.{option_msg}"
         )
 
@@ -674,29 +675,31 @@ class TransitiveExcludesNotSupportedError(ValueError):
         )
 
 
-def parse_dependencies_field(
-    field: Dependencies,
-    *,
-    subproject_roots: Sequence[str],
-    registered_target_types: Sequence[Type[Target]],
+@rule
+async def determine_explicitly_provided_dependencies(
+    request: DependenciesRequest,
     union_membership: UnionMembership,
-) -> ParsedDependencies:
+    registered_target_types: RegisteredTargetTypes,
+    global_options: GlobalOptions,
+) -> ExplicitlyProvidedDependencies:
     parse = functools.partial(
-        AddressInput.parse, relative_to=field.address.spec_path, subproject_roots=subproject_roots
+        AddressInput.parse,
+        relative_to=request.field.address.spec_path,
+        subproject_roots=global_options.options.subproject_roots,
     )
 
     addresses: List[AddressInput] = []
     ignored_addresses: List[AddressInput] = []
-    for v in field.value or ():
+    for v in request.field.value or ():
         is_ignore = v.startswith("!")
         if is_ignore:
             # Check if it's a transitive exclude, rather than a direct exclude.
             if v.startswith("!!"):
-                if not field.supports_transitive_excludes:
+                if not request.field.supports_transitive_excludes:
                     raise TransitiveExcludesNotSupportedError(
                         bad_value=v,
-                        address=field.address,
-                        registered_target_types=registered_target_types,
+                        address=request.field.address,
+                        registered_target_types=registered_target_types.types,
                         union_membership=union_membership,
                     )
                 v = v[2:]
@@ -707,26 +710,19 @@ def parse_dependencies_field(
             ignored_addresses.append(result)
         else:
             addresses.append(result)
-    return ParsedDependencies(addresses, ignored_addresses)
+
+    parsed_includes = await MultiGet(Get(Address, AddressInput, ai) for ai in addresses)
+    parsed_ignores = await MultiGet(Get(Address, AddressInput, ai) for ai in ignored_addresses)
+    return ExplicitlyProvidedDependencies(
+        FrozenOrderedSet(sorted(parsed_includes)), FrozenOrderedSet(sorted(parsed_ignores))
+    )
 
 
 @rule(desc="Resolve direct dependencies")
 async def resolve_dependencies(
-    request: DependenciesRequest,
-    union_membership: UnionMembership,
-    registered_target_types: RegisteredTargetTypes,
-    global_options: GlobalOptions,
+    request: DependenciesRequest, union_membership: UnionMembership, global_options: GlobalOptions
 ) -> Addresses:
-    provided = parse_dependencies_field(
-        request.field,
-        subproject_roots=global_options.options.subproject_roots,
-        registered_target_types=registered_target_types.types,
-        union_membership=union_membership,
-    )
-    literal_addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in provided.addresses)
-    ignored_addresses = set(
-        await MultiGet(Get(Address, AddressInput, ai) for ai in provided.ignored_addresses)
-    )
+    explicitly_provided = await Get(ExplicitlyProvidedDependencies, DependenciesRequest, request)
 
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
@@ -807,12 +803,12 @@ async def resolve_dependencies(
         addr
         for addr in (
             *subtarget_addresses,
-            *literal_addresses,
+            *explicitly_provided.includes,
             *itertools.chain.from_iterable(injected),
             *itertools.chain.from_iterable(inferred),
             *special_cased,
         )
-        if addr not in ignored_addresses
+        if addr not in explicitly_provided.ignores
     }
     return Addresses(sorted(result))
 

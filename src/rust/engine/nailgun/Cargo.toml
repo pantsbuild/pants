@@ -7,13 +7,13 @@ publish = false
 
 [dependencies]
 async_latch = { path = "../async_latch" }
-bytes = "0.5"
+bytes = "1.0"
 futures = "0.3"
 log = "0.4"
-nails = "0.11"
+nails = "0.12"
 os_pipe = "0.9"
 task_executor = { path = "../task_executor" }
-tokio = { version = "0.2.23", features = ["tcp", "fs", "sync", "io-std", "signal"] }
+tokio = { version = "1.4", features = ["fs", "io-std", "io-util", "net", "signal", "sync"] }
 
 [dev-dependencies]
-tokio = { version = "0.2.23", features = ["dns", "rt-threaded", "macros", "tcp", "io-std"] }
+tokio = { version = "1.4", features = ["io-std", "macros", "net", "rt-multi-thread"] }

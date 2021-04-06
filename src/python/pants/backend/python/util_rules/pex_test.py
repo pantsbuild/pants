@@ -19,8 +19,10 @@ from pants.backend.python.target_types import (
     EntryPoint,
     InterpreterConstraintsField,
     MainSpecification,
+    PythonRequirementConstraints,
 )
 from pants.backend.python.util_rules.pex import (
+    MaybeConstraintsFile,
     Pex,
     PexDistributionInfo,
     PexInterpreterConstraints,
@@ -31,11 +33,14 @@ from pants.backend.python.util_rules.pex import (
     PexResolveInfo,
     VenvPex,
     VenvPexProcess,
+    resolve_requirements_constraints_file,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
+from pants.engine.rules import SubsystemRule
 from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
 from pants.testutil.option_util import create_subsystem
@@ -290,6 +295,40 @@ def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
     )
 
 
+def test_maybe_constraints_file() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            resolve_requirements_constraints_file,
+            SubsystemRule(PythonSetup),
+            QueryRule(MaybeConstraintsFile, []),
+        ],
+        target_types=[PythonRequirementConstraints],
+    )
+    constraints = ["c1==1.1.1", "c2==2.2.2"]
+    constraints_file = "\n".join(constraints)
+    rule_runner.create_file("constraints.txt", constraints_file)
+    rule_runner.add_to_build_file(
+        "", f"_python_constraints(name='constraints', constraints={repr(constraints)})"
+    )
+
+    def get_constraints(arg: str | None) -> MaybeConstraintsFile:
+        if arg:
+            rule_runner.set_options([arg])
+        return rule_runner.request(MaybeConstraintsFile, [])
+
+    assert get_constraints(None) == MaybeConstraintsFile(None, EMPTY_DIGEST)
+    expected_digest = rule_runner.make_snapshot({"constraints.txt": constraints_file}).digest
+    assert get_constraints(
+        "--python-setup-requirement-constraints=constraints.txt"
+    ) == MaybeConstraintsFile("constraints.txt", expected_digest)
+    expected_digest = rule_runner.make_snapshot(
+        {"constraints.generated.txt": constraints_file}
+    ).digest
+    assert get_constraints(
+        "--python-setup-requirement-constraints-target=//:constraints"
+    ) == MaybeConstraintsFile("constraints.generated.txt", expected_digest)
+
+
 @dataclass(frozen=True)
 class ExactRequirement:
     project_name: str
@@ -325,7 +364,9 @@ def rule_runner() -> RuleRunner:
             QueryRule(Process, (PexProcess,)),
             QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
+            QueryRule(PexResolveInfo, (Pex,)),
             QueryRule(PexResolveInfo, (VenvPex,)),
+            QueryRule(PexPEX, ()),
         ]
     )
 
@@ -354,7 +395,7 @@ def create_pex_and_get_all_data(
         main=main,
         sources=sources,
         additional_inputs=additional_inputs,
-        additional_args=("--include-tools", *additional_pex_args),
+        additional_args=additional_pex_args,
     )
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python", *additional_pants_args],
@@ -364,26 +405,37 @@ def create_pex_and_get_all_data(
     pex = rule_runner.request(pex_type, [request])
     if isinstance(pex, Pex):
         digest = pex.digest
+        pex_pex = rule_runner.request(PexPEX, [])
+        process = rule_runner.request(
+            Process,
+            [
+                PexProcess(
+                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+                    argv=["-m", "pex.tools", pex.name, "info"],
+                    input_digest=pex.digest,
+                    extra_env=dict(PEX_INTERPRETER="1"),
+                    description="Extract PEX-INFO.",
+                )
+            ],
+        )
     elif isinstance(pex, VenvPex):
         digest = pex.digest
+        process = rule_runner.request(
+            Process,
+            [
+                VenvPexProcess(
+                    pex,
+                    argv=["info"],
+                    extra_env=dict(PEX_TOOLS="1"),
+                    description="Extract PEX-INFO.",
+                ),
+            ],
+        )
     else:
         raise AssertionError(f"Expected a Pex or a VenvPex but got a {type(pex)}.")
+
     rule_runner.scheduler.write_digest(digest)
     pex_path = os.path.join(rule_runner.build_root, "test.pex")
-
-    pex_process_type = PexProcess if isinstance(pex, Pex) else VenvPexProcess
-    process = rule_runner.request(
-        Process,
-        [
-            pex_process_type(
-                pex,
-                argv=["info"],
-                extra_env=dict(PEX_TOOLS="1"),
-                description="Extract PEX-INFO.",
-            ),
-        ],
-    )
-
     result = rule_runner.request(ProcessResult, [process])
     pex_info_content = result.stdout.decode()
 
@@ -614,13 +666,14 @@ def test_additional_inputs(rule_runner: RuleRunner) -> None:
     assert main_content[: len(preamble)] == preamble
 
 
-def test_venv_pex_resolve_info(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("pex_type", [Pex, VenvPex])
+def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
     venv_pex = create_pex_and_get_all_data(
-        rule_runner, pex_type=VenvPex, requirements=PexRequirements(["requests==2.23.0"])
+        rule_runner, pex_type=pex_type, requirements=PexRequirements(["requests==2.23.0"])
     )["pex"]
     dists = rule_runner.request(PexResolveInfo, [venv_pex])
-    assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), SpecifierSet(""), ())
-    assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), SpecifierSet(""), ())
+    assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), None, ())
+    assert dists[1] == PexDistributionInfo("chardet", Version("3.0.4"), None, ())
     assert dists[2] == PexDistributionInfo(
         "idna", Version("2.10"), SpecifierSet("!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"), ()
     )

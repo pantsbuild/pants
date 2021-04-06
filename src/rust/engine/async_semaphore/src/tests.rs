@@ -1,12 +1,10 @@
-use crate::AsyncSemaphore;
-
 use std::time::Duration;
 
 use futures::channel::oneshot;
 use futures::future::{self, FutureExt};
+use tokio::time::{sleep, timeout};
 
-use tokio;
-use tokio::time::{delay_for, timeout};
+use crate::AsyncSemaphore;
 
 #[tokio::test]
 async fn acquire_and_release() {
@@ -28,27 +26,27 @@ async fn correct_semaphore_slot_ids() {
   //Process 1
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
     tx1.send(id).unwrap();
-    delay_for(2 * scale).await;
+    sleep(2 * scale).await;
     future::ready(())
   }));
   //Process 2
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
-    delay_for(1 * scale).await;
+    sleep(scale).await;
     tx2.send(id).unwrap();
     future::ready(())
   }));
   //Process 3
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
-    delay_for(1 * scale).await;
+    sleep(scale).await;
     tx3.send(id).unwrap();
     future::ready(())
   }));
 
-  delay_for(5 * scale).await;
+  sleep(5 * scale).await;
 
   //Process 4
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
-    delay_for(1 * scale).await;
+    sleep(scale).await;
     tx4.send(id).unwrap();
     future::ready(())
   }));
@@ -82,49 +80,49 @@ async fn correct_semaphore_slot_ids_2() {
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
     println!("Exec process 1");
     tx1.send(id).unwrap();
-    delay_for(Duration::from_millis(20)).await;
+    sleep(Duration::from_millis(20)).await;
     future::ready(())
   }));
   println!("Spawning process 2");
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
     println!("Exec process 2");
     tx2.send(id).unwrap();
-    delay_for(Duration::from_millis(20)).await;
+    sleep(Duration::from_millis(20)).await;
     future::ready(())
   }));
   println!("Spawning process 3");
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
     println!("Exec process 3");
     tx3.send(id).unwrap();
-    delay_for(Duration::from_millis(20)).await;
+    sleep(Duration::from_millis(20)).await;
     future::ready(())
   }));
   println!("Spawning process 4");
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
     println!("Exec process 4");
     tx4.send(id).unwrap();
-    delay_for(Duration::from_millis(20)).await;
+    sleep(Duration::from_millis(20)).await;
     future::ready(())
   }));
   println!("Spawning process 5");
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
     println!("Exec process 5");
     tx5.send(id).unwrap();
-    delay_for(Duration::from_millis(20)).await;
+    sleep(Duration::from_millis(20)).await;
     future::ready(())
   }));
   println!("Spawning process 6");
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
     println!("Exec process 6");
     tx6.send(id).unwrap();
-    delay_for(Duration::from_millis(20)).await;
+    sleep(Duration::from_millis(20)).await;
     future::ready(())
   }));
   println!("Spawning process 7");
   tokio::spawn(sema.clone().with_acquired(move |id| async move {
     println!("Exec process 7");
     tx7.send(id).unwrap();
-    delay_for(Duration::from_millis(20)).await;
+    sleep(Duration::from_millis(20)).await;
     future::ready(())
   }));
 
@@ -176,7 +174,7 @@ async fn at_most_n_acquisitions() {
 
   // thread2 should not signal until we unblock thread1.
   let acquired_thread2 =
-    match future::select(delay_for(Duration::from_millis(100)), acquired_thread2).await {
+    match future::select(sleep(Duration::from_millis(100)).boxed(), acquired_thread2).await {
       future::Either::Left((_, acquired_thread2)) => acquired_thread2,
       future::Either::Right(_) => {
         panic!("thread2 should not have acquired while thread1 was holding.")
@@ -238,7 +236,7 @@ async fn drop_while_waiting() {
   // thread2 will wait for a little while, but then drop its PermitFuture to give up on waiting.
   tokio::spawn(async move {
     let permit_future = handle2.acquire().boxed();
-    let delay_future = delay_for(Duration::from_millis(100));
+    let delay_future = sleep(Duration::from_millis(100)).boxed();
     let raced_result = future::select(delay_future, permit_future).await;
     // We expect to have timed out, because the other Future will not resolve until asked.
     match raced_result {
@@ -296,7 +294,7 @@ async fn dropped_future_is_removed_from_queue() {
   }
   let waiter = handle2.with_acquired(|_id| future::ready(()));
   let join_handle2 = tokio::spawn(async move {
-    match future::select(delay_for(Duration::from_millis(100)), waiter.boxed()).await {
+    match future::select(sleep(Duration::from_millis(100)).boxed(), waiter.boxed()).await {
       future::Either::Left(((), waiter_future)) => {
         tx_thread2.send(()).unwrap();
         rx_thread2.await.unwrap();
@@ -304,7 +302,7 @@ async fn dropped_future_is_removed_from_queue() {
         ()
       }
       future::Either::Right(_) => {
-        panic!("The delay_for result should always be ready first!");
+        panic!("The sleep result should always be ready first!");
       }
     }
   });
