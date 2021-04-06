@@ -1,8 +1,12 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
-from typing import Dict, Set
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import ProtobufSources
@@ -12,21 +16,29 @@ from pants.engine.addresses import Address
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
     SourcesPathsRequest,
     Targets,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-class ProtobufMapping(FrozenDict[str, Address]):
+@dataclass(frozen=True)
+class ProtobufMapping:
     """A mapping of stripped .proto file names to their owning file address."""
+
+    mapping: FrozenDict[str, Address]
+    ambiguous_modules: FrozenDict[str, tuple[Address, ...]]
 
 
 @rule(desc="Creating map of Protobuf file names to Protobuf targets", level=LogLevel.DEBUG)
@@ -38,12 +50,14 @@ async def map_protobuf_files() -> ProtobufMapping:
         for tgt in protobuf_targets
     )
 
-    stripped_files_to_addresses: Dict[str, Address] = {}
-    stripped_files_with_multiple_owners: Set[str] = set()
+    stripped_files_to_addresses: dict[str, Address] = {}
+    stripped_files_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt, stripped_sources in zip(protobuf_targets, stripped_sources_per_target):
         for stripped_f in stripped_sources:
             if stripped_f in stripped_files_to_addresses:
-                stripped_files_with_multiple_owners.add(stripped_f)
+                stripped_files_with_multiple_owners[stripped_f].update(
+                    {stripped_files_to_addresses[stripped_f], tgt.address}
+                )
             else:
                 stripped_files_to_addresses[stripped_f] = tgt.address
 
@@ -51,7 +65,12 @@ async def map_protobuf_files() -> ProtobufMapping:
     for ambiguous_stripped_f in stripped_files_with_multiple_owners:
         stripped_files_to_addresses.pop(ambiguous_stripped_f)
 
-    return ProtobufMapping(stripped_files_to_addresses)
+    return ProtobufMapping(
+        mapping=FrozenDict(sorted(stripped_files_to_addresses.items())),
+        ambiguous_modules=FrozenDict(
+            (k, tuple(sorted(v))) for k, v in sorted(stripped_files_with_multiple_owners.items())
+        ),
+    )
 
 
 # See https://developers.google.com/protocol-buffers/docs/reference/proto3-spec for the Proto
@@ -78,17 +97,35 @@ async def infer_protobuf_dependencies(
     if not protoc.dependency_inference:
         return InferredDependencies([], sibling_dependencies_inferrable=False)
 
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
-    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
-    result = sorted(
-        {
-            protobuf_mapping[import_path]
-            for file_content in digest_contents
-            for import_path in parse_proto_imports(file_content.content.decode())
-            if import_path in protobuf_mapping
-        }
+    address = request.sources_field.address
+    wrapped_tgt = await Get(WrappedTarget, Address, address)
+    explicitly_provided_deps, hydrated_sources = await MultiGet(
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
+        Get(HydratedSources, HydrateSourcesRequest(request.sources_field)),
     )
-    return InferredDependencies(result, sibling_dependencies_inferrable=True)
+    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
+
+    result: OrderedSet[Address] = OrderedSet()
+    for file_content in digest_contents:
+        for import_path in parse_proto_imports(file_content.content.decode()):
+            unambiguous = protobuf_mapping.mapping.get(import_path)
+            ambiguous = protobuf_mapping.ambiguous_modules.get(import_path)
+            if unambiguous:
+                result.add(unambiguous)
+            if ambiguous:
+                explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                    ambiguous,
+                    address,
+                    import_reference="file",
+                    context=(
+                        f"The target {address} imports `{import_path}` in the file "
+                        f"{file_content.path}"
+                    ),
+                )
+                maybe_disambiguated = explicitly_provided_deps.disambiguated_via_ignores(ambiguous)
+                if maybe_disambiguated:
+                    result.add(maybe_disambiguated)
+    return InferredDependencies(sorted(result), sibling_dependencies_inferrable=True)
 
 
 def rules():
