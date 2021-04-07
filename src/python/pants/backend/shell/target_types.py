@@ -64,7 +64,7 @@ class Shunit2Shell(Enum):
                 self.sh: None,
                 self.bash: "--version",
                 self.dash: None,
-                self.ksh: None,
+                self.ksh: "--version",
                 self.pdksh: None,
                 self.zsh: "--version",
             },
