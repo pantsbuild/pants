@@ -32,7 +32,7 @@ else
 fi
 
 export PY="${PY:-${default_python}}"
-if ! command -v "${PY}" >/dev/null; then
+if ! command -v "${PY}" > /dev/null; then
   die "Python interpreter ${PY} not discoverable on your PATH."
 fi
 py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
@@ -102,20 +102,20 @@ function pkg_pants_install_test() {
   local version=$1
   shift
   local PIP_ARGS=("$@")
-  pip install "${PIP_ARGS[@]}" "pantsbuild.pants==${version}" || \
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants==${version}" ||
     die "pip install of pantsbuild.pants failed!"
-  execute_packaged_pants_with_internal_backends list src:: || \
+  execute_packaged_pants_with_internal_backends list src:: ||
     die "'pants list src::' failed in venv!"
-  [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
-     == "${version}" ]] || die "Installed version of pants does not match requested version!"
+  [[ "$(execute_packaged_pants_with_internal_backends --version 2> /dev/null)" == \
+  "${version}" ]] || die "Installed version of pants does not match requested version!"
 }
 
 function pkg_testutil_install_test() {
   local version=$1
   shift
   local PIP_ARGS=("$@")
-  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testutil==${version}" && \
-  python -c "import pants.testutil.option_util, pants.testutil.rule_runner, pants.testutil.pants_integration_test"
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testutil==${version}" &&
+    python -c "import pants.testutil.option_util, pants.testutil.rule_runner, pants.testutil.pants_integration_test"
 }
 
 #
@@ -178,9 +178,9 @@ function activate_tmp_venv() {
   # Because the venv/bin/activate script's location is dynamic and not located in a fixed
   # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
-  VENV_DIR=$(mktemp -d -t pants.XXXXX) && \
-  "${ROOT}/build-support/virtualenv" "$VENV_DIR" && \
-  source "$VENV_DIR/bin/activate"
+  VENV_DIR=$(mktemp -d -t pants.XXXXX) &&
+    "${ROOT}/build-support/virtualenv" "$VENV_DIR" &&
+    source "$VENV_DIR/bin/activate"
 }
 
 function pre_install() {
@@ -192,7 +192,7 @@ function pre_install() {
 function post_install() {
   # this assume pre_install is called and a new temp venv activation has been done.
   if [[ "${pause_after_venv_creation}" == "true" ]]; then
-    cat <<EOM
+    cat << EOM
 
 If you want to poke around with the new version of pants that has been built
 and installed in a temporary virtualenv, fire up another shell window and type:
@@ -236,11 +236,10 @@ function install_and_test_packages() {
     $(run_packages_script list-packages | grep '.' | awk '{print $1}')
   ) || die "Failed to list packages!"
 
-  for package in "${packages[@]}"
-  do
+  for package in "${packages[@]}"; do
     start_travis_section "${package}" "Installing and testing package ${package}-${VERSION}"
     # shellcheck disable=SC2086
-    eval pkg_${package##*\.}_install_test "${PIP_ARGS[@]}" || \
+    eval pkg_${package##*\.}_install_test "${PIP_ARGS[@]}" ||
       die "Failed to install and test package ${package}-${VERSION}!"
     end_travis_section
   done
@@ -252,11 +251,11 @@ function install_and_test_packages() {
 function dry_run_install() {
   # Build a complete set of whls, and then ensure that we can install pants using only whls.
   local VERSION="${PANTS_UNSTABLE_VERSION}"
-  run_packages_script build-pants-wheels && \
-  build_3rdparty_packages "${VERSION}" && \
-  install_and_test_packages "${VERSION}" \
-    --only-binary=:all: \
-    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
+  run_packages_script build-pants-wheels &&
+    build_3rdparty_packages "${VERSION}" &&
+    install_and_test_packages "${VERSION}" \
+      --only-binary=:all: \
+      -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
 }
 
 function get_pgp_keyid() {
@@ -281,12 +280,12 @@ function activate_twine() {
 
 function execute_pex() {
   run_pex \
-      --no-build \
-      --no-pypi \
-      --disable-cache \
-      -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-      -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-      "$@"
+    --no-build \
+    --no-pypi \
+    --disable-cache \
+    -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+    "$@"
 }
 
 function build_pex() {
@@ -396,7 +395,7 @@ function usage() {
   echo
   echo "All options (except for '-d') are mutually exclusive."
 
-  if (( $# > 0 )); then
+  if (($# > 0)); then
     die "$@"
   else
     exit 0
@@ -408,14 +407,35 @@ while getopts ":${_OPTS}" opt; do
     h) usage ;;
     d) debug="true" ;;
     n) dry_run="true" ;;
-    f) run_packages_script build-fs-util ; exit $? ;;
+    f)
+      run_packages_script build-fs-util
+      exit $?
+      ;;
     t) test_release="true" ;;
-    l) run_packages_script list-packages ; exit $? ;;
-    o) run_packages_script list-owners ; exit $? ;;
-    w) run_packages_script list-prebuilt-wheels ; exit $? ;;
-    e) run_packages_script fetch-and-check-prebuilt-wheels ; exit $? ;;
-    p) build_pex fetch ; exit $? ;;
-    q) build_pex build ; exit $? ;;
+    l)
+      run_packages_script list-packages
+      exit $?
+      ;;
+    o)
+      run_packages_script list-owners
+      exit $?
+      ;;
+    w)
+      run_packages_script list-prebuilt-wheels
+      exit $?
+      ;;
+    e)
+      run_packages_script fetch-and-check-prebuilt-wheels
+      exit $?
+      ;;
+    p)
+      build_pex fetch
+      exit $?
+      ;;
+    q)
+      build_pex build
+      exit $?
+      ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -430,19 +450,19 @@ if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
 elif [[ "${dry_run}" == "true" ]]; then
   banner "Performing a dry run release"
   (
-    dry_run_install && \
-    banner "Dry run release succeeded"
+    dry_run_install &&
+      banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
   banner "Installing and testing the latest released packages"
   (
-    install_and_test_packages "${PANTS_STABLE_VERSION}" && \
-    banner "Successfully installed and tested the latest released packages"
+    install_and_test_packages "${PANTS_STABLE_VERSION}" &&
+      banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
   banner "Releasing packages to PyPI"
   (
-    run_packages_script check-release-prereqs && publish_packages && \
-    run_packages_script post-publish && banner "Successfully released packages to PyPI"
+    run_packages_script check-release-prereqs && publish_packages &&
+      run_packages_script post-publish && banner "Successfully released packages to PyPI"
   ) || die "Failed to release packages to PyPI."
 fi

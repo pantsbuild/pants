@@ -34,13 +34,14 @@ function create_venv() {
 
 function ensure_gcc() {
   if ! GCC_VERSION="$(gcc -v 2>&1)"; then
-    die "$(cat << MESSAGE
+    die "$(
+      cat << MESSAGE
 ERROR: unable to execute 'gcc'. Please verify that your compiler is installed, in your
        \$PATH and functional.
 
 Hint: on macOS, you may need to accept the XCode EULA: 'sudo xcodebuild -license accept'.
 MESSAGE
-)"
+    )"
   fi
   # Prevent bootstrapping failure due to unrecognized flag:
   # https://github.com/pantsbuild/pants/issues/78
@@ -87,7 +88,7 @@ function activate_pants_venv() {
     for req in "${REQUIREMENTS[@]}"; do
       # NB: For the pip_extra reference, see:
       #   https://stackoverflow.com/questions/7577052/bash-empty-array-expansion-with-set-u
-      pip install "${pip_extra[@]+"${pip_extra[@]}"}" -r "${req}" || \
+      pip install "${pip_extra[@]+"${pip_extra[@]}"}" -r "${req}" ||
         die "Failed to install requirements from ${req}."
     done
     touch "${BOOTSTRAPPED_FILE}"
@@ -95,4 +96,3 @@ function activate_pants_venv() {
     activate_venv || die "Failed to activate venv."
   fi
 }
-
