@@ -7,23 +7,39 @@ from typing import List, Optional
 import pytest
 
 from pants.backend.python.goals.coverage_py import CoverageSubsystem, create_coverage_config
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    EMPTY_SNAPSHOT,
     CreateDigest,
     Digest,
     DigestContents,
     FileContent,
-    PathGlobs,
 )
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
+from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 
 
 def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
     coverage = create_subsystem(CoverageSubsystem, config="some_file" if coverage_config else None)
     resolved_config: List[str] = []
 
-    def mock_handle_config(request: CreateDigest) -> Digest:
+    def mock_find_existing_config(request: ConfigFilesRequest) -> ConfigFiles:
+        snapshot = (
+            EMPTY_SNAPSHOT
+            if not request.specified
+            else RuleRunner().make_snapshot_of_empty_files([".coveragerc"])
+        )
+        return ConfigFiles(snapshot)
+
+    def mock_read_existing_config(_: Digest) -> DigestContents:
+        # This shouldn't be called if no config file provided.
+        assert coverage_config is not None
+        return DigestContents(
+            [FileContent(path="/dev/null/prelude", content=coverage_config.encode())]
+        )
+
+    def mock_create_final_config(request: CreateDigest) -> Digest:
         assert len(request) == 1
         assert request[0].path == ".coveragerc"
         assert isinstance(request[0], FileContent)
@@ -31,16 +47,12 @@ def run_create_coverage_config_rule(coverage_config: Optional[str]) -> str:
         resolved_config.append(request[0].content.decode())
         return EMPTY_DIGEST
 
-    def mock_read_config(_: PathGlobs) -> DigestContents:
-        # This shouldn't be called if no config file provided.
-        assert coverage_config is not None
-        return DigestContents(
-            [FileContent(path="/dev/null/prelude", content=coverage_config.encode())]
-        )
-
     mock_gets = [
-        MockGet(output_type=DigestContents, input_type=PathGlobs, mock=mock_read_config),
-        MockGet(output_type=Digest, input_type=CreateDigest, mock=mock_handle_config),
+        MockGet(
+            output_type=ConfigFiles, input_type=ConfigFilesRequest, mock=mock_find_existing_config
+        ),
+        MockGet(output_type=DigestContents, input_type=Digest, mock=mock_read_existing_config),
+        MockGet(output_type=Digest, input_type=CreateDigest, mock=mock_create_final_config),
     ]
 
     result = run_rule_with_mocks(create_coverage_config, rule_args=[coverage], mock_gets=mock_gets)

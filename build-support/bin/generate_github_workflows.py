@@ -97,7 +97,7 @@ def setup_toolchain_auth() -> Sequence[Step]:
     return [
         {
             "name": "Setup toolchain auth",
-            "if": "github.event_name == 'push'",
+            "if": "github.event_name != 'pull_request'",
             "run": dedent(
                 """\
                 echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -291,7 +291,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             ],
         },
         "lint_python": {
-            "name": "Lint Python",
+            "name": "Lint Python and Shell",
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},

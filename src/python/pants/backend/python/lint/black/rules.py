@@ -17,9 +17,9 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, GlobMatchErrorBehavior, MergeDigests, PathGlobs
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
@@ -86,7 +86,7 @@ async def setup_black(
         else PexInterpreterConstraints(black.interpreter_constraints)
     )
 
-    black_pex_request = Get(
+    black_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="black.pex",
@@ -97,22 +97,14 @@ async def setup_black(
         ),
     )
 
-    config_digest_request = Get(
-        Digest,
-        PathGlobs(
-            globs=[black.config] if black.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--black-config`",
-        ),
-    )
-
-    source_files_request = Get(
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, black.config_request)
+    source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
 
-    source_files, black_pex, config_digest = await MultiGet(
-        source_files_request, black_pex_request, config_digest_request
+    source_files, black_pex, config_files = await MultiGet(
+        source_files_get, black_pex_get, config_files_get
     )
     source_files_snapshot = (
         source_files.snapshot
@@ -120,7 +112,9 @@ async def setup_black(
         else setup_request.request.prior_formatter_result
     )
 
-    input_digest = await Get(Digest, MergeDigests((source_files_snapshot.digest, config_digest)))
+    input_digest = await Get(
+        Digest, MergeDigests((source_files_snapshot.digest, config_files.snapshot.digest))
+    )
 
     process = await Get(
         Process,
@@ -170,5 +164,4 @@ def rules():
         UnionRule(PythonFmtRequest, BlackRequest),
         UnionRule(LintRequest, BlackRequest),
         *pex.rules(),
-        *stripped_source_files.rules(),
     ]

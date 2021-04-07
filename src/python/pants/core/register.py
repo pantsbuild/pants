@@ -11,6 +11,7 @@ from pants.core.target_types import ArchiveTarget, Files, GenericTarget, Relocat
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
     archive,
+    config_files,
     distdir,
     external_tool,
     filter_empty_sources,
@@ -35,6 +36,7 @@ def rules():
         *typecheck.rules(),
         *tailor.rules(),
         # util_rules
+        *config_files.rules(),
         *distdir.rules(),
         *filter_empty_sources.rules(),
         *pants_bin.rules(),

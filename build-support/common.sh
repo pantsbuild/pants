@@ -1,6 +1,7 @@
-# NB: shellcheck complains this is unused, but it's used by callers. See https://github.com/koalaman/shellcheck/wiki/SC2034.
-# shellcheck disable=SC2034
-CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+# shellcheck shell=bash
 
 TRAVIS_FOLD_STATE="/tmp/.travis_fold_current"
 
@@ -9,7 +10,6 @@ COLOR_BLUE="\x1b[34m"
 COLOR_RED="\x1b[31m"
 COLOR_GREEN="\x1b[32m"
 COLOR_RESET="\x1b[0m"
-
 
 function log() {
   echo -e "$@" 1>&2
@@ -30,7 +30,7 @@ export elapsed_start_time
 
 function elapsed() {
   now=$(date '+%s')
-  elapsed_secs=$(( now - elapsed_start_time ))
+  elapsed_secs=$((now - elapsed_start_time))
   echo $elapsed_secs | awk '{printf "%02d:%02d\n",int($1/60), int($1%60)}'
 }
 
@@ -69,7 +69,7 @@ function git_merge_base() {
   # We fall back to the commit before HEAD to attempt to account for situations without a tracking
   # branch, which might include `main` builds, but can also include branch-PR builds, where
   # Travis checks out a specially crafted Github `+refs/pull/11516/merge` branch.
-  git rev-parse --symbolic-full-name --abbrev-ref HEAD@\{upstream\} 2>/dev/null || git rev-parse HEAD^
+  git rev-parse --symbolic-full-name --abbrev-ref HEAD@\{upstream\} 2> /dev/null || git rev-parse HEAD^
 }
 
 function determine_python() {

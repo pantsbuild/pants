@@ -18,6 +18,9 @@ target(
     'src/python/pants/backend/python/lint/pylint',
     'src/python/pants/backend/python/mixed_interpreter_constraints',
     'src/python/pants/backend/python/typecheck/mypy',
+    'src/python/pants/backend/shell',
+    'src/python/pants/backend/shell/lint/shellcheck',
+    'src/python/pants/backend/shell/lint/shfmt',
     'src/python/pants/core',
   ],
 )

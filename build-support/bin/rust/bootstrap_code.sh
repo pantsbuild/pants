@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# shellcheck shell=bash
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
 # Defines:
@@ -42,8 +44,8 @@ function bootstrap_native_code() {
   if [[ "${SKIP_NATIVE_ENGINE_SO_BOOTSTRAP}" == "true" ]]; then
     if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" ]]; then
       die "You requested to override bootstrapping native_engine.so via the env var" \
-          "SKIP_NATIVE_ENGINE_SO_BOOTSTRAP, but the file does not exist at" \
-           "${NATIVE_ENGINE_RESOURCE}. This is not safe to do."
+        "SKIP_NATIVE_ENGINE_SO_BOOTSTRAP, but the file does not exist at" \
+        "${NATIVE_ENGINE_RESOURCE}. This is not safe to do."
     fi
     return
   fi

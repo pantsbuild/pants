@@ -161,12 +161,13 @@ async def infer_python_dependencies_via_imports(
     for owners, imp in zip(owners_per_import, relevant_imports):
         merged_result.update(owners.unambiguous)
         address = wrapped_tgt.target.address
-        owners.maybe_warn_of_ambiguity(
-            explicitly_provided_deps,
+        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+            owners.ambiguous,
             address,
+            import_reference="module",
             context=f"The target {address} imports `{imp}`",
         )
-        maybe_disambiguated = owners.disambiguated_via_ignores(explicitly_provided_deps)
+        maybe_disambiguated = explicitly_provided_deps.disambiguated_via_ignores(owners.ambiguous)
         if maybe_disambiguated:
             merged_result.add(maybe_disambiguated)
 
