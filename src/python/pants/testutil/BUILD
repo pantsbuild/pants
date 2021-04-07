@@ -8,7 +8,7 @@ python_distribution(
     ':pants_integration_test',
     ':rule_runner',
   ],
-  setup_py_commands=["bdist_wheel", "--python-tag", "py37.py38", "sdist"],
+  setup_py_commands=["bdist_wheel", "--python-tag", "py37.py38.py39", "sdist"],
   provides=setup_py(
     name='pantsbuild.pants.testutil',
     description='Test support for writing Pants plugins.',

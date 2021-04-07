@@ -41,6 +41,7 @@ NATIVE_ENGINE_SO_FILES = [
 #  https://github.com/actions/setup-python#available-versions-of-python
 PYTHON37_VERSION = "3.7"
 PYTHON38_VERSION = "3.8"
+PYTHON39_VERSION = "3.9"
 
 LINUX_VERSION = "ubuntu-20.04"
 MACOS_VERSION = "macos-10.15"
@@ -126,9 +127,13 @@ def pants_virtualenv_cache() -> Step:
     }
 
 
-def global_env() -> Env:
+def global_env(*, disable_buildsense: bool = False) -> Env:
     return {
-        "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
+        "PANTS_CONFIG_FILES": (
+            "+['pants.ci.toml']"
+            if not disable_buildsense
+            else "+['pants.ci.toml', 'pants.no-buildsense.toml']"
+        ),
         "RUST_BACKTRACE": "all",
     }
 
@@ -250,12 +255,12 @@ def upload_log_artifacts(name: str) -> Step:
     }
 
 
-def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
+def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     jobs = {
         "bootstrap_pants_linux": {
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
             "runs-on": LINUX_VERSION,
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
             "steps": [
@@ -296,7 +301,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "name": "Test Python (Linux)",
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "strategy": {"matrix": {"python-version": python_versions}},
             "timeout-minutes": 60,
             "steps": [
                 *checkout(),
@@ -313,7 +318,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "name": "Lint Python and Shell",
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "strategy": {"matrix": {"python-version": python_versions}},
             "timeout-minutes": 30,
             "steps": [
                 *checkout(),
@@ -331,7 +336,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
         "bootstrap_pants_macos": {
             "name": "Bootstrap Pants, test Rust (macOS)",
             "runs-on": MACOS_VERSION,
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
             "steps": [
@@ -355,7 +360,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             "name": "Test Python (macOS)",
             "runs-on": MACOS_VERSION,
             "needs": "bootstrap_pants_macos",
-            "strategy": {"matrix": {"python-version": [primary_python_version]}},
+            "strategy": {"matrix": {"python-version": python_versions}},
             "env": MACOS_ENV,
             "timeout-minutes": 20,
             "steps": [
@@ -385,13 +390,15 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                     [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
                     ./build-support/bin/release.sh -n
                     USE_PY38=true ./build-support/bin/release.sh -n
+                    USE_PY39=true ./build-support/bin/release.sh -n
                     ./build-support/bin/release.sh -f
                     """
                 ),
                 "if": DONT_SKIP_WHEELS,
+                "env": {"PANTS_CONFIG_FILES": "+['pants.ci.toml', 'pants.no-buildsense.toml']"},
             }
             if is_macos:
-                step["env"] = MACOS_ENV  # type: ignore[assignment]
+                step["env"].update(MACOS_ENV)  # type: ignore[attr-defined]
             return step
 
         deploy_to_s3_step = {
@@ -419,7 +426,8 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                             "run": (
                                 'echo "PATH=${PATH}:'
                                 "/opt/python/cp37-cp37m/bin:"
-                                '/opt/python/cp38-cp38/bin" >> $GITHUB_ENV'
+                                "/opt/python/cp38-cp38/bin:"
+                                '/opt/python/cp39-cp39/bin" >> $GITHUB_ENV'
                             ),
                         },
                         setup_toolchain_auth(),
@@ -480,7 +488,7 @@ def generate() -> dict[Path, str]:
         {
             "name": test_workflow_name,
             "on": ["push", "pull_request"],
-            "jobs": test_workflow_jobs(PYTHON37_VERSION, cron=False),
+            "jobs": test_workflow_jobs([PYTHON37_VERSION], cron=False),
             "env": global_env(),
         },
         Dumper=NoAliasDumper,
@@ -489,9 +497,10 @@ def generate() -> dict[Path, str]:
         {
             "name": "Daily Extended Python Testing",
             # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
-            "on": {"schedule": [{"cron": "45 8 * * *"}]},
-            "jobs": test_workflow_jobs(PYTHON38_VERSION, cron=True),
-            "env": global_env(),
+            # "on": {"schedule": [{"cron": "45 8 * * *"}]},
+            "on": ["pull_request"],
+            "jobs": test_workflow_jobs([PYTHON38_VERSION, PYTHON39_VERSION], cron=True),
+            "env": global_env(disable_buildsense=True),
         },
         Dumper=NoAliasDumper,
     )

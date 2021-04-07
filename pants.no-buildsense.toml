@@ -1,0 +1,7 @@
+[GLOBAL]
+verify_config = false
+
+plugins = ["hdrhistogram"]
+
+remote_cache_read = false
+remote_cache_write = false
