@@ -49,8 +49,8 @@ bad_files=(
     echo >&2 "Ensuring generated code is present for downstream formatting checks..."
     "${REPO_ROOT}/cargo" check -p bazel_protos
 
-    "${cmd[@]}" | \
-      awk '$0 ~ /^Diff in/ {print $3}' | \
+    "${cmd[@]}" |
+      awk '$0 ~ /^Diff in/ {print $3}' |
       sort -u
     exit "${PIPESTATUS[0]}"
   )
@@ -67,7 +67,7 @@ if [[ ${exit_code} -ne 0 ]]; then
     cat << EOF >&2
 An error occurred while checking the formatting of Rust files:
 EOF
-    cd "${NATIVE_ROOT}" && "${cmd[@]}" >/dev/null
+    cd "${NATIVE_ROOT}" && "${cmd[@]}" > /dev/null
   fi
   exit 1
 fi

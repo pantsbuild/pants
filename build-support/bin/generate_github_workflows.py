@@ -291,7 +291,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
             ],
         },
         "lint_python": {
-            "name": "Lint Python",
+            "name": "Lint Python and Shell",
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": [primary_python_version]}},

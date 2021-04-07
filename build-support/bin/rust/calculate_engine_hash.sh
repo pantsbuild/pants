@@ -30,16 +30,18 @@ function calculate_current_hash() {
   #
   # NB: Ensure that this stays in sync with `githooks/prepare-commit-msg`.
   (
-   cd "${REPO_ROOT}" || exit 1
-   (echo "${MODE_FLAG}"
-    echo "${RUST_TOOLCHAIN_CONTENTS}"
-    uname
-    python --version 2>&1
-    git ls-files --cached --others --exclude-standard \
-     "${NATIVE_ROOT}" \
-     "${REPO_ROOT}/rust-toolchain" \
-     "${REPO_ROOT}/build-support/bin/rust" \
-   | grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" \
-   | git hash-object --stdin-paths) | fingerprint_data
+    cd "${REPO_ROOT}" || exit 1
+    (
+      echo "${MODE_FLAG}"
+      echo "${RUST_TOOLCHAIN_CONTENTS}"
+      uname
+      python --version 2>&1
+      git ls-files --cached --others --exclude-standard \
+        "${NATIVE_ROOT}" \
+        "${REPO_ROOT}/rust-toolchain" \
+        "${REPO_ROOT}/build-support/bin/rust" |
+        grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" |
+        git hash-object --stdin-paths
+    ) | fingerprint_data
   )
 }

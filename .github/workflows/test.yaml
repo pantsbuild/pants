@@ -358,7 +358,7 @@ jobs:
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
   lint_python:
-    name: Lint Python
+    name: Lint Python and Shell
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
     steps:

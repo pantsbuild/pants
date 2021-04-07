@@ -233,7 +233,7 @@ jobs:
         python-version:
         - 3.8.3
   lint_python:
-    name: Lint Python
+    name: Lint Python and Shell
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
     steps:
