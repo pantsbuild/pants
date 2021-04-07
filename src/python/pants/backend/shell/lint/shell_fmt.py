@@ -1,9 +1,11 @@
-# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.python.target_types import PythonSources
+from pants.backend.shell.target_types import ShellSources
 from pants.core.goals.fmt import EnrichedFmtResult, LanguageFmtResults, LanguageFmtTargets
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -13,35 +15,35 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 
 
 @dataclass(frozen=True)
-class PythonFmtTargets(LanguageFmtTargets):
-    required_fields = (PythonSources,)
+class ShellFmtTargets(LanguageFmtTargets):
+    required_fields = (ShellSources,)
 
 
 @union
-class PythonFmtRequest(StyleRequest):
+class ShellFmtRequest(StyleRequest):
     pass
 
 
 @rule
-async def format_python_target(
-    python_fmt_targets: PythonFmtTargets, union_membership: UnionMembership
+async def format_shell_targets(
+    shell_fmt_targets: ShellFmtTargets, union_membership: UnionMembership
 ) -> LanguageFmtResults:
     original_sources = await Get(
         SourceFiles,
-        SourceFilesRequest(target[PythonSources] for target in python_fmt_targets.targets),
+        SourceFilesRequest(target[ShellSources] for target in shell_fmt_targets.targets),
     )
     prior_formatter_result = original_sources.snapshot
 
     results = []
-    fmt_request_types = union_membership.union_rules[PythonFmtRequest]
+    fmt_request_types = union_membership.union_rules[ShellFmtRequest]
     for fmt_request_type in fmt_request_types:
         result = await Get(
             EnrichedFmtResult,
-            PythonFmtRequest,
+            ShellFmtRequest,
             fmt_request_type(
                 (
                     fmt_request_type.field_set_type.create(target)
-                    for target in python_fmt_targets.targets
+                    for target in shell_fmt_targets.targets
                 ),
                 prior_formatter_result=prior_formatter_result,
             ),
@@ -57,4 +59,4 @@ async def format_python_target(
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LanguageFmtTargets, PythonFmtTargets)]
+    return [*collect_rules(), UnionRule(LanguageFmtTargets, ShellFmtTargets)]

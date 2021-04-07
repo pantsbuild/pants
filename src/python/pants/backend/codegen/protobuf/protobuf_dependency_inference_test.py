@@ -17,6 +17,7 @@ from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.mark.parametrize(
@@ -85,52 +86,80 @@ def rule_runner() -> RuleRunner:
 
 def test_protobuf_mapping(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--source-root-patterns=['root1', 'root2', 'root3']"])
-
-    # Two proto files belonging to the same target. We should use two file addresses.
-    rule_runner.create_files("root1/protos", ["f1.proto", "f2.proto"])
-    rule_runner.add_to_build_file("root1/protos", "protobuf_library()")
-
-    # These protos would result in the same stripped file name, so neither should be used.
-    rule_runner.create_file("root1/two_owners/f.proto")
-    rule_runner.add_to_build_file("root1/two_owners", "protobuf_library()")
-    rule_runner.create_file("root2/two_owners/f.proto")
-    rule_runner.add_to_build_file("root2/two_owners", "protobuf_library()")
-
+    rule_runner.write_files(
+        {
+            # Two proto files belonging to the same target. We should use two file addresses.
+            "root1/protos/f1.proto": "",
+            "root1/protos/f2.proto": "",
+            "root1/protos/BUILD": "protobuf_library()",
+            # These protos would result in the same stripped file name, so they are ambiguous.
+            "root1/two_owners/f.proto": "",
+            "root1/two_owners/BUILD": "protobuf_library()",
+            "root2/two_owners/f.proto": "",
+            "root2/two_owners/BUILD": "protobuf_library()",
+        }
+    )
     result = rule_runner.request(ProtobufMapping, [])
     assert result == ProtobufMapping(
+        mapping=FrozenDict(
+            {
+                "protos/f1.proto": Address("root1/protos", relative_file_path="f1.proto"),
+                "protos/f2.proto": Address("root1/protos", relative_file_path="f2.proto"),
+            }
+        ),
+        ambiguous_modules=FrozenDict(
+            {
+                "two_owners/f.proto": (
+                    Address("root1/two_owners", relative_file_path="f.proto"),
+                    Address("root2/two_owners", relative_file_path="f.proto"),
+                )
+            }
+        ),
+    )
+
+
+def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
+    rule_runner.set_options(["--source-root-patterns=['src/protos']"])
+    rule_runner.write_files(
         {
-            "protos/f1.proto": Address("root1/protos", relative_file_path="f1.proto"),
-            "protos/f2.proto": Address("root1/protos", relative_file_path="f2.proto"),
+            "src/protos/project/f1.proto": dedent(
+                """\
+                import 'tests/f.proto';
+                import 'unrelated_path/foo.proto";
+                """
+            ),
+            "src/protos/project/f2.proto": "import 'project/f1.proto';",
+            "src/protos/project/BUILD": "protobuf_library()",
+            "src/protos/tests/f.proto": "",
+            "src/protos/tests/BUILD": "protobuf_library()",
+            # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but
+            # not warn on the disambiguated one and should infer a dep.
+            "src/protos/ambiguous/dep.proto": "",
+            "src/protos/ambiguous/disambiguated.proto": "",
+            "src/protos/ambiguous/main.proto": dedent(
+                """\
+                import 'ambiguous/dep.proto';
+                import 'ambiguous/disambiguated.proto";
+                """
+            ),
+            "src/protos/ambiguous/BUILD": dedent(
+                """\
+                protobuf_library(name='dep1', sources=['dep.proto', 'disambiguated.proto'])
+                protobuf_library(name='dep2', sources=['dep.proto', 'disambiguated.proto'])
+                protobuf_library(
+                    name='main',
+                    sources=['main.proto'],
+                    dependencies=['!./disambiguated.proto:dep2'],
+                )
+                """
+            ),
         }
     )
 
-
-def test_dependency_inference(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file(
-        "src/protos/project/f1.proto",
-        dedent(
-            """\
-            import 'tests/f.proto';
-            import 'unrelated_path/foo.proto";
-            """
-        ),
-    )
-    rule_runner.create_file("src/protos/project/f2.proto", "import 'project/f1.proto';")
-    rule_runner.add_to_build_file("src/protos/project", "protobuf_library()")
-
-    rule_runner.create_file("src/protos/tests/f.proto")
-    rule_runner.add_to_build_file("src/protos/tests", "protobuf_library()")
-
     def run_dep_inference(address: Address) -> InferredDependencies:
-        rule_runner.set_options(
-            [
-                "--backend-packages=pants.backend.codegen.protobuf.python",
-                "--source-root-patterns=['src/protos']",
-            ]
-        )
-        target = rule_runner.get_target(address)
+        tgt = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferProtobufDependencies(target[ProtobufSources])]
+            InferredDependencies, [InferProtobufDependencies(tgt[ProtobufSources])]
         )
 
     build_address = Address("src/protos/project")
@@ -147,3 +176,22 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
         [Address("src/protos/tests", relative_file_path="f.proto")],
         sibling_dependencies_inferrable=True,
     )
+
+    caplog.clear()
+    assert run_dep_inference(
+        Address("src/protos/ambiguous", target_name="main")
+    ) == InferredDependencies(
+        [
+            Address(
+                "src/protos/ambiguous", target_name="dep1", relative_file_path="disambiguated.proto"
+            )
+        ],
+        sibling_dependencies_inferrable=True,
+    )
+    assert len(caplog.records) == 1
+    assert "The target src/protos/ambiguous:main imports `ambiguous/dep.proto`" in caplog.text
+    assert (
+        "['src/protos/ambiguous/dep.proto:dep1', 'src/protos/ambiguous/dep.proto:dep2']"
+        in caplog.text
+    )
+    assert "disambiguated.proto" not in caplog.text

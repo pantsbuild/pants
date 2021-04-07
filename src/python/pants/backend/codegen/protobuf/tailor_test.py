@@ -17,13 +17,14 @@ def test_find_putative_targets() -> None:
         ],
         target_types=[],
     )
-    for path in [
-        "protos/foo/f.proto",
-        "protos/foo/bar/baz1.proto",
-        "protos/foo/bar/baz2.proto",
-        "protos/foo/bar/baz3.proto",
-    ]:
-        rule_runner.create_file(path)
+    rule_runner.write_files(
+        {
+            "protos/foo/f.proto": "",
+            "protos/foo/bar/baz1.proto": "",
+            "protos/foo/bar/baz2.proto": "",
+            "protos/foo/bar/baz3.proto": "",
+        }
+    )
 
     pts = rule_runner.request(
         PutativeTargets,

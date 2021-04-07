@@ -148,6 +148,7 @@ function execute_packaged_pants_with_internal_backends() {
     --backend-packages="[\
         'pants.backend.awslambda.python',\
         'pants.backend.python',\
+        'pants.backend.shell',\
         'internal_plugins.releases',\
       ]" \
     "$@"
