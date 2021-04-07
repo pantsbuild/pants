@@ -1,0 +1,31 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "client"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[[bin]]
+name = "pants"
+path = "src/main.rs"
+
+[dependencies]
+env_logger = "0.5.4"
+futures = "0.3"
+libc = "0.2"
+log = "0.4"
+nails = "0.12"
+nix = "0.20"
+peg = "0.7"
+remoteprocess = "0.4"
+sha2 = "0.9"
+shellexpand = "2.1"
+strum = "0.20"
+strum_macros = "0.20"
+tokio = { version = "1.4", features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
+toml = "0.5"
+uname = "0.1"
+
+[dev-dependencies]
+lazy_static = "1.4"
+tempdir = "0.3"

@@ -1,0 +1,247 @@
+// Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+use core::fmt;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use libc::pid_t;
+use log::debug;
+use sha2::{Digest, Sha256};
+
+struct Metadata {
+  metadata_dir: PathBuf,
+}
+
+impl Metadata {
+  fn mount<P: AsRef<Path>>(directory: P) -> Result<Metadata, String> {
+    let info = uname::uname().map_err(|e| format!("{}", e))?;
+    let host_hash = Sha256::new()
+      .chain(&info.sysname)
+      .chain(&info.nodename)
+      .chain(&info.release)
+      .chain(&info.version)
+      .chain(&info.machine)
+      .finalize();
+
+    const HOST_FINGERPRINT_LENGTH: usize = 12;
+    let mut hex_digest = String::with_capacity(HOST_FINGERPRINT_LENGTH);
+    for byte in host_hash {
+      fmt::Write::write_fmt(&mut hex_digest, format_args!("{:02x}", byte)).unwrap();
+      if hex_digest.len() >= HOST_FINGERPRINT_LENGTH {
+        break;
+      }
+    }
+
+    let metadata_dir = directory
+      .as_ref()
+      .join(&hex_digest[..HOST_FINGERPRINT_LENGTH])
+      .join("pantsd");
+    if metadata_dir.is_dir() {
+      Ok(Metadata { metadata_dir })
+    } else {
+      Err(format!(
+        "There is no pantsd metadata at {metadata_dir}.",
+        metadata_dir = metadata_dir.display()
+      ))
+    }
+  }
+
+  fn pid(&self) -> Result<pid_t, String> {
+    self
+      .read_metadata("pid")
+      .and_then(|(pid_metadata_path, value)| {
+        value
+          .parse()
+          .map(|pid| {
+            debug!(
+              "Parsed pid {pid} from {pid_metadata_path}.",
+              pid = pid,
+              pid_metadata_path = pid_metadata_path.display()
+            );
+            pid
+          })
+          .map_err(|e| {
+            format!(
+              "Failed to parse pantsd pid from {pid_metadata_path}: {err}",
+              pid_metadata_path = pid_metadata_path.display(),
+              err = e
+            )
+          })
+      })
+  }
+
+  fn process_name(&self) -> Result<String, String> {
+    self.read_metadata("process_name").map(|(_, value)| value)
+  }
+
+  fn port(&self) -> Result<u16, String> {
+    self
+      .read_metadata("socket")
+      .and_then(|(socket_metadata_path, value)| {
+        value
+          .parse()
+          .map(|port| {
+            debug!(
+              "Parsed port {port} from {socket_metadata_path}.",
+              port = port,
+              socket_metadata_path = socket_metadata_path.display()
+            );
+            port
+          })
+          .map_err(|e| {
+            format!(
+              "Failed to parse pantsd port from {socket_metadata_path}: {err}",
+              socket_metadata_path = &socket_metadata_path.display(),
+              err = e
+            )
+          })
+      })
+  }
+
+  fn read_metadata(&self, name: &str) -> Result<(PathBuf, String), String> {
+    let metadata_path = self.metadata_dir.join(name);
+    fs::read_to_string(&metadata_path)
+      .map_err(|e| {
+        format!(
+          "Failed to read {name} from {metadata_path}: {err}",
+          name = name,
+          metadata_path = &metadata_path.display(),
+          err = e
+        )
+      })
+      .map(|value| (metadata_path, value))
+  }
+}
+
+pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
+  let pantsd_metadata = Metadata::mount(metadata_dir)?;
+
+  // Grab the purported port early. If we can't get that, then none of the following checks
+  // are useful.
+  let port = pantsd_metadata.port()?;
+
+  // Check that the recorded pid is a live process.
+  // TODO(John Sirois): This does not check for zombie status like the psutil-based Python
+  //  implementation does.
+  let pid = pantsd_metadata.pid()?;
+  nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).map_err(|e| {
+    format!(
+      "\
+      The last pid for the pantsd controlling {working_dir} was {pid} but it's no longer running: \
+      {err}\
+      ",
+      working_dir = working_dir.display(),
+      pid = pid,
+      err = e
+    )
+  })?;
+
+  // Check that the live process is in fact the expected pantsd process (i.e.: pids have not
+  // wrapped).
+  let pantsd_process = remoteprocess::Process::new(pid).map_err(|e| {
+    format!(
+      "Failed to read process information for pantsd at pid {pid}: {err}",
+      pid = pid,
+      err = e
+    )
+  })?;
+  let expected_process_name_prefix = pantsd_metadata.process_name()?;
+  let actual_command_line = pantsd_process.cmdline().map_err(|e| {
+    format!(
+      "Failed to determine the process name for the running process at pid {pid}: {err}",
+      pid = pid,
+      err = e
+    )
+  })?;
+  let actual_argv0 = actual_command_line.get(0).ok_or_else(|| {
+    format!(
+      "The command line for pantsd at pid {pid} was unexpectedly empty.",
+      pid = pid
+    )
+  })?;
+  // It appears the the daemon only records a prefix of the process name, so we just check that.
+  if actual_argv0.starts_with(&expected_process_name_prefix) {
+    Ok(port)
+  } else {
+    Err(format!(
+      "\
+      The process with pid {pid} is not pantsd. Expected a process name matching {expected_name} \
+      but is {actual_name}.\
+      ",
+      pid = pid,
+      expected_name = expected_process_name_prefix,
+      actual_name = actual_argv0
+    ))
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use crate::build_root::BuildRoot;
+  use crate::pantsd;
+  use std::fs;
+  use std::net::TcpStream;
+  use std::process::{Command, Stdio};
+  use std::str::from_utf8;
+  use tempdir::TempDir;
+
+  fn launch_pantsd() -> (BuildRoot, TempDir) {
+    let build_root = BuildRoot::find()
+      .expect("Expected test to be run inside the Pants repo but no build root was detected.");
+    let pants_subprocessdir = TempDir::new("pants_subproccessdir").unwrap();
+    let mut cmd = Command::new(build_root.join("pants"));
+    cmd
+      .current_dir(build_root.as_path())
+      .arg("--pants-config-files=[]")
+      .arg("--no-pantsrc")
+      .arg("--pantsd")
+      .arg(format!(
+        "--pants-subprocessdir={}",
+        pants_subprocessdir.path().display()
+      ))
+      .arg("-V")
+      .stderr(Stdio::inherit());
+    let result = cmd.output().unwrap();
+    assert_eq!(Some(0), result.status.code());
+    assert_eq!(
+      fs::read_to_string(
+        build_root
+          .join("src")
+          .join("python")
+          .join("pants")
+          .join("VERSION")
+      )
+      .unwrap(),
+      from_utf8(result.stdout.as_slice()).unwrap()
+    );
+    (build_root, pants_subprocessdir)
+  }
+
+  fn assert_connect(port: u16) {
+    assert!(
+      port >= 1024,
+      "Pantsd should never be running on a privileged port."
+    );
+
+    let stream = TcpStream::connect(("0.0.0.0", port)).unwrap();
+    assert_eq!(port, stream.peer_addr().unwrap().port());
+  }
+
+  #[test]
+  fn test_address_integration() {
+    let (_, pants_subprocessdir) = launch_pantsd();
+
+    let pantsd_metadata = pantsd::Metadata::mount(&pants_subprocessdir).unwrap();
+    let port = pantsd_metadata.port().unwrap();
+    assert_connect(port);
+  }
+
+  #[test]
+  fn test_probe() {
+    let (build_root, pants_subprocessdir) = launch_pantsd();
+
+    let port = pantsd::probe(&build_root, pants_subprocessdir.path()).unwrap();
+    assert_connect(port);
+  }
+}

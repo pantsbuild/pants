@@ -30,11 +30,17 @@ esac
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
+readonly NATIVE_CLIENT_PATH="${REPO_ROOT}/.pants"
 
-function _build_native_code() {
+function _build_native_engine() {
   # NB: See Cargo.toml with regard to the `extension-module` feature.
   "${REPO_ROOT}/cargo" build --features=extension-module ${MODE_FLAG} -p engine || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
+}
+
+function _build_native_client() {
+  "${REPO_ROOT}/cargo" build ${MODE_FLAG} -p client || die
+  echo "${NATIVE_ROOT}/target/${MODE}/pants"
 }
 
 function bootstrap_native_code() {
@@ -56,14 +62,23 @@ function bootstrap_native_code() {
   if [[ -f "${NATIVE_ENGINE_RESOURCE_METADATA}" ]]; then
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
   fi
-  if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
-    echo "Building native engine"
-    local -r native_binary="$(_build_native_code)"
+  if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" || ! -f "${NATIVE_CLIENT_PATH}" || \
+    "${engine_version_calculated}" != "${engine_version_in_metadata}" ]]; then
 
-    # If bootstrapping the native engine fails, don't attempt to run pants
-    # afterwards.
-    if [[ ! -f "${native_binary}" ]]; then
+    echo "Building native engine"
+    local -r native_engine="$(_build_native_engine)"
+
+    # If bootstrapping the native engine fails, don't attempt to run pants afterwards.
+    if [[ ! -f "${native_engine}" ]]; then
       die "Failed to build native engine."
+    fi
+
+    echo "Building native client"
+    local -r native_client="$(_build_native_client)"
+
+    # If bootstrapping the native client fails, don't attempt to run pants afterwards.
+    if [[ ! -f "${native_client}" ]]; then
+      die "Failed to build native client."
     fi
 
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
@@ -72,8 +87,9 @@ function bootstrap_native_code() {
     # Create the native engine resource.
     # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
     #  process from being killed when recompiling.
-    rm -f "${NATIVE_ENGINE_RESOURCE}"
-    cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
+    rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_PATH}"
+    cp "${native_engine}" "${NATIVE_ENGINE_RESOURCE}"
+    cp "${native_client}" "${NATIVE_CLIENT_PATH}"
 
     # Create the accompanying metadata file.
     local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
