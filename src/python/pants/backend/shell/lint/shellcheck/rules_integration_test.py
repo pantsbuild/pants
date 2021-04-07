@@ -11,7 +11,7 @@ from pants.backend.shell.lint.shellcheck.rules import ShellcheckFieldSet, Shellc
 from pants.backend.shell.lint.shellcheck.rules import rules as shellcheck_rules
 from pants.backend.shell.target_types import ShellLibrary
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules import external_tool, source_files
+from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -22,6 +22,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *shellcheck_rules(),
+            *config_files.rules(),
             *external_tool.rules(),
             *source_files.rules(),
             QueryRule(LintResults, [ShellcheckRequest]),
@@ -86,6 +87,14 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert result[0].exit_code == 1
     assert "good.sh" not in result[0].stdout
     assert "In bad.sh line 1:" in result[0].stdout
+
+
+def test_respects_config(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {"f.sh": BAD_FILE, "BUILD": "shell_library(name='t')", ".shellcheckrc": "disable=SC2148"}
+    )
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
+    assert_success(rule_runner, tgt, extra_args=["--shellcheck-config=.shellcheckrc"])
 
 
 def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.option.custom_types import file_option, shell_str
@@ -64,5 +65,9 @@ class Shfmt(TemplatedExternalTool):
         return tuple(self.options.args)
 
     @property
-    def config(self) -> str | None:
-        return cast("str | None", self.options.config)
+    def config_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=cast("str | None", self.options.config),
+            check_content={".editorconfig": b"[*.sh]"},
+            option_name=f"[{self.options_scope}].config",
+        )

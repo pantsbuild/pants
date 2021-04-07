@@ -12,7 +12,7 @@ from pants.backend.shell.lint.shfmt.rules import rules as shfmt_rules
 from pants.backend.shell.target_types import ShellLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules import external_tool, source_files
+from pants.core.util_rules import config_files, external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -25,6 +25,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *shfmt_rules(),
+            *config_files.rules(),
             *external_tool.rules(),
             *source_files.rules(),
             QueryRule(LintResults, [ShfmtRequest]),

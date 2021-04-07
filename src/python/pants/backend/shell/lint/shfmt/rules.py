@@ -8,9 +8,10 @@ from pants.backend.shell.lint.shfmt.subsystem import Shfmt
 from pants.backend.shell.target_types import ShellSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, GlobMatchErrorBehavior, MergeDigests, PathGlobs
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -48,21 +49,14 @@ async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
     download_shfmt_get = Get(
         DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(Platform.current)
     )
-    config_digest_get = Get(
-        Digest,
-        PathGlobs(
-            globs=[shfmt.config] if shfmt.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `[shfmt].config`",
-        ),
-    )
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, shfmt.config_request)
     source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
 
-    downloaded_shfmt, config_digest, source_files = await MultiGet(
-        download_shfmt_get, config_digest_get, source_files_get
+    downloaded_shfmt, config_files, source_files = await MultiGet(
+        download_shfmt_get, config_files_get, source_files_get
     )
 
     source_files_snapshot = (
@@ -73,7 +67,9 @@ async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
 
     input_digest = await Get(
         Digest,
-        MergeDigests((source_files_snapshot.digest, downloaded_shfmt.digest, config_digest)),
+        MergeDigests(
+            (source_files_snapshot.digest, downloaded_shfmt.digest, config_files.snapshot.digest)
+        ),
     )
 
     argv = [

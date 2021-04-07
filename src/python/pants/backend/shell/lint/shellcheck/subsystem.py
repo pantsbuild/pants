@@ -5,9 +5,10 @@ from __future__ import annotations
 
 from typing import cast
 
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.custom_types import shell_str
+from pants.option.custom_types import file_option, shell_str
 
 
 class Shellcheck(TemplatedExternalTool):
@@ -43,6 +44,16 @@ class Shellcheck(TemplatedExternalTool):
                 "Arguments to pass directly to Shellcheck, e.g. `--shellcheck-args='-e SC20529'`.'"
             ),
         )
+        register(
+            "--config",
+            type=file_option,
+            advanced=True,
+            help=(
+                "Path to `.shellcheckrc` file.\n\nBecause Shellcheck does not have a config file "
+                "option, you must locate this file somewhere Shellcheck can auto-discover it, "
+                "usually in your build root. See https://www.mankier.com/1/shellcheck#RC_Files."
+            ),
+        )
 
     def generate_exe(self, _: Platform) -> str:
         return f"./shellcheck-{self.version}/shellcheck"
@@ -54,3 +65,11 @@ class Shellcheck(TemplatedExternalTool):
     @property
     def args(self) -> tuple[str, ...]:
         return tuple(self.options.args)
+
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=cast("str | None", self.options.config),
+            check_existence=[".shellcheckrc", "shellcheckrc"],
+            option_name=f"[{self.options_scope}].config",
+        )

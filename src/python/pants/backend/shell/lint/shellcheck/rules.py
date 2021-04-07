@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.backend.shell.target_types import ShellSources
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -57,13 +58,14 @@ async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> 
             enable_codegen=True,
         ),
     )
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, shellcheck.config_request)
 
     download_shellcheck_get = Get(
         DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(Platform.current)
     )
 
-    direct_sources, dependency_sources, downloaded_shellcheck = await MultiGet(
-        direct_sources_get, dependency_sources_get, download_shellcheck_get
+    direct_sources, dependency_sources, downloaded_shellcheck, config_files = await MultiGet(
+        direct_sources_get, dependency_sources_get, download_shellcheck_get, config_files_get
     )
     input_digest = await Get(
         Digest,
@@ -72,6 +74,7 @@ async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> 
                 direct_sources.snapshot.digest,
                 dependency_sources.snapshot.digest,
                 downloaded_shellcheck.digest,
+                config_files.snapshot.digest,
             )
         ),
     )
