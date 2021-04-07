@@ -97,7 +97,7 @@ def setup_toolchain_auth() -> Sequence[Step]:
     return [
         {
             "name": "Setup toolchain auth",
-            "if": "github.event_name == 'push'",
+            "if": "github.event_name != 'pull_request'",
             "run": dedent(
                 """\
                 echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV

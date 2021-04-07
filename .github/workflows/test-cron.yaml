@@ -35,7 +35,7 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push'
+    - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
@@ -259,7 +259,7 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push'
+    - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
@@ -320,7 +320,7 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push'
+    - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
@@ -383,7 +383,7 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - if: github.event_name == 'push'
+    - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
