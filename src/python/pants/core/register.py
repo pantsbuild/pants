@@ -6,6 +6,7 @@
 These are always activated and cannot be disabled.
 """
 
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.core.goals import fmt, lint, package, repl, run, tailor, test, typecheck
 from pants.core.target_types import ArchiveTarget, Files, GenericTarget, RelocatedFiles, Resources
 from pants.core.target_types import rules as target_type_rules
@@ -20,8 +21,26 @@ from pants.core.util_rules import (
     stripped_source_files,
     subprocess_environment,
 )
+from pants.engine.rules import Get, goal_rule
+from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
+from pants.engine.platform import Platform
+
+
+class Debug(GoalSubsystem):
+    name = "debug"
+
+
+class DebugGoal(Goal):
+    subsystem_cls = Debug
+
+
+@goal_rule
+async def debug_goal(shellcheck: Shellcheck) -> DebugGoal:
+    await Get(DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(Platform.current))
+    return DebugGoal(exit_code=0)
 
 
 def rules():

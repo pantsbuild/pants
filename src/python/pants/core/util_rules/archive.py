@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from enum import Enum
@@ -19,6 +20,8 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 # Note that updating this will impact the `archive` target defined in `core/target_types.py`.
@@ -186,8 +189,20 @@ async def maybe_extract_archive(
         env = {}
     elif fp.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")):
         argv = tar_binary.extract_archive_argv(archive_path)
+        input_snapshot = await Get(Snapshot, Digest, input_digest)
+        logger.info(f"input snapshot files: {input_snapshot.files}")
+        logger.info(f"input snapshot dirs: {input_snapshot.dirs}")
+        logger.info(f"argv: {argv}")
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
+
+        tar_version = await Get(
+            ProcessResult,
+            Process(
+                [tar_binary.path, "--version"], description="Version for tar", level=LogLevel.DEBUG
+            ),
+        )
+        logger.info(f"tar version: {tar_version.stdout.decode()}")
     else:
         return ExtractedArchive(digest)
 
@@ -203,6 +218,9 @@ async def maybe_extract_archive(
             working_directory=output_dir,
         ),
     )
+    result_snapshot = await Get(Snapshot, Digest, result.output_digest)
+    logger.info(f"output files: {result_snapshot.files}")
+    logger.info(f"output dirs: {result_snapshot.dirs}")
     strip_output_dir = await Get(Digest, RemovePrefix(result.output_digest, output_dir))
     return ExtractedArchive(strip_output_dir)
 
