@@ -1609,20 +1609,20 @@ class ExplicitlyProvidedDependencies:
         )
 
     @memoized_method
-    def remaining_after_ignores(self, addresses: tuple[Address, ...]) -> set[Address]:
+    def remaining_after_ignores(self, addresses: tuple[Address, ...]) -> frozenset[Address]:
         """All addresses that are not covered by the explicitly provided ignores.
 
         Note that if the input addresses are file addresses, they will still be marked as covered if
         their original BUILD target is in the explicitly provided ignores.
         """
-        return {
+        return frozenset(
             addr
             for addr in addresses
             if (
                 addr not in self.ignores
                 and addr.maybe_convert_to_build_target() not in self.ignores
             )
-        }
+        )
 
     def maybe_warn_of_ambiguous_dependency_inference(
         self,
@@ -1640,12 +1640,12 @@ class ExplicitlyProvidedDependencies:
         if len(remaining_after_ignores) <= 1:
             return
         logger.warning(
-            f"{context}, but Pants cannot safely infer a dependency because >1 target owns "
-            f"this {import_reference}, so it is ambiguous which to use: "
+            f"{context}, but Pants cannot safely infer a dependency because more than one target "
+            f"owns this {import_reference}, so it is ambiguous which to use: "
             f"{sorted(addr.spec for addr in remaining_after_ignores)}."
             f"\n\nPlease explicitly include the dependency you want in the `dependencies` "
             f"field of {original_address}, or ignore the ones you do not want by prefixing "
-            f"with `!` or `!!` so that <=1 targets are left."
+            f"with `!` or `!!` so that one or no targets are left."
             f"\n\nAlternatively, you can remove the ambiguity by deleting/changing some of the "
             f"targets so that only 1 target owns this {import_reference}. Refer to "
             f"{bracketed_docs_url('troubleshooting#import-errors-and-missing-dependencies')}."

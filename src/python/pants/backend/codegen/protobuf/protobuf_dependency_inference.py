@@ -112,7 +112,7 @@ async def infer_protobuf_dependencies(
             ambiguous = protobuf_mapping.ambiguous_modules.get(import_path)
             if unambiguous:
                 result.add(unambiguous)
-            if ambiguous:
+            elif ambiguous:
                 explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                     ambiguous,
                     address,
