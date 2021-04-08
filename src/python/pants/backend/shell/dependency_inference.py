@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -37,6 +38,8 @@ from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -118,14 +121,31 @@ async def parse_shell_imports(
     try:
         output = json.loads(process_result.stdout)
     except json.JSONDecodeError:
+        logger.error(
+            f"Parsing {request.fp} for dependency inference failed because Shellcheck's output "
+            f"could not be loaded as JSON. Please open a GitHub issue at "
+            f"https://github.com/pantsbuild/pants/issues/new with this error message attached.\n\n"
+            f"\nshellcheck version: {shellcheck.version}\n"
+            f"process_result.stdout: {process_result.stdout.decode()}"
+        )
         return ParsedShellImports()
 
     paths = set()
     for error in output:
+        if not error.get("code", "") == 1091:
+            continue
         msg = error.get("message", "")
         matches = PATH_FROM_SHELLCHECK_ERROR.match(msg)
         if matches:
             paths.add(matches.group(1))
+        else:
+            logger.error(
+                f"Parsing {request.fp} for dependency inference failed because Shellcheck's error "
+                f"message was not in the expected format. Please open a GitHub issue at "
+                f"https://github.com/pantsbuild/pants/issues/new with this error message "
+                f"attached.\n\n\nshellcheck version: {shellcheck.version}\n"
+                f"error JSON entry: {error}"
+            )
     return ParsedShellImports(paths)
 
 
