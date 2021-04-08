@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from typing import cast
 
 from pants.engine.environment import Environment
 from pants.option.subsystem import Subsystem
@@ -30,6 +31,15 @@ class ShellSetup(Subsystem):
                 'The special string "<PATH>" will expand to the contents of the PATH env var.'
             ),
         )
+        register(
+            "--dependency-inference",
+            advanced=True,
+            type=bool,
+            default=True,
+            help=(
+                "Infer Shell dependencies on other Shell files by analyzing `source` statements."
+            ),
+        )
 
     @memoized_method
     def executable_search_path(self, env: Environment) -> tuple[str, ...]:
@@ -44,3 +54,7 @@ class ShellSetup(Subsystem):
                     yield entry
 
         return tuple(OrderedSet(iter_path_entries()))
+
+    @property
+    def dependency_inference(self) -> bool:
+        return cast(bool, self.options.dependency_inference)
