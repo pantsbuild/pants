@@ -2096,6 +2096,8 @@ dependencies = [
  "shell-quote",
  "spectral",
  "store",
+ "strum",
+ "strum_macros",
  "task_executor",
  "tempfile",
  "testutil",

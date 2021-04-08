@@ -12,7 +12,7 @@ use bytes::{Bytes, BytesMut};
 use futures::future::TryFutureExt;
 use futures::Future;
 use futures::StreamExt;
-use grpc_util::headers_to_interceptor_fn;
+use grpc_util::{headers_to_interceptor_fn, status_to_str};
 use hashing::Digest;
 use log::Level;
 use remexec::content_addressable_storage_client::ContentAddressableStorageClient;
@@ -135,12 +135,10 @@ impl ByteStore {
     // NOTE: This async closure must be boxed or else it triggers a consistent stack overflow
     // when awaited with the `with_workunit` call below.
     let result_future = Box::pin(async move {
-      let response = client.write(Request::new(stream)).await.map_err(|err| {
-        format!(
-          "Error from server while uploading digest {:?}: {:?}",
-          digest, err
-        )
-      })?;
+      let response = client
+        .write(Request::new(stream))
+        .await
+        .map_err(status_to_str)?;
 
       let response = response.into_inner();
       if response.committed_size == len as i64 {
@@ -209,15 +207,12 @@ impl ByteStore {
 
       let mut stream = match stream_result {
         Ok(response) => response.into_inner(),
-        Err(status) => match status.code() {
-          Code::NotFound => return Ok(None),
-          _ => {
-            return Err(format!(
-              "Error making CAS read request for {:?}: {:?}",
-              digest, status
-            ))
+        Err(status) => {
+          return match status.code() {
+            Code::NotFound => Ok(None),
+            _ => Err(status_to_str(status)),
           }
-        },
+        }
       };
 
       let read_result_closure = async {
@@ -254,10 +249,7 @@ impl ByteStore {
           if status.code() == tonic::Code::NotFound {
             None
           } else {
-            return Err(format!(
-              "Error from server in response to CAS read request: {:?}",
-              status
-            ));
+            return Err(status_to_str(status));
           }
         }
       };
@@ -305,12 +297,7 @@ impl ByteStore {
       let request = request.clone();
       let response = client
         .find_missing_blobs(request)
-        .map_err(|err| {
-          format!(
-            "Error from server in response to find_missing_blobs_request: {:?}",
-            err
-          )
-        })
+        .map_err(status_to_str)
         .await?;
 
       response

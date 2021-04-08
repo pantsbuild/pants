@@ -49,6 +49,7 @@ use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -65,6 +66,7 @@ use hashing::Digest;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
+use process_execution::RemoteCacheWarningsBehavior;
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
@@ -560,6 +562,7 @@ py_class!(class PyRemotingOptions |py| {
     store_chunk_bytes: u64,
     store_chunk_upload_timeout: u64,
     store_rpc_retries: u64,
+    cache_warnings_behavior: String,
     cache_eager_fetch: bool,
     execution_extra_platform_properties: Vec<(String, String)>,
     execution_headers: Vec<(String, String)>,
@@ -577,6 +580,7 @@ py_class!(class PyRemotingOptions |py| {
         store_chunk_bytes: store_chunk_bytes as usize,
         store_chunk_upload_timeout: Duration::from_secs(store_chunk_upload_timeout),
         store_rpc_retries: store_rpc_retries as usize,
+        cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(&cache_warnings_behavior).unwrap(),
         cache_eager_fetch,
         execution_extra_platform_properties,
         execution_headers: execution_headers.into_iter().collect(),
