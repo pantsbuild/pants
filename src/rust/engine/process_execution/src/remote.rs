@@ -20,6 +20,7 @@ use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use futures::{Stream, StreamExt};
 use grpc_util::prost::MessageExt;
+use grpc_util::{headers_to_interceptor_fn, status_to_str};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use prost::Message;
@@ -43,7 +44,6 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessCacheScope, ProcessMetadata, ProcessResultMetadata,
 };
-use grpc_util::headers_to_interceptor_fn;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -207,7 +207,7 @@ impl CommandRunner {
         .get_capabilities(request)
         .await
         .map(|r| r.into_inner())
-        .map_err(rpcerror_to_string)
+        .map_err(status_to_str)
     };
 
     self
@@ -1425,7 +1425,7 @@ pub async fn check_action_cache(
         context
           .workunit_store
           .increment_counter(Metric::RemoteCacheReadErrors, 1);
-        Err(rpcerror_to_string(status))
+        Err(status_to_str(status))
       }
     },
   }
@@ -1474,10 +1474,6 @@ pub fn format_error(error: &StatusProto) -> String {
     x => format!("{:?}", x),
   };
   format!("{}: {}", error_code, error.message)
-}
-
-pub(crate) fn rpcerror_to_string(status: Status) -> String {
-  format!("{:?}: {:?}", status.code(), status.message(),)
 }
 
 pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {

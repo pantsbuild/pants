@@ -616,5 +616,13 @@ impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
   }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
+#[strum(serialize_all = "snake_case")]
+pub enum RemoteCacheWarningsBehavior {
+  Ignore,
+  FirstOnly,
+  Backoff,
+}
+
 #[cfg(test)]
 mod tests;

@@ -86,6 +86,13 @@ class OwnersNotFoundBehavior(Enum):
 
 
 @enum.unique
+class RemoteCacheWarningsBehavior(Enum):
+    ignore = "ignore"
+    first_only = "first_only"
+    backoff = "backoff"
+
+
+@enum.unique
 class AuthPluginState(Enum):
     OK = "ok"
     UNAVAILABLE = "unavailable"
@@ -141,6 +148,7 @@ class ExecutionOptions:
     remote_store_rpc_retries: int
 
     remote_cache_eager_fetch: bool
+    remote_cache_warnings: RemoteCacheWarningsBehavior
 
     remote_execution_address: str | None
     remote_execution_extra_platform_properties: List[str]
@@ -273,6 +281,7 @@ class ExecutionOptions:
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             # Remote cache setup.
             remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
+            remote_cache_warnings=bootstrap_options.remote_cache_warnings,
             # Remote execution setup.
             remote_execution_address=remote_execution_address,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
@@ -344,6 +353,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_rpc_retries=2,
     # Remote cache setup.
     remote_cache_eager_fetch=True,
+    remote_cache_warnings=RemoteCacheWarningsBehavior.first_only,
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_extra_platform_properties=[],
@@ -1084,6 +1094,17 @@ class GlobalOptions(Subsystem):
             help="Number of times to retry any RPC to the remote store before giving up.",
         )
 
+        register(
+            "--remote-cache-warnings",
+            type=RemoteCacheWarningsBehavior,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_warnings,
+            advanced=True,
+            help=(
+                "Whether to log remote cache failures at the `warn` log level.\n\n"
+                "All errors not logged at the `warn` level will instead be logged at the "
+                "`debug` level."
+            ),
+        )
         register(
             "--remote-cache-eager-fetch",
             type=bool,
