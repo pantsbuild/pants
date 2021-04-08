@@ -136,3 +136,7 @@ pub fn headers_to_interceptor_fn(
     Ok(req)
   })
 }
+
+pub fn status_to_str(status: tonic::Status) -> String {
+  format!("{:?}: {:?}", status.code(), status.message(),)
+}

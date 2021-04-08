@@ -10,6 +10,7 @@ use bazel_protos::require_digest;
 use fs::RelativePath;
 use futures::FutureExt;
 use grpc_util::headers_to_interceptor_fn;
+use grpc_util::status_to_str;
 use hashing::Digest;
 use parking_lot::Mutex;
 use remexec::action_cache_client::ActionCacheClient;
@@ -27,10 +28,11 @@ use crate::{
 /// Every n times, log a particular remote cache error at warning level instead of debug level. We
 /// don't log at warn level every time to avoid flooding the console.
 ///
-/// Every 5 times is arbitrary and can be changed. It's based on running the `lint` goal with a
-/// fake store address resulting in 5 read errors and 18 write errors; 5 seems like a
+/// Every 15 times is arbitrary and can be changed. It's based on running `./pants dependencies ::`
+/// with no local caching against pantsbuild/pants with a fake store address, which results in
+/// ~150 read errors and ~150 write errors, mostly from trying to parse files; 15 seems like a
 /// reasonable increment.
-const LOG_ERRORS_INCREMENT: usize = 5;
+const LOG_ERRORS_INCREMENT: usize = 15;
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.
@@ -388,7 +390,7 @@ impl CommandRunner {
     client
       .update_action_result(update_action_cache_request)
       .await
-      .map_err(crate::remote::rpcerror_to_string)?;
+      .map_err(status_to_str)?;
 
     Ok(())
   }
