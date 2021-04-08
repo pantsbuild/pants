@@ -139,19 +139,7 @@ REQUIREMENTS_3RDPARTY_FILES=(
 # either pexes or venvs (as created by the `pants` script that we distribute) are
 # created outside of the buildroot.
 function execute_packaged_pants_with_internal_backends() {
-  pants \
-    --no-verify-config \
-    --no-remote-cache-read \
-    --no-remote-cache-write \
-    --no-pantsd \
-    --pythonpath="['pants-plugins']" \
-    --backend-packages="[\
-        'pants.backend.awslambda.python',\
-        'pants.backend.python',\
-        'pants.backend.shell',\
-        'internal_plugins.releases',\
-      ]" \
-    "$@"
+  pants --pants-config-files="+['pants.release.toml']" "$@"
 }
 
 function build_3rdparty_packages() {

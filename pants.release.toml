@@ -1,0 +1,14 @@
+[GLOBAL]
+verify_config=false
+remote_cache_read=false
+remote_cache_write=false
+pantsd=false
+
+pythonpath=["pants-plugins"]
+
+backend_packages=[
+  "pants.backend.awslambda.python",
+  "pants.backend.python",
+  "pants.backend.shell",
+  "internal_plugins.releases",
+]
