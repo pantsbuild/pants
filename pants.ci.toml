@@ -4,6 +4,9 @@ colors = true
 # TODO: See #9924.
 dynamic_ui = false
 
+# We want to continue to get logs when remote caching errors.
+remote_cache_warnings = "backoff"
+
 [stats]
 log = true
 
