@@ -253,7 +253,7 @@ def get_build_wheels_step(is_macos: bool) -> Step:
     if is_macos:
         # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
         # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
-        step["env"] = {"ARCHFLAGS": "-arch x86_64"}
+        step["env"] = {"ARCHFLAGS": "-arch x86_64"}  # type: ignore[assignment]
     return step
 
 
