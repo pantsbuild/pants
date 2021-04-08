@@ -410,7 +410,7 @@ impl CommandRunner {
     let log_at_warn = match self.warnings_behavior {
       RemoteCacheWarningsBehavior::Ignore => false,
       RemoteCacheWarningsBehavior::FirstOnly => err_count == 1,
-      RemoteCacheWarningsBehavior::Backoff => (err_count as f64).log2().fract() == 0.0,
+      RemoteCacheWarningsBehavior::Backoff => err_count.is_power_of_two(),
     };
     if log_at_warn {
       log::warn!("{}", log_msg);
