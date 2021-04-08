@@ -173,6 +173,7 @@ class Scheduler:
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,
+            cache_warnings_behavior=execution_options.remote_cache_warnings.value,
             cache_eager_fetch=execution_options.remote_cache_eager_fetch,
             execution_extra_platform_properties=tuple(
                 tuple(pair.split("=", 1))

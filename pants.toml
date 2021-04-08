@@ -56,7 +56,7 @@ pants_ignore.add = [
 # NB: Users must still set `--remote-cache-read --remote-cache-write` to enable this all.
 remote_store_address = "grpcs://build.toolchain.com:443"
 remote_instance_name = "main"
-remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
+#remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 
 [anonymous-telemetry]
 enabled = true

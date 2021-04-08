@@ -23,6 +23,7 @@ use log::info;
 use parking_lot::Mutex;
 use process_execution::{
   self, BoundedCommandRunner, CommandRunner, NamedCaches, Platform, ProcessMetadata,
+  RemoteCacheWarningsBehavior,
 };
 use regex::Regex;
 use rule_graph::RuleGraph;
@@ -77,6 +78,7 @@ pub struct RemotingOptions {
   pub store_chunk_bytes: usize,
   pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
+  pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_eager_fetch: bool,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
@@ -213,6 +215,7 @@ impl Core {
           Platform::current()?,
           exec_strategy_opts.remote_cache_read,
           exec_strategy_opts.remote_cache_write,
+          remoting_opts.cache_warnings_behavior,
           remoting_opts.cache_eager_fetch,
         )?)
       } else {

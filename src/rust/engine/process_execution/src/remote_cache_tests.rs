@@ -22,6 +22,7 @@ use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, Platform, Process, ProcessMetadata, ProcessResultMetadata,
+  RemoteCacheWarningsBehavior,
 };
 
 /// A mock of the local runner used for better hermeticity of the tests.
@@ -137,6 +138,7 @@ fn create_cached_runner(
       Platform::current().unwrap(),
       true,
       true,
+      RemoteCacheWarningsBehavior::FirstOnly,
       eager_fetch,
     )
     .expect("caching command runner"),
