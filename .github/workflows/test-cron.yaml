@@ -289,6 +289,11 @@ jobs:
         ./pants lint typecheck ::
 
         '
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-python-lint
+        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
@@ -350,6 +355,11 @@ jobs:
       run: './pants test ::
 
         '
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-python-test-linux
+        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
@@ -413,6 +423,11 @@ jobs:
       run: './pants --tag=+platform_specific_behavior test ::
 
         '
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-python-test-macos
+        path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
