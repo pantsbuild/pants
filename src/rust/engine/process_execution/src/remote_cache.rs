@@ -10,6 +10,7 @@ use bazel_protos::require_digest;
 use fs::RelativePath;
 use futures::FutureExt;
 use grpc_util::headers_to_interceptor_fn;
+use grpc_util::status_to_str;
 use hashing::Digest;
 use parking_lot::Mutex;
 use remexec::action_cache_client::ActionCacheClient;
@@ -21,16 +22,8 @@ use workunit_store::{with_workunit, Level, Metric, ObservationMetric, WorkunitMe
 use crate::remote::make_execute_request;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessMetadata,
+  ProcessMetadata, RemoteCacheWarningsBehavior,
 };
-
-/// Every n times, log a particular remote cache error at warning level instead of debug level. We
-/// don't log at warn level every time to avoid flooding the console.
-///
-/// Every 5 times is arbitrary and can be changed. It's based on running the `lint` goal with a
-/// fake store address resulting in 5 read errors and 18 write errors; 5 seems like a
-/// reasonable increment.
-const LOG_ERRORS_INCREMENT: usize = 5;
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.
@@ -52,6 +45,7 @@ pub struct CommandRunner {
   cache_read: bool,
   cache_write: bool,
   eager_fetch: bool,
+  warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
 }
@@ -68,6 +62,7 @@ impl CommandRunner {
     platform: Platform,
     cache_read: bool,
     cache_write: bool,
+    warnings_behavior: RemoteCacheWarningsBehavior,
     eager_fetch: bool,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
@@ -95,6 +90,7 @@ impl CommandRunner {
       cache_read,
       cache_write,
       eager_fetch,
+      warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
     })
@@ -388,10 +384,45 @@ impl CommandRunner {
     client
       .update_action_result(update_action_cache_request)
       .await
-      .map_err(crate::remote::rpcerror_to_string)?;
+      .map_err(status_to_str)?;
 
     Ok(())
   }
+
+  fn log_cache_error(&self, err: String, err_type: CacheErrorType) {
+    let err_count = {
+      let mut errors_counter = match err_type {
+        CacheErrorType::ReadError => self.read_errors_counter.lock(),
+        CacheErrorType::WriteError => self.write_errors_counter.lock(),
+      };
+      let count = errors_counter.entry(err.clone()).or_insert(0);
+      *count += 1;
+      *count
+    };
+    let failure_desc = match err_type {
+      CacheErrorType::ReadError => "read from",
+      CacheErrorType::WriteError => "write to",
+    };
+    let log_msg = format!(
+      "Failed to {} remote cache ({} occurrences so far): {}",
+      failure_desc, err_count, err
+    );
+    let log_at_warn = match self.warnings_behavior {
+      RemoteCacheWarningsBehavior::Ignore => false,
+      RemoteCacheWarningsBehavior::FirstOnly => err_count == 1,
+      RemoteCacheWarningsBehavior::Backoff => err_count.is_power_of_two(),
+    };
+    if log_at_warn {
+      log::warn!("{}", log_msg);
+    } else {
+      log::debug!("{}", log_msg);
+    }
+  }
+}
+
+enum CacheErrorType {
+  ReadError,
+  WriteError,
 }
 
 #[async_trait]
@@ -458,21 +489,7 @@ impl crate::CommandRunner for CommandRunner {
             cached_response_opt
           }
           Err(err) => {
-            let err_count = {
-              let mut errors_counter = self.read_errors_counter.lock();
-              let count = errors_counter.entry(err.clone()).or_insert(0);
-              *count += 1;
-              *count
-            };
-            let log_msg = format!(
-              "Failed to read from remote cache ({} occurrences so far): {}",
-              err_count, err
-            );
-            if err_count == 1 || err_count % LOG_ERRORS_INCREMENT == 0 {
-              log::warn!("{}", log_msg);
-            } else {
-              log::debug!("{}", log_msg);
-            }
+            self.log_cache_error(err, CacheErrorType::ReadError);
             None
           }
         }
@@ -537,21 +554,7 @@ impl crate::CommandRunner for CommandRunner {
           .workunit_store
           .increment_counter(Metric::RemoteCacheWriteFinished, 1);
         if let Err(err) = write_result {
-          let err_count = {
-            let mut errors_counter = command_runner.write_errors_counter.lock();
-            let count = errors_counter.entry(err.clone()).or_insert(0);
-            *count += 1;
-            *count
-          };
-          let log_msg = format!(
-            "Failed to write to remote cache ({} occurrences so far): {}",
-            err_count, err
-          );
-          if err_count == 1 || err_count % LOG_ERRORS_INCREMENT == 0 {
-            log::warn!("{}", log_msg);
-          } else {
-            log::debug!("{}", log_msg);
-          }
+          command_runner.log_cache_error(err, CacheErrorType::WriteError);
           context2
             .workunit_store
             .increment_counter(Metric::RemoteCacheWriteErrors, 1);
