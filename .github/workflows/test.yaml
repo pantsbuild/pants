@@ -340,7 +340,9 @@ jobs:
         restore-keys: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
-    - if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
+    - env:
+        ARCHFLAGS: -arch x86_64
+      if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels and fs_util
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 

@@ -235,6 +235,28 @@ def expose_all_pythons() -> Sequence[Step]:
     ]
 
 
+def get_build_wheels_step(is_macos: bool) -> Step:
+    step = {
+        "name": "Build wheels and fs_util",
+        "run": dedent(
+            # We use MODE=debug on PR builds to speed things up, given that those are only
+            # smoke tests of our release process.
+            """\
+                [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+                ./build-support/bin/release.sh -n
+                USE_PY38=true ./build-support/bin/release.sh -n
+                ./build-support/bin/release.sh -f
+                """
+        ),
+        "if": DONT_SKIP_WHEELS,
+    }
+    if is_macos:
+        # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
+        # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
+        step["env"] = {"ARCHFLAGS": "-arch x86_64"}
+    return step
+
+
 def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
     jobs = {
         "bootstrap_pants_linux": {
@@ -354,20 +376,6 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
         },
     }
     if not cron:
-        build_wheels_step = {
-            "name": "Build wheels and fs_util",
-            "run": dedent(
-                # We use MODE=debug on PR builds to speed things up, given that those are only
-                # smoke tests of our release process.
-                """\
-                [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-                ./build-support/bin/release.sh -n
-                USE_PY38=true ./build-support/bin/release.sh -n
-                ./build-support/bin/release.sh -f
-                """
-            ),
-            "if": DONT_SKIP_WHEELS,
-        }
         deploy_to_s3_step = {
             "name": "Deploy to S3",
             "run": "./build-support/bin/deploy_to_s3.py",
@@ -393,7 +401,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                                 '/opt/python/cp38-cp38/bin" >> $GITHUB_ENV'
                             ),
                         },
-                        build_wheels_step,
+                        get_build_wheels_step(is_macos=False),
                         deploy_to_s3_step,
                     ],
                 },
@@ -408,7 +416,7 @@ def test_workflow_jobs(primary_python_version: str, *, cron: bool) -> Jobs:
                         # multiple Python versions, whereas that caching assumes only one primary
                         # Python version (marked via matrix.strategy).
                         *rust_caches(),
-                        build_wheels_step,
+                        get_build_wheels_step(is_macos=True),
                         deploy_to_s3_step,
                     ],
                 },
