@@ -586,6 +586,7 @@ async fn make_action_result_basic() {
     Platform::current().unwrap(),
     true,
     true,
+    RemoteCacheWarningsBehavior::FirstOnly,
     false,
   )
   .expect("caching command runner");
