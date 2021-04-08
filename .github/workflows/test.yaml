@@ -417,7 +417,7 @@ jobs:
     - name: Upload pants log
       uses: actions/upload-artifact@v2
       with:
-        name: pants-log-python-lint
+        name: pants-log-lint
         path: .pants.d/pants.log
     strategy:
       matrix:
