@@ -179,8 +179,9 @@ function activate_tmp_venv() {
   # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
   VENV_DIR=$(mktemp -d -t pants.XXXXX) &&
-    "${ROOT}/build-support/virtualenv" "$VENV_DIR" &&
-    source "$VENV_DIR/bin/activate"
+    "${PY}" -m venv "${VENV_DIR}" &&
+    "${VENV_DIR}/bin/pip" install wheel &&
+    source "${VENV_DIR}/bin/activate"
 }
 
 function pre_install() {
@@ -270,9 +271,9 @@ function activate_twine() {
   local -r venv_dir="${ROOT}/build-support/twine-deps.venv"
 
   rm -rf "${venv_dir}"
-  "${ROOT}/build-support/virtualenv" "${venv_dir}"
-  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
-  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
+  "${PY}" -m venv "${venv_dir}"
+  # While the `activate` script is in a fixed location, it might not exist on the user's machine as
+  # we gitignore the venv. So, we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
   source "${venv_dir}/bin/activate"
   pip install twine
