@@ -108,6 +108,7 @@ def setup_toolchain_auth() -> Step:
         "run": dedent(
             """\
             echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+            [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && echo PANTS_REMOTE_CACHE_WRITE=false >> $GITHUB_ENV
             """
         ),
     }
