@@ -131,6 +131,107 @@ jobs:
       matrix:
         python-version:
         - 3.8.3
+  bootstrap_pants_macos:
+    name: Bootstrap Pants, test Rust (macOS)
+    runs-on: macos-10.15
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 10
+    - if: github.event_name == 'push'
+      name: Get commit message for branch builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'pull_request'
+      name: Get commit message for PR builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Cache Rust toolchain
+      uses: actions/cache@v2
+      with:
+        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
+        path: '~/.rustup/toolchains/1.49.0-*
+
+          ~/.rustup/update-hashes
+
+          ~/.rustup/settings.toml
+
+          '
+    - name: Cache Cargo
+      uses: actions/cache@v2
+      with:
+        key: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
+          }}
+
+          '
+        path: '~/.cargo/registry
+
+          ~/.cargo/git
+
+          '
+        restore-keys: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-
+
+          '
+    - name: Cache Pants Virtualenv
+      uses: actions/cache@v2
+      with:
+        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''pants/3rdparty/python/**'',
+          ''pants.toml'') }}
+
+          '
+        path: '~/.cache/pants/pants_dev_deps
+
+          '
+    - id: get-engine-hash
+      name: Get Engine Hash
+      run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
+
+        '
+      shell: bash
+    - name: Cache Native Engine
+      uses: actions/cache@v2
+      with:
+        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
+
+          '
+        path: 'src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - name: Bootstrap Pants
+      run: './pants --version
+
+        '
+    - name: Upload native_engine.so
+      uses: actions/upload-artifact@v2
+      with:
+        name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
+        path: 'src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - env:
+        TMPDIR: ${{ runner.temp }}
+      if: '!contains(env.COMMIT_MESSAGE, ''[ci skip-rust]'')'
+      name: Test Rust
+      run: ./cargo test --tests -- --nocapture
+    strategy:
+      matrix:
+        python-version:
+        - 3.8.3
   lint_python:
     name: Lint Python and Shell
     needs: bootstrap_pants_linux
@@ -192,6 +293,140 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: pants-log-lint
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - 3.8.3
+  test_python_linux:
+    name: Test Python (Linux)
+    needs: bootstrap_pants_linux
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 10
+    - if: github.event_name == 'push'
+      name: Get commit message for branch builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'pull_request'
+      name: Get commit message for PR builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Cache Pants Virtualenv
+      uses: actions/cache@v2
+      with:
+        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''pants/3rdparty/python/**'',
+          ''pants.toml'') }}
+
+          '
+        path: '~/.cache/pants/pants_dev_deps
+
+          '
+    - name: Download native_engine.so
+      uses: actions/download-artifact@v2
+      with:
+        name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
+        path: src/python/pants/engine/internals/
+    - name: Run Python tests
+      run: './pants test ::
+
+        '
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-python-test-linux
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - 3.8.3
+  test_python_macos:
+    env:
+      ARCHFLAGS: -arch x86_64
+    name: Test Python (macOS)
+    needs: bootstrap_pants_macos
+    runs-on: macos-10.15
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 10
+    - if: github.event_name == 'push'
+      name: Get commit message for branch builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'pull_request'
+      name: Get commit message for PR builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Cache Pants Virtualenv
+      uses: actions/cache@v2
+      with:
+        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''pants/3rdparty/python/**'',
+          ''pants.toml'') }}
+
+          '
+        path: '~/.cache/pants/pants_dev_deps
+
+          '
+    - name: Download native_engine.so
+      uses: actions/download-artifact@v2
+      with:
+        name: native_engine.so.${{ matrix.python-version }}.${{ runner.os }}
+        path: src/python/pants/engine/internals/
+    - name: Run Python tests
+      run: './pants --tag=+platform_specific_behavior test ::
+
+        '
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log-python-test-macos
         path: .pants.d/pants.log
     strategy:
       matrix:
