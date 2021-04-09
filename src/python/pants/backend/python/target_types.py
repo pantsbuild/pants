@@ -326,6 +326,7 @@ class PexExecutionModeField(StringField):
     alias = "execution_mode"
     valid_choices = PexExecutionMode
     expected_type = str
+    default = PexExecutionMode.ZIPAPP.value
     help = (
         "The mode the generated PEX file will run in.\n\nThe traditional PEX file runs in "
         f"{PexExecutionMode.ZIPAPP.value!r} mode (See: https://www.python.org/dev/peps/pep-0441/). "
@@ -337,21 +338,6 @@ class PexExecutionModeField(StringField):
         "native virtual environment start times. This mode also benefits from a traditional "
         "virtual environment `sys.path`, giving maximum compatibility with stdlib and third party "
         "APIs."
-    )
-
-
-class PexUnzipField(BoolField):
-    alias = "unzip"
-    default = False
-    value: bool
-    deprecated_removal_version = "2.5.0.dev1"
-    deprecated_removal_hint = (
-        f"Use {PexExecutionModeField.alias}={PexExecutionMode.UNZIP.value!r} to enable "
-        f"{PexExecutionMode.UNZIP.value!r} mode instead."
-    )
-    help = (
-        "Whether to have the PEX unzip itself into the PEX_ROOT before running.\n\nEnabling unzip "
-        "mode can provide lower startup latencies for most PEX files; even on first run."
     )
 
 
@@ -380,7 +366,6 @@ class PexBinary(Target):
         PexIgnoreErrorsField,
         PexShebangField,
         PexEmitWarningsField,
-        PexUnzipField,
         PexExecutionModeField,
         PexIncludeToolsField,
     )
