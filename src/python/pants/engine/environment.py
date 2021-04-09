@@ -4,9 +4,8 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, Optional, Sequence, cast
+from typing import Dict, Optional, Sequence
 
-from pants.core.util_rules.pants_environment import PantsEnvironment
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
@@ -87,12 +86,6 @@ class EnvironmentRequest:
 
 class Environment(FrozenDict[str, str]):
     """A subset of the variables set in the environment."""
-
-
-@rule
-def pants_environment(session_values: SessionValues) -> PantsEnvironment:
-    # TODO: The @deprecated decorator seems to obscure type information.
-    return cast(PantsEnvironment, PantsEnvironment(session_values[CompleteEnvironment]))
 
 
 @rule

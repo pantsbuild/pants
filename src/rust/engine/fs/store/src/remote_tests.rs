@@ -215,10 +215,6 @@ async fn write_file_errors() {
     .await
     .expect_err("Want error");
   assert!(
-    error.contains("Error from server"),
-    format!("Bad error message, got: {}", error)
-  );
-  assert!(
     error.contains("StubCAS is configured to always fail"),
     format!("Bad error message, got: {}", error)
   );

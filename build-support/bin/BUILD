@@ -1,10 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-shell_library(
-    name="sh_scripts",
-    dependencies=["build-support/common.sh", "build-support/pants_venv", "build-support/bin/rust/bootstrap_code.sh"],
-)
+shell_library(name="sh_scripts")
 
 python_library(name="py_scripts")
 python_tests(name="py_tests", timeout=90)  # reversion_test.py times out occasionally.
