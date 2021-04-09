@@ -467,4 +467,5 @@ jobs:
         - '3.8'
 name: Daily Extended Python Testing
 'on':
-- pull_request
+  schedule:
+  - cron: 45 8 * * *

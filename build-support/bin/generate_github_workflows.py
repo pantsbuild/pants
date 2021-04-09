@@ -474,8 +474,7 @@ def generate() -> dict[Path, str]:
         {
             "name": "Daily Extended Python Testing",
             # 08:45 UTC / 12:45AM PST, 1:45AM PDT: arbitrary time after hours.
-            # "on": {"schedule": [{"cron": "45 8 * * *"}]},
-            "on": ["pull_request"],
+            "on": {"schedule": [{"cron": "45 8 * * *"}]},
             "jobs": test_workflow_jobs(PYTHON38_VERSION, cron=True),
             "env": global_env(),
         },
