@@ -239,7 +239,7 @@ class AllOwnedSources(DeduplicatedCollection[str]):
     """All files in the project already owned by targets."""
 
 
-@rule(level=LogLevel.DEBUG, desc="Determine all files already owned by targets")
+@rule(desc="Determine all files already owned by targets", level=LogLevel.DEBUG)
 async def determine_all_owned_sources() -> AllOwnedSources:
     all_tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
     all_sources_paths = await MultiGet(
@@ -343,7 +343,7 @@ def make_content_str(
     return "\n\n".join(new_content) + "\n"
 
 
-@rule(desc="Edit BUILD files with new targets")
+@rule(desc="Edit BUILD files with new targets", level=LogLevel.DEBUG)
 async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
     ptgts_by_build_file = group_by_build_file(req.putative_targets)
     # There may be an existing *directory* whose name collides with that of a BUILD file

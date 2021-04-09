@@ -468,7 +468,7 @@ impl HeavyHittersData {
   }
 
   fn is_visible(workunit: &Workunit) -> bool {
-    workunit.metadata.level <= Level::Info && workunit.metadata.desc.is_some()
+    workunit.metadata.level <= Level::Debug && workunit.metadata.desc.is_some()
   }
 
   fn duration_for(now: SystemTime, workunit: &Workunit) -> Option<Duration> {
